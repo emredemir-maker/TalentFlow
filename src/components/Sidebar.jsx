@@ -18,6 +18,7 @@ const NAV_ITEMS = [
     { id: 'ai-match', label: 'AI Match', icon: Sparkles },
     { id: 'messages', label: 'Messages', icon: MessageSquare },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+    { id: 'candidate-process', label: 'Aday Görünümü', icon: Globe },
 ];
 
 const BOTTOM_ITEMS = [

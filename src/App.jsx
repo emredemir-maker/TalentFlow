@@ -14,6 +14,7 @@ import MessagesPage from './pages/MessagesPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import ScraperPage from './pages/ScraperPage';
 import AIMatchPage from './pages/AIMatchPage';
+import CandidateProcessPage from './pages/CandidateProcessPage';
 import PlaceholderPage from './pages/PlaceholderPage';
 
 function AppContent() {
@@ -64,6 +65,8 @@ function AppContent() {
         return <ScraperPage />;
       case 'ai-match':
         return <AIMatchPage />;
+      case 'candidate-process':
+        return <CandidateProcessPage />;
       default:
         return <Dashboard />;
     }
