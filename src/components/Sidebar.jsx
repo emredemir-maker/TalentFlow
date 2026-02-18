@@ -10,11 +10,13 @@ import {
     Settings,
     ChevronLeft,
     Zap,
+    Briefcase
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const NAV_ITEMS = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'positions', label: 'Pozisyonlar', icon: Briefcase },
     { id: 'ai-match', label: 'AI Match', icon: Sparkles },
     { id: 'messages', label: 'Messages', icon: MessageSquare },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },

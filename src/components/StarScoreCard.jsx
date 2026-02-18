@@ -3,6 +3,7 @@
 // S: Situation, T: Task, A: Action, R: Result
 
 import { CheckCircle, Circle, Zap, Target } from 'lucide-react';
+import InterviewGenerator from './InterviewGenerator';
 
 const STAR_CRITERIA = {
     Situation: { label: 'Durum (Context Clarity)', color: 'text-violet-400', bg: 'bg-violet-500/10', ring: 'ring-violet-500/20' },
@@ -82,6 +83,8 @@ export default function StarScoreCard({ analysis }) {
                     </div>
                 </div>
             </div>
+            {/* Interview Generator */}
+            <InterviewGenerator candidateName="Aday" starAnalysis={scores} />
         </div>
     );
 }

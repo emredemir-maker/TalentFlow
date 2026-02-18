@@ -8,6 +8,7 @@ import StatCard from '../components/StatCard';
 import CandidateCard from '../components/CandidateCard';
 import CandidateDrawer from '../components/CandidateDrawer';
 import AddCandidateModal from '../components/AddCandidateModal';
+import OpportunityHub from '../components/OpportunityHub';
 import {
     Users,
     UserPlus,
@@ -123,6 +124,11 @@ export default function Dashboard() {
                 searchQuery={searchQuery}
                 onSearchChange={setSearchQuery}
             />
+
+            {/* ===== OPPORTUNITY HUB (Smart Match Notifications) ===== */}
+            <div className="px-6 lg:px-8 pt-6 pb-2">
+                <OpportunityHub />
+            </div>
 
             {/* ===== STATS ===== */}
             <div className="px-6 lg:px-8 py-6">

@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { useAuth } from './context/AuthContext';
 import { CandidatesProvider } from './context/CandidatesContext';
+import { PositionsProvider } from './context/PositionsContext';
 import { UserSettingsProvider } from './context/UserSettingsContext';
 import { MessageQueueProvider } from './context/MessageQueueContext';
 import Sidebar from './components/Sidebar';
@@ -14,6 +15,7 @@ import MessagesPage from './pages/MessagesPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import ScraperPage from './pages/ScraperPage';
 import AIMatchPage from './pages/AIMatchPage';
+import PositionsPage from './pages/PositionsPage';
 import CandidateProcessPage from './pages/CandidateProcessPage';
 import PlaceholderPage from './pages/PlaceholderPage';
 
@@ -67,32 +69,36 @@ function AppContent() {
         return <AIMatchPage />;
       case 'candidate-process':
         return <CandidateProcessPage />;
+      case 'positions':
+        return <PositionsPage />;
       default:
         return <Dashboard />;
     }
   };
 
   return (
-    <CandidatesProvider>
-      <UserSettingsProvider>
-        <MessageQueueProvider>
-          <div className="flex min-h-screen">
-            <Sidebar
-              activeView={activeView}
-              onNavigate={setActiveView}
-              collapsed={sidebarCollapsed}
-              onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-            />
-            <main
-              className={`flex-1 min-h-screen transition-all duration-300 pb-16 md:pb-0
-                ${sidebarCollapsed ? 'md:ml-[72px]' : 'md:ml-[220px]'}`}
-            >
-              {renderPage()}
-            </main>
-          </div>
-        </MessageQueueProvider>
-      </UserSettingsProvider>
-    </CandidatesProvider>
+    <PositionsProvider>
+      <CandidatesProvider>
+        <UserSettingsProvider>
+          <MessageQueueProvider>
+            <div className="flex min-h-screen">
+              <Sidebar
+                activeView={activeView}
+                onNavigate={setActiveView}
+                collapsed={sidebarCollapsed}
+                onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+              />
+              <main
+                className={`flex-1 min-h-screen transition-all duration-300 pb-16 md:pb-0
+                  ${sidebarCollapsed ? 'md:ml-[72px]' : 'md:ml-[220px]'}`}
+              >
+                {renderPage()}
+              </main>
+            </div>
+          </MessageQueueProvider>
+        </UserSettingsProvider>
+      </CandidatesProvider>
+    </PositionsProvider>
   );
 }
 

@@ -2,7 +2,7 @@
 // Premium candidate card with match score ring
 
 import MatchScoreRing from './MatchScoreRing';
-import { MapPin, Briefcase, Clock, ArrowUpRight } from 'lucide-react';
+import { MapPin, Briefcase, Clock, ArrowUpRight, ShieldAlert } from 'lucide-react';
 
 const STATUS_CONFIG = {
     new: { label: 'Yeni', classes: 'bg-violet-500/10 text-violet-400 ring-violet-500/20' },
@@ -53,8 +53,8 @@ export default function CandidateCard({ candidate, index = 0, onClick, isSelecte
                         onSelect?.();
                     }}
                     className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${isSelected
-                            ? 'bg-electric border-electric text-white'
-                            : 'bg-white/10 border-white/20 hover:border-electric/50'
+                        ? 'bg-electric border-electric text-white'
+                        : 'bg-white/10 border-white/20 hover:border-electric/50'
                         }`}
                 >
                     {isSelected && <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>}
@@ -86,6 +86,14 @@ export default function CandidateCard({ candidate, index = 0, onClick, isSelecte
 
             {/* Meta */}
             <div className="space-y-1.5 mb-4">
+                {/* Human-in-the-Loop Warning */}
+                {candidate.matchScore > 0 && candidate.matchScore < 75 && (
+                    <div className="flex items-center gap-2 p-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-300 text-[11px] font-bold animate-in slide-in-from-left-2">
+                        <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
+                        <span>Manuel İnceleme Gerekli</span>
+                    </div>
+                )}
+
                 <div className="flex items-center gap-2 text-[12px] text-navy-400">
                     <Briefcase className="w-3.5 h-3.5 text-navy-500" />
                     <span>{candidate.department}</span>

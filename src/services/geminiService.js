@@ -144,32 +144,30 @@ function getModel(modelId = MODEL_ID) {
 // ==================== ANALYSIS PROMPT ====================
 
 function buildAnalysisPrompt(jobDescription, candidateProfile) {
-    return `Sen uzman bir İK analizcisisin. Aşağıdaki iş tanımı ile aday profilini karşılaştırarak detaylı bir uyumluluk analizi yapman gerekiyor.
+    return `Sen otonom bir İşe Alım Ajanısın. Görevin sadece puanlama yapmak değil, adayın potansiyelini semantik olarak analize edip bir sonraki aksiyona karar vermektir.
 
-## İŞ TANIMI
+## İŞ TANIMI (Job Description)
 ${jobDescription}
 
 ## ADAY PROFİLİ
 ${typeof candidateProfile === 'string' ? candidateProfile : JSON.stringify(candidateProfile, null, 2)}
 
-## TALİMATLAR
+## GÖREVLERİN & KURALLARIN
 
-1. İş tanımının gerektirdiği yetkinlikler ile adayın profili arasında detaylı bir analiz yap.
-2. 0-100 arası bir uyumluluk skoru (matchScore) hesapla. Puanlama kriterleri:
-   - Teknik beceri eşleşmesi: %35
-   - Deneyim yılı ve seviyesi: %25
-   - Sektör/alan uyumu: %20
-   - Yumuşak beceriler ve kültürel uyum: %20
-3. En iyi eşleşen 3 yeteneği belirle.
-4. Adayın eksik olduğu noktaları (gap) analiz et.
-5. LinkedIn Sales Navigator için kişiselleştirilmiş bir DM taslağı oluştur.
+1. **Semantik Eşleştirme:** Adayın yeteneklerini (skills) sadece kelime bazlı eşleştirme. Eğer adayda doğrudan istenen yetenek yoksa ama benzer teknolojilerde (Transferable Skills) deneyimi varsa bunu pozitif değerlendir. (Örn: React yok ama Vue.js +5 yıl deneyim varsa, Frontend mantığını bildiği için puan ver).
+2. **Otonom Karar Verme:** Analiz sonucuna göre bu aday için atılması gereken en mantıklı adımı (nextAction) belirle.
+3. **Ajan Mantığı (Agent Logic):** Neden bu puanı verdiğini ve neden bu aksiyonu seçtiğini insani bir dille açıkla.
 
-## ÇIKTI FORMATI
+## ÇIKTI FORMATI (JSON)
 
-Yanıtını aşağıdaki JSON formatında ver:
+Yanıtını aşağıdaki JSON yapısında ver:
 
 {
   "score": <0-100 arası sayısal değer>,
+  "agentReasoning": "<Ajanın düşünce süreci. Örn: 'Adayın doğrudan React deneyimi yok ancak Vue.js geçmişi çok güçlü (Transferable Skill). Temel CS bilgisi sağlam olduğu için teknik mülakata davet edilmeli.'>",
+  "autonomousStatus": "<pending | action_taken | manual_review_required>",
+  "nextAction": "<schedule_technical_interview | send_rejection | request_portfolio | send_offer | keep_in_pool>",
+  
   "scoreBreakdown": {
     "technicalSkills": <0-100>,
     "experience": <0-100>,
@@ -177,82 +175,65 @@ Yanıtını aşağıdaki JSON formatında ver:
     "softSkills": <0-100>
   },
   "topSkills": [
-    {
-      "skill": "<yetenek adı>",
-      "relevance": "<neden önemli - kısa açıklama>"
-    },
-    {
-      "skill": "<yetenek adı>",
-      "relevance": "<neden önemli - kısa açıklama>"
-    },
-    {
-      "skill": "<yetenek adı>",
-      "relevance": "<neden önemli - kısa açıklama>"
-    }
+    { "skill": "...", "relevance": "..." }
   ],
   "gapAnalysis": [
-    {
-      "gap": "<eksik yetkinlik>",
-      "severity": "<critical | moderate | minor>",
-      "suggestion": "<bu açığı kapatmak için öneri>"
-    }
+    { "gap": "...", "severity": "...", "suggestion": "..." }
   ],
-  "personalizedMessage": "<Sales Navigator DM taslağı. Format: 'Merhabalar [Adayın Adı], [Şirket/Pozisyon] pozisyonu için tecrübelerinizin, özellikle [X yeteneği] konusundaki başarınızın çok uygun olduğunu gördüm...' şeklinde başlamalı. Samimi, profesyonel ve ikna edici olmalı. En az 3 cümle.>",
-  "summary": "<2-3 cümlelik genel değerlendirme>",
+  "personalizedMessage": "<LinkedIn DM taslağı>",
+  "summary": "<Kısa özet>",
   "recommendation": "<hire | strong_consider | consider | pass>"
 }
 
-ÖNEMLİ: Yanıtın SADECE geçerli JSON olmalı, başka metin olmamalı.`;
+ÖNEMLİ: Yanıtın SADECE geçerli JSON olmalı.`;
 }
+
+// ... (getModel function remains unchanged)
 
 // ==================== MAIN ANALYSIS FUNCTION ====================
 
-/**
- * Analyzes a candidate profile against a job description.
- * 
- * @param {string} jobDescription - The job posting/description text
- * @param {string|object} candidateProfile - The candidate's CV/profile data
- * @param {string} [modelId] - Specific model ID to use
- */
 export async function analyzeCandidateMatch(jobDescription, candidateProfile, modelId) {
-    if (!jobDescription?.trim()) throw new Error('İş tanımı boş olamaz.');
-    if (!candidateProfile) throw new Error('Aday profili boş olamaz.');
+    if (!API_KEY) {
+        throw new Error('Gemini API anahtarı bulunamadı.');
+    }
 
     const prompt = buildAnalysisPrompt(jobDescription, candidateProfile);
 
-    return withExponentialBackoff(async () => {
-        const geminiModel = getModel(modelId);
+    // Call Gemini API with exponential backoff
+    const result = await withExponentialBackoff(async () => {
+        const geminiModel = getModel(modelId); // Use passed modelId or default
         const result = await geminiModel.generateContent(prompt);
-        const response = await result.response;
-        const text = response.text();
+        const responseText = result.response.text();
 
-        // Parse JSON response
-        let parsed;
+        // Remove markdown formatting if present (```json ... ```)
+        const cleanJson = responseText.replace(/```json|```/g, '').trim();
+
         try {
-            parsed = JSON.parse(text);
-        } catch (parseErr) {
-            // Updated regex to better handle markdown code blocks
-            const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/) ||
-                text.match(/\{[\s\S]*\}/);
-
-            if (jsonMatch) {
-                parsed = JSON.parse(jsonMatch[1] || jsonMatch[0]);
-            } else {
-                throw new Error('Gemini yanıtı geçerli JSON formatında değil: ' + text.substring(0, 50) + '...');
-            }
+            return JSON.parse(cleanJson);
+        } catch (e) {
+            console.error('JSON Parse Error:', e);
+            console.error('Raw Response:', responseText);
+            throw new Error('AI yanıtı geçerli bir JSON formatında değildi.');
         }
-
-        validateAnalysisResult(parsed);
-        return parsed;
     });
+
+    // Validate the result structure
+    validateAnalysisResult(result);
+
+    return result;
 }
 
-/**
- * Validates the analysis result has all required fields.
- */
 function validateAnalysisResult(result) {
     if (typeof result.score !== 'number' || result.score < 0 || result.score > 100) {
         throw new Error('Geçersiz skor değeri. 0-100 arası bir sayı bekleniyor.');
+    }
+
+    if (!result.agentReasoning) {
+        throw new Error('agentReasoning (Ajan Mantığı) alanı eksik.');
+    }
+
+    if (!result.nextAction) {
+        throw new Error('nextAction (Sonraki Adım) alanı eksik.');
     }
 
     if (!Array.isArray(result.topSkills) || result.topSkills.length === 0) {

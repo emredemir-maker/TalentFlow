@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import MatchScoreRing from '../components/MatchScoreRing';
 import CandidateDrawer from '../components/CandidateDrawer';
+import AgentThoughtPanel from '../components/AgentThoughtPanel';
 
 export default function AIMatchPage() {
     const { filteredCandidates, updateCandidate } = useCandidates();
@@ -274,6 +275,13 @@ export default function AIMatchPage() {
                                 <Layers className="w-5 h-5 text-electric" />
                                 Analiz Kontrolü
                             </h3>
+
+                            {/* Agent Thought Process Visualization */}
+                            {isProcessing && (
+                                <div className="mb-6">
+                                    <AgentThoughtPanel isProcessing={true} />
+                                </div>
+                            )}
 
                             <div className="space-y-6">
                                 <div>

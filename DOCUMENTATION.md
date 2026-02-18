@@ -107,6 +107,12 @@ Firestore veritabanı **NoSQL** yapısındadır. Temel koleksiyon: `candidates`
   "experience": 5,
   "skills": ["React", "TypeScript", "Tailwind"],
   "matchScore": 88, // AI tarafından hesaplanan son skor
+
+  // 🧠 Ajan Düşünce Süreci (Agent Reasoning & Memory)
+  "agentReasoning": "Adayın teknik yetkinliği pozisyon için yeterli (%88). STAR analizi, problem çözme yeteneğinin güçlü olduğunu doğruladı ancak takım liderliği deneyimi eksik. Bu nedenle bir sonraki adımda teknik liderlik potansiyeli sorgulanmalı.",
+  "autonomousStatus": "pending", // 'pending' | 'action_taken' | 'manual_review_required'
+  "nextAction": "schedule_technical_interview", // Ajanın belirlediği otonom aksiyon (örn: 'send_rejection', 'request_portfolio')
+
   "aiAnalysis": {
     "summary": "Teknik yetkinlikler güçlü, liderlik potansiyeli var.",
     "pros": ["Güçlü React bilgisi", "Problemlere analitik yaklaşım"],
@@ -120,6 +126,14 @@ Firestore veritabanı **NoSQL** yapısındadır. Temel koleksiyon: `candidates`
   "updatedAt": "Timestamp"
 }
 ```
+
+### 5.1 Ajan Hafızası ve Otonom Kararlar
+
+Sistem sadece puanlama yapmaz, aynı zamanda bir "Ajan" gibi davranarak bir sonraki adımı planlar:
+
+* **`agentReasoning`**: Ajanın neden bu puanı verdiğini ve neden bir sonraki aksiyonu seçtiğini açıklayan, insan tarafından okunabilir mantıksal çıkarım metni.
+* **`nextAction`**: Ajanın inisiyatif alarak belirlediği aksiyon. Örneğin; puanı 90+ olan bir adaya otomatik olarak *"Mülakat Daveti"* gönderme kararı alabilir.
+* **`autonomousStatus`**: Bu aksiyonun gerçekleşip gerçekleşmediğini takip eder.
 
 ---
 
