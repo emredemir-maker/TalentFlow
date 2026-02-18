@@ -1,0 +1,227 @@
+// src/components/AddCandidateModal.jsx
+import { useState, useRef } from 'react';
+import { X, Upload, FileText, Check, AlertCircle, Loader2, Trash2, Files } from 'lucide-react';
+import { useCandidates } from '../context/CandidatesContext';
+
+export default function AddCandidateModal({ isOpen, onClose }) {
+    const { addCandidate } = useCandidates();
+    const [files, setFiles] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+    const [results, setResults] = useState(null); // { results: [{fileName, candidate, success, error}] }
+    const fileInputRef = useRef(null);
+
+    if (!isOpen) return null;
+
+    const handleFileChange = (e) => {
+        const selectedFiles = Array.from(e.target.files);
+        if (selectedFiles.length > 0) {
+            const validFiles = selectedFiles.filter(file => {
+                if (file.size > 10 * 1024 * 1024) {
+                    setError(`"${file.name}" 10MB'dan büyük olduğu için elendi.`);
+                    return false;
+                }
+                return true;
+            });
+            setFiles(prev => [...prev, ...validFiles]);
+            setError(null);
+        }
+    };
+
+    const removeFile = (index) => {
+        setFiles(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const handleUpload = async () => {
+        if (files.length === 0) return;
+
+        setLoading(true);
+        setError(null);
+        setResults(null);
+
+        const formData = new FormData();
+        files.forEach(file => {
+            formData.append('cvs', file);
+        });
+
+        try {
+            const response = await fetch('http://localhost:3001/api/process-cv', {
+                method: 'POST',
+                body: formData,
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'CV\'ler işlenirken bir hata oluştu.');
+            }
+
+            setResults(data.results);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSaveAll = async () => {
+        if (!results) return;
+
+        setLoading(true);
+        try {
+            const successfulOnes = results.filter(r => r.success && r.candidate);
+            await Promise.all(successfulOnes.map(r =>
+                addCandidate({
+                    ...r.candidate,
+                    status: 'new',
+                    appliedDate: new Date().toISOString().split('T')[0],
+                    source: 'Bulk CV Upload'
+                })
+            ));
+            onClose();
+            // Reset state
+            setFiles([]);
+            setResults(null);
+        } catch (err) {
+            setError('Adaylar kaydedilirken hata oluştu: ' + err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-navy-950/80 backdrop-blur-md" onClick={onClose} />
+
+            <div className="relative w-full max-w-2xl glass rounded-3xl overflow-hidden shadow-2xl border border-white/10 animate-in fade-in zoom-in duration-300">
+                <div className="p-6 border-b border-white/5 flex items-center justify-between">
+                    <div>
+                        <h2 className="text-xl font-bold text-white">Toplu Aday Ekle</h2>
+                        <p className="text-sm text-navy-400">Birden fazla PDF veya Word CV yükleyin.</p>
+                    </div>
+                    <button onClick={onClose} className="p-2 rounded-xl hover:bg-white/5 text-navy-400 transition-colors">
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+
+                <div className="p-8 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                    {!results ? (
+                        <div className="space-y-6">
+                            <div
+                                onClick={() => fileInputRef.current?.click()}
+                                className={`group relative border-2 border-dashed rounded-3xl p-8 flex flex-col items-center justify-center gap-4 transition-all cursor-pointer
+                                    ${files.length > 0 ? 'border-electric/50 bg-electric/5' : 'border-white/10 hover:border-electric/30 hover:bg-white/[0.02]'}`}
+                            >
+                                <input
+                                    type="file"
+                                    ref={fileInputRef}
+                                    onChange={handleFileChange}
+                                    accept=".pdf,.docx"
+                                    multiple
+                                    className="hidden"
+                                />
+                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${files.length > 0 ? 'bg-electric text-white' : 'bg-white/5 text-navy-400 group-hover:text-electric'}`}>
+                                    {files.length > 0 ? <Files className="w-7 h-7" /> : <Upload className="w-7 h-7" />}
+                                </div>
+                                <div className="text-center">
+                                    <p className="text-white font-medium">{files.length > 0 ? `${files.length} Dosya Seçildi` : 'Dosyaları Seçin veya Sürükleyin'}</p>
+                                    <p className="text-xs text-navy-500 mt-1">PDF, DOCX (Max 10MB/Dosya)</p>
+                                </div>
+                            </div>
+
+                            {files.length > 0 && (
+                                <div className="space-y-2">
+                                    <p className="text-xs font-bold text-navy-500 uppercase tracking-widest pl-1">Yüklenecek Dosyalar</p>
+                                    <div className="grid grid-cols-1 gap-2">
+                                        {files.map((f, idx) => (
+                                            <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5 group">
+                                                <div className="flex items-center gap-3 overflow-hidden">
+                                                    <FileText className="w-4 h-4 text-electric shrink-0" />
+                                                    <span className="text-sm text-navy-200 truncate">{f.name}</span>
+                                                    <span className="text-[10px] text-navy-500 shrink-0">({(f.size / 1024 / 1024).toFixed(2)} MB)</span>
+                                                </div>
+                                                <button onClick={(e) => { e.stopPropagation(); removeFile(idx); }} className="p-1.5 rounded-lg hover:bg-red-500/20 text-navy-500 hover:text-red-400 transition-all opacity-0 group-hover:opacity-100">
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {error && (
+                                <div className="flex items-center gap-3 p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                                    <AlertCircle className="w-5 h-5 shrink-0" />
+                                    <p>{error}</p>
+                                </div>
+                            )}
+
+                            <button
+                                onClick={handleUpload}
+                                disabled={files.length === 0 || loading}
+                                className="w-full py-4 rounded-2xl bg-gradient-to-r from-electric to-blue-600 text-white font-bold shadow-xl shadow-electric/20 hover:shadow-electric/40 disabled:opacity-50 disabled:shadow-none transition-all flex items-center justify-center gap-2"
+                            >
+                                {loading ? (
+                                    <>
+                                        <Loader2 className="w-5 h-5 animate-spin" />
+                                        <span>Yapay Zeka Hepsi Üzerinde Çalışıyor...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Check className="w-5 h-5" />
+                                        <span>Seçilenleri Analiz Et</span>
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                            <div className="space-y-3">
+                                <p className="text-xs font-bold text-navy-500 uppercase tracking-widest pl-1">Analiz Sonuçları</p>
+                                <div className="grid grid-cols-1 gap-3">
+                                    {results.map((res, idx) => (
+                                        <div key={idx} className={`p-4 rounded-2xl border transition-all ${res.success ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-red-500/5 border-red-500/20'}`}>
+                                            <div className="flex items-center justify-between gap-4">
+                                                <div className="flex items-center gap-3 overflow-hidden">
+                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${res.success ? 'bg-emerald-500 text-navy-950' : 'bg-red-500 text-white'}`}>
+                                                        {res.success ? <Check className="w-5 h-5 stroke-[3]" /> : <X className="w-5 h-5" />}
+                                                    </div>
+                                                    <div className="overflow-hidden">
+                                                        <p className="text-sm font-bold text-white truncate">{res.success ? res.candidate.name : res.fileName}</p>
+                                                        <p className="text-xs text-navy-400 truncate">{res.success ? res.candidate.position : res.error}</p>
+                                                    </div>
+                                                </div>
+                                                {res.success && (
+                                                    <div className="flex gap-2 shrink-0">
+                                                        <span className="px-2 py-0.5 rounded-md bg-white/5 border border-white/5 text-[10px] text-navy-300">AI Hazır</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3 pt-2">
+                                <button
+                                    onClick={() => setResults(null)}
+                                    className="flex-1 py-4 rounded-2xl bg-white/5 hover:bg-white/10 text-white font-bold transition-all border border-white/10"
+                                >
+                                    Geri Dön
+                                </button>
+                                <button
+                                    onClick={handleSaveAll}
+                                    disabled={loading || !results.some(r => r.success)}
+                                    className="flex-1 py-4 rounded-2xl bg-electric text-white font-bold shadow-xl shadow-electric/20 hover:shadow-electric/40 transition-all flex items-center justify-center gap-2"
+                                >
+                                    {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
+                                    <span>Tümünü Havuza Ekle</span>
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
