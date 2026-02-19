@@ -97,7 +97,7 @@ function ScoreCircle({ value, label, size = 'sm' }) {
     );
 }
 
-export default function AIAnalysisPanel({ result, loading, error, onRetry }) {
+export default function AIAnalysisPanel({ result, loading, error, onRetry, title }) {
     const [dmCopied, setDmCopied] = useState(false);
 
     const handleCopyDM = () => {
@@ -125,7 +125,6 @@ export default function AIAnalysisPanel({ result, loading, error, onRetry }) {
                     </div>
                 </div>
 
-                {/* Skeleton */}
                 <div className="grid grid-cols-4 gap-3">
                     {Array.from({ length: 4 }).map((_, i) => (
                         <div key={i} className="p-3 rounded-xl bg-white/[0.02]">
@@ -163,7 +162,33 @@ export default function AIAnalysisPanel({ result, loading, error, onRetry }) {
     }
 
     // ===== NO RESULT =====
-    if (!result) return null;
+    // ===== EMPTY STATE =====
+    if (!result) {
+        return (
+            <div className="flex flex-col items-center justify-center py-12 px-4 rounded-xl bg-white/[0.02] border border-white/[0.06] text-center space-y-4 animate-fade-in">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-electric/20 to-violet-500/20 flex items-center justify-center mb-2">
+                    <Brain className="w-8 h-8 text-electric-light" />
+                </div>
+                <div>
+                    <h3 className="text-white font-bold text-lg mb-1">Henüz Analiz Yapılmadı</h3>
+                    <p className="text-navy-400 text-xs max-w-[250px] mx-auto leading-relaxed">
+                        Adayın bu pozisyon ile uyumluluğunu detaylıca analiz etmek için yapay zekayı başlatın.
+                    </p>
+                </div>
+                {onRetry && (
+                    <button
+                        onClick={() => onRetry()}
+                        className="px-6 py-2.5 rounded-xl bg-electric hover:bg-electric-hover text-white font-bold text-sm shadow-lg shadow-electric/20 transition-all hover:scale-105 active:scale-95 flex items-center gap-2"
+                    >
+                        <Sparkles className="w-4 h-4" />
+                        Analizi Başlat
+                    </button>
+                )}
+
+            </div>
+        );
+    }
+
 
     const rec = RECOMMENDATION_CONFIG[result.recommendation] || RECOMMENDATION_CONFIG.consider;
 
@@ -175,14 +200,27 @@ export default function AIAnalysisPanel({ result, loading, error, onRetry }) {
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                         <Sparkles className="w-4 h-4 text-electric-light" />
-                        <span className="text-[12px] uppercase tracking-wider text-navy-400 font-semibold">AI Uyumluluk Skoru</span>
+                        <span className="text-[12px] uppercase tracking-wider text-navy-400 font-semibold">
+                            {title ? `${title} Uyumluluğu` : 'AI Uyumluluk Skoru'}
+                        </span>
                     </div>
-                    <div className="flex items-center gap-2 mt-2">
+                    <div className="flex items-center justify-between mt-2">
                         <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${rec.color} ${rec.bg} ring-1 ring-inset ring-white/5`}>
                             {rec.icon} {rec.label}
                         </span>
+                        {onRetry && (
+                            <button
+                                onClick={() => onRetry()}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-[10px] font-bold text-navy-300 hover:text-white hover:bg-white/[0.08] transition-all"
+                                title="Yapay Zeka Analizini Yenile"
+                            >
+                                <RefreshCw className="w-3 h-3" />
+                                Yenile
+                            </button>
+                        )}
                     </div>
                 </div>
+
             </div>
 
             {/* ===== SCORE BREAKDOWN ===== */}

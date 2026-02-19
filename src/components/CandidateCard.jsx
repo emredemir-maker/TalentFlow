@@ -2,16 +2,25 @@
 // Premium candidate card with match score ring
 
 import MatchScoreRing from './MatchScoreRing';
-import { MapPin, Briefcase, Clock, ArrowUpRight, ShieldAlert } from 'lucide-react';
+import { MapPin, Briefcase, Clock, ArrowUpRight, ShieldAlert, Sparkles } from 'lucide-react';
+
 
 const STATUS_CONFIG = {
-    new: { label: 'Yeni', classes: 'bg-violet-500/10 text-violet-400 ring-violet-500/20' },
-    review: { label: 'İnceleme', classes: 'bg-amber-500/10 text-amber-400 ring-amber-500/20' },
+    ai_analysis: { label: 'AI Analiz', classes: 'bg-violet-500/10 text-violet-400 ring-violet-500/20' },
+    review: { label: 'İlk İnceleme', classes: 'bg-amber-500/10 text-amber-400 ring-amber-500/20' },
     interview: { label: 'Mülakat', classes: 'bg-blue-500/10 text-blue-400 ring-blue-500/20' },
+    deep_review: { label: 'Detaylı İnceleme', classes: 'bg-indigo-500/10 text-indigo-400 ring-indigo-500/20' },
     offer: { label: 'Teklif', classes: 'bg-cyan-500/10 text-cyan-400 ring-cyan-500/20' },
-    hired: { label: 'İşe Alındı', classes: 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/20' },
+    hired: { label: 'Onaylandı', classes: 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/20' },
     rejected: { label: 'Reddedildi', classes: 'bg-red-500/10 text-red-400 ring-red-500/20' },
 };
+
+
+const REJECTION_REASONS = [
+    { id: 'not_suitable', label: 'Uygun Değil' },
+    { id: 'declined', label: 'Kabul Etmedi' },
+    { id: 'wrong_entry', label: 'Hatalı Kayıt' }
+];
 
 const AVATAR_GRADIENTS = [
     'from-indigo-500 to-purple-600',
@@ -28,7 +37,8 @@ function getInitials(name) {
 }
 
 export default function CandidateCard({ candidate, index = 0, onClick, isSelected, onSelect }) {
-    const status = STATUS_CONFIG[candidate.status] || STATUS_CONFIG.new;
+    const status = STATUS_CONFIG[candidate.status] || STATUS_CONFIG.ai_analysis;
+
     const gradient = AVATAR_GRADIENTS[index % AVATAR_GRADIENTS.length];
 
     return (
@@ -74,15 +84,40 @@ export default function CandidateCard({ candidate, index = 0, onClick, isSelecte
                         <p className="text-[12px] text-navy-400 truncate">{candidate.position}</p>
                     </div>
                 </div>
-                <MatchScoreRing score={candidate.matchScore || 0} size={48} />
+                <div className="flex flex-col items-end">
+                    <MatchScoreRing score={candidate.matchScore || candidate.aiAnalysis?.score || 0} size={48} />
+                    {candidate.aiAnalysis && (
+                        <div className="flex flex-col items-end mt-1">
+                            <div className="flex items-center gap-0.5 text-electric-light animate-pulse">
+                                <Sparkles className="w-2.5 h-2.5" />
+                                <span className="text-[8px] font-bold uppercase tracking-tighter">AI Onaylı</span>
+                            </div>
+                            {candidate.matchedPositionTitle && (
+                                <span className="text-[9px] text-navy-500 font-medium truncate max-w-[100px] text-right">
+                                    {candidate.matchedPositionTitle}
+                                </span>
+                            )}
+                        </div>
+                    )}
+
+                </div>
             </div>
+
+
+
 
             {/* Status badge */}
             <div className="mb-3">
                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wide ring-1 ring-inset ${status.classes}`}>
                     {status.label}
+                    {candidate.status === 'rejected' && candidate.rejectionReason && (
+                        <span className="ml-1 opacity-75 font-medium border-l border-current pl-1 ml-1.5">
+                            {REJECTION_REASONS.find(r => r.id === candidate.rejectionReason)?.label}
+                        </span>
+                    )}
                 </span>
             </div>
+
 
             {/* Meta */}
             <div className="space-y-1.5 mb-4">

@@ -12,7 +12,37 @@ const __dirname = path.dirname(__filename);
 
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
-const pdf = require('pdf-parse');
+const pdfLib = require('pdf-parse');
+const pdf = async (buffer) => {
+    try {
+        const PDFClass = pdfLib.PDFParse || pdfLib.default;
+        if (PDFClass && typeof PDFClass === 'function') {
+            try {
+                // Try as class first
+                const instance = new PDFClass({ data: buffer });
+                const result = await instance.getText();
+                await instance.destroy().catch(() => { });
+                return result;
+            } catch (err) {
+                if (err.message.includes("cannot be invoked without 'new'")) {
+                    // This shouldn't happen if we used new, but let's be safe
+                    throw err;
+                }
+                // If it's the old pdf-parse function style
+                if (typeof pdfLib === 'function') {
+                    return await pdfLib(buffer);
+                }
+                throw err;
+            }
+        } else if (typeof pdfLib === 'function') {
+            return await pdfLib(buffer);
+        }
+        throw new Error('PDF parsing library not found or invalid');
+    } catch (err) {
+        console.error('PDF Error:', err);
+        return { text: 'PDF Error: ' + err.message };
+    }
+};
 const mammoth = require('mammoth');
 const multer = require('multer');
 
@@ -45,7 +75,7 @@ const API_KEY = getApiKey();
 const genAI = new GoogleGenerativeAI(API_KEY || 'DUMMY_KEY');
 
 // Gemini Parser Function
-async function parseProfile(text, modelId = 'gemini-pro') {
+async function parseProfile(text, modelId = 'gemini-2.0-flash') {
     const apiKey = getApiKey();
     if (!apiKey) throw new Error('API Key missing');
 
@@ -61,10 +91,12 @@ async function parseProfile(text, modelId = 'gemini-pro') {
     - skills (Array of strings)
     - experience (Total years as number)
     - education (Last school/degree)
-    - about (Summary max 200 chars)
+    - summary (Professional summary in TURKISH, max 400 chars)
+
 
     Mark missing fields as null.
     Add "source": "Auto Scraper".
+    IMPORTANT: The input text might be in any language, but ALL output text fields MUST be in TURKISH.
 
     TEXT:
     ${text.substring(0, 20000)}
@@ -308,13 +340,13 @@ app.get('/api/scrape', async (req, res) => {
                     }
 
                     console.log(`🤖 Gemini Parsing (${extractionMethod}): ${item.name}...`);
-                    let refined = await parseProfile(profileText, 'gemini-pro');
+                    let refined = await parseProfile(profileText, 'gemini-2.0-flash');
 
                     // Final Fallback: If full-page parse failed, try snippet one last time
                     if (!refined && extractionMethod === 'full-page') {
                         console.log('🔄 Full-page parse failed. Retrying with original snippet...');
                         profileText = `TITLE: ${item.rawTitle}\nSNIPPET: ${item.rawSnippet}`;
-                        refined = await parseProfile(profileText, 'gemini-pro');
+                        refined = await parseProfile(profileText, 'gemini-2.0-flash');
                     }
 
                     if (refined && (refined.name || item.name)) {
@@ -436,7 +468,7 @@ app.post('/api/direct-add', async (req, res) => {
         const { text, url } = req.body;
         console.log(`📥 Direct Add request for: ${url}`);
 
-        const candidate = await parseProfile(text, 'gemini-pro');
+        const candidate = await parseProfile(text, 'gemini-2.0-flash');
         if (candidate && candidate.name) {
             candidate.linkedinUrl = url;
             candidate.source = 'Browser Extension';
@@ -476,7 +508,7 @@ app.post('/api/process-cv', upload.array('cvs', 20), async (req, res) => {
                     return { fileName: file.originalname, error: 'İçerik okunamadı' };
                 }
 
-                const candidate = await parseProfile(text, 'gemini-pro');
+                const candidate = await parseProfile(text, 'gemini-2.0-flash');
                 if (!candidate) return { fileName: file.originalname, error: 'AI ayrıştırma hatası' };
 
                 return { fileName: file.originalname, candidate, success: true };

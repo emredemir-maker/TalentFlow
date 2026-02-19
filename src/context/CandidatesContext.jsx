@@ -27,6 +27,7 @@ export function CandidatesProvider({ children }) {
     // CRUD Operations
     const addCandidate = async (candidateData) => {
         try {
+            console.log('[CandidatesContext] Adding candidate to:', CANDIDATES_COLLECTION, candidateData);
             const docRef = await addDoc(collection(db, CANDIDATES_COLLECTION), {
                 ...candidateData,
                 createdAt: serverTimestamp(),
@@ -72,9 +73,12 @@ export function CandidatesProvider({ children }) {
 
         // onSnapshot for real-time listening (no complex queries - Rule 2)
         const candidatesRef = collection(db, CANDIDATES_COLLECTION);
+        console.log('[CandidatesContext] Listening to collection:', CANDIDATES_COLLECTION);
+
         const unsubscribe = onSnapshot(
             candidatesRef,
             (snapshot) => {
+                console.log(`[CandidatesContext] Received snapshot. Size: ${snapshot.size}`);
                 const candidateList = snapshot.docs.map((doc) => ({
                     id: doc.id,
                     ...doc.data(),
@@ -95,6 +99,12 @@ export function CandidatesProvider({ children }) {
 
         return () => unsubscribe();
     }, [isAuthenticated, authLoading]);
+
+    useEffect(() => {
+        if (candidates.length > 0) {
+            window.__CANDIDATES__ = candidates;
+        }
+    }, [candidates]);
 
     // Client-side filtering (Rule 2 - no orderBy/limit queries)
     const filteredCandidates = useMemo(() => {

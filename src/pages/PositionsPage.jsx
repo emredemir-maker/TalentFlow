@@ -14,18 +14,25 @@ import {
     XCircle,
     Users,
     Clock,
-    Search
+    Search,
+    Sparkles,
+    Loader2
 } from 'lucide-react';
 
 import PotentialCandidatesTab from '../components/PotentialCandidatesTab';
+import CandidateDrawer from '../components/CandidateDrawer';
 import { useCandidates } from '../context/CandidatesContext';
+import { extractPositionFromJD } from '../services/geminiService';
+import { calculateMatchScore } from '../services/matchService';
 
 export default function PositionsPage() {
     const { positions, loading, addPosition, deletePosition, togglePositionStatus } = usePositions();
-    const { filteredCandidates: candidates } = useCandidates();
+    const { candidates } = useCandidates();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [expandedPosition, setExpandedPosition] = useState(null);
+    const [selectedCandidate, setSelectedCandidate] = useState(null);
+    const [activePosition, setActivePosition] = useState(null); // Track which position context is active
 
     // Form State
     const [formData, setFormData] = useState({
@@ -34,16 +41,55 @@ export default function PositionsPage() {
         minExperience: '',
         requirements: '',
     });
+    const [jdText, setJdText] = useState('');
+    const [isExtracting, setIsExtracting] = useState(false);
+
+    const handleExtractFromJD = async () => {
+        if (!jdText || jdText.length < 50) return;
+
+        setIsExtracting(true);
+        try {
+            const result = await extractPositionFromJD(jdText);
+            setFormData({
+                title: result.title || formData.title,
+                department: result.department || formData.department,
+                minExperience: result.minExperience?.toString() || formData.minExperience,
+                requirements: result.requirements?.join(', ') || formData.requirements,
+            });
+            // Show success or just update
+        } catch (error) {
+            console.error('Extraction error:', error);
+            alert('Ayrıştırma sırasında bir hata oluştu: ' + error.message);
+        } finally {
+            setIsExtracting(false);
+        }
+    };
 
     const handleAddPosition = async (e) => {
         e.preventDefault();
         if (!formData.title || !formData.department) return;
 
+        const positionRequirements = formData.requirements.split(',').map(r => r.trim()).filter(r => r);
+
+        // Automatic matching against existing candidates
+        const matchedCandidates = candidates
+            .map(c => ({ ...c, match: calculateMatchScore(c, { ...formData, requirements: positionRequirements }) }))
+            .filter(c => c.match.score >= 50)
+            .sort((a, b) => b.match.score - a.match.score)
+            .slice(0, 10)
+            .map(c => ({
+                id: c.id,
+                name: c.name,
+                score: c.match.score,
+                reason: c.match.score >= 70 ? 'Yüksek Uyumluluk' : 'Potansiyel Eşleşme'
+            }));
+
         const newPosition = {
             title: formData.title,
             department: formData.department,
             minExperience: parseInt(formData.minExperience) || 0,
-            requirements: formData.requirements.split(',').map(r => r.trim()).filter(r => r),
+            requirements: positionRequirements,
+            matchedCandidates: matchedCandidates
         };
 
         await addPosition(newPosition);
@@ -157,7 +203,14 @@ export default function PositionsPage() {
                                 {/* Expanded Potential Candidates Tab */}
                                 {expandedPosition === pos.id && (
                                     <div className="mt-4 pt-4 border-t border-white/[0.06]">
-                                        <PotentialCandidatesTab position={pos} candidates={candidates} />
+                                        <PotentialCandidatesTab
+                                            position={pos}
+                                            candidates={candidates}
+                                            onCandidateClick={(c) => {
+                                                setSelectedCandidate(c);
+                                                setActivePosition(pos);
+                                            }}
+                                        />
                                     </div>
                                 )}
                             </div>
@@ -166,15 +219,69 @@ export default function PositionsPage() {
                 )}
             </div>
 
+            {/* ===== DRAWER ===== */}
+            {selectedCandidate && (
+                <CandidateDrawer
+                    candidate={selectedCandidate}
+                    positionContext={activePosition}
+                    onClose={() => {
+                        setSelectedCandidate(null);
+                        setActivePosition(null);
+                    }}
+                />
+            )}
+
             {/* Add Position Modal */}
             {isModalOpen && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[80] flex items-center justify-center p-4">
                     <div className="w-full max-w-md bg-navy-900 rounded-3xl border border-white/[0.1] p-6 shadow-2xl animate-fade-in-up">
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="text-lg font-bold text-white">Yeni Pozisyon Ekle</h2>
-                            <button onClick={() => setIsModalOpen(false)} className="text-navy-400 hover:text-white">
+                            <button onClick={() => {
+                                setIsModalOpen(false);
+                                setJdText('');
+                            }} className="text-navy-400 hover:text-white">
                                 <XCircle className="w-5 h-5" />
                             </button>
+                        </div>
+
+                        {/* Smart Extraction Section */}
+                        <div className="mb-6 p-4 rounded-2xl bg-electric/10 border border-electric/20">
+                            <label className="block text-xs font-bold text-electric-light mb-2 flex items-center gap-2">
+                                <Sparkles className="w-3.5 h-3.5" />
+                                AI İle İş Tanımından Veri Çek
+                            </label>
+                            <textarea
+                                value={jdText}
+                                onChange={e => setJdText(e.target.value)}
+                                className="w-full px-3 py-2 rounded-xl bg-white/[0.03] border border-white/[0.06] text-xs text-white focus:border-electric/50 outline-none resize-none mb-2"
+                                rows={4}
+                                placeholder="İş tanımını buraya yapıştırın (Sorumluluklar, gereksinimler vb.)..."
+                            />
+                            <button
+                                type="button"
+                                onClick={handleExtractFromJD}
+                                disabled={isExtracting || jdText.length < 50}
+                                className="w-full py-2 rounded-lg bg-electric text-white text-[11px] font-bold hover:bg-electric-light transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-electric/10"
+                            >
+                                {isExtracting ? (
+                                    <>
+                                        <Loader2 className="w-3 h-3 animate-spin" />
+                                        Ayrıştırılıyor...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Sparkles className="w-3 h-3" />
+                                        Metni Analiz Et ve Formu Doldur
+                                    </>
+                                )}
+                            </button>
+                        </div>
+
+                        <div className="relative flex items-center gap-4 mb-6">
+                            <div className="flex-1 h-[1px] bg-white/[0.06]"></div>
+                            <span className="text-[10px] font-bold text-navy-500 uppercase tracking-widest">veya manuel girin</span>
+                            <div className="flex-1 h-[1px] bg-white/[0.06]"></div>
                         </div>
 
                         <form onSubmit={handleAddPosition} className="space-y-4">

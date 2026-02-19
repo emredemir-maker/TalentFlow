@@ -1,10 +1,16 @@
 // src/components/AddCandidateModal.jsx
 import { useState, useRef } from 'react';
-import { X, Upload, FileText, Check, AlertCircle, Loader2, Trash2, Files } from 'lucide-react';
+import { X, Upload, FileText, Check, AlertCircle, Loader2, Trash2, Files, Sparkles } from 'lucide-react';
 import { useCandidates } from '../context/CandidatesContext';
+import { usePositions } from '../context/PositionsContext';
+import { calculateMatchScore } from '../services/matchService';
+import { quickScore } from '../services/geminiService';
+
 
 export default function AddCandidateModal({ isOpen, onClose }) {
     const { addCandidate } = useCandidates();
+    const { positions } = usePositions();
+    const openPositions = positions.filter(p => p.status === 'open');
     const [files, setFiles] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -17,8 +23,9 @@ export default function AddCandidateModal({ isOpen, onClose }) {
         const selectedFiles = Array.from(e.target.files);
         if (selectedFiles.length > 0) {
             const validFiles = selectedFiles.filter(file => {
-                if (file.size > 10 * 1024 * 1024) {
-                    setError(`"${file.name}" 10MB'dan büyük olduğu için elendi.`);
+                if (file.size > 30 * 1024 * 1024) {
+                    setError(`"${file.name}" 30MB'dan büyük olduğu için elendi.`);
+
                     return false;
                 }
                 return true;
@@ -56,7 +63,47 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                 throw new Error(data.error || 'CV\'ler işlenirken bir hata oluştu.');
             }
 
-            setResults(data.results);
+            // --- Otonom AI Matching Start ---
+            const processedResults = await Promise.all(data.results.map(async (res) => {
+                if (!res.success) return res;
+
+                console.log(`[AddCandidateModal] Otonom AI taranıyor: ${res.candidate.name}`);
+
+                // 1. First, find candidate candidates using semantic logic to save tokens/time
+                let candidates = openPositions.map(pos => ({
+                    pos,
+                    static: calculateMatchScore(res.candidate, pos)
+                })).sort((a, b) => b.static.score - a.static.score);
+
+                // 2. Take the best static match and confirm with Otonom AI (Quick Score)
+                const topCandidate = candidates[0];
+                if (topCandidate && topCandidate.static.score > 0) {
+                    try {
+                        const jobText = `${topCandidate.pos.title}\n${topCandidate.pos.requirements?.join(', ')}`;
+                        const aiQuick = await quickScore(jobText, res.candidate);
+
+                        return {
+                            ...res,
+                            match: {
+                                ...topCandidate.pos,
+                                score: aiQuick.score,
+                                aiInsight: aiQuick.summary
+                            }
+                        };
+                    } catch (aiErr) {
+                        console.warn('[AddCandidateModal] Otonom AI Hatası, statik veriye dönülüyor:', aiErr);
+                        return {
+                            ...res,
+                            match: { ...topCandidate.pos, score: topCandidate.static.score }
+                        };
+                    }
+                }
+
+                return { ...res, match: null };
+            }));
+
+            setResults(processedResults);
+
         } catch (err) {
             setError(err.message);
         } finally {
@@ -70,14 +117,35 @@ export default function AddCandidateModal({ isOpen, onClose }) {
         setLoading(true);
         try {
             const successfulOnes = results.filter(r => r.success && r.candidate);
-            await Promise.all(successfulOnes.map(r =>
-                addCandidate({
-                    ...r.candidate,
-                    status: 'new',
-                    appliedDate: new Date().toISOString().split('T')[0],
-                    source: 'Bulk CV Upload'
-                })
-            ));
+            console.log('[AddCandidateModal] Saving candidates:', successfulOnes.length);
+
+            await Promise.all(successfulOnes.map(async (r, idx) => {
+                try {
+                    const candidateData = {
+                        ...r.candidate,
+                        status: 'ai_analysis',
+
+                        matchScore: r.match ? r.match.score : 0,
+                        matchedPositionTitle: r.match ? r.match.title : null,
+                        initialAiScore: r.match ? r.match.score : 0,
+                        scoringStage: 'initial',
+                        aiAnalysis: r.match ? {
+                            score: r.match.score,
+                            summary: r.match.aiInsight || 'Ön AI taraması yapıldı.'
+                        } : null,
+
+                        appliedDate: new Date().toISOString().split('T')[0],
+                        source: 'Bulk CV Upload'
+                    };
+                    console.log(`[AddCandidateModal] Saving #${idx + 1}: ${candidateData.name} with score %${candidateData.matchScore}`);
+                    await addCandidate(candidateData);
+
+                } catch (candidateErr) {
+                    console.error(`[AddCandidateModal] Failed to save candidate #${idx + 1}:`, candidateErr);
+                    throw candidateErr;
+                }
+            }));
+            console.log('[AddCandidateModal] All candidates saved successfully!');
             onClose();
             // Reset state
             setFiles([]);
@@ -125,8 +193,9 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                                 </div>
                                 <div className="text-center">
                                     <p className="text-white font-medium">{files.length > 0 ? `${files.length} Dosya Seçildi` : 'Dosyaları Seçin veya Sürükleyin'}</p>
-                                    <p className="text-xs text-navy-500 mt-1">PDF, DOCX (Max 10MB/Dosya)</p>
+                                    <p className="text-xs text-navy-500 mt-1">PDF, DOCX (Max 30MB/Dosya)</p>
                                 </div>
+
                             </div>
 
                             {files.length > 0 && (
@@ -192,9 +261,18 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                                                     </div>
                                                 </div>
                                                 {res.success && (
-                                                    <div className="flex gap-2 shrink-0">
-                                                        <span className="px-2 py-0.5 rounded-md bg-white/5 border border-white/5 text-[10px] text-navy-300">AI Hazır</span>
+                                                    <div className="flex flex-col items-end gap-2 shrink-0">
+                                                        <span className="px-2 py-0.5 rounded-md bg-electric/10 border border-electric/20 text-[10px] text-electric-light font-bold">Otonom Tarama Ok</span>
+                                                        {res.match ? (
+                                                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20">
+                                                                <Sparkles className="w-3 h-3 text-emerald-400" />
+                                                                <span className="text-[10px] font-bold text-emerald-400">%{res.match.score} {res.match.title} Uyumu</span>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-[10px] text-navy-500 italic">Uygun Pozisyon Bulunamadı</span>
+                                                        )}
                                                     </div>
+
                                                 )}
                                             </div>
                                         </div>

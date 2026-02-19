@@ -24,13 +24,15 @@ import {
 
 const STATUS_OPTIONS = [
     { value: 'all', label: 'Tüm Durumlar' },
-    { value: 'new', label: 'Yeni' },
-    { value: 'review', label: 'İnceleme' },
-    { value: 'interview', label: 'Mülakat' },
+    { value: 'ai_analysis', label: 'AI Analiz' },
+    { value: 'review', label: 'İlk İnceleme' },
+    { value: 'interview', label: 'Mülakat Değerlendirme' },
+    { value: 'deep_review', label: 'Detaylı İnceleme' },
     { value: 'offer', label: 'Teklif' },
-    { value: 'hired', label: 'İşe Alındı' },
+    { value: 'hired', label: 'Onaylandı' },
     { value: 'rejected', label: 'Reddedildi' },
 ];
+
 
 const EXPERIENCE_OPTIONS = [
     { value: 'all', label: 'Tüm Deneyim' },
@@ -55,7 +57,7 @@ export default function Dashboard() {
         setStatusFilter,
         experienceFilter,
         setExperienceFilter,
-        deleteCandidate, // Added deleteCandidate
+        deleteCandidate,
     } = useCandidates();
 
     const [selectedCandidate, setSelectedCandidate] = useState(null);
@@ -65,11 +67,11 @@ export default function Dashboard() {
 
     // Sort by match score descending (client-side, Rule 2)
     const sortedCandidates = useMemo(() => {
-        return [...filteredCandidates].sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0));
+        return [...filteredCandidates].sort((a, b) => (b.matchScore || b.aiAnalysis?.score || 0) - (a.matchScore || a.aiAnalysis?.score || 0));
     }, [filteredCandidates]);
 
     const handleSelectAll = () => {
-        if (selectedIds.size === sortedCandidates.length) {
+        if (selectedIds.size === sortedCandidates.length && sortedCandidates.length > 0) {
             setSelectedIds(new Set());
         } else {
             setSelectedIds(new Set(sortedCandidates.map(c => c.id)));
@@ -145,48 +147,65 @@ export default function Dashboard() {
             {/* ===== TOOLBAR ===== */}
             <div className="px-6 lg:px-8 pb-4">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    {/* Filters */}
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <div className="flex items-center gap-1.5 text-navy-500 mr-1">
-                            <Filter className="w-4 h-4" />
-                            <span className="text-[12px] font-semibold uppercase tracking-wider hidden sm:inline">Filtreler</span>
+                    {/* Left: Selection + Filters */}
+                    <div className="flex items-center gap-4 flex-wrap">
+                        {/* Select All Checkbox */}
+                        <div
+                            onClick={handleSelectAll}
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.08] transition-all cursor-pointer group"
+                        >
+                            <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${selectedIds.size === sortedCandidates.length && sortedCandidates.length > 0
+                                ? 'bg-electric border-electric text-white'
+                                : 'bg-white/10 border-white/20'}`}>
+                                {selectedIds.size === sortedCandidates.length && sortedCandidates.length > 0 && (
+                                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                )}
+                            </div>
+                            <span className="text-[12px] font-bold text-navy-300 group-hover:text-white transition-colors">Tümünü Seç</span>
                         </div>
 
-                        <select
-                            value={departmentFilter}
-                            onChange={(e) => setDepartmentFilter(e.target.value)}
-                            className="px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-[12px] text-navy-300 outline-none focus:border-electric/40 transition-all cursor-pointer appearance-none pr-7 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_6px_center]"
-                            id="department-filter"
-                        >
-                            {departments.map((d) => (
-                                <option key={d} value={d}>{d === 'all' ? 'Tüm Departmanlar' : d}</option>
-                            ))}
-                        </select>
+                        <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1.5 text-navy-500 mr-1">
+                                <Filter className="w-4 h-4" />
+                                <span className="text-[12px] font-semibold uppercase tracking-wider hidden sm:inline">Filtreler</span>
+                            </div>
 
-                        <select
-                            value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value)}
-                            className="px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-[12px] text-navy-300 outline-none focus:border-electric/40 transition-all cursor-pointer appearance-none pr-7 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_6px_center]"
-                            id="status-filter"
-                        >
-                            {STATUS_OPTIONS.map((o) => (
-                                <option key={o.value} value={o.value}>{o.label}</option>
-                            ))}
-                        </select>
+                            <select
+                                value={departmentFilter}
+                                onChange={(e) => setDepartmentFilter(e.target.value)}
+                                className="px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-[12px] text-navy-300 outline-none focus:border-electric/40 transition-all cursor-pointer appearance-none pr-7 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_6px_center]"
+                                id="department-filter"
+                            >
+                                {departments.map((d) => (
+                                    <option key={d} value={d}>{d === 'all' ? 'Tüm Departmanlar' : d}</option>
+                                ))}
+                            </select>
 
-                        <select
-                            value={experienceFilter}
-                            onChange={(e) => setExperienceFilter(e.target.value)}
-                            className="px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-[12px] text-navy-300 outline-none focus:border-electric/40 transition-all cursor-pointer appearance-none pr-7 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_6px_center]"
-                            id="experience-filter"
-                        >
-                            {EXPERIENCE_OPTIONS.map((o) => (
-                                <option key={o.value} value={o.value}>{o.label}</option>
-                            ))}
-                        </select>
+                            <select
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value)}
+                                className="px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-[12px] text-navy-300 outline-none focus:border-electric/40 transition-all cursor-pointer appearance-none pr-7 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_6px_center]"
+                                id="status-filter"
+                            >
+                                {STATUS_OPTIONS.map((o) => (
+                                    <option key={o.value} value={o.value}>{o.label}</option>
+                                ))}
+                            </select>
+
+                            <select
+                                value={experienceFilter}
+                                onChange={(e) => setExperienceFilter(e.target.value)}
+                                className="px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-[12px] text-navy-300 outline-none focus:border-electric/40 transition-all cursor-pointer appearance-none pr-7 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_6px_center]"
+                                id="experience-filter"
+                            >
+                                {EXPERIENCE_OPTIONS.map((o) => (
+                                    <option key={o.value} value={o.value}>{o.label}</option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
 
-                    {/* Count + Sort indicator + Bulk Actions */}
+                    {/* Right: Actions/Count */}
                     <div className="flex items-center gap-4">
                         {selectedIds.size > 0 ? (
                             <div className="flex items-center gap-3 animate-in fade-in slide-in-from-right-4 duration-300">
@@ -222,7 +241,7 @@ export default function Dashboard() {
                                     <ArrowDownWideNarrow className="w-3.5 h-3.5" />
                                     <span>Match Score sırası</span>
                                 </div>
-                                <span className="text-[12px] text-navy-500 font-medium">
+                                <span className="text-[12px] text-navy-500 font-medium whitespace-nowrap">
                                     {sortedCandidates.length} / {stats.total} aday
                                 </span>
                             </>

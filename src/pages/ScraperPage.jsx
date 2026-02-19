@@ -36,7 +36,7 @@ export default function ScraperPage() {
         getAvailableModels().then(models => {
             setAvailableModels(models);
             if (models.length > 0) setSelectedModel(models[0].id);
-            else setSelectedModel('gemini-pro');
+            else setSelectedModel('gemini-2.0-flash');
         });
     }, []);
 

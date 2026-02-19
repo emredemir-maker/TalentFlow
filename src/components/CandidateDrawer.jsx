@@ -1,561 +1,613 @@
 // src/components/CandidateDrawer.jsx
-// Right-side drawer with AI-analyzed CV details + Gemini integration
+// Context-aware Candidate Management + Assessment + Reporting
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import SendMessageModal from './SendMessageModal';
 import {
-    X,
-    Mail,
-    Phone,
-    MapPin,
-    Briefcase,
-    GraduationCap,
-    Calendar,
-    Globe,
-    TrendingUp,
-    TrendingDown,
-    Brain,
-    Target,
-    MessageCircle,
-    Users,
-    Star,
-    Sparkles,
-    ChevronRight,
-    Zap,
-    Send,
-    Linkedin,
-    Layers,
-    Loader2,
+    X, Mail, Phone, MapPin, Briefcase, GraduationCap, Calendar, Globe,
+    TrendingUp, TrendingDown, Brain, Target, MessageCircle, Users, Star,
+    Sparkles, ChevronRight, Zap, Send, Layers, Loader2, ShieldAlert,
+    ClipboardCheck, Printer, FileText, PlusCircle, Trash2
 } from 'lucide-react';
 import MatchScoreRing from './MatchScoreRing';
 import AIAnalysisPanel from './AIAnalysisPanel';
 import { analyzeCandidateMatch, getAvailableModels } from '../services/geminiService';
 import { useCandidates } from '../context/CandidatesContext';
+import { usePositions } from '../context/PositionsContext';
+import { calculateMatchScore } from '../services/matchService';
 
 const STATUS_CONFIG = {
-    new: { label: 'Yeni', dot: 'bg-violet-400', next: 'review' },
-    review: { label: 'İnceleme', dot: 'bg-amber-400', next: 'interview' },
-    interview: { label: 'Mülakat', dot: 'bg-blue-400', next: 'offer' },
-    offer: { label: 'Teklif', dot: 'bg-cyan-400', next: 'hired' },
-    hired: { label: 'İşe Alındı', dot: 'bg-emerald-400', next: null },
-    rejected: { label: 'Reddedildi', dot: 'bg-red-400', next: 'review' },
+    ai_analysis: { label: 'AI Analiz', dot: 'bg-violet-400', color: 'text-violet-400', next: 'review' },
+    review: { label: 'İlk İnceleme', dot: 'bg-amber-400', color: 'text-amber-400', next: 'interview' },
+    interview: { label: 'Mülakat Değerlendirme', dot: 'bg-blue-400', color: 'text-blue-400', next: 'deep_review' },
+    deep_review: { label: 'Detaylı İnceleme', dot: 'bg-indigo-400', color: 'text-indigo-400', next: 'offer' },
+    offer: { label: 'Teklif', dot: 'bg-cyan-400', color: 'text-cyan-400', next: 'hired' },
+    hired: { label: 'Onaylandı', dot: 'bg-emerald-400', color: 'text-emerald-400', next: null },
+    rejected: { label: 'Reddedildi', dot: 'bg-red-400', color: 'text-red-400', next: null },
 };
 
-// Default job description for analysis
-const DEFAULT_JOB_DESC = `Aranan Pozisyon: Yazılım Geliştirici
+const REJECTION_REASONS = [
+    { id: 'not_suitable', label: 'Uygun Değil' },
+    { id: 'declined', label: 'Kabul Etmedi' },
+    { id: 'wrong_entry', label: 'Hatalı Kayıt' }
+];
 
-Gereksinimler:
-- Minimum 3 yıl yazılım geliştirme deneyimi
-- Modern web teknolojileri (React, Node.js, TypeScript) bilgisi
-- Veritabanı tasarımı ve yönetimi deneyimi
-- RESTful API tasarımı ve geliştirmesi
-- Git versiyon kontrol sistemi kullanımı
-- Takım çalışmasına yatkınlık
-- Türkçe ve İngilizce iletişim becerisi
 
-Tercih Edilen:
-- Cloud platformları (AWS, GCP) deneyimi
-- CI/CD pipeline kurulumu
-- Agile/Scrum metodolojileri
-- Açık kaynak projelere katkı`;
+export default function CandidateDrawer({ candidate: initialCandidate, onClose, positionContext = null }) {
+    const { updateCandidate, candidates: allCandidates } = useCandidates();
+    const candidate = allCandidates.find(c => c.id === initialCandidate?.id) || initialCandidate;
 
-function ScoreBar({ label, icon: Icon, value, color = 'bg-electric' }) {
-    return (
-        <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-[12px] text-navy-400">
-                    <Icon className="w-3.5 h-3.5" />
-                    <span>{label}</span>
-                </div>
-                <span className="text-[12px] font-bold text-navy-200">{value}%</span>
-            </div>
-            <div className="h-1.5 bg-navy-800 rounded-full overflow-hidden">
-                <div
-                    className={`h-full rounded-full ${color} transition-all duration-1000 ease-out`}
-                    style={{ width: `${value}%` }}
-                />
-            </div>
-        </div>
-    );
-}
+    const { positions } = usePositions();
 
-export default function CandidateDrawer({ candidate, onClose }) {
-    const { updateCandidate } = useCandidates();
     const [updatingStatus, setUpdatingStatus] = useState(false);
+    const reportRef = useRef(null);
 
     // UI State
-    const [activeTab, setActiveTab] = useState('profile'); // 'profile' | 'ai-analysis'
+    const [activeTab, setActiveTab] = useState(positionContext ? 'matches' : 'profile');
     const [showJobInput, setShowJobInput] = useState(false);
     const [showSendModal, setShowSendModal] = useState(false);
 
     // AI Analysis State
-    const [aiResult, setAiResult] = useState(null);
+    const [aiResult, setAiResult] = useState(candidate?.aiAnalysis || null);
     const [aiLoading, setAiLoading] = useState(false);
     const [aiError, setAiError] = useState(null);
-    const [jobDescription, setJobDescription] = useState(DEFAULT_JOB_DESC);
+    const [jobDescription, setJobDescription] = useState('');
 
-    // Model Selection State
-    const [availableModels, setAvailableModels] = useState([]);
-    const [selectedModel, setSelectedModel] = useState('');
-    const [loadingModels, setLoadingModels] = useState(false);
+    // Assessment State (Point 3)
+    const [assessments, setAssessments] = useState(candidate?.assessments || {
+        technical: 0,
+        communication: 0,
+        culture: 0,
+        notes: ''
+    });
 
-    // Fetch available models on mount
-    useEffect(() => {
-        async function fetchModels() {
-            setLoadingModels(true);
-            try {
-                const models = await getAvailableModels();
-                setAvailableModels(models);
-                if (models.length > 0) {
-                    const defaultModel = models.find(m => m.id === 'gemini-1.5-flash') || models[0];
-                    setSelectedModel(defaultModel.id);
-                } else {
-                    setSelectedModel('gemini-1.5-flash');
-                }
-            } catch (error) {
-                console.error('Failed to load models:', error);
-                setSelectedModel('gemini-1.5-flash');
-            } finally {
-                setLoadingModels(false);
-            }
+    const liveScore = Math.round((assessments.technical + assessments.communication + assessments.culture) / 3);
+
+    // Score Calculation (Prioritize Current AI Session -> Saved AI Score -> static algo)
+    const activeMatch = useMemo(() => {
+        // 1. If we just ran an AI analysis in this session, use it immediately
+        if (aiResult?.score > 0) {
+            return {
+                score: aiResult.score,
+                isHighMatch: aiResult.score >= 75,
+                reasons: aiResult.reasons || (aiResult.summary ? [aiResult.summary] : ['Yeni AI Analizi Tamamlandı']),
+
+                initialScore: candidate?.initialAiScore || aiResult.score
+            };
         }
-        fetchModels();
-    }, []);
 
-    if (!candidate) return null;
+        // 2. If we have a saved matchScore in the database, use it
+        if (candidate?.matchScore > 0) {
+            return {
+                score: candidate.matchScore,
+                isHighMatch: candidate.matchScore >= 75,
+                reasons: candidate.aiAnalysis?.reasons || (candidate.aiAnalysis?.summary ? [candidate.aiAnalysis.summary] : ['Sistem Taraması Mevcut']),
 
-    const currentStatusKey = candidate.status || 'new';
-    const status = STATUS_CONFIG[currentStatusKey] || STATUS_CONFIG.new;
-    const analysis = candidate.aiAnalysis || {};
+                initialScore: candidate?.initialAiScore || candidate.matchScore
+            };
+        }
 
-    const handleUpdateStatus = async (newStatus) => {
-        if (!candidate.id || updatingStatus) return;
+        // 3. Fallback to static algorithm (First look)
+        const targetPos = positionContext || positions.find(p => p.title === candidate?.matchedPositionTitle) || positions[0];
+        const baseMatch = calculateMatchScore(candidate, targetPos);
+        return {
+            ...baseMatch,
+            initialScore: candidate?.initialAiScore || baseMatch.score
+        };
+    }, [candidate, positionContext, positions, aiResult]);
+
+
+
+    // Calculate smart matches for open positions (Point 1 & 2)
+    const smartMatches = useMemo(() => {
+        if (!positions || !candidate) return [];
+        return positions
+            .filter(p => p.status === 'open')
+            .map(p => {
+                // Check if we have a stored AI analysis for this specific position
+                const savedAnalysis = candidate.positionAnalyses?.[p.title];
+
+                if (savedAnalysis) {
+                    return {
+                        position: p,
+                        match: {
+                            score: savedAnalysis.score,
+                            reasons: savedAnalysis.reasons || (savedAnalysis.summary ? [savedAnalysis.summary] : ['AI Analizi Mevcut']),
+                            isAi: true // Flag to show AI indicator
+                        }
+                    };
+                }
+
+                return {
+                    position: p,
+                    match: calculateMatchScore(candidate, p)
+                };
+            })
+            .sort((a, b) => b.match.score - a.match.score);
+    }, [positions, candidate]);
+
+
+    const handleUpdateAssessment = async () => {
         setUpdatingStatus(true);
         try {
-            await updateCandidate(candidate.id, { status: newStatus });
-            // Close drawer after successful update to provide feedback
-            setTimeout(() => {
-                onClose();
-            }, 300);
+            // Calculate a human assessment score (average of the three metrics)
+            const humanScore = Math.round((assessments.technical + assessments.communication + assessments.culture) / 3);
+
+            // Determine stage based on current status
+            let newStage = 'review';
+            if (['interview', 'deep_review'].includes(candidate.status)) {
+                newStage = 'interview';
+            } else if (['offer', 'hired'].includes(candidate.status)) {
+                newStage = 'offer';
+            }
+
+
+            const updates = {
+                assessments,
+                matchScore: humanScore, // Human score becomes the definitive matchScore
+                scoringStage: newStage,
+                manualScore: humanScore,
+                lastAssessedBy: 'Human'
+            };
+
+            await updateCandidate(candidate.id, updates);
+            alert('Değerlendirme başarıyla kaydedildi. Skor güncellendi ve AI ezilmesine karşı korumaya alındı.');
         } catch (err) {
-            console.error('Status update error:', err);
+            console.error(err);
         } finally {
             setUpdatingStatus(false);
         }
     };
 
-    const handleRunAnalysis = useCallback(async () => {
+    const handlePrintReport = () => {
+        window.print();
+    };
+
+
+    const handleRunAnalysis = useCallback(async (customJobDesc = null) => {
+        let descToUse = customJobDesc || jobDescription;
+
+        // Fallback: If no explicit JD, try to deduce from matched position
+        if (!descToUse) {
+            const targetPos = positionContext || positions.find(p => p.title === candidate?.matchedPositionTitle) || positions[0];
+            if (targetPos) {
+                descToUse = `${targetPos.title}\n${targetPos.requirements?.join(', ')}`;
+            }
+        }
+
+        if (!descToUse) {
+            alert("Analiz için bir pozisyon veya iş tanımı bulunamadı.");
+            return;
+        }
+
+
         setAiLoading(true);
         setAiError(null);
-        setAiResult(null);
         setActiveTab('ai-analysis');
 
-        // Build candidate profile string
-        const profileText = `
-İsim: ${candidate.name}
-Pozisyon: ${candidate.position}
-Departman: ${candidate.department}
-Deneyim: ${candidate.experience} yıl
-Konum: ${candidate.location}
-Eğitim: ${candidate.education || 'Belirtilmemiş'}
-Yetenekler: ${(candidate.skills || []).join(', ')}
-Maaş Beklentisi: ${candidate.salary}
-Notlar: ${candidate.notes || ''}
-    `.trim();
-
         try {
-            const result = await analyzeCandidateMatch(jobDescription, profileText, selectedModel);
+            const result = await analyzeCandidateMatch(descToUse, candidate, 'gemini-2.0-flash');
             setAiResult(result);
+
+            const posTitle = descToUse.split('\n')[0].substring(0, 50);
+
+            // Merge with existing position analyses
+            const existingAnalyses = candidate.positionAnalyses || {};
+            const updatedAnalyses = {
+                ...existingAnalyses,
+                [posTitle]: result
+            };
+
+            const updates = {
+                aiAnalysis: result,
+                aiScore: result.score,
+                matchedPositionTitle: posTitle,
+                summary: result.summary, // Retrofit summary from analysis
+                positionAnalyses: updatedAnalyses
+            };
+
+            // Rule: AI can only overwrite common matchScore in 'initial' stage
+            const currentStage = candidate.scoringStage || 'initial';
+            if (currentStage === 'initial') {
+                updates.matchScore = result.score;
+                updates.initialAiScore = result.score;
+            } else {
+                console.log(`[CandidateDrawer] AI Score (${result.score}) received, but NOT overwriting Stage: ${currentStage}`);
+            }
+
+
+            await updateCandidate(candidate.id, updates);
         } catch (err) {
-            console.error('[TalentFlow] AI Analysis error:', err);
             setAiError(err.message);
         } finally {
             setAiLoading(false);
         }
-    }, [candidate, jobDescription, selectedModel]);
+
+    }, [candidate, jobDescription, updateCandidate]);
+
+    if (!candidate) return null;
+
+    const status = STATUS_CONFIG[candidate.status] || STATUS_CONFIG.ai_analysis;
+
 
     return (
         <>
-            {/* Overlay */}
-            <div
-                className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] animate-fade-in"
-                onClick={onClose}
-            />
-
-            {/* Drawer */}
-            <div className="fixed top-0 right-0 h-full w-full max-w-[520px] z-[70] flex flex-col bg-navy-900 border-l border-white/[0.06] shadow-2xl animate-slide-in-right">
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] print:hidden" onClick={onClose} />
+            <div className="fixed top-0 right-0 h-full w-full max-w-[560px] z-[70] flex flex-col bg-navy-900 border-l border-white/[0.06] shadow-2xl animate-slide-in-right overflow-hidden print:static print:w-full print:max-w-none print:shadow-none print:bg-white print:text-black">
 
                 {/* ===== HEADER ===== */}
-                <div className="shrink-0 p-6 border-b border-white/[0.06]">
+                <div className="shrink-0 p-6 border-b border-white/[0.06] print:border-black">
                     <div className="flex items-start justify-between mb-5">
                         <div className="flex items-center gap-4">
-                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-electric to-violet-accent flex items-center justify-center text-xl font-bold text-white shadow-[0_0_24px_rgba(59,130,246,0.25)]">
-                                {(candidate.name || 'Aday').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-electric to-violet-accent flex items-center justify-center text-xl font-bold text-white print:bg-none print:text-black print:border print:border-black">
+                                {candidate.name?.[0]}
                             </div>
                             <div>
-                                <h2 className="text-lg font-bold text-white">{candidate.name || 'İsimsiz Aday'}</h2>
-                                <p className="text-sm text-navy-400">{candidate.position || 'Pozisyon Belirtilmemiş'}</p>
-                                <div className="flex items-center gap-2 mt-1">
-                                    <span className={`w-2 h-2 rounded-full ${status.dot || 'bg-navy-500'}`} />
-                                    <span className="text-[11px] text-navy-400 font-medium">{status.label || 'Durum Belirtilmemiş'}</span>
-                                </div>
-                            </div>
-                        </div>
-                        <button
-                            onClick={onClose}
-                            className="w-8 h-8 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-navy-400 hover:text-white hover:bg-white/[0.08] transition-all cursor-pointer"
-                        >
-                            <X className="w-4 h-4" />
-                        </button>
-                    </div>
+                                <h2 className="text-xl font-bold text-white print:text-black">{candidate.name || 'İsimsiz'}</h2>
+                                <p className="text-sm text-navy-400 print:text-gray-600">{candidate.position || 'Aday'}</p>
 
-                    {/* Score overview */}
-                    <div className="flex items-center gap-5 p-4 rounded-xl bg-white/[0.03] border border-white/[0.06] mb-4">
-                        <MatchScoreRing score={candidate.matchScore || 0} size={64} />
-                        <div className="flex-1 min-w-0">
-                            <div className="text-[11px] uppercase tracking-wider text-navy-500 font-semibold mb-1">
-                                Uyumluluk Skoru
-                            </div>
-                            <div className="text-2xl font-extrabold text-white">
-                                %{candidate.matchScore || 0}
-                            </div>
-                        </div>
+                                <div className="flex flex-wrap items-center gap-2 mt-2 print:hidden">
+                                    {/* STATUS BADGE & SWITCHER */}
+                                    <div className="relative group/status">
+                                        <div className={`flex items-center gap-2 px-2.5 py-1 rounded-lg bg-white/[0.03] border border-white/[0.06] cursor-pointer hover:bg-white/[0.06] transition-all`}>
+                                            <span className={`w-2 h-2 rounded-full ${status.dot}`} />
+                                            <span className="text-[11px] text-navy-300 font-bold uppercase tracking-wider">{status.label}</span>
+                                            {candidate.rejectionReason && (
+                                                <span className="text-[10px] text-red-400/80 font-medium lowercase italic">({REJECTION_REASONS.find(r => r.id === candidate.rejectionReason)?.label})</span>
+                                            )}
+                                        </div>
 
-                        {/* AI Analyze button */}
-                        <div className="flex flex-col gap-2">
-                            {candidate.matchScore > 0 && candidate.matchScore < 75 && (
-                                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-300 text-[10px] font-bold animate-pulse">
-                                    <ShieldAlert className="w-3 h-3" />
-                                    <span>Manuel İnceleme Gerekli</span>
-                                </div>
-                            )}
-                            <button
-                                onClick={() => showJobInput ? handleRunAnalysis() : setShowJobInput(true)}
-                                disabled={aiLoading}
-                                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-electric text-white text-[12px] font-semibold shadow-[0_4px_16px_rgba(139,92,246,0.3)] hover:shadow-[0_6px_24px_rgba(139,92,246,0.4)] hover:-translate-y-0.5 transition-all disabled:opacity-50 cursor-pointer shrink-0"
-                            >
-                                <Sparkles className="w-4 h-4" />
-                                {aiLoading ? 'Analiz...' : 'AI Analiz'}
-                            </button>
-                        </div>
-                    </div>
+                                        {/* Status Dropdown */}
+                                        <div className="absolute top-full left-0 mt-2 w-56 bg-navy-800 border border-white/[0.08] rounded-xl shadow-2xl opacity-0 invisible group-hover/status:opacity-100 group-hover/status:visible transition-all z-[80] p-1.5 backdrop-blur-xl">
+                                            {Object.entries(STATUS_CONFIG).map(([key, config]) => (
+                                                <button
+                                                    key={key}
+                                                    onClick={() => updateCandidate(candidate.id, { status: key, rejectionReason: null })}
+                                                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-[11px] font-bold transition-all ${candidate.status === key ? 'bg-white/[0.06] text-white' : 'text-navy-400 hover:bg-white/[0.04] hover:text-navy-100'}`}
+                                                >
+                                                    <span className={`w-2 h-2 rounded-full ${config.dot}`} />
+                                                    {config.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
 
-                    {/* Job Description Input (expandable) */}
-                    {showJobInput && !aiResult && !aiLoading && (
-                        <div className="space-y-3 animate-fade-in-up mb-4 px-1">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <Brain className="w-4 h-4 text-violet-400" />
-                                    <span className="text-[12px] font-semibold text-navy-300">İş Tanımı</span>
-                                </div>
-                                <button
-                                    onClick={() => setShowJobInput(false)}
-                                    className="text-[11px] text-navy-500 hover:text-navy-300 cursor-pointer"
-                                >
-                                    İptal
-                                </button>
-                            </div>
-                            <textarea
-                                value={jobDescription}
-                                onChange={(e) => setJobDescription(e.target.value)}
-                                rows={5}
-                                className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.06] text-[12px] text-navy-200 placeholder:text-navy-500 outline-none focus:border-electric/40 focus:ring-2 focus:ring-electric/10 transition-all resize-none leading-relaxed"
-                                placeholder="Pozisyon gereksinimlerini buraya yapıştırın..."
-                            />
-
-                            {/* Model Selection Dropdown */}
-                            <div className="flex items-center gap-2 px-1">
-                                <Layers className="w-3.5 h-3.5 text-navy-400" />
-                                <select
-                                    value={selectedModel}
-                                    onChange={(e) => setSelectedModel(e.target.value)}
-                                    disabled={loadingModels}
-                                    className="flex-1 bg-white/[0.04] border border-white/[0.06] rounded-lg px-2 py-1.5 text-[11px] text-navy-300 outline-none focus:border-electric/40"
-                                >
-                                    {loadingModels ? (
-                                        <option>Modeller yükleniyor...</option>
-                                    ) : availableModels.length > 0 ? (
-                                        availableModels.map(model => (
-                                            <option key={model.id} value={model.id}>
-                                                {model.displayName}
-                                            </option>
-                                        ))
-                                    ) : (
-                                        <option value="gemini-pro">Gemini Pro (Default)</option>
+                                    {/* Next Step Shortcut */}
+                                    {status.next && (
+                                        <button
+                                            onClick={() => updateCandidate(candidate.id, { status: status.next, rejectionReason: null })}
+                                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-electric/10 border border-electric/20 text-electric-light text-[10px] font-bold hover:bg-electric/20 transition-all"
+                                        >
+                                            Sonraki Aşama
+                                            <ChevronRight className="w-3 h-3" />
+                                        </button>
                                     )}
-                                </select>
-                            </div>
 
-                            <button
-                                onClick={handleRunAnalysis}
-                                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-electric text-white text-[13px] font-semibold shadow-[0_4px_16px_rgba(139,92,246,0.3)] hover:shadow-[0_6px_24px_rgba(139,92,246,0.4)] transition-all cursor-pointer"
-                            >
-                                <Zap className="w-4 h-4" />
-                                {selectedModel ? `${selectedModel.replace('models/', '').split('-')[1]} ile Analiz Et` : 'Analiz Et'}
+                                    {/* Reject Button & Sub-reasons */}
+                                    {candidate.status !== 'rejected' && candidate.status !== 'hired' && (
+                                        <div className="relative group/reject">
+                                            <button className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-500/5 border border-red-500/10 text-red-400/60 text-[10px] font-bold hover:bg-red-500/10 hover:text-red-400 transition-all">
+                                                Reddet
+                                            </button>
+                                            <div className="absolute top-full left-0 mt-2 w-40 bg-navy-800 border border-white/[0.08] rounded-xl shadow-2xl opacity-0 invisible group-hover/reject:opacity-100 group-hover/reject:visible transition-all z-[80] p-1.5 backdrop-blur-xl">
+                                                <div className="px-3 py-1.5 text-[9px] font-bold text-navy-500 uppercase tracking-widest border-b border-white/[0.04] mb-1">Neden?</div>
+                                                {REJECTION_REASONS.map(reason => (
+                                                    <button
+                                                        key={reason.id}
+                                                        onClick={() => updateCandidate(candidate.id, { status: 'rejected', rejectionReason: reason.id })}
+                                                        className="w-full text-left px-3 py-2 rounded-lg text-[11px] font-bold text-navy-400 hover:bg-red-500/10 hover:text-red-400 transition-all"
+                                                    >
+                                                        {reason.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2 print:hidden">
+
+                            <button onClick={handlePrintReport} className="p-2 rounded-lg bg-white/[0.04] text-navy-400 hover:text-white" title="Rapor Al">
+                                <Printer className="w-4 h-4" />
+                            </button>
+                            <button onClick={onClose} className="p-2 rounded-lg bg-white/[0.04] text-navy-400 hover:text-white">
+                                <X className="w-4 h-4" />
                             </button>
                         </div>
-                    )}
-
-                    {/* Tabs */}
-                    <div className="flex gap-1 mt-3">
-                        <button
-                            onClick={() => setActiveTab('profile')}
-                            className={`flex-1 py-2 rounded-lg text-[12px] font-semibold transition-all cursor-pointer ${activeTab === 'profile'
-                                ? 'bg-electric/10 text-electric-light'
-                                : 'text-navy-500 hover:text-navy-300 hover:bg-white/[0.04]'
-                                }`}
-                        >
-                            Profil
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('ai-analysis')}
-                            className={`flex-1 py-2 rounded-lg text-[12px] font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${activeTab === 'ai-analysis'
-                                ? 'bg-violet-500/10 text-violet-400'
-                                : 'text-navy-500 hover:text-navy-300 hover:bg-white/[0.04]'
-                                }`}
-                        >
-                            <Sparkles className="w-3.5 h-3.5" />
-                            AI Analiz
-                            {aiResult && (
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                            )}
-                        </button>
                     </div>
                 </div>
 
-                {/* ===== SCROLLABLE CONTENT ===== */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-6">
 
-                    {/* === TAB: Profile === */}
+                <div className="flex items-center gap-6 p-5 rounded-2xl bg-white/[0.03] border border-white/[0.06] mb-4 relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-electric/5 rounded-full -mr-16 -mt-16 blur-3xl group-hover:bg-electric/10 transition-colors" />
+
+                    <div className="relative">
+                        <MatchScoreRing
+                            score={activeTab === 'assessments' ? liveScore : activeMatch.score}
+                            size={80}
+                        />
+                        {activeTab === 'assessments' && liveScore !== activeMatch.score && (
+                            <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 border border-navy-900 flex items-center justify-center animate-pulse">
+                                <Zap className="w-2.5 h-2.5 text-white" />
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="flex-1 space-y-2">
+                        <div className="flex items-center gap-2">
+                            <div className="text-[10px] uppercase tracking-widest text-navy-500 font-bold">
+                                {positionContext || candidate.matchedPositionTitle
+                                    ? `${positionContext?.title || candidate.matchedPositionTitle} Uygunluğu`
+                                    : 'Aday Uyumluluk Tahmini'}
+                            </div>
+                            <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter ${candidate.scoringStage === 'initial' || !candidate.scoringStage ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}>
+                                {candidate.scoringStage === 'interview' ? 'Mülakat Skoru' : candidate.scoringStage === 'review' ? 'İnceleme Skoru' : 'İlk AI Skoru'}
+                            </span>
+                        </div>
+
+                        <div className="flex items-end gap-3">
+                            <div className="text-4xl font-black text-white tracking-tight">
+                                %{activeTab === 'assessments' ? liveScore : activeMatch.score}
+                            </div>
+
+                            {/* SCORE EVOLUTION */}
+                            <div className="flex flex-col mb-1 border-l border-white/[0.08] pl-3">
+                                <div className="flex items-center gap-1.5 grayscale opacity-50">
+                                    <span className="text-[9px] font-bold text-navy-400">İlk: %{activeMatch.initialScore}</span>
+                                    <ChevronRight className="w-2 h-2 text-navy-600" />
+                                    <span className="text-[9px] font-bold text-emerald-400">Şu an: %{activeMatch.score}</span>
+                                </div>
+                                <div className="text-[9px] text-navy-500 mt-1">
+                                    Kaynak: <span className="font-bold text-navy-300">{candidate.lastAssessedBy || 'Otonom AI'}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                        {activeMatch.isHighMatch ? (
+                            <div className="px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 text-[11px] font-bold border border-emerald-500/20 flex items-center gap-2 shadow-lg shadow-emerald-500/5">
+                                <Star className="w-3.5 h-3.5" /> Güçlü Aday
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-end gap-1">
+                                <div className="px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 text-[11px] font-bold border border-red-500/20 flex items-center gap-2 shadow-lg shadow-red-500/5">
+                                    <ShieldAlert className="w-3.5 h-3.5" /> Manuel İnceleme
+                                </div>
+                                {activeMatch.reasons[0] && (
+                                    <span className="text-[9px] text-navy-400 max-w-[150px] text-right leading-tight">
+                                        {activeMatch.reasons[0]}
+                                    </span>
+                                )}
+                            </div>
+                        )}
+
+                        {activeTab === 'assessments' && liveScore !== activeMatch.score && (
+                            <div className="px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-500 text-[10px] font-bold border border-amber-500/20 animate-pulse text-center">
+                                Kaydedilmemiş Değişiklik
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+
+
+
+                {/* TABS */}
+                <div className="flex gap-1 print:hidden">
+                    {[
+                        { id: 'profile', label: 'Profil', icon: FileText },
+                        { id: 'matches', label: 'Pozisyonlar', icon: Target },
+                        { id: 'assessments', label: 'Değerlendirme', icon: ClipboardCheck },
+                        { id: 'ai-analysis', label: 'AI Analiz', icon: Sparkles }
+                    ].map(tab => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            className={`flex-1 flex flex-col items-center py-2 rounded-lg transition-all ${activeTab === tab.id ? 'bg-electric/10 text-electric-light shadow-inner shadow-electric/5' : 'text-navy-500 hover:bg-white/[0.04]'}`}
+                        >
+                            <tab.icon className="w-4 h-4 mb-1" />
+                            <span className="text-[10px] font-bold uppercase tracking-tight">{tab.label}</span>
+                        </button>
+                    ))}
+                </div>
+
+
+
+                {/* ===== CONTENT ===== */}
+                <div className="flex-1 overflow-y-auto p-6 space-y-8 scrollbar-hide print:overflow-visible print:p-0">
+
+                    {/* TAB: PROFILE */}
                     {activeTab === 'profile' && (
-                        <>
-                            {/* Contact Info */}
-                            <Section title="İletişim">
-                                <div className="grid grid-cols-1 gap-2.5">
-                                    <InfoRow icon={Mail} label="E-posta" value={candidate.email} />
-                                    <InfoRow icon={Phone} label="Telefon" value={candidate.phone} />
-                                    <InfoRow icon={MapPin} label="Konum" value={candidate.location} />
-                                    <InfoRow icon={Calendar} label="Başvuru" value={candidate.appliedDate} />
-                                    <InfoRow icon={Globe} label="Kaynak" value={candidate.source} />
-                                </div>
+                        <div className="space-y-6">
+                            <Section title="Profesyonel Özet">
+                                <p className="text-sm text-navy-200 leading-relaxed italic border-l-2 border-electric/30 pl-4 py-1">
+                                    {candidate.summary || candidate.about || 'Aday hakkında özet bilgi bulunmuyor.'}
+                                </p>
                             </Section>
 
-                            {/* Details */}
-                            <Section title="Detaylar">
+                            <Section title="Eğitim & Deneyim">
+
                                 <div className="grid grid-cols-2 gap-3">
-                                    <MiniCard label="Departman" value={candidate.department || 'Belirtilmemiş'} icon={Briefcase} />
-                                    <MiniCard label="Deneyim" value={`${candidate.experience || 0} Yıl`} icon={TrendingUp} />
-                                    <MiniCard label="Eğitim" value={(candidate.education || '').split(' - ')[0] || 'Belirtilmemiş'} icon={GraduationCap} />
-                                    <MiniCard label="Maaş" value={candidate.salary || 'Belirtilmemiş'} icon={Star} />
+                                    <MiniCard label="Deneyim" value={`${candidate.experience || 0} Yıl`} icon={Briefcase} />
+                                    <MiniCard label="Eğitim" value={candidate.education || 'Belirtilmemiş'} icon={GraduationCap} />
+                                    <MiniCard label="Departman" value={candidate.department} icon={Layers} />
+                                    <MiniCard label="Maaş Beklentisi" value={candidate.salary} icon={Star} />
                                 </div>
                             </Section>
 
-                            {/* Skills */}
-                            <Section title="Yetenekler">
+                            <Section title="Teknik Yetkinlikler">
                                 <div className="flex flex-wrap gap-2">
-                                    {(Array.isArray(candidate.skills) ? candidate.skills : []).map((skill) => (
-                                        <span
-                                            key={skill}
-                                            className="px-3 py-1.5 rounded-lg text-[12px] font-medium text-navy-200 bg-electric/8 border border-electric/15 hover:bg-electric/15 transition-all"
-                                        >
+                                    {candidate.skills?.map(skill => (
+                                        <span key={skill} className="px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs text-navy-200">
                                             {skill}
                                         </span>
                                     ))}
-                                    {(!candidate.skills || candidate.skills.length === 0) && (
-                                        <span className="text-[12px] text-navy-500 italic">Yetenek belirtilmemiş</span>
-                                    )}
                                 </div>
                             </Section>
-
-                            {/* Existing AI Analysis (from seed data) */}
-                            {analysis && analysis.summary && (
-                                <>
-                                    <Section title="Ön Değerlendirme" icon={Brain}>
-                                        <p className="text-[13px] text-navy-300 leading-relaxed">{analysis.summary}</p>
-                                    </Section>
-
-                                    <Section title="Yetkinlik Puanları">
-                                        <div className="space-y-4">
-                                            <ScoreBar
-                                                label="Teknik Yetkinlik"
-                                                icon={Target}
-                                                value={analysis.scoreBreakdown?.technicalSkills || analysis.technicalScore || 0}
-                                                color="bg-electric"
-                                            />
-                                            <ScoreBar
-                                                label="Deneyim / Sektör"
-                                                icon={Briefcase}
-                                                value={analysis.scoreBreakdown?.experience || analysis.scoreBreakdown?.industryFit || analysis.communicationScore || 0}
-                                                color="bg-cyan-400"
-                                            />
-                                            <ScoreBar
-                                                label="Soft Skill / Kültür"
-                                                icon={Users}
-                                                value={analysis.scoreBreakdown?.softSkills || analysis.cultureFit || 0}
-                                                color="bg-violet-400"
-                                            />
-                                        </div>
-                                    </Section>
-
-                                    {analysis.strengths?.length > 0 && (
-                                        <Section title="Güçlü Yönler" icon={TrendingUp}>
-                                            <div className="space-y-2">
-                                                {analysis.strengths.map((s, i) => (
-                                                    <div key={i} className="flex items-start gap-2.5 text-[13px] text-navy-300">
-                                                        <div className="w-5 h-5 rounded-md bg-emerald-500/10 flex items-center justify-center shrink-0 mt-0.5">
-                                                            <ChevronRight className="w-3 h-3 text-emerald-400" />
-                                                        </div>
-                                                        <span>{s}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </Section>
-                                    )}
-
-                                    {analysis.weaknesses?.length > 0 && (
-                                        <Section title="Gelişim Alanları" icon={TrendingDown}>
-                                            <div className="space-y-2">
-                                                {analysis.weaknesses.map((w, i) => (
-                                                    <div key={i} className="flex items-start gap-2.5 text-[13px] text-navy-300">
-                                                        <div className="w-5 h-5 rounded-md bg-amber-500/10 flex items-center justify-center shrink-0 mt-0.5">
-                                                            <ChevronRight className="w-3 h-3 text-amber-400" />
-                                                        </div>
-                                                        <span>{w}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </Section>
-                                    )}
-
-                                    {analysis.recommendation && (
-                                        <Section title="Öneri" icon={Sparkles}>
-                                            <div className="p-4 rounded-xl bg-electric/5 border border-electric/10 text-[13px] text-navy-200 leading-relaxed">
-                                                {analysis.recommendation}
-                                            </div>
-                                        </Section>
-                                    )}
-                                </>
-                            )}
-
-                            {/* Notes */}
-                            {candidate.notes && (
-                                <Section title="Notlar">
-                                    <div className="p-3.5 rounded-xl bg-white/[0.03] border-l-[3px] border-electric text-[13px] text-navy-300 leading-relaxed">
-                                        {candidate.notes}
-                                    </div>
-                                </Section>
-                            )}
-                        </>
+                        </div>
                     )}
 
-                    {/* === TAB: AI Analysis === */}
-                    {activeTab === 'ai-analysis' && (
-                        <>
-                            {!aiResult && !aiLoading && !aiError && (
-                                <div className="flex flex-col items-center justify-center py-16 gap-4 text-center">
-                                    <div className="w-16 h-16 rounded-2xl bg-violet-500/10 border border-violet-500/10 flex items-center justify-center"
-                                        style={{ animation: 'float-subtle 3s ease-in-out infinite' }}
-                                    >
-                                        <Sparkles className="w-7 h-7 text-violet-400" />
+                    {/* TAB: MATCHES (Point 1 & 2) */}
+                    {activeTab === 'matches' && (
+                        <div className="space-y-4">
+                            <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold mb-2">
+                                * Aday, sistemdeki tüm açık pozisyonlarla otomatik olarak taranmıştır.
+                            </div>
+                            {smartMatches.map(({ position: pos, match }) => (
+                                <div key={pos.id} className={`p-4 rounded-xl border transition-all ${positionContext?.id === pos.id ? 'bg-electric/10 border-electric/40 shadow-lg shadow-electric/5' : 'bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.04]'}`}>
+                                    <div className="flex justify-between items-center mb-2">
+                                        <h4 className="font-bold text-white text-sm">{pos.title}</h4>
+                                        <span className={`text-xs font-bold px-2 py-0.5 rounded flex items-center gap-1 ${match.score > 70 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-navy-500/10 text-navy-400'}`}>
+                                            {match.isAi && <Sparkles className="w-3 h-3" />}
+                                            %{match.score}
+                                        </span>
                                     </div>
-                                    <h3 className="text-base font-bold text-navy-200">Gemini AI Analizi</h3>
-                                    <p className="text-[13px] text-navy-400 max-w-sm">
-                                        İş tanımı ile adayın CV'sini karşılaştırarak detaylı uyumluluk skoru, eşleşen yetenekler, eksiklik analizi ve kişiselleştirilmiş LinkedIn DM taslağı oluşturun.
-                                    </p>
-                                    <button
-                                        onClick={() => setShowJobInput(true)}
-                                        className="mt-2 flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-electric text-white text-[13px] font-semibold shadow-[0_4px_16px_rgba(139,92,246,0.3)] hover:shadow-[0_6px_24px_rgba(139,92,246,0.4)] transition-all cursor-pointer"
-                                    >
-                                        <Zap className="w-4 h-4" />
-                                        Analizi Başlat
+
+                                    <div className="flex flex-wrap gap-1.5 mb-3">
+                                        {match.reasons.map((r, i) => <span key={i} className="text-[10px] text-navy-400">• {r}</span>)}
+                                    </div>
+                                    <button onClick={() => handleRunAnalysis(`${pos.title}\n${pos.requirements?.join(', ')}`)} className="w-full py-1.5 text-[10px] font-bold uppercase tracking-widest text-navy-400 hover:text-white border border-white/[0.06] rounded-lg transition-all">
+                                        Detaylı Analiz Al
                                     </button>
                                 </div>
-                            )}
-
-                            <AIAnalysisPanel
-                                result={aiResult}
-                                loading={aiLoading}
-                                error={aiError}
-                                onRetry={handleRunAnalysis}
-                            />
-                        </>
+                            ))}
+                        </div>
                     )}
+
+                    {/* TAB: ASSESSMENTS (Point 3) */}
+                    {activeTab === 'assessments' && (
+                        <div className="space-y-6">
+                            <div className="p-4 rounded-xl bg-violet-500/5 border border-violet-500/10">
+                                <h4 className="text-xs font-black uppercase text-violet-400 mb-4 flex items-center gap-2">
+                                    <ClipboardCheck className="w-4 h-4" /> Mülakat Puanlaması (%40 Etki)
+                                </h4>
+                                <div className="space-y-5">
+                                    <RangeInput label="Teknik Yeterlilik" value={assessments.technical} onChange={v => setAssessments({ ...assessments, technical: v })} />
+                                    <RangeInput label="İletişim & Sosyal" value={assessments.communication} onChange={v => setAssessments({ ...assessments, communication: v })} />
+                                    <RangeInput label="Kültür Uyumu" value={assessments.culture} onChange={v => setAssessments({ ...assessments, culture: v })} />
+                                </div>
+                            </div>
+
+                            <Section title="Mülakat Notları">
+                                <textarea
+                                    className="w-full bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 text-sm text-white focus:border-electric/40 outline-none min-h-[150px]"
+                                    placeholder="Adayın güçlü ve zayıf yanları hakkında notlar..."
+                                    value={assessments.notes}
+                                    onChange={e => setAssessments({ ...assessments, notes: e.target.value })}
+                                />
+                            </Section>
+
+                        </div>
+                    )}
+
+
+
+                    {/* TAB: AI ANALYSIS */}
+                    {activeTab === 'ai-analysis' && (
+                        <AIAnalysisPanel result={aiResult} loading={aiLoading} error={aiError} onRetry={handleRunAnalysis} title={candidate.matchedPositionTitle} />
+                    )}
+
+                    {/* PRINT-ONLY EVALUATION REPORT (Point 4) */}
+                    <div className="hidden print:block space-y-8 mt-10">
+                        <div className="border-b-2 border-black pb-4">
+                            <h1 className="text-2xl font-black">ADAY DEĞERLENDİRME RAPORU</h1>
+                            <p className="text-sm font-bold">Oluşturulma Tarihi: {new Date().toLocaleDateString()}</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-10">
+                            <div>
+                                <h3 className="font-black border-b border-gray-300 mb-2">SİSTEM SKORU</h3>
+                                <p className="text-4xl font-black">%{activeMatch.systemScore || 0}</p>
+                                <div className="mt-2 text-xs space-y-1">
+                                    {activeMatch.reasons.map((r, i) => <p key={i}>• {r}</p>)}
+                                </div>
+                            </div>
+                            <div>
+                                <h3 className="font-black border-b border-gray-300 mb-2">MÜLAKAT SKORU</h3>
+                                <p className="text-4xl font-black">%{Math.round((assessments.technical + assessments.communication + assessments.culture) / 3) || 0}</p>
+                            </div>
+                        </div>
+                        <div className="p-4 bg-gray-50 border border-gray-200">
+                            <h3 className="font-black mb-2">KARAR VERİCİ NOTLARI</h3>
+                            <p className="text-sm italic">{assessments.notes || 'Not girilmemiştir.'}</p>
+                        </div>
+                        <div className="pt-20 text-center">
+                            <div className="w-48 border-t border-black mx-auto"></div>
+                            <p className="text-xs font-bold mt-2">İMZA / ONAY</p>
+                        </div>
+                    </div>
+
                 </div>
 
                 {/* ===== FOOTER ===== */}
-                <div className="shrink-0 p-4 border-t border-white/[0.06] flex gap-3">
-                    <button
-                        onClick={() => handleUpdateStatus('rejected')}
-                        disabled={updatingStatus || currentStatusKey === 'rejected'}
-                        className="py-2.5 px-4 rounded-xl bg-white/[0.04] border border-white/[0.06] text-[13px] font-semibold text-navy-300 hover:bg-white/[0.08] hover:text-red-400 transition-all cursor-pointer disabled:opacity-50"
-                    >
-                        Reddet
+                <div className="shrink-0 p-4 border-t border-white/[0.06] flex gap-3 print:hidden">
+                    <button onClick={handlePrintReport} className="py-2.5 px-4 rounded-xl bg-white/[0.04] border border-white/[0.06] text-[13px] font-semibold text-navy-300 hover:text-white transition-all flex items-center gap-2">
+                        <Printer className="w-4 h-4" />
                     </button>
-                    <button
-                        onClick={() => setShowSendModal(true)}
-                        className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-[#0077B5] to-[#00A0DC] text-[13px] font-semibold text-white shadow-[0_4px_16px_rgba(0,119,181,0.3)] hover:shadow-[0_6px_24px_rgba(0,119,181,0.4)] hover:-translate-y-0.5 transition-all cursor-pointer flex items-center justify-center gap-2"
-                    >
-                        <Send className="w-4 h-4" />
-                        Gönder
-                    </button>
-                    <button
-                        onClick={() => status.next && handleUpdateStatus(status.next)}
-                        disabled={updatingStatus || !status.next}
-                        className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-electric to-blue-500 text-[13px] font-semibold text-white shadow-[0_4px_16px_rgba(59,130,246,0.3)] hover:shadow-[0_6px_24px_rgba(59,130,246,0.4)] hover:-translate-y-0.5 transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
-                    >
-                        {updatingStatus ? <Loader2 className="w-4 h-4 animate-spin" /> : 'İlerlet →'}
-                    </button>
-                </div>
 
-                {/* SendMessage Modal */}
-                {showSendModal && (
-                    <SendMessageModal
-                        candidate={candidate}
-                        aiAnalysisResult={aiResult}
-                        onClose={() => setShowSendModal(false)}
-                        onSent={(info) => {
-                            console.log('[TalentFlow] Message queued:', info);
-                        }}
-                    />
-                )}
+                    {activeTab === 'assessments' ? (
+                        <button
+                            onClick={handleUpdateAssessment}
+                            disabled={updatingStatus}
+                            className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-[0_4px_16px_rgba(16,185,129,0.2)] flex items-center justify-center gap-2 transition-all active:scale-95"
+                        >
+                            {updatingStatus ? <Loader2 className="w-4 h-4 animate-spin" /> : <><ClipboardCheck className="w-4 h-4" /> Değerlendirmeyi Kaydet</>}
+                        </button>
+                    ) : (
+                        <button onClick={() => setShowSendModal(true)} className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-electric to-blue-500 text-white font-bold text-sm shadow-[0_4px_16px_rgba(59,130,246,0.3)] hover:brightness-110 transition-all active:scale-95">
+                            Mülakat Planla
+                        </button>
+                    )}
+                    {showSendModal && (
+                        <SendMessageModal
+                            candidate={candidate}
+                            aiAnalysisResult={aiResult}
+                            onClose={() => setShowSendModal(false)}
+                        />
+                    )}
+                </div>
             </div>
         </>
     );
 }
 
-/* ===== Helpers ===== */
 
-function Section({ title, icon: Icon, children }) {
+
+
+function Section({ title, children }) {
     return (
         <div>
-            <div className="flex items-center gap-2 mb-3">
-                {Icon && <Icon className="w-4 h-4 text-electric-light" />}
-                <h3 className="text-[12px] font-semibold uppercase tracking-wider text-navy-400">{title}</h3>
-            </div>
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-navy-500 mb-3">{title}</h3>
             {children}
-        </div>
-    );
-}
-
-function InfoRow({ icon: Icon, label, value }) {
-    if (!value) return null;
-    return (
-        <div className="flex items-center gap-3 text-[13px]">
-            <Icon className="w-4 h-4 text-navy-500 shrink-0" />
-            <span className="text-navy-500 w-16 shrink-0">{label}</span>
-            <span className="text-navy-200 truncate">{value}</span>
         </div>
     );
 }
 
 function MiniCard({ label, value, icon: Icon }) {
     return (
-        <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-            <div className="flex items-center gap-1.5 mb-1">
+        <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+            <div className="flex items-center gap-1.5 mb-1.5">
                 <Icon className="w-3.5 h-3.5 text-navy-500" />
-                <span className="text-[10px] uppercase tracking-wider text-navy-500 font-medium">{label}</span>
+                <span className="text-[9px] uppercase tracking-widest text-navy-500 font-black">{label}</span>
             </div>
-            <div className="text-[13px] font-semibold text-navy-200 truncate">{value}</div>
+            <div className="text-[13px] font-bold text-white truncate">{value || '---'}</div>
+        </div>
+    );
+}
+
+function RangeInput({ label, value, onChange }) {
+    return (
+        <div className="space-y-2">
+            <div className="flex justify-between items-center text-[11px] font-bold">
+                <span className="text-navy-300 uppercase tracking-tighter">{label}</span>
+                <span className="text-white px-2 py-0.5 rounded bg-white/10">%{value}</span>
+            </div>
+            <input
+                type="range" min="0" max="100" value={value}
+                onChange={e => onChange(parseInt(e.target.value))}
+                className="w-full h-1.5 bg-navy-800 rounded-lg appearance-none cursor-pointer accent-electric"
+            />
         </div>
     );
 }
