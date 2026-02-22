@@ -4,7 +4,7 @@ import { X, Upload, FileText, Check, AlertCircle, Loader2, Trash2, Files, Sparkl
 import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
 import { calculateMatchScore } from '../services/matchService';
-import { quickScore } from '../services/geminiService';
+import { analyzeCandidateMatch } from '../services/geminiService';
 
 
 export default function AddCandidateModal({ isOpen, onClose }) {
@@ -80,7 +80,7 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                 if (topCandidate && topCandidate.static.score > 0) {
                     try {
                         const jobText = `${topCandidate.pos.title}\n${topCandidate.pos.requirements?.join(', ')}`;
-                        const aiQuick = await quickScore(jobText, res.candidate);
+                        const aiQuick = await analyzeCandidateMatch(jobText, res.candidate);
 
                         return {
                             ...res,

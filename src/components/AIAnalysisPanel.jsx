@@ -97,7 +97,7 @@ function ScoreCircle({ value, label, size = 'sm' }) {
     );
 }
 
-export default function AIAnalysisPanel({ result, loading, error, onRetry, title }) {
+export default function AIAnalysisPanel({ result, loading, error, onRetry, title, targetScore }) {
     const [dmCopied, setDmCopied] = useState(false);
 
     const handleCopyDM = () => {
@@ -196,7 +196,7 @@ export default function AIAnalysisPanel({ result, loading, error, onRetry, title
         <div className="space-y-5 animate-fade-in-up">
             {/* ===== HEADER: Score + Recommendation ===== */}
             <div className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-r from-electric/5 to-violet-500/5 border border-electric/10">
-                <ScoreCircle value={result.score} size="lg" />
+                <ScoreCircle value={targetScore || result.score} size="lg" />
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                         <Sparkles className="w-4 h-4 text-electric-light" />

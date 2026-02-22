@@ -82,29 +82,126 @@ export default function CandidateCard({ candidate, index = 0, onClick, isSelecte
                             {candidate.name}
                         </h3>
                         <p className="text-[12px] text-navy-400 truncate">{candidate.position}</p>
+
+
+                        {(() => {
+                            // 1. Start with the explicitly assigned match information
+                            let displayScore = candidate.matchScore || 0;
+                            let displayTitle = candidate.matchedPositionTitle;
+
+                            // 2. If we have a specific assigned position, ensure we use THAT analysis score if it exists
+                            if (displayTitle && candidate.positionAnalyses?.[displayTitle]) {
+                                displayScore = candidate.positionAnalyses[displayTitle].score;
+                            }
+                            // 3. Otherwise, find the absolute best match found across all positions analyzed
+                            else if (candidate.positionAnalyses) {
+                                Object.entries(candidate.positionAnalyses).forEach(([title, analysis]) => {
+                                    if (analysis && analysis.score > displayScore) {
+                                        displayScore = analysis.score;
+                                        displayTitle = title;
+                                    }
+                                });
+                            }
+
+                            if (displayTitle) {
+                                return (
+                                    <div className="flex items-center gap-1.5 mt-1.5 text-xs">
+                                        <span className="text-electric-light font-semibold uppercase tracking-wide">
+                                            {candidate.matchedPositionTitle === displayTitle ? 'EŞLEŞEN:' : 'EN UYGUN:'}
+                                        </span>
+                                        <span className="text-white font-bold truncate max-w-[120px]" title={displayTitle}>
+                                            {displayTitle}
+                                        </span>
+                                        {displayScore > 0 && (
+                                            <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${displayScore >= 70 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-navy-500/20 text-navy-300'}`}>
+                                                %{Math.round(displayScore)}
+                                            </span>
+                                        )}
+                                    </div>
+                                );
+                            } else if (candidate.preAssessment) {
+                                return (
+                                    <div className="flex items-center gap-1.5 mt-1.5 text-xs">
+                                        <span className="text-emerald-400 font-semibold uppercase tracking-wide">
+                                            Önerilen:
+                                        </span>
+                                        <span className="text-white font-bold truncate max-w-[120px]" title={candidate.preAssessment.suggestedOpenPosition || candidate.preAssessment.potentialPosition}>
+                                            {candidate.preAssessment.suggestedOpenPosition || candidate.preAssessment.potentialPosition}
+                                        </span>
+                                    </div>
+                                )
+                            }
+                            return null;
+                        })()}
+
+
                     </div>
                 </div>
                 <div className="flex flex-col items-end">
-                    <MatchScoreRing score={candidate.matchScore || candidate.aiAnalysis?.score || 0} size={48} />
-                    {candidate.aiAnalysis && (
-                        <div className="flex flex-col items-end mt-1">
-                            <div className="flex items-center gap-0.5 text-electric-light animate-pulse">
-                                <Sparkles className="w-2.5 h-2.5" />
-                                <span className="text-[8px] font-bold uppercase tracking-tighter">AI Onaylı</span>
-                            </div>
-                            {candidate.matchedPositionTitle && (
-                                <span className="text-[9px] text-navy-500 font-medium truncate max-w-[100px] text-right">
-                                    {candidate.matchedPositionTitle}
-                                </span>
-                            )}
-                        </div>
-                    )}
+                    {(() => {
+                        let displayScore = candidate.matchScore || 0;
+                        let displayTitle = candidate.matchedPositionTitle;
 
+                        if (displayTitle && candidate.positionAnalyses?.[displayTitle]) {
+                            displayScore = candidate.positionAnalyses[displayTitle].score;
+                        } else if (candidate.positionAnalyses) {
+                            Object.entries(candidate.positionAnalyses).forEach(([title, analysis]) => {
+                                if (analysis && analysis.score > displayScore) {
+                                    displayScore = analysis.score;
+                                    displayTitle = title;
+                                }
+                            });
+                        }
+
+                        displayScore = Math.round(Math.min(displayScore, 100));
+
+                        // Color mapping for pre-assessment
+                        const suitabilityColors = {
+                            "Uygun": "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+                            "Potansiyel": "bg-amber-500/20 text-amber-400 border-amber-500/30",
+                            "Uygun Değil": "bg-red-500/20 text-red-400 border-red-500/30",
+                        };
+
+                        if (candidate.positionAnalyses || candidate.aiAnalysis || displayScore > 0) {
+                            return (
+                                <>
+                                    <MatchScoreRing score={displayScore} size={48} />
+                                    {(candidate.aiAnalysis || candidate.positionAnalyses) && (
+                                        <div className="flex flex-col items-end mt-1">
+                                            <div className="flex items-center gap-0.5 text-electric-light animate-pulse">
+                                                <Sparkles className="w-2.5 h-2.5" />
+                                                <span className="text-[8px] font-bold uppercase tracking-tighter">AI Skoru</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            );
+                        } else if (candidate.preAssessment) {
+                            const suit = candidate.preAssessment.suitability;
+                            const classes = suitabilityColors[suit] || "bg-navy-500/20 text-navy-300 border-navy-500/30";
+                            return (
+                                <div className="flex flex-col items-end">
+                                    <div className={`px-2 py-1.5 rounded-lg border text-[11px] font-bold text-center leading-tight shadow-lg backdrop-blur-sm ${classes}`}>
+                                        {suit}
+                                    </div>
+                                    <div className="flex flex-col items-end mt-1">
+                                        <div className="flex items-center gap-0.5 text-emerald-400">
+                                            <Sparkles className="w-2.5 h-2.5" />
+                                            <span className="text-[8px] font-bold uppercase tracking-tighter">Ön Analiz</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        } else {
+                            return (
+                                <div className="flex items-center justify-center w-12 h-12 rounded-full border-2 border-dashed border-white/10 text-white/30 text-[10px] font-bold">
+                                    %?
+                                </div>
+                            );
+                        }
+                    })()}
                 </div>
             </div>
-
-
-
 
             {/* Status badge */}
             <div className="mb-3">
@@ -117,7 +214,6 @@ export default function CandidateCard({ candidate, index = 0, onClick, isSelecte
                     )}
                 </span>
             </div>
-
 
             {/* Meta */}
             <div className="space-y-1.5 mb-4">
@@ -158,6 +254,18 @@ export default function CandidateCard({ candidate, index = 0, onClick, isSelecte
                             +{candidate.skills.length - 3}
                         </span>
                     )}
+                </div>
+            )}
+
+            {/* AI Insight Highlight */}
+            {(candidate.aiAnalysis?.summary || candidate.summary) && (
+                <div className="mb-4 p-2.5 rounded-xl bg-electric/5 border border-electric/10 group/insight">
+                    <div className="flex items-center gap-1.5 mb-1 text-[10px] font-bold text-electric-light uppercase tracking-widest">
+                        <Sparkles className="w-3 h-3" /> AI Görüşü
+                    </div>
+                    <p className="text-[11px] text-navy-200 leading-relaxed line-clamp-2 italic group-hover/insight:line-clamp-none transition-all duration-300">
+                        "{candidate.aiAnalysis?.summary || candidate.summary}"
+                    </p>
                 </div>
             )}
 

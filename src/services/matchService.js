@@ -1,5 +1,5 @@
 // src/services/matchService.js
-import { quickScore, analyzeCandidateMatch } from './geminiService';
+import { analyzeCandidateMatch } from './geminiService';
 
 /**
  * Semantic Technology Groups to improve matching without LLM for every call

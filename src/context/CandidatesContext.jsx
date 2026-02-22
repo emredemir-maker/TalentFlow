@@ -17,12 +17,14 @@ export function CandidatesProvider({ children }) {
     const [candidates, setCandidates] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [viewCandidateId, setViewCandidateId] = useState(null);
 
     // Filter states (client-side filtering per Rule 2)
     const [searchQuery, setSearchQuery] = useState('');
     const [departmentFilter, setDepartmentFilter] = useState('all');
     const [statusFilter, setStatusFilter] = useState('all');
     const [experienceFilter, setExperienceFilter] = useState('all');
+    const [positionFilter, setPositionFilter] = useState('all');
 
     // CRUD Operations
     const addCandidate = async (candidateData) => {
@@ -106,9 +108,27 @@ export function CandidatesProvider({ children }) {
         }
     }, [candidates]);
 
+    // Enrich candidates with best match data
+    const enrichedCandidates = useMemo(() => {
+        return candidates.map(c => {
+            let bestScore = c.matchScore || c.aiAnalysis?.score || 0;
+            let bestTitle = c.matchedPositionTitle || null;
+
+            if (c.positionAnalyses) {
+                Object.entries(c.positionAnalyses).forEach(([title, analysis]) => {
+                    if (analysis && analysis.score > bestScore) {
+                        bestScore = analysis.score;
+                        bestTitle = title;
+                    }
+                });
+            }
+            return { ...c, bestScore, bestTitle };
+        });
+    }, [candidates]);
+
     // Client-side filtering (Rule 2 - no orderBy/limit queries)
     const filteredCandidates = useMemo(() => {
-        let result = [...candidates];
+        let result = [...enrichedCandidates];
 
         // Search filter
         if (searchQuery.trim()) {
@@ -143,14 +163,24 @@ export function CandidatesProvider({ children }) {
             });
         }
 
-        return result;
-    }, [candidates, searchQuery, departmentFilter, statusFilter, experienceFilter]);
+        // Position Match filter
+        if (positionFilter !== 'all') {
+            result = result.filter((c) => c.bestTitle === positionFilter);
+        }
 
-    // Extract unique departments for filter options
+        return result;
+    }, [enrichedCandidates, searchQuery, departmentFilter, statusFilter, experienceFilter, positionFilter]);
+
+    // Extract unique departments and matched positions for filter options
     const departments = useMemo(() => {
         const deptSet = new Set(candidates.map((c) => c.department).filter(Boolean));
         return ['all', ...Array.from(deptSet).sort()];
     }, [candidates]);
+
+    const matchPositions = useMemo(() => {
+        const titleSet = new Set(enrichedCandidates.map((c) => c.bestTitle).filter(Boolean));
+        return ['all', ...Array.from(titleSet).sort()];
+    }, [enrichedCandidates]);
 
     // Stats
     const stats = useMemo(() => ({
@@ -191,6 +221,13 @@ export function CandidatesProvider({ children }) {
         setStatusFilter,
         experienceFilter,
         setExperienceFilter,
+        setPositionFilter,
+        matchPositions,
+        enrichedCandidates,
+
+        // Navigation / Detailed View
+        viewCandidateId,
+        setViewCandidateId,
     };
 
     return (

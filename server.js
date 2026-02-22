@@ -46,11 +46,29 @@ const pdf = async (buffer) => {
 const mammoth = require('mammoth');
 const multer = require('multer');
 
+// Configure storage for uploads
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        const dir = path.join(__dirname, 'uploads', 'cvs');
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+        }
+        cb(null, dir);
+    },
+    filename: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, uniqueSuffix + '-' + file.originalname);
+    }
+});
+
+const upload = multer({ storage: storage });
+
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-const upload = multer({ storage: multer.memoryStorage() });
+// Serve static files from uploads directory
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Health Check
 app.get('/api/health', (req, res) => {
@@ -494,11 +512,13 @@ app.post('/api/process-cv', upload.array('cvs', 20), async (req, res) => {
         const results = await Promise.all(req.files.map(async (file) => {
             try {
                 let text = '';
+                const fileBuffer = fs.readFileSync(file.path);
+
                 if (file.mimetype === 'application/pdf') {
-                    const data = await pdf(file.buffer);
+                    const data = await pdf(fileBuffer);
                     text = data.text;
                 } else if (file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-                    const result = await mammoth.extractRawText({ buffer: file.buffer });
+                    const result = await mammoth.extractRawText({ buffer: fileBuffer });
                     text = result.value;
                 } else {
                     return { fileName: file.originalname, error: 'Desteklenmeyen format' };
@@ -511,8 +531,16 @@ app.post('/api/process-cv', upload.array('cvs', 20), async (req, res) => {
                 const candidate = await parseProfile(text, 'gemini-2.0-flash');
                 if (!candidate) return { fileName: file.originalname, error: 'AI ayrıştırma hatası' };
 
+                // Keep the raw text so we can display it later
+                candidate.originalText = text;
+
+                // Add the URL to the stored file
+                // We assume the server is at PORT 3001
+                candidate.cvUrl = `http://localhost:3001/uploads/cvs/${file.filename}`;
+
                 return { fileName: file.originalname, candidate, success: true };
             } catch (err) {
+                console.error(`Error processing ${file.originalname}:`, err);
                 return { fileName: file.originalname, error: err.message };
             }
         }));

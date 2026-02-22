@@ -17,45 +17,31 @@ import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
 
 export default function OpportunityHub() {
-    const { candidates } = useCandidates();
+    const { enrichedCandidates, candidates } = useCandidates();
     const { positions } = usePositions();
     const [expandedId, setExpandedId] = useState(null);
 
     // Dynamic Opportunity Calculation
-    // Finds the best match for each open position from the actual candidate pool
+    // Retrieves AI-analyzed opportunities with >=80 match score
     const opportunities = useMemo(() => {
-        if (!candidates?.length || !positions?.length) return [];
+        const pool = enrichedCandidates || candidates;
+        if (!pool?.length || !positions?.length) return [];
 
         const openPositions = positions.filter(p => p.status === 'open');
 
         return openPositions.map(pos => {
-            // Simple matching logic for proactive suggestions
-            const matches = candidates.map(c => {
-                let score = 0;
-
-                // Skills match (Weight: 60%)
-                const cSkills = (c.skills || []).map(s => s.toLowerCase());
-                const pReqs = (pos.requirements || []).map(r => r.toLowerCase());
-                if (pReqs.length > 0) {
-                    const matched = cSkills.filter(s => pReqs.some(r => r.includes(s) || s.includes(r)));
-                    score += Math.round((matched.length / Math.max(pReqs.length, 1)) * 60);
-                }
-
-                // Title match (Weight: 40%)
-                const cPos = (c.position || '').toLowerCase();
-                const pTitle = (pos.title || '').toLowerCase();
-                if (cPos && pTitle && (cPos.includes(pTitle) || pTitle.includes(cPos))) {
-                    score += 40;
-                }
-
+            const matches = pool.map(c => {
+                const score = c.positionAnalyses?.[pos.title]?.score || 0;
                 return { ...c, score };
             })
-                .filter(c => c.score > 50) // Only show high-quality matches
+                .filter(c => c.score >= 80) // High-quality AI matches
                 .sort((a, b) => b.score - a.score);
 
             if (matches.length === 0) return null;
 
             const best = matches[0];
+            const bestAnalysis = best.positionAnalyses[pos.title];
+
             return {
                 id: pos.id,
                 title: pos.title,
@@ -64,13 +50,13 @@ export default function OpportunityHub() {
                     id: best.id,
                     name: best.name,
                     score: best.score,
-                    reason: `${best.skills?.slice(0, 3).join(', ')} gibi kritik yetenekleri bu pozisyon için mükemmel bir uyum sağlıyor.`,
+                    reason: bestAnalysis?.summary || bestAnalysis?.reasons?.[0] || 'AI tarafından yüksek uyumluluk tespit edildi.',
                     avatar: best.name?.split(' ').map(n => n[0]).join('').toUpperCase() || '?',
                     color: scoreToColor(best.score)
                 }
             };
         }).filter(Boolean).slice(0, 3); // Top 3 opportunities
-    }, [candidates, positions]);
+    }, [enrichedCandidates, candidates, positions]);
 
     function scoreToColor(score) {
         if (score >= 85) return 'bg-emerald-500';

@@ -324,3 +324,9 @@ body {
     padding: 0.5rem 0 calc(0.5rem + env(safe-area-inset-bottom));
   }
 }
+
+/* Global Select Options Styling */
+select option {
+  background-color: #ffffff;
+  color: #000000;
+}

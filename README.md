@@ -1,16 +1,77 @@
-# React + Vite
+# TalentFlow 🚀
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**TalentFlow**, modern işe alım süreçlerini yapay zeka ile optimize eden, premium özelliklere sahip bir **AI Destekli İK Yönetim Paneli**'dir. Gemini AI entegrasyonu sayesinde aday analizlerini saniyeler içinde yapar, pozisyonlarla eşleştirir ve tüm iletişim sürecini akıllıca takip eder.
 
-Currently, two official plugins are available:
+![TalentFlow Banner](https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?auto=format&fit=crop&q=80&w=2072&ixlib=rb-4.0.3)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+---
 
-## React Compiler
+## 🌟 Öne Çıkan Özellikler
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### 🧠 1. Yapay Zeka Destekli Aday Analizi
+*   **Gemini AI Entegrasyonu:** Adayların özgeçmişlerini ve yeteneklerini analiz ederek güçlü/zayıf yönlerini belirler.
+*   **Akıllı Puanlama:** Adayları açık pozisyonlarla % bazlı eşleştirir ve teknik uygunluk skoru üretir.
+*   **Otomatik Geri Bildirim:** Mülakat notlarından ve aday yanıtlarından otomatik özetler ve aksiyon planları oluşturur.
 
-## Expanding the ESLint configuration
+### 🔐 2. Güvenli Davetiye Sistemi (White-list Auth)
+*   **Süper Admin Yönetimi:** Uygulama sadece yöneticilerin davet ettiği kullanıcılara açıktır.
+*   **Rol Tabanlı Erişim:** Süper Admin ve Recruiter rolleri ile yetki yönetimi.
+*   **Email & Google Login:** Güvenli oturum açma yöntemleri ve davetiye kontrolü ile yetkisiz erişimi engelleme.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### 📧 3. Akıllı Mesaj ve E-posta Takibi
+*   **Unique Tracking IDs:** Gönderilen her e-postaya özel bir takip kodu (TF-XXXXX) ekleyerek yanıtları otomatik olarak aday profiliyle eşleştirir.
+*   **Hazır Şablonlar:** Pozisyon tipine göre AI tarafından optimize edilmiş mülakat daveti ve ret mektubu şablonları.
+*   **Gmail & Mailto Entegrasyonu:** Tek tıkla adaylara ulaşma ve durumu güncelleme.
+
+### 📊 4. Gelişmiş Analitik Dashboard
+*   **Aday Hunisi:** Başvurudan işe alıma kadar tüm süreci görselleştirir.
+*   **Performans Metrikleri:** Mesaj yanıt oranları, AI analiz sayıları ve süreç hızlarını takip eder.
+*   **Sektörel Dağılım:** Aday havuzunun yetenek ve kıdem dağılımını analiz eder.
+
+---
+
+## 🛠️ Teknik Altyapı
+
+*   **Frontend:** React.js, Tailwind CSS, Lucide Icons
+*   **Backend & DB:** Firebase (Firestore, Authentication, Hosting)
+*   **AI Engine:** Google Gemini AI (Vertex AI / Generative AI SDK)
+*   **State Management:** React Context API
+*   **Real-time:** Cloud Firestore Snapshot Listeners
+
+---
+
+## 🚀 Kurulum ve Başlangıç
+
+1.  **Repoyu Klonlayın:**
+    ```bash
+    git clone https://github.com/emredemir-maker/TalentFlow.git
+    cd TalentFlow
+    ```
+
+2.  **Bağımlılıkları Yükleyin:**
+    ```bash
+    npm install
+    ```
+
+3.  **Çevre Değişkenlerini Ayarlayın:**
+    `.env` dosyası oluşturup aşağıdaki anahtarları ekleyin:
+    ```env
+    VITE_FIREBASE_API_KEY=your_api_key
+    VITE_FIREBASE_AUTH_DOMAIN=your_auth_domain
+    VITE_FIREBASE_PROJECT_ID=your_id
+    VITE_GEMINI_API_KEY=your_gemini_key
+    ```
+
+4.  **Uygulamayı Çalıştırın:**
+    ```bash
+    npm run dev
+    ```
+
+---
+
+## 👔 Admin Notu
+Uygulama ilk kez kurulduğunda `emre.demir@infoset.app` adresi veya ilk kayıt olan kullanıcı otomatik olarak **Süper Admin** tanımlanır. Bu aşamadan sonra sisteme girişler sadece admin panelinden gönderilen davetiyeler ile mümkündür.
+
+---
+
+Designed with ❤️ by **Antigravity AI** for **TalentFlow**.

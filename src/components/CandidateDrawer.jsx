@@ -2,16 +2,15 @@
 // Context-aware Candidate Management + Assessment + Reporting
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import SendMessageModal from './SendMessageModal';
 import {
     X, Mail, Phone, MapPin, Briefcase, GraduationCap, Calendar, Globe,
     TrendingUp, TrendingDown, Brain, Target, MessageCircle, Users, Star,
     Sparkles, ChevronRight, Zap, Send, Layers, Loader2, ShieldAlert,
-    ClipboardCheck, Printer, FileText, PlusCircle, Trash2
+    ClipboardCheck, Printer, FileText, PlusCircle, Trash2, RefreshCw, ExternalLink
 } from 'lucide-react';
 import MatchScoreRing from './MatchScoreRing';
 import AIAnalysisPanel from './AIAnalysisPanel';
-import { analyzeCandidateMatch, getAvailableModels } from '../services/geminiService';
+import { analyzeCandidateMatch } from '../services/geminiService';
 import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
 import { calculateMatchScore } from '../services/matchService';
@@ -34,7 +33,7 @@ const REJECTION_REASONS = [
 
 
 export default function CandidateDrawer({ candidate: initialCandidate, onClose, positionContext = null }) {
-    const { updateCandidate, candidates: allCandidates } = useCandidates();
+    const { updateCandidate, candidates: allCandidates, setViewCandidateId } = useCandidates();
     const candidate = allCandidates.find(c => c.id === initialCandidate?.id) || initialCandidate;
 
     const { positions } = usePositions();
@@ -43,9 +42,9 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
     const reportRef = useRef(null);
 
     // UI State
-    const [activeTab, setActiveTab] = useState(positionContext ? 'matches' : 'profile');
+    const [activeTab, setActiveTab] = useState(positionContext ? 'ai-analysis' : 'profile');
+    const [expandedPositionId, setExpandedPositionId] = useState(positionContext ? positionContext.id : null);
     const [showJobInput, setShowJobInput] = useState(false);
-    const [showSendModal, setShowSendModal] = useState(false);
 
     // AI Analysis State
     const [aiResult, setAiResult] = useState(candidate?.aiAnalysis || null);
@@ -63,38 +62,54 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
 
     const liveScore = Math.round((assessments.technical + assessments.communication + assessments.culture) / 3);
 
-    // Score Calculation (Prioritize Current AI Session -> Saved AI Score -> static algo)
+    // Score Calculation (Find best AI match in positionAnalyses)
     const activeMatch = useMemo(() => {
-        // 1. If we just ran an AI analysis in this session, use it immediately
-        if (aiResult?.score > 0) {
-            return {
-                score: aiResult.score,
-                isHighMatch: aiResult.score >= 75,
-                reasons: aiResult.reasons || (aiResult.summary ? [aiResult.summary] : ['Yeni AI Analizi Tamamlandı']),
+        let highestScore = 0;
+        let bestAnalysis = null;
+        let bestTitle = candidate?.matchedPositionTitle || null;
 
-                initialScore: candidate?.initialAiScore || aiResult.score
+        // Try getting specific context or highest available
+        if (positionContext && candidate?.positionAnalyses?.[positionContext.title]) {
+            bestAnalysis = candidate.positionAnalyses[positionContext.title];
+            bestTitle = positionContext.title;
+        } else if (candidate?.positionAnalyses) {
+            Object.entries(candidate.positionAnalyses).forEach(([title, analysis]) => {
+                if (analysis && analysis.score > highestScore) {
+                    highestScore = analysis.score;
+                    bestAnalysis = analysis;
+                    bestTitle = title;
+                }
+            });
+        }
+
+        if (bestAnalysis) {
+            let rs = [];
+            if (Array.isArray(bestAnalysis.reasons) && bestAnalysis.reasons.length > 0) {
+                rs = bestAnalysis.reasons;
+            } else if (bestAnalysis.summary) {
+                rs = [bestAnalysis.summary];
+            } else {
+                rs = ['AI Analizi Mevcut'];
+            }
+
+            return {
+                score: bestAnalysis.score,
+                isHighMatch: bestAnalysis.score >= 75,
+                reasons: rs,
+                initialScore: candidate?.initialAiScore || bestAnalysis.score,
+                title: bestTitle
             };
         }
 
-        // 2. If we have a saved matchScore in the database, use it
-        if (candidate?.matchScore > 0) {
-            return {
-                score: candidate.matchScore,
-                isHighMatch: candidate.matchScore >= 75,
-                reasons: candidate.aiAnalysis?.reasons || (candidate.aiAnalysis?.summary ? [candidate.aiAnalysis.summary] : ['Sistem Taraması Mevcut']),
-
-                initialScore: candidate?.initialAiScore || candidate.matchScore
-            };
-        }
-
-        // 3. Fallback to static algorithm (First look)
+        // Fallback to static algorithm if no AI exists
         const targetPos = positionContext || positions.find(p => p.title === candidate?.matchedPositionTitle) || positions[0];
         const baseMatch = calculateMatchScore(candidate, targetPos);
         return {
             ...baseMatch,
-            initialScore: candidate?.initialAiScore || baseMatch.score
+            initialScore: candidate?.initialAiScore || baseMatch.score,
+            title: targetPos?.title
         };
-    }, [candidate, positionContext, positions, aiResult]);
+    }, [candidate, positionContext, positions]);
 
 
 
@@ -164,57 +179,60 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
     };
 
 
-    const handleRunAnalysis = useCallback(async (customJobDesc = null) => {
-        let descToUse = customJobDesc || jobDescription;
-
-        // Fallback: If no explicit JD, try to deduce from matched position
-        if (!descToUse) {
-            const targetPos = positionContext || positions.find(p => p.title === candidate?.matchedPositionTitle) || positions[0];
-            if (targetPos) {
-                descToUse = `${targetPos.title}\n${targetPos.requirements?.join(', ')}`;
-            }
-        }
-
-        if (!descToUse) {
-            alert("Analiz için bir pozisyon veya iş tanımı bulunamadı.");
-            return;
-        }
-
-
+    const handleRunAnalysis = useCallback(async () => {
         setAiLoading(true);
         setAiError(null);
         setActiveTab('ai-analysis');
 
         try {
-            const result = await analyzeCandidateMatch(descToUse, candidate, 'gemini-2.0-flash');
-            setAiResult(result);
+            const openPositions = positions.filter(p => p.status === 'open');
+            if (openPositions.length === 0) {
+                alert("Açık pozisyon bulunamadı.");
+                setAiLoading(false);
+                return;
+            }
 
-            const posTitle = descToUse.split('\n')[0].substring(0, 50);
+            const updatedAnalyses = { ...(candidate.positionAnalyses || {}) };
+            let highestScore = -1;
+            let bestResult = null;
+            let bestTitle = null;
 
-            // Merge with existing position analyses
-            const existingAnalyses = candidate.positionAnalyses || {};
-            const updatedAnalyses = {
-                ...existingAnalyses,
-                [posTitle]: result
-            };
+            // Analyze all open positions in parallel
+            await Promise.all(openPositions.map(async (pos) => {
+                const descToUse = `${pos.title}\n${(pos.requirements || []).join(', ')}\n${pos.description || ''}`;
+                try {
+                    const result = await analyzeCandidateMatch(descToUse, candidate, 'gemini-2.0-flash');
+                    updatedAnalyses[pos.title] = result;
+
+                    if (result.score > highestScore) {
+                        highestScore = result.score;
+                        bestResult = result;
+                        bestTitle = pos.title;
+                    }
+                } catch (e) {
+                    console.error("AI Error for pos", pos.title, e);
+                }
+            }));
+
+            if (!bestResult) throw new Error("Aday hiçbir pozisyon için analiz edilemedi.");
+
+            setAiResult(bestResult);
 
             const updates = {
-                aiAnalysis: result,
-                aiScore: result.score,
-                matchedPositionTitle: posTitle,
-                summary: result.summary, // Retrofit summary from analysis
-                positionAnalyses: updatedAnalyses
+                aiAnalysis: bestResult, // keep backward compat
+                aiScore: bestResult.score,
+                matchedPositionTitle: bestTitle,
+                summary: bestResult.summary,
+                positionAnalyses: updatedAnalyses,
+                lastScannedAt: new Date().toISOString()
             };
 
             // Rule: AI can only overwrite common matchScore in 'initial' stage
             const currentStage = candidate.scoringStage || 'initial';
             if (currentStage === 'initial') {
-                updates.matchScore = result.score;
-                updates.initialAiScore = result.score;
-            } else {
-                console.log(`[CandidateDrawer] AI Score (${result.score}) received, but NOT overwriting Stage: ${currentStage}`);
+                updates.matchScore = bestResult.score;
+                updates.initialAiScore = bestResult.score;
             }
-
 
             await updateCandidate(candidate.id, updates);
         } catch (err) {
@@ -222,8 +240,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
         } finally {
             setAiLoading(false);
         }
-
-    }, [candidate, jobDescription, updateCandidate]);
+    }, [candidate, positions, updateCandidate]);
 
     if (!candidate) return null;
 
@@ -307,7 +324,21 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                             </div>
                         </div>
                         <div className="flex items-center gap-2 print:hidden">
-
+                            <button
+                                onClick={() => {
+                                    setViewCandidateId(candidate.id);
+                                    window.dispatchEvent(new CustomEvent('changeView', { detail: 'candidate-process' }));
+                                    onClose();
+                                }}
+                                className="px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition-all font-bold text-[11px] flex gap-2 items-center shadow-sm"
+                                title="Adayın Detaylı Arayüzüne Git"
+                            >
+                                <ExternalLink className="w-4 h-4" />
+                                Portal Görünümü
+                            </button>
+                            <button onClick={() => setShowSendModal(true)} className="p-2 rounded-lg bg-electric/10 border border-electric/20 text-electric-light hover:bg-electric/20 transition-all shadow-sm" title="Aday İletişimi (Mülakat/Red)">
+                                <Mail className="w-4 h-4" />
+                            </button>
                             <button onClick={handlePrintReport} className="p-2 rounded-lg bg-white/[0.04] text-navy-400 hover:text-white" title="Rapor Al">
                                 <Printer className="w-4 h-4" />
                             </button>
@@ -337,8 +368,8 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                     <div className="flex-1 space-y-2">
                         <div className="flex items-center gap-2">
                             <div className="text-[10px] uppercase tracking-widest text-navy-500 font-bold">
-                                {positionContext || candidate.matchedPositionTitle
-                                    ? `${positionContext?.title || candidate.matchedPositionTitle} Uygunluğu`
+                                {activeMatch.title
+                                    ? `${activeMatch.title} Uygunluğu`
                                     : 'Aday Uyumluluk Tahmini'}
                             </div>
                             <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter ${candidate.scoringStage === 'initial' || !candidate.scoringStage ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}>
@@ -395,19 +426,18 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
 
 
                 {/* TABS */}
-                <div className="flex gap-1 print:hidden">
+                <div className="flex gap-1 print:hidden mb-4">
                     {[
                         { id: 'profile', label: 'Profil', icon: FileText },
-                        { id: 'matches', label: 'Pozisyonlar', icon: Target },
-                        { id: 'assessments', label: 'Değerlendirme', icon: ClipboardCheck },
-                        { id: 'ai-analysis', label: 'AI Analiz', icon: Sparkles }
+                        { id: 'ai-analysis', label: 'Pozisyonlar & AI Analiz', icon: Target },
+                        { id: 'assessments', label: 'Değerlendirme', icon: ClipboardCheck }
                     ].map(tab => (
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
-                            className={`flex-1 flex flex-col items-center py-2 rounded-lg transition-all ${activeTab === tab.id ? 'bg-electric/10 text-electric-light shadow-inner shadow-electric/5' : 'text-navy-500 hover:bg-white/[0.04]'}`}
+                            className={`flex-1 flex flex-col items-center py-2.5 rounded-xl transition-all ${activeTab === tab.id ? 'bg-electric/10 text-electric-light shadow-inner shadow-electric/5 ring-1 ring-electric/20' : 'text-navy-500 hover:bg-white/[0.04]'}`}
                         >
-                            <tab.icon className="w-4 h-4 mb-1" />
+                            <tab.icon className={`w-4 h-4 mb-1.5 ${activeTab === tab.id ? 'text-electric-light' : 'text-navy-500'}`} />
                             <span className="text-[10px] font-bold uppercase tracking-tight">{tab.label}</span>
                         </button>
                     ))}
@@ -421,10 +451,23 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                     {/* TAB: PROFILE */}
                     {activeTab === 'profile' && (
                         <div className="space-y-6">
-                            <Section title="Profesyonel Özet">
-                                <p className="text-sm text-navy-200 leading-relaxed italic border-l-2 border-electric/30 pl-4 py-1">
-                                    {candidate.summary || candidate.about || 'Aday hakkında özet bilgi bulunmuyor.'}
-                                </p>
+                            <Section title="AI Görüşü & Öne Çıkanlar">
+                                <div className="space-y-4">
+                                    <p className="text-sm text-navy-200 leading-relaxed italic border-l-2 border-electric/30 pl-4 py-1">
+                                        {candidate.aiAnalysis?.summary || activeMatch.reasons[0] || candidate.summary || candidate.about || 'Aday hakkında özet bilgi bulunmuyor.'}
+                                    </p>
+
+                                    {candidate.aiAnalysis?.reasons?.length > 0 && (
+                                        <div className="grid grid-cols-1 gap-2 mt-2">
+                                            {candidate.aiAnalysis.reasons.map((r, i) => (
+                                                <div key={i} className="flex gap-2 p-2 rounded-lg bg-white/[0.02] border border-white/[0.04] text-[11px] text-navy-300">
+                                                    <Sparkles className="w-3 h-3 text-electric-light shrink-0 mt-0.5" />
+                                                    <span>{r}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                             </Section>
 
                             <Section title="Eğitim & Deneyim">
@@ -449,64 +492,96 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                         </div>
                     )}
 
-                    {/* TAB: MATCHES (Point 1 & 2) */}
-                    {activeTab === 'matches' && (
-                        <div className="space-y-4">
-                            <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold mb-2">
-                                * Aday, sistemdeki tüm açık pozisyonlarla otomatik olarak taranmıştır.
-                            </div>
-                            {smartMatches.map(({ position: pos, match }) => (
-                                <div key={pos.id} className={`p-4 rounded-xl border transition-all ${positionContext?.id === pos.id ? 'bg-electric/10 border-electric/40 shadow-lg shadow-electric/5' : 'bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.04]'}`}>
-                                    <div className="flex justify-between items-center mb-2">
-                                        <h4 className="font-bold text-white text-sm">{pos.title}</h4>
-                                        <span className={`text-xs font-bold px-2 py-0.5 rounded flex items-center gap-1 ${match.score > 70 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-navy-500/10 text-navy-400'}`}>
-                                            {match.isAi && <Sparkles className="w-3 h-3" />}
-                                            %{match.score}
-                                        </span>
-                                    </div>
-
-                                    <div className="flex flex-wrap gap-1.5 mb-3">
-                                        {match.reasons.map((r, i) => <span key={i} className="text-[10px] text-navy-400">• {r}</span>)}
-                                    </div>
-                                    <button onClick={() => handleRunAnalysis(`${pos.title}\n${pos.requirements?.join(', ')}`)} className="w-full py-1.5 text-[10px] font-bold uppercase tracking-widest text-navy-400 hover:text-white border border-white/[0.06] rounded-lg transition-all">
-                                        Detaylı Analiz Al
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
-                    {/* TAB: ASSESSMENTS (Point 3) */}
-                    {activeTab === 'assessments' && (
-                        <div className="space-y-6">
-                            <div className="p-4 rounded-xl bg-violet-500/5 border border-violet-500/10">
-                                <h4 className="text-xs font-black uppercase text-violet-400 mb-4 flex items-center gap-2">
-                                    <ClipboardCheck className="w-4 h-4" /> Mülakat Puanlaması (%40 Etki)
-                                </h4>
-                                <div className="space-y-5">
-                                    <RangeInput label="Teknik Yeterlilik" value={assessments.technical} onChange={v => setAssessments({ ...assessments, technical: v })} />
-                                    <RangeInput label="İletişim & Sosyal" value={assessments.communication} onChange={v => setAssessments({ ...assessments, communication: v })} />
-                                    <RangeInput label="Kültür Uyumu" value={assessments.culture} onChange={v => setAssessments({ ...assessments, culture: v })} />
-                                </div>
-                            </div>
-
-                            <Section title="Mülakat Notları">
-                                <textarea
-                                    className="w-full bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 text-sm text-white focus:border-electric/40 outline-none min-h-[150px]"
-                                    placeholder="Adayın güçlü ve zayıf yanları hakkında notlar..."
-                                    value={assessments.notes}
-                                    onChange={e => setAssessments({ ...assessments, notes: e.target.value })}
-                                />
-                            </Section>
-
-                        </div>
-                    )}
-
-
-
-                    {/* TAB: AI ANALYSIS */}
+                    {/* TAB: COMBINED POSITIONS & AI ANALYSIS */}
                     {activeTab === 'ai-analysis' && (
-                        <AIAnalysisPanel result={aiResult} loading={aiLoading} error={aiError} onRetry={handleRunAnalysis} title={candidate.matchedPositionTitle} />
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-center bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-3 rounded-lg mb-4 shadow-sm">
+                                <span className="text-xs font-semibold leading-relaxed max-w-[70%]">
+                                    * Aday mevcut özgeçmişiyle sistemdeki tüm açık pozisyonlarla karşılaştırılır. Detaylı analiz için pozisyona tıklayın.
+                                </span>
+                                <button
+                                    onClick={handleRunAnalysis}
+                                    disabled={aiLoading}
+                                    className="flex items-center gap-1.5 px-3 py-2 bg-electric-light/10 text-electric-light rounded-lg hover:bg-electric-light/20 text-xs font-bold transition-all disabled:opacity-50 shrink-0"
+                                >
+                                    {aiLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                                    Yeniden Analiz Et
+                                </button>
+                            </div>
+
+                            {aiError && <div className="p-3 text-red-400 text-xs bg-red-500/10 rounded-lg font-medium">{aiError}</div>}
+
+                            <div className="space-y-3">
+                                {smartMatches.map(({ position: pos, match }) => {
+                                    const isExpanded = expandedPositionId === pos.id;
+                                    const posAnalysis = candidate.positionAnalyses?.[pos.title];
+                                    const hasAI = !!posAnalysis;
+
+                                    return (
+                                        <div key={pos.id} className={`rounded-xl border transition-all duration-300 overflow-hidden ${isExpanded ? 'bg-navy-900 border-electric/30 shadow-[0_4px_24px_rgba(59,130,246,0.1)]' : 'bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.04]'}`}>
+                                            <div
+                                                className="p-4 cursor-pointer flex justify-between items-center group select-none"
+                                                onClick={() => setExpandedPositionId(isExpanded ? null : pos.id)}
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <h4 className={`font-bold text-[14px] transition-colors ${isExpanded ? 'text-white' : 'text-navy-100 group-hover:text-white'}`}>{pos.title}</h4>
+                                                    {hasAI && (
+                                                        <span className="text-[9px] font-bold uppercase tracking-widest bg-violet-500/10 text-violet-400 border border-violet-500/20 px-2 py-0.5 rounded flex items-center gap-1 shadow-sm">
+                                                            <Sparkles className="w-2.5 h-2.5" /> AI Analizli
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-4">
+                                                    <span className={`text-[11px] font-bold px-2 py-1 rounded-md flex items-center gap-1 shadow-sm ${match.score >= 70 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-navy-800 text-navy-400 border border-white/[0.06]'}`}>
+                                                        {match.score >= 70 ? '🟢' : '🟡'} %{match.score}
+                                                    </span>
+                                                    <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${isExpanded ? 'bg-electric/20' : 'bg-white/[0.04] group-hover:bg-white/[0.08]'}`}>
+                                                        <ChevronRight className={`w-4 h-4 text-navy-300 transition-transform duration-300 ${isExpanded ? 'rotate-90 text-electric-light' : ''}`} />
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {isExpanded && (
+                                                <div className="px-5 pb-5 border-t border-white/[0.04] pt-5 bg-navy-950/30 animate-in slide-in-from-top-2 duration-200">
+                                                    {posAnalysis ? (
+                                                        <AIAnalysisPanel
+                                                            result={posAnalysis}
+                                                            loading={aiLoading}
+                                                            error={null}
+                                                            onRetry={null} // Global retry is used instead
+                                                            title={pos.title}
+                                                            targetScore={match.score}
+                                                        />
+                                                    ) : (
+                                                        <div className="text-center py-8">
+                                                            {aiLoading ? (
+                                                                <div className="flex flex-col items-center gap-3">
+                                                                    <Loader2 className="w-6 h-6 text-electric animate-spin" />
+                                                                    <p className="text-sm font-medium text-electric-light">AI Analizi Sürüyor...</p>
+                                                                </div>
+                                                            ) : (
+                                                                <>
+                                                                    <div className="w-12 h-12 rounded-full bg-navy-800 flex items-center justify-center mx-auto mb-3">
+                                                                        <Brain className="w-6 h-6 text-navy-400" />
+                                                                    </div>
+                                                                    <p className="text-[13px] text-navy-300 mb-4 max-w-[250px] mx-auto">Bu pozisyon için henüz detaylı yapay zeka analizi yapılmamış.</p>
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); handleRunAnalysis(); }}
+                                                                        className="text-xs font-bold text-white px-5 py-2.5 bg-electric rounded-xl shadow-[0_4px_12px_rgba(59,130,246,0.3)] hover:scale-105 transition-all"
+                                                                    >
+                                                                        Tüm Pozisyonları Analiz Et
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
                     )}
 
                     {/* PRINT-ONLY EVALUATION REPORT (Point 4) */}
@@ -542,11 +617,22 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
 
                 {/* ===== FOOTER ===== */}
                 <div className="shrink-0 p-4 border-t border-white/[0.06] flex gap-3 print:hidden">
+                    {candidate.cvUrl && (
+                        <a
+                            href={candidate.cvUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="py-2.5 px-4 rounded-xl bg-purple-500/10 border border-purple-500/20 text-[13px] font-bold text-purple-400 hover:bg-purple-500/20 transition-all flex items-center gap-2"
+                        >
+                            <FileText className="w-4 h-4" /> CV Gör
+                        </a>
+                    )}
+
                     <button onClick={handlePrintReport} className="py-2.5 px-4 rounded-xl bg-white/[0.04] border border-white/[0.06] text-[13px] font-semibold text-navy-300 hover:text-white transition-all flex items-center gap-2">
                         <Printer className="w-4 h-4" />
                     </button>
 
-                    {activeTab === 'assessments' ? (
+                    {activeTab === 'assessments' && (
                         <button
                             onClick={handleUpdateAssessment}
                             disabled={updatingStatus}
@@ -554,17 +640,6 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                         >
                             {updatingStatus ? <Loader2 className="w-4 h-4 animate-spin" /> : <><ClipboardCheck className="w-4 h-4" /> Değerlendirmeyi Kaydet</>}
                         </button>
-                    ) : (
-                        <button onClick={() => setShowSendModal(true)} className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-electric to-blue-500 text-white font-bold text-sm shadow-[0_4px_16px_rgba(59,130,246,0.3)] hover:brightness-110 transition-all active:scale-95">
-                            Mülakat Planla
-                        </button>
-                    )}
-                    {showSendModal && (
-                        <SendMessageModal
-                            candidate={candidate}
-                            aiAnalysisResult={aiResult}
-                            onClose={() => setShowSendModal(false)}
-                        />
                     )}
                 </div>
             </div>

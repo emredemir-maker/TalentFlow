@@ -52,19 +52,21 @@ export async function createMessage(messageData) {
         candidateEmail: messageData.candidateEmail || '',
         candidateLinkedIn: messageData.candidateLinkedIn || '',
         messageContent: messageData.messageContent || '',
+        subject: messageData.subject || '',
+        trackingId: messageData.trackingId || '',
         jobDescription: messageData.jobDescription || '',
         aiGenerated: messageData.aiGenerated || false,
         createdBy: messageData.createdBy || '',
         matchScore: messageData.matchScore || null,
-        status: MESSAGE_STATUS.DRAFT,
-        sentTimestamp: null,
+        status: messageData.status || MESSAGE_STATUS.DRAFT,
+        sentTimestamp: messageData.status === MESSAGE_STATUS.SENT ? serverTimestamp() : null,
         retryCount: 0,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
     };
 
     const docRef = await addDoc(queueRef, message);
-    console.log(`[MessageQueue] Created message ${docRef.id} for ${message.candidateName}`);
+    console.log(`[MessageQueue] Created message ${docRef.id} for ${message.candidateName}${message.trackingId ? ' (ID: ' + message.trackingId + ')' : ''}`);
     return docRef.id;
 }
 

@@ -3,6 +3,8 @@
 
 import { useState, useCallback, useMemo } from 'react';
 import { useCandidates } from '../context/CandidatesContext';
+import { usePositions } from '../context/PositionsContext';
+import { analyzeCandidateMatch } from '../services/geminiService';
 import Header from '../components/Header';
 import StatCard from '../components/StatCard';
 import CandidateCard from '../components/CandidateCard';
@@ -20,7 +22,13 @@ import {
     ArrowDownWideNarrow,
     Search,
     Plus,
+    Brain,
+    Loader2,
+    Eye,
+    GitBranch,
+    Database
 } from 'lucide-react';
+import { createPortal } from 'react-dom';
 
 const STATUS_OPTIONS = [
     { value: 'all', label: 'Tüm Durumlar' },
@@ -44,6 +52,8 @@ const EXPERIENCE_OPTIONS = [
 
 export default function Dashboard() {
     const {
+        candidates,
+        updateCandidate,
         filteredCandidates,
         stats,
         departments,
@@ -57,6 +67,9 @@ export default function Dashboard() {
         setStatusFilter,
         experienceFilter,
         setExperienceFilter,
+        positionFilter,
+        setPositionFilter,
+        matchPositions,
         deleteCandidate,
     } = useCandidates();
 
@@ -64,10 +77,20 @@ export default function Dashboard() {
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [isDeleting, setIsDeleting] = useState(false);
+    const { positions } = usePositions();
+
+    // Bulk analysis state
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [analyzeProgress, setAnalyzeProgress] = useState(0);
+    const [analyzeTotal, setAnalyzeTotal] = useState(0);
+    const [analyzeCurrentCandidate, setAnalyzeCurrentCandidate] = useState(null);
+    const [analyzeCurrentStage, setAnalyzeCurrentStage] = useState(null);
+    const [analyzePosCurrent, setAnalyzePosCurrent] = useState(0);
+    const [analyzePosTotal, setAnalyzePosTotal] = useState(0);
 
     // Sort by match score descending (client-side, Rule 2)
     const sortedCandidates = useMemo(() => {
-        return [...filteredCandidates].sort((a, b) => (b.matchScore || b.aiAnalysis?.score || 0) - (a.matchScore || a.aiAnalysis?.score || 0));
+        return [...filteredCandidates].sort((a, b) => (b.bestScore || 0) - (a.bestScore || 0));
     }, [filteredCandidates]);
 
     const handleSelectAll = () => {
@@ -100,6 +123,87 @@ export default function Dashboard() {
             alert('Silme işlemi sırasında bir hata oluştu.');
         } finally {
             setIsDeleting(false);
+        }
+    };
+
+    const handleBulkAnalyze = async () => {
+        const openPositions = positions.filter(p => p.status === 'open');
+        if (openPositions.length === 0) {
+            alert("Açık pozisyon bulunamadı.");
+            return;
+        }
+
+        setIsAnalyzing(true);
+        const candidatesToAnalyze = Array.from(selectedIds);
+        setAnalyzeTotal(candidatesToAnalyze.length);
+        setAnalyzeProgress(0);
+        setAnalyzePosTotal(openPositions.length);
+
+        try {
+            for (let i = 0; i < candidatesToAnalyze.length; i++) {
+                const id = candidatesToAnalyze[i];
+                const candidate = candidates.find(c => c.id === id);
+                if (!candidate) continue;
+
+                setAnalyzeCurrentCandidate(candidate);
+                setAnalyzeProgress(((i) / candidatesToAnalyze.length) * 100);
+
+                // STAGE 1: Scout
+                setAnalyzeCurrentStage('scout');
+                await new Promise(r => setTimeout(r, 600));
+
+                const updatedAnalyses = { ...(candidate.positionAnalyses || {}) };
+                let highestScore = -1;
+                let bestResult = null;
+                let bestTitle = candidate.matchedPositionTitle;
+
+                // STAGE 2: Researcher & Analyst
+                setAnalyzeCurrentStage('analyst');
+
+                for (let j = 0; j < openPositions.length; j++) {
+                    const pos = openPositions[j];
+                    setAnalyzePosCurrent(j + 1);
+
+                    const jobDesc = `${pos.title}\n${(pos.requirements || []).join(', ')}\n${pos.description || ''}`;
+                    try {
+                        const result = await analyzeCandidateMatch(jobDesc, candidate, 'gemini-2.0-flash');
+                        updatedAnalyses[pos.title] = result;
+                        if (result.score > highestScore) {
+                            highestScore = result.score;
+                            bestResult = result;
+                            bestTitle = pos.title;
+                        }
+                    } catch (e) {
+                        console.error("AI Error for pos", pos.title, e);
+                    }
+                }
+
+                // STAGE 3: Recruiter (Saving)
+                if (bestResult) {
+                    setAnalyzeCurrentStage('recruiter');
+                    await updateCandidate(candidate.id, {
+                        aiAnalysis: bestResult,
+                        summary: bestResult.summary,
+                        matchScore: bestResult.score,
+                        aiScore: bestResult.score,
+                        matchedPositionTitle: bestTitle,
+                        positionAnalyses: updatedAnalyses,
+                        lastScannedAt: new Date().toISOString()
+                    });
+                    await new Promise(r => setTimeout(r, 800)); // small delay for visual feedback
+                }
+            }
+
+            setAnalyzeProgress(100);
+            setTimeout(() => {
+                setSelectedIds(new Set());
+                setIsAnalyzing(false);
+                setAnalyzeCurrentCandidate(null);
+            }, 2000);
+        } catch (err) {
+            console.error('Bulk analyze error:', err);
+            alert('Analiz sırasında bir hata oluştu.');
+            setIsAnalyzing(false);
         }
     };
 
@@ -182,6 +286,17 @@ export default function Dashboard() {
                             </select>
 
                             <select
+                                value={positionFilter}
+                                onChange={(e) => setPositionFilter(e.target.value)}
+                                className="px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-[12px] text-navy-300 outline-none focus:border-electric/40 transition-all cursor-pointer appearance-none pr-7 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_6px_center]"
+                                id="position-filter"
+                            >
+                                {matchPositions.map((p) => (
+                                    <option key={p} value={p}>{p === 'all' ? 'Tüm Pozisyonlar' : p}</option>
+                                ))}
+                            </select>
+
+                            <select
                                 value={statusFilter}
                                 onChange={(e) => setStatusFilter(e.target.value)}
                                 className="px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-[12px] text-navy-300 outline-none focus:border-electric/40 transition-all cursor-pointer appearance-none pr-7 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_6px_center]"
@@ -213,8 +328,15 @@ export default function Dashboard() {
                                     {selectedIds.size} seçildi
                                 </span>
                                 <button
+                                    onClick={handleBulkAnalyze}
+                                    disabled={isAnalyzing || isDeleting}
+                                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-electric/10 hover:bg-electric/20 text-electric-light text-[13px] font-bold border border-electric/20 transition-all"
+                                >
+                                    {isAnalyzing ? 'Analiz Ediliyor...' : 'Detaylı Determinik Skorla'}
+                                </button>
+                                <button
                                     onClick={handleBulkDelete}
-                                    disabled={isDeleting}
+                                    disabled={isDeleting || isAnalyzing}
                                     className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 text-[13px] font-bold border border-red-500/20 transition-all"
                                 >
                                     {isDeleting ? 'Siliniyor...' : 'Seçilenleri Sil'}
@@ -338,6 +460,86 @@ export default function Dashboard() {
                 isOpen={isAddModalOpen}
                 onClose={() => setIsAddModalOpen(false)}
             />
+
+            {/* ===== BULK ANALYSIS MODAL ===== */}
+            {isAnalyzing && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
+                    <div className="bg-navy-900 border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col relative mx-auto my-auto">
+                        <div className="p-6 border-b border-white/5 flex justify-between items-center bg-navy-800/50">
+                            <div>
+                                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                                    {analyzeProgress < 100 ? (
+                                        <>
+                                            <span className="relative flex h-3 w-3">
+                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-electric opacity-75"></span>
+                                                <span className="relative inline-flex rounded-full h-3 w-3 bg-electric"></span>
+                                            </span>
+                                            Detaylı Deterministik Analiz
+                                        </>
+                                    ) : (
+                                        <>
+                                            <CheckCircle className="w-5 h-5 text-emerald-400" />
+                                            Analiz Tamamlandı
+                                        </>
+                                    )}
+                                </h2>
+                                <p className="text-xs text-navy-400 mt-1">
+                                    {analyzeProgress < 100 ? 'Yapay zeka tüm pozisyonlar için 0 sapma ile kesin skoru hesaplıyor.' : 'Aday skorları başarıyla güncellendi.'}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="h-1 bg-navy-950 w-full">
+                            <div
+                                className="h-full bg-gradient-to-r from-electric to-emerald-400 transition-all duration-300 ease-out"
+                                style={{ width: `${analyzeProgress}%` }}
+                            />
+                        </div>
+
+                        <div className="p-8 flex flex-col items-center justify-center min-h-[250px] relative">
+                            {analyzeProgress < 100 && analyzeCurrentCandidate ? (
+                                <div className="flex flex-col items-center animate-in zoom-in-95 duration-300">
+                                    <div className="w-20 h-20 rounded-full bg-navy-800 border-4 border-navy-700 flex items-center justify-center mb-4 relative">
+                                        <span className="text-2xl font-bold text-white">{analyzeCurrentCandidate.name?.[0]}</span>
+                                        <div className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-navy-900 border border-white/10 flex items-center justify-center shadow-lg">
+                                            {analyzeCurrentStage === 'scout' && <Eye className="w-4 h-4 text-blue-400 animate-pulse" />}
+                                            {analyzeCurrentStage === 'analyst' && <Brain className="w-4 h-4 text-purple-400 animate-pulse" />}
+                                            {analyzeCurrentStage === 'recruiter' && <Database className="w-4 h-4 text-emerald-400 animate-pulse" />}
+                                        </div>
+                                    </div>
+
+                                    <h3 className="text-xl font-bold text-white mb-1">{analyzeCurrentCandidate.name}</h3>
+                                    <p className="text-sm text-navy-400 mb-6 text-center">
+                                        Mevcut Pozisyon: {analyzeCurrentCandidate.position || '-'}
+                                    </p>
+
+                                    <div className="flex flex-col items-center gap-3 w-full">
+                                        <div className="flex items-center gap-3 px-4 py-2 rounded-full bg-white/5 border border-white/10 self-center">
+                                            <Loader2 className="w-4 h-4 animate-spin text-electric" />
+                                            <span className="text-sm font-medium text-electric-light uppercase tracking-wide">
+                                                {analyzeCurrentStage === 'scout' && 'Aday Özgeçmişi Taranıyor...'}
+                                                {analyzeCurrentStage === 'analyst' && `Pozisyon Analizi (${analyzePosCurrent}/${analyzePosTotal})`}
+                                                {analyzeCurrentStage === 'recruiter' && 'Sonuçlar Kaydediliyor...'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="text-center animate-in fade-in slide-in-from-bottom-4">
+                                    <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
+                                        <CheckCircle className="w-8 h-8 text-emerald-400" />
+                                    </div>
+                                    <h3 className="text-2xl font-bold text-white mb-2">İşlem Tamamlandı</h3>
+                                    <p className="text-navy-400 mb-8 max-w-sm">
+                                        {analyzeTotal} adayın detaylı skorlama analizi başarıyla tamamlandı.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
         </>
     );
 }
