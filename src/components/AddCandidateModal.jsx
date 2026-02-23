@@ -67,7 +67,6 @@ export default function AddCandidateModal({ isOpen, onClose }) {
             const processedResults = await Promise.all(data.results.map(async (res) => {
                 if (!res.success) return res;
 
-                console.log(`[AddCandidateModal] Otonom AI taranıyor: ${res.candidate.name}`);
 
                 // 1. First, find candidate candidates using semantic logic to save tokens/time
                 let candidates = openPositions.map(pos => ({
@@ -117,7 +116,6 @@ export default function AddCandidateModal({ isOpen, onClose }) {
         setLoading(true);
         try {
             const successfulOnes = results.filter(r => r.success && r.candidate);
-            console.log('[AddCandidateModal] Saving candidates:', successfulOnes.length);
 
             await Promise.all(successfulOnes.map(async (r, idx) => {
                 try {
@@ -137,7 +135,7 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                         appliedDate: new Date().toISOString().split('T')[0],
                         source: 'Bulk CV Upload'
                     };
-                    console.log(`[AddCandidateModal] Saving #${idx + 1}: ${candidateData.name} with score %${candidateData.matchScore}`);
+
                     await addCandidate(candidateData);
 
                 } catch (candidateErr) {
@@ -145,7 +143,7 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                     throw candidateErr;
                 }
             }));
-            console.log('[AddCandidateModal] All candidates saved successfully!');
+
             onClose();
             // Reset state
             setFiles([]);

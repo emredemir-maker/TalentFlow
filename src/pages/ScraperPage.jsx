@@ -118,7 +118,6 @@ export default function ScraperPage() {
             return;
         }
 
-        console.log('[Scraper] handleAutoScrape triggered for:', searchQuery);
 
         // Immediate UI feedback
         setAutoScraping(true);
@@ -126,10 +125,7 @@ export default function ScraperPage() {
         setAutoResults([]);
 
         try {
-            console.log(`[Scraper] Fetching from API (Visual: ${visual})...`);
             const response = await fetch(`/api/scrape?q=${encodeURIComponent(searchQuery)}&visual=${visual}`);
-
-            console.log('[Scraper] API Response status:', response.status);
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({ error: 'Bilinmeyen sunucu hatası.' }));
@@ -137,7 +133,6 @@ export default function ScraperPage() {
             }
 
             const data = await response.json();
-            console.log('[Scraper] API Data received:', data);
 
             if (data.candidates && data.candidates.length > 0) {
                 let successCount = 0;
@@ -161,7 +156,6 @@ export default function ScraperPage() {
             console.error('[Scraper] Auto Scrape Error:', err);
             setError(`Arama işlemi şu an gerçekleştirilemiyor: ${err.message}. Lütfen manuel yöntemi deneyin.`);
         } finally {
-            console.log('[Scraper] Setting autoScraping to false');
             setAutoScraping(false);
         }
     };

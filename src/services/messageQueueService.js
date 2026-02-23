@@ -66,7 +66,6 @@ export async function createMessage(messageData) {
     };
 
     const docRef = await addDoc(queueRef, message);
-    console.log(`[MessageQueue] Created message ${docRef.id} for ${message.candidateName}${message.trackingId ? ' (ID: ' + message.trackingId + ')' : ''}`);
     return docRef.id;
 }
 
@@ -94,7 +93,6 @@ export async function updateMessageStatus(messageId, newStatus) {
     }
 
     await updateDoc(docRef, update);
-    console.log(`[MessageQueue] Updated message ${messageId} → ${newStatus}`);
 }
 
 // ==================== UPDATE CONTENT ====================
@@ -108,7 +106,6 @@ export async function updateMessageContent(messageId, newContent) {
         messageContent: newContent,
         updatedAt: serverTimestamp(),
     });
-    console.log(`[MessageQueue] Updated content for message ${messageId}`);
 }
 
 // ==================== APPROVE (Mark Ready) ====================
@@ -124,7 +121,6 @@ export async function approveMessage(messageId, finalContent) {
         status: MESSAGE_STATUS.READY_TO_SEND,
         updatedAt: serverTimestamp(),
     });
-    console.log(`[MessageQueue] Approved message ${messageId} → ready_to_send`);
 }
 
 // ==================== SIMULATE SEND ====================
@@ -143,7 +139,6 @@ export async function simulateSend(messageId) {
         sentTimestamp: serverTimestamp(),
         updatedAt: serverTimestamp(),
     });
-    console.log(`[MessageQueue] Simulated send for message ${messageId}`);
 }
 
 // ==================== MARK FAILED ====================
@@ -168,7 +163,6 @@ export async function markMessageFailed(messageId, errorReason) {
 export async function deleteMessage(messageId) {
     const docRef = doc(db, QUEUE_PATH, messageId);
     await deleteDoc(docRef);
-    console.log(`[MessageQueue] Deleted message ${messageId}`);
 }
 
 // ==================== BATCH APPROVE ====================
@@ -181,7 +175,6 @@ export async function batchApprove(messageIds) {
         updateMessageStatus(id, MESSAGE_STATUS.READY_TO_SEND)
     );
     await Promise.all(promises);
-    console.log(`[MessageQueue] Batch approved ${messageIds.length} messages`);
 }
 
 // ==================== CHROME EXTENSION QUEUE STRUCTURE ====================

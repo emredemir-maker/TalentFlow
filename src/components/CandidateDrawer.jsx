@@ -15,14 +15,16 @@ import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
 import { calculateMatchScore } from '../services/matchService';
 
+import InterviewSessionModal from './InterviewSessionModal';
+import InterviewHistory from './InterviewHistory';
+
 const STATUS_CONFIG = {
     ai_analysis: { label: 'AI Analiz', dot: 'bg-violet-400', color: 'text-violet-400', next: 'review' },
-    review: { label: 'İlk İnceleme', dot: 'bg-amber-400', color: 'text-amber-400', next: 'interview' },
-    interview: { label: 'Mülakat Değerlendirme', dot: 'bg-blue-400', color: 'text-blue-400', next: 'deep_review' },
-    deep_review: { label: 'Detaylı İnceleme', dot: 'bg-indigo-400', color: 'text-indigo-400', next: 'offer' },
+    review: { label: 'İnceleme', dot: 'bg-amber-400', color: 'text-amber-400', next: 'interview' },
+    interview: { label: 'Mülakat', dot: 'bg-blue-400', color: 'text-blue-400', next: 'offer' },
     offer: { label: 'Teklif', dot: 'bg-cyan-400', color: 'text-cyan-400', next: 'hired' },
-    hired: { label: 'Onaylandı', dot: 'bg-emerald-400', color: 'text-emerald-400', next: null },
-    rejected: { label: 'Reddedildi', dot: 'bg-red-400', color: 'text-red-400', next: null },
+    hired: { label: 'İşe Alındı', dot: 'bg-emerald-400', color: 'text-emerald-400', next: null },
+    rejected: { label: 'Red', dot: 'bg-red-400', color: 'text-red-400', next: null },
 };
 
 const REJECTION_REASONS = [
@@ -45,6 +47,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
     const [activeTab, setActiveTab] = useState(positionContext ? 'ai-analysis' : 'profile');
     const [expandedPositionId, setExpandedPositionId] = useState(positionContext ? positionContext.id : null);
     const [showJobInput, setShowJobInput] = useState(false);
+    const [showInterviewModal, setShowInterviewModal] = useState(false);
 
     // AI Analysis State
     const [aiResult, setAiResult] = useState(candidate?.aiAnalysis || null);
@@ -52,15 +55,6 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
     const [aiError, setAiError] = useState(null);
     const [jobDescription, setJobDescription] = useState('');
 
-    // Assessment State (Point 3)
-    const [assessments, setAssessments] = useState(candidate?.assessments || {
-        technical: 0,
-        communication: 0,
-        culture: 0,
-        notes: ''
-    });
-
-    const liveScore = Math.round((assessments.technical + assessments.communication + assessments.culture) / 3);
 
     // Score Calculation (Find best AI match in positionAnalyses)
     const activeMatch = useMemo(() => {
@@ -142,37 +136,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
     }, [positions, candidate]);
 
 
-    const handleUpdateAssessment = async () => {
-        setUpdatingStatus(true);
-        try {
-            // Calculate a human assessment score (average of the three metrics)
-            const humanScore = Math.round((assessments.technical + assessments.communication + assessments.culture) / 3);
 
-            // Determine stage based on current status
-            let newStage = 'review';
-            if (['interview', 'deep_review'].includes(candidate.status)) {
-                newStage = 'interview';
-            } else if (['offer', 'hired'].includes(candidate.status)) {
-                newStage = 'offer';
-            }
-
-
-            const updates = {
-                assessments,
-                matchScore: humanScore, // Human score becomes the definitive matchScore
-                scoringStage: newStage,
-                manualScore: humanScore,
-                lastAssessedBy: 'Human'
-            };
-
-            await updateCandidate(candidate.id, updates);
-            alert('Değerlendirme başarıyla kaydedildi. Skor güncellendi ve AI ezilmesine karşı korumaya alındı.');
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setUpdatingStatus(false);
-        }
-    };
 
     const handlePrintReport = () => {
         window.print();
@@ -355,14 +319,9 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
 
                     <div className="relative">
                         <MatchScoreRing
-                            score={activeTab === 'assessments' ? liveScore : activeMatch.score}
+                            score={activeMatch.score}
                             size={80}
                         />
-                        {activeTab === 'assessments' && liveScore !== activeMatch.score && (
-                            <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 border border-navy-900 flex items-center justify-center animate-pulse">
-                                <Zap className="w-2.5 h-2.5 text-white" />
-                            </div>
-                        )}
                     </div>
 
                     <div className="flex-1 space-y-2">
@@ -379,7 +338,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
 
                         <div className="flex items-end gap-3">
                             <div className="text-4xl font-black text-white tracking-tight">
-                                %{activeTab === 'assessments' ? liveScore : activeMatch.score}
+                                %{activeMatch.score}
                             </div>
 
                             {/* SCORE EVOLUTION */}
@@ -414,11 +373,6 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                             </div>
                         )}
 
-                        {activeTab === 'assessments' && liveScore !== activeMatch.score && (
-                            <div className="px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-500 text-[10px] font-bold border border-amber-500/20 animate-pulse text-center">
-                                Kaydedilmemiş Değişiklik
-                            </div>
-                        )}
                     </div>
                 </div>
 
@@ -584,6 +538,34 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                         </div>
                     )}
 
+                    {/* TAB: ASSESSMENTS */}
+                    {activeTab === 'assessments' && (
+                        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                            {/* Start New Interview */}
+                            <button
+                                onClick={() => setShowInterviewModal(true)}
+                                className="w-full py-4 rounded-2xl bg-gradient-to-r from-electric to-blue-600 hover:from-electric-light hover:to-blue-500 text-white font-bold text-sm shadow-lg shadow-electric/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                            >
+                                <ClipboardCheck className="w-5 h-5" /> Yeni Mülakat Oturumu Başlat
+                            </button>
+
+                            {/* Interview History */}
+                            <InterviewHistory sessions={candidate.interviewSessions} />
+
+                            {/* Manual Assessment Card (simple override) */}
+
+                        </div>
+                    )}
+
+                    {/* Interview Session Modal */}
+                    {showInterviewModal && (
+                        <InterviewSessionModal
+                            candidate={candidate}
+                            onClose={() => setShowInterviewModal(false)}
+                            onSessionSaved={() => setShowInterviewModal(false)}
+                        />
+                    )}
+
                     {/* PRINT-ONLY EVALUATION REPORT (Point 4) */}
                     <div className="hidden print:block space-y-8 mt-10">
                         <div className="border-b-2 border-black pb-4">
@@ -600,12 +582,12 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                             </div>
                             <div>
                                 <h3 className="font-black border-b border-gray-300 mb-2">MÜLAKAT SKORU</h3>
-                                <p className="text-4xl font-black">%{Math.round((assessments.technical + assessments.communication + assessments.culture) / 3) || 0}</p>
+                                <p className="text-4xl font-black">%{candidate.interviewSessions?.length > 0 ? candidate.interviewSessions[candidate.interviewSessions.length - 1].finalScore : 0}</p>
                             </div>
                         </div>
                         <div className="p-4 bg-gray-50 border border-gray-200">
                             <h3 className="font-black mb-2">KARAR VERİCİ NOTLARI</h3>
-                            <p className="text-sm italic">{assessments.notes || 'Not girilmemiştir.'}</p>
+                            <p className="text-sm italic">{candidate.interviewSessions?.length > 0 ? (candidate.interviewSessions[candidate.interviewSessions.length - 1].interviewerNotes || 'Not girilmemiştir.') : 'Not girilmemiştir.'}</p>
                         </div>
                         <div className="pt-20 text-center">
                             <div className="w-48 border-t border-black mx-auto"></div>
@@ -632,15 +614,6 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                         <Printer className="w-4 h-4" />
                     </button>
 
-                    {activeTab === 'assessments' && (
-                        <button
-                            onClick={handleUpdateAssessment}
-                            disabled={updatingStatus}
-                            className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-[0_4px_16px_rgba(16,185,129,0.2)] flex items-center justify-center gap-2 transition-all active:scale-95"
-                        >
-                            {updatingStatus ? <Loader2 className="w-4 h-4 animate-spin" /> : <><ClipboardCheck className="w-4 h-4" /> Değerlendirmeyi Kaydet</>}
-                        </button>
-                    )}
                 </div>
             </div>
         </>

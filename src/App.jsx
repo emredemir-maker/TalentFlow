@@ -16,6 +16,9 @@ import CandidateProcessPage from './pages/CandidateProcessPage';
 import PositionsPage from './pages/PositionsPage';
 import SuperAdminPage from './pages/SuperAdminPage';
 import LoginPage from './pages/LoginPage';
+import AnalyticsPage from './pages/AnalyticsPage';
+import ScraperPage from './pages/ScraperPage';
+import AIMatchPage from './pages/AIMatchPage';
 
 function AppContent() {
   const { loading, error, isAuthenticated, loginWithGoogle } = useAuth();

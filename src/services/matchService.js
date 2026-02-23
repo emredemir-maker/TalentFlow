@@ -123,14 +123,6 @@ export function calculateMatchScore(candidate, position, options = {}) {
         skillRatio = Math.min(matchCount / validReqs.length, 1);
         score += Math.round(skillRatio * 70);
 
-        // DEBUG LOG
-        console.log(`[Match Debug vs Keywords] ${candidate.name}:
-          - Extracted Keywords: ${validReqs.slice(0, 5)}... (Total: ${validReqs.length})
-          - Candidate Skills: ${cSkills.slice(0, 5)}...
-          - Found Matches: ${matchCount}
-          - Ratio: ${skillRatio.toFixed(2)}
-          - Score Added: ${Math.round(skillRatio * 70)}`);
-
         if (matchCount > 0) reasons.push(`${Math.ceil(matchCount)} teknik yetkinlik eşleşmesi`);
     }
 

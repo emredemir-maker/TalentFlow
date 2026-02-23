@@ -7,12 +7,11 @@ import { MapPin, Briefcase, Clock, ArrowUpRight, ShieldAlert, Sparkles } from 'l
 
 const STATUS_CONFIG = {
     ai_analysis: { label: 'AI Analiz', classes: 'bg-violet-500/10 text-violet-400 ring-violet-500/20' },
-    review: { label: 'İlk İnceleme', classes: 'bg-amber-500/10 text-amber-400 ring-amber-500/20' },
+    review: { label: 'İnceleme', classes: 'bg-amber-500/10 text-amber-400 ring-amber-500/20' },
     interview: { label: 'Mülakat', classes: 'bg-blue-500/10 text-blue-400 ring-blue-500/20' },
-    deep_review: { label: 'Detaylı İnceleme', classes: 'bg-indigo-500/10 text-indigo-400 ring-indigo-500/20' },
     offer: { label: 'Teklif', classes: 'bg-cyan-500/10 text-cyan-400 ring-cyan-500/20' },
-    hired: { label: 'Onaylandı', classes: 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/20' },
-    rejected: { label: 'Reddedildi', classes: 'bg-red-500/10 text-red-400 ring-red-500/20' },
+    hired: { label: 'İşe Alındı', classes: 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/20' },
+    rejected: { label: 'Red', classes: 'bg-red-500/10 text-red-400 ring-red-500/20' },
 };
 
 

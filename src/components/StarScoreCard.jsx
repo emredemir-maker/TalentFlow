@@ -1,5 +1,4 @@
-import { CheckCircle, Circle, Zap, Target, Info, X, RefreshCw } from 'lucide-react';
-import InterviewGenerator from './OtonomInterview';
+import { CheckCircle, Circle, Zap, Target, Info, X, RefreshCw, MessageSquare } from 'lucide-react';
 import { useState } from 'react';
 
 const STAR_CRITERIA = {
@@ -226,8 +225,12 @@ export default function StarScoreCard({ analysis, candidate, onRefresh }) {
                 </div>
             )}
 
-            {/* Interview Generator */}
-            <InterviewGenerator candidate={candidate} starAnalysis={scores} />
+            {/* Interview Session Prompt */}
+            <div className="glass rounded-3xl p-6 border border-white/[0.06] mt-6 text-center">
+                <MessageSquare className="w-8 h-8 text-electric mx-auto mb-3 opacity-60" />
+                <p className="text-sm text-navy-300 mb-1 font-medium">Mülakat Oturumu</p>
+                <p className="text-[10px] text-navy-500">Aday kartındaki "Değerlendirme" sekmesinden veya sol paneldeki "Yeni Mülakat Oturumu" butonundan interaktif mülakat başlatabilirsiniz.</p>
+            </div>
         </div>
     );
 }

@@ -31,7 +31,6 @@ export default function SystemScanner() {
     const prevPositionsCount = useRef(0);
     useEffect(() => {
         if (positions.length > prevPositionsCount.current && prevPositionsCount.current > 0) {
-            console.log("New position detected, triggering Auto-Scan...");
             setTimeout(() => handleScan(false), 1000);
         }
         prevPositionsCount.current = positions.length;
@@ -61,7 +60,6 @@ export default function SystemScanner() {
             setUpdatedCount(0);
 
             const openPositions = positions.filter(p => p.status === 'open');
-            console.log(`Starting scan. Candidates: ${candidates.length}, Open Positions: ${openPositions.length}, Force: ${effectiveForce}`);
 
             if (openPositions.length === 0) {
                 alert("Açık pozisyon bulunamadı.");
@@ -74,7 +72,6 @@ export default function SystemScanner() {
 
             for (let i = 0; i < total; i++) {
                 if (!isScanningRef.current) {
-                    console.log("Scan stopped by user.");
                     break;
                 }
 
@@ -114,7 +111,6 @@ export default function SystemScanner() {
 
                     try {
                         if (effectiveForce) {
-                            console.log(`Deep Analyzing candidate: ${candidate.name} for ALL positions`);
                             const updatedAnalyses = { ...(candidate.positionAnalyses || {}) };
                             let highestScore = -1;
                             let bestResult = null;
@@ -147,7 +143,6 @@ export default function SystemScanner() {
                                 updates.positionAnalyses = updatedAnalyses;
                             }
                         } else {
-                            console.log(`Quick Screening candidate: ${candidate.name}`);
                             const screeningResult = await quickCandidateScreening(candidate, openPositions);
 
                             updates.preAssessment = screeningResult;

@@ -26,19 +26,26 @@ import {
     Loader2,
     Eye,
     GitBranch,
-    Database
+    Database,
+    LayoutGrid,
+    Columns3,
+    List,
+    Briefcase,
+    Clock,
+    MapPin,
+    Sparkles,
+    ArrowUpRight
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
 const STATUS_OPTIONS = [
     { value: 'all', label: 'Tüm Durumlar' },
     { value: 'ai_analysis', label: 'AI Analiz' },
-    { value: 'review', label: 'İlk İnceleme' },
-    { value: 'interview', label: 'Mülakat Değerlendirme' },
-    { value: 'deep_review', label: 'Detaylı İnceleme' },
+    { value: 'review', label: 'İnceleme' },
+    { value: 'interview', label: 'Mülakat' },
     { value: 'offer', label: 'Teklif' },
-    { value: 'hired', label: 'Onaylandı' },
-    { value: 'rejected', label: 'Reddedildi' },
+    { value: 'hired', label: 'İşe Alındı' },
+    { value: 'rejected', label: 'Red' },
 ];
 
 
@@ -79,6 +86,11 @@ export default function Dashboard() {
     const [isDeleting, setIsDeleting] = useState(false);
     const { positions } = usePositions();
 
+    // Stat card filter
+    const [statFilter, setStatFilter] = useState(null); // null | 'all' | status key
+    // View mode
+    const [viewMode, setViewMode] = useState('card'); // card | kanban | list
+
     // Bulk analysis state
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [analyzeProgress, setAnalyzeProgress] = useState(0);
@@ -88,10 +100,25 @@ export default function Dashboard() {
     const [analyzePosCurrent, setAnalyzePosCurrent] = useState(0);
     const [analyzePosTotal, setAnalyzePosTotal] = useState(0);
 
-    // Sort by match score descending (client-side, Rule 2)
+    // Sort by match score descending + apply stat filter
     const sortedCandidates = useMemo(() => {
-        return [...filteredCandidates].sort((a, b) => (b.bestScore || 0) - (a.bestScore || 0));
-    }, [filteredCandidates]);
+        let list = [...filteredCandidates];
+        // Migrate deep_review to interview
+        list = list.map(c => c.status === 'deep_review' ? { ...c, status: 'interview' } : c);
+        if (statFilter && statFilter !== 'all') {
+            if (statFilter === '__total__') {
+                // show all
+            } else if (statFilter === '__new__') {
+                list = list.filter(c => c.status === 'ai_analysis' || c.status === 'review' || !c.status);
+            } else {
+                list = list.filter(c => c.status === statFilter);
+            }
+        }
+        return list.sort((a, b) => (b.bestScore || 0) - (a.bestScore || 0));
+    }, [filteredCandidates, statFilter]);
+
+    // Kanban drag state
+    const [draggedId, setDraggedId] = useState(null);
 
     const handleSelectAll = () => {
         if (selectedIds.size === sortedCandidates.length && sortedCandidates.length > 0) {
@@ -239,12 +266,24 @@ export default function Dashboard() {
             {/* ===== STATS ===== */}
             <div className="px-6 lg:px-8 py-6">
                 <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 stagger">
-                    <StatCard icon={Users} iconColor="text-electric-light" bgColor="bg-electric/10" value={stats.total} label="Toplam Aday" />
-                    <StatCard icon={UserPlus} iconColor="text-violet-400" bgColor="bg-violet-500/10" value={stats.byStatus?.new || 0} label="Yeni Başvuru" trend={12} />
-                    <StatCard icon={MessageSquare} iconColor="text-blue-400" bgColor="bg-blue-500/10" value={stats.byStatus?.interview || 0} label="Mülakat" />
-                    <StatCard icon={CheckCircle} iconColor="text-emerald-400" bgColor="bg-emerald-500/10" value={stats.byStatus?.hired || 0} label="İşe Alınan" />
-                    <StatCard icon={Send} iconColor="text-cyan-400" bgColor="bg-cyan-500/10" value={stats.byStatus?.offer || 0} label="Teklif" />
-                    <StatCard icon={XCircle} iconColor="text-red-400" bgColor="bg-red-500/10" value={stats.byStatus?.rejected || 0} label="Reddedilen" />
+                    <StatCard icon={Users} iconColor="text-electric-light" bgColor="bg-electric/10" value={stats.total} label="Toplam Aday"
+                        isActive={statFilter === '__total__'}
+                        onClick={() => setStatFilter(statFilter === '__total__' ? null : '__total__')} />
+                    <StatCard icon={UserPlus} iconColor="text-violet-400" bgColor="bg-violet-500/10" value={(stats.byStatus?.ai_analysis || 0) + (stats.byStatus?.review || 0)} label="Yeni Başvuru" trend={12}
+                        isActive={statFilter === '__new__'}
+                        onClick={() => setStatFilter(statFilter === '__new__' ? null : '__new__')} />
+                    <StatCard icon={MessageSquare} iconColor="text-blue-400" bgColor="bg-blue-500/10" value={stats.byStatus?.interview || 0} label="Mülakat"
+                        isActive={statFilter === 'interview'}
+                        onClick={() => setStatFilter(statFilter === 'interview' ? null : 'interview')} />
+                    <StatCard icon={CheckCircle} iconColor="text-emerald-400" bgColor="bg-emerald-500/10" value={stats.byStatus?.hired || 0} label="İşe Alınan"
+                        isActive={statFilter === 'hired'}
+                        onClick={() => setStatFilter(statFilter === 'hired' ? null : 'hired')} />
+                    <StatCard icon={Send} iconColor="text-cyan-400" bgColor="bg-cyan-500/10" value={stats.byStatus?.offer || 0} label="Teklif"
+                        isActive={statFilter === 'offer'}
+                        onClick={() => setStatFilter(statFilter === 'offer' ? null : 'offer')} />
+                    <StatCard icon={XCircle} iconColor="text-red-400" bgColor="bg-red-500/10" value={stats.byStatus?.rejected || 0} label="Reddedilen"
+                        isActive={statFilter === 'rejected'}
+                        onClick={() => setStatFilter(statFilter === 'rejected' ? null : 'rejected')} />
                 </div>
             </div>
 
@@ -359,10 +398,20 @@ export default function Dashboard() {
                                     <span>Aday Ekle</span>
                                 </button>
 
-                                <div className="hidden lg:flex items-center gap-1.5 text-[12px] text-navy-500">
-                                    <ArrowDownWideNarrow className="w-3.5 h-3.5" />
-                                    <span>Match Score sırası</span>
+                                {/* View Mode Toggle */}
+                                <div className="hidden lg:flex items-center gap-1 bg-white/[0.03] rounded-lg p-0.5 border border-white/[0.06]">
+                                    {[
+                                        { id: 'card', icon: LayoutGrid, label: 'Kart' },
+                                        { id: 'kanban', icon: Columns3, label: 'Kanban' },
+                                        { id: 'list', icon: List, label: 'Liste' },
+                                    ].map(v => (
+                                        <button key={v.id} onClick={() => setViewMode(v.id)} title={v.label}
+                                            className={`p-1.5 rounded-md transition-all ${viewMode === v.id ? 'bg-electric/20 text-electric-light' : 'text-navy-500 hover:text-navy-200'}`}>
+                                            <v.icon className="w-4 h-4" />
+                                        </button>
+                                    ))}
                                 </div>
+
                                 <span className="text-[12px] text-navy-500 font-medium whitespace-nowrap">
                                     {sortedCandidates.length} / {stats.total} aday
                                 </span>
@@ -384,8 +433,17 @@ export default function Dashboard() {
                 </div>
             </div>
 
-            {/* ===== CANDIDATES GRID ===== */}
+            {/* ===== CANDIDATES AREA ===== */}
             <div className="px-6 lg:px-8 pb-8 md:pb-8 pb-24">
+                {/* Stat filter active indicator */}
+                {statFilter && (
+                    <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-xl bg-electric/5 border border-electric/20 text-electric-light text-xs font-medium">
+                        <Filter className="w-3 h-3" />
+                        <span>Filtreleniyor: <strong>{statFilter === '__total__' ? 'Tüm Adaylar' : statFilter === '__new__' ? 'Yeni Başvurular' : statFilter === 'interview' ? 'Mülakat' : statFilter === 'hired' ? 'İşe Alınan' : statFilter === 'offer' ? 'Teklif' : statFilter === 'rejected' ? 'Reddedilen' : statFilter}</strong></span>
+                        <button onClick={() => setStatFilter(null)} className="ml-auto p-1 rounded hover:bg-white/10"><XCircle className="w-3 h-3" /></button>
+                    </div>
+                )}
+
                 {/* Loading skeleton */}
                 {loading && (
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 stagger">
@@ -418,20 +476,20 @@ export default function Dashboard() {
                             <Users className="w-8 h-8 text-navy-500" style={{ animation: 'float-subtle 3s ease-in-out infinite' }} />
                         </div>
                         <h3 className="text-lg font-bold text-navy-300">
-                            {searchQuery || departmentFilter !== 'all' || statusFilter !== 'all'
+                            {searchQuery || departmentFilter !== 'all' || statusFilter !== 'all' || statFilter
                                 ? 'Sonuç Bulunamadı'
                                 : 'Henüz Aday Yok'}
                         </h3>
                         <p className="text-sm text-navy-500 max-w-sm">
-                            {searchQuery || departmentFilter !== 'all' || statusFilter !== 'all'
+                            {searchQuery || departmentFilter !== 'all' || statusFilter !== 'all' || statFilter
                                 ? 'Filtreleri değiştirerek tekrar deneyin.'
                                 : 'Aday havuzunuz boş. Yeni bir aday ekleyerek başlayabilirsiniz.'}
                         </p>
                     </div>
                 )}
 
-                {/* Grid */}
-                {!loading && sortedCandidates.length > 0 && (
+                {/* ===== VIEW: CARD (Default Grid) ===== */}
+                {!loading && sortedCandidates.length > 0 && viewMode === 'card' && (
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 stagger">
                         {sortedCandidates.map((candidate, index) => (
                             <CandidateCard
@@ -443,6 +501,145 @@ export default function Dashboard() {
                                 onClick={setSelectedCandidate}
                             />
                         ))}
+                    </div>
+                )}
+
+                {/* ===== VIEW: KANBAN ===== */}
+                {!loading && sortedCandidates.length > 0 && viewMode === 'kanban' && (
+                    <div className="flex gap-4 overflow-x-auto pb-4 -mx-2 px-2">
+                        {[
+                            { key: 'ai_analysis', label: 'AI Analiz', dot: 'bg-violet-400', border: 'border-violet-500/30' },
+                            { key: 'review', label: 'İnceleme', dot: 'bg-amber-400', border: 'border-amber-500/30' },
+                            { key: 'interview', label: 'Mülakat', dot: 'bg-blue-400', border: 'border-blue-500/30' },
+                            { key: 'offer', label: 'Teklif', dot: 'bg-cyan-400', border: 'border-cyan-500/30' },
+                            { key: 'hired', label: 'İşe Alındı', dot: 'bg-emerald-400', border: 'border-emerald-500/30' },
+                            { key: 'rejected', label: 'Red', dot: 'bg-red-400', border: 'border-red-500/30' },
+                        ].map(col => {
+                            const colCandidates = sortedCandidates.filter(c => (c.status || 'ai_analysis') === col.key);
+                            return (
+                                <div key={col.key}
+                                    className={`min-w-[240px] flex-1 flex flex-col rounded-2xl transition-all duration-200 ${draggedId ? 'bg-white/[0.01]' : ''
+                                        }`}
+                                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('ring-2', 'ring-electric/40', 'bg-electric/5'); }}
+                                    onDragLeave={(e) => { e.currentTarget.classList.remove('ring-2', 'ring-electric/40', 'bg-electric/5'); }}
+                                    onDrop={async (e) => {
+                                        e.preventDefault();
+                                        e.currentTarget.classList.remove('ring-2', 'ring-electric/40', 'bg-electric/5');
+                                        const cid = e.dataTransfer.getData('candidateId');
+                                        if (cid) {
+                                            const cand = sortedCandidates.find(c => c.id === cid);
+                                            if (cand && (cand.status || 'ai_analysis') !== col.key) {
+                                                try {
+                                                    await updateCandidate(cid, { status: col.key });
+                                                } catch (err) { console.error(err); }
+                                            }
+                                        }
+                                        setDraggedId(null);
+                                    }}
+                                >
+                                    <div className="flex items-center gap-2 px-3 py-2.5 mb-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                                        <span className={`w-2.5 h-2.5 rounded-full ${col.dot}`} />
+                                        <span className="text-xs font-bold text-navy-200 flex-1">{col.label}</span>
+                                        <span className="text-[10px] font-bold text-navy-500 bg-white/5 px-1.5 py-0.5 rounded">{colCandidates.length}</span>
+                                    </div>
+                                    <div className="flex-1 space-y-2 min-h-[120px] max-h-[65vh] overflow-y-auto pr-1 scrollbar-hide">
+                                        {colCandidates.length === 0 && (
+                                            <div className="text-center py-8 text-navy-600 text-[10px] border-2 border-dashed border-white/[0.04] rounded-xl">
+                                                Buraya sürükleyin
+                                            </div>
+                                        )}
+                                        {colCandidates.map(c => (
+                                            <div key={c.id}
+                                                draggable
+                                                onDragStart={(e) => {
+                                                    e.dataTransfer.setData('candidateId', c.id);
+                                                    setDraggedId(c.id);
+                                                }}
+                                                onDragEnd={() => setDraggedId(null)}
+                                                onClick={() => setSelectedCandidate(c)}
+                                                className={`p-3 rounded-xl border transition-all cursor-grab active:cursor-grabbing group ${draggedId === c.id
+                                                    ? 'opacity-40 border-electric/30 bg-electric/5 scale-95'
+                                                    : 'bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.05] hover:border-electric/30'
+                                                    }`}>
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-[10px] font-bold text-white">
+                                                        {c.name?.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-xs font-bold text-white truncate group-hover:text-electric-light transition-colors">{c.name}</p>
+                                                        <p className="text-[10px] text-navy-500 truncate">{c.position}</p>
+                                                    </div>
+                                                    {c.bestScore > 0 && (
+                                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${c.bestScore >= 70 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-navy-500/20 text-navy-400'}`}>
+                                                            %{Math.round(c.bestScore)}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {c.skills?.length > 0 && (
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {c.skills.slice(0, 2).map(s => (
+                                                            <span key={s} className="text-[9px] text-navy-400 bg-white/[0.04] px-1.5 py-0.5 rounded">{s}</span>
+                                                        ))}
+                                                        {c.skills.length > 2 && <span className="text-[9px] text-navy-600">+{c.skills.length - 2}</span>}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+
+                {/* ===== VIEW: LIST ===== */}
+                {!loading && sortedCandidates.length > 0 && viewMode === 'list' && (
+                    <div className="glass rounded-2xl border border-white/[0.06] overflow-hidden">
+                        {/* Table Header */}
+                        <div className="grid grid-cols-[1fr_180px_120px_100px_80px_60px] gap-4 px-5 py-3 border-b border-white/[0.06] bg-white/[0.01]">
+                            <span className="text-[10px] font-bold text-navy-500 uppercase tracking-wider">Aday</span>
+                            <span className="text-[10px] font-bold text-navy-500 uppercase tracking-wider">Pozisyon</span>
+                            <span className="text-[10px] font-bold text-navy-500 uppercase tracking-wider">Durum</span>
+                            <span className="text-[10px] font-bold text-navy-500 uppercase tracking-wider">Deneyim</span>
+                            <span className="text-[10px] font-bold text-navy-500 uppercase tracking-wider">Skor</span>
+                            <span className="text-[10px] font-bold text-navy-500 uppercase tracking-wider"></span>
+                        </div>
+                        {/* Table Rows */}
+                        {sortedCandidates.map((c, i) => {
+                            const statusCfg = {
+                                ai_analysis: { l: 'AI Analiz', cls: 'bg-violet-500/10 text-violet-400' },
+                                review: { l: 'İnceleme', cls: 'bg-amber-500/10 text-amber-400' },
+                                interview: { l: 'Mülakat', cls: 'bg-blue-500/10 text-blue-400' },
+                                offer: { l: 'Teklif', cls: 'bg-cyan-500/10 text-cyan-400' },
+                                hired: { l: 'İşe Alındı', cls: 'bg-emerald-500/10 text-emerald-400' },
+                                rejected: { l: 'Red', cls: 'bg-red-500/10 text-red-400' },
+                            };
+                            const st = statusCfg[c.status] || statusCfg.ai_analysis;
+                            return (
+                                <div key={c.id} onClick={() => setSelectedCandidate(c)}
+                                    className={`grid grid-cols-[1fr_180px_120px_100px_80px_60px] gap-4 px-5 py-3 items-center cursor-pointer transition-all hover:bg-white/[0.04] ${i < sortedCandidates.length - 1 ? 'border-b border-white/[0.04]' : ''}`}>
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-[10px] font-bold text-white shrink-0">
+                                            {c.name?.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-bold text-white truncate">{c.name}</p>
+                                            <p className="text-[10px] text-navy-500 truncate">{c.email}</p>
+                                        </div>
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="text-xs text-navy-200 truncate">{c.matchedPositionTitle || c.position}</p>
+                                        <p className="text-[10px] text-navy-500 truncate">{c.department}</p>
+                                    </div>
+                                    <span className={`inline-flex items-center justify-center px-2 py-1 rounded-md text-[10px] font-bold ${st.cls}`}>{st.l}</span>
+                                    <span className="text-xs text-navy-300">{c.experience || 0} yıl</span>
+                                    <span className={`text-sm font-bold ${c.bestScore >= 70 ? 'text-emerald-400' : c.bestScore >= 40 ? 'text-amber-400' : 'text-navy-400'}`}>
+                                        {c.bestScore > 0 ? `%${Math.round(c.bestScore)}` : '-'}
+                                    </span>
+                                    <ArrowUpRight className="w-4 h-4 text-navy-600 group-hover:text-electric" />
+                                </div>
+                            );
+                        })}
                     </div>
                 )}
             </div>

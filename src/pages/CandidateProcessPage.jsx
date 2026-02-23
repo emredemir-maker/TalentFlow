@@ -4,6 +4,9 @@
 import { useMemo, useState } from 'react';
 import Header from '../components/Header';
 import StarScoreCard from '../components/StarScoreCard';
+
+import InterviewSessionModal from '../components/InterviewSessionModal';
+import InterviewHistory from '../components/InterviewHistory';
 import SendMessageModal from '../components/SendMessageModal';
 import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
@@ -26,19 +29,19 @@ import { analyzeCandidateMatch } from '../services/geminiService';
 import { createMessage, MESSAGE_STATUS } from '../services/messageQueueService';
 
 const STATUS_LABELS = {
-    ai_analysis: 'Aİ Analizi',
-    review: 'İlk İnceleme',
+    ai_analysis: 'AI Analiz',
+    review: 'İnceleme',
     interview: 'Mülakat',
-    deep_review: 'Detaylı İnceleme',
     offer: 'Teklif',
     hired: 'İşe Alındı',
-    rejected: 'Reddedildi'
+    rejected: 'Red'
 };
 
 export default function CandidateProcessPage() {
     const { candidates, viewCandidateId, setViewCandidateId, updateCandidate } = useCandidates();
     const { positions } = usePositions();
-    const [sendModalPurpose, setSendModalPurpose] = useState(null); // null means closed, 'interview', 'general', etc.
+    const [sendModalPurpose, setSendModalPurpose] = useState(null);
+    const [showInterviewModal, setShowInterviewModal] = useState(false);
 
     const handleMessageSent = async (data) => {
         try {
@@ -184,8 +187,8 @@ export default function CandidateProcessPage() {
             },
             {
                 title: 'Mülakat & Değerlendirme',
-                date: current === 'interview' || current === 'deep_review' ? 'Aktif' : '-',
-                status: (current === 'offer' || isHired || isRejected) ? 'completed' : (current === 'interview' || current === 'deep_review' ? 'upcoming' : 'pending')
+                date: current === 'interview' ? 'Aktif' : '-',
+                status: (current === 'offer' || isHired || isRejected) ? 'completed' : (current === 'interview' ? 'upcoming' : 'pending')
             },
             {
                 title: 'Sonuç',
@@ -352,6 +355,17 @@ export default function CandidateProcessPage() {
                                 )}
                             </div>
                         </div>
+
+                        {/* Interview Sessions */}
+                        <div className="glass rounded-3xl p-6 border border-white/[0.06] space-y-4">
+                            <button
+                                onClick={() => setShowInterviewModal(true)}
+                                className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-electric to-blue-600 hover:from-electric-light hover:to-blue-500 text-white font-bold text-sm shadow-lg shadow-electric/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                            >
+                                <Activity className="w-4 h-4" /> Yeni Mülakat Oturumu
+                            </button>
+                            <InterviewHistory sessions={candidate.interviewSessions} />
+                        </div>
                     </div>
 
                     {/* Right Column: AI Feedback & Scorecard */}
@@ -446,6 +460,14 @@ export default function CandidateProcessPage() {
                         initialPurpose={sendModalPurpose}
                         onSent={handleMessageSent}
                         onClose={() => setSendModalPurpose(null)}
+                    />
+                )}
+
+                {showInterviewModal && (
+                    <InterviewSessionModal
+                        candidate={candidate}
+                        onClose={() => setShowInterviewModal(false)}
+                        onSessionSaved={() => setShowInterviewModal(false)}
                     />
                 )}
             </div>

@@ -3,9 +3,12 @@ import express from 'express';
 import cors from 'cors';
 import puppeteer from 'puppeteer';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import nodemailer from 'nodemailer';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -64,7 +67,23 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 const app = express();
-app.use(cors());
+const allowedOrigins = [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    process.env.APP_URL
+].filter(Boolean);
+
+app.use(cors({
+    origin: function (origin, callback) {
+        // allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.indexOf(origin) === -1) {
+            const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+            return callback(new Error(msg), false);
+        }
+        return callback(null, true);
+    }
+}));
 app.use(express.json());
 
 // Serve static files from uploads directory
@@ -77,20 +96,15 @@ app.get('/api/health', (req, res) => {
 
 // Load API Key from .env
 function getApiKey() {
-    try {
-        const envPath = path.join(__dirname, '.env');
-        if (!fs.existsSync(envPath)) return null;
-
-        const content = fs.readFileSync(envPath, 'utf-8');
-        const match = content.match(/VITE_GEMINI_API_KEY=(.*)/);
-        return match ? match[1].trim().replace(/["']/g, '') : null;
-    } catch (e) {
-        return null;
+    const key = process.env.VITE_GEMINI_API_KEY;
+    if (!key || key.trim() === '' || key === 'null' || key === 'undefined') {
+        throw new Error('VITE_GEMINI_API_KEY is missing in environment variables');
     }
+    return key;
 }
 
 const API_KEY = getApiKey();
-const genAI = new GoogleGenerativeAI(API_KEY || 'DUMMY_KEY');
+const genAI = new GoogleGenerativeAI(API_KEY);
 
 // Gemini Parser Function
 async function parseProfile(text, modelId = 'gemini-2.0-flash') {
@@ -531,12 +545,9 @@ app.post('/api/process-cv', upload.array('cvs', 20), async (req, res) => {
                 const candidate = await parseProfile(text, 'gemini-2.0-flash');
                 if (!candidate) return { fileName: file.originalname, error: 'AI ayrıştırma hatası' };
 
-                // Keep the raw text so we can display it later
-                candidate.originalText = text;
-
                 // Add the URL to the stored file
-                // We assume the server is at PORT 3001
-                candidate.cvUrl = `http://localhost:3001/uploads/cvs/${file.filename}`;
+                const baseUrl = process.env.SERVER_URL || 'http://localhost:3001';
+                candidate.cvUrl = `${baseUrl}/uploads/cvs/${file.filename}`;
 
                 return { fileName: file.originalname, candidate, success: true };
             } catch (err) {
@@ -552,9 +563,53 @@ app.post('/api/process-cv', upload.array('cvs', 20), async (req, res) => {
     }
 });
 
+// Invite Email Endpoint
+app.post('/api/send-invite', async (req, res) => {
+    const { email, role, inviteLink } = req.body;
+
+    if (!email || !inviteLink) {
+        return res.status(400).json({ error: 'Email ve davet linki gereklidir.' });
+    }
+
+    try {
+        const transporter = nodemailer.createTransport({
+            host: 'smtp.gmail.com',
+            port: 587,
+            secure: false, // TLS için false
+            auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASS
+            },
+        });
+
+        const mailOptions = {
+            from: 'TalentFlow <emre.demir@infoset.app>',
+            to: email,
+            subject: 'TalentFlow\'a Davet Edildiniz',
+            html: `
+                <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
+                    <h2 style="color: #4f46e5;">TalentFlow'a Hoş Geldiniz!</h2>
+                    <p>Merhaba,</p>
+                    <p>TalentFlow platformuna <strong>${role === 'super_admin' ? 'Süper Admin' : 'Recruiter'}</strong> olarak davet edildiniz.</p>
+                    <p>Aşağıdaki butona tıklayarak hesabınızı oluşturabilir ve ekibe katılabilirsiniz:</p>
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="${inviteLink}" style="background-color: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Daveti Kabul Et</a>
+                    </div>
+                </div>
+            `
+        };
+
+        await transporter.sendMail(mailOptions);
+        console.log(`✉️ Invite email sent via Node backend to: ${email}`);
+        res.json({ success: true, message: 'Davet maili başarıyla gönderildi.' });
+    } catch (error) {
+        console.error('Email sending error:', error);
+        res.status(500).json({ error: 'Mail gönderilirken bir hata oluştu: ' + error.message });
+    }
+});
+
 const PORT = 3001;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Backend Server running on http://localhost:${PORT}`);
     console.log(`📡 Health: http://localhost:${PORT}/api/health`);
 });
-

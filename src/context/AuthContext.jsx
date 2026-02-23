@@ -47,7 +47,16 @@ export function AuthProvider({ children }) {
                     const userDoc = await getDoc(doc(db, USERS_PATH, currentUser.uid));
 
                     if (userDoc.exists()) {
-                        setUserProfile(userDoc.data());
+                        const profileData = userDoc.data();
+                        if (profileData.status === 'disabled') {
+                            await signOut(auth);
+                            setError('Hesabınız dondurulmuştur. Lütfen sistem yöneticisi ile iletişime geçin.');
+                            setUser(null);
+                            setUserProfile(null);
+                            setLoading(false);
+                            return;
+                        }
+                        setUserProfile(profileData);
                     } else {
                         const emailLower = currentUser.email.toLowerCase();
                         const isPrimaryAdmin = INITIAL_SUPER_ADMINS.includes(emailLower);

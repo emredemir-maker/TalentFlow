@@ -14,7 +14,9 @@ import {
     X,
     ShieldCheck,
     Copy,
-    Trash2
+    Trash2,
+    UserX,
+    UserCheck
 } from 'lucide-react';
 import {
     collection,
@@ -24,7 +26,8 @@ import {
     serverTimestamp,
     where,
     deleteDoc,
-    doc
+    doc,
+    updateDoc
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
@@ -83,6 +86,35 @@ export default function SuperAdminPage() {
         }
     };
 
+    const handleDeleteUser = async (userId) => {
+        if (userId === user.uid) return alert("Kendi hesabınızı silemezsiniz.");
+        if (!window.confirm("Bu kullanıcıyı tamamen silmek istediğinize emin misiniz? Bu işlem geri alınamaz.")) return;
+
+        try {
+            await deleteDoc(doc(db, USERS_PATH, userId));
+        } catch (err) {
+            console.error("User delete error:", err);
+            alert("Kullanıcı silinirken bir hata oluştu.");
+        }
+    };
+
+    const handleToggleUserStatus = async (userId, currentStatus) => {
+        if (userId === user.uid) return alert("Kendi durumunuzu değiştiremezsiniz.");
+        const newStatus = currentStatus === 'disabled' ? 'active' : 'disabled';
+        const actionText = newStatus === 'disabled' ? 'dondurmak' : 'aktifleştimek';
+
+        if (!window.confirm(`Bu kullanıcıyı ${actionText} istediğinize emin misiniz?`)) return;
+
+        try {
+            await updateDoc(doc(db, USERS_PATH, userId), {
+                status: newStatus
+            });
+        } catch (err) {
+            console.error("User status toggle error:", err);
+            alert("Kullanıcı durumu güncellenirken bir hata oluştu.");
+        }
+    };
+
     const handleSendInvite = async (e) => {
         e.preventDefault();
         if (!inviteEmail.trim()) return;
@@ -104,6 +136,28 @@ export default function SuperAdminPage() {
                 invitedBy: user.uid,
                 createdAt: serverTimestamp()
             });
+
+            // Send Invitation via Backend API
+            const baseUrl = window.location.origin;
+            const inviteLink = `${baseUrl}?invite=${encodeURIComponent(inviteEmail.trim().toLowerCase())}`;
+
+            try {
+                const response = await fetch('/api/send-invite', { // Vite proxy will forward this to http://localhost:3001
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: inviteEmail.trim().toLowerCase(),
+                        role: inviteRole,
+                        inviteLink: inviteLink
+                    })
+                });
+
+                if (!response.ok) {
+                    console.warn('Mail gönderimi API seviyesinde başarısız oldu.');
+                }
+            } catch (err) {
+                console.error('Mail API Hatası:', err);
+            }
 
             setInviteEmail('');
             setShowInviteModal(false);
@@ -177,6 +231,7 @@ export default function SuperAdminPage() {
                                     <th className="px-6 py-4">Kullanıcı</th>
                                     <th className="px-6 py-4">Rol</th>
                                     <th className="px-6 py-4">Durum</th>
+                                    <th className="px-6 py-4">İşlemler</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-white/[0.04]">
@@ -201,8 +256,34 @@ export default function SuperAdminPage() {
                                             )}
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-400">
-                                                <CheckCircle className="w-3.5 h-3.5" /> Aktif
+                                            <div className={`flex items-center gap-1.5 text-[11px] font-bold ${u.status === 'disabled' ? 'text-red-400' : 'text-emerald-400'}`}>
+                                                {u.status === 'disabled' ? (
+                                                    <><XCircle className="w-3.5 h-3.5" /> Devre Dışı</>
+                                                ) : (
+                                                    <><CheckCircle className="w-3.5 h-3.5" /> Aktif</>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-2">
+                                                {u.id !== user.uid && (
+                                                    <>
+                                                        <button
+                                                            onClick={() => handleToggleUserStatus(u.id, u.status)}
+                                                            className={`p-2 rounded-lg transition-all ${u.status === 'disabled' ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20' : 'bg-amber-500/10 text-amber-400 hover:bg-amber-500/20'}`}
+                                                            title={u.status === 'disabled' ? 'Aktifleştir' : 'Dondur'}
+                                                        >
+                                                            {u.status === 'disabled' ? <UserCheck className="w-3.5 h-3.5" /> : <UserX className="w-3.5 h-3.5" />}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteUser(u.id)}
+                                                            className="p-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all"
+                                                            title="Kullanıcıyı Sil"
+                                                        >
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>
