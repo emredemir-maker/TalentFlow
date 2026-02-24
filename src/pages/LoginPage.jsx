@@ -154,8 +154,12 @@ export default function LoginPage() {
                     </button>
                 </div>
 
-                <div className="text-center pt-4 border-t border-white/5">
+                <div className="flex flex-col items-center gap-4 pt-4 border-t border-white/5">
                     <p className="text-[9px] text-navy-600 uppercase tracking-widest font-black">Powered by Gemini AI</p>
+                    <div className="flex gap-4">
+                        <a href="#" className="text-[10px] text-navy-500 hover:text-white transition-colors">KVKK Aydınlatma Metni</a>
+                        <a href="#" className="text-[10px] text-navy-500 hover:text-white transition-colors">Gizlilik Politikası</a>
+                    </div>
                 </div>
             </div>
         </div>

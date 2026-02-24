@@ -22,6 +22,7 @@ export default function ScraperPage() {
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState(null);
     const [error, setError] = useState(null);
+    const [kvkkChecked, setKvkkChecked] = useState(false);
 
     // Auto Scraper State
     const [searchQuery, setSearchQuery] = useState('');
@@ -217,7 +218,7 @@ export default function ScraperPage() {
                                     />
                                     <button
                                         onClick={() => handleAutoScrape(false)}
-                                        disabled={autoScraping || !searchQuery.trim()}
+                                        disabled={autoScraping || !searchQuery.trim() || !kvkkChecked}
                                         className="px-6 py-3 rounded-xl bg-electric text-white font-bold hover:bg-electric-light transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                                         type="button"
                                     >
@@ -227,12 +228,24 @@ export default function ScraperPage() {
                                 <div className="flex items-center gap-3">
                                     <button
                                         onClick={() => handleAutoScrape(true)}
-                                        disabled={autoScraping || !searchQuery.trim()}
+                                        disabled={autoScraping || !searchQuery.trim() || !kvkkChecked}
                                         className="flex-1 py-3 rounded-xl bg-violet-600/20 text-violet-300 border border-violet-500/30 font-bold hover:bg-violet-600/30 transition-all flex items-center justify-center gap-2"
                                     >
                                         <Search className="w-4 h-4" />
                                         Görsel Tarayıcıyı Aç ve Ara (LinkedIn & SalesNav)
                                     </button>
+                                </div>
+                                <div className="flex items-center gap-2 px-1 mt-1">
+                                    <input
+                                        type="checkbox"
+                                        id="kvkk-auto"
+                                        checked={kvkkChecked}
+                                        onChange={() => setKvkkChecked(!kvkkChecked)}
+                                        className="w-4 h-4 rounded border-white/10 bg-navy-900 text-electric focus:ring-electric"
+                                    />
+                                    <label htmlFor="kvkk-auto" className="text-[11px] text-navy-400 cursor-pointer">
+                                        Adayın verilerinin <b>KVKK/GDPR</b> kapsamında işlenmesini ve istihdam amacıyla saklanmasını onaylıyorum.
+                                    </label>
                                 </div>
                                 <div className="flex justify-center">
                                     <button
@@ -359,7 +372,7 @@ export default function ScraperPage() {
 
                                 <button
                                     onClick={handleParse}
-                                    disabled={loading || !textInput.trim()}
+                                    disabled={loading || !textInput.trim() || !kvkkChecked}
                                     className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 text-white font-semibold shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {loading ? (
@@ -374,6 +387,18 @@ export default function ScraperPage() {
                                         </>
                                     )}
                                 </button>
+                            </div>
+                            <div className="flex items-center gap-2 px-1 mt-3">
+                                <input
+                                    type="checkbox"
+                                    id="kvkk-manual"
+                                    checked={kvkkChecked}
+                                    onChange={() => setKvkkChecked(!kvkkChecked)}
+                                    className="w-4 h-4 rounded border-white/10 bg-navy-900 text-emerald-500 focus:ring-emerald-500"
+                                />
+                                <label htmlFor="kvkk-manual" className="text-[11px] text-navy-400 cursor-pointer">
+                                    Adayın verilerinin <b>KVKK/GDPR</b> kapsamında işlenmesini ve sistemde saklanmasını onaylıyorum.
+                                </label>
                             </div>
                         </div>
 

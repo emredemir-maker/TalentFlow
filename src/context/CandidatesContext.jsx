@@ -43,13 +43,15 @@ export function CandidatesProvider({ children }) {
 
     const updateCandidate = async (id, updates) => {
         try {
+            console.log(`[Firestore] Updating candidate ${id}...`, updates);
             const docRef = doc(db, CANDIDATES_COLLECTION, id);
             await updateDoc(docRef, {
                 ...updates,
                 updatedAt: serverTimestamp()
             });
+            console.log(`[Firestore] Candidate ${id} updated successfully.`);
         } catch (err) {
-            console.error('Error updating candidate:', err);
+            console.error('Error updating candidate in Firestore:', err);
             throw err;
         }
     };

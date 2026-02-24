@@ -145,7 +145,7 @@ export default function InterviewSessionModal({ candidate, onClose, onSessionSav
         setLoadingAction('score');
         try {
             const answered = conversation
-                .map(c => ({ question: c.question, answer: c.answer, evaluationHint: c.evaluationHint, category: c.category }))
+                .map(c => ({ id: c.id, question: c.question, answer: c.answer, evaluationHint: c.evaluationHint, category: c.category }))
                 .filter(c => c.answer?.trim());
             const result = await scoreInterviewSession(candidate, interviewType, answered);
             setAiResult(result);
@@ -169,18 +169,25 @@ export default function InterviewSessionModal({ candidate, onClose, onSessionSav
                 typeLabel: INTERVIEW_TYPES.find(t => t.id === interviewType)?.label || interviewType,
                 pathTitle: selectedPath?.title || '',
                 date: new Date().toISOString(),
-                questions: conversation.map(c => ({
-                    ...c,
-                    aiScore: aiResult?.questionScores?.find(qs => qs.questionId === c.id)?.score ?? null,
-                    aiFeedback: aiResult?.questionScores?.find(qs => qs.questionId === c.id)?.feedback ?? ''
-                })),
+                // Sadece cevaplanmış soruları kaydet
+                questions: conversation
+                    .filter(c => c.answer?.trim())
+                    .map(c => ({
+                        id: c.id,
+                        question: c.question,
+                        answer: c.answer,
+                        category: c.category,
+                        isFollowUp: c.isFollowUp,
+                        aiScore: aiResult?.questionScores?.find(qs => qs.questionId === c.id)?.score ?? null,
+                        aiFeedback: aiResult?.questionScores?.find(qs => qs.questionId === c.id)?.feedback ?? ''
+                    })),
                 aiOverallScore: aiResult?.overallScore || 0,
                 aiVerdict: aiResult?.overallVerdict || '',
                 aiSummary: aiResult?.summary || '',
                 aiStrengths: aiResult?.strengths || [],
                 aiWeaknesses: aiResult?.weaknesses || [],
                 finalScore,
-                interviewerNotes,
+                interviewerNotes: interviewerNotes?.trim() || '',
                 positionTitle: candidate?.matchedPositionTitle || candidate?.position || ''
             };
             const existing = candidate.interviewSessions || [];
@@ -339,10 +346,10 @@ export default function InterviewSessionModal({ candidate, onClose, onSessionSav
                                     <button key={i}
                                         onClick={() => { saveCurrentAnswer(); setActiveIdx(i); setCurrentAnswer(conversation[i]?.answer || ''); }}
                                         className={`w-8 h-8 rounded-lg text-[10px] font-bold transition-all relative ${activeIdx === i ? 'bg-electric text-white shadow-lg shadow-electric/30 scale-110'
-                                                : c.answer?.trim() ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                                                    : 'bg-white/5 text-navy-500 hover:bg-white/10'
+                                            : c.answer?.trim() ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                                : 'bg-white/5 text-navy-500 hover:bg-white/10'
                                             }`}
-                                        title={c.question.substring(0, 60)}
+                                        title={c.question?.substring(0, 60) || ''}
                                     >
                                         {i + 1}
                                         {c.isFollowUp && <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-violet-500 border border-navy-900 flex items-center justify-center"><GitBranch className="w-1.5 h-1.5 text-white" /></span>}

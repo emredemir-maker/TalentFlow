@@ -34,6 +34,32 @@ export {
     analyzeResponseEmail
 };
 
+export async function parseCandidateFromText(text, modelId = 'gemini-2.0-flash') {
+    const model = getModel(modelId);
+    const prompt = `Sen bir LinkedIn profil ayrıştırıcısısın. Aşağıdaki profil metninden aday bilgilerini çıkart.
+
+Sadece şu JSON formatında dön (başka hiçbir şey yazma):
+{
+  "name": "Ad Soyad",
+  "position": "Mevcut Pozisyon",
+  "company": "Mevcut Şirket",
+  "location": "Şehir, Ülke",
+  "skills": ["Yetenek1", "Yetenek2"],
+  "experience": <toplam_yıl_sayısı>,
+  "education": "Son Okul / Bölüm",
+  "summary": "Profesyonel özet (Türkçe, max 400 karakter)"
+}
+
+Eksik alanlar için null kullan.
+
+PROFİL METNİ:
+${text.substring(0, 20000)}`;
+
+    const result = await model.generateContent(prompt);
+    const raw = result.response.text().replace(/```json|```/gi, '').trim();
+    return JSON.parse(raw);
+}
+
 export async function getAvailableModels() {
     return [
         { id: 'gemini-2.0-flash', displayName: 'Gemini 2.0 Flash (Fast & Deterministic)' }

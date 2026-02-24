@@ -19,22 +19,92 @@ export async function generateInterviewQuestions(candidate, starAnalysis, interv
 }
 
 export async function generateInterviewPaths(candidate, interviewType = 'technical') {
-    const prompt = `Aday ${candidate?.name} için 3 farklı mülakat rotası hazırla.
-    JSON formatında: { "paths": [{ "id": "p1", "title": "...", "description": "...", "questions": [...] }] }`;
+    const typeContexts = {
+        technical: "Teknik Lead personasıyla, mimari, kod kalitesi, problem çözme ve derin teknoloji bilgisine odaklan.",
+        product: "Product Manager personasıyla, sadece ürün vizyonu, kullanıcı deneyimi (UX), önceliklendirme, metrikler ve iş değerine odaklan. Aday teknik biriyse bile teknik detaylara girmeyin, ürün bakış açısını ölçün.",
+        culture: "İK Direktörü personasıyla, iletişim becerileri, ekip uyumu, çatışma yönetimi ve şirket değerlerine odaklan."
+    };
+
+    const prompt = `Sen kıdemli bir mülakatçısın. Aday ${candidate?.name} için 3 farklı mülakat rotası hazırla.
+    Tür: ${interviewType.toUpperCase()}. 
+    Odak Noktası: ${typeContexts[interviewType] || typeContexts.technical}
+    
+    JSON formatında tam olarak şu yapıda dön:
+    { 
+      "paths": [
+        { 
+          "id": "p1", 
+          "title": "Rota Başlığı", 
+          "description": "Rota Açıklaması", 
+          "icon": "zap", 
+          "questions": [
+            { "question": "Soru metni", "category": "Kategori", "evaluationHint": "Değerlendirme ipucu" }
+          ] 
+        }
+      ] 
+    }
+
+    ÖNEMLİ: icon alanı "zap", "code", "users", "target", "box" değerlerinden biri olmalı. 
+    İş Tanımı: ${candidate.matchedPositionTitle || candidate.position}
+    Aday Verisi: ${JSON.stringify(candidate)}`;
 
     const model = getModel();
-    const result = await model.generateContent(prompt);
     try {
-        const parsed = JSON.parse(result.response.text().replace(/```json|```/gi, '').trim());
-        return parsed.paths || parsed;
+        const result = await model.generateContent(prompt);
+        const text = result.response.text();
+        const cleanJson = text.replace(/```json|```/gi, '').trim();
+        const parsed = JSON.parse(cleanJson);
+        const paths = parsed.paths || (Array.isArray(parsed) ? parsed : []);
+
+        // Yapıyı garantiye al
+        return paths.map((p, i) => ({
+            id: p.id || `p${i}`,
+            title: p.title || 'Mülakat Rotası',
+            description: p.description || 'Aday değerlendirme süreci',
+            icon: p.icon || 'target',
+            questions: (p.questions || []).map(q =>
+                typeof q === 'string' ? { question: q, category: 'Genel' } :
+                    { ...q, question: q.question || q.text || 'Soru bulunamadı' }
+            )
+        }));
     } catch (e) {
-        return [{ id: 'default', title: 'Genel Değerlendirme', questions: [] }];
+        console.error("Interview paths error:", e);
+        return [{
+            id: 'default',
+            title: 'Genel Tanışma ve Değerlendirme',
+            description: 'Adayın genel yetkinliklerini ve deneyimini anlamaya yönelik standart rota.',
+            icon: 'users',
+            questions: [
+                { question: "Kariyer yolculuğunuzdan ve son dönemdeki projelerinizden bahseder misiniz?", category: "Deneyim" },
+                { question: "Sizi bu pozisyon için en güçlü aday yapan özellikleriniz nelerdir?", category: "Yetkinlik" },
+                { question: "Gelecek 2-3 yıl için kariyer hedefleriniz nelerdir?", category: "Vizyon" }
+            ]
+        }];
     }
 }
 
 export async function scoreInterviewSession(candidate, interviewType, questionsAndAnswers) {
-    const prompt = `Mülakatı değerlendir: Candidate: ${candidate?.name}, QA: ${JSON.stringify(questionsAndAnswers)}
-    JSON: { "overallScore": 0, "summary": "...", "strengths": [], "weaknesses": [] }`;
+    const prompt = `Sen bir mülakat değerlendirme asistanısın. Aday ${candidate?.name} ile yapılan ${interviewType} mülakatını değerlendir.
+    
+    ÖNEMLİ KURALLAR:
+    1. Sadece sana gönderilen Soru-Cevap ikililerini değerlendir.
+    2. Sorulmayan veya cevaplanmayan sorular için puan kırma, onları yok say. 
+    3. Puanlamayı (0-100) sadece mevcut cevaplardaki kanıtlara göre yap.
+    
+    MÜLAKAT VERİSİ (QA):
+    ${JSON.stringify(questionsAndAnswers)}
+    
+    JSON formatında dön:
+    { 
+      "overallScore": <integer>, 
+      "overallVerdict": "Güçlü Aday / Potansiyel / Uygun Değil", 
+      "summary": "Genel değerlendirme özeti", 
+      "strengths": ["Yetenek 1"], 
+      "weaknesses": ["Eksiklik 1"],
+      "questionScores": [
+        { "questionId": <id>, "score": <0-100>, "feedback": "Cevap analizi" }
+      ] 
+    }`;
     const model = getModel();
     const result = await model.generateContent(prompt);
     try {

@@ -86,12 +86,22 @@ export default function SuperAdminPage() {
         }
     };
 
-    const handleDeleteUser = async (userId) => {
-        if (userId === user.uid) return alert("Kendi hesabınızı silemezsiniz.");
-        if (!window.confirm("Bu kullanıcıyı tamamen silmek istediğinize emin misiniz? Bu işlem geri alınamaz.")) return;
+    const handleDeleteUser = async (userToDelete) => {
+        if (userToDelete.id === user.uid) return alert("Kendi hesabınızı silemezsiniz.");
+        if (!window.confirm(`${userToDelete.displayName} kullanıcısını tamamen silmek istediğinize emin misiniz? \n\nNot: Kullanıcı Firebase Auth üzerinde kalmaya devam edecektir, ancak tekrar davet edilirse erişim sağlayabilir.`)) return;
 
         try {
-            await deleteDoc(doc(db, USERS_PATH, userId));
+            // 1. Delete user profile
+            await deleteDoc(doc(db, USERS_PATH, userToDelete.id));
+
+            // 2. Clear invitations for this email so they can be re-invited
+            const q = query(collection(db, INVITATIONS_PATH), where("email", "==", userToDelete.email.toLowerCase()));
+            const inviteSnap = await getDocs(q);
+            for (const d of inviteSnap.docs) {
+                await deleteDoc(doc(db, INVITATIONS_PATH, d.id));
+            }
+
+            alert("Kullanıcı ve davet geçmişi temizlendi.");
         } catch (err) {
             console.error("User delete error:", err);
             alert("Kullanıcı silinirken bir hata oluştu.");
@@ -276,7 +286,7 @@ export default function SuperAdminPage() {
                                                             {u.status === 'disabled' ? <UserCheck className="w-3.5 h-3.5" /> : <UserX className="w-3.5 h-3.5" />}
                                                         </button>
                                                         <button
-                                                            onClick={() => handleDeleteUser(u.id)}
+                                                            onClick={() => handleDeleteUser(u)}
                                                             className="p-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all"
                                                             title="Kullanıcıyı Sil"
                                                         >

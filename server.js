@@ -8,6 +8,10 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import xss from 'xss-clean';
+import hpp from 'hpp';
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
@@ -73,18 +77,33 @@ const allowedOrigins = [
     process.env.APP_URL
 ].filter(Boolean);
 
+// --- Security Middlewares ---
+app.use(helmet({
+    contentSecurityPolicy: false, // Vite dev server ile çakışmaması için
+}));
+app.use(xss()); // XSS Protection
+app.use(hpp()); // HTTP Parameter Pollution protection
+
+// Rate Limiting
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 dakika
+    max: 100, // IP başına 100 istek
+    message: 'Too many requests from this IP, please try again after 15 minutes'
+});
+app.use('/api/', limiter);
+
 app.use(cors({
     origin: function (origin, callback) {
-        // allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
         if (allowedOrigins.indexOf(origin) === -1) {
             const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
             return callback(new Error(msg), false);
         }
         return callback(null, true);
-    }
+    },
+    credentials: true
 }));
-app.use(express.json());
+app.use(express.json({ limit: '10kb' })); // Body size limiting (GDPR data minimization principle)
 
 // Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -98,18 +117,22 @@ app.get('/api/health', (req, res) => {
 function getApiKey() {
     const key = process.env.VITE_GEMINI_API_KEY;
     if (!key || key.trim() === '' || key === 'null' || key === 'undefined') {
-        throw new Error('VITE_GEMINI_API_KEY is missing in environment variables');
+        console.warn('⚠️ VITE_GEMINI_API_KEY is missing in environment variables. AI features will not work.');
+        return null;
     }
     return key;
 }
 
 const API_KEY = getApiKey();
-const genAI = new GoogleGenerativeAI(API_KEY);
+const genAI = API_KEY ? new GoogleGenerativeAI(API_KEY) : null;
 
 // Gemini Parser Function
 async function parseProfile(text, modelId = 'gemini-2.0-flash') {
     const apiKey = getApiKey();
-    if (!apiKey) throw new Error('API Key missing');
+    if (!apiKey) {
+        console.error('Gemini Parse Error: API Key missing');
+        return null;
+    }
 
     console.log(`🤖 Using model: ${modelId} for parsing...`);
     const genAI = new GoogleGenerativeAI(apiKey);
@@ -571,45 +594,79 @@ app.post('/api/send-invite', async (req, res) => {
         return res.status(400).json({ error: 'Email ve davet linki gereklidir.' });
     }
 
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+        console.error('❌ Email configuration missing in .env (EMAIL_USER or EMAIL_PASS)');
+        return res.status(500).json({ error: 'Sistem email yapılandırması eksik (.env kontrol edin).' });
+    }
+
     try {
         const transporter = nodemailer.createTransport({
-            host: 'smtp.gmail.com',
-            port: 587,
-            secure: false, // TLS için false
+            service: 'gmail',
             auth: {
                 user: process.env.EMAIL_USER,
-                pass: process.env.EMAIL_PASS
+                pass: process.env.EMAIL_PASS // App Password is required for Gmail
             },
         });
 
+        // Verify transporter connection
+        await transporter.verify();
+
         const mailOptions = {
-            from: 'TalentFlow <emre.demir@infoset.app>',
+            from: `"TalentFlow" <${process.env.EMAIL_USER}>`,
             to: email,
             subject: 'TalentFlow\'a Davet Edildiniz',
             html: `
-                <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
-                    <h2 style="color: #4f46e5;">TalentFlow'a Hoş Geldiniz!</h2>
-                    <p>Merhaba,</p>
-                    <p>TalentFlow platformuna <strong>${role === 'super_admin' ? 'Süper Admin' : 'Recruiter'}</strong> olarak davet edildiniz.</p>
-                    <p>Aşağıdaki butona tıklayarak hesabınızı oluşturabilir ve ekibe katılabilirsiniz:</p>
-                    <div style="text-align: center; margin: 30px 0;">
-                        <a href="${inviteLink}" style="background-color: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Daveti Kabul Et</a>
+                <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px; background-color: #ffffff;">
+                    <h2 style="color: #4f46e5; border-bottom: 2px solid #f3f4f6; padding-bottom: 10px;">TalentFlow'a Hoş Geldiniz!</h2>
+                    <p style="color: #374151; font-size: 16px;">Merhaba,</p>
+                    <p style="color: #374151; font-size: 15px; line-height: 1.5;">TalentFlow platformuna <strong>${role === 'super_admin' ? 'Süper Admin' : 'Recruiter'}</strong> olarak davet edildiniz.</p>
+                    <p style="color: #374151; font-size: 15px;">Aşağıdaki butona tıklayarak hesabınızı oluşturabilir ve ekibe katılabilirsiniz:</p>
+                    <div style="text-align: center; margin: 35px 0;">
+                        <a href="${inviteLink}" style="background-color: #4f46e5; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 16px;">Daveti Kabul Et</a>
                     </div>
+                    <p style="color: #6b7280; font-size: 12px; border-top: 1px solid #f3f4f6; padding-top: 20px;">
+                        Eğer butona tıklayamıyorsanız, bu bağlantıyı tarayıcınıza yapıştırın:<br/>
+                        <span style="color: #4f46e5;">${inviteLink}</span>
+                    </p>
                 </div>
             `
         };
 
         await transporter.sendMail(mailOptions);
-        console.log(`✉️ Invite email sent via Node backend to: ${email}`);
+        console.log(`✉️ Invite email sent successfully to: ${email}`);
         res.json({ success: true, message: 'Davet maili başarıyla gönderildi.' });
     } catch (error) {
-        console.error('Email sending error:', error);
-        res.status(500).json({ error: 'Mail gönderilirken bir hata oluştu: ' + error.message });
+        console.error('❌ Nodemailer Error:', error);
+        res.status(500).json({ error: 'Mail gönderilirken bir hata oluştu: ' + (error.code || error.message) });
     }
 });
+
+// --- Cleanup Routine (GDPR/KVKK Compliance) ---
+// Sadece fiziksel ham dosyaları siler (Hassas Veri Minimizasyonu). 
+// Veritabanındaki (Firestore) isim, email, tel gibi iletişim bilgileri korunur.
+function cleanupOldFiles() {
+    const dir = path.join(__dirname, 'uploads', 'cvs');
+    if (!fs.existsSync(dir)) return;
+
+    const files = fs.readdirSync(dir);
+    const now = Date.now();
+    const expiry = 15 * 24 * 60 * 60 * 1000; // 15 gün
+
+    let count = 0;
+    files.forEach(file => {
+        const filePath = path.join(dir, file);
+        const stats = fs.statSync(filePath);
+        if (now - stats.mtimeMs > expiry) {
+            fs.unlinkSync(filePath);
+            count++;
+        }
+    });
+    if (count > 0) console.log(`🧹 KVKK Veri Minimizasyonu: ${count} adet eski ham CV dosyası diskten silindi. (İletişim kayıtları korunuyor)`);
+}
 
 const PORT = 3001;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Backend Server running on http://localhost:${PORT}`);
     console.log(`📡 Health: http://localhost:${PORT}/api/health`);
+    cleanupOldFiles();
 });

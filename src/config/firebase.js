@@ -1,7 +1,4 @@
 // src/config/firebase.js
-// Firebase Configuration for TalentFlow
-// Uses environment variables for security
-
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
@@ -14,13 +11,6 @@ const firebaseConfig = {
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
-
-// Validate config
-Object.entries(firebaseConfig).forEach(([key, value]) => {
-  if (!value) {
-    console.error(`Firebase configuration error: ${key} is missing.`);
-  }
-});
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
