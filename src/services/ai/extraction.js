@@ -42,7 +42,7 @@ export async function extractCandidateEvidence(jobDescription, candidateProfile)
 
     const prompt = `${EXTRACTOR_PROMPT}\n## İŞ TANIMI\n${jobDescription}\n\n## ADAY VERİSİ\n${JSON.stringify(sanitizedCandidate, null, 2)}\n\nSadece JSON yanıtı ver.`;
 
-    const model = getModel();
+    const model = await getModel();
     const result = await model.generateContent(prompt);
     try {
         const text = result.response.text();
@@ -60,7 +60,7 @@ export async function extractPositionFromJD(jdText) {
     
     Metin: ${jdText}`;
 
-    const model = getModel();
+    const model = await getModel();
     const result = await model.generateContent(prompt);
     try {
         const clean = result.response.text().replace(/```json|```/gi, '').trim();
@@ -97,7 +97,7 @@ export async function quickCandidateScreening(candidateProfile, openPositions) {
       "reasoning": "Açıklama"
     }`;
 
-    const model = getModel();
+    const model = await getModel();
     const result = await model.generateContent(prompt);
     try {
         const text = result.response.text();

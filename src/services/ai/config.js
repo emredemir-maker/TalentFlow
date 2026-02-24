@@ -1,21 +1,36 @@
-// src/services/ai/config.js
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { db } from '../../config/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const DEFAULT_MODEL = 'gemini-2.0-flash';
-
 let genAI = null;
+let currentApiKey = null;
+
+export async function getGlobalGeminiKey() {
+    try {
+        const docRef = doc(db, 'artifacts/talent-flow/public/data/settings', 'system');
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists() && docSnap.data().geminiApiKey) {
+            return docSnap.data().geminiApiKey;
+        }
+    } catch (e) {
+        console.warn("Global API Key fetching error:", e);
+    }
+    return import.meta.env.VITE_GEMINI_API_KEY || '';
+}
 
 /**
  * Initializes and returns a Gemini model with deterministic settings.
  */
-export function getModel(modelId = DEFAULT_MODEL) {
-    if (!API_KEY) {
-        throw new Error('Gemini API anahtarı bulunamadı (VITE_GEMINI_API_KEY).');
+export async function getModel(modelId = DEFAULT_MODEL) {
+    const apiKey = await getGlobalGeminiKey();
+    if (!apiKey) {
+        throw new Error('Gemini API anahtarı bulunamadı. Lütfen Sistem Ayarları üzerinden anahtarınızı ekleyin.');
     }
 
-    if (!genAI) {
-        genAI = new GoogleGenerativeAI(API_KEY);
+    if (!genAI || currentApiKey !== apiKey) {
+        currentApiKey = apiKey;
+        genAI = new GoogleGenerativeAI(apiKey);
     }
 
     return genAI.getGenerativeModel({

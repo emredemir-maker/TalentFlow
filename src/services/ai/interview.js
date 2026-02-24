@@ -8,7 +8,7 @@ export async function generateInterviewQuestions(candidate, starAnalysis, interv
     STAR Analizi: ${JSON.stringify(starAnalysis)}
     JSON array olarak dön ["soru1", "soru2", "soru3"]`;
 
-    const model = getModel();
+    const model = await getModel();
     const result = await model.generateContent(prompt);
     try {
         const clean = result.response.text().replace(/```json|```/gi, '').trim();
@@ -48,7 +48,7 @@ export async function generateInterviewPaths(candidate, interviewType = 'technic
     İş Tanımı: ${candidate.matchedPositionTitle || candidate.position}
     Aday Verisi: ${JSON.stringify(candidate)}`;
 
-    const model = getModel();
+    const model = await getModel();
     try {
         const result = await model.generateContent(prompt);
         const text = result.response.text();
@@ -105,7 +105,7 @@ export async function scoreInterviewSession(candidate, interviewType, questionsA
         { "questionId": <id>, "score": <0-100>, "feedback": "Cevap analizi" }
       ] 
     }`;
-    const model = getModel();
+    const model = await getModel();
     const result = await model.generateContent(prompt);
     try {
         return JSON.parse(result.response.text().replace(/```json|```/gi, '').trim());
@@ -117,7 +117,7 @@ export async function scoreInterviewSession(candidate, interviewType, questionsA
 export async function generateFollowUpQuestion(candidate, interviewType, conversationHistory, mode = 'deepen') {
     const prompt = `Aday ${candidate?.name} için takip sorusu sor: ${JSON.stringify(conversationHistory)}
     JSON: { "question": "..." }`;
-    const model = getModel();
+    const model = await getModel();
     const result = await model.generateContent(prompt);
     try {
         return JSON.parse(result.response.text().replace(/```json|```/gi, '').trim());

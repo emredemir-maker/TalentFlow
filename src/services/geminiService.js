@@ -35,7 +35,7 @@ export {
 };
 
 export async function parseCandidateFromText(text, modelId = 'gemini-2.0-flash') {
-    const model = getModel(modelId);
+    const model = await getModel(modelId);
     const prompt = `Sen bir LinkedIn profil ayrıştırıcısısın. Aşağıdaki profil metninden aday bilgilerini çıkart.
 
 Sadece şu JSON formatında dön (başka hiçbir şey yazma):
