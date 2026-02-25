@@ -259,13 +259,13 @@ export default function Dashboard() {
             />
 
             {/* ===== OPPORTUNITY HUB (Smart Match Notifications) ===== */}
-            <div className="px-6 lg:px-8 pt-6 pb-2">
+            <div className="px-6 lg:px-8 pt-4 pb-1">
                 <OpportunityHub />
             </div>
 
             {/* ===== STATS ===== */}
-            <div className="px-6 lg:px-8 py-6">
-                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 stagger">
+            <div className="px-6 lg:px-8 py-3">
+                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 stagger">
                     <StatCard icon={Users} iconColor="text-electric-light" bgColor="bg-electric/10" value={stats.total} label="Toplam Aday"
                         isActive={statFilter === '__total__'}
                         onClick={() => setStatFilter(statFilter === '__total__' ? null : '__total__')} />
@@ -608,12 +608,12 @@ export default function Dashboard() {
                     <div className="bg-navy-900/10 rounded-3xl border border-border-subtle overflow-hidden shadow-2xl">
                         {/* Table Header */}
                         <div className="grid grid-cols-[1fr_200px_140px_100px_80px_60px] gap-6 px-6 py-4 border-b border-border-subtle bg-navy-800/10">
-                            <span className="text-[11px] font-black text-text-muted uppercase tracking-widest">Aday</span>
-                            <span className="text-[11px] font-black text-text-muted uppercase tracking-widest">Pozisyon</span>
-                            <span className="text-[11px] font-black text-text-muted uppercase tracking-widest">Durum</span>
-                            <span className="text-[11px] font-black text-text-muted uppercase tracking-widest">Deneyim</span>
-                            <span className="text-[11px] font-black text-text-muted uppercase tracking-widest">Skor</span>
-                            <span className="text-[11px] font-black text-text-muted uppercase tracking-widest"></span>
+                            <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">Aday</span>
+                            <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">Pozisyon</span>
+                            <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">Durum</span>
+                            <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">Deneyim</span>
+                            <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">Skor</span>
+                            <span className="text-[10px] font-black text-text-muted uppercase tracking-widest"></span>
                         </div>
                         {/* Table Rows */}
                         <div className="divide-y divide-border-subtle">
@@ -635,19 +635,19 @@ export default function Dashboard() {
                                                 {c.name?.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                                             </div>
                                             <div className="min-w-0">
-                                                <p className="text-[15px] font-bold text-text-primary truncate transition-colors">{c.name}</p>
-                                                <p className="text-[11px] text-text-muted truncate">{c.email}</p>
+                                                <p className="text-[13px] font-bold text-text-primary truncate transition-colors">{c.name}</p>
+                                                <p className="text-[10px] text-text-muted truncate">{c.email}</p>
                                             </div>
                                         </div>
                                         <div className="min-w-0">
-                                            <p className="text-[13px] font-bold text-text-secondary truncate">{c.matchedPositionTitle || c.position}</p>
-                                            <p className="text-[11px] text-text-muted truncate">{c.department}</p>
+                                            <p className="text-[12px] font-bold text-text-secondary truncate">{c.matchedPositionTitle || c.position}</p>
+                                            <p className="text-[10px] text-text-muted truncate">{c.department}</p>
                                         </div>
                                         <div>
-                                            <span className={`inline-flex items-center justify-center px-3 py-1 rounded-md text-[11px] font-bold border ${st.cls}`}>{st.l}</span>
+                                            <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded-md text-[10px] font-bold border ${st.cls}`}>{st.l}</span>
                                         </div>
-                                        <span className="text-[13px] font-medium text-text-secondary">{c.experience || 0} yıl</span>
-                                        <span className={`text-[15px] font-extrabold ${c.combinedScore >= 70 ? 'text-emerald-400' : c.combinedScore >= 40 ? 'text-amber-400' : 'text-navy-400'}`}>
+                                        <span className="text-[12px] font-medium text-text-secondary">{c.experience || 0} yıl</span>
+                                        <span className={`text-[13px] font-extrabold ${c.combinedScore >= 70 ? 'text-emerald-400' : c.combinedScore >= 40 ? 'text-amber-400' : 'text-navy-400'}`}>
                                             {c.combinedScore > 0 ? `%${Math.round(c.combinedScore)}` : '-'}
                                         </span>
                                         <div className="w-8 h-8 rounded-full bg-navy-800/20 flex items-center justify-center group-hover:bg-electric/10 group-hover:text-electric transition-all ml-auto">

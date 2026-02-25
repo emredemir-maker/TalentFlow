@@ -22,6 +22,7 @@ const NAV_ITEMS = [
     { id: 'positions', label: 'Pozisyonlar', icon: Briefcase },
     { id: 'analytics', label: 'Analitik', icon: BarChart3 },
     { id: 'candidate-process', label: 'Aday Görünümü', icon: Globe },
+    { id: 'guide', label: 'Kullanım Kılavuzu', icon: MessageSquare },
 ];
 
 const BOTTOM_ITEMS = [

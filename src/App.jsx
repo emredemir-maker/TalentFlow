@@ -18,6 +18,7 @@ import PositionsPage from './pages/PositionsPage';
 import SuperAdminPage from './pages/SuperAdminPage';
 import LoginPage from './pages/LoginPage';
 import AnalyticsPage from './pages/AnalyticsPage';
+import GuidePage from './pages/GuidePage';
 
 export default function App() {
   return (
@@ -76,6 +77,7 @@ function AppContent() {
       case 'analytics': return <AnalyticsPage />;
       case 'candidate-process': return <CandidateProcessPage />;
       case 'positions': return <PositionsPage />;
+      case 'guide': return <GuidePage />;
       case 'super-admin': return <SuperAdminPage />;
       default: return <Dashboard />;
     }

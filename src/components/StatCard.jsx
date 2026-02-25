@@ -5,7 +5,7 @@ export default function StatCard({ icon: Icon, iconColor = 'text-electric', bgCo
     return (
         <div
             onClick={onClick}
-            className={`relative rounded-3xl p-6 overflow-hidden transition-all duration-500 group
+            className={`relative rounded-3xl p-4 overflow-hidden transition-all duration-500 group
                 ${onClick ? 'cursor-pointer hover:-translate-y-1' : ''}
                 ${isActive
                     ? 'bg-gradient-to-br from-electric/20 to-electric/5 border border-electric/40 shadow-[0_0_30px_rgba(59,130,246,0.15)] scale-[1.02]'
@@ -27,10 +27,10 @@ export default function StatCard({ icon: Icon, iconColor = 'text-electric', bgCo
                     </span>
                 )}
             </div>
-            <div className={`text-3xl font-black tracking-tight mb-1 transition-colors ${isActive ? 'text-text-primary' : 'text-text-primary'}`}>
+            <div className={`text-2xl font-black tracking-tight mb-0.5 transition-colors ${isActive ? 'text-text-primary' : 'text-text-primary'}`}>
                 {value}
             </div>
-            <div className={`text-xs font-bold uppercase tracking-wider transition-colors ${isActive ? 'text-electric-light' : 'text-text-muted'}`}>
+            <div className={`text-[10px] font-bold uppercase tracking-wider transition-colors ${isActive ? 'text-electric-light' : 'text-text-muted'}`}>
                 {label}
             </div>
         </div>
