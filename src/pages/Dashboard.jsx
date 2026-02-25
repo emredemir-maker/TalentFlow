@@ -114,7 +114,7 @@ export default function Dashboard() {
                 list = list.filter(c => c.status === statFilter);
             }
         }
-        return list.sort((a, b) => (b.bestScore || 0) - (a.bestScore || 0));
+        return list.sort((a, b) => (b.combinedScore || 0) - (a.combinedScore || 0));
     }, [filteredCandidates, statFilter]);
 
     // Kanban drag state
@@ -241,8 +241,8 @@ export default function Dashboard() {
                 <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center">
                     <XCircle className="w-8 h-8 text-red-400" />
                 </div>
-                <h2 className="text-lg font-bold text-navy-200">Bağlantı Hatası</h2>
-                <p className="text-sm text-navy-400 max-w-sm">
+                <h2 className="text-lg font-bold text-text-primary">Bağlantı Hatası</h2>
+                <p className="text-sm text-text-muted max-w-sm">
                     Firebase bağlantısı kurulamadı. Yapılandırmanızı kontrol edin.
                 </p>
                 <p className="text-xs text-navy-600 font-mono">{error}</p>
@@ -289,7 +289,7 @@ export default function Dashboard() {
 
             {/* ===== TOOLBAR ===== */}
             <div className="px-6 lg:px-8 pb-4 relative z-10">
-                <div className="glass rounded-2xl p-4 border border-white/[0.08] shadow-lg shadow-black/20 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 relative overflow-hidden">
+                <div className="glass rounded-2xl p-4 border border-border-subtle shadow-lg flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 relative overflow-hidden">
                     <div className="absolute top-0 right-1/4 w-96 h-96 bg-electric/5 rounded-full blur-[100px] -z-10 pointer-events-none" />
 
                     {/* Left: Selection + Filters */}
@@ -299,20 +299,20 @@ export default function Dashboard() {
                             onClick={handleSelectAll}
                             className={`flex items-center gap-3 px-4 py-2 rounded-xl border transition-all cursor-pointer group shadow-sm ${selectedIds.size === sortedCandidates.length && sortedCandidates.length > 0
                                 ? 'bg-electric/20 border-electric/40 shadow-[0_0_15px_rgba(59,130,246,0.15)]'
-                                : 'bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06] hover:border-white/[0.1]'}`}
+                                : 'bg-navy-800/10 border-border-subtle hover:bg-navy-800/20 hover:border-navy-400/20'}`}
                         >
                             <div className={`w-4 h-4 rounded-md border flex items-center justify-center transition-all ${selectedIds.size === sortedCandidates.length && sortedCandidates.length > 0
                                 ? 'bg-electric border-electric text-white'
-                                : 'bg-navy-800 border-white/20 group-hover:border-white/40'}`}>
+                                : 'bg-navy-900 border-border-subtle group-hover:border-navy-400/40'}`}>
                                 {selectedIds.size === sortedCandidates.length && sortedCandidates.length > 0 && (
                                     <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
                                 )}
                             </div>
-                            <span className={`text-[13px] font-bold transition-colors ${selectedIds.size === sortedCandidates.length && sortedCandidates.length > 0 ? "text-white" : "text-navy-300 group-hover:text-white"}`}>Tümünü Seç</span>
+                            <span className={`text-[13px] font-bold transition-colors ${selectedIds.size === sortedCandidates.length && sortedCandidates.length > 0 ? "text-text-primary" : "text-text-muted group-hover:text-text-primary"}`}>Tümünü Seç</span>
                         </div>
 
-                        <div className="hidden sm:flex items-center gap-1 text-navy-500 mr-2 ml-2">
-                            <span className="w-px h-6 bg-white/[0.06]"></span>
+                        <div className="hidden sm:flex items-center gap-1 text-text-muted mr-2 ml-2">
+                            <span className="w-px h-6 bg-border-subtle"></span>
                         </div>
 
                         <div className="flex items-center gap-3 flex-wrap">
@@ -320,7 +320,7 @@ export default function Dashboard() {
                                 <select
                                     value={departmentFilter}
                                     onChange={(e) => setDepartmentFilter(e.target.value)}
-                                    className="px-4 py-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] hover:border-white/[0.1] text-[13px] font-medium text-white outline-none focus:border-electric/50 focus:bg-electric/5 transition-all cursor-pointer appearance-none pr-9 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_10px_center] shadow-sm"
+                                    className="px-4 py-2 rounded-xl bg-navy-800/20 hover:bg-navy-800/40 border border-border-subtle hover:border-navy-400/20 text-[13px] font-medium text-text-primary outline-none focus:border-electric/50 focus:bg-electric/5 transition-all cursor-pointer appearance-none pr-9 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_10px_center] shadow-sm"
                                     id="department-filter"
                                 >
                                     {departments.map((d) => (
@@ -333,7 +333,7 @@ export default function Dashboard() {
                                 <select
                                     value={positionFilter}
                                     onChange={(e) => setPositionFilter(e.target.value)}
-                                    className="px-4 py-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] hover:border-white/[0.1] text-[13px] font-medium text-white outline-none focus:border-electric/50 focus:bg-electric/5 transition-all cursor-pointer appearance-none pr-9 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_10px_center] shadow-sm"
+                                    className="px-4 py-2 rounded-xl bg-navy-800/20 hover:bg-navy-800/40 border border-border-subtle hover:border-navy-400/20 text-[13px] font-medium text-text-primary outline-none focus:border-electric/50 focus:bg-electric/5 transition-all cursor-pointer appearance-none pr-9 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_10px_center] shadow-sm"
                                     id="position-filter"
                                 >
                                     {matchPositions.map((p) => (
@@ -346,7 +346,7 @@ export default function Dashboard() {
                                 <select
                                     value={statusFilter}
                                     onChange={(e) => setStatusFilter(e.target.value)}
-                                    className="px-4 py-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] hover:border-white/[0.1] text-[13px] font-medium text-white outline-none focus:border-electric/50 focus:bg-electric/5 transition-all cursor-pointer appearance-none pr-9 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_10px_center] shadow-sm"
+                                    className="px-4 py-2 rounded-xl bg-navy-800/20 hover:bg-navy-800/40 border border-border-subtle hover:border-navy-400/20 text-[13px] font-medium text-text-primary outline-none focus:border-electric/50 focus:bg-electric/5 transition-all cursor-pointer appearance-none pr-9 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_10px_center] shadow-sm"
                                     id="status-filter"
                                 >
                                     {STATUS_OPTIONS.map((o) => (
@@ -359,7 +359,7 @@ export default function Dashboard() {
                                 <select
                                     value={experienceFilter}
                                     onChange={(e) => setExperienceFilter(e.target.value)}
-                                    className="px-4 py-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] hover:border-white/[0.1] text-[13px] font-medium text-white outline-none focus:border-electric/50 focus:bg-electric/5 transition-all cursor-pointer appearance-none pr-9 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_10px_center] shadow-sm"
+                                    className="px-4 py-2 rounded-xl bg-navy-800/20 hover:bg-navy-800/40 border border-border-subtle hover:border-navy-400/20 text-[13px] font-medium text-text-primary outline-none focus:border-electric/50 focus:bg-electric/5 transition-all cursor-pointer appearance-none pr-9 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_10px_center] shadow-sm"
                                     id="experience-filter"
                                 >
                                     {EXPERIENCE_OPTIONS.map((o) => (
@@ -374,7 +374,7 @@ export default function Dashboard() {
                     <div className="flex items-center justify-between lg:justify-end w-full lg:w-auto gap-4">
                         {selectedIds.size > 0 ? (
                             <div className="flex items-center gap-3 animate-in fade-in slide-in-from-right-4 duration-300 w-full lg:w-auto">
-                                <span className="text-sm font-bold text-white bg-white/10 px-3 py-1.5 rounded-lg border border-white/10">
+                                <span className="text-sm font-bold text-text-primary bg-navy-800/40 px-3 py-1.5 rounded-lg border border-border-subtle">
                                     {selectedIds.size} Seçili
                                 </span>
                                 <button
@@ -395,7 +395,7 @@ export default function Dashboard() {
                                 </button>
                                 <button
                                     onClick={() => setSelectedIds(new Set())}
-                                    className="p-2.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] text-navy-400 hover:text-white border border-white/[0.06] transition-all cursor-pointer"
+                                    className="p-2.5 rounded-xl bg-navy-800/20 hover:bg-navy-800/40 text-text-muted hover:text-text-primary border border-border-subtle transition-all cursor-pointer"
                                     title="Seçimi Temizle"
                                 >
                                     Kapat
@@ -411,19 +411,19 @@ export default function Dashboard() {
                                         placeholder="Ara..."
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="w-full pl-9 pr-3 py-2 rounded-xl bg-white/[0.04] border border-white/[0.06] text-sm text-navy-200 placeholder:text-navy-500 outline-none focus:border-electric/40 focus:bg-white/[0.06] transition-all"
+                                        className="w-full pl-9 pr-3 py-2 rounded-xl bg-navy-800/20 border border-border-subtle text-sm text-text-secondary placeholder:text-navy-500 outline-none focus:border-electric/40 focus:bg-navy-800/40 transition-all"
                                     />
                                 </div>
                                 <div className="flex items-center gap-4">
                                     {/* View Mode Toggle */}
-                                    <div className="hidden lg:flex items-center gap-1 bg-navy-900/50 rounded-xl p-1 border border-white/[0.08] shadow-inner">
+                                    <div className="hidden lg:flex items-center gap-1 bg-navy-900/50 rounded-xl p-1 border border-border-subtle shadow-inner">
                                         {[
                                             { id: 'card', icon: LayoutGrid, label: 'Kılavuz' },
                                             { id: 'kanban', icon: Columns3, label: 'Kanban' },
                                             { id: 'list', icon: List, label: 'Liste' },
                                         ].map(v => (
                                             <button key={v.id} onClick={() => setViewMode(v.id)} title={v.label}
-                                                className={`p-2 rounded-lg transition-all duration-200 ${viewMode === v.id ? 'bg-electric text-white shadow-md' : 'text-navy-400 hover:text-white hover:bg-white/5'}`}>
+                                                className={`p-2 rounded-lg transition-all duration-200 ${viewMode === v.id ? 'bg-electric text-white shadow-md' : 'text-text-muted hover:text-text-primary hover:bg-navy-800/40'}`}>
                                                 <v.icon className="w-4 h-4" />
                                             </button>
                                         ))}
@@ -431,7 +431,7 @@ export default function Dashboard() {
 
                                     <button
                                         onClick={() => setIsAddModalOpen(true)}
-                                        className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-white text-navy-950 hover:bg-navy-100 text-[13px] font-black tracking-wide shadow-[0_0_15px_rgba(255,255,255,0.1)] hover:shadow-[0_0_25px_rgba(255,255,255,0.2)] transform hover:-translate-y-0.5 active:translate-y-0 transition-all cursor-pointer whitespace-nowrap"
+                                        className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-electric text-white hover:bg-electric-dark text-[13px] font-black tracking-wide shadow-lg shadow-electric/20 transform hover:-translate-y-0.5 active:translate-y-0 transition-all cursor-pointer whitespace-nowrap"
                                     >
                                         <Plus className="w-4 h-4" />
                                         <span>Aday Ekle</span>
@@ -481,17 +481,17 @@ export default function Dashboard() {
 
                 {/* Empty state */}
                 {!loading && sortedCandidates.length === 0 && (
-                    <div className="flex flex-col items-center justify-center py-20 gap-4 text-center glass rounded-3xl border border-white/[0.05] relative overflow-hidden group">
+                    <div className="flex flex-col items-center justify-center py-20 gap-4 text-center glass rounded-3xl border border-border-subtle relative overflow-hidden group">
                         <div className="absolute inset-0 bg-electric/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-2xl"></div>
-                        <div className="w-20 h-20 rounded-full bg-white/[0.02] border border-white/[0.05] flex items-center justify-center relative z-10 group-hover:scale-110 transition-transform duration-500 shadow-xl shadow-black/20">
-                            <Users className="w-8 h-8 text-navy-500 group-hover:text-electric transition-colors duration-500" style={{ animation: 'float-subtle 3s ease-in-out infinite' }} />
+                        <div className="w-20 h-20 rounded-full bg-navy-800/10 border border-border-subtle flex items-center justify-center relative z-10 group-hover:scale-110 transition-transform duration-500 shadow-xl shadow-black/20">
+                            <Users className="w-8 h-8 text-text-muted group-hover:text-electric transition-colors duration-500" style={{ animation: 'float-subtle 3s ease-in-out infinite' }} />
                         </div>
-                        <h3 className="text-xl font-bold text-white relative z-10">
+                        <h3 className="text-xl font-bold text-text-primary relative z-10">
                             {searchQuery || departmentFilter !== 'all' || statusFilter !== 'all' || statFilter
                                 ? 'Sonuç Bulunamadı'
                                 : 'Henüz Aday Yok'}
                         </h3>
-                        <p className="text-sm text-navy-400 max-w-sm relative z-10">
+                        <p className="text-sm text-text-muted max-w-sm relative z-10">
                             {searchQuery || departmentFilter !== 'all' || statusFilter !== 'all' || statFilter
                                 ? 'Filtreleri değiştirerek tekrar deneyin.'
                                 : 'Aday havuzunuz boş. Yeni bir aday ekleyerek başlayabilirsiniz.'}
@@ -529,7 +529,7 @@ export default function Dashboard() {
                             const colCandidates = sortedCandidates.filter(c => (c.status || 'ai_analysis') === col.key);
                             return (
                                 <div key={col.key}
-                                    className={`min-w-[260px] flex-1 flex flex-col rounded-3xl p-2 transition-all duration-300 border border-transparent ${draggedId ? 'bg-white/[0.01]' : ''
+                                    className={`min-w-[260px] flex-1 flex flex-col rounded-3xl p-2 transition-all duration-300 border border-transparent ${draggedId ? 'bg-navy-800/5' : ''
                                         }`}
                                     onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-electric/30', 'bg-electric/5', 'shadow-[0_0_20px_rgba(59,130,246,0.1)]'); }}
                                     onDragLeave={(e) => { e.currentTarget.classList.remove('border-electric/30', 'bg-electric/5', 'shadow-[0_0_20px_rgba(59,130,246,0.1)]'); }}
@@ -548,14 +548,14 @@ export default function Dashboard() {
                                         setDraggedId(null);
                                     }}
                                 >
-                                    <div className="flex items-center gap-2 px-4 py-3 mb-3 rounded-2xl bg-white/[0.03] border border-white/[0.05] shadow-sm backdrop-blur-md">
+                                    <div className="flex items-center gap-2 px-4 py-3 mb-3 rounded-2xl bg-navy-800/10 border border-border-subtle shadow-sm backdrop-blur-md">
                                         <span className={`w-3 h-3 rounded-full shadow-lg ${col.dot}`} />
-                                        <span className="text-sm font-bold text-white flex-1 tracking-wide">{col.label}</span>
-                                        <span className="text-[11px] font-black text-navy-400 bg-navy-900 border border-white/5 px-2 py-1 rounded-lg">{colCandidates.length}</span>
+                                        <span className="text-sm font-bold text-text-primary flex-1 tracking-wide">{col.label}</span>
+                                        <span className="text-[11px] font-black text-text-muted bg-navy-900/50 border border-border-subtle px-2 py-1 rounded-lg">{colCandidates.length}</span>
                                     </div>
                                     <div className="flex-1 space-y-3 min-h-[120px] max-h-[65vh] overflow-y-auto pr-1 flex flex-col custom-scrollbar pb-2">
                                         {colCandidates.length === 0 && (
-                                            <div className="text-center py-10 flex flex-col items-center justify-center text-navy-500 text-xs border-2 border-dashed border-white/[0.04] rounded-2xl h-full mt-2 mx-1">
+                                            <div className="text-center py-10 flex flex-col items-center justify-center text-text-muted text-xs border-2 border-dashed border-border-subtle rounded-2xl h-full mt-2 mx-1">
                                                 Buraya sürükleyin
                                             </div>
                                         )}
@@ -568,30 +568,30 @@ export default function Dashboard() {
                                                 }}
                                                 onDragEnd={() => setDraggedId(null)}
                                                 onClick={() => setSelectedCandidate(c)}
-                                                className={`p-4 rounded-2xl border transition-all duration-300 cursor-grab active:cursor-grabbing group shadow-sm bg-gradient-to-br from-white/[0.02] to-transparent ${draggedId === c.id
+                                                className={`p-4 rounded-2xl border transition-all duration-300 cursor-grab active:cursor-grabbing group shadow-sm bg-gradient-to-br from-navy-800/10 to-transparent ${draggedId === c.id
                                                     ? 'opacity-40 border-electric/30 bg-electric/10 scale-95 shadow-none'
-                                                    : 'border-white/[0.06] hover:bg-white/[0.04] hover:border-electric/30 hover:shadow-[0_8px_20px_rgba(0,0,0,0.2)]'
+                                                    : 'border-border-subtle hover:bg-navy-800/20 hover:border-electric/30 hover:shadow-[0_8px_20px_rgba(0,0,0,0.2)]'
                                                     }`}>
                                                 <div className="flex items-center gap-3 mb-3">
                                                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-[11px] font-bold text-white shadow-md shrink-0">
                                                         {c.name?.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                                                     </div>
                                                     <div className="flex-1 min-w-0">
-                                                        <p className="text-sm font-bold text-white truncate group-hover:text-electric-light transition-colors">{c.name}</p>
-                                                        <p className="text-[11px] text-navy-400 truncate">{c.position}</p>
+                                                        <p className="text-sm font-bold text-text-primary truncate group-hover:text-electric-light transition-colors">{c.name}</p>
+                                                        <p className="text-[11px] text-text-muted truncate">{c.position}</p>
                                                     </div>
-                                                    {c.bestScore > 0 && (
-                                                        <span className={`text-[10px] font-black px-2 py-1 rounded-md border ${c.bestScore >= 70 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-navy-500/10 text-navy-300 border-navy-500/20'}`}>
-                                                            %{Math.round(c.bestScore)}
+                                                    {c.combinedScore > 0 && (
+                                                        <span className={`text-[10px] font-black px-2 py-1 rounded-md border ${c.combinedScore >= 70 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-navy-800/20 text-text-muted border-border-subtle'}`}>
+                                                            %{Math.round(c.combinedScore)}
                                                         </span>
                                                     )}
                                                 </div>
                                                 {c.skills?.length > 0 && (
                                                     <div className="flex flex-wrap gap-1.5 mt-2">
                                                         {c.skills.slice(0, 2).map(s => (
-                                                            <span key={s} className="text-[10px] font-medium text-navy-300 bg-white/[0.03] px-2 py-0.5 rounded-md border border-white/[0.05]">{s}</span>
+                                                            <span key={s} className="text-[10px] font-medium text-text-secondary bg-navy-800/20 px-2 py-0.5 rounded-md border border-border-subtle">{s}</span>
                                                         ))}
-                                                        {c.skills.length > 2 && <span className="text-[10px] font-medium text-navy-500 bg-white/[0.01] px-1.5 py-0.5 rounded-md">+{c.skills.length - 2}</span>}
+                                                        {c.skills.length > 2 && <span className="text-[10px] font-medium text-text-muted bg-navy-800/10 px-1.5 py-0.5 rounded-md">+{c.skills.length - 2}</span>}
                                                     </div>
                                                 )}
                                             </div>
@@ -605,18 +605,18 @@ export default function Dashboard() {
 
                 {/* ===== VIEW: LIST ===== */}
                 {!loading && sortedCandidates.length > 0 && viewMode === 'list' && (
-                    <div className="bg-white/[0.01] rounded-3xl border border-white/[0.05] overflow-hidden shadow-2xl">
+                    <div className="bg-navy-900/10 rounded-3xl border border-border-subtle overflow-hidden shadow-2xl">
                         {/* Table Header */}
-                        <div className="grid grid-cols-[1fr_200px_140px_100px_80px_60px] gap-6 px-6 py-4 border-b border-white/[0.05] bg-white/[0.02]">
-                            <span className="text-[11px] font-black text-navy-400 uppercase tracking-widest">Aday</span>
-                            <span className="text-[11px] font-black text-navy-400 uppercase tracking-widest">Pozisyon</span>
-                            <span className="text-[11px] font-black text-navy-400 uppercase tracking-widest">Durum</span>
-                            <span className="text-[11px] font-black text-navy-400 uppercase tracking-widest">Deneyim</span>
-                            <span className="text-[11px] font-black text-navy-400 uppercase tracking-widest">Skor</span>
-                            <span className="text-[11px] font-black text-navy-400 uppercase tracking-widest"></span>
+                        <div className="grid grid-cols-[1fr_200px_140px_100px_80px_60px] gap-6 px-6 py-4 border-b border-border-subtle bg-navy-800/10">
+                            <span className="text-[11px] font-black text-text-muted uppercase tracking-widest">Aday</span>
+                            <span className="text-[11px] font-black text-text-muted uppercase tracking-widest">Pozisyon</span>
+                            <span className="text-[11px] font-black text-text-muted uppercase tracking-widest">Durum</span>
+                            <span className="text-[11px] font-black text-text-muted uppercase tracking-widest">Deneyim</span>
+                            <span className="text-[11px] font-black text-text-muted uppercase tracking-widest">Skor</span>
+                            <span className="text-[11px] font-black text-text-muted uppercase tracking-widest"></span>
                         </div>
                         {/* Table Rows */}
-                        <div className="divide-y divide-white/[0.03]">
+                        <div className="divide-y divide-border-subtle">
                             {sortedCandidates.map((c, i) => {
                                 const statusCfg = {
                                     ai_analysis: { l: 'AI Analiz', cls: 'bg-violet-500/10 text-violet-400 border-violet-500/20' },
@@ -629,29 +629,29 @@ export default function Dashboard() {
                                 const st = statusCfg[c.status] || statusCfg.ai_analysis;
                                 return (
                                     <div key={c.id} onClick={() => setSelectedCandidate(c)}
-                                        className="grid grid-cols-[1fr_200px_140px_100px_80px_60px] gap-6 px-6 py-4 items-center cursor-pointer transition-all hover:bg-white/[0.03] hover:px-7 duration-300 group">
+                                        className="grid grid-cols-[1fr_200px_140px_100px_80px_60px] gap-6 px-6 py-4 items-center cursor-pointer transition-all hover:bg-navy-800/20 hover:px-7 duration-300 group">
                                         <div className="flex items-center gap-4 min-w-0">
                                             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-xs font-bold text-white shrink-0 shadow-md">
                                                 {c.name?.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                                             </div>
                                             <div className="min-w-0">
-                                                <p className="text-[15px] font-bold text-white truncate group-hover:text-electric-light transition-colors">{c.name}</p>
-                                                <p className="text-[11px] text-navy-400 truncate">{c.email}</p>
+                                                <p className="text-[15px] font-bold text-text-primary truncate transition-colors">{c.name}</p>
+                                                <p className="text-[11px] text-text-muted truncate">{c.email}</p>
                                             </div>
                                         </div>
                                         <div className="min-w-0">
-                                            <p className="text-[13px] font-bold text-navy-200 truncate">{c.matchedPositionTitle || c.position}</p>
-                                            <p className="text-[11px] text-navy-500 truncate">{c.department}</p>
+                                            <p className="text-[13px] font-bold text-text-secondary truncate">{c.matchedPositionTitle || c.position}</p>
+                                            <p className="text-[11px] text-text-muted truncate">{c.department}</p>
                                         </div>
                                         <div>
                                             <span className={`inline-flex items-center justify-center px-3 py-1 rounded-md text-[11px] font-bold border ${st.cls}`}>{st.l}</span>
                                         </div>
-                                        <span className="text-[13px] font-medium text-navy-300">{c.experience || 0} yıl</span>
-                                        <span className={`text-[15px] font-extrabold ${c.bestScore >= 70 ? 'text-emerald-400' : c.bestScore >= 40 ? 'text-amber-400' : 'text-navy-400'}`}>
-                                            {c.bestScore > 0 ? `%${Math.round(c.bestScore)}` : '-'}
+                                        <span className="text-[13px] font-medium text-text-secondary">{c.experience || 0} yıl</span>
+                                        <span className={`text-[15px] font-extrabold ${c.combinedScore >= 70 ? 'text-emerald-400' : c.combinedScore >= 40 ? 'text-amber-400' : 'text-navy-400'}`}>
+                                            {c.combinedScore > 0 ? `%${Math.round(c.combinedScore)}` : '-'}
                                         </span>
-                                        <div className="w-8 h-8 rounded-full bg-white/[0.02] flex items-center justify-center group-hover:bg-electric/10 group-hover:text-electric transition-all ml-auto">
-                                            <ArrowUpRight className="w-4 h-4 text-navy-500 group-hover:text-electric" />
+                                        <div className="w-8 h-8 rounded-full bg-navy-800/20 flex items-center justify-center group-hover:bg-electric/10 group-hover:text-electric transition-all ml-auto">
+                                            <ArrowUpRight className="w-4 h-4 text-text-muted group-hover:text-electric" />
                                         </div>
                                     </div>
                                 );

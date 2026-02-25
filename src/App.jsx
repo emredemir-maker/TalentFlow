@@ -5,8 +5,9 @@ import { useState, useEffect } from 'react';
 import { useAuth } from './context/AuthContext';
 import { CandidatesProvider } from './context/CandidatesContext';
 import { PositionsProvider } from './context/PositionsContext';
-import { UserSettingsProvider } from './context/UserSettingsContext';
+import { UserSettingsProvider, useUserSettings } from './context/UserSettingsContext';
 import { MessageQueueProvider } from './context/MessageQueueContext';
+import { NotificationProvider, useNotifications } from './context/NotificationContext';
 import Sidebar from './components/Sidebar';
 import LoadingScreen from './components/LoadingScreen';
 import Dashboard from './pages/Dashboard';
@@ -17,10 +18,26 @@ import PositionsPage from './pages/PositionsPage';
 import SuperAdminPage from './pages/SuperAdminPage';
 import LoginPage from './pages/LoginPage';
 import AnalyticsPage from './pages/AnalyticsPage';
-import GuidePage from './pages/GuidePage';
+
+export default function App() {
+  return (
+    <PositionsProvider>
+      <CandidatesProvider>
+        <UserSettingsProvider>
+          <NotificationProvider>
+            <MessageQueueProvider>
+              <AppContent />
+            </MessageQueueProvider>
+          </NotificationProvider>
+        </UserSettingsProvider>
+      </CandidatesProvider>
+    </PositionsProvider>
+  );
+}
 
 function AppContent() {
-  const { loading, error, isAuthenticated, loginWithGoogle } = useAuth();
+  const { loading, error, isAuthenticated } = useAuth();
+  const { settings } = useUserSettings();
   const [activeView, setActiveView] = useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -29,6 +46,12 @@ function AppContent() {
     window.addEventListener('changeView', handleNav);
     return () => window.removeEventListener('changeView', handleNav);
   }, []);
+
+  useEffect(() => {
+    if (settings?.theme) {
+      document.documentElement.setAttribute('data-theme', settings.theme);
+    }
+  }, [settings?.theme]);
 
   // Auth loading
   if (loading) {
@@ -42,59 +65,36 @@ function AppContent() {
 
   // Not authenticated? Show Login
   if (!isAuthenticated) {
-    // If there's an error (like "unauthorized"), LoginPage will display it from context
     return <LoginPage />;
   }
 
   const renderPage = () => {
     switch (activeView) {
-      case 'dashboard':
-        return <Dashboard />;
-      case 'settings':
-        return <SettingsPage />;
-      case 'messages':
-        return <MessagesPage />;
-      case 'analytics':
-        return <AnalyticsPage />;
-      case 'candidate-process':
-        return <CandidateProcessPage />;
-      case 'positions':
-        return <PositionsPage />;
-      case 'super-admin':
-        return <SuperAdminPage />;
-      case 'guide':
-        return <GuidePage />;
-      default:
-        return <Dashboard />;
+      case 'dashboard': return <Dashboard />;
+      case 'settings': return <SettingsPage />;
+      case 'messages': return <MessagesPage />;
+      case 'analytics': return <AnalyticsPage />;
+      case 'candidate-process': return <CandidateProcessPage />;
+      case 'positions': return <PositionsPage />;
+      case 'super-admin': return <SuperAdminPage />;
+      default: return <Dashboard />;
     }
   };
 
   return (
-    <PositionsProvider>
-      <CandidatesProvider>
-        <UserSettingsProvider>
-          <MessageQueueProvider>
-            <div className="flex min-h-screen">
-              <Sidebar
-                activeView={activeView}
-                onNavigate={setActiveView}
-                collapsed={sidebarCollapsed}
-                onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-              />
-              <main
-                className={`flex-1 min-h-screen transition-all duration-300 pb-16 md:pb-0
-                  ${sidebarCollapsed ? 'md:ml-[72px]' : 'md:ml-[220px]'}`}
-              >
-                {renderPage()}
-              </main>
-            </div>
-          </MessageQueueProvider>
-        </UserSettingsProvider>
-      </CandidatesProvider>
-    </PositionsProvider>
+    <div className="flex min-h-screen bg-navy-950 transition-colors duration-300">
+      <Sidebar
+        activeView={activeView}
+        onNavigate={setActiveView}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+      />
+      <main
+        className={`flex-1 min-h-screen transition-all duration-300 pb-16 md:pb-0
+          ${sidebarCollapsed ? 'md:ml-[72px]' : 'md:ml-[220px]'}`}
+      >
+        {renderPage()}
+      </main>
+    </div>
   );
-}
-
-export default function App() {
-  return <AppContent />;
 }

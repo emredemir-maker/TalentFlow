@@ -91,7 +91,7 @@ function ScoreCircle({ value, label, size = 'sm' }) {
                 </span>
             </div>
             {label && (
-                <span className="text-[10px] text-navy-500 font-medium text-center leading-tight">{label}</span>
+                <span className="text-[10px] text-text-muted font-medium text-center leading-tight">{label}</span>
             )}
         </div>
     );
@@ -121,13 +121,13 @@ export default function AIAnalysisPanel({ result, loading, error, onRetry, title
                     </div>
                     <div>
                         <div className="text-[13px] font-semibold text-electric-light">Gemini AI Analiz Ediyor...</div>
-                        <div className="text-[11px] text-navy-400 mt-0.5">CV ve iş tanımı karşılaştırılıyor</div>
+                        <div className="text-[11px] text-text-muted mt-0.5">CV ve iş tanımı karşılaştırılıyor</div>
                     </div>
                 </div>
 
                 <div className="grid grid-cols-4 gap-3">
                     {Array.from({ length: 4 }).map((_, i) => (
-                        <div key={i} className="p-3 rounded-xl bg-white/[0.02]">
+                        <div key={i} className="p-3 rounded-xl bg-navy-800/10">
                             <div className="skeleton w-10 h-10 rounded-full mx-auto mb-2" />
                             <div className="skeleton w-full h-2 rounded" />
                         </div>
@@ -147,11 +147,11 @@ export default function AIAnalysisPanel({ result, loading, error, onRetry, title
                     <AlertTriangle className="w-4 h-4 text-red-400" />
                     <span className="text-[13px] font-semibold text-red-400">Analiz Hatası</span>
                 </div>
-                <p className="text-[12px] text-navy-400 leading-relaxed">{error}</p>
+                <p className="text-[12px] text-text-muted leading-relaxed">{error}</p>
                 {onRetry && (
                     <button
                         onClick={onRetry}
-                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-[12px] text-navy-300 hover:bg-white/[0.08] transition-all cursor-pointer"
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-navy-800/20 border border-border-subtle text-[12px] text-text-muted hover:bg-navy-800/40 transition-all cursor-pointer"
                     >
                         <RefreshCw className="w-3.5 h-3.5" />
                         Tekrar Dene
@@ -165,13 +165,13 @@ export default function AIAnalysisPanel({ result, loading, error, onRetry, title
     // ===== EMPTY STATE =====
     if (!result) {
         return (
-            <div className="flex flex-col items-center justify-center py-12 px-4 rounded-xl bg-white/[0.02] border border-white/[0.06] text-center space-y-4 animate-fade-in">
+            <div className="flex flex-col items-center justify-center py-12 px-4 rounded-xl bg-navy-800/10 border border-border-subtle text-center space-y-4 animate-fade-in">
                 <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-electric/20 to-violet-500/20 flex items-center justify-center mb-2">
                     <Brain className="w-8 h-8 text-electric-light" />
                 </div>
                 <div>
-                    <h3 className="text-white font-bold text-lg mb-1">Henüz Analiz Yapılmadı</h3>
-                    <p className="text-navy-400 text-xs max-w-[250px] mx-auto leading-relaxed">
+                    <h3 className="text-text-primary font-bold text-lg mb-1">Henüz Analiz Yapılmadı</h3>
+                    <p className="text-text-muted text-xs max-w-[250px] mx-auto leading-relaxed">
                         Adayın bu pozisyon ile uyumluluğunu detaylıca analiz etmek için yapay zekayı başlatın.
                     </p>
                 </div>
@@ -200,7 +200,7 @@ export default function AIAnalysisPanel({ result, loading, error, onRetry, title
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                         <Sparkles className="w-4 h-4 text-electric-light" />
-                        <span className="text-[12px] uppercase tracking-wider text-navy-400 font-semibold">
+                        <span className="text-[12px] uppercase tracking-wider text-text-muted font-semibold">
                             {title ? `${title} Uyumluluğu` : 'AI Uyumluluk Skoru'}
                         </span>
                     </div>
@@ -211,7 +211,7 @@ export default function AIAnalysisPanel({ result, loading, error, onRetry, title
                         {onRetry && (
                             <button
                                 onClick={() => onRetry()}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-[10px] font-bold text-navy-300 hover:text-white hover:bg-white/[0.08] transition-all"
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-navy-800/20 border border-border-subtle text-[10px] font-bold text-text-muted hover:text-text-primary hover:bg-navy-800/40 transition-all"
                                 title="Yapay Zeka Analizini Yenile"
                             >
                                 <RefreshCw className="w-3 h-3" />
@@ -240,7 +240,7 @@ export default function AIAnalysisPanel({ result, loading, error, onRetry, title
             {result.summary && (
                 <div>
                     <SectionHeader icon={Brain} title="Genel Değerlendirme" />
-                    <p className="text-[13px] text-navy-300 leading-relaxed p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                    <p className="text-[13px] text-text-secondary leading-relaxed p-3 rounded-xl bg-navy-800/10 border border-border-subtle">
                         {result.summary}
                     </p>
                 </div>
@@ -252,13 +252,13 @@ export default function AIAnalysisPanel({ result, loading, error, onRetry, title
                     <SectionHeader icon={TrendingUp} title="Eşleşen Yetenekler" />
                     <div className="space-y-2">
                         {result.topSkills.map((item, i) => (
-                            <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/8">
+                            <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
                                 <div className="w-6 h-6 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0 mt-0.5">
                                     <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
                                 </div>
                                 <div className="min-w-0">
-                                    <div className="text-[13px] font-semibold text-emerald-300">{item.skill}</div>
-                                    <div className="text-[11px] text-navy-400 mt-0.5">{item.relevance}</div>
+                                    <div className="text-[13px] font-semibold text-emerald-500">{item.skill}</div>
+                                    <div className="text-[11px] text-emerald-500/70 mt-0.5">{item.relevance}</div>
                                 </div>
                             </div>
                         ))}
@@ -275,7 +275,7 @@ export default function AIAnalysisPanel({ result, loading, error, onRetry, title
                             const sev = SEVERITY_CONFIG[item.severity] || SEVERITY_CONFIG.moderate;
                             const SevIcon = sev.icon;
                             return (
-                                <div key={i} className={`p-3 rounded-xl ${sev.bg} border border-white/[0.04]`}>
+                                <div key={i} className={`p-3 rounded-xl ${sev.bg} border border-border-subtle`}>
                                     <div className="flex items-center gap-2 mb-1.5">
                                         <SevIcon className={`w-3.5 h-3.5 ${sev.color}`} />
                                         <span className={`text-[13px] font-semibold ${sev.color}`}>{item.gap}</span>
@@ -284,8 +284,8 @@ export default function AIAnalysisPanel({ result, loading, error, onRetry, title
                                         </span>
                                     </div>
                                     <div className="flex items-start gap-2 mt-1">
-                                        <ChevronRight className="w-3 h-3 text-navy-500 shrink-0 mt-0.5" />
-                                        <span className="text-[11px] text-navy-400">{item.suggestion}</span>
+                                        <ChevronRight className="w-3 h-3 text-text-muted shrink-0 mt-0.5" />
+                                        <span className="text-[11px] text-text-muted">{item.suggestion}</span>
                                     </div>
                                 </div>
                             );
@@ -298,13 +298,13 @@ export default function AIAnalysisPanel({ result, loading, error, onRetry, title
             {result.personalizedMessage && (
                 <div>
                     <SectionHeader icon={MessageSquare} title="LinkedIn DM Taslağı" />
-                    <div className="relative p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-                        <p className="text-[13px] text-navy-200 leading-relaxed whitespace-pre-wrap pr-8">
+                    <div className="relative p-4 rounded-xl bg-navy-800/10 border border-border-subtle">
+                        <p className="text-[13px] text-text-secondary leading-relaxed whitespace-pre-wrap pr-8">
                             {result.personalizedMessage}
                         </p>
                         <button
                             onClick={handleCopyDM}
-                            className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-navy-400 hover:text-electric-light hover:bg-white/[0.08] transition-all cursor-pointer"
+                            className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-navy-800/20 border border-border-subtle flex items-center justify-center text-text-muted hover:text-electric-light hover:bg-navy-800/40 transition-all cursor-pointer"
                             title="Mesajı kopyala"
                         >
                             {dmCopied
@@ -328,7 +328,7 @@ function SectionHeader({ icon: Icon, title }) {
     return (
         <div className="flex items-center gap-2 mb-3">
             <Icon className="w-4 h-4 text-electric-light" />
-            <h4 className="text-[11px] font-semibold uppercase tracking-wider text-navy-400">{title}</h4>
+            <h4 className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">{title}</h4>
         </div>
     );
 }

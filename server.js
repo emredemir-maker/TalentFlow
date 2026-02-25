@@ -694,6 +694,59 @@ app.post('/api/google/send-email', async (req, res) => {
     }
 });
 
+app.get('/api/google/check-messages', async (req, res) => {
+    const { token, q } = req.query;
+    if (!token || !q) return res.status(400).json({ success: false, error: 'Token and query are required.' });
+
+    try {
+        // 1. Search for messages
+        const searchResponse = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(q)}&maxResults=1`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const searchData = await searchResponse.json();
+
+        if (!searchData.messages || searchData.messages.length === 0) {
+            return res.json({ success: true, found: false });
+        }
+
+        // 2. Get the latest message content
+        const msgId = searchData.messages[0].id;
+        const msgResponse = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${msgId}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const msgData = await msgResponse.json();
+
+        // Extract body (this is a bit simplified, but works for plain/html text)
+        let body = "";
+        if (msgData.payload.parts) {
+            const part = msgData.payload.parts.find(p => p.mimeType === 'text/plain') || msgData.payload.parts[0];
+            if (part && part.body && part.body.data) {
+                body = Buffer.from(part.body.data, 'base64').toString('utf-8');
+            }
+        } else if (msgData.payload.body && msgData.payload.body.data) {
+            body = Buffer.from(msgData.payload.body.data, 'base64').toString('utf-8');
+        }
+
+        const snippet = msgData.snippet;
+        const fromHeader = msgData.payload.headers.find(h => h.name === 'From')?.value;
+        const dateHeader = msgData.payload.headers.find(h => h.name === 'Date')?.value;
+
+        res.json({
+            success: true,
+            found: true,
+            message: {
+                id: msgId,
+                snippet,
+                body,
+                from: fromHeader,
+                date: dateHeader
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 app.post('/api/google/create-calendar-event', async (req, res) => {
     const { token, summary, description, startDateTime, endDateTime, location, guestEmail } = req.body;
     if (!token || !summary || !startDateTime) return res.status(400).json({ success: false, error: 'Missing parameters.' });

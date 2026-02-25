@@ -56,54 +56,37 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
     const [jobDescription, setJobDescription] = useState('');
 
 
-    // Score Calculation (Find best AI match in positionAnalyses)
+    // Score Calculation (Uses enriched combinedScore from context)
     const activeMatch = useMemo(() => {
-        let highestScore = 0;
-        let bestAnalysis = null;
-        let bestTitle = candidate?.matchedPositionTitle || null;
+        // Find best position-specific analysis score
+        let bestPosAiScore = 0;
+        let bestTitle = candidate.matchedPositionTitle || null;
 
-        // Try getting specific context or highest available
-        if (positionContext && candidate?.positionAnalyses?.[positionContext.title]) {
-            bestAnalysis = candidate.positionAnalyses[positionContext.title];
+        if (positionContext && candidate.positionAnalyses?.[positionContext.title]) {
+            bestPosAiScore = candidate.positionAnalyses[positionContext.title].score;
             bestTitle = positionContext.title;
-        } else if (candidate?.positionAnalyses) {
+        } else if (candidate.positionAnalyses) {
             Object.entries(candidate.positionAnalyses).forEach(([title, analysis]) => {
-                if (analysis && analysis.score > highestScore) {
-                    highestScore = analysis.score;
-                    bestAnalysis = analysis;
+                if (analysis && analysis.score > bestPosAiScore) {
+                    bestPosAiScore = analysis.score;
                     bestTitle = title;
                 }
             });
         }
 
-        if (bestAnalysis) {
-            let rs = [];
-            if (Array.isArray(bestAnalysis.reasons) && bestAnalysis.reasons.length > 0) {
-                rs = bestAnalysis.reasons;
-            } else if (bestAnalysis.summary) {
-                rs = [bestAnalysis.summary];
-            } else {
-                rs = ['AI Analizi Mevcut'];
-            }
+        const interviewScore = candidate.interviewScore || null;
+        const displayScore = candidate.combinedScore || bestPosAiScore;
 
-            return {
-                score: bestAnalysis.score,
-                isHighMatch: bestAnalysis.score >= 75,
-                reasons: rs,
-                initialScore: candidate?.initialAiScore || bestAnalysis.score,
-                title: bestTitle
-            };
-        }
-
-        // Fallback to static algorithm if no AI exists
-        const targetPos = positionContext || positions.find(p => p.title === candidate?.matchedPositionTitle) || positions[0];
-        const baseMatch = calculateMatchScore(candidate, targetPos);
         return {
-            ...baseMatch,
-            initialScore: candidate?.initialAiScore || baseMatch.score,
-            title: targetPos?.title
+            score: displayScore,
+            isHighMatch: displayScore >= 75,
+            reasons: candidate.aiAnalysis?.reasons || [candidate.aiAnalysis?.summary || 'Analiz Mevcut'],
+            initialScore: candidate.initialAiScore || bestPosAiScore,
+            title: bestTitle,
+            aiScore: bestPosAiScore,
+            interviewScore
         };
-    }, [candidate, positionContext, positions]);
+    }, [candidate, positionContext]);
 
 
 
@@ -214,37 +197,37 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
     return (
         <>
             <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] print:hidden" onClick={onClose} />
-            <div className="fixed top-0 right-0 h-full w-full max-w-[560px] z-[70] flex flex-col bg-navy-900 border-l border-white/[0.06] shadow-2xl animate-slide-in-right overflow-hidden print:static print:w-full print:max-w-none print:shadow-none print:bg-white print:text-black">
+            <div className="fixed top-0 right-0 h-full w-full max-w-[560px] z-[70] flex flex-col bg-navy-900 border-l border-border-subtle shadow-2xl animate-slide-in-right overflow-hidden print:static print:w-full print:max-w-none print:shadow-none print:bg-white print:text-black">
 
                 {/* ===== HEADER ===== */}
-                <div className="shrink-0 p-6 border-b border-white/[0.06] print:border-black">
+                <div className="shrink-0 p-6 border-b border-border-subtle print:border-black">
                     <div className="flex items-start justify-between mb-5">
                         <div className="flex items-center gap-4">
                             <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-electric to-violet-accent flex items-center justify-center text-xl font-bold text-white print:bg-none print:text-black print:border print:border-black">
                                 {candidate.name?.[0]}
                             </div>
                             <div>
-                                <h2 className="text-xl font-bold text-white print:text-black">{candidate.name || 'İsimsiz'}</h2>
-                                <p className="text-sm text-navy-400 print:text-gray-600">{candidate.position || 'Aday'}</p>
+                                <h2 className="text-xl font-bold text-text-primary print:text-black">{candidate.name || 'İsimsiz'}</h2>
+                                <p className="text-sm text-text-muted print:text-gray-600">{candidate.position || 'Aday'}</p>
 
                                 <div className="flex flex-wrap items-center gap-2 mt-2 print:hidden">
                                     {/* STATUS BADGE & SWITCHER */}
                                     <div className="relative group/status">
-                                        <div className={`flex items-center gap-2 px-2.5 py-1 rounded-lg bg-white/[0.03] border border-white/[0.06] cursor-pointer hover:bg-white/[0.06] transition-all`}>
+                                        <div className={`flex items-center gap-2 px-2.5 py-1 rounded-lg bg-navy-800/20 border border-border-subtle cursor-pointer hover:bg-navy-800/40 transition-all`}>
                                             <span className={`w-2 h-2 rounded-full ${status.dot}`} />
-                                            <span className="text-[11px] text-navy-300 font-bold uppercase tracking-wider">{status.label}</span>
+                                            <span className="text-[11px] text-text-secondary font-bold uppercase tracking-wider">{status.label}</span>
                                             {candidate.rejectionReason && (
                                                 <span className="text-[10px] text-red-400/80 font-medium lowercase italic">({REJECTION_REASONS.find(r => r.id === candidate.rejectionReason)?.label})</span>
                                             )}
                                         </div>
 
                                         {/* Status Dropdown */}
-                                        <div className="absolute top-full left-0 mt-2 w-56 bg-navy-800 border border-white/[0.08] rounded-xl shadow-2xl opacity-0 invisible group-hover/status:opacity-100 group-hover/status:visible transition-all z-[80] p-1.5 backdrop-blur-xl">
+                                        <div className="absolute top-full left-0 mt-2 w-56 bg-navy-900 border border-border-subtle rounded-xl shadow-2xl opacity-0 invisible group-hover/status:opacity-100 group-hover/status:visible transition-all z-[80] p-1.5 backdrop-blur-xl">
                                             {Object.entries(STATUS_CONFIG).map(([key, config]) => (
                                                 <button
                                                     key={key}
                                                     onClick={() => updateCandidate(candidate.id, { status: key, rejectionReason: null })}
-                                                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-[11px] font-bold transition-all ${candidate.status === key ? 'bg-white/[0.06] text-white' : 'text-navy-400 hover:bg-white/[0.04] hover:text-navy-100'}`}
+                                                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-[11px] font-bold transition-all ${candidate.status === key ? 'bg-navy-800/40 text-text-primary' : 'text-text-muted hover:bg-navy-800/20 hover:text-text-primary'}`}
                                                 >
                                                     <span className={`w-2 h-2 rounded-full ${config.dot}`} />
                                                     {config.label}
@@ -270,8 +253,8 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                             <button className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-500/5 border border-red-500/10 text-red-400/60 text-[10px] font-bold hover:bg-red-500/10 hover:text-red-400 transition-all">
                                                 Reddet
                                             </button>
-                                            <div className="absolute top-full left-0 mt-2 w-40 bg-navy-800 border border-white/[0.08] rounded-xl shadow-2xl opacity-0 invisible group-hover/reject:opacity-100 group-hover/reject:visible transition-all z-[80] p-1.5 backdrop-blur-xl">
-                                                <div className="px-3 py-1.5 text-[9px] font-bold text-navy-500 uppercase tracking-widest border-b border-white/[0.04] mb-1">Neden?</div>
+                                            <div className="absolute top-full left-0 mt-2 w-40 bg-navy-900 border border-border-subtle rounded-xl shadow-2xl opacity-0 invisible group-hover/reject:opacity-100 group-hover/reject:visible transition-all z-[80] p-1.5 backdrop-blur-xl">
+                                                <div className="px-3 py-1.5 text-[9px] font-bold text-text-muted uppercase tracking-widest border-b border-border-subtle mb-1">Neden?</div>
                                                 {REJECTION_REASONS.map(reason => (
                                                     <button
                                                         key={reason.id}
@@ -303,10 +286,10 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                             <button onClick={() => setShowSendModal(true)} className="p-2 rounded-lg bg-electric/10 border border-electric/20 text-electric-light hover:bg-electric/20 transition-all shadow-sm" title="Aday İletişimi (Mülakat/Red)">
                                 <Mail className="w-4 h-4" />
                             </button>
-                            <button onClick={handlePrintReport} className="p-2 rounded-lg bg-white/[0.04] text-navy-400 hover:text-white" title="Rapor Al">
+                            <button onClick={handlePrintReport} className="p-2 rounded-lg bg-navy-800/20 text-text-muted hover:text-text-primary" title="Rapor Al">
                                 <Printer className="w-4 h-4" />
                             </button>
-                            <button onClick={onClose} className="p-2 rounded-lg bg-white/[0.04] text-navy-400 hover:text-white">
+                            <button onClick={onClose} className="p-2 rounded-lg bg-navy-800/20 text-text-muted hover:text-text-primary">
                                 <X className="w-4 h-4" />
                             </button>
                         </div>
@@ -314,7 +297,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                 </div>
 
 
-                <div className="flex items-center gap-6 p-5 rounded-2xl bg-white/[0.03] border border-white/[0.06] mb-4 relative overflow-hidden group">
+                <div className="flex items-center gap-6 p-5 rounded-2xl bg-navy-800/10 border border-border-subtle mb-4 relative overflow-hidden group">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-electric/5 rounded-full -mr-16 -mt-16 blur-3xl group-hover:bg-electric/10 transition-colors" />
 
                     <div className="relative">
@@ -326,30 +309,38 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
 
                     <div className="flex-1 space-y-2">
                         <div className="flex items-center gap-2">
-                            <div className="text-[10px] uppercase tracking-widest text-navy-500 font-bold">
+                            <div className="text-[10px] uppercase tracking-widest text-text-muted font-bold">
                                 {activeMatch.title
                                     ? `${activeMatch.title} Uygunluğu`
                                     : 'Aday Uyumluluk Tahmini'}
                             </div>
-                            <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter ${candidate.scoringStage === 'initial' || !candidate.scoringStage ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}>
-                                {candidate.scoringStage === 'interview' ? 'Mülakat Skoru' : candidate.scoringStage === 'review' ? 'İnceleme Skoru' : 'İlk AI Skoru'}
+                            <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter ${candidate.hasInterview ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'}`}>
+                                {candidate.hasInterview ? 'Endeks Skoru (AI + Mülakat)' : 'AI Skoru'}
                             </span>
                         </div>
 
                         <div className="flex items-end gap-3">
-                            <div className="text-4xl font-black text-white tracking-tight">
+                            <div className="text-4xl font-black text-text-primary tracking-tight">
                                 %{activeMatch.score}
                             </div>
 
                             {/* SCORE EVOLUTION */}
-                            <div className="flex flex-col mb-1 border-l border-white/[0.08] pl-3">
-                                <div className="flex items-center gap-1.5 grayscale opacity-50">
-                                    <span className="text-[9px] font-bold text-navy-400">İlk: %{activeMatch.initialScore}</span>
-                                    <ChevronRight className="w-2 h-2 text-navy-600" />
-                                    <span className="text-[9px] font-bold text-emerald-400">Şu an: %{activeMatch.score}</span>
-                                </div>
-                                <div className="text-[9px] text-navy-500 mt-1">
-                                    Kaynak: <span className="font-bold text-navy-300">{candidate.lastAssessedBy || 'Otonom AI'}</span>
+                            <div className="flex flex-col mb-1 border-l border-border-subtle pl-3">
+                                {candidate.hasInterview ? (
+                                    <div className="flex items-center gap-1.5 opacity-80">
+                                        <span className="text-[9px] font-bold text-violet-400">AI: %{Math.round(activeMatch.aiScore)}</span>
+                                        <span className="text-navy-500">•</span>
+                                        <span className="text-[9px] font-bold text-blue-400">Mülakat: %{activeMatch.interviewScore}</span>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center gap-1.5 grayscale opacity-50">
+                                        <span className="text-[9px] font-bold text-text-muted">İlk: %{activeMatch.initialScore}</span>
+                                        <ChevronRight className="w-2 h-2 text-text-muted" />
+                                        <span className="text-[9px] font-bold text-emerald-500">Şu an: %{activeMatch.score}</span>
+                                    </div>
+                                )}
+                                <div className="text-[9px] text-text-muted mt-1">
+                                    Ağırlıklı Ortalama: <span className="font-bold text-text-secondary">{candidate.hasInterview ? '50/50' : 'Başlangıç'}</span>
                                 </div>
                             </div>
                         </div>
@@ -366,7 +357,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                     <ShieldAlert className="w-3.5 h-3.5" /> Manuel İnceleme
                                 </div>
                                 {activeMatch.reasons[0] && (
-                                    <span className="text-[9px] text-navy-400 max-w-[150px] text-right leading-tight">
+                                    <span className="text-[9px] text-text-muted max-w-[150px] text-right leading-tight">
                                         {activeMatch.reasons[0]}
                                     </span>
                                 )}
@@ -389,9 +380,9 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
-                            className={`flex-1 flex flex-col items-center py-2.5 rounded-xl transition-all ${activeTab === tab.id ? 'bg-electric/10 text-electric-light shadow-inner shadow-electric/5 ring-1 ring-electric/20' : 'text-navy-500 hover:bg-white/[0.04]'}`}
+                            className={`flex-1 flex flex-col items-center py-2.5 rounded-xl transition-all ${activeTab === tab.id ? 'bg-electric/10 text-electric-light shadow-inner shadow-electric/5 ring-1 ring-electric/20' : 'text-text-muted hover:bg-navy-800/10'}`}
                         >
-                            <tab.icon className={`w-4 h-4 mb-1.5 ${activeTab === tab.id ? 'text-electric-light' : 'text-navy-500'}`} />
+                            <tab.icon className={`w-4 h-4 mb-1.5 ${activeTab === tab.id ? 'text-electric-light' : 'text-text-muted'}`} />
                             <span className="text-[10px] font-bold uppercase tracking-tight">{tab.label}</span>
                         </button>
                     ))}
@@ -407,14 +398,14 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                         <div className="space-y-6">
                             <Section title="AI Görüşü & Öne Çıkanlar">
                                 <div className="space-y-4">
-                                    <p className="text-sm text-navy-200 leading-relaxed italic border-l-2 border-electric/30 pl-4 py-1">
+                                    <p className="text-sm text-text-secondary leading-relaxed italic border-l-2 border-electric/30 pl-4 py-1">
                                         {candidate.aiAnalysis?.summary || activeMatch.reasons[0] || candidate.summary || candidate.about || 'Aday hakkında özet bilgi bulunmuyor.'}
                                     </p>
 
                                     {candidate.aiAnalysis?.reasons?.length > 0 && (
                                         <div className="grid grid-cols-1 gap-2 mt-2">
                                             {candidate.aiAnalysis.reasons.map((r, i) => (
-                                                <div key={i} className="flex gap-2 p-2 rounded-lg bg-white/[0.02] border border-white/[0.04] text-[11px] text-navy-300">
+                                                <div key={i} className="flex gap-2 p-2 rounded-lg bg-navy-800/20 border border-border-subtle text-[11px] text-text-secondary">
                                                     <Sparkles className="w-3 h-3 text-electric-light shrink-0 mt-0.5" />
                                                     <span>{r}</span>
                                                 </div>
@@ -437,7 +428,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                             <Section title="Teknik Yetkinlikler">
                                 <div className="flex flex-wrap gap-2">
                                     {candidate.skills?.map(skill => (
-                                        <span key={skill} className="px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-xs text-navy-200">
+                                        <span key={skill} className="px-3 py-1.5 rounded-lg bg-navy-800/10 border border-border-subtle text-xs text-text-secondary">
                                             {skill}
                                         </span>
                                     ))}
@@ -472,13 +463,13 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                     const hasAI = !!posAnalysis;
 
                                     return (
-                                        <div key={pos.id} className={`rounded-xl border transition-all duration-300 overflow-hidden ${isExpanded ? 'bg-navy-900 border-electric/30 shadow-[0_4px_24px_rgba(59,130,246,0.1)]' : 'bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.04]'}`}>
+                                        <div key={pos.id} className={`rounded-xl border transition-all duration-300 overflow-hidden ${isExpanded ? 'bg-navy-950/20 border-electric/30 shadow-[0_4px_24px_rgba(59,130,246,0.1)]' : 'bg-navy-800/10 border-border-subtle hover:bg-navy-800/20'}`}>
                                             <div
                                                 className="p-4 cursor-pointer flex justify-between items-center group select-none"
                                                 onClick={() => setExpandedPositionId(isExpanded ? null : pos.id)}
                                             >
                                                 <div className="flex items-center gap-3">
-                                                    <h4 className={`font-bold text-[14px] transition-colors ${isExpanded ? 'text-white' : 'text-navy-100 group-hover:text-white'}`}>{pos.title}</h4>
+                                                    <h4 className={`font-bold text-[14px] transition-colors ${isExpanded ? 'text-text-primary' : 'text-text-secondary group-hover:text-text-primary'}`}>{pos.title}</h4>
                                                     {hasAI && (
                                                         <span className="text-[9px] font-bold uppercase tracking-widest bg-violet-500/10 text-violet-400 border border-violet-500/20 px-2 py-0.5 rounded flex items-center gap-1 shadow-sm">
                                                             <Sparkles className="w-2.5 h-2.5" /> AI Analizli
@@ -486,17 +477,17 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                                     )}
                                                 </div>
                                                 <div className="flex items-center gap-4">
-                                                    <span className={`text-[11px] font-bold px-2 py-1 rounded-md flex items-center gap-1 shadow-sm ${match.score >= 70 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-navy-800 text-navy-400 border border-white/[0.06]'}`}>
+                                                    <span className={`text-[11px] font-bold px-2 py-1 rounded-md flex items-center gap-1 shadow-sm ${match.score >= 70 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-navy-800/20 text-text-muted border-border-subtle'}`}>
                                                         {match.score >= 70 ? '🟢' : '🟡'} %{match.score}
                                                     </span>
-                                                    <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${isExpanded ? 'bg-electric/20' : 'bg-white/[0.04] group-hover:bg-white/[0.08]'}`}>
-                                                        <ChevronRight className={`w-4 h-4 text-navy-300 transition-transform duration-300 ${isExpanded ? 'rotate-90 text-electric-light' : ''}`} />
+                                                    <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${isExpanded ? 'bg-electric/20' : 'bg-navy-800/20 group-hover:bg-navy-800/40'}`}>
+                                                        <ChevronRight className={`w-4 h-4 text-text-muted transition-transform duration-300 ${isExpanded ? 'rotate-90 text-electric-light' : ''}`} />
                                                     </div>
                                                 </div>
                                             </div>
 
                                             {isExpanded && (
-                                                <div className="px-5 pb-5 border-t border-white/[0.04] pt-5 bg-navy-950/30 animate-in slide-in-from-top-2 duration-200">
+                                                <div className="px-5 pb-5 border-t border-border-subtle pt-5 bg-navy-950/10 animate-in slide-in-from-top-2 duration-200">
                                                     {posAnalysis ? (
                                                         <AIAnalysisPanel
                                                             result={posAnalysis}
@@ -598,7 +589,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                 </div>
 
                 {/* ===== FOOTER ===== */}
-                <div className="shrink-0 p-4 border-t border-white/[0.06] flex gap-3 print:hidden">
+                <div className="shrink-0 p-4 border-t border-border-subtle flex gap-3 print:hidden">
                     {candidate.cvUrl && (
                         <a
                             href={candidate.cvUrl}
@@ -610,7 +601,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                         </a>
                     )}
 
-                    <button onClick={handlePrintReport} className="py-2.5 px-4 rounded-xl bg-white/[0.04] border border-white/[0.06] text-[13px] font-semibold text-navy-300 hover:text-white transition-all flex items-center gap-2">
+                    <button onClick={handlePrintReport} className="py-2.5 px-4 rounded-xl bg-navy-800/10 border border-border-subtle text-[13px] font-semibold text-text-muted hover:text-text-primary transition-all flex items-center gap-2">
                         <Printer className="w-4 h-4" />
                     </button>
 
@@ -626,7 +617,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
 function Section({ title, children }) {
     return (
         <div>
-            <h3 className="text-[10px] font-black uppercase tracking-widest text-navy-500 mb-3">{title}</h3>
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-text-muted mb-3">{title}</h3>
             {children}
         </div>
     );
@@ -634,12 +625,12 @@ function Section({ title, children }) {
 
 function MiniCard({ label, value, icon: Icon }) {
     return (
-        <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+        <div className="p-3 rounded-xl bg-navy-800/10 border border-border-subtle">
             <div className="flex items-center gap-1.5 mb-1.5">
-                <Icon className="w-3.5 h-3.5 text-navy-500" />
-                <span className="text-[9px] uppercase tracking-widest text-navy-500 font-black">{label}</span>
+                <Icon className="w-3.5 h-3.5 text-text-muted" />
+                <span className="text-[9px] uppercase tracking-widest text-text-muted font-black">{label}</span>
             </div>
-            <div className="text-[13px] font-bold text-white truncate">{value || '---'}</div>
+            <div className="text-[13px] font-bold text-text-primary truncate">{value || '---'}</div>
         </div>
     );
 }

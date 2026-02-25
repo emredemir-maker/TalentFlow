@@ -3,16 +3,22 @@
 
 /* ==================== CUSTOM THEME LAYER ==================== */
 @theme {
-  --color-navy-950: #020617;
-  --color-navy-900: #0f172a;
-  --color-navy-800: #1e293b;
-  --color-navy-700: #334155;
-  --color-navy-600: #475569;
-  --color-navy-500: #64748b;
-  --color-navy-400: #94a3b8;
-  --color-navy-300: #cbd5e1;
-  --color-navy-200: #e2e8f0;
-  --color-navy-100: #f1f5f9;
+  --color-navy-950: var(--navy-950);
+  --color-navy-900: var(--navy-900);
+  --color-navy-800: var(--navy-800);
+  --color-navy-700: var(--navy-700);
+  --color-navy-600: var(--navy-600);
+  --color-navy-500: var(--navy-500);
+  --color-navy-400: var(--navy-400);
+  --color-navy-300: var(--navy-300);
+  --color-navy-200: var(--navy-200);
+  --color-navy-100: var(--navy-100);
+
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-border-subtle: var(--border-subtle);
+  --color-header-bg: var(--header-bg);
 
   --color-electric: #3b82f6;
   --color-electric-light: #60a5fa;
@@ -23,6 +29,57 @@
   --color-violet-accent: #8b5cf6;
 
   --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+:root {
+  --navy-950: #020617;
+  --navy-900: #0f172a;
+  --navy-800: #1e293b;
+  --navy-700: #334155;
+  --navy-600: #475569;
+  --navy-500: #64748b;
+  --navy-400: #94a3b8;
+  --navy-300: #cbd5e1;
+  --navy-200: #e2e8f0;
+  --navy-100: #f1f5f9;
+
+  --text-primary: #ffffff;
+  --text-secondary: #e2e8f0;
+  --text-muted: #64748b;
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --header-bg: rgba(15, 23, 42, 0.8);
+
+  --glass-bg: rgba(15, 23, 42, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --card-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+[data-theme='light'] {
+  --navy-950: #f8fafc;
+  /* Page Background Light */
+  --navy-900: #ffffff;
+  /* Sidebar / Header Light */
+  --navy-800: #f1f5f9;
+  /* Card Hover / Secondary Light */
+  --navy-700: #e2e8f0;
+  /* Icons / Muted Light */
+  --navy-600: #cbd5e1;
+  --navy-500: #94a3b8;
+  --navy-400: #64748b;
+  --navy-300: #475569;
+  --navy-200: #1e293b;
+  /* Main Text Light */
+  --navy-100: #0f172a;
+
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #64748b;
+  --border-subtle: rgba(0, 0, 0, 0.08);
+  --header-bg: rgba(255, 255, 255, 0.8);
+
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(0, 0, 0, 0.05);
+  --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
 }
 
 /* ==================== BASE STYLES ==================== */
@@ -51,10 +108,11 @@
 
 body {
   font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
-  background-color: #0f172a;
-  color: #e2e8f0;
+  background-color: var(--navy-950);
+  color: var(--text-secondary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.3s, color 0.3s;
 }
 
 /* ==================== ANIMATIONS ==================== */
@@ -277,10 +335,11 @@ body {
 
 /* Glass surface */
 .glass {
-  background: rgba(15, 23, 42, 0.7);
+  background: var(--glass-bg);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--card-shadow);
 }
 
 /* Gradient border trick */
@@ -335,13 +394,16 @@ select option {
 .custom-scrollbar::-webkit-scrollbar {
   width: 4px;
 }
+
 .custom-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
+
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.1);
   border-radius: 999px;
 }
+
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.2);
 }

@@ -103,21 +103,44 @@ export function CandidatesProvider({ children }) {
 
 
 
-    // Enrich candidates with best match data
+    // Enrich candidates with best match data and interview scores
     const enrichedCandidates = useMemo(() => {
         return candidates.map(c => {
-            let bestScore = c.matchScore || c.aiAnalysis?.score || 0;
+            let bestAiScore = c.aiScore || c.aiAnalysis?.score || 0;
             let bestTitle = c.matchedPositionTitle || null;
 
             if (c.positionAnalyses) {
                 Object.entries(c.positionAnalyses).forEach(([title, analysis]) => {
-                    if (analysis && analysis.score > bestScore) {
-                        bestScore = analysis.score;
+                    if (analysis && analysis.score > bestAiScore) {
+                        bestAiScore = analysis.score;
                         bestTitle = title;
                     }
                 });
             }
-            return { ...c, bestScore, bestTitle };
+
+            // Calculate Interview Score (if exists, use the latest session's finalScore)
+            const sessions = c.interviewSessions || [];
+            const hasInterview = sessions.length > 0;
+            const interviewScore = hasInterview
+                ? sessions[sessions.length - 1].finalScore
+                : null;
+
+            // Combined Score Calculation: 
+            // If interview exists, it's (AI + Interview) / 2.
+            // This is the "True Score" or "Index Score".
+            let combinedScore = bestAiScore;
+            if (interviewScore !== null) {
+                combinedScore = Math.round((bestAiScore + interviewScore) / 2);
+            }
+
+            return {
+                ...c,
+                bestScore: bestAiScore, // Original AI best
+                bestTitle,
+                interviewScore,
+                combinedScore,
+                hasInterview
+            };
         });
     }, [candidates]);
 

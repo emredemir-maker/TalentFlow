@@ -13,7 +13,6 @@ import {
     Briefcase,
     Shield,
     LogOut,
-    BookOpen,
     Search
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -23,7 +22,6 @@ const NAV_ITEMS = [
     { id: 'positions', label: 'Pozisyonlar', icon: Briefcase },
     { id: 'analytics', label: 'Analitik', icon: BarChart3 },
     { id: 'candidate-process', label: 'Aday Görünümü', icon: Globe },
-    { id: 'guide', label: 'Kullanım Rehberi', icon: BookOpen },
 ];
 
 const BOTTOM_ITEMS = [
@@ -39,12 +37,12 @@ export default function Sidebar({ activeView, onNavigate, collapsed, onToggleCol
             {/* ===== DESKTOP SIDEBAR ===== */}
             <aside
                 className={`hidden md:flex fixed top-0 left-0 h-screen flex-col z-50
-          border-r border-white/[0.06] bg-navy-900/95 backdrop-blur-xl
+          border-r border-border-subtle bg-navy-900/95 backdrop-blur-xl
           transition-all duration-300 ease-out
           ${collapsed ? 'w-[72px]' : 'w-[220px]'}`}
             >
                 {/* Logo */}
-                <div className={`flex items-center gap-3 px-4 h-16 border-b border-white/[0.06] shrink-0 ${collapsed ? 'justify-center' : ''}`}>
+                <div className={`flex items-center gap-3 px-4 h-16 border-b border-border-subtle shrink-0 ${collapsed ? 'justify-center' : ''}`}>
                     <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-electric to-cyan-accent flex items-center justify-center shrink-0 shadow-[0_0_20px_rgba(59,130,246,0.3)]">
                         <Zap className="w-5 h-5 text-white" />
                     </div>
@@ -106,7 +104,7 @@ export default function Sidebar({ activeView, onNavigate, collapsed, onToggleCol
                 </nav>
 
                 {/* Settings + Collapse */}
-                <div className="px-3 pb-3 space-y-1 border-t border-white/[0.06] pt-3">
+                <div className="px-3 pb-3 space-y-1 border-t border-border-subtle pt-3">
                     <button
                         onClick={() => onNavigate('settings')}
                         title={collapsed ? 'Ayarlar' : undefined}
@@ -141,12 +139,12 @@ export default function Sidebar({ activeView, onNavigate, collapsed, onToggleCol
 
                     {/* User pill */}
                     {!collapsed && userProfile && (
-                        <div className="mt-2 flex items-center gap-2.5 p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                        <div className="mt-2 flex items-center gap-2.5 p-2.5 rounded-xl bg-navy-800/10 border border-border-subtle">
                             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-[11px] font-bold text-white shrink-0">
                                 {userProfile.displayName?.substring(0, 2).toUpperCase() || 'U'}
                             </div>
                             <div className="min-w-0 flex-1">
-                                <div className="text-[12px] font-semibold text-navy-200 truncate">
+                                <div className="text-[12px] font-semibold text-text-primary truncate">
                                     {userProfile.displayName || 'Kullanıcı'}
                                 </div>
                                 <div className="text-[9px] text-navy-500 truncate font-mono uppercase tracking-widest">

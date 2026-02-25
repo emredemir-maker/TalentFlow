@@ -51,7 +51,7 @@ export default function CandidateCard({ candidate, index = 0, onClick, isSelecte
             tabIndex={0}
             onKeyDown={(e) => e.key === 'Enter' && onClick?.(candidate)}
             className={`group rounded-3xl p-6 cursor-pointer transition-all duration-300 relative overflow-hidden backdrop-blur-xl border flex flex-col
-            ${isSelected ? 'bg-gradient-to-br from-electric/10 to-transparent border-electric/40 shadow-[0_0_25px_rgba(59,130,246,0.15)] ring-1 ring-electric/30 scale-[1.01]' : 'bg-white/[0.01] hover:bg-white/[0.03] border-white/[0.06] hover:border-white/[0.15] hover:shadow-2xl hover:shadow-black/20 hover:-translate-y-1'}
+            ${isSelected ? 'bg-gradient-to-br from-electric/10 to-transparent border-electric/40 shadow-[0_0_25px_rgba(59,130,246,0.15)] ring-1 ring-electric/30 scale-[1.01]' : 'bg-navy-900/10 hover:bg-navy-900/20 border-border-subtle hover:border-navy-400/20 hover:shadow-2xl hover:-translate-y-1'}
             focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-electric/30 h-full`}
         >
             <div className={`absolute top-0 right-0 w-40 h-40 bg-electric/10 rounded-full blur-[60px] -z-10 transition-opacity duration-300 pointer-events-none ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} />
@@ -63,8 +63,8 @@ export default function CandidateCard({ candidate, index = 0, onClick, isSelecte
                         onSelect?.();
                     }}
                     className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${isSelected
-                        ? 'bg-electric border-electric text-white'
-                        : 'bg-white/10 border-white/20 hover:border-electric/50'
+                        ? 'bg-electric border-electric text-text-primary'
+                        : 'bg-navy-800/20 border-border-subtle hover:border-electric/50'
                         }`}
                 >
                     {isSelected && <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>}
@@ -78,7 +78,7 @@ export default function CandidateCard({ candidate, index = 0, onClick, isSelecte
                         {getInitials(candidate.name)}
                     </div>
                     <div className="min-w-0">
-                        <h3 className="text-[15px] font-semibold text-navy-100 truncate group-hover:text-white transition-colors">
+                        <h3 className="text-[15px] font-semibold text-text-primary truncate">
                             {candidate.name}
                         </h3>
                         <p className="text-[12px] text-navy-400 truncate">{candidate.position}</p>
@@ -139,66 +139,35 @@ export default function CandidateCard({ candidate, index = 0, onClick, isSelecte
                 </div>
                 <div className="flex flex-col items-end">
                     {(() => {
-                        let displayScore = candidate.matchScore || 0;
-                        let displayTitle = candidate.matchedPositionTitle;
+                        const displayScore = Math.round(candidate.combinedScore || 0);
+                        const hasAi = !!(candidate.aiAnalysis || candidate.positionAnalyses);
+                        const hasInterview = !!(candidate.interviewSessions?.length > 0);
 
-                        if (displayTitle && candidate.positionAnalyses?.[displayTitle]) {
-                            displayScore = candidate.positionAnalyses[displayTitle].score;
-                        } else if (candidate.positionAnalyses) {
-                            Object.entries(candidate.positionAnalyses).forEach(([title, analysis]) => {
-                                if (analysis && analysis.score > displayScore) {
-                                    displayScore = analysis.score;
-                                    displayTitle = title;
-                                }
-                            });
-                        }
-
-                        displayScore = Math.round(Math.min(displayScore, 100));
-
-                        // Color mapping for pre-assessment
-                        const suitabilityColors = {
-                            "Uygun": "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-                            "Potansiyel": "bg-amber-500/20 text-amber-400 border-amber-500/30",
-                            "Uygun Değil": "bg-red-500/20 text-red-400 border-red-500/30",
-                        };
-
-                        if (candidate.positionAnalyses || candidate.aiAnalysis || displayScore > 0) {
-                            return (
-                                <>
-                                    <MatchScoreRing score={displayScore} size={48} />
-                                    {(candidate.aiAnalysis || candidate.positionAnalyses) && (
-                                        <div className="flex flex-col items-end mt-1">
-                                            <div className="flex items-center gap-0.5 text-electric-light animate-pulse">
-                                                <Sparkles className="w-2.5 h-2.5" />
-                                                <span className="text-[8px] font-bold uppercase tracking-tighter">AI Skoru</span>
-                                            </div>
+                        return (
+                            <>
+                                <MatchScoreRing score={displayScore} size={48} />
+                                <div className="flex flex-col items-end mt-1">
+                                    {hasInterview && (
+                                        <div className="flex items-center gap-0.5 text-blue-400">
+                                            <ShieldAlert className="w-2.5 h-2.5" />
+                                            <span className="text-[8px] font-black uppercase tracking-tighter">Verified</span>
                                         </div>
                                     )}
-                                </>
-                            );
-                        } else if (candidate.preAssessment) {
-                            const suit = candidate.preAssessment.suitability;
-                            const classes = suitabilityColors[suit] || "bg-navy-500/20 text-navy-300 border-navy-500/30";
-                            return (
-                                <div className="flex flex-col items-end">
-                                    <div className={`px-2 py-1.5 rounded-lg border text-[11px] font-bold text-center leading-tight shadow-lg backdrop-blur-sm ${classes}`}>
-                                        {suit}
-                                    </div>
-                                    <div className="flex flex-col items-end mt-1">
+                                    {hasAi && !hasInterview && (
+                                        <div className="flex items-center gap-0.5 text-electric-light">
+                                            <Sparkles className="w-2.5 h-2.5" />
+                                            <span className="text-[8px] font-black uppercase tracking-tighter">AI Only</span>
+                                        </div>
+                                    )}
+                                    {hasAi && hasInterview && (
                                         <div className="flex items-center gap-0.5 text-emerald-400">
                                             <Sparkles className="w-2.5 h-2.5" />
-                                            <span className="text-[8px] font-bold uppercase tracking-tighter">Ön Analiz</span>
+                                            <span className="text-[8px] font-black uppercase tracking-tighter">Full Match</span>
                                         </div>
-                                    </div>
+                                    )}
                                 </div>
-                            );
-                        } else {
-                            return (
-                                <div className="flex items-center justify-center w-12 h-12 rounded-full border-2 border-dashed border-white/10 text-white/30 text-[10px] font-bold">
-                                    %?
-                                </div>
-                            );
-                        }
+                            </>
+                        );
                     })()}
                 </div>
             </div>
@@ -244,7 +213,7 @@ export default function CandidateCard({ candidate, index = 0, onClick, isSelecte
                     {candidate.skills.slice(0, 3).map((skill) => (
                         <span
                             key={skill}
-                            className="px-2 py-0.5 rounded-md text-[11px] font-medium text-navy-300 bg-white/[0.04] border border-white/[0.06]"
+                            className="px-2 py-0.5 rounded-md text-[11px] font-medium text-text-secondary bg-navy-800/20 border border-border-subtle"
                         >
                             {skill}
                         </span>
@@ -263,15 +232,15 @@ export default function CandidateCard({ candidate, index = 0, onClick, isSelecte
                     <div className="flex items-center gap-1.5 mb-1 text-[10px] font-bold text-electric-light uppercase tracking-widest">
                         <Sparkles className="w-3 h-3" /> AI Görüşü
                     </div>
-                    <p className="text-[11px] text-navy-200 leading-relaxed line-clamp-2 italic group-hover/insight:line-clamp-none transition-all duration-300">
+                    <p className="text-[11px] text-text-secondary leading-relaxed line-clamp-2 italic group-hover/insight:line-clamp-none transition-all duration-300">
                         "{candidate.aiAnalysis?.summary || candidate.summary}"
                     </p>
                 </div>
             )}
 
             {/* Footer */}
-            <div className="flex items-center justify-between pt-4 border-t border-white/[0.06] mt-auto">
-                <span className="text-[12px] font-bold text-navy-400">{candidate.salary}</span>
+            <div className="flex items-center justify-between pt-4 border-t border-border-subtle mt-auto">
+                <span className="text-[12px] font-bold text-text-muted">{candidate.salary}</span>
                 <div className="flex items-center gap-1 text-[12px] text-electric opacity-0 group-hover:opacity-100 transition-all transform group-hover:translate-x-1">
                     <span className="font-extrabold uppercase tracking-wide">Detayları Gör</span>
                     <ArrowUpRight className="w-4 h-4" />

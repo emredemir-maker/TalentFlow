@@ -11,22 +11,26 @@ import SendMessageModal from '../components/SendMessageModal';
 import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
 import {
+    Github,
+    Linkedin,
+    Globe,
+    CheckCircle2,
+    Shield,
+    Terminal,
+    MapPin,
+    Cpu,
+    BadgeCheck,
+    MoreVertical,
+    Download,
     Activity,
     Briefcase,
-    CheckCircle,
     Calendar,
     MessageSquare,
-    Link,
     Clock,
-    User,
     Mail,
     Phone,
     FileText,
-    Edit2,
-    ExternalLink,
-    Github,
-    Linkedin,
-    Globe
+    ExternalLink
 } from 'lucide-react';
 import { analyzeCandidateMatch } from '../services/geminiService';
 import { createMessage, MESSAGE_STATUS } from '../services/messageQueueService';
@@ -182,58 +186,101 @@ export default function CandidateProcessPage() {
             </div>
 
             <div className="max-w-7xl mx-auto px-6 lg:px-8 space-y-8">
-                {/* Status Header */}
-                <div className="glass rounded-3xl p-8 border border-white/[0.06] flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-96 h-96 bg-electric/5 rounded-full blur-[100px] -z-10" />
-                    <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
-                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-electric to-blue-600 flex items-center justify-center text-2xl font-bold text-white shadow-xl shadow-electric/20 uppercase shrink-0">
-                            {candidate.name?.substring(0, 2) || 'AD'}
-                        </div>
-                        <div>
-                            <h2 className="text-2xl font-bold text-white mb-1">{candidate.name || 'İsimsiz Aday'}</h2>
-                            <div className="flex flex-wrap items-center gap-2 text-navy-300 text-sm">
-                                <Briefcase className="w-4 h-4 text-electric shrink-0" />
-                                <div className="relative group flex items-center">
-                                    <select
-                                        value={candidate.matchedPositionTitle || candidate.position || ''}
-                                        onChange={handleTargetPositionChange}
-                                        className="appearance-none bg-transparent hover:bg-white/[0.04] border border-transparent hover:border-white/[0.06] rounded-lg px-2 py-1 pr-6 cursor-pointer text-sm text-electric-light focus:outline-none focus:border-electric transition-all"
-                                    >
-                                        <option value="" disabled>Pozisyon Seçin</option>
-                                        <option value={candidate.position || 'Mevcut Pozisyon'}>{candidate.position || 'Mevcut Pozisyon'} (Orjinal)</option>
-                                        {positions?.map(pos => <option key={pos.id} value={pos.title}>{pos.title}</option>)}
-                                    </select>
-                                    <Edit2 className="w-3 h-3 absolute right-2 text-navy-400 pointer-events-none group-hover:text-electric transition-colors" />
+                {/* Hero Profile Section */}
+                <div className="relative group/hero">
+                    <div className="absolute -inset-1 bg-gradient-to-r from-electric/20 via-violet-500/20 to-cyan-500/20 rounded-[3rem] blur-2xl opacity-0 group-hover/hero:opacity-100 transition-opacity duration-700 -z-10" />
+                    <div className="glass rounded-[3rem] p-8 md:p-10 border border-white/[0.08] relative overflow-hidden">
+                        {/* Background Decoration */}
+                        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-electric/[0.03] rounded-full blur-[120px] -z-10 -translate-y-1/2 translate-x-1/2" />
+                        <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-violet-600/[0.02] rounded-full blur-[100px] -z-10 translate-y-1/2 -translate-x-1/2" />
+
+                        <div className="flex flex-col lg:flex-row gap-10 items-start">
+                            {/* Profile Core */}
+                            <div className="flex flex-col md:flex-row items-center md:items-start gap-8 flex-1 w-full">
+                                <div className="relative shrink-0">
+                                    <div className="w-28 h-28 rounded-[2.5rem] bg-gradient-to-br from-electric via-blue-600 to-violet-600 flex items-center justify-center text-3xl font-black text-white shadow-2xl shadow-electric/30 uppercase ring-4 ring-white/10 ring-offset-4 ring-offset-navy-950">
+                                        {candidate.name?.substring(0, 2) || 'AD'}
+                                    </div>
+                                    <div className="absolute -bottom-2 -right-2 w-10 h-10 rounded-2xl bg-navy-900 border-2 border-white/10 flex items-center justify-center shadow-lg">
+                                        <BadgeCheck className="w-6 h-6 text-electric" />
+                                    </div>
                                 </div>
-                                <span className="text-navy-600">•</span>
-                                <div className="relative group flex items-center">
-                                    <select
-                                        value={candidate.status}
-                                        onChange={(e) => updateCandidate(candidate.id, { status: e.target.value })}
-                                        className="appearance-none bg-electric/10 text-electric px-2 py-0.5 pr-6 rounded-md text-[11px] font-bold uppercase tracking-wider cursor-pointer border border-transparent hover:bg-electric/20 focus:outline-none transition-all"
-                                    >
-                                        {Object.entries(STATUS_LABELS).map(([key, label]) => (
-                                            <option key={key} value={key} className="bg-navy-800 text-white capitalize">{label}</option>
-                                        ))}
-                                    </select>
-                                    <Edit2 className="w-2.5 h-2.5 absolute right-2 text-electric/70 pointer-events-none" />
+
+                                <div className="flex-1 text-center md:text-left space-y-4">
+                                    <div>
+                                        <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mb-2">
+                                            <h2 className="text-3xl md:text-4xl font-black text-white tracking-tight">{candidate.name || 'İsimsiz Aday'}</h2>
+                                            <div className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] font-black text-navy-400 uppercase tracking-widest flex items-center gap-1.5">
+                                                <Terminal className="w-3 h-3" /> {candidate.id.substring(0, 8)}
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-navy-400 text-sm font-medium">
+                                            <div className="flex items-center gap-2 group/pos">
+                                                <Briefcase className="w-4 h-4 text-electric" />
+                                                <select
+                                                    value={candidate.matchedPositionTitle || candidate.position || ''}
+                                                    onChange={handleTargetPositionChange}
+                                                    className="bg-navy-900/50 hover:bg-navy-800 border border-white/5 rounded-xl px-3 py-1.5 cursor-pointer text-xs font-bold text-electric-light focus:outline-none focus:border-electric transition-all pr-8 appearance-none relative"
+                                                >
+                                                    <option value="" disabled>Pozisyon Seçin</option>
+                                                    <option value={candidate.position || 'Mevcut Pozisyon'}>{candidate.position || 'Mevcut Pozisyon'} (Orjinal)</option>
+                                                    {positions?.map(pos => <option key={pos.id} value={pos.title}>{pos.title}</option>)}
+                                                </select>
+                                            </div>
+                                            <span className="w-1.5 h-1.5 rounded-full bg-navy-800" />
+                                            <div className="flex items-center gap-2">
+                                                <MapPin className="w-4 h-4 text-cyan-400" />
+                                                <span>İstanbul, TR</span>
+                                            </div>
+                                            <span className="w-1.5 h-1.5 rounded-full bg-navy-800" />
+                                            <div className="flex items-center gap-2 text-emerald-400 font-bold">
+                                                <Shield className="w-4 h-4" />
+                                                <span>KVKK Onaylı</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex flex-wrap justify-center md:justify-start gap-2 pt-2">
+                                        <div className="px-4 py-2 rounded-2xl bg-white/[0.03] border border-white/[0.06] text-xs font-bold text-white flex items-center gap-2">
+                                            <select
+                                                value={candidate.status}
+                                                onChange={(e) => updateCandidate(candidate.id, { status: e.target.value })}
+                                                className="bg-transparent text-electric font-black uppercase tracking-widest cursor-pointer focus:outline-none"
+                                            >
+                                                {Object.entries(STATUS_LABELS).map(([key, label]) => (
+                                                    <option key={key} value={key} className="bg-navy-800 text-white capitalize">{label}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="px-4 py-2 rounded-2xl bg-electric/10 border border-electric/20 text-xs font-black text-electric uppercase tracking-widest flex items-center gap-2">
+                                            <Cpu className="w-3.5 h-3.5" /> AI Skoru: %{candidate.matchScore || 0}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
+
+                            {/* Main CTAs */}
+                            <div className="flex flex-col sm:flex-row lg:flex-col gap-4 w-full lg:w-auto shrink-0">
+                                <button
+                                    onClick={() => setSendModalPurpose('general')}
+                                    className="px-8 py-4 rounded-[1.5rem] bg-white text-navy-950 font-black text-xs uppercase tracking-widest hover:bg-electric hover:text-white transition-all shadow-xl shadow-white/5 flex items-center justify-center gap-3 group"
+                                >
+                                    <Mail className="w-5 h-5" /> Mesaj Gönder
+                                </button>
+                                <button
+                                    onClick={() => { setSendModalPurpose('interview'); }}
+                                    className="px-8 py-4 rounded-[1.5rem] bg-electric text-white font-black text-xs uppercase tracking-widest hover:bg-electric-light transition-all shadow-xl shadow-electric/20 flex items-center justify-center gap-3"
+                                >
+                                    <Calendar className="w-5 h-5" /> Mülakat Planla
+                                </button>
+                                <button
+                                    onClick={() => window.open(candidate.cvUrl, '_blank')}
+                                    className="px-8 py-4 rounded-[1.5rem] bg-navy-900 border border-white/10 text-white font-black text-xs uppercase tracking-widest hover:bg-white/5 transition-all flex items-center justify-center gap-3"
+                                >
+                                    <Download className="w-5 h-5 text-navy-400" /> CV İndir
+                                </button>
+                            </div>
                         </div>
-                    </div>
-                    <div className="flex flex-wrap gap-3 w-full md:w-auto">
-                        <button
-                            onClick={() => setSendModalPurpose('general')}
-                            className="flex-1 md:flex-none px-6 py-3 rounded-2xl bg-white/[0.04] hover:bg-white/[0.08] text-white border border-white/[0.06] font-bold text-xs transition-all flex items-center justify-center gap-2 group"
-                        >
-                            <Mail className="w-4 h-4 text-navy-400 group-hover:text-white transition-colors" /> Mesaj Gönder
-                        </button>
-                        <button
-                            onClick={() => { setSendModalPurpose('interview'); }}
-                            className="flex-1 md:flex-none px-6 py-3 rounded-2xl bg-gradient-to-r from-electric to-blue-600 hover:from-electric-light hover:to-blue-500 text-white font-black text-xs shadow-xl shadow-electric/20 hover:shadow-electric/40 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 group"
-                        >
-                            <Calendar className="w-4 h-4 text-white group-hover:scale-110 transition-transform" /> Mülakat Planla
-                        </button>
                     </div>
                 </div>
 
@@ -241,17 +288,22 @@ export default function CandidateProcessPage() {
                     {/* LEFT PANEL (1/4) */}
                     <div className="lg:col-span-1 space-y-6">
                         {/* Status Timeline */}
-                        <div className="glass rounded-3xl p-6 border border-white/[0.06]">
-                            <h3 className="text-sm font-bold text-white mb-6 flex items-center gap-2 uppercase tracking-widest text-navy-400">
-                                <Activity className="w-4 h-4 text-emerald-400" /> Süreç Takibi
+                        <div className="glass rounded-[2rem] p-6 border border-white/[0.06] relative overflow-hidden group/process">
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl -z-10" />
+                            <h3 className="text-[10px] font-black text-navy-500 mb-6 uppercase tracking-[0.2em] flex items-center gap-2">
+                                <Activity className="w-3.5 h-3.5 text-emerald-400" /> Süreç Yol Haritası
                             </h3>
-                            <div className="relative pl-4 border-l-2 border-navy-800 space-y-6">
+                            <div className="relative pl-6 border-l-2 border-white/[0.04] space-y-8">
                                 {timeline.map((step, index) => (
-                                    <div key={index} className="relative group">
-                                        <span className={`absolute -left-[21px] top-1.5 w-3 h-3 rounded-full border-2 transition-all ${step.status === 'completed' ? 'bg-emerald-500 border-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.4)]' : step.status === 'upcoming' ? 'bg-navy-900 border-electric animate-pulse' : step.status === 'rejected' ? 'bg-red-500 border-red-500' : 'bg-navy-900 border-navy-700'}`} />
+                                    <div key={index} className="relative group/step">
+                                        <div className={`absolute -left-[33px] top-0 w-6 h-6 rounded-xl border-2 transition-all flex items-center justify-center z-10 ${step.status === 'completed' ? 'bg-navy-950 border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)]' : step.status === 'upcoming' ? 'bg-navy-950 border-electric animate-[pulse_2s_infinite]' : step.status === 'rejected' ? 'bg-navy-950 border-red-500' : 'bg-navy-950 border-navy-800'}`}>
+                                            {step.status === 'completed' ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> : <div className={`w-1.5 h-1.5 rounded-full ${step.status === 'upcoming' ? 'bg-electric' : 'bg-navy-800'}`} />}
+                                        </div>
                                         <div>
-                                            <h4 className={`text-xs font-bold ${step.status === 'completed' ? 'text-white' : step.status === 'upcoming' ? 'text-electric' : step.status === 'rejected' ? 'text-red-400' : 'text-navy-500'}`}>{step.title}</h4>
-                                            <p className="text-[10px] text-navy-500 mt-0.5">{step.date}</p>
+                                            <h4 className={`text-xs font-black uppercase tracking-wider ${step.status === 'completed' ? 'text-white' : step.status === 'upcoming' ? 'text-electric' : step.status === 'rejected' ? 'text-red-400' : 'text-navy-500'}`}>{step.title}</h4>
+                                            <p className="text-[10px] text-navy-500 font-bold mt-1.5 flex items-center gap-1.5">
+                                                <Clock className="w-3 h-3" /> {step.date}
+                                            </p>
                                         </div>
                                     </div>
                                 ))}
@@ -259,44 +311,41 @@ export default function CandidateProcessPage() {
                         </div>
 
                         {/* Contact & Social Links */}
-                        <div className="glass rounded-3xl p-6 border border-white/[0.06]">
-                            <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2 uppercase tracking-widest text-navy-400">
-                                <User className="w-4 h-4 text-blue-400" /> İletişim & Sosyal
+                        <div className="glass rounded-[2rem] p-6 border border-white/[0.06]">
+                            <h3 className="text-[10px] font-black text-navy-500 mb-4 uppercase tracking-[0.2em] flex items-center gap-2">
+                                <div className="w-1.5 h-1.5 rounded-full bg-blue-400" /> Kanallar
                             </h3>
                             <div className="space-y-3">
-                                <a href={`mailto:${candidate.email}`} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.06] transition-all group">
-                                    <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center group-hover:bg-red-500/20 transition-colors">
-                                        <Mail className="w-4 h-4 text-red-400" />
+                                <a href={`mailto:${candidate.email}`} className="flex items-center gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/[0.05] hover:border-white/10 transition-all group/mail">
+                                    <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center group-hover/mail:bg-red-500/20 transition-colors">
+                                        <Mail className="w-5 h-5 text-red-400" />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-[10px] text-navy-500 font-bold uppercase">E-Posta</p>
-                                        <p className="text-xs text-navy-200 truncate">{candidate.email || 'Email Yok'}</p>
+                                        <p className="text-[9px] text-navy-500 font-bold uppercase tracking-widest mb-0.5">E-Posta Adresi</p>
+                                        <p className="text-xs text-white font-semibold truncate">{candidate.email || '-'}</p>
                                     </div>
                                 </a>
-                                <a href={`tel:${candidate.phone}`} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.06] transition-all group">
-                                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center group-hover:bg-emerald-500/20 transition-colors">
-                                        <Phone className="w-4 h-4 text-emerald-400" />
+                                <a href={`tel:${candidate.phone}`} className="flex items-center gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/[0.05] hover:border-white/10 transition-all group/phone">
+                                    <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center group-hover/phone:bg-emerald-500/20 transition-colors">
+                                        <Phone className="w-5 h-5 text-emerald-400" />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-[10px] text-navy-500 font-bold uppercase">Telefon</p>
-                                        <p className="text-xs text-navy-200">{candidate.phone || 'Telefon Yok'}</p>
+                                        <p className="text-[9px] text-navy-500 font-bold uppercase tracking-widest mb-0.5">Telefon Hattı</p>
+                                        <p className="text-xs text-white font-semibold">{candidate.phone || '-'}</p>
                                     </div>
                                 </a>
                                 <div className="grid grid-cols-2 gap-3 pt-2">
                                     {(candidate.linkedinUrl || candidate.linkedin) && (
-                                        <a href={(candidate.linkedinUrl || candidate.linkedin).startsWith('http') ? (candidate.linkedinUrl || candidate.linkedin) : `https://${(candidate.linkedinUrl || candidate.linkedin)}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 p-3 rounded-xl bg-[#0077b5]/10 border border-[#0077b5]/20 hover:bg-[#0077b5]/20 text-[#0077b5] transition-all">
-                                            <Linkedin className="w-4 h-4" /> <span className="text-[10px] font-bold">LinkedIn</span>
+                                        <a href={(candidate.linkedinUrl || candidate.linkedin).startsWith('http') ? (candidate.linkedinUrl || candidate.linkedin) : `https://${(candidate.linkedinUrl || candidate.linkedin)}`} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-white/[0.02] border border-black/20 hover:bg-[#0077b5]/10 hover:border-[#0077b5]/30 transition-all group/li">
+                                            <Linkedin className="w-5 h-5 text-navy-400 group-hover/li:text-[#0077b5]" />
+                                            <span className="text-[10px] font-black text-navy-500 uppercase group-hover/li:text-white">LinkedIn</span>
                                         </a>
                                     )}
                                     {candidate.github && (
-                                        <a href={candidate.github.startsWith('http') ? candidate.github : `https://github.com/${candidate.github}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white transition-all">
-                                            <Github className="w-4 h-4" /> <span className="text-[10px] font-bold">GitHub</span>
+                                        <a href={candidate.github.startsWith('http') ? candidate.github : `https://github.com/${candidate.github}`} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-white/[0.02] border border-black/20 hover:bg-white/5 hover:border-white/20 transition-all group/gh">
+                                            <Github className="w-5 h-5 text-navy-400 group-hover/gh:text-white" />
+                                            <span className="text-[10px] font-black text-navy-500 uppercase group-hover/gh:text-white">GitHub</span>
                                         </a>
-                                    )}
-                                    {!candidate.github && (
-                                        <div className="flex items-center justify-center gap-2 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] text-navy-600 opacity-50">
-                                            <Globe className="w-4 h-4" /> <span className="text-[10px] font-bold">Portfolyo</span>
-                                        </div>
                                     )}
                                 </div>
                             </div>
@@ -326,37 +375,40 @@ export default function CandidateProcessPage() {
                             />
 
                             {/* Interview Section (Taşınan Alan) */}
-                            <div className="relative glass rounded-3xl p-6 border border-white/[0.08] flex flex-col h-full overflow-hidden">
-                                <div className="absolute top-0 right-0 w-64 h-64 bg-electric/10 rounded-full blur-[80px] -z-10 pointer-events-none" />
+                            {/* Interview Section (Taşınan Alan) */}
+                            <div className="relative glass rounded-[2.5rem] p-8 border border-white/[0.08] flex flex-col h-full overflow-hidden group/interview">
+                                <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-electric/5 rounded-full blur-[100px] -z-10 -translate-y-1/2 translate-x-1/2 group-hover/interview:bg-electric/10 transition-colors duration-700" />
 
-                                <div className="flex flex-col mb-6">
+                                <div className="flex flex-col mb-8">
                                     <div className="flex items-center justify-between">
-                                        <h3 className="text-xl font-black text-white flex items-center gap-3 tracking-tight">
-                                            <div className="w-8 h-8 rounded-lg bg-electric/10 flex items-center justify-center">
-                                                <MessageSquare className="w-4 h-4 text-electric" />
+                                        <h3 className="text-xl font-black text-white flex items-center gap-4 tracking-tight">
+                                            <div className="w-12 h-12 rounded-[1.25rem] bg-electric/10 flex items-center justify-center border border-electric/20">
+                                                <MessageSquare className="w-6 h-6 text-electric" />
                                             </div>
-                                            Mülakat Oturumu
+                                            Mülakat Paneli
                                         </h3>
-                                        <span className="text-[10px] font-bold text-electric bg-electric/10 px-2.5 py-1 rounded-full uppercase tracking-wider border border-electric/20">
-                                            {candidate.interviewSessions?.length || 0} Oturum
-                                        </span>
+                                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                            <span className="text-[10px] font-black text-white uppercase tracking-widest leading-none">
+                                                {candidate.interviewSessions?.length || 0} SEANS
+                                            </span>
+                                        </div>
                                     </div>
-                                    <p className="text-xs text-navy-400 mt-2 ml-11">Adayın mülakat geçmişi</p>
                                 </div>
 
                                 <div className="flex-1 flex flex-col min-h-0">
                                     {candidate.interviewSessions?.length > 0 ? (
-                                        <div className="flex-1 overflow-y-auto pr-2 mb-6 custom-scrollbar">
+                                        <div className="flex-1 overflow-y-auto pr-4 mb-8 custom-scrollbar">
                                             <InterviewHistory sessions={candidate.interviewSessions} />
                                         </div>
                                     ) : (
-                                        <div className="flex-1 flex flex-col items-center justify-center relative overflow-hidden text-center p-8 rounded-2xl mb-6 bg-gradient-to-b from-white/[0.02] to-transparent border border-white/[0.05] group">
-                                            <div className="absolute inset-0 bg-electric/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-xl"></div>
-                                            <div className="w-16 h-16 rounded-full bg-white/[0.02] border border-white/[0.05] flex items-center justify-center mb-4 relative z-10 group-hover:scale-110 transition-transform duration-500 shadow-xl shadow-black/20">
-                                                <MessageSquare className="w-8 h-8 text-electric/60 group-hover:text-electric transition-colors duration-500" />
+                                        <div className="flex-1 flex flex-col items-center justify-center text-center p-10 rounded-[2rem] mb-8 bg-white/[0.01] border border-white/[0.05] relative overflow-hidden group/empty">
+                                            <div className="absolute inset-0 bg-gradient-to-br from-electric/5 via-transparent to-transparent opacity-0 group-hover/empty:opacity-100 transition-opacity duration-700" />
+                                            <div className="w-20 h-20 rounded-[2rem] bg-navy-900 border border-white/5 flex items-center justify-center mb-6 relative z-10 shadow-2xl group-hover/empty:scale-110 transition-transform duration-500">
+                                                <MessageSquare className="w-10 h-10 text-navy-700 group-hover/empty:text-electric transition-colors" />
                                             </div>
-                                            <p className="text-sm font-semibold text-white mb-2 relative z-10">Kayıt Bulunamadı</p>
-                                            <p className="text-xs text-navy-400 relative z-10 max-w-[200px] leading-relaxed">Yeni bir değerlendirme süreci başlatmak için ilk mülakat oturumunu oluşturun.</p>
+                                            <p className="text-sm font-black text-white mb-2 relative z-10 uppercase tracking-widest">Oturum Başlatılmadı</p>
+                                            <p className="text-[11px] text-navy-500 relative z-10 max-w-[220px] leading-relaxed font-medium">Adayın mülakat performansını takip etmek için ilk oturumu şimdi açın.</p>
                                         </div>
                                     )}
                                 </div>
@@ -364,28 +416,36 @@ export default function CandidateProcessPage() {
                                 <div className="mt-auto">
                                     <button
                                         onClick={() => setShowInterviewModal(true)}
-                                        className="w-full py-3.5 rounded-2xl bg-white/5 hover:bg-white/10 text-white border border-white/10 font-bold text-sm transition-all duration-300 flex items-center justify-center gap-2 group"
+                                        className="w-full py-4.5 rounded-[1.5rem] bg-white/[0.03] hover:bg-white/[0.07] text-white border border-white/10 font-black text-xs uppercase tracking-[0.2em] transition-all duration-300 flex items-center justify-center gap-3 group/btn"
                                     >
-                                        <Activity className="w-5 h-5 text-emerald-400 group-hover:animate-pulse" /> Canlı Mülakat Notu Gir
+                                        <Activity className="w-5 h-5 text-emerald-400 group-hover/btn:scale-125 transition-transform" /> Canlı Mülakat Notu Gir
                                     </button>
                                 </div>
                             </div>
                         </div>
 
                         {/* CV View */}
-                        <div className="glass rounded-3xl p-6 border border-white/[0.06] flex flex-col">
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                                    <FileText className="w-5 h-5 text-purple-400" /> Orijinal Özgeçmiş (CV)
-                                </h3>
+                        <div className="glass rounded-[2.5rem] p-4 md:p-8 border border-white/[0.08] relative overflow-hidden">
+                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-purple-500/50 to-transparent" />
+                            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-[1.25rem] bg-purple-500/10 flex items-center justify-center border border-purple-500/20">
+                                        <FileText className="w-6 h-6 text-purple-400" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-black text-white tracking-tight">Orijinal Özgeçmiş</h3>
+                                        <p className="text-[10px] text-navy-500 font-bold uppercase tracking-widest mt-1">Belge Kayıt & Önizleme</p>
+                                    </div>
+                                </div>
                                 {candidate.cvUrl && (
-                                    <a href={candidate.cvUrl} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 rounded-xl bg-electric/10 text-electric-light text-xs font-bold border border-electric/20 hover:bg-electric/20 transition-all flex items-center gap-2">
-                                        <ExternalLink className="w-3.5 h-3.5" /> Tam Ekran Gör
+                                    <a href={candidate.cvUrl} target="_blank" rel="noopener noreferrer" className="px-6 py-3 rounded-2xl bg-white/5 hover:bg-white/10 text-white text-[10px] font-black uppercase tracking-widest border border-white/10 hover:border-purple-500/30 transition-all flex items-center gap-2">
+                                        <ExternalLink className="w-4 h-4" /> Tam Ekran
                                     </a>
                                 )}
                             </div>
 
-                            <div className="rounded-2xl overflow-hidden border border-white/10 bg-white/[0.01] h-[700px] w-full relative">
+                            <div className="rounded-[2rem] overflow-hidden border border-white/10 bg-black/40 h-[750px] w-full relative group/cv">
+                                <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-navy-950/40 to-transparent z-10 pointer-events-none opacity-0 group-hover/cv:opacity-100 transition-opacity" />
                                 {candidate.cvUrl ? (
                                     <iframe
                                         src={`${candidate.cvUrl}#toolbar=0`}

@@ -5,10 +5,12 @@ import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
 import { findBestPositionMatch } from '../services/matchService';
 import { analyzeCandidateMatch, quickCandidateScreening } from '../services/geminiService';
+import { useNotifications } from '../context/NotificationContext';
 
 export default function SystemScanner() {
     const { candidates, updateCandidate } = useCandidates();
     const { positions } = usePositions();
+    const { addNotification } = useNotifications();
 
     // UI State
     const [scanning, setScanning] = useState(false);
@@ -193,10 +195,21 @@ export default function SystemScanner() {
             setScanning(false);
             isScanningRef.current = false;
 
+            addNotification({
+                title: 'Sistem Taraması Tamamlandı',
+                message: `${candidates.length} aday tarandı, ${aiCount} AI analizi gerçekleştirildi.`,
+                type: 'success'
+            });
+
         } catch (err) {
             console.error("Scan Error:", err);
             setScanning(false);
             isScanningRef.current = false;
+            addNotification({
+                title: 'Tarama Hatası',
+                message: 'Sistem taraması sırasında bir hata oluştu.',
+                type: 'error'
+            });
         }
     };
 

@@ -5,10 +5,12 @@ import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
 import { calculateMatchScore } from '../services/matchService';
 import { analyzeCandidateMatch } from '../services/geminiService';
+import { useNotifications } from '../context/NotificationContext';
 
 
 export default function AddCandidateModal({ isOpen, onClose }) {
     const { addCandidate } = useCandidates();
+    const { addNotification } = useNotifications();
     const { positions } = usePositions();
     const openPositions = positions.filter(p => p.status === 'open');
     const [files, setFiles] = useState([]);
@@ -157,15 +159,15 @@ export default function AddCandidateModal({ isOpen, onClose }) {
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-navy-950/80 backdrop-blur-md" onClick={onClose} />
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={onClose} />
 
-            <div className="relative w-full max-w-2xl glass rounded-3xl overflow-hidden shadow-2xl border border-white/10 animate-in fade-in zoom-in duration-300">
-                <div className="p-6 border-b border-white/5 flex items-center justify-between">
+            <div className="relative w-full max-w-2xl bg-navy-900 rounded-3xl overflow-hidden shadow-2xl border border-border-subtle animate-in fade-in zoom-in duration-300">
+                <div className="p-6 border-b border-border-subtle flex items-center justify-between">
                     <div>
-                        <h2 className="text-xl font-bold text-white">Toplu Aday Ekle</h2>
-                        <p className="text-sm text-navy-400">Birden fazla PDF veya Word CV yükleyin.</p>
+                        <h2 className="text-xl font-bold text-text-primary">Toplu Aday Ekle</h2>
+                        <p className="text-sm text-text-muted">Birden fazla PDF veya Word CV yükleyin.</p>
                     </div>
-                    <button onClick={onClose} className="p-2 rounded-xl hover:bg-white/5 text-navy-400 transition-colors">
+                    <button onClick={onClose} className="p-2 rounded-xl hover:bg-navy-800/20 text-text-muted transition-colors">
                         <X className="w-5 h-5" />
                     </button>
                 </div>
@@ -176,7 +178,7 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                             <div
                                 onClick={() => fileInputRef.current?.click()}
                                 className={`group relative border-2 border-dashed rounded-3xl p-8 flex flex-col items-center justify-center gap-4 transition-all cursor-pointer
-                                    ${files.length > 0 ? 'border-electric/50 bg-electric/5' : 'border-white/10 hover:border-electric/30 hover:bg-white/[0.02]'}`}
+                                    ${files.length > 0 ? 'border-electric/50 bg-electric/5' : 'border-border-subtle hover:border-electric/30 hover:bg-navy-800/10'}`}
                             >
                                 <input
                                     type="file"
@@ -186,28 +188,28 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                                     multiple
                                     className="hidden"
                                 />
-                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${files.length > 0 ? 'bg-electric text-white' : 'bg-white/5 text-navy-400 group-hover:text-electric'}`}>
+                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${files.length > 0 ? 'bg-electric text-white' : 'bg-navy-800/20 text-text-muted group-hover:text-electric'}`}>
                                     {files.length > 0 ? <Files className="w-7 h-7" /> : <Upload className="w-7 h-7" />}
                                 </div>
                                 <div className="text-center">
-                                    <p className="text-white font-medium">{files.length > 0 ? `${files.length} Dosya Seçildi` : 'Dosyaları Seçin veya Sürükleyin'}</p>
-                                    <p className="text-xs text-navy-500 mt-1">PDF, DOCX (Max 30MB/Dosya)</p>
+                                    <p className="text-text-primary font-medium">{files.length > 0 ? `${files.length} Dosya Seçildi` : 'Dosyaları Seçin veya Sürükleyin'}</p>
+                                    <p className="text-xs text-text-muted mt-1">PDF, DOCX (Max 30MB/Dosya)</p>
                                 </div>
 
                             </div>
 
                             {files.length > 0 && (
                                 <div className="space-y-2">
-                                    <p className="text-xs font-bold text-navy-500 uppercase tracking-widest pl-1">Yüklenecek Dosyalar</p>
+                                    <p className="text-xs font-bold text-text-muted uppercase tracking-widest pl-1">Yüklenecek Dosyalar</p>
                                     <div className="grid grid-cols-1 gap-2">
                                         {files.map((f, idx) => (
-                                            <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5 group">
+                                            <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-navy-800/10 border border-border-subtle group">
                                                 <div className="flex items-center gap-3 overflow-hidden">
                                                     <FileText className="w-4 h-4 text-electric shrink-0" />
-                                                    <span className="text-sm text-navy-200 truncate">{f.name}</span>
-                                                    <span className="text-[10px] text-navy-500 shrink-0">({(f.size / 1024 / 1024).toFixed(2)} MB)</span>
+                                                    <span className="text-sm text-text-secondary truncate">{f.name}</span>
+                                                    <span className="text-[10px] text-text-muted shrink-0">({(f.size / 1024 / 1024).toFixed(2)} MB)</span>
                                                 </div>
-                                                <button onClick={(e) => { e.stopPropagation(); removeFile(idx); }} className="p-1.5 rounded-lg hover:bg-red-500/20 text-navy-500 hover:text-red-400 transition-all opacity-0 group-hover:opacity-100">
+                                                <button onClick={(e) => { e.stopPropagation(); removeFile(idx); }} className="p-1.5 rounded-lg hover:bg-red-500/20 text-text-muted hover:text-red-400 transition-all opacity-0 group-hover:opacity-100">
                                                     <Trash2 className="w-4 h-4" />
                                                 </button>
                                             </div>
@@ -244,18 +246,18 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                     ) : (
                         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                             <div className="space-y-3">
-                                <p className="text-xs font-bold text-navy-500 uppercase tracking-widest pl-1">Analiz Sonuçları</p>
+                                <p className="text-xs font-bold text-text-muted uppercase tracking-widest pl-1">Analiz Sonuçları</p>
                                 <div className="grid grid-cols-1 gap-3">
                                     {results.map((res, idx) => (
                                         <div key={idx} className={`p-4 rounded-2xl border transition-all ${res.success ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-red-500/5 border-red-500/20'}`}>
                                             <div className="flex items-center justify-between gap-4">
                                                 <div className="flex items-center gap-3 overflow-hidden">
-                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${res.success ? 'bg-emerald-500 text-navy-950' : 'bg-red-500 text-white'}`}>
+                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${res.success ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`}>
                                                         {res.success ? <Check className="w-5 h-5 stroke-[3]" /> : <X className="w-5 h-5" />}
                                                     </div>
                                                     <div className="overflow-hidden">
-                                                        <p className="text-sm font-bold text-white truncate">{res.success ? res.candidate.name : res.fileName}</p>
-                                                        <p className="text-xs text-navy-400 truncate">{res.success ? res.candidate.position : res.error}</p>
+                                                        <p className="text-sm font-bold text-text-primary truncate">{res.success ? res.candidate.name : res.fileName}</p>
+                                                        <p className="text-xs text-text-muted truncate">{res.success ? res.candidate.position : res.error}</p>
                                                     </div>
                                                 </div>
                                                 {res.success && (
@@ -267,7 +269,7 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                                                                 <span className="text-[10px] font-bold text-emerald-400">%{res.match.score} {res.match.title} Uyumu</span>
                                                             </div>
                                                         ) : (
-                                                            <span className="text-[10px] text-navy-500 italic">Uygun Pozisyon Bulunamadı</span>
+                                                            <span className="text-[10px] text-text-muted italic">Uygun Pozisyon Bulunamadı</span>
                                                         )}
                                                     </div>
 
@@ -281,7 +283,7 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                             <div className="flex gap-3 pt-2">
                                 <button
                                     onClick={() => setResults(null)}
-                                    className="flex-1 py-4 rounded-2xl bg-white/5 hover:bg-white/10 text-white font-bold transition-all border border-white/10"
+                                    className="flex-1 py-4 rounded-2xl bg-navy-800/10 hover:bg-navy-800/20 text-text-primary font-bold transition-all border border-border-subtle"
                                 >
                                     Geri Dön
                                 </button>

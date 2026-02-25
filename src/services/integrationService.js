@@ -102,4 +102,11 @@ export const createDirectCalendarEvent = async (userId, token, eventData) => {
         return { success: false, error: error.message };
     }
 };
-
+export const checkGmailMessages = async (token, query) => {
+    try {
+        const response = await fetch(`${import.meta.env.VITE_SERVER_URL || 'http://localhost:3001'}/api/google/check-messages?token=${token}&q=${encodeURIComponent(query)}`);
+        return await response.json();
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+};
