@@ -12,7 +12,9 @@ import {
     Zap,
     Briefcase,
     Shield,
-    LogOut
+    LogOut,
+    BookOpen,
+    Search
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -21,6 +23,7 @@ const NAV_ITEMS = [
     { id: 'positions', label: 'Pozisyonlar', icon: Briefcase },
     { id: 'analytics', label: 'Analitik', icon: BarChart3 },
     { id: 'candidate-process', label: 'Aday Görünümü', icon: Globe },
+    { id: 'guide', label: 'Kullanım Rehberi', icon: BookOpen },
 ];
 
 const BOTTOM_ITEMS = [

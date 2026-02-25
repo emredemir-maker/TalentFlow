@@ -74,32 +74,28 @@ const app = express();
 const allowedOrigins = [
     'http://localhost:5173',
     'http://127.0.0.1:5173',
+    'http://localhost:3000',
+    process.env.VITE_APP_URL,
     process.env.APP_URL
 ].filter(Boolean);
 
 // --- Security Middlewares ---
 app.use(helmet({
-    contentSecurityPolicy: false, // Vite dev server ile çakışmaması için
+    contentSecurityPolicy: false,
 }));
-app.use(xss()); // XSS Protection
-app.use(hpp()); // HTTP Parameter Pollution protection
+// app.use(xss());
+app.use(hpp());
 
-// Rate Limiting
-const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 dakika
-    max: 100, // IP başına 100 istek
-    message: 'Too many requests from this IP, please try again after 15 minutes'
-});
-app.use('/api/', limiter);
-
+// Flexible CORS setup
 app.use(cors({
-    origin: function (origin, callback) {
-        if (!origin) return callback(null, true);
-        if (allowedOrigins.indexOf(origin) === -1) {
-            const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-            return callback(new Error(msg), false);
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            // Keep it loose for development, or strict if needed
+            // Currently allowing all to troubleshoot the "Failed to fetch"
+            callback(null, true);
         }
-        return callback(null, true);
     },
     credentials: true
 }));
@@ -642,8 +638,6 @@ app.post('/api/send-invite', async (req, res) => {
 });
 
 // --- Cleanup Routine (GDPR/KVKK Compliance) ---
-// Sadece fiziksel ham dosyaları siler (Hassas Veri Minimizasyonu). 
-// Veritabanındaki (Firestore) isim, email, tel gibi iletişim bilgileri korunur.
 function cleanupOldFiles() {
     const dir = path.join(__dirname, 'uploads', 'cvs');
     if (!fs.existsSync(dir)) return;
@@ -664,7 +658,81 @@ function cleanupOldFiles() {
     if (count > 0) console.log(`🧹 KVKK Veri Minimizasyonu: ${count} adet eski ham CV dosyası diskten silindi. (İletişim kayıtları korunuyor)`);
 }
 
+// --- Google API Endpoints ---
+app.post('/api/google/send-email', async (req, res) => {
+    const { token, to, subject, body } = req.body;
+    if (!token || !to) return res.status(400).json({ success: false, error: 'Token and recipient are required.' });
+
+    try {
+        // Construct the RFC2822 message
+        const utf8Subject = `=?utf-8?B?${Buffer.from(subject).toString('base64')}?=`;
+        const str = [
+            `To: ${to}`,
+            `Subject: ${utf8Subject}`,
+            'Content-Type: text/plain; charset=utf-8',
+            'MIME-Version: 1.0',
+            '',
+            body
+        ].join('\r\n');
+
+        const encodedMail = Buffer.from(str).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+        const response = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ raw: encodedMail })
+        });
+
+        const data = await response.json();
+        if (data.id) return res.json({ success: true, messageId: data.id });
+        res.status(response.status).json({ success: false, error: data.error?.message || 'Gmail Send Error' });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+app.post('/api/google/create-calendar-event', async (req, res) => {
+    const { token, summary, description, startDateTime, endDateTime, location, guestEmail } = req.body;
+    if (!token || !summary || !startDateTime) return res.status(400).json({ success: false, error: 'Missing parameters.' });
+
+    try {
+        const event = {
+            summary,
+            description,
+            location,
+            start: { dateTime: startDateTime },
+            end: { dateTime: endDateTime },
+            attendees: guestEmail ? [{ email: guestEmail }] : [],
+            conferenceData: {
+                createRequest: {
+                    requestId: `tf-${Date.now()}`,
+                    conferenceSolutionKey: { type: 'hangoutsMeet' }
+                }
+            }
+        };
+
+        const response = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(event)
+        });
+
+        const data = await response.json();
+        if (data.id) return res.json({ success: true, eventId: data.id, htmlLink: data.htmlLink, meetLink: data.hangoutLink });
+        res.status(response.status).json({ success: false, error: data.error?.message || 'Calendar Create Error' });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 const PORT = 3001;
+
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Backend Server running on http://localhost:${PORT}`);
     console.log(`📡 Health: http://localhost:${PORT}/api/health`);

@@ -21,7 +21,8 @@ import {
     where,
     getDocs,
     serverTimestamp,
-    updateDoc
+    updateDoc,
+    onSnapshot
 } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../config/firebase';
 
@@ -40,93 +41,100 @@ export function AuthProvider({ children }) {
     const [error, setError] = useState(null);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            if (currentUser) {
-                try {
-                    // 1. Check if user exists in our users collection
-                    const userDoc = await getDoc(doc(db, USERS_PATH, currentUser.uid));
+        let unsubscribeProfile = null;
 
-                    if (userDoc.exists()) {
-                        const profileData = userDoc.data();
+        const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
+            if (currentUser) {
+                setUser(currentUser);
+
+                // Set up real-time listener for the user profile
+                const userDocRef = doc(db, USERS_PATH, currentUser.uid);
+
+                unsubscribeProfile = onSnapshot(userDocRef, (docSnap) => {
+                    if (docSnap.exists()) {
+                        const profileData = docSnap.data();
                         if (profileData.status === 'disabled') {
-                            await signOut(auth);
+                            signOut(auth);
                             setError('Hesabınız dondurulmuştur. Lütfen sistem yöneticisi ile iletişime geçin.');
                             setUser(null);
                             setUserProfile(null);
-                            setLoading(false);
                             return;
                         }
                         setUserProfile(profileData);
                     } else {
-                        const emailLower = currentUser.email.toLowerCase();
-                        const isPrimaryAdmin = INITIAL_SUPER_ADMINS.includes(emailLower);
-                        const allUsersSnap = await getDocs(query(collection(db, USERS_PATH)));
-                        const isFirstUser = allUsersSnap.empty;
-
-                        if (isPrimaryAdmin || isFirstUser) {
-                            const firstProfile = {
-                                uid: currentUser.uid,
-                                email: emailLower,
-                                displayName: currentUser.displayName || emailLower.split('@')[0],
-                                photoURL: currentUser.photoURL || '',
-                                role: 'super_admin',
-                                status: 'active',
-                                createdAt: serverTimestamp()
-                            };
-                            await setDoc(doc(db, USERS_PATH, currentUser.uid), firstProfile);
-                            setUserProfile(firstProfile);
-                        } else {
-                            // CHECK INVITATION for Google/Existing Login without profile
-                            const q = query(collection(db, INVITATIONS_PATH),
-                                where("email", "==", emailLower),
-                                where("status", "==", "pending")
-                            );
-                            const inviteSnap = await getDocs(q);
-
-                            if (!inviteSnap.empty) {
-                                const inviteDoc = inviteSnap.docs[0];
-                                const invitation = inviteDoc.data();
-
-                                const newProfile = {
-                                    uid: currentUser.uid,
-                                    email: emailLower,
-                                    displayName: currentUser.displayName || emailLower.split('@')[0],
-                                    photoURL: currentUser.photoURL || '',
-                                    role: invitation.role || 'recruiter',
-                                    status: 'active',
-                                    createdAt: serverTimestamp()
-                                };
-
-                                await setDoc(doc(db, USERS_PATH, currentUser.uid), newProfile);
-                                await updateDoc(doc(db, INVITATIONS_PATH, inviteDoc.id), {
-                                    status: 'accepted',
-                                    acceptedAt: serverTimestamp()
-                                });
-                                setUserProfile(newProfile);
-                            } else {
-                                // UNAUTHORIZED: Sign out immediately
-                                await signOut(auth);
-                                setError('Erişim yetkiniz bulunmuyor. Lütfen davet edildiğiniz e-posta adresi ile giriş yapın.');
-                                setUser(null);
-                                setUserProfile(null);
-                                setLoading(false);
-                                return;
-                            }
-                        }
+                        // Profile doesn't exist yet, handle initial creation logic if needed
+                        // (Keeping the logic from the previous implementation but making it more robust)
+                        handleInitialProfile(currentUser);
                     }
-                    setUser(currentUser);
-                } catch (err) {
-                    console.error("Auth Profile Error:", err);
-                    setError(err.message);
-                }
+                    setLoading(false);
+                }, (err) => {
+                    console.error("Profile Listener Error:", err);
+                    setLoading(false);
+                });
             } else {
                 setUser(null);
                 setUserProfile(null);
+                if (unsubscribeProfile) unsubscribeProfile();
+                setLoading(false);
             }
-            setLoading(false);
         });
 
-        return () => unsubscribe();
+        async function handleInitialProfile(currentUser) {
+            try {
+                const emailLower = currentUser.email.toLowerCase();
+                const isPrimaryAdmin = INITIAL_SUPER_ADMINS.includes(emailLower);
+                const allUsersSnap = await getDocs(query(collection(db, USERS_PATH)));
+                const isFirstUser = allUsersSnap.empty;
+
+                if (isPrimaryAdmin || isFirstUser) {
+                    const firstProfile = {
+                        uid: currentUser.uid,
+                        email: emailLower,
+                        displayName: currentUser.displayName || emailLower.split('@')[0],
+                        photoURL: currentUser.photoURL || '',
+                        role: 'super_admin',
+                        status: 'active',
+                        createdAt: serverTimestamp()
+                    };
+                    await setDoc(doc(db, USERS_PATH, currentUser.uid), firstProfile);
+                } else {
+                    const q = query(collection(db, INVITATIONS_PATH),
+                        where("email", "==", emailLower),
+                        where("status", "==", "pending")
+                    );
+                    const inviteSnap = await getDocs(q);
+
+                    if (!inviteSnap.empty) {
+                        const inviteDoc = inviteSnap.docs[0];
+                        const invitation = inviteDoc.data();
+                        const newProfile = {
+                            uid: currentUser.uid,
+                            email: emailLower,
+                            displayName: currentUser.displayName || emailLower.split('@')[0],
+                            photoURL: currentUser.photoURL || '',
+                            role: invitation.role || 'recruiter',
+                            status: 'active',
+                            createdAt: serverTimestamp()
+                        };
+                        await setDoc(doc(db, USERS_PATH, currentUser.uid), newProfile);
+                        await updateDoc(doc(db, INVITATIONS_PATH, inviteDoc.id), {
+                            status: 'accepted',
+                            acceptedAt: serverTimestamp()
+                        });
+                    } else {
+                        await signOut(auth);
+                        setError('Erişim yetkiniz bulunmuyor.');
+                    }
+                }
+            } catch (err) {
+                console.error("Initial Profile Creation Error:", err);
+            }
+        }
+
+        return () => {
+            unsubscribeAuth();
+            if (unsubscribeProfile) unsubscribeProfile();
+        };
     }, []);
 
     const loginWithGoogle = async () => {

@@ -35,19 +35,27 @@ export {
 };
 
 export async function parseCandidateFromText(text, modelId = 'gemini-2.0-flash') {
-    const model = await getModel(modelId);
-    const prompt = `Sen bir LinkedIn profil ayrıştırıcısısın. Aşağıdaki profil metninden aday bilgilerini çıkart.
+    const model = getModel(modelId);
+    const prompt = `Sen bir uzman İK Profil Ayrıştırıcısısın (CV Parser). Aşağıdaki profil metninden aday bilgilerini çıkart.
+
+ÇOK ÖNEMLİ KURALLAR (KVKK / GDPR UYGUNLUĞU İÇİN):
+Ad, iletişim bilgileri gibi kişisel nitelikli verileri sadece kendi alanlarında (name, email, phone, vb.) tut.
+'cvData' alanında ise adayın TÜM PROFESYONEL GEÇMİŞİNİ (iş tecrübeleri, görev tanımları, başarıları, eğitimleri, sertifikaları, yetenekleri) İSİM VE İLETİŞİM BİLGİSİNDEN ARINDIRILMIŞ ŞEKİLDE kelimesi kelimesine detaylıca yaz. (Bu veri, KVKK kapsamında adayın "gerçek" CV'si silindikten sonra bile AI skorlamasının doğru çalışması için detaylı teknik veri olarak saklanacaktır, asla kısa özet geçme, tüm tecrübeleri uzunca dök).
 
 Sadece şu JSON formatında dön (başka hiçbir şey yazma):
 {
   "name": "Ad Soyad",
-  "position": "Mevcut Pozisyon",
+  "email": "Adayın e-posta adresi",
+  "phone": "Adayın telefon numarası",
+  "linkedinUrl": "LinkedIn veya portfolyo URL'si",
+  "position": "Mevcut veya Hedeflenen Pozisyon",
   "company": "Mevcut Şirket",
   "location": "Şehir, Ülke",
   "skills": ["Yetenek1", "Yetenek2"],
-  "experience": <toplam_yıl_sayısı>,
+  "experience": <toplam_yıl_sayısı_integer_olarak>,
   "education": "Son Okul / Bölüm",
-  "summary": "Profesyonel özet (Türkçe, max 400 karakter)"
+  "summary": "Mülakatçı için kısa önizleme / uyarı özeti (Türkçe, max 400 karakter)",
+  "cvData": "Ad-soyad ve iletişim bilgilerinden arındırılmış, tüm iş geçmişinin, eğitimlerin ve yetkinliklerin DEV ve DETAYLI dökümü."
 }
 
 Eksik alanlar için null kullan.
@@ -89,8 +97,8 @@ function calculateHybridScore(data) {
     let score = 0;
     const exp = Number(data.totalYearsOfExperience || 0);
     score += Math.min(exp * 5, 30);
-    const matched = Array.isArray(data.matchedTechKeywords) ? data.matchedTechKeywords.length : 0;
-    const missing = Array.isArray(data.missingTechKeywords) ? data.missingTechKeywords.length : 0;
+    const matched = Array.isArray(data.matchedKeywords) ? data.matchedKeywords.length : 0;
+    const missing = Array.isArray(data.missingKeywords) ? data.missingKeywords.length : 0;
     const totalKeywords = (matched + missing) || 1;
     score += Math.round((matched / totalKeywords) * 40);
     return Math.min(score, 100);
@@ -108,9 +116,9 @@ export async function analyzeCandidateMatch(jobDescription, candidateProfile) {
         reasons: evidence.evidence.reasoning || [],
         summary: evidence.evidence.summary,
         agentReasoning: evidence.evidence.reasoning,
-        nextAction: evidence.extractedData.totalYearsOfExperience > 2 ? "schedule_technical_interview" : "send_rejection",
-        topSkills: (evidence.extractedData.matchedTechKeywords || []).map(s => ({ skill: s, relevance: "High" })),
-        gapAnalysis: (evidence.extractedData.missingTechKeywords || []).map(s => ({ gap: s, severity: "High", suggestion: "Eğitim önerilir" })),
+        nextAction: evidence.extractedData.totalYearsOfExperience >= 2 ? "schedule_interview" : "potential_review",
+        topSkills: (evidence.extractedData.matchedKeywords || []).map(s => ({ skill: s, relevance: "High" })),
+        gapAnalysis: (evidence.extractedData.missingKeywords || []).map(s => ({ gap: s, severity: "Medium", suggestion: "Eğitim veya oryantasyon önerilir" })),
         personalizedMessage: `Merhabalar ${candidateProfile.name}. Profilinizi inceledim. ${evidence.evidence.summary}`
     };
 }

@@ -288,148 +288,158 @@ export default function Dashboard() {
             </div>
 
             {/* ===== TOOLBAR ===== */}
-            <div className="px-6 lg:px-8 pb-4">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="px-6 lg:px-8 pb-4 relative z-10">
+                <div className="glass rounded-2xl p-4 border border-white/[0.08] shadow-lg shadow-black/20 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 relative overflow-hidden">
+                    <div className="absolute top-0 right-1/4 w-96 h-96 bg-electric/5 rounded-full blur-[100px] -z-10 pointer-events-none" />
+
                     {/* Left: Selection + Filters */}
-                    <div className="flex items-center gap-4 flex-wrap">
+                    <div className="flex items-center gap-4 flex-wrap w-full lg:w-auto">
                         {/* Select All Checkbox */}
                         <div
                             onClick={handleSelectAll}
-                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.08] transition-all cursor-pointer group"
+                            className={`flex items-center gap-3 px-4 py-2 rounded-xl border transition-all cursor-pointer group shadow-sm ${selectedIds.size === sortedCandidates.length && sortedCandidates.length > 0
+                                ? 'bg-electric/20 border-electric/40 shadow-[0_0_15px_rgba(59,130,246,0.15)]'
+                                : 'bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06] hover:border-white/[0.1]'}`}
                         >
-                            <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${selectedIds.size === sortedCandidates.length && sortedCandidates.length > 0
+                            <div className={`w-4 h-4 rounded-md border flex items-center justify-center transition-all ${selectedIds.size === sortedCandidates.length && sortedCandidates.length > 0
                                 ? 'bg-electric border-electric text-white'
-                                : 'bg-white/10 border-white/20'}`}>
+                                : 'bg-navy-800 border-white/20 group-hover:border-white/40'}`}>
                                 {selectedIds.size === sortedCandidates.length && sortedCandidates.length > 0 && (
-                                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                    <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
                                 )}
                             </div>
-                            <span className="text-[12px] font-bold text-navy-300 group-hover:text-white transition-colors">Tümünü Seç</span>
+                            <span className={`text-[13px] font-bold transition-colors ${selectedIds.size === sortedCandidates.length && sortedCandidates.length > 0 ? "text-white" : "text-navy-300 group-hover:text-white"}`}>Tümünü Seç</span>
                         </div>
 
-                        <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-1.5 text-navy-500 mr-1">
-                                <Filter className="w-4 h-4" />
-                                <span className="text-[12px] font-semibold uppercase tracking-wider hidden sm:inline">Filtreler</span>
+                        <div className="hidden sm:flex items-center gap-1 text-navy-500 mr-2 ml-2">
+                            <span className="w-px h-6 bg-white/[0.06]"></span>
+                        </div>
+
+                        <div className="flex items-center gap-3 flex-wrap">
+                            <div className="relative group">
+                                <select
+                                    value={departmentFilter}
+                                    onChange={(e) => setDepartmentFilter(e.target.value)}
+                                    className="px-4 py-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] hover:border-white/[0.1] text-[13px] font-medium text-white outline-none focus:border-electric/50 focus:bg-electric/5 transition-all cursor-pointer appearance-none pr-9 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_10px_center] shadow-sm"
+                                    id="department-filter"
+                                >
+                                    {departments.map((d) => (
+                                        <option key={d} value={d}>{d === 'all' ? 'Tüm Departmanlar' : d}</option>
+                                    ))}
+                                </select>
                             </div>
 
-                            <select
-                                value={departmentFilter}
-                                onChange={(e) => setDepartmentFilter(e.target.value)}
-                                className="px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-[12px] text-navy-300 outline-none focus:border-electric/40 transition-all cursor-pointer appearance-none pr-7 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_6px_center]"
-                                id="department-filter"
-                            >
-                                {departments.map((d) => (
-                                    <option key={d} value={d}>{d === 'all' ? 'Tüm Departmanlar' : d}</option>
-                                ))}
-                            </select>
+                            <div className="relative group">
+                                <select
+                                    value={positionFilter}
+                                    onChange={(e) => setPositionFilter(e.target.value)}
+                                    className="px-4 py-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] hover:border-white/[0.1] text-[13px] font-medium text-white outline-none focus:border-electric/50 focus:bg-electric/5 transition-all cursor-pointer appearance-none pr-9 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_10px_center] shadow-sm"
+                                    id="position-filter"
+                                >
+                                    {matchPositions.map((p) => (
+                                        <option key={p} value={p}>{p === 'all' ? 'Tüm Pozisyonlar' : p}</option>
+                                    ))}
+                                </select>
+                            </div>
 
-                            <select
-                                value={positionFilter}
-                                onChange={(e) => setPositionFilter(e.target.value)}
-                                className="px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-[12px] text-navy-300 outline-none focus:border-electric/40 transition-all cursor-pointer appearance-none pr-7 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_6px_center]"
-                                id="position-filter"
-                            >
-                                {matchPositions.map((p) => (
-                                    <option key={p} value={p}>{p === 'all' ? 'Tüm Pozisyonlar' : p}</option>
-                                ))}
-                            </select>
+                            <div className="relative group">
+                                <select
+                                    value={statusFilter}
+                                    onChange={(e) => setStatusFilter(e.target.value)}
+                                    className="px-4 py-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] hover:border-white/[0.1] text-[13px] font-medium text-white outline-none focus:border-electric/50 focus:bg-electric/5 transition-all cursor-pointer appearance-none pr-9 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_10px_center] shadow-sm"
+                                    id="status-filter"
+                                >
+                                    {STATUS_OPTIONS.map((o) => (
+                                        <option key={o.value} value={o.value}>{o.label}</option>
+                                    ))}
+                                </select>
+                            </div>
 
-                            <select
-                                value={statusFilter}
-                                onChange={(e) => setStatusFilter(e.target.value)}
-                                className="px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-[12px] text-navy-300 outline-none focus:border-electric/40 transition-all cursor-pointer appearance-none pr-7 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_6px_center]"
-                                id="status-filter"
-                            >
-                                {STATUS_OPTIONS.map((o) => (
-                                    <option key={o.value} value={o.value}>{o.label}</option>
-                                ))}
-                            </select>
-
-                            <select
-                                value={experienceFilter}
-                                onChange={(e) => setExperienceFilter(e.target.value)}
-                                className="px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-[12px] text-navy-300 outline-none focus:border-electric/40 transition-all cursor-pointer appearance-none pr-7 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_6px_center]"
-                                id="experience-filter"
-                            >
-                                {EXPERIENCE_OPTIONS.map((o) => (
-                                    <option key={o.value} value={o.value}>{o.label}</option>
-                                ))}
-                            </select>
+                            <div className="relative group">
+                                <select
+                                    value={experienceFilter}
+                                    onChange={(e) => setExperienceFilter(e.target.value)}
+                                    className="px-4 py-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] hover:border-white/[0.1] text-[13px] font-medium text-white outline-none focus:border-electric/50 focus:bg-electric/5 transition-all cursor-pointer appearance-none pr-9 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_10px_center] shadow-sm"
+                                    id="experience-filter"
+                                >
+                                    {EXPERIENCE_OPTIONS.map((o) => (
+                                        <option key={o.value} value={o.value}>{o.label}</option>
+                                    ))}
+                                </select>
+                            </div>
                         </div>
                     </div>
 
                     {/* Right: Actions/Count */}
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center justify-between lg:justify-end w-full lg:w-auto gap-4">
                         {selectedIds.size > 0 ? (
-                            <div className="flex items-center gap-3 animate-in fade-in slide-in-from-right-4 duration-300">
-                                <span className="text-sm font-medium text-navy-200">
-                                    {selectedIds.size} seçildi
+                            <div className="flex items-center gap-3 animate-in fade-in slide-in-from-right-4 duration-300 w-full lg:w-auto">
+                                <span className="text-sm font-bold text-white bg-white/10 px-3 py-1.5 rounded-lg border border-white/10">
+                                    {selectedIds.size} Seçili
                                 </span>
                                 <button
                                     onClick={handleBulkAnalyze}
                                     disabled={isAnalyzing || isDeleting}
-                                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-electric/10 hover:bg-electric/20 text-electric-light text-[13px] font-bold border border-electric/20 transition-all"
+                                    className="flex-1 lg:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-electric to-blue-600 hover:from-electric-light hover:to-electric text-white text-[13px] font-bold shadow-[0_0_15px_rgba(59,130,246,0.3)] hover:shadow-[0_0_25px_rgba(59,130,246,0.5)] transform hover:-translate-y-0.5 active:translate-y-0 transition-all cursor-pointer"
                                 >
-                                    {isAnalyzing ? 'Analiz Ediliyor...' : 'Detaylı Determinik Skorla'}
+                                    <Sparkles className="w-4 h-4" />
+                                    {isAnalyzing ? 'Analiz Ediliyor...' : 'Detaylı Olarak Skorla'}
                                 </button>
                                 <button
                                     onClick={handleBulkDelete}
                                     disabled={isDeleting || isAnalyzing}
-                                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 text-[13px] font-bold border border-red-500/20 transition-all"
+                                    className="flex items-center justify-center gap-2 p-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 hover:border-red-500/40 transition-all cursor-pointer"
+                                    title="Seçilenleri Sil"
                                 >
-                                    {isDeleting ? 'Siliniyor...' : 'Seçilenleri Sil'}
+                                    <XCircle className="w-5 h-5" />
                                 </button>
                                 <button
                                     onClick={() => setSelectedIds(new Set())}
-                                    className="p-2 rounded-lg hover:bg-white/5 text-navy-400 hover:text-white transition-colors"
+                                    className="p-2.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] text-navy-400 hover:text-white border border-white/[0.06] transition-all cursor-pointer"
                                     title="Seçimi Temizle"
                                 >
-                                    <XCircle className="w-4 h-4" />
+                                    Kapat
                                 </button>
                             </div>
                         ) : (
-                            <>
-                                <button
-                                    onClick={() => setIsAddModalOpen(true)}
-                                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-electric/10 hover:bg-electric/20 text-electric-light text-[13px] font-bold border border-electric/20 transition-all cursor-pointer whitespace-nowrap"
-                                >
-                                    <Plus className="w-4 h-4" />
-                                    <span>Aday Ekle</span>
-                                </button>
-
-                                {/* View Mode Toggle */}
-                                <div className="hidden lg:flex items-center gap-1 bg-white/[0.03] rounded-lg p-0.5 border border-white/[0.06]">
-                                    {[
-                                        { id: 'card', icon: LayoutGrid, label: 'Kart' },
-                                        { id: 'kanban', icon: Columns3, label: 'Kanban' },
-                                        { id: 'list', icon: List, label: 'Liste' },
-                                    ].map(v => (
-                                        <button key={v.id} onClick={() => setViewMode(v.id)} title={v.label}
-                                            className={`p-1.5 rounded-md transition-all ${viewMode === v.id ? 'bg-electric/20 text-electric-light' : 'text-navy-500 hover:text-navy-200'}`}>
-                                            <v.icon className="w-4 h-4" />
-                                        </button>
-                                    ))}
+                            <div className="flex items-center gap-4 w-full lg:w-auto justify-between lg:justify-end">
+                                {/* Mobile search inside toolbar space on small screens */}
+                                <div className="sm:hidden relative flex-1 mr-2">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-navy-500 pointer-events-none" />
+                                    <input
+                                        type="text"
+                                        placeholder="Ara..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        className="w-full pl-9 pr-3 py-2 rounded-xl bg-white/[0.04] border border-white/[0.06] text-sm text-navy-200 placeholder:text-navy-500 outline-none focus:border-electric/40 focus:bg-white/[0.06] transition-all"
+                                    />
                                 </div>
+                                <div className="flex items-center gap-4">
+                                    {/* View Mode Toggle */}
+                                    <div className="hidden lg:flex items-center gap-1 bg-navy-900/50 rounded-xl p-1 border border-white/[0.08] shadow-inner">
+                                        {[
+                                            { id: 'card', icon: LayoutGrid, label: 'Kılavuz' },
+                                            { id: 'kanban', icon: Columns3, label: 'Kanban' },
+                                            { id: 'list', icon: List, label: 'Liste' },
+                                        ].map(v => (
+                                            <button key={v.id} onClick={() => setViewMode(v.id)} title={v.label}
+                                                className={`p-2 rounded-lg transition-all duration-200 ${viewMode === v.id ? 'bg-electric text-white shadow-md' : 'text-navy-400 hover:text-white hover:bg-white/5'}`}>
+                                                <v.icon className="w-4 h-4" />
+                                            </button>
+                                        ))}
+                                    </div>
 
-                                <span className="text-[12px] text-navy-500 font-medium whitespace-nowrap">
-                                    {sortedCandidates.length} / {stats.total} aday
-                                </span>
-                            </>
+                                    <button
+                                        onClick={() => setIsAddModalOpen(true)}
+                                        className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-white text-navy-950 hover:bg-navy-100 text-[13px] font-black tracking-wide shadow-[0_0_15px_rgba(255,255,255,0.1)] hover:shadow-[0_0_25px_rgba(255,255,255,0.2)] transform hover:-translate-y-0.5 active:translate-y-0 transition-all cursor-pointer whitespace-nowrap"
+                                    >
+                                        <Plus className="w-4 h-4" />
+                                        <span>Aday Ekle</span>
+                                    </button>
+                                </div>
+                            </div>
                         )}
                     </div>
-                </div>
-
-                {/* Mobile search */}
-                <div className="sm:hidden mt-3 relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-navy-500 pointer-events-none" />
-                    <input
-                        type="text"
-                        placeholder="Ara..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.06] text-sm text-navy-200 placeholder:text-navy-500 outline-none focus:border-electric/40 transition-all"
-                    />
                 </div>
             </div>
 
@@ -471,16 +481,17 @@ export default function Dashboard() {
 
                 {/* Empty state */}
                 {!loading && sortedCandidates.length === 0 && (
-                    <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
-                        <div className="w-20 h-20 rounded-full bg-white/[0.03] border border-white/[0.06] flex items-center justify-center">
-                            <Users className="w-8 h-8 text-navy-500" style={{ animation: 'float-subtle 3s ease-in-out infinite' }} />
+                    <div className="flex flex-col items-center justify-center py-20 gap-4 text-center glass rounded-3xl border border-white/[0.05] relative overflow-hidden group">
+                        <div className="absolute inset-0 bg-electric/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-2xl"></div>
+                        <div className="w-20 h-20 rounded-full bg-white/[0.02] border border-white/[0.05] flex items-center justify-center relative z-10 group-hover:scale-110 transition-transform duration-500 shadow-xl shadow-black/20">
+                            <Users className="w-8 h-8 text-navy-500 group-hover:text-electric transition-colors duration-500" style={{ animation: 'float-subtle 3s ease-in-out infinite' }} />
                         </div>
-                        <h3 className="text-lg font-bold text-navy-300">
+                        <h3 className="text-xl font-bold text-white relative z-10">
                             {searchQuery || departmentFilter !== 'all' || statusFilter !== 'all' || statFilter
                                 ? 'Sonuç Bulunamadı'
                                 : 'Henüz Aday Yok'}
                         </h3>
-                        <p className="text-sm text-navy-500 max-w-sm">
+                        <p className="text-sm text-navy-400 max-w-sm relative z-10">
                             {searchQuery || departmentFilter !== 'all' || statusFilter !== 'all' || statFilter
                                 ? 'Filtreleri değiştirerek tekrar deneyin.'
                                 : 'Aday havuzunuz boş. Yeni bir aday ekleyerek başlayabilirsiniz.'}
@@ -518,13 +529,13 @@ export default function Dashboard() {
                             const colCandidates = sortedCandidates.filter(c => (c.status || 'ai_analysis') === col.key);
                             return (
                                 <div key={col.key}
-                                    className={`min-w-[240px] flex-1 flex flex-col rounded-2xl transition-all duration-200 ${draggedId ? 'bg-white/[0.01]' : ''
+                                    className={`min-w-[260px] flex-1 flex flex-col rounded-3xl p-2 transition-all duration-300 border border-transparent ${draggedId ? 'bg-white/[0.01]' : ''
                                         }`}
-                                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('ring-2', 'ring-electric/40', 'bg-electric/5'); }}
-                                    onDragLeave={(e) => { e.currentTarget.classList.remove('ring-2', 'ring-electric/40', 'bg-electric/5'); }}
+                                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-electric/30', 'bg-electric/5', 'shadow-[0_0_20px_rgba(59,130,246,0.1)]'); }}
+                                    onDragLeave={(e) => { e.currentTarget.classList.remove('border-electric/30', 'bg-electric/5', 'shadow-[0_0_20px_rgba(59,130,246,0.1)]'); }}
                                     onDrop={async (e) => {
                                         e.preventDefault();
-                                        e.currentTarget.classList.remove('ring-2', 'ring-electric/40', 'bg-electric/5');
+                                        e.currentTarget.classList.remove('border-electric/30', 'bg-electric/5', 'shadow-[0_0_20px_rgba(59,130,246,0.1)]');
                                         const cid = e.dataTransfer.getData('candidateId');
                                         if (cid) {
                                             const cand = sortedCandidates.find(c => c.id === cid);
@@ -537,14 +548,14 @@ export default function Dashboard() {
                                         setDraggedId(null);
                                     }}
                                 >
-                                    <div className="flex items-center gap-2 px-3 py-2.5 mb-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-                                        <span className={`w-2.5 h-2.5 rounded-full ${col.dot}`} />
-                                        <span className="text-xs font-bold text-navy-200 flex-1">{col.label}</span>
-                                        <span className="text-[10px] font-bold text-navy-500 bg-white/5 px-1.5 py-0.5 rounded">{colCandidates.length}</span>
+                                    <div className="flex items-center gap-2 px-4 py-3 mb-3 rounded-2xl bg-white/[0.03] border border-white/[0.05] shadow-sm backdrop-blur-md">
+                                        <span className={`w-3 h-3 rounded-full shadow-lg ${col.dot}`} />
+                                        <span className="text-sm font-bold text-white flex-1 tracking-wide">{col.label}</span>
+                                        <span className="text-[11px] font-black text-navy-400 bg-navy-900 border border-white/5 px-2 py-1 rounded-lg">{colCandidates.length}</span>
                                     </div>
-                                    <div className="flex-1 space-y-2 min-h-[120px] max-h-[65vh] overflow-y-auto pr-1 scrollbar-hide">
+                                    <div className="flex-1 space-y-3 min-h-[120px] max-h-[65vh] overflow-y-auto pr-1 flex flex-col custom-scrollbar pb-2">
                                         {colCandidates.length === 0 && (
-                                            <div className="text-center py-8 text-navy-600 text-[10px] border-2 border-dashed border-white/[0.04] rounded-xl">
+                                            <div className="text-center py-10 flex flex-col items-center justify-center text-navy-500 text-xs border-2 border-dashed border-white/[0.04] rounded-2xl h-full mt-2 mx-1">
                                                 Buraya sürükleyin
                                             </div>
                                         )}
@@ -557,30 +568,30 @@ export default function Dashboard() {
                                                 }}
                                                 onDragEnd={() => setDraggedId(null)}
                                                 onClick={() => setSelectedCandidate(c)}
-                                                className={`p-3 rounded-xl border transition-all cursor-grab active:cursor-grabbing group ${draggedId === c.id
-                                                    ? 'opacity-40 border-electric/30 bg-electric/5 scale-95'
-                                                    : 'bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.05] hover:border-electric/30'
+                                                className={`p-4 rounded-2xl border transition-all duration-300 cursor-grab active:cursor-grabbing group shadow-sm bg-gradient-to-br from-white/[0.02] to-transparent ${draggedId === c.id
+                                                    ? 'opacity-40 border-electric/30 bg-electric/10 scale-95 shadow-none'
+                                                    : 'border-white/[0.06] hover:bg-white/[0.04] hover:border-electric/30 hover:shadow-[0_8px_20px_rgba(0,0,0,0.2)]'
                                                     }`}>
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-[10px] font-bold text-white">
+                                                <div className="flex items-center gap-3 mb-3">
+                                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-[11px] font-bold text-white shadow-md shrink-0">
                                                         {c.name?.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                                                     </div>
                                                     <div className="flex-1 min-w-0">
-                                                        <p className="text-xs font-bold text-white truncate group-hover:text-electric-light transition-colors">{c.name}</p>
-                                                        <p className="text-[10px] text-navy-500 truncate">{c.position}</p>
+                                                        <p className="text-sm font-bold text-white truncate group-hover:text-electric-light transition-colors">{c.name}</p>
+                                                        <p className="text-[11px] text-navy-400 truncate">{c.position}</p>
                                                     </div>
                                                     {c.bestScore > 0 && (
-                                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${c.bestScore >= 70 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-navy-500/20 text-navy-400'}`}>
+                                                        <span className={`text-[10px] font-black px-2 py-1 rounded-md border ${c.bestScore >= 70 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-navy-500/10 text-navy-300 border-navy-500/20'}`}>
                                                             %{Math.round(c.bestScore)}
                                                         </span>
                                                     )}
                                                 </div>
                                                 {c.skills?.length > 0 && (
-                                                    <div className="flex flex-wrap gap-1">
+                                                    <div className="flex flex-wrap gap-1.5 mt-2">
                                                         {c.skills.slice(0, 2).map(s => (
-                                                            <span key={s} className="text-[9px] text-navy-400 bg-white/[0.04] px-1.5 py-0.5 rounded">{s}</span>
+                                                            <span key={s} className="text-[10px] font-medium text-navy-300 bg-white/[0.03] px-2 py-0.5 rounded-md border border-white/[0.05]">{s}</span>
                                                         ))}
-                                                        {c.skills.length > 2 && <span className="text-[9px] text-navy-600">+{c.skills.length - 2}</span>}
+                                                        {c.skills.length > 2 && <span className="text-[10px] font-medium text-navy-500 bg-white/[0.01] px-1.5 py-0.5 rounded-md">+{c.skills.length - 2}</span>}
                                                     </div>
                                                 )}
                                             </div>
@@ -594,52 +605,58 @@ export default function Dashboard() {
 
                 {/* ===== VIEW: LIST ===== */}
                 {!loading && sortedCandidates.length > 0 && viewMode === 'list' && (
-                    <div className="glass rounded-2xl border border-white/[0.06] overflow-hidden">
+                    <div className="bg-white/[0.01] rounded-3xl border border-white/[0.05] overflow-hidden shadow-2xl">
                         {/* Table Header */}
-                        <div className="grid grid-cols-[1fr_180px_120px_100px_80px_60px] gap-4 px-5 py-3 border-b border-white/[0.06] bg-white/[0.01]">
-                            <span className="text-[10px] font-bold text-navy-500 uppercase tracking-wider">Aday</span>
-                            <span className="text-[10px] font-bold text-navy-500 uppercase tracking-wider">Pozisyon</span>
-                            <span className="text-[10px] font-bold text-navy-500 uppercase tracking-wider">Durum</span>
-                            <span className="text-[10px] font-bold text-navy-500 uppercase tracking-wider">Deneyim</span>
-                            <span className="text-[10px] font-bold text-navy-500 uppercase tracking-wider">Skor</span>
-                            <span className="text-[10px] font-bold text-navy-500 uppercase tracking-wider"></span>
+                        <div className="grid grid-cols-[1fr_200px_140px_100px_80px_60px] gap-6 px-6 py-4 border-b border-white/[0.05] bg-white/[0.02]">
+                            <span className="text-[11px] font-black text-navy-400 uppercase tracking-widest">Aday</span>
+                            <span className="text-[11px] font-black text-navy-400 uppercase tracking-widest">Pozisyon</span>
+                            <span className="text-[11px] font-black text-navy-400 uppercase tracking-widest">Durum</span>
+                            <span className="text-[11px] font-black text-navy-400 uppercase tracking-widest">Deneyim</span>
+                            <span className="text-[11px] font-black text-navy-400 uppercase tracking-widest">Skor</span>
+                            <span className="text-[11px] font-black text-navy-400 uppercase tracking-widest"></span>
                         </div>
                         {/* Table Rows */}
-                        {sortedCandidates.map((c, i) => {
-                            const statusCfg = {
-                                ai_analysis: { l: 'AI Analiz', cls: 'bg-violet-500/10 text-violet-400' },
-                                review: { l: 'İnceleme', cls: 'bg-amber-500/10 text-amber-400' },
-                                interview: { l: 'Mülakat', cls: 'bg-blue-500/10 text-blue-400' },
-                                offer: { l: 'Teklif', cls: 'bg-cyan-500/10 text-cyan-400' },
-                                hired: { l: 'İşe Alındı', cls: 'bg-emerald-500/10 text-emerald-400' },
-                                rejected: { l: 'Red', cls: 'bg-red-500/10 text-red-400' },
-                            };
-                            const st = statusCfg[c.status] || statusCfg.ai_analysis;
-                            return (
-                                <div key={c.id} onClick={() => setSelectedCandidate(c)}
-                                    className={`grid grid-cols-[1fr_180px_120px_100px_80px_60px] gap-4 px-5 py-3 items-center cursor-pointer transition-all hover:bg-white/[0.04] ${i < sortedCandidates.length - 1 ? 'border-b border-white/[0.04]' : ''}`}>
-                                    <div className="flex items-center gap-3 min-w-0">
-                                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-[10px] font-bold text-white shrink-0">
-                                            {c.name?.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                        <div className="divide-y divide-white/[0.03]">
+                            {sortedCandidates.map((c, i) => {
+                                const statusCfg = {
+                                    ai_analysis: { l: 'AI Analiz', cls: 'bg-violet-500/10 text-violet-400 border-violet-500/20' },
+                                    review: { l: 'İnceleme', cls: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
+                                    interview: { l: 'Mülakat', cls: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
+                                    offer: { l: 'Teklif', cls: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20' },
+                                    hired: { l: 'İşe Alındı', cls: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' },
+                                    rejected: { l: 'Red', cls: 'bg-red-500/10 text-red-400 border-red-500/20' },
+                                };
+                                const st = statusCfg[c.status] || statusCfg.ai_analysis;
+                                return (
+                                    <div key={c.id} onClick={() => setSelectedCandidate(c)}
+                                        className="grid grid-cols-[1fr_200px_140px_100px_80px_60px] gap-6 px-6 py-4 items-center cursor-pointer transition-all hover:bg-white/[0.03] hover:px-7 duration-300 group">
+                                        <div className="flex items-center gap-4 min-w-0">
+                                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-xs font-bold text-white shrink-0 shadow-md">
+                                                {c.name?.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="text-[15px] font-bold text-white truncate group-hover:text-electric-light transition-colors">{c.name}</p>
+                                                <p className="text-[11px] text-navy-400 truncate">{c.email}</p>
+                                            </div>
                                         </div>
                                         <div className="min-w-0">
-                                            <p className="text-sm font-bold text-white truncate">{c.name}</p>
-                                            <p className="text-[10px] text-navy-500 truncate">{c.email}</p>
+                                            <p className="text-[13px] font-bold text-navy-200 truncate">{c.matchedPositionTitle || c.position}</p>
+                                            <p className="text-[11px] text-navy-500 truncate">{c.department}</p>
+                                        </div>
+                                        <div>
+                                            <span className={`inline-flex items-center justify-center px-3 py-1 rounded-md text-[11px] font-bold border ${st.cls}`}>{st.l}</span>
+                                        </div>
+                                        <span className="text-[13px] font-medium text-navy-300">{c.experience || 0} yıl</span>
+                                        <span className={`text-[15px] font-extrabold ${c.bestScore >= 70 ? 'text-emerald-400' : c.bestScore >= 40 ? 'text-amber-400' : 'text-navy-400'}`}>
+                                            {c.bestScore > 0 ? `%${Math.round(c.bestScore)}` : '-'}
+                                        </span>
+                                        <div className="w-8 h-8 rounded-full bg-white/[0.02] flex items-center justify-center group-hover:bg-electric/10 group-hover:text-electric transition-all ml-auto">
+                                            <ArrowUpRight className="w-4 h-4 text-navy-500 group-hover:text-electric" />
                                         </div>
                                     </div>
-                                    <div className="min-w-0">
-                                        <p className="text-xs text-navy-200 truncate">{c.matchedPositionTitle || c.position}</p>
-                                        <p className="text-[10px] text-navy-500 truncate">{c.department}</p>
-                                    </div>
-                                    <span className={`inline-flex items-center justify-center px-2 py-1 rounded-md text-[10px] font-bold ${st.cls}`}>{st.l}</span>
-                                    <span className="text-xs text-navy-300">{c.experience || 0} yıl</span>
-                                    <span className={`text-sm font-bold ${c.bestScore >= 70 ? 'text-emerald-400' : c.bestScore >= 40 ? 'text-amber-400' : 'text-navy-400'}`}>
-                                        {c.bestScore > 0 ? `%${Math.round(c.bestScore)}` : '-'}
-                                    </span>
-                                    <ArrowUpRight className="w-4 h-4 text-navy-600 group-hover:text-electric" />
-                                </div>
-                            );
-                        })}
+                                );
+                            })}
+                        </div>
                     </div>
                 )}
             </div>
@@ -661,10 +678,12 @@ export default function Dashboard() {
             {/* ===== BULK ANALYSIS MODAL ===== */}
             {isAnalyzing && createPortal(
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
-                    <div className="bg-navy-900 border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col relative mx-auto my-auto">
-                        <div className="p-6 border-b border-white/5 flex justify-between items-center bg-navy-800/50">
+                    <div className="bg-navy-900/90 border border-white/[0.08] backdrop-blur-2xl rounded-3xl w-full max-w-lg shadow-[0_40px_80px_-20px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col relative mx-auto my-auto ring-1 ring-white/10">
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-electric/20 rounded-full blur-[80px] -z-10 pointer-events-none" />
+
+                        <div className="p-6 border-b border-white/[0.04] flex justify-between items-center bg-white/[0.01]">
                             <div>
-                                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                                <h2 className="text-xl font-black text-white flex items-center gap-3">
                                     {analyzeProgress < 100 ? (
                                         <>
                                             <span className="relative flex h-3 w-3">
@@ -675,45 +694,53 @@ export default function Dashboard() {
                                         </>
                                     ) : (
                                         <>
-                                            <CheckCircle className="w-5 h-5 text-emerald-400" />
+                                            <CheckCircle className="w-6 h-6 text-emerald-400" />
                                             Analiz Tamamlandı
                                         </>
                                     )}
                                 </h2>
-                                <p className="text-xs text-navy-400 mt-1">
+                                <p className="text-[13px] text-navy-400 mt-2 font-medium">
                                     {analyzeProgress < 100 ? 'Yapay zeka tüm pozisyonlar için 0 sapma ile kesin skoru hesaplıyor.' : 'Aday skorları başarıyla güncellendi.'}
                                 </p>
                             </div>
                         </div>
 
-                        <div className="h-1 bg-navy-950 w-full">
+                        <div className="h-1.5 bg-navy-950 w-full relative">
                             <div
-                                className="h-full bg-gradient-to-r from-electric to-emerald-400 transition-all duration-300 ease-out"
+                                className="absolute inset-0 bg-electric/20 blur shadow-[0_0_10px_rgba(59,130,246,0.5)]"
+                                style={{ width: `${analyzeProgress}%` }}
+                            />
+                            <div
+                                className="h-full bg-gradient-to-r from-electric to-emerald-400 transition-all duration-300 ease-out relative z-10"
                                 style={{ width: `${analyzeProgress}%` }}
                             />
                         </div>
 
-                        <div className="p-8 flex flex-col items-center justify-center min-h-[250px] relative">
+                        <div className="p-8 flex flex-col items-center justify-center min-h-[300px] relative">
                             {analyzeProgress < 100 && analyzeCurrentCandidate ? (
-                                <div className="flex flex-col items-center animate-in zoom-in-95 duration-300">
-                                    <div className="w-20 h-20 rounded-full bg-navy-800 border-4 border-navy-700 flex items-center justify-center mb-4 relative">
-                                        <span className="text-2xl font-bold text-white">{analyzeCurrentCandidate.name?.[0]}</span>
-                                        <div className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-navy-900 border border-white/10 flex items-center justify-center shadow-lg">
-                                            {analyzeCurrentStage === 'scout' && <Eye className="w-4 h-4 text-blue-400 animate-pulse" />}
-                                            {analyzeCurrentStage === 'analyst' && <Brain className="w-4 h-4 text-purple-400 animate-pulse" />}
-                                            {analyzeCurrentStage === 'recruiter' && <Database className="w-4 h-4 text-emerald-400 animate-pulse" />}
+                                <div className="flex flex-col items-center animate-in zoom-in-95 duration-500 w-full">
+                                    <div className="w-24 h-24 rounded-full bg-navy-800/80 border-[4px] border-white/10 flex items-center justify-center mb-6 relative shadow-[0_0_30px_rgba(0,0,0,0.3)] backdrop-blur-sm">
+                                        <span className="text-3xl font-black text-white">{analyzeCurrentCandidate.name?.[0]}</span>
+                                        <div className="absolute -bottom-2 -right-2 w-10 h-10 rounded-full bg-navy-900 border-2 border-white/10 flex items-center justify-center shadow-xl">
+                                            {analyzeCurrentStage === 'scout' && <Eye className="w-5 h-5 text-blue-400 animate-pulse drop-shadow-[0_0_8px_rgba(96,165,250,0.8)]" />}
+                                            {analyzeCurrentStage === 'analyst' && <Brain className="w-5 h-5 text-purple-400 animate-pulse drop-shadow-[0_0_8px_rgba(192,132,252,0.8)]" />}
+                                            {analyzeCurrentStage === 'recruiter' && <Database className="w-5 h-5 text-emerald-400 animate-pulse drop-shadow-[0_0_8px_rgba(52,211,153,0.8)]" />}
                                         </div>
                                     </div>
 
-                                    <h3 className="text-xl font-bold text-white mb-1">{analyzeCurrentCandidate.name}</h3>
-                                    <p className="text-sm text-navy-400 mb-6 text-center">
-                                        Mevcut Pozisyon: {analyzeCurrentCandidate.position || '-'}
+                                    <h3 className="text-2xl font-black text-white mb-2 tracking-tight">{analyzeCurrentCandidate.name}</h3>
+                                    <p className="text-[13px] font-bold text-navy-400 mb-8 text-center px-4 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.05]">
+                                        Mevcut Pozisyon: <span className="text-white ml-2">{analyzeCurrentCandidate.position || '-'}</span>
                                     </p>
 
-                                    <div className="flex flex-col items-center gap-3 w-full">
-                                        <div className="flex items-center gap-3 px-4 py-2 rounded-full bg-white/5 border border-white/10 self-center">
-                                            <Loader2 className="w-4 h-4 animate-spin text-electric" />
-                                            <span className="text-sm font-medium text-electric-light uppercase tracking-wide">
+                                    <div className="flex flex-col items-center w-full">
+                                        <div className={`flex items-center gap-3 px-6 py-3 rounded-xl border self-center shadow-lg transition-all duration-500
+                                            ${analyzeCurrentStage === 'scout' ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' :
+                                                analyzeCurrentStage === 'analyst' ? 'bg-purple-500/10 border-purple-500/20 text-purple-400' :
+                                                    'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'}
+                                        `}>
+                                            <Loader2 className="w-5 h-5 animate-spin" />
+                                            <span className="text-sm font-bold uppercase tracking-wider">
                                                 {analyzeCurrentStage === 'scout' && 'Aday Özgeçmişi Taranıyor...'}
                                                 {analyzeCurrentStage === 'analyst' && `Pozisyon Analizi (${analyzePosCurrent}/${analyzePosTotal})`}
                                                 {analyzeCurrentStage === 'recruiter' && 'Sonuçlar Kaydediliyor...'}
@@ -722,13 +749,13 @@ export default function Dashboard() {
                                     </div>
                                 </div>
                             ) : (
-                                <div className="text-center animate-in fade-in slide-in-from-bottom-4">
-                                    <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
-                                        <CheckCircle className="w-8 h-8 text-emerald-400" />
+                                <div className="text-center animate-in zoom-in-95 duration-500">
+                                    <div className="w-20 h-20 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-6 shadow-[0_0_30px_rgba(52,211,153,0.2)]">
+                                        <CheckCircle className="w-10 h-10 text-emerald-400" />
                                     </div>
-                                    <h3 className="text-2xl font-bold text-white mb-2">İşlem Tamamlandı</h3>
-                                    <p className="text-navy-400 mb-8 max-w-sm">
-                                        {analyzeTotal} adayın detaylı skorlama analizi başarıyla tamamlandı.
+                                    <h3 className="text-3xl font-black text-white mb-3 tracking-tight">İşlem Tamamlandı</h3>
+                                    <p className="text-navy-300 mb-8 max-w-sm text-sm leading-relaxed">
+                                        Seçili <strong className="text-white">{analyzeTotal}</strong> adayın detaylı skorlama analizi yapay zeka tarafından başarıyla gerçekleştirildi.
                                     </p>
                                 </div>
                             )}

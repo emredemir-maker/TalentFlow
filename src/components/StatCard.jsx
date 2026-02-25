@@ -5,14 +5,15 @@ export default function StatCard({ icon: Icon, iconColor = 'text-electric', bgCo
     return (
         <div
             onClick={onClick}
-            className={`glass rounded-2xl p-5 transition-all duration-300 group
-                ${onClick ? 'cursor-pointer' : ''}
+            className={`relative rounded-3xl p-6 overflow-hidden transition-all duration-500 group
+                ${onClick ? 'cursor-pointer hover:-translate-y-1' : ''}
                 ${isActive
-                    ? 'bg-electric/10 border-2 border-electric/40 shadow-[0_0_20px_rgba(59,130,246,0.15)] scale-[1.02]'
-                    : 'hover:bg-white/[0.04] border-2 border-transparent'
+                    ? 'bg-gradient-to-br from-electric/20 to-electric/5 border border-electric/40 shadow-[0_0_30px_rgba(59,130,246,0.15)] scale-[1.02]'
+                    : 'bg-white/[0.02] hover:bg-white/[0.04] border border-white/[0.06] hover:border-white/[0.12] shadow-lg shadow-black/10'
                 }
             `}
         >
+            <div className={`absolute top-0 right-0 w-32 h-32 rounded-full blur-[50px] transition-opacity duration-500 -z-10 ${isActive ? 'bg-electric/20 opacity-100' : 'bg-white/5 opacity-0 group-hover:opacity-100'}`} />
             <div className="flex items-center justify-between mb-3">
                 <div className={`w-10 h-10 rounded-xl ${isActive ? 'bg-electric/20' : bgColor} flex items-center justify-center transition-all`}>
                     <Icon className={`w-5 h-5 ${isActive ? 'text-electric-light' : iconColor}`} />
@@ -26,10 +27,10 @@ export default function StatCard({ icon: Icon, iconColor = 'text-electric', bgCo
                     </span>
                 )}
             </div>
-            <div className={`text-2xl font-extrabold tracking-tight mb-0.5 transition-colors ${isActive ? 'text-electric-light' : 'text-white'}`}>
+            <div className={`text-3xl font-black tracking-tight mb-1 transition-colors ${isActive ? 'text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]' : 'text-white'}`}>
                 {value}
             </div>
-            <div className={`text-[12px] font-medium transition-colors ${isActive ? 'text-electric-light/80' : 'text-navy-400'}`}>
+            <div className={`text-xs font-bold uppercase tracking-wider transition-colors ${isActive ? 'text-electric-light' : 'text-navy-400'}`}>
                 {label}
             </div>
         </div>

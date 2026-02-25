@@ -20,6 +20,15 @@ const INTERVIEW_TYPES = [
     { id: 'product', label: 'Product Mindset', icon: Box, color: 'violet-500', desc: 'Ürün bakışı, strateji, metrikler, kullanıcı odaklılık' },
 ];
 
+const COMPETENCY_MODES = [
+    { id: 'technical', label: 'Teknik Derinlik', icon: Code, color: 'electric' },
+    { id: 'stress', label: 'Stres Yönetimi', icon: AlertTriangle, color: 'red-400' },
+    { id: 'team', label: 'Ekip Uyumu', icon: Users, color: 'emerald-400' },
+    { id: 'growth', label: 'Gelişim Odaklılık', icon: TrendingUp, color: 'amber-400' },
+    { id: 'problem', label: 'Problem Çözme', icon: Target, color: 'blue-400' },
+    { id: 'leadership', label: 'Sahiplenme', icon: Award, color: 'purple-400' },
+];
+
 const PATH_ICON_MAP = { code: Code, users: Users, target: Target, zap: Zap, box: Box };
 
 export default function InterviewSessionModal({ candidate, onClose, onSessionSaved }) {
@@ -113,19 +122,21 @@ export default function InterviewSessionModal({ candidate, onClose, onSessionSav
         finally { setIsLoading(false); setLoadingAction(''); }
     };
 
-    // ===== 4. New CV-based question =====
-    const handleNewQuestion = async () => {
+    // ===== 4. New CV-based question (can be generic or category-specific) =====
+    const handleNewQuestion = async (category = null) => {
         saveCurrentAnswer();
         setIsLoading(true);
-        setLoadingAction('new');
+        setLoadingAction(category ? `cat-${category.id}` : 'new');
         try {
             const history = getAnsweredHistory();
-            const newQ = await generateFollowUpQuestion(candidate, interviewType, history, 'new');
+            const mode = category ? 'category' : 'new';
+            const newQ = await generateFollowUpQuestion(candidate, interviewType, history, mode, category?.label);
+
             const newEntry = {
                 id: conversation.length + 1,
                 question: newQ.question,
                 answer: '',
-                category: newQ.category || 'Yeni Konu',
+                category: category?.label || newQ.category || 'Yeni Konu',
                 evaluationHint: newQ.evaluationHint,
                 isFollowUp: false,
                 depth: 0
@@ -404,6 +415,34 @@ export default function InterviewSessionModal({ candidate, onClose, onSessionSav
                                             )}
                                         </div>
 
+                                        {/* COMPETENCY MODES SECTION */}
+                                        <div className="space-y-3 p-5 rounded-2xl bg-white/[0.02] border border-white/[0.05]">
+                                            <div className="flex items-center justify-between">
+                                                <h4 className="text-[10px] font-black text-navy-400 uppercase tracking-widest">Yetkinlik Odaklı Soru Sor</h4>
+                                                <Sparkles className="w-3 h-3 text-electric animate-pulse" />
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-2">
+                                                {COMPETENCY_MODES.map(mode => (
+                                                    <button
+                                                        key={mode.id}
+                                                        disabled={isLoading}
+                                                        onClick={() => handleNewQuestion(mode)}
+                                                        className={`flex items-center gap-2 p-2 rounded-xl border border-white/5 hover:border-${mode.color}/30 bg-white/[0.02] hover:bg-${mode.color}/5 transition-all text-left disabled:opacity-30 group relative overflow-hidden`}
+                                                    >
+                                                        <div className={`w-7 h-7 rounded-lg bg-${mode.color}/10 flex items-center justify-center shrink-0`}>
+                                                            <mode.icon className={`w-3.5 h-3.5 text-${mode.color}`} />
+                                                        </div>
+                                                        <span className="text-[10px] font-bold text-navy-300 group-hover:text-white truncate transition-colors">{mode.label}</span>
+                                                        {isLoading && loadingAction === `cat-${mode.id}` && (
+                                                            <div className="absolute inset-0 bg-navy-900/80 flex items-center justify-center">
+                                                                <Loader2 className="w-3.5 h-3.5 text-white animate-spin" />
+                                                            </div>
+                                                        )}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
                                         {/* Actions */}
                                         <div className="grid grid-cols-3 gap-3">
                                             <button onClick={handleDeepen} disabled={isLoading || !currentQ.answer?.trim()}
@@ -411,7 +450,7 @@ export default function InterviewSessionModal({ candidate, onClose, onSessionSav
                                                 {isLoading && loadingAction === 'deepen' ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowDown className="w-4 h-4" />}
                                                 Derinleş
                                             </button>
-                                            <button onClick={handleNewQuestion} disabled={isLoading}
+                                            <button onClick={() => handleNewQuestion()} disabled={isLoading}
                                                 className="py-3 rounded-xl bg-electric/10 border border-electric/20 text-electric-light hover:bg-electric/20 text-[11px] font-bold transition-all disabled:opacity-30 flex flex-col items-center gap-1.5">
                                                 {isLoading && loadingAction === 'new' ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlusCircle className="w-4 h-4" />}
                                                 Yeni Soru (CV)

@@ -2,7 +2,7 @@
 import { getModel } from './config.js';
 
 const EXTRACTOR_PROMPT = `
-Sen kıdemli ve son derece analitik bir IT İşe Alım Yöneticisisin. Görevin, adayı derinlemesine analiz etmek.
+Sen kıdemli ve son derece analitik bir İşe Alım Yöneticisisin. Görevin, adayı derinlemesine analiz etmek.
 
 ÇOK ÖNEMLİ KURALLAR:
 1. STAR Analizi: Her kategori (S, T, A, R) için 1-10 arası puan ver. 
@@ -14,8 +14,8 @@ Sen kıdemli ve son derece analitik bir IT İşe Alım Yöneticisisin. Görevin,
 {
   "extractedData": {
     "totalYearsOfExperience": <integer>,
-    "matchedTechKeywords": ["tech1"],
-    "missingTechKeywords": ["tech2"],
+    "matchedKeywords": ["keyword1"],
+    "missingKeywords": ["keyword2"],
     "starAnalysis": {
         "Situation": { "score": <integer>, "reason": "..." },
         "Task": { "score": <integer>, "reason": "..." },
@@ -37,6 +37,7 @@ export async function extractCandidateEvidence(jobDescription, candidateProfile)
         experience: candidateProfile.experience,
         skills: candidateProfile.skills,
         description: candidateProfile.description || candidateProfile.about || '',
+        cvData: candidateProfile.cvData || '', // Fallback to cvData to prevent AI performance loss if the raw CV is deleted
         experiences: candidateProfile.experiences || []
     };
 
@@ -77,6 +78,7 @@ export async function quickCandidateScreening(candidateProfile, openPositions) {
         experience: candidateProfile.experience,
         skills: candidateProfile.skills,
         description: candidateProfile.description || candidateProfile.about || '',
+        cvData: candidateProfile.cvData || '', // Essential for AI scoring after GDPR raw CV deletion
     };
 
     const positionsText = openPositions.map(p => `- ${p.title}: ${p.requirements?.join(', ')}`).join('\n');

@@ -17,8 +17,7 @@ import PositionsPage from './pages/PositionsPage';
 import SuperAdminPage from './pages/SuperAdminPage';
 import LoginPage from './pages/LoginPage';
 import AnalyticsPage from './pages/AnalyticsPage';
-import ScraperPage from './pages/ScraperPage';
-import AIMatchPage from './pages/AIMatchPage';
+import GuidePage from './pages/GuidePage';
 
 function AppContent() {
   const { loading, error, isAuthenticated, loginWithGoogle } = useAuth();
@@ -57,16 +56,14 @@ function AppContent() {
         return <MessagesPage />;
       case 'analytics':
         return <AnalyticsPage />;
-      case 'scraper':
-        return <ScraperPage />;
-      case 'ai-match':
-        return <AIMatchPage />;
       case 'candidate-process':
         return <CandidateProcessPage />;
       case 'positions':
         return <PositionsPage />;
       case 'super-admin':
         return <SuperAdminPage />;
+      case 'guide':
+        return <GuidePage />;
       default:
         return <Dashboard />;
     }

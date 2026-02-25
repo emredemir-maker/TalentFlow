@@ -50,10 +50,11 @@ export default function CandidateCard({ candidate, index = 0, onClick, isSelecte
             role="button"
             tabIndex={0}
             onKeyDown={(e) => e.key === 'Enter' && onClick?.(candidate)}
-            className={`group glass gradient-border rounded-2xl p-5 cursor-pointer transition-all duration-300 relative
-            ${isSelected ? 'bg-electric/5 border-electric/30 ring-1 ring-electric/30' : 'hover:bg-white/[0.04] hover:shadow-[0_8px_32px_rgba(59,130,246,0.08)]'}
-            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-electric/30`}
+            className={`group rounded-3xl p-6 cursor-pointer transition-all duration-300 relative overflow-hidden backdrop-blur-xl border flex flex-col
+            ${isSelected ? 'bg-gradient-to-br from-electric/10 to-transparent border-electric/40 shadow-[0_0_25px_rgba(59,130,246,0.15)] ring-1 ring-electric/30 scale-[1.01]' : 'bg-white/[0.01] hover:bg-white/[0.03] border-white/[0.06] hover:border-white/[0.15] hover:shadow-2xl hover:shadow-black/20 hover:-translate-y-1'}
+            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-electric/30 h-full`}
         >
+            <div className={`absolute top-0 right-0 w-40 h-40 bg-electric/10 rounded-full blur-[60px] -z-10 transition-opacity duration-300 pointer-events-none ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} />
             {/* Selection Checkbox */}
             <div className={`absolute top-4 right-4 z-10 selection-checkbox ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'} transition-opacity`}>
                 <div
@@ -269,11 +270,11 @@ export default function CandidateCard({ candidate, index = 0, onClick, isSelecte
             )}
 
             {/* Footer */}
-            <div className="flex items-center justify-between pt-3 border-t border-white/[0.06]">
-                <span className="text-[12px] text-navy-500 font-medium">{candidate.salary}</span>
-                <div className="flex items-center gap-1 text-[12px] text-electric-light opacity-0 group-hover:opacity-100 transition-opacity">
-                    <span className="font-medium">Detaylar</span>
-                    <ArrowUpRight className="w-3.5 h-3.5" />
+            <div className="flex items-center justify-between pt-4 border-t border-white/[0.06] mt-auto">
+                <span className="text-[12px] font-bold text-navy-400">{candidate.salary}</span>
+                <div className="flex items-center gap-1 text-[12px] text-electric opacity-0 group-hover:opacity-100 transition-all transform group-hover:translate-x-1">
+                    <span className="font-extrabold uppercase tracking-wide">Detayları Gör</span>
+                    <ArrowUpRight className="w-4 h-4" />
                 </div>
             </div>
         </div>

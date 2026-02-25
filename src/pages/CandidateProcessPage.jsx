@@ -221,12 +221,18 @@ export default function CandidateProcessPage() {
                             </div>
                         </div>
                     </div>
-                    <div className="flex gap-3 w-full md:w-auto">
-                        <button onClick={() => setSendModalPurpose('general')} className="flex-1 md:flex-none px-5 py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-white border border-white/[0.06] font-semibold text-sm transition-all flex items-center justify-center gap-2">
-                            <Mail className="w-4 h-4" /> Mesaj Gönder
+                    <div className="flex flex-wrap gap-3 w-full md:w-auto">
+                        <button
+                            onClick={() => setSendModalPurpose('general')}
+                            className="flex-1 md:flex-none px-6 py-3 rounded-2xl bg-white/[0.04] hover:bg-white/[0.08] text-white border border-white/[0.06] font-bold text-xs transition-all flex items-center justify-center gap-2 group"
+                        >
+                            <Mail className="w-4 h-4 text-navy-400 group-hover:text-white transition-colors" /> Mesaj Gönder
                         </button>
-                        <button onClick={() => { updateCandidate(candidate.id, { status: 'interview' }); setSendModalPurpose('interview'); }} className="flex-1 md:flex-none px-5 py-2.5 rounded-xl bg-electric hover:bg-electric-light text-white font-bold text-sm shadow-lg shadow-electric/20 transition-all flex items-center justify-center gap-2">
-                            <Calendar className="w-4 h-4" /> Randevu Planla
+                        <button
+                            onClick={() => { setSendModalPurpose('interview'); }}
+                            className="flex-1 md:flex-none px-6 py-3 rounded-2xl bg-gradient-to-r from-electric to-blue-600 hover:from-electric-light hover:to-blue-500 text-white font-black text-xs shadow-xl shadow-electric/20 hover:shadow-electric/40 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 group"
+                        >
+                            <Calendar className="w-4 h-4 text-white group-hover:scale-110 transition-transform" /> Mülakat Planla
                         </button>
                     </div>
                 </div>
@@ -277,8 +283,8 @@ export default function CandidateProcessPage() {
                                     </div>
                                 </a>
                                 <div className="grid grid-cols-2 gap-3 pt-2">
-                                    {candidate.linkedin && (
-                                        <a href={candidate.linkedin.startsWith('http') ? candidate.linkedin : `https://${candidate.linkedin}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 p-3 rounded-xl bg-[#0077b5]/10 border border-[#0077b5]/20 hover:bg-[#0077b5]/20 text-[#0077b5] transition-all">
+                                    {(candidate.linkedinUrl || candidate.linkedin) && (
+                                        <a href={(candidate.linkedinUrl || candidate.linkedin).startsWith('http') ? (candidate.linkedinUrl || candidate.linkedin) : `https://${(candidate.linkedinUrl || candidate.linkedin)}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 p-3 rounded-xl bg-[#0077b5]/10 border border-[#0077b5]/20 hover:bg-[#0077b5]/20 text-[#0077b5] transition-all">
                                             <Linkedin className="w-4 h-4" /> <span className="text-[10px] font-bold">LinkedIn</span>
                                         </a>
                                     )}
@@ -320,33 +326,49 @@ export default function CandidateProcessPage() {
                             />
 
                             {/* Interview Section (Taşınan Alan) */}
-                            <div className="glass rounded-3xl p-6 border border-white/[0.06] flex flex-col justify-between">
-                                <div className="flex items-center justify-between mb-4">
-                                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                                        <MessageSquare className="w-5 h-5 text-electric" /> Mülakat Oturumu
-                                    </h3>
-                                    <span className="text-[10px] font-bold text-navy-500 bg-white/5 px-2 py-1 rounded capitalize">
-                                        {candidate.interviewSessions?.length || 0} Oturum
-                                    </span>
+                            <div className="relative glass rounded-3xl p-6 border border-white/[0.08] flex flex-col h-full overflow-hidden">
+                                <div className="absolute top-0 right-0 w-64 h-64 bg-electric/10 rounded-full blur-[80px] -z-10 pointer-events-none" />
+
+                                <div className="flex flex-col mb-6">
+                                    <div className="flex items-center justify-between">
+                                        <h3 className="text-xl font-black text-white flex items-center gap-3 tracking-tight">
+                                            <div className="w-8 h-8 rounded-lg bg-electric/10 flex items-center justify-center">
+                                                <MessageSquare className="w-4 h-4 text-electric" />
+                                            </div>
+                                            Mülakat Oturumu
+                                        </h3>
+                                        <span className="text-[10px] font-bold text-electric bg-electric/10 px-2.5 py-1 rounded-full uppercase tracking-wider border border-electric/20">
+                                            {candidate.interviewSessions?.length || 0} Oturum
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-navy-400 mt-2 ml-11">Adayın mülakat geçmişi</p>
                                 </div>
 
-                                {candidate.interviewSessions?.length > 0 ? (
-                                    <div className="flex-1 overflow-y-auto max-h-[180px] mb-4 pr-1">
-                                        <InterviewHistory sessions={candidate.interviewSessions} />
-                                    </div>
-                                ) : (
-                                    <div className="flex-1 flex flex-col items-center justify-center text-center p-4 border border-dashed border-white/10 rounded-2xl mb-4 bg-white/[0.01]">
-                                        <MessageSquare className="w-8 h-8 text-navy-700 mb-2" />
-                                        <p className="text-xs text-navy-500">Henüz mülakat oturumu gerçekleştirilmedi.</p>
-                                    </div>
-                                )}
+                                <div className="flex-1 flex flex-col min-h-0">
+                                    {candidate.interviewSessions?.length > 0 ? (
+                                        <div className="flex-1 overflow-y-auto pr-2 mb-6 custom-scrollbar">
+                                            <InterviewHistory sessions={candidate.interviewSessions} />
+                                        </div>
+                                    ) : (
+                                        <div className="flex-1 flex flex-col items-center justify-center relative overflow-hidden text-center p-8 rounded-2xl mb-6 bg-gradient-to-b from-white/[0.02] to-transparent border border-white/[0.05] group">
+                                            <div className="absolute inset-0 bg-electric/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-xl"></div>
+                                            <div className="w-16 h-16 rounded-full bg-white/[0.02] border border-white/[0.05] flex items-center justify-center mb-4 relative z-10 group-hover:scale-110 transition-transform duration-500 shadow-xl shadow-black/20">
+                                                <MessageSquare className="w-8 h-8 text-electric/60 group-hover:text-electric transition-colors duration-500" />
+                                            </div>
+                                            <p className="text-sm font-semibold text-white mb-2 relative z-10">Kayıt Bulunamadı</p>
+                                            <p className="text-xs text-navy-400 relative z-10 max-w-[200px] leading-relaxed">Yeni bir değerlendirme süreci başlatmak için ilk mülakat oturumunu oluşturun.</p>
+                                        </div>
+                                    )}
+                                </div>
 
-                                <button
-                                    onClick={() => setShowInterviewModal(true)}
-                                    className="w-full py-3 rounded-2xl bg-electric hover:bg-electric-light text-white font-bold text-sm shadow-lg shadow-electric/20 transition-all flex items-center justify-center gap-2"
-                                >
-                                    <Activity className="w-4 h-4" /> Yeni Mülakat Başlat
-                                </button>
+                                <div className="mt-auto">
+                                    <button
+                                        onClick={() => setShowInterviewModal(true)}
+                                        className="w-full py-3.5 rounded-2xl bg-white/5 hover:bg-white/10 text-white border border-white/10 font-bold text-sm transition-all duration-300 flex items-center justify-center gap-2 group"
+                                    >
+                                        <Activity className="w-5 h-5 text-emerald-400 group-hover:animate-pulse" /> Canlı Mülakat Notu Gir
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
@@ -386,11 +408,24 @@ export default function CandidateProcessPage() {
                                                 Adayın <b>{candidate.email}</b> e-posta adresi ve AI tarafından ayrıştırılmış profil verileri korunmaktadır.
                                             </p>
                                         </div>
-                                        <div className="pt-6 w-full max-w-md text-left bg-white/[0.02] p-6 rounded-2xl border border-white/[0.04]">
-                                            <p className="text-[10px] text-navy-500 font-bold uppercase mb-4 tracking-widest">Ayrıştırılmış Özet</p>
-                                            <p className="text-sm text-navy-200 italic leading-relaxed">
-                                                "{candidate.summary || candidate.originalText?.substring(0, 300) + '...'}"
-                                            </p>
+                                        <div className="pt-6 w-full max-w-2xl text-left bg-white/[0.02] p-6 rounded-2xl border border-white/[0.04]">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest flex items-center gap-2">
+                                                    <CheckCircle2 className="w-4 h-4" />
+                                                    KVKK Uyumlu Ayrıştırılmış CV Verisi
+                                                </p>
+                                            </div>
+                                            <div className="h-[250px] overflow-y-auto pr-4 custom-scrollbar">
+                                                {candidate.cvData ? (
+                                                    <div className="text-sm text-navy-200 leading-relaxed whitespace-pre-wrap font-mono">
+                                                        {candidate.cvData}
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-sm text-navy-200 italic leading-relaxed">
+                                                        "{candidate.summary || candidate.originalText?.substring(0, 300) + '...'}"
+                                                    </p>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 )}

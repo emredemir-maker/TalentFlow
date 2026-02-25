@@ -20,8 +20,8 @@ export async function generateInterviewQuestions(candidate, starAnalysis, interv
 
 export async function generateInterviewPaths(candidate, interviewType = 'technical') {
     const typeContexts = {
-        technical: "Teknik Lead personasıyla, mimari, kod kalitesi, problem çözme ve derin teknoloji bilgisine odaklan.",
-        product: "Product Manager personasıyla, sadece ürün vizyonu, kullanıcı deneyimi (UX), önceliklendirme, metrikler ve iş değerine odaklan. Aday teknik biriyse bile teknik detaylara girmeyin, ürün bakış açısını ölçün.",
+        technical: "Uzmanlık Lead personasıyla, mimari, derin bilgi, problem çözme ve saha tecrübesine odaklan.",
+        product: "Product Manager personasıyla, sadece ürün vizyonu, kullanıcı deneyimi (UX), önceliklendirme, metrikler ve iş değerine odaklan. Satış veya operasyon rolü ise iş geliştirme perspektifini ölçün.",
         culture: "İK Direktörü personasıyla, iletişim becerileri, ekip uyumu, çatışma yönetimi ve şirket değerlerine odaklan."
     };
 
@@ -114,14 +114,48 @@ export async function scoreInterviewSession(candidate, interviewType, questionsA
     }
 }
 
-export async function generateFollowUpQuestion(candidate, interviewType, conversationHistory, mode = 'deepen') {
-    const prompt = `Aday ${candidate?.name} için takip sorusu sor: ${JSON.stringify(conversationHistory)}
-    JSON: { "question": "..." }`;
-    const model = await getModel();
-    const result = await model.generateContent(prompt);
+export async function generateFollowUpQuestion(candidate, interviewType, conversationHistory, mode = 'deepen', category = null) {
+    const persona = interviewType === 'product' ? 'Product Manager' : (interviewType === 'culture' ? 'İK Direktörü' : 'Technical Lead');
+
+    let modeInstruction = "";
+    if (mode === 'deepen') {
+        modeInstruction = "Önceki cevaptaki teknik veya davranışsal bir detayı derinlemesine sorgula. 'Nasıl?', 'Neden?', 'Hangi yöntemle?' gibi sorularla adayı zorla.";
+    } else if (mode === 'category' && category) {
+        modeInstruction = `Özellikle '${category}' yetkinliğine odaklanan, adayın CV'sindeki deneyimlerle bağdaştırılmış yeni bir soru sor.`;
+    } else {
+        modeInstruction = "Adayın CV'sine ve şu ana kadarki mülakat akışına göre, henüz sorulmamış önemli bir alandan yeni bir soru sor.";
+    }
+
+    const prompt = `Sen kıdemli bir ${persona}sın. Aday ${candidate?.name} ile mülakat yapıyorsun.
+    
+    ADAY CV: ${JSON.stringify(candidate)}
+    MÜLAKAT GEÇMİŞİ: ${JSON.stringify(conversationHistory)}
+    
+    GÖREV: ${modeInstruction}
+    
+    ÖNEMLİ KURALLAR:
+    1. Soru dili TÜRKÇE olmalıdır.
+    2. Soru adayın CV'sindeki gerçek verilere dayanmalıdır.
+    3. Daha önce sorulmuş soruların aynısını sorma.
+    
+    JSON formatında şu yapıda dön:
+    { 
+      "question": "Soru metni", 
+      "category": "Kategori İsmi", 
+      "evaluationHint": "Mülakatçı için bu soruda neye dikkat etmesi gerektiğine dair kısa ipucu" 
+    }`;
+
+    const model = getModel();
     try {
-        return JSON.parse(result.response.text().replace(/```json|```/gi, '').trim());
+        const result = await model.generateContent(prompt);
+        const text = result.response.text();
+        const cleanJson = text.replace(/```json|```/gi, '').trim();
+        return JSON.parse(cleanJson);
     } catch (e) {
-        return { question: "Biraz daha detaylandırır mısın?" };
+        console.error("Follow up error:", e);
+        return {
+            question: category ? `${category} ile ilgili bir deneyiminden bahseder misin?` : "Biraz daha detaylandırır mısın?",
+            category: category || 'Genel'
+        };
     }
 }

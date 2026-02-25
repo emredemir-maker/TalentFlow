@@ -15,10 +15,13 @@ export default function InterviewHistory({ sessions = [] }) {
 
     if (!sessions || sessions.length === 0) {
         return (
-            <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/[0.04] text-center">
-                <MessageSquare className="w-8 h-8 text-navy-600 mx-auto mb-3" />
-                <p className="text-sm text-navy-400">Henüz mülakat kaydı bulunmuyor.</p>
-                <p className="text-[10px] text-navy-500 mt-1">Yeni bir mülakat oturumu başlatarak kayıt oluşturabilirsiniz.</p>
+            <div className="p-8 rounded-2xl flex flex-col items-center justify-center text-center relative overflow-hidden bg-gradient-to-b from-white/[0.02] to-transparent border border-white/[0.05] group">
+                <div className="absolute inset-0 bg-electric/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-xl"></div>
+                <div className="w-16 h-16 rounded-full bg-white/[0.02] border border-white/[0.05] flex items-center justify-center mb-4 relative z-10 group-hover:scale-110 transition-transform duration-500 shadow-xl shadow-black/20">
+                    <MessageSquare className="w-8 h-8 text-electric/60 group-hover:text-electric transition-colors duration-500" />
+                </div>
+                <p className="text-sm font-semibold text-white mb-2 relative z-10">Kayıt Bulunamadı</p>
+                <p className="text-xs text-navy-400 relative z-10 max-w-[200px] leading-relaxed">Yeni bir değerlendirme süreci başlatmak için ilk mülakat oturumunu oluşturun.</p>
             </div>
         );
     }
@@ -73,29 +76,31 @@ export default function InterviewHistory({ sessions = [] }) {
                 const TypeIcon = TYPE_ICONS[session.type] || MessageSquare;
 
                 return (
-                    <div key={session.id} className="rounded-2xl bg-white/[0.02] border border-white/[0.06] overflow-hidden transition-all">
+                    <div key={session.id} className="group rounded-2xl bg-gradient-to-br from-white/[0.03] to-white/[0.01] border border-white/[0.08] hover:border-white/[0.15] overflow-hidden transition-all duration-300">
                         {/* Summary Row */}
                         <button
                             onClick={() => setExpandedId(isExpanded ? null : session.id)}
-                            className="w-full p-4 flex items-center gap-3 hover:bg-white/[0.02] transition-all text-left"
+                            className="w-full p-4 flex items-center gap-4 hover:bg-white/[0.04] transition-colors text-left relative overflow-hidden"
                         >
-                            <div className={`w-9 h-9 rounded-xl bg-${TYPE_COLORS[session.type] || 'electric'}/10 flex items-center justify-center shrink-0`}>
+                            <div className={`w-10 h-10 rounded-xl bg-${TYPE_COLORS[session.type] || 'electric'}/10 flex items-center justify-center shrink-0 border border-${TYPE_COLORS[session.type] || 'electric'}/20 group-hover:scale-110 transition-transform duration-300`}>
                                 <TypeIcon className={`w-4 h-4 text-${TYPE_COLORS[session.type] || 'electric'}`} />
                             </div>
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-xs font-bold text-white">{session.typeLabel}</span>
-                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${session.finalScore >= 70 ? 'bg-emerald-500/20 text-emerald-400' : session.finalScore >= 40 ? 'bg-amber-500/20 text-amber-400' : 'bg-red-500/20 text-red-400'}`}>
-                                        %{session.finalScore}
+                            <div className="flex-1 min-w-0 z-10">
+                                <div className="flex items-center gap-3 mb-1">
+                                    <span className="text-sm font-bold text-white tracking-tight">{session.typeLabel}</span>
+                                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm ${session.finalScore >= 70 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : session.finalScore >= 40 ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+                                        Skor: {session.finalScore}
                                     </span>
                                 </div>
-                                <p className="text-[10px] text-navy-500 mt-0.5 flex items-center gap-1">
-                                    <CalendarDays className="w-2.5 h-2.5" />
+                                <p className="text-[11px] text-navy-400 flex items-center gap-1.5 opacity-80">
+                                    <CalendarDays className="w-3 h-3" />
                                     {new Date(session.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
-                                    {session.positionTitle && <> • {session.positionTitle}</>}
+                                    {session.positionTitle && <> <span className="text-navy-600 px-1">•</span> <span className="truncate">{session.positionTitle}</span></>}
                                 </p>
                             </div>
-                            {isExpanded ? <ChevronUp className="w-4 h-4 text-navy-500" /> : <ChevronDown className="w-4 h-4 text-navy-500" />}
+                            <div className={`w-8 h-8 rounded-full bg-white/[0.02] border border-white/[0.05] flex items-center justify-center transition-transform duration-300 ${isExpanded ? 'rotate-180 bg-white/[0.06]' : ''}`}>
+                                <ChevronDown className="w-4 h-4 text-navy-400" />
+                            </div>
                         </button>
 
                         {/* Expanded Details */}
