@@ -56,30 +56,47 @@
 
 [data-theme='light'] {
   --navy-950: #f8fafc;
-  /* Page Background Light */
   --navy-900: #ffffff;
-  /* Sidebar / Header Light */
   --navy-800: #f1f5f9;
-  /* Card Hover / Secondary Light */
   --navy-700: #e2e8f0;
-  /* Icons / Muted Light */
-  --navy-600: #cbd5e1;
-  --navy-500: #94a3b8;
-  --navy-400: #64748b;
-  --navy-300: #475569;
+  --navy-600: #94a3b8;
+  --navy-500: #64748b;
+  --navy-400: #475569;
+  --navy-300: #334155;
   --navy-200: #1e293b;
-  /* Main Text Light */
   --navy-100: #0f172a;
 
   --text-primary: #0f172a;
   --text-secondary: #334155;
   --text-muted: #64748b;
-  --border-subtle: rgba(0, 0, 0, 0.08);
-  --header-bg: rgba(255, 255, 255, 0.8);
+  --border-subtle: rgba(15, 23, 42, 0.08);
+  --header-bg: rgba(248, 250, 252, 0.9);
 
   --glass-bg: rgba(255, 255, 255, 0.85);
-  --glass-border: rgba(0, 0, 0, 0.05);
-  --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+  --glass-border: rgba(15, 23, 42, 0.05);
+  --card-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.04), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
+}
+
+/* Fix text contrast inside primary colored containers in light mode */
+[data-theme='light'] .bg-electric,
+[data-theme='light'] .bg-blue-500,
+[data-theme='light'] .bg-emerald-500,
+[data-theme='light'] .bg-red-500,
+[data-theme='light'] .bg-violet-500,
+[data-theme='light'] .bg-cyan-500,
+[data-theme='light'] .bg-amber-500 {
+  color: #ffffff;
+}
+
+[data-theme='light'] .bg-electric .text-text-primary,
+[data-theme='light'] .bg-electric .text-text-muted,
+[data-theme='light'] .bg-blue-500 .text-text-primary,
+[data-theme='light'] .bg-emerald-500 .text-text-primary,
+[data-theme='light'] .bg-red-500 .text-text-primary,
+[data-theme='light'] .bg-violet-500 .text-text-primary,
+[data-theme='light'] .bg-cyan-500 .text-text-primary,
+[data-theme='light'] .bg-amber-500 .text-text-primary {
+  color: #ffffff !important;
 }
 
 /* ==================== BASE STYLES ==================== */
@@ -385,7 +402,21 @@ body {
 }
 
 /* Global Select Options Styling */
+select {
+  color-scheme: dark;
+}
+
+[data-theme='light'] select {
+  color-scheme: light;
+}
+
 select option {
+  background-color: #0f172a;
+  /* navy-900 */
+  color: #ffffff;
+}
+
+[data-theme='light'] select option {
   background-color: #ffffff;
   color: #000000;
 }

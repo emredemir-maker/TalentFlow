@@ -79,34 +79,160 @@ export const connectGoogleWorkspace = async (userId) => {
 
 export const sendDirectEmail = async (userId, token, emailData) => {
     try {
-        const response = await fetch(`${import.meta.env.VITE_SERVER_URL || 'http://localhost:3001'}/api/google/send-email`, {
+        const { to, subject, body } = emailData;
+
+        // Construct simple RFC822 message
+        const utf8Subject = `=?utf-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`;
+        const messageParts = [
+            `To: ${to}`,
+            `Subject: ${utf8Subject}`,
+            'Content-Type: text/plain; charset="UTF-8"',
+            'MIME-Version: 1.0',
+            '',
+            body
+        ];
+        const message = messageParts.join('\n');
+
+        // Base64url encoding
+        const encodedMessage = btoa(unescape(encodeURIComponent(message)))
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=+$/, '');
+
+        const response = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId, token, ...emailData })
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ raw: encodedMessage })
         });
-        return await response.json();
+
+        const data = await response.json();
+        if (!response.ok) {
+            // Check for revoked tokens
+            if (response.status === 401) throw new Error("Oturum süresi dolmuş veya yetki kaldırılmış. Lütfen tekrar bağlanın.");
+            throw new Error(data.error?.message || 'E-posta gönderilemedi');
+        }
+
+        return { success: true, messageId: data.id };
     } catch (error) {
+        console.error("Direct Email Error:", error);
         return { success: false, error: error.message };
     }
 };
 
 export const createDirectCalendarEvent = async (userId, token, eventData) => {
     try {
-        const response = await fetch(`${import.meta.env.VITE_SERVER_URL || 'http://localhost:3001'}/api/google/create-calendar-event`, {
+        const { summary, description, startDateTime, endDateTime, guestEmail } = eventData;
+
+        const event = {
+            summary,
+            description,
+            start: { dateTime: startDateTime },
+            end: { dateTime: endDateTime },
+            conferenceData: {
+                createRequest: {
+                    requestId: `tf-${Date.now()}`,
+                    conferenceSolutionKey: { type: 'hangoutsMeet' }
+                }
+            }
+        };
+
+        if (guestEmail) {
+            event.attendees = [{ email: guestEmail }];
+        }
+
+        const response = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId, token, ...eventData })
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(event)
         });
-        return await response.json();
+
+        const data = await response.json();
+        if (!response.ok) {
+            if (response.status === 401) throw new Error("Oturum süresi dolmuş. Lütfen tekrar bağlanın.");
+            throw new Error(data.error?.message || 'Takvim etkinliği oluşturulamadı');
+        }
+
+        return {
+            success: true,
+            htmlLink: data.htmlLink,
+            meetLink: data.conferenceData?.entryPoints?.[0]?.uri || data.htmlLink
+        };
     } catch (error) {
+        console.error("Direct Calendar Event Error:", error);
         return { success: false, error: error.message };
     }
 };
+
 export const checkGmailMessages = async (token, query) => {
     try {
-        const response = await fetch(`${import.meta.env.VITE_SERVER_URL || 'http://localhost:3001'}/api/google/check-messages?token=${token}&q=${encodeURIComponent(query)}`);
-        return await response.json();
+        const searchResponse = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=1`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!searchResponse.ok) {
+            if (searchResponse.status === 401) throw new Error("Oturum süresi dolmuş. Lütfen tekrar bağlanın.");
+            const errData = await searchResponse.json();
+            throw new Error(errData.error?.message || 'Mail aranırken bir hata oluştu');
+        }
+
+        const searchData = await searchResponse.json();
+
+        if (!searchData.messages || searchData.messages.length === 0) {
+            return { success: true, found: false };
+        }
+
+        const msgId = searchData.messages[0].id;
+        const msgResponse = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${msgId}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!msgResponse.ok) {
+            if (msgResponse.status === 401) throw new Error("Oturum süresi dolmuş. Lütfen tekrar bağlanın.");
+            const errData = await msgResponse.json();
+            throw new Error(errData.error?.message || 'Mail içeriği alınırken bir hata oluştu');
+        }
+
+        const msgData = await msgResponse.json();
+
+        const decodeBase64 = (str) => {
+            const base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+            try {
+                return decodeURIComponent(escape(atob(base64)));
+            } catch (e) {
+                return atob(base64); // Fallback
+            }
+        };
+
+        let body = "";
+        if (msgData.payload.parts) {
+            // Priority: text/plain
+            const part = msgData.payload.parts.find(p => p.mimeType === 'text/plain') || msgData.payload.parts[0];
+            if (part && part.body && part.body.data) {
+                body = decodeBase64(part.body.data);
+            }
+        } else if (msgData.payload.body && msgData.payload.body.data) {
+            body = decodeBase64(msgData.payload.body.data);
+        }
+
+        return {
+            success: true,
+            found: true,
+            message: {
+                id: msgId,
+                snippet: msgData.snippet,
+                body,
+                from: msgData.payload.headers.find(h => h.name === 'From')?.value,
+                date: msgData.payload.headers.find(h => h.name === 'Date')?.value
+            }
+        };
     } catch (error) {
+        console.error("Direct Check Messages Error:", error);
         return { success: false, error: error.message };
     }
 };

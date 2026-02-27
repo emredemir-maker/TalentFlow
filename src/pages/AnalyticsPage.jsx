@@ -5,7 +5,6 @@ import { useMessageQueue } from '../context/MessageQueueContext';
 import { usePositions } from '../context/PositionsContext';
 import Header from '../components/Header';
 import CustomLineChart from '../components/charts/CustomLineChart';
-import CustomPieChart from '../components/charts/CustomPieChart';
 import GaugeChart from '../components/charts/GaugeChart';
 import {
     Users,
@@ -39,6 +38,7 @@ export default function AnalyticsPage() {
     const { userProfile } = useAuth();
     const [activeTab, setActiveTab] = useState('responses'); // 'responses' | 'pending'
     const [timeRange, setTimeRange] = useState('7d');
+    const [activeSourceTab, setActiveSourceTab] = useState('source'); // 'source' or 'subSource'
 
     // Response processing state
     const [processingResponse, setProcessingResponse] = useState(null); // { message, emailText, loading, result, checkingMail }
@@ -134,24 +134,6 @@ export default function AnalyticsPage() {
         }));
     }, [candidates]);
 
-    // 2. Position Distribution
-    const positionDistribution = useMemo(() => {
-        const counts = {};
-        candidates.forEach(c => {
-            const pos = c.matchedPositionTitle || 'Atanmamış';
-            counts[pos] = (counts[pos] || 0) + 1;
-        });
-
-        if (Object.keys(counts).length === 0) {
-            return [{ name: 'Veri Yok', value: 1 }];
-        }
-
-        return Object.entries(counts)
-            .map(([name, value]) => ({ name, value }))
-            .sort((a, b) => b.value - a.value)
-            .slice(0, 5); // Top 5
-    }, [candidates]);
-
     // 2.5. Position-based Status Analysis
     const positionStatusData = useMemo(() => {
         const matrix = {};
@@ -231,16 +213,50 @@ export default function AnalyticsPage() {
         });
     }, [candidates]);
 
-    // 4. Source Distribution
-    const sourceData = useMemo(() => {
+    // 4. Source & Sub-Source Distribution
+    const { sourceList, subSourceList } = useMemo(() => {
         const sources = {};
+        const subSources = {};
+
         candidates.forEach(c => {
             const s = c.source?.includes('Visual') ? 'LinkedIn / Scraper' :
                 c.source?.includes('Browser') ? 'Eklenti' :
-                    c.source?.includes('CV') ? 'CV Yükleme' : 'Diğer';
-            sources[s] = (sources[s] || 0) + 1;
+                    c.source?.includes('CV') ? 'CV Yükleme' : (c.source || 'Diğer');
+
+            if (!sources[s]) sources[s] = { count: 0, totalScore: 0, successCount: 0 };
+            sources[s].count += 1;
+            sources[s].totalScore += (c.matchScore || 0);
+
+            const sub = c.sourceDetail || c.subSource || 'Belirtilmedi';
+            if (!subSources[sub]) subSources[sub] = { count: 0, totalScore: 0, successCount: 0 };
+            subSources[sub].count += 1;
+            subSources[sub].totalScore += (c.matchScore || 0);
+
+            // Determine if the candidate is considered "successful" (hired or offer stage)
+            const isSuccessful = ['hired', 'offer'].includes(c.status);
+            if (isSuccessful) {
+                sources[s].successCount += 1;
+                subSources[sub].successCount += 1;
+            }
         });
-        return Object.entries(sources).map(([name, value]) => ({ name, value }));
+
+        const formatData = (dataObj) => Object.entries(dataObj)
+            .map(([name, data]) => {
+                const avgScore = data.count > 0 ? Math.round(data.totalScore / data.count) : 0;
+                const successRate = data.count > 0 ? Math.round((data.successCount / data.count) * 100) : 0;
+                return {
+                    name,
+                    value: data.count,
+                    percentage: avgScore,
+                    successRate: successRate
+                };
+            })
+            .sort((a, b) => b.value - a.value);
+
+        return {
+            sourceList: formatData(sources),
+            subSourceList: formatData(subSources)
+        };
     }, [candidates]);
 
     // 5. Top Skills
@@ -282,13 +298,13 @@ export default function AnalyticsPage() {
     }
 
     return (
-        <div className="min-h-screen pb-20 bg-[#020617] text-white">
+        <div className="min-h-screen pb-20 bg-[#020617] text-text-primary">
             <Header title="Stratejik Analitik" />
 
             {/* ===== DASHBOARD TOP BAR ===== */}
             <div className="px-6 lg:px-8 pt-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h2 className="text-2xl font-black tracking-tight text-white flex items-center gap-3">
+                    <h2 className="text-2xl font-black tracking-tight text-text-primary flex items-center gap-3">
                         <Zap className="w-6 h-6 text-electric" /> Veri Odaklı Karar Destek
                     </h2>
                     <p className="text-navy-400 text-sm font-medium mt-1">Yapay zeka asistanınız tarafından hazırlanan gerçek zamanlı metrikler.</p>
@@ -298,7 +314,7 @@ export default function AnalyticsPage() {
                         <button
                             key={r}
                             onClick={() => setTimeRange(r)}
-                            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${timeRange === r ? 'bg-electric text-white shadow-lg' : 'text-navy-400 hover:text-white'}`}
+                            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${timeRange === r ? 'bg-electric text-text-primary shadow-lg' : 'text-navy-400 hover:text-text-primary'}`}
                         >
                             {r === '7d' ? '7 Gün' : r === '30d' ? '30 Gün' : '90 Gün'}
                         </button>
@@ -356,7 +372,7 @@ export default function AnalyticsPage() {
                     <div className="absolute top-0 right-0 w-64 h-64 bg-electric/5 rounded-full blur-[80px] -z-10" />
                     <div className="flex items-center justify-between mb-8">
                         <div>
-                            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                            <h3 className="text-lg font-bold text-text-primary flex items-center gap-2">
                                 <Activity className="w-5 h-5 text-electric-light" /> Aday Edinme Trendi
                             </h3>
                             <p className="text-xs text-navy-400 mt-1">Son 7 gün boyunca günlük başvuru hacmi.</p>
@@ -369,7 +385,7 @@ export default function AnalyticsPage() {
 
                 {/* 2. Funnel Analysis (Narrow) */}
                 <div className="xl:col-span-4 glass rounded-[2.5rem] p-8 border border-white/[0.08] flex flex-col group">
-                    <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+                    <h3 className="text-lg font-bold text-text-primary mb-6 flex items-center gap-2">
                         <Layers className="w-5 h-5 text-amber-400" /> Dönüşüm Hunisi
                     </h3>
                     <div className="flex-1 flex flex-col justify-between py-2 overflow-hidden">
@@ -377,7 +393,7 @@ export default function AnalyticsPage() {
                             <div key={stage.name} className="relative group/funnel animate-fade-in-up" style={{ animationDelay: `${idx * 100}ms` }}>
                                 <div className="flex justify-between items-end mb-2">
                                     <span className="text-xs font-bold text-navy-300 uppercase tracking-widest">{stage.name}</span>
-                                    <span className="text-lg font-black text-white">{stage.count}</span>
+                                    <span className="text-lg font-black text-text-primary">{stage.count}</span>
                                 </div>
                                 <div className="h-4 bg-navy-950 rounded-full overflow-hidden border border-white/5">
                                     <div
@@ -406,25 +422,65 @@ export default function AnalyticsPage() {
 
                 {/* 3. Skill Cloud & Source Split (Bottom Row) */}
                 <div className="xl:col-span-4 glass rounded-[2.5rem] p-8 border border-white/[0.08]">
-                    <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+                    <h3 className="text-lg font-bold text-text-primary mb-6 flex items-center gap-2">
                         <Zap className="w-5 h-5 text-electric-light" /> Öne Çıkan Yetenekler
                     </h3>
                     <div className="flex flex-wrap gap-2">
-                        {topSkills.map(([skill, count], idx) => (
+                        {topSkills.map(([skill, count]) => (
                             <div key={skill} className="px-4 py-2 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:border-electric/30 hover:bg-electric/5 transition-all group flex items-center gap-3">
-                                <span className="text-xs font-semibold text-navy-200 group-hover:text-white">{skill}</span>
+                                <span className="text-xs font-semibold text-navy-200 group-hover:text-text-primary">{skill}</span>
                                 <span className="text-[10px] font-black text-electric bg-electric/10 px-1.5 py-0.5 rounded-md">{count}</span>
                             </div>
                         ))}
                     </div>
                 </div>
 
-                <div className="xl:col-span-4 glass rounded-[2.5rem] p-8 border border-white/[0.08]">
-                    <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-                        <Globe className="w-5 h-5 text-cyan-400" /> Kaynak Dağılımı
-                    </h3>
-                    <div className="h-[200px]">
-                        <CustomPieChart data={sourceData} />
+                <div className="xl:col-span-4 glass rounded-[2.5rem] p-8 border border-white/[0.08] flex flex-col min-h-[320px]">
+                    <div className="flex items-center justify-between mb-8">
+                        <h3 className="text-lg font-bold text-text-primary flex items-center gap-2">
+                            <Globe className="w-5 h-5 text-cyan-400" /> Kaynak Dağılımı
+                        </h3>
+                        <div className="flex bg-navy-900/50 rounded-lg p-1 border border-border-subtle shrink-0">
+                            <button
+                                onClick={() => setActiveSourceTab('source')}
+                                className={`px-3 py-1 text-[11px] font-bold rounded-md transition-all ${activeSourceTab === 'source' ? 'bg-cyan-500 text-white shadow-md' : 'text-navy-400 hover:text-text-primary'}`}
+                            >
+                                Kaynak
+                            </button>
+                            <button
+                                onClick={() => setActiveSourceTab('subSource')}
+                                className={`px-3 py-1 text-[11px] font-bold rounded-md transition-all ${activeSourceTab === 'subSource' ? 'bg-cyan-500 text-white shadow-md' : 'text-navy-400 hover:text-text-primary'}`}
+                            >
+                                Alt Kaynak
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
+                        {(activeSourceTab === 'source' ? sourceList : subSourceList).map((item) => (
+                            <div key={item.name} className="flex justify-between items-center bg-white/[0.02] border border-white/[0.05] p-4 rounded-[1rem] hover:border-cyan-500/30 transition-all group">
+                                <span className="text-sm font-semibold text-text-secondary truncate pr-2 group-hover:text-text-primary transition-colors cursor-default" title={item.name}>{item.name}</span>
+                                <div className="flex items-center gap-3 shrink-0">
+                                    <div className="flex flex-col items-end">
+                                        <span className="text-xs font-black text-text-primary" title="Aday Sayısı">{item.value} Aday</span>
+                                    </div>
+                                    <div className="h-6 w-px bg-white/10 mx-1"></div>
+                                    <div className="flex flex-col items-end cursor-default" title="Ortalama Uyum Skoru">
+                                        <span className="text-[10px] text-navy-400 font-medium tracking-wide uppercase">Uyum</span>
+                                        <span className="text-xs font-black text-cyan-400">%{item.percentage}</span>
+                                    </div>
+                                    <div className="flex flex-col items-end cursor-default min-w-[50px]" title="Başarı (İşe Alım/Teklif) Oranı">
+                                        <span className="text-[10px] text-navy-400 font-medium tracking-wide uppercase">Başarı</span>
+                                        <span className="text-xs font-black text-emerald-400">%{item.successRate}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                        {(activeSourceTab === 'source' ? sourceList : subSourceList).length === 0 && (
+                            <div className="h-full flex items-center justify-center pb-4">
+                                <p className="text-sm text-center text-text-muted">Kayıt Bulunamadı.</p>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -432,7 +488,7 @@ export default function AnalyticsPage() {
                     <h3 className="text-sm font-bold text-navy-400 mb-4 uppercase tracking-tighter">Genel Uyumluluk Skoru</h3>
                     <GaugeChart value={avgMatchScore} size={200} />
                     <div className="mt-4 text-center">
-                        <p className="text-2xl font-black text-white">%{avgMatchScore}</p>
+                        <p className="text-2xl font-black text-text-primary">%{avgMatchScore}</p>
                         <p className="text-[11px] text-navy-500 font-medium">Havuz Potansiyeli</p>
                     </div>
                 </div>
@@ -445,7 +501,7 @@ export default function AnalyticsPage() {
 
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
                         <div>
-                            <h3 className="text-xl font-black text-white flex items-center gap-3">
+                            <h3 className="text-xl font-black text-text-primary flex items-center gap-3">
                                 <Briefcase className="w-6 h-6 text-violet-400" /> Pozisyon Performans Matrisi
                             </h3>
                             <p className="text-xs text-navy-400 mt-1">Açık pozisyonların başvuru hacmi ve aday kalitesi bazlı analizi.</p>
@@ -457,7 +513,7 @@ export default function AnalyticsPage() {
                             <div key={pos.name} className="p-6 rounded-[2rem] bg-white/[0.02] border border-white/[0.05] hover:border-violet-500/30 transition-all group animate-fade-in-up" style={{ animationDelay: `${idx * 100}ms` }}>
                                 <div className="flex justify-between items-start mb-4">
                                     <div className="min-w-0 flex-1">
-                                        <h4 className="text-sm font-black text-white truncate group-hover:text-violet-400 transition-colors uppercase tracking-tight">{pos.name}</h4>
+                                        <h4 className="text-sm font-black text-text-primary truncate group-hover:text-violet-400 transition-colors uppercase tracking-tight">{pos.name}</h4>
                                         <p className="text-[10px] text-navy-500 font-bold uppercase tracking-wider mt-1">{pos.total} Toplam Aday</p>
                                     </div>
                                     <div className="flex flex-col items-end shrink-0 ml-4">
@@ -470,7 +526,7 @@ export default function AnalyticsPage() {
                                     <div className="space-y-1.5">
                                         <div className="flex justify-between text-[10px] font-black uppercase tracking-widest leading-none mb-1">
                                             <span className="text-emerald-400">İşe Alım</span>
-                                            <span className="text-white">{pos.hired}</span>
+                                            <span className="text-text-primary">{pos.hired}</span>
                                         </div>
                                         <div className="h-1.5 bg-navy-950 rounded-full overflow-hidden">
                                             <div
@@ -483,7 +539,7 @@ export default function AnalyticsPage() {
                                     <div className="space-y-1.5">
                                         <div className="flex justify-between text-[10px] font-black uppercase tracking-widest leading-none mb-1">
                                             <span className="text-blue-400">Mülakat</span>
-                                            <span className="text-white">{pos.interview}</span>
+                                            <span className="text-text-primary">{pos.interview}</span>
                                         </div>
                                         <div className="h-1.5 bg-navy-950 rounded-full overflow-hidden">
                                             <div
@@ -496,7 +552,7 @@ export default function AnalyticsPage() {
                                     <div className="space-y-1.5">
                                         <div className="flex justify-between text-[10px] font-black uppercase tracking-widest leading-none mb-1">
                                             <span className="text-amber-500">İnceleme</span>
-                                            <span className="text-white">{pos.review}</span>
+                                            <span className="text-text-primary">{pos.review}</span>
                                         </div>
                                         <div className="h-1.5 bg-navy-950 rounded-full overflow-hidden">
                                             <div
@@ -513,7 +569,7 @@ export default function AnalyticsPage() {
                                     </span>
                                     <div className="flex -space-x-2">
                                         {[...Array(Math.min(3, pos.total))].map((_, i) => (
-                                            <div key={i} className="w-6 h-6 rounded-full bg-navy-800 border-2 border-navy-900 flex items-center justify-center text-[8px] font-black text-white shadow-lg overflow-hidden ring-1 ring-white/5">
+                                            <div key={i} className="w-6 h-6 rounded-full bg-navy-800 border-2 border-navy-900 flex items-center justify-center text-[8px] font-black text-text-primary shadow-lg overflow-hidden ring-1 ring-white/5">
                                                 {String.fromCharCode(65 + i)}
                                             </div>
                                         ))}
@@ -535,7 +591,7 @@ export default function AnalyticsPage() {
                             <button
                                 onClick={() => setActiveTab('responses')}
                                 className={`flex items-center gap-2 px-6 py-6 text-sm font-black border-b-2 transition-all cursor-pointer ${activeTab === 'responses'
-                                    ? 'border-electric text-white'
+                                    ? 'border-electric text-text-primary'
                                     : 'border-transparent text-navy-500 hover:text-navy-300'
                                     }`}
                             >
@@ -606,7 +662,7 @@ export default function AnalyticsPage() {
                         <div className="absolute inset-0 bg-navy-950/80 backdrop-blur-xl" onClick={() => setProcessingResponse(null)} />
                         <div className="relative w-full max-w-xl glass rounded-[3rem] p-8 border border-white/10 space-y-6 animate-scale-in">
                             <div className="flex items-center justify-between">
-                                <h3 className="text-xl font-black text-white flex items-center gap-3">
+                                <h3 className="text-xl font-black text-text-primary flex items-center gap-3">
                                     <Sparkles className="w-6 h-6 text-electric" /> Yanıt Analizi
                                 </h3>
                                 <button onClick={() => setProcessingResponse(null)} className="p-3 hover:bg-white/5 rounded-2xl text-navy-400"><X className="w-5 h-5" /></button>
@@ -621,7 +677,7 @@ export default function AnalyticsPage() {
                                         </div>
                                     ) : (
                                         <textarea
-                                            className="w-full h-56 bg-navy-950 border border-white/10 rounded-[1.5rem] p-6 text-sm text-white outline-none focus:border-electric/50 transition-all resize-none"
+                                            className="w-full h-56 bg-navy-950 border border-white/10 rounded-[1.5rem] p-6 text-sm text-text-primary outline-none focus:border-electric/50 transition-all resize-none"
                                             placeholder="Yanıtı buraya yapıştırın veya 'Mail Ara' butonuna tıklayın..."
                                             value={processingResponse.emailText}
                                             onChange={(e) => setProcessingResponse(prev => ({ ...prev, emailText: e.target.value }))}
@@ -630,7 +686,7 @@ export default function AnalyticsPage() {
                                     <button
                                         onClick={handleProcessResponse}
                                         disabled={processingResponse.checkingMail || !processingResponse.emailText.trim()}
-                                        className="w-full py-4 rounded-[1.5rem] bg-electric text-white font-black uppercase tracking-widest text-xs disabled:opacity-30"
+                                        className="w-full py-4 rounded-[1.5rem] bg-electric text-text-primary font-black uppercase tracking-widest text-xs disabled:opacity-30"
                                     >
                                         Analiz Et
                                     </button>
@@ -651,13 +707,13 @@ export default function AnalyticsPage() {
     );
 }
 
-function KPICard({ title, value, icon: Icon, trend, isPositive, color, iconColor }) {
+function KPICard({ title, value, icon: IconComponent, trend, isPositive, color, iconColor }) {
     return (
         <div className={`glass rounded-[2rem] p-6 border border-white/[0.08] relative overflow-hidden group hover:border-white/20 transition-all duration-500`}>
             <div className={`absolute -inset-1 bg-gradient-to-br ${color} opacity-40 group-hover:opacity-100 transition-opacity blur-[40px] -z-10`} />
             <div className="flex justify-between items-start mb-4">
                 <div className={`p-4 rounded-2xl bg-navy-950/50 border border-white/5 ${iconColor}`}>
-                    <Icon className="w-6 h-6" />
+                    {IconComponent && <IconComponent className="w-6 h-6" />}
                 </div>
                 {trend && (
                     <div className={`flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-black ${isPositive ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
@@ -667,7 +723,7 @@ function KPICard({ title, value, icon: Icon, trend, isPositive, color, iconColor
             </div>
             <div>
                 <p className="text-xs font-black text-navy-400 uppercase tracking-widest mb-1">{title}</p>
-                <h3 className="text-3xl font-black text-white tracking-tighter">{value}</h3>
+                <h3 className="text-3xl font-black text-text-primary tracking-tighter">{value}</h3>
             </div>
         </div>
     );
@@ -679,11 +735,11 @@ function TableRow({ msg, type, onProcess, onCheckMail, index }) {
         <tr className="hover:bg-white/[0.03] transition-all group animate-fade-in-up" style={{ animationDelay: `${index * 50}ms` }}>
             <td className="px-8 py-5">
                 <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-navy-800 flex items-center justify-center text-xs font-black text-white border border-white/5">
+                    <div className="w-10 h-10 rounded-xl bg-navy-800 flex items-center justify-center text-xs font-black text-text-primary border border-white/5">
                         {msg.candidateName?.substring(0, 2).toUpperCase()}
                     </div>
                     <div>
-                        <p className="text-sm font-bold text-white">{msg.candidateName}</p>
+                        <p className="text-sm font-bold text-text-primary">{msg.candidateName}</p>
                         <p className="text-[10px] font-mono text-navy-500">#{msg.trackingId || 'TRC'}</p>
                     </div>
                 </div>
@@ -701,15 +757,15 @@ function TableRow({ msg, type, onProcess, onCheckMail, index }) {
                         <button
                             onClick={onCheckMail}
                             title="Gmail'den otomatik tara"
-                            className="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 text-navy-400 hover:text-white hover:bg-white/10 transition-all"
+                            className="p-2.5 rounded-xl bg-white/[0.03] border border-white/10 text-navy-400 hover:text-text-primary hover:bg-white/10 transition-all"
                         >
                             <Search className="w-4 h-4" />
                         </button>
-                        <button onClick={onProcess} className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-[10px] font-black hover:bg-electric transition-all">İşle</button>
+                        <button onClick={onProcess} className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-text-primary text-[10px] font-black hover:bg-electric transition-all">İşle</button>
                     </div>
                 )}
                 {isPending && (
-                    <button className="px-4 py-2 rounded-xl bg-electric text-white text-[10px] font-black hover:bg-electric-light transition-all">Onayla</button>
+                    <button className="px-4 py-2 rounded-xl bg-electric text-text-primary text-[10px] font-black hover:bg-electric-light transition-all">Onayla</button>
                 )}
             </td>
         </tr>

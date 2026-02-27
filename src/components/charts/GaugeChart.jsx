@@ -64,7 +64,7 @@ export default function GaugeChart({ value, label, size = 200 }) {
             {/* Value Overlay */}
             <div className="absolute top-[45%] left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
                 <div className="flex items-baseline">
-                    <span className="text-4xl font-black text-white tracking-tighter" style={{ textShadow: `0 0 20px ${color}40` }}>
+                    <span className="text-4xl font-black text-text-primary tracking-tighter" style={{ textShadow: `0 0 20px ${color}40` }}>
                         {percent}
                     </span>
                     <span className="text-sm font-bold text-navy-500 ml-0.5">%</span>

@@ -19,6 +19,8 @@ import SuperAdminPage from './pages/SuperAdminPage';
 import LoginPage from './pages/LoginPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import GuidePage from './pages/GuidePage';
+import DepartmentManagementPage from './pages/DepartmentManagementPage';
+import SourceManagementPage from './pages/SourceManagementPage';
 
 export default function App() {
   return (
@@ -79,6 +81,8 @@ function AppContent() {
       case 'positions': return <PositionsPage />;
       case 'guide': return <GuidePage />;
       case 'super-admin': return <SuperAdminPage />;
+      case 'departments': return <DepartmentManagementPage />;
+      case 'sources': return <SourceManagementPage />;
       default: return <Dashboard />;
     }
   };

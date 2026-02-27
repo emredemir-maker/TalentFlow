@@ -35,6 +35,7 @@ import {
 import { analyzeCandidateMatch } from '../services/geminiService';
 import { createMessage, MESSAGE_STATUS } from '../services/messageQueueService';
 
+
 const STATUS_LABELS = {
     ai_analysis: 'AI Analiz',
     review: 'İnceleme',
@@ -164,10 +165,34 @@ export default function CandidateProcessPage() {
         ];
     }, [candidate]);
 
-    if (!candidate) return null;
+    if (!candidate) return (
+        <div className="min-h-screen flex flex-col relative isolate">
+
+
+            <Header title="Aday Süreç Portalı" />
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-navy-950">
+                <div className="w-24 h-24 rounded-[2.5rem] bg-white/[0.03] border border-white/[0.08] flex items-center justify-center mb-8 relative group">
+                    <div className="absolute inset-0 bg-electric/10 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <Activity className="w-10 h-10 text-navy-700" />
+                </div>
+                <h2 className="text-2xl font-black text-text-primary mb-3 uppercase tracking-tight">Aktif Aday Bulunamadı</h2>
+                <p className="text-sm text-navy-500 max-w-sm font-medium leading-relaxed">
+                    Süreç takibi yapılacak aday bulunmuyor. Lütfen dashboard üzerinden bir aday seçin veya yeni bir aday ekleyin.
+                </p>
+                <button
+                    onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'dashboard' }))}
+                    className="mt-8 px-8 py-3.5 rounded-2xl bg-electric hover:bg-electric-light text-text-primary font-black text-[10px] uppercase tracking-widest transition-all shadow-xl shadow-electric/20"
+                >
+                    Aday Havuzuna Git
+                </button>
+            </div>
+        </div>
+    );
 
     return (
-        <div className="min-h-screen pb-20">
+        <div className="min-h-screen pb-20 relative isolate">
+
+
             <Header title="Aday Süreç Portalı" />
 
             <div className="flex items-center justify-end px-6 lg:px-8 py-3 mb-2">
@@ -176,7 +201,7 @@ export default function CandidateProcessPage() {
                     <select
                         value={candidate.id}
                         onChange={(e) => setViewCandidateId(e.target.value)}
-                        className="px-4 py-2 rounded-xl bg-navy-800 border border-white/[0.06] text-sm text-white font-medium outline-none focus:border-electric cursor-pointer hover:bg-white/[0.04] transition-all"
+                        className="px-4 py-2 rounded-xl bg-navy-800 border border-white/[0.06] text-sm text-text-primary font-medium outline-none focus:border-electric cursor-pointer hover:bg-white/[0.04] transition-all"
                     >
                         {candidates.map(c => (
                             <option key={c.id} value={c.id}>{c.name || 'İsimsiz'} ({STATUS_LABELS[c.status] || c.status})</option>
@@ -198,7 +223,7 @@ export default function CandidateProcessPage() {
                             {/* Profile Core */}
                             <div className="flex flex-col md:flex-row items-center md:items-start gap-8 flex-1 w-full">
                                 <div className="relative shrink-0">
-                                    <div className="w-28 h-28 rounded-[2.5rem] bg-gradient-to-br from-electric via-blue-600 to-violet-600 flex items-center justify-center text-3xl font-black text-white shadow-2xl shadow-electric/30 uppercase ring-4 ring-white/10 ring-offset-4 ring-offset-navy-950">
+                                    <div className="w-28 h-28 rounded-[2.5rem] bg-gradient-to-br from-electric via-blue-600 to-violet-600 flex items-center justify-center text-3xl font-black text-text-primary shadow-2xl shadow-electric/30 uppercase ring-4 ring-white/10 ring-offset-4 ring-offset-navy-950">
                                         {candidate.name?.substring(0, 2) || 'AD'}
                                     </div>
                                     <div className="absolute -bottom-2 -right-2 w-10 h-10 rounded-2xl bg-navy-900 border-2 border-white/10 flex items-center justify-center shadow-lg">
@@ -209,7 +234,7 @@ export default function CandidateProcessPage() {
                                 <div className="flex-1 text-center md:text-left space-y-4">
                                     <div>
                                         <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mb-2">
-                                            <h2 className="text-3xl md:text-4xl font-black text-white tracking-tight">{candidate.name || 'İsimsiz Aday'}</h2>
+                                            <h2 className="text-3xl md:text-4xl font-black text-text-primary tracking-tight">{candidate.name || 'İsimsiz Aday'}</h2>
                                             <div className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] font-black text-navy-400 uppercase tracking-widest flex items-center gap-1.5">
                                                 <Terminal className="w-3 h-3" /> {candidate.id.substring(0, 8)}
                                             </div>
@@ -241,14 +266,14 @@ export default function CandidateProcessPage() {
                                     </div>
 
                                     <div className="flex flex-wrap justify-center md:justify-start gap-2 pt-2">
-                                        <div className="px-4 py-2 rounded-2xl bg-white/[0.03] border border-white/[0.06] text-xs font-bold text-white flex items-center gap-2">
+                                        <div className="px-4 py-2 rounded-2xl bg-white/[0.03] border border-white/[0.06] text-xs font-bold text-text-primary flex items-center gap-2">
                                             <select
                                                 value={candidate.status}
                                                 onChange={(e) => updateCandidate(candidate.id, { status: e.target.value })}
                                                 className="bg-transparent text-electric font-black uppercase tracking-widest cursor-pointer focus:outline-none"
                                             >
                                                 {Object.entries(STATUS_LABELS).map(([key, label]) => (
-                                                    <option key={key} value={key} className="bg-navy-800 text-white capitalize">{label}</option>
+                                                    <option key={key} value={key} className="bg-navy-800 text-text-primary capitalize">{label}</option>
                                                 ))}
                                             </select>
                                         </div>
@@ -263,19 +288,19 @@ export default function CandidateProcessPage() {
                             <div className="flex flex-col sm:flex-row lg:flex-col gap-4 w-full lg:w-auto shrink-0">
                                 <button
                                     onClick={() => setSendModalPurpose('general')}
-                                    className="px-8 py-4 rounded-[1.5rem] bg-white text-navy-950 font-black text-xs uppercase tracking-widest hover:bg-electric hover:text-white transition-all shadow-xl shadow-white/5 flex items-center justify-center gap-3 group"
+                                    className="px-8 py-4 rounded-[1.5rem] bg-white text-navy-950 font-black text-xs uppercase tracking-widest hover:bg-electric hover:text-text-primary transition-all shadow-xl shadow-white/5 flex items-center justify-center gap-3 group"
                                 >
                                     <Mail className="w-5 h-5" /> Mesaj Gönder
                                 </button>
                                 <button
                                     onClick={() => { setSendModalPurpose('interview'); }}
-                                    className="px-8 py-4 rounded-[1.5rem] bg-electric text-white font-black text-xs uppercase tracking-widest hover:bg-electric-light transition-all shadow-xl shadow-electric/20 flex items-center justify-center gap-3"
+                                    className="px-8 py-4 rounded-[1.5rem] bg-electric text-text-primary font-black text-xs uppercase tracking-widest hover:bg-electric-light transition-all shadow-xl shadow-electric/20 flex items-center justify-center gap-3"
                                 >
                                     <Calendar className="w-5 h-5" /> Mülakat Planla
                                 </button>
                                 <button
                                     onClick={() => window.open(candidate.cvUrl, '_blank')}
-                                    className="px-8 py-4 rounded-[1.5rem] bg-navy-900 border border-white/10 text-white font-black text-xs uppercase tracking-widest hover:bg-white/5 transition-all flex items-center justify-center gap-3"
+                                    className="px-8 py-4 rounded-[1.5rem] bg-navy-900 border border-white/10 text-text-primary font-black text-xs uppercase tracking-widest hover:bg-white/5 transition-all flex items-center justify-center gap-3"
                                 >
                                     <Download className="w-5 h-5 text-navy-400" /> CV İndir
                                 </button>
@@ -300,7 +325,7 @@ export default function CandidateProcessPage() {
                                             {step.status === 'completed' ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> : <div className={`w-1.5 h-1.5 rounded-full ${step.status === 'upcoming' ? 'bg-electric' : 'bg-navy-800'}`} />}
                                         </div>
                                         <div>
-                                            <h4 className={`text-xs font-black uppercase tracking-wider ${step.status === 'completed' ? 'text-white' : step.status === 'upcoming' ? 'text-electric' : step.status === 'rejected' ? 'text-red-400' : 'text-navy-500'}`}>{step.title}</h4>
+                                            <h4 className={`text-xs font-black uppercase tracking-wider ${step.status === 'completed' ? 'text-text-primary' : step.status === 'upcoming' ? 'text-electric' : step.status === 'rejected' ? 'text-red-400' : 'text-navy-500'}`}>{step.title}</h4>
                                             <p className="text-[10px] text-navy-500 font-bold mt-1.5 flex items-center gap-1.5">
                                                 <Clock className="w-3 h-3" /> {step.date}
                                             </p>
@@ -322,7 +347,7 @@ export default function CandidateProcessPage() {
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-[9px] text-navy-500 font-bold uppercase tracking-widest mb-0.5">E-Posta Adresi</p>
-                                        <p className="text-xs text-white font-semibold truncate">{candidate.email || '-'}</p>
+                                        <p className="text-xs text-text-primary font-semibold truncate">{candidate.email || '-'}</p>
                                     </div>
                                 </a>
                                 <a href={`tel:${candidate.phone}`} className="flex items-center gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/[0.05] hover:border-white/10 transition-all group/phone">
@@ -331,20 +356,20 @@ export default function CandidateProcessPage() {
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-[9px] text-navy-500 font-bold uppercase tracking-widest mb-0.5">Telefon Hattı</p>
-                                        <p className="text-xs text-white font-semibold">{candidate.phone || '-'}</p>
+                                        <p className="text-xs text-text-primary font-semibold">{candidate.phone || '-'}</p>
                                     </div>
                                 </a>
                                 <div className="grid grid-cols-2 gap-3 pt-2">
                                     {(candidate.linkedinUrl || candidate.linkedin) && (
                                         <a href={(candidate.linkedinUrl || candidate.linkedin).startsWith('http') ? (candidate.linkedinUrl || candidate.linkedin) : `https://${(candidate.linkedinUrl || candidate.linkedin)}`} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-white/[0.02] border border-black/20 hover:bg-[#0077b5]/10 hover:border-[#0077b5]/30 transition-all group/li">
                                             <Linkedin className="w-5 h-5 text-navy-400 group-hover/li:text-[#0077b5]" />
-                                            <span className="text-[10px] font-black text-navy-500 uppercase group-hover/li:text-white">LinkedIn</span>
+                                            <span className="text-[10px] font-black text-navy-500 uppercase group-hover/li:text-text-primary">LinkedIn</span>
                                         </a>
                                     )}
                                     {candidate.github && (
                                         <a href={candidate.github.startsWith('http') ? candidate.github : `https://github.com/${candidate.github}`} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-white/[0.02] border border-black/20 hover:bg-white/5 hover:border-white/20 transition-all group/gh">
-                                            <Github className="w-5 h-5 text-navy-400 group-hover/gh:text-white" />
-                                            <span className="text-[10px] font-black text-navy-500 uppercase group-hover/gh:text-white">GitHub</span>
+                                            <Github className="w-5 h-5 text-navy-400 group-hover/gh:text-text-primary" />
+                                            <span className="text-[10px] font-black text-navy-500 uppercase group-hover/gh:text-text-primary">GitHub</span>
                                         </a>
                                     )}
                                 </div>
@@ -381,7 +406,7 @@ export default function CandidateProcessPage() {
 
                                 <div className="flex flex-col mb-8">
                                     <div className="flex items-center justify-between">
-                                        <h3 className="text-xl font-black text-white flex items-center gap-4 tracking-tight">
+                                        <h3 className="text-xl font-black text-text-primary flex items-center gap-4 tracking-tight">
                                             <div className="w-12 h-12 rounded-[1.25rem] bg-electric/10 flex items-center justify-center border border-electric/20">
                                                 <MessageSquare className="w-6 h-6 text-electric" />
                                             </div>
@@ -389,7 +414,7 @@ export default function CandidateProcessPage() {
                                         </h3>
                                         <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10">
                                             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                            <span className="text-[10px] font-black text-white uppercase tracking-widest leading-none">
+                                            <span className="text-[10px] font-black text-text-primary uppercase tracking-widest leading-none">
                                                 {candidate.interviewSessions?.length || 0} SEANS
                                             </span>
                                         </div>
@@ -407,7 +432,7 @@ export default function CandidateProcessPage() {
                                             <div className="w-20 h-20 rounded-[2rem] bg-navy-900 border border-white/5 flex items-center justify-center mb-6 relative z-10 shadow-2xl group-hover/empty:scale-110 transition-transform duration-500">
                                                 <MessageSquare className="w-10 h-10 text-navy-700 group-hover/empty:text-electric transition-colors" />
                                             </div>
-                                            <p className="text-sm font-black text-white mb-2 relative z-10 uppercase tracking-widest">Oturum Başlatılmadı</p>
+                                            <p className="text-sm font-black text-text-primary mb-2 relative z-10 uppercase tracking-widest">Oturum Başlatılmadı</p>
                                             <p className="text-[11px] text-navy-500 relative z-10 max-w-[220px] leading-relaxed font-medium">Adayın mülakat performansını takip etmek için ilk oturumu şimdi açın.</p>
                                         </div>
                                     )}
@@ -416,7 +441,7 @@ export default function CandidateProcessPage() {
                                 <div className="mt-auto">
                                     <button
                                         onClick={() => setShowInterviewModal(true)}
-                                        className="w-full py-4.5 rounded-[1.5rem] bg-white/[0.03] hover:bg-white/[0.07] text-white border border-white/10 font-black text-xs uppercase tracking-[0.2em] transition-all duration-300 flex items-center justify-center gap-3 group/btn"
+                                        className="w-full py-4.5 rounded-[1.5rem] bg-white/[0.03] hover:bg-white/[0.07] text-text-primary border border-white/10 font-black text-xs uppercase tracking-[0.2em] transition-all duration-300 flex items-center justify-center gap-3 group/btn"
                                     >
                                         <Activity className="w-5 h-5 text-emerald-400 group-hover/btn:scale-125 transition-transform" /> Canlı Mülakat Notu Gir
                                     </button>
@@ -433,12 +458,12 @@ export default function CandidateProcessPage() {
                                         <FileText className="w-6 h-6 text-purple-400" />
                                     </div>
                                     <div>
-                                        <h3 className="text-xl font-black text-white tracking-tight">Orijinal Özgeçmiş</h3>
+                                        <h3 className="text-xl font-black text-text-primary tracking-tight">Orijinal Özgeçmiş</h3>
                                         <p className="text-[10px] text-navy-500 font-bold uppercase tracking-widest mt-1">Belge Kayıt & Önizleme</p>
                                     </div>
                                 </div>
                                 {candidate.cvUrl && (
-                                    <a href={candidate.cvUrl} target="_blank" rel="noopener noreferrer" className="px-6 py-3 rounded-2xl bg-white/5 hover:bg-white/10 text-white text-[10px] font-black uppercase tracking-widest border border-white/10 hover:border-purple-500/30 transition-all flex items-center gap-2">
+                                    <a href={candidate.cvUrl} target="_blank" rel="noopener noreferrer" className="px-6 py-3 rounded-2xl bg-white/5 hover:bg-white/10 text-text-primary text-[10px] font-black uppercase tracking-widest border border-white/10 hover:border-purple-500/30 transition-all flex items-center gap-2">
                                         <ExternalLink className="w-4 h-4" /> Tam Ekran
                                     </a>
                                 )}
@@ -461,7 +486,7 @@ export default function CandidateProcessPage() {
                                             <FileText className="w-10 h-10 text-navy-600" />
                                         </div>
                                         <div>
-                                            <h4 className="text-lg font-bold text-white">Orijinal Belge Mevcut Değil</h4>
+                                            <h4 className="text-lg font-bold text-text-primary">Orijinal Belge Mevcut Değil</h4>
                                             <p className="text-sm text-navy-400 max-w-sm mx-auto mt-2">
                                                 KVKK ve veri minimizasyonu politikası gereği ham belgeler 15 gün sonra güvenli bir şekilde silinmektedir.
                                                 <br /><br />

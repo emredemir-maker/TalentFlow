@@ -60,7 +60,7 @@ export default function PotentialCandidatesTab({ position, candidates, onCandida
         <div className="animate-in fade-in slide-in-from-top-2">
             <div className="flex items-center gap-2 mb-4 px-1">
                 <Sparkles className="w-4 h-4 text-emerald-400" />
-                <h4 className="text-sm font-bold text-white">Akıllı Pozisyon Uyumluluk Analizi</h4>
+                <h4 className="text-sm font-bold text-text-primary">Akıllı Pozisyon Uyumluluk Analizi</h4>
             </div>
 
             <div className="space-y-3">
@@ -78,7 +78,7 @@ export default function PotentialCandidatesTab({ position, candidates, onCandida
                                     {idx + 1}
                                 </span>
                                 <div>
-                                    <h5 className="text-sm font-bold text-white group-hover:text-electric-light transition-colors">
+                                    <h5 className="text-sm font-bold text-text-primary group-hover:text-electric-light transition-colors">
                                         {candidate.name}
                                     </h5>
                                     <div className="flex items-center gap-2 mt-1">
@@ -94,7 +94,7 @@ export default function PotentialCandidatesTab({ position, candidates, onCandida
                                 </div>
                             </div>
 
-                            <button className="p-1.5 rounded-lg text-navy-400 hover:text-white hover:bg-white/[0.1] transition-all">
+                            <button className="p-1.5 rounded-lg text-navy-400 hover:text-text-primary hover:bg-white/[0.1] transition-all">
                                 <ArrowUpRight className="w-4 h-4" />
                             </button>
                         </div>

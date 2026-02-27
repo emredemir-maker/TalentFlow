@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { generatePersonalizedDM } from '../services/geminiService';
 import { useAuth } from '../context/AuthContext';
-import { sendDirectEmail, createDirectCalendarEvent } from '../services/integrationService';
+import { sendDirectEmail, createDirectCalendarEvent, connectGoogleWorkspace } from '../services/integrationService';
 
 export default function SendMessageModal({ candidate, onClose, onSent, initialPurpose = 'interview' }) {
     const { userId, userProfile } = useAuth();
@@ -161,6 +161,24 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
         }
     }
 
+    async function handleReconnect() {
+        setSending(true);
+        setError(null);
+        try {
+            const res = await connectGoogleWorkspace(userId);
+            if (res.success) {
+                setError(null);
+                // The sync will happen via AuthContext
+            } else {
+                setError("Yeniden bağlanılamadı: " + res.error);
+            }
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setSending(false);
+        }
+    }
+
     function handleOpenFallback(client = 'default') {
         const toEmail = candidate.email || '';
         const fullSubject = `${messageSubject} [#${trackingId}]`;
@@ -203,24 +221,24 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
                                     <Mail className="w-6 h-6 text-electric" />
                                 </div>
                                 <div>
-                                    <h2 className="text-xl font-black text-white tracking-tight">Aday İletişimi</h2>
+                                    <h2 className="text-xl font-black text-text-primary tracking-tight">Aday İletişimi</h2>
                                     <p className="text-xs text-navy-400 font-medium">Yapay Zeka Destekli Mesajlaşma</p>
                                 </div>
                             </div>
-                            <button onClick={onClose} className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-navy-400 hover:text-white transition-all">
+                            <button onClick={onClose} className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-navy-400 hover:text-text-primary transition-all">
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
 
                         {/* CANDIDATE STRIP */}
                         <div className="flex items-center gap-4 p-4 rounded-3xl bg-white/[0.03] border border-white/[0.06] backdrop-blur-xl">
-                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-electric to-blue-600 flex items-center justify-center text-lg font-bold text-white shadow-xl shadow-electric/10 shrink-0">
+                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-electric to-blue-600 flex items-center justify-center text-lg font-bold text-text-primary shadow-xl shadow-electric/10 shrink-0">
                                 {candidate.name?.[0].toUpperCase()}
                             </div>
                             <div className="flex-1 min-w-0">
-                                <h4 className="text-sm font-bold text-white truncate">{candidate.name || 'İsimsiz Aday'}</h4>
+                                <h4 className="text-sm font-bold text-text-primary truncate">{candidate.name || 'İsimsiz Aday'}</h4>
                                 <div className="flex items-center gap-2 mt-0.5 opacity-60">
-                                    <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded-full font-bold text-white uppercase tracking-wider truncate max-w-full">
+                                    <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded-full font-bold text-text-primary uppercase tracking-wider truncate max-w-full">
                                         {candidate.matchedPositionTitle || candidate.position || 'Genel Başvuru'}
                                     </span>
                                 </div>
@@ -246,7 +264,7 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
                                     key={t.id}
                                     onClick={() => generateDM(t.id)}
                                     disabled={generating}
-                                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-2xl text-[11px] font-bold transition-all duration-300 ${purpose === t.id ? 'bg-white/10 text-white shadow-lg' : 'text-navy-400 hover:text-white hover:bg-white/5'}`}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-2xl text-[11px] font-bold transition-all duration-300 ${purpose === t.id ? 'bg-white/10 text-text-primary shadow-lg' : 'text-navy-400 hover:text-text-primary hover:bg-white/5'}`}
                                 >
                                     <t.icon className="w-3.5 h-3.5" /> {t.label}
                                 </button>
@@ -281,13 +299,13 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
                                             </div>
                                             <div className="flex items-center gap-4">
                                                 <div className="flex flex-col items-end gap-1">
-                                                    <span className="text-[9px] text-white font-bold uppercase">Takvime Ekle</span>
+                                                    <span className="text-[9px] text-text-primary font-bold uppercase">Takvime Ekle</span>
                                                     <button onClick={() => setSyncToCalendar(!syncToCalendar)} className={`w-8 h-4 rounded-full transition-colors relative ${syncToCalendar ? 'bg-emerald-500' : 'bg-navy-800'}`}>
                                                         <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all ${syncToCalendar ? 'left-4.5' : 'left-0.5'}`} />
                                                     </button>
                                                 </div>
                                                 <div className="flex flex-col items-end gap-1">
-                                                    <span className="text-[9px] text-white font-bold uppercase">E-posta Gönder</span>
+                                                    <span className="text-[9px] text-text-primary font-bold uppercase">E-posta Gönder</span>
                                                     <button onClick={() => setSendCandidateEmail(!sendCandidateEmail)} className={`w-8 h-4 rounded-full transition-colors relative ${sendCandidateEmail ? 'bg-electric' : 'bg-navy-800'}`}>
                                                         <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all ${sendCandidateEmail ? 'left-4.5' : 'left-0.5'}`} />
                                                     </button>
@@ -307,7 +325,7 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
                                                         type="date"
                                                         value={interviewDate}
                                                         onChange={(e) => setInterviewDate(e.target.value)}
-                                                        className="w-full bg-navy-950/80 border border-white/5 group-hover/date:border-electric/30 rounded-2xl py-3 pl-10 pr-4 text-xs text-white outline-none focus:border-electric transition-all cursor-pointer font-bold [color-scheme:dark]"
+                                                        className="w-full bg-navy-950/80 border border-white/5 group-hover/date:border-electric/30 rounded-2xl py-3 pl-10 pr-4 text-xs text-text-primary outline-none focus:border-electric transition-all cursor-pointer font-bold [color-scheme:dark]"
                                                     />
                                                 </div>
                                             </div>
@@ -321,7 +339,7 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
                                                     <select
                                                         value={interviewTime}
                                                         onChange={(e) => setInterviewTime(e.target.value)}
-                                                        className="w-full bg-navy-950/80 border border-white/5 group-hover/time:border-electric/30 rounded-2xl py-3 pl-10 pr-8 text-xs text-white outline-none focus:border-electric transition-all cursor-pointer font-bold appearance-none"
+                                                        className="w-full bg-navy-950/80 border border-white/5 group-hover/time:border-electric/30 rounded-2xl py-3 pl-10 pr-8 text-xs text-text-primary outline-none focus:border-electric transition-all cursor-pointer font-bold appearance-none"
                                                     >
                                                         <option value="">Seçin</option>
                                                         {Array.from({ length: 24 }, (_, i) => {
@@ -343,7 +361,7 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
                                                     <select
                                                         value={duration}
                                                         onChange={(e) => setDuration(Number(e.target.value))}
-                                                        className="w-full bg-navy-950/80 border border-white/5 group-hover/duration:border-purple-500/30 rounded-2xl py-3 pl-10 pr-8 text-xs text-white outline-none focus:border-purple-500 transition-all cursor-pointer font-bold appearance-none"
+                                                        className="w-full bg-navy-950/80 border border-white/5 group-hover/duration:border-purple-500/30 rounded-2xl py-3 pl-10 pr-8 text-xs text-text-primary outline-none focus:border-purple-500 transition-all cursor-pointer font-bold appearance-none"
                                                     >
                                                         {[15, 30, 45, 60, 90, 120].map(mins => (
                                                             <option key={mins} value={mins} className="bg-navy-900">
@@ -363,7 +381,7 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
                                         {generating ? <RefreshCcw className="w-3.5 h-3.5 text-electric animate-spin" /> : <Sparkles className="w-3.5 h-3.5 text-electric" />}
-                                        <span className="text-[10px] font-black text-white uppercase tracking-widest">{generating ? 'AI Oluşturuyor...' : 'E-posta İçeriği'}</span>
+                                        <span className="text-[10px] font-black text-text-primary uppercase tracking-widest">{generating ? 'AI Oluşturuyor...' : 'E-posta İçeriği'}</span>
                                     </div>
                                     <div className="flex items-center gap-3">
                                         {purpose === 'interview' && (
@@ -377,7 +395,7 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
                                                 <Layers className="w-3 h-3" /> Tarihi Metne Uygula
                                             </button>
                                         )}
-                                        <button onClick={() => setIsEditing(!isEditing)} className="text-[10px] font-bold text-navy-400 hover:text-white transition-colors flex items-center gap-1.5 border-b border-navy-400/20">
+                                        <button onClick={() => setIsEditing(!isEditing)} className="text-[10px] font-bold text-navy-400 hover:text-text-primary transition-colors flex items-center gap-1.5 border-b border-navy-400/20">
                                             <Edit3 className="w-3 h-3" /> {isEditing ? 'Önizleme' : 'Metni Düzenle'}
                                         </button>
                                     </div>
@@ -389,7 +407,7 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
                                             <input
                                                 value={messageSubject}
                                                 onChange={(e) => setMessageSubject(e.target.value)}
-                                                className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-5 text-sm font-bold text-white outline-none focus:border-electric/40"
+                                                className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-5 text-sm font-bold text-text-primary outline-none focus:border-electric/40"
                                                 placeholder="Konu başlığı..."
                                             />
                                             <textarea
@@ -403,7 +421,7 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
                                         </div>
                                     ) : (
                                         <div className="p-6 rounded-[32px] bg-white/[0.03] border border-white/[0.08] hover:border-white/[0.15] transition-all cursor-text" onClick={() => setIsEditing(true)}>
-                                            <div className="text-[10px] text-navy-500 font-bold uppercase mb-2">Konu: <span className="text-white">{messageSubject}</span></div>
+                                            <div className="text-[10px] text-navy-500 font-bold uppercase mb-2">Konu: <span className="text-text-primary">{messageSubject}</span></div>
                                             <p className="text-sm text-navy-200 leading-relaxed whitespace-pre-wrap">{messageContent}</p>
                                         </div>
                                     )}
@@ -411,9 +429,21 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
                             </div>
 
                             {error && (
-                                <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-start gap-3 animate-shake">
-                                    <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-                                    <p className="text-xs text-red-400 font-medium">{error}</p>
+                                <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 flex flex-col gap-3 animate-shake">
+                                    <div className="flex items-start gap-3">
+                                        <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                                        <p className="text-xs text-red-400 font-medium">{error}</p>
+                                    </div>
+                                    {error.includes('Oturum süresi dolmuş') && (
+                                        <button
+                                            onClick={handleReconnect}
+                                            disabled={sending}
+                                            className="ml-7 flex items-center gap-2 text-[10px] font-black text-text-primary bg-red-500/20 px-4 py-2 rounded-xl border border-red-500/30 hover:bg-red-500/40 transition-all uppercase tracking-widest w-fit"
+                                        >
+                                            {sending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCcw className="w-3 h-3" />}
+                                            Google Bağlantısını Tazele
+                                        </button>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -425,7 +455,7 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
                             <button
                                 onClick={handleDirectSend}
                                 disabled={sending || generating || (!sendCandidateEmail && purpose !== 'interview') || (purpose === 'interview' && !syncToCalendar && !sendCandidateEmail) || (purpose === 'interview' && (syncToCalendar || sendCandidateEmail) && (!interviewDate || !interviewTime))}
-                                className={`w-full py-4 rounded-[20px] bg-gradient-to-r ${sendCandidateEmail ? 'from-electric to-blue-600 shadow-electric/20' : 'from-emerald-500 to-teal-600 shadow-emerald-500/20'} font-black text-sm text-white shadow-2xl hover:translate-y-[-2px] active:translate-y-0 transition-all duration-300 flex items-center justify-center gap-3 disabled:opacity-50 disabled:translate-y-0 group relative overflow-hidden`}
+                                className={`w-full py-4 rounded-[20px] bg-gradient-to-r ${sendCandidateEmail ? 'from-electric to-blue-600 shadow-electric/20' : 'from-emerald-500 to-teal-600 shadow-emerald-500/20'} font-black text-sm text-text-primary shadow-2xl hover:translate-y-[-2px] active:translate-y-0 transition-all duration-300 flex items-center justify-center gap-3 disabled:opacity-50 disabled:translate-y-0 group relative overflow-hidden`}
                             >
                                 <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
                                 {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : sendCandidateEmail ? <Send className="w-5 h-5" /> : <Calendar className="w-5 h-5" />}
@@ -446,16 +476,16 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
 
                         <div className="grid grid-cols-3 gap-3">
                             <button onClick={handleCopy} className="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 transition-all group">
-                                {copied ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-navy-400 group-hover:text-white" />}
-                                <span className="text-[9px] font-black text-navy-400 group-hover:text-white uppercase">Kopyala</span>
+                                {copied ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-navy-400 group-hover:text-text-primary" />}
+                                <span className="text-[9px] font-black text-navy-400 group-hover:text-text-primary uppercase">Kopyala</span>
                             </button>
                             <button onClick={() => handleOpenFallback('gmail')} className="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 transition-all group">
                                 <Mail className="w-4 h-4 text-rose-400 group-hover:text-rose-300" />
-                                <span className="text-[9px] font-black text-navy-400 group-hover:text-white uppercase">Gmail Web</span>
+                                <span className="text-[9px] font-black text-navy-400 group-hover:text-text-primary uppercase">Gmail Web</span>
                             </button>
                             <button onClick={onClose} className="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 transition-all group">
-                                <X className="w-4 h-4 text-navy-400 group-hover:text-white" />
-                                <span className="text-[9px] font-black text-navy-400 group-hover:text-white uppercase">Vazgeç</span>
+                                <X className="w-4 h-4 text-navy-400 group-hover:text-text-primary" />
+                                <span className="text-[9px] font-black text-navy-400 group-hover:text-text-primary uppercase">Vazgeç</span>
                             </button>
                         </div>
                     </div>

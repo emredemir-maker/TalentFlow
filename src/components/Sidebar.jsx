@@ -13,7 +13,8 @@ import {
     Briefcase,
     Shield,
     LogOut,
-    Search
+    Search,
+    Building2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -42,16 +43,15 @@ export default function Sidebar({ activeView, onNavigate, collapsed, onToggleCol
           transition-all duration-300 ease-out
           ${collapsed ? 'w-[72px]' : 'w-[220px]'}`}
             >
-                {/* Logo */}
-                <div className={`flex items-center gap-3 px-4 h-16 border-b border-border-subtle shrink-0 ${collapsed ? 'justify-center' : ''}`}>
-                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-electric to-cyan-accent flex items-center justify-center shrink-0 shadow-[0_0_20px_rgba(59,130,246,0.3)]">
-                        <Zap className="w-5 h-5 text-white" />
+                {/* Logo Section */}
+                <div className={`flex flex-col justify-center py-6 border-b border-border-subtle shrink-0 ${collapsed ? 'px-2 items-center' : 'px-6 items-start'}`}>
+                    <div className={`transition-all duration-300 ${collapsed ? 'w-10 h-10' : 'w-full h-14 flex items-center justify-start'} shrink-0 overflow-hidden`}>
+                        <img
+                            src={collapsed ? "/favicon.png" : "/logo.png"}
+                            alt="TalentFlow Logo"
+                            className={`transition-all duration-300 ${collapsed ? 'w-full h-full object-contain' : 'max-w-full max-h-full object-contain object-left'}`}
+                        />
                     </div>
-                    {!collapsed && (
-                        <span className="text-lg font-extrabold tracking-tight bg-gradient-to-r from-electric-light to-cyan-accent bg-clip-text text-transparent">
-                            TalentFlow
-                        </span>
-                    )}
                 </div>
 
                 {/* Nav items */}
@@ -102,6 +102,48 @@ export default function Sidebar({ activeView, onNavigate, collapsed, onToggleCol
                             )}
                         </button>
                     )}
+
+                    {/* Department Management (Admin Only) */}
+                    {isSuperAdmin && (
+                        <button
+                            onClick={() => onNavigate('departments')}
+                            title={collapsed ? 'Departmanlar' : undefined}
+                            className={`group relative flex items-center gap-3 rounded-xl transition-all duration-200 cursor-pointer
+                            ${collapsed ? 'justify-center px-0 py-3' : 'px-3 py-2.5'}
+                            ${activeView === 'departments'
+                                    ? 'bg-amber-500/10 text-amber-400'
+                                    : 'text-navy-400 hover:text-amber-300 hover:bg-amber-500/5'}`}
+                        >
+                            {activeView === 'departments' && (
+                                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-amber-500" />
+                            )}
+                            <Building2 className={`w-5 h-5 shrink-0 transition-colors ${activeView === 'departments' ? 'text-amber-400' : 'text-navy-500 group-hover:text-amber-400'}`} />
+                            {!collapsed && (
+                                <span className="text-[13px] font-bold">Departmanlar</span>
+                            )}
+                        </button>
+                    )}
+
+                    {/* Source Management (Admin Only) */}
+                    {isSuperAdmin && (
+                        <button
+                            onClick={() => onNavigate('sources')}
+                            title={collapsed ? 'Kaynak Yönetimi' : undefined}
+                            className={`group relative flex items-center gap-3 rounded-xl transition-all duration-200 cursor-pointer
+                            ${collapsed ? 'justify-center px-0 py-3' : 'px-3 py-2.5'}
+                            ${activeView === 'sources'
+                                    ? 'bg-indigo-500/10 text-indigo-400'
+                                    : 'text-navy-400 hover:text-indigo-300 hover:bg-indigo-500/5'}`}
+                        >
+                            {activeView === 'sources' && (
+                                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-indigo-500" />
+                            )}
+                            <Globe className={`w-5 h-5 shrink-0 transition-colors ${activeView === 'sources' ? 'text-indigo-400' : 'text-navy-500 group-hover:text-indigo-400'}`} />
+                            {!collapsed && (
+                                <span className="text-[13px] font-bold">Kaynak Yönetimi</span>
+                            )}
+                        </button>
+                    )}
                 </nav>
 
                 {/* Settings + Collapse */}
@@ -141,7 +183,7 @@ export default function Sidebar({ activeView, onNavigate, collapsed, onToggleCol
                     {/* User pill */}
                     {!collapsed && userProfile && (
                         <div className="mt-2 flex items-center gap-2.5 p-2.5 rounded-xl bg-navy-800/10 border border-border-subtle">
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-[11px] font-bold text-white shrink-0">
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-[11px] font-bold text-text-primary shrink-0">
                                 {userProfile.displayName?.substring(0, 2).toUpperCase() || 'U'}
                             </div>
                             <div className="min-w-0 flex-1">
@@ -149,7 +191,7 @@ export default function Sidebar({ activeView, onNavigate, collapsed, onToggleCol
                                     {userProfile.displayName || 'Kullanıcı'}
                                 </div>
                                 <div className="text-[9px] text-navy-500 truncate font-mono uppercase tracking-widest">
-                                    {userProfile.role === 'super_admin' ? 'Süper Yönetici' : 'Recruiter'}
+                                    {userProfile.role === 'super_admin' ? 'Süper Yönetici' : userProfile.role === 'department_user' ? `Dept: ${userProfile.department || ''}` : 'Recruiter'}
                                 </div>
                             </div>
                         </div>

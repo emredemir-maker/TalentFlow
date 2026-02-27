@@ -5,6 +5,7 @@
  */
 
 import { getModel } from './ai/config.js';
+import { parseAIJson, buildStructuredPrompt, sanitizeForPrompt } from './ai/utils.js';
 import {
     extractCandidateEvidence,
     extractPositionFromJD,
@@ -35,14 +36,13 @@ export {
 };
 
 export async function parseCandidateFromText(text, modelId = 'gemini-2.0-flash') {
-    const model = getModel(modelId);
-    const prompt = `Sen bir uzman İK Profil Ayrıştırıcısısın (CV Parser). Aşağıdaki profil metninden aday bilgilerini çıkart.
+    const instruction = `Sen bir uzman İK Profil Ayrıştırıcısısın (CV Parser). Aşağıdaki profil metninden aday bilgilerini çıkart.
 
 ÇOK ÖNEMLİ KURALLAR (KVKK / GDPR UYGUNLUĞU İÇİN):
 Ad, iletişim bilgileri gibi kişisel nitelikli verileri sadece kendi alanlarında (name, email, phone, vb.) tut.
-'cvData' alanında ise adayın TÜM PROFESYONEL GEÇMİŞİNİ (iş tecrübeleri, görev tanımları, başarıları, eğitimleri, sertifikaları, yetenekleri) İSİM VE İLETİŞİM BİLGİSİNDEN ARINDIRILMIŞ ŞEKİLDE kelimesi kelimesine detaylıca yaz. (Bu veri, KVKK kapsamında adayın "gerçek" CV'si silindikten sonra bile AI skorlamasının doğru çalışması için detaylı teknik veri olarak saklanacaktır, asla kısa özet geçme, tüm tecrübeleri uzunca dök).
+'cvData' alanunda ise adayın TÜM PROFESYONEL GEÇMİŞİNİ (iş tecrübeleri, görev tanımları, başarıları, eğitimleri, sertifikaları, yetenekleri) İSİM VE İLETİŞİM BİLGİSİNDEN ARINDIRILMIŞ ŞEKİLDE kelimesi kelimesine detaylıca yaz.
 
-Sadece şu JSON formatında dön (başka hiçbir şey yazma):
+Sadece şu JSON formatında dön:
 {
   "name": "Ad Soyad",
   "email": "Adayın e-posta adresi",
@@ -52,20 +52,16 @@ Sadece şu JSON formatında dön (başka hiçbir şey yazma):
   "company": "Mevcut Şirket",
   "location": "Şehir, Ülke",
   "skills": ["Yetenek1", "Yetenek2"],
-  "experience": <toplam_yıl_sayısı_integer_olarak>,
+  "experience": <integer>,
   "education": "Son Okul / Bölüm",
-  "summary": "Mülakatçı için kısa önizleme / uyarı özeti (Türkçe, max 400 karakter)",
-  "cvData": "Ad-soyad ve iletişim bilgilerinden arındırılmış, tüm iş geçmişinin, eğitimlerin ve yetkinliklerin DEV ve DETAYLI dökümü."
-}
+  "summary": "Kısa önizleme özeti (Turkish)",
+  "cvData": "Detaylı döküm."
+}`;
 
-Eksik alanlar için null kullan.
-
-PROFİL METNİ:
-${text.substring(0, 20000)}`;
-
+    const prompt = buildStructuredPrompt(instruction, { "PROFIL_METNI": sanitizeForPrompt(text, 20000) });
+    const model = await getModel(modelId);
     const result = await model.generateContent(prompt);
-    const raw = result.response.text().replace(/```json|```/gi, '').trim();
-    return JSON.parse(raw);
+    return parseAIJson(result.response.text());
 }
 
 export async function getAvailableModels() {
@@ -104,8 +100,8 @@ function calculateHybridScore(data) {
     return Math.min(score, 100);
 }
 
-export async function analyzeCandidateMatch(jobDescription, candidateProfile) {
-    const evidence = await extractCandidateEvidence(jobDescription, candidateProfile);
+export async function analyzeCandidateMatch(jobDescription, candidateProfile, modelId = 'gemini-2.0-flash') {
+    const evidence = await extractCandidateEvidence(jobDescription, candidateProfile, modelId);
     const score = calculateHybridScore(evidence.extractedData);
 
     return {

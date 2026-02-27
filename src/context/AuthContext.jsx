@@ -113,6 +113,7 @@ export function AuthProvider({ children }) {
                             displayName: currentUser.displayName || emailLower.split('@')[0],
                             photoURL: currentUser.photoURL || '',
                             role: invitation.role || 'recruiter',
+                            departments: invitation.departments ? invitation.departments : (invitation.department ? [invitation.department] : []),
                             status: 'active',
                             createdAt: serverTimestamp()
                         };
@@ -199,6 +200,7 @@ export function AuthProvider({ children }) {
                 displayName: name,
                 photoURL: '',
                 role: (isPrimaryAdmin || isFirstUser) ? 'super_admin' : (invitation?.role || 'recruiter'),
+                departments: invitation?.departments ? invitation.departments : (invitation?.department ? [invitation.department] : []),
                 status: 'active',
                 createdAt: serverTimestamp()
             };
@@ -242,6 +244,8 @@ export function AuthProvider({ children }) {
         userProfile,
         role: userProfile?.role || null,
         isSuperAdmin: userProfile?.role === 'super_admin',
+        isDepartmentUser: userProfile?.role === 'department_user',
+        userDepartments: userProfile?.departments || (userProfile?.department ? [userProfile.department] : []),
         userId: user?.uid || null,
         isAuthenticated: !!user && !!userProfile,
         loading,

@@ -13,7 +13,7 @@ const CandidatesContext = createContext(null);
 const CANDIDATES_COLLECTION = 'artifacts/talent-flow/public/data/candidates';
 
 export function CandidatesProvider({ children }) {
-    const { isAuthenticated, loading: authLoading } = useAuth();
+    const { isAuthenticated, loading: authLoading, isDepartmentUser, userDepartments, role } = useAuth();
     const [candidates, setCandidates] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -25,6 +25,8 @@ export function CandidatesProvider({ children }) {
     const [statusFilter, setStatusFilter] = useState('all');
     const [experienceFilter, setExperienceFilter] = useState('all');
     const [positionFilter, setPositionFilter] = useState('all');
+    const [sourceFilter, setSourceFilter] = useState('all');
+    const [subSourceFilter, setSubSourceFilter] = useState('all');
 
     // CRUD Operations
     const addCandidate = async (candidateData) => {
@@ -142,7 +144,16 @@ export function CandidatesProvider({ children }) {
                 hasInterview
             };
         });
-    }, [candidates]);
+
+        if (isDepartmentUser && userDepartments?.length > 0) {
+            return enrichedCandidates.filter(c =>
+                userDepartments.includes(c.department) ||
+                (c.visibleToDepartments && c.visibleToDepartments.some(d => userDepartments.includes(d)))
+            );
+        }
+
+        return enrichedCandidates;
+    }, [candidates, isDepartmentUser, userDepartments]);
 
     // Client-side filtering (Rule 2 - no orderBy/limit queries)
     const filteredCandidates = useMemo(() => {
@@ -186,8 +197,18 @@ export function CandidatesProvider({ children }) {
             result = result.filter((c) => c.bestTitle === positionFilter);
         }
 
+        // Source filter
+        if (sourceFilter !== 'all') {
+            result = result.filter((c) => c.source === sourceFilter);
+        }
+
+        // Sub-source filter
+        if (subSourceFilter !== 'all') {
+            result = result.filter((c) => c.sourceDetail === subSourceFilter);
+        }
+
         return result;
-    }, [enrichedCandidates, searchQuery, departmentFilter, statusFilter, experienceFilter, positionFilter]);
+    }, [enrichedCandidates, searchQuery, departmentFilter, statusFilter, experienceFilter, positionFilter, sourceFilter, subSourceFilter]);
 
     // Extract unique departments and matched positions for filter options
     const departments = useMemo(() => {
@@ -199,6 +220,16 @@ export function CandidatesProvider({ children }) {
         const titleSet = new Set(enrichedCandidates.map((c) => c.bestTitle).filter(Boolean));
         return ['all', ...Array.from(titleSet).sort()];
     }, [enrichedCandidates]);
+
+    const sourcesOptions = useMemo(() => {
+        const srcSet = new Set(candidates.map((c) => c.source).filter(Boolean));
+        return ['all', ...Array.from(srcSet).sort()];
+    }, [candidates]);
+
+    const subSourcesOptions = useMemo(() => {
+        const subSet = new Set(candidates.map((c) => c.sourceDetail).filter(Boolean));
+        return ['all', ...Array.from(subSet).sort()];
+    }, [candidates]);
 
     // Stats
     const stats = useMemo(() => ({
@@ -243,6 +274,12 @@ export function CandidatesProvider({ children }) {
         setPositionFilter,
         matchPositions,
         enrichedCandidates,
+        sourceFilter,
+        setSourceFilter,
+        sourcesOptions,
+        subSourceFilter,
+        setSubSourceFilter,
+        subSourcesOptions,
 
         // Navigation / Detailed View
         viewCandidateId,

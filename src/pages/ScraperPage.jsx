@@ -126,7 +126,8 @@ export default function ScraperPage() {
         setAutoResults([]);
 
         try {
-            const response = await fetch(`/api/scrape?q=${encodeURIComponent(searchQuery)}&visual=${visual}`);
+            const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+            const response = await fetch(`${serverUrl}/api/scrape?q=${encodeURIComponent(searchQuery)}&visual=${visual}`);
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({ error: 'Bilinmeyen sunucu hatası.' }));
@@ -164,7 +165,8 @@ export default function ScraperPage() {
     const handleSetupBrowser = async () => {
         setAutoScraping(true);
         try {
-            await fetch('/api/scrape?q=https://www.linkedin.com/login&visual=true');
+            const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+            await fetch(`${serverUrl}/api/scrape?q=https://www.linkedin.com/login&visual=true`);
         } catch (err) {
             alert('Tarayıcı açılamadı: ' + err.message);
         } finally {
@@ -183,7 +185,7 @@ export default function ScraperPage() {
                         <DownloadCloud className="w-6 h-6" />
                     </div>
                     <div>
-                        <h2 className="text-xl font-bold text-white mb-2">LinkedIn Profilini Adaya Dönüştür</h2>
+                        <h2 className="text-xl font-bold text-text-primary mb-2">LinkedIn Profilini Adaya Dönüştür</h2>
                         <p className="text-sm text-navy-300 leading-relaxed">
                             Aşağıdaki yöntemlerden birini kullanarak adayları sisteme ekleyin.
                         </p>
@@ -201,7 +203,7 @@ export default function ScraperPage() {
                                 <Search className="w-24 h-24 text-electric" />
                             </div>
 
-                            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                            <h3 className="text-lg font-bold text-text-primary mb-4 flex items-center gap-2">
                                 <Search className="w-5 h-5 text-electric" />
                                 URL ile Çek veya Otomatik Arama
                             </h3>
@@ -219,7 +221,7 @@ export default function ScraperPage() {
                                     <button
                                         onClick={() => handleAutoScrape(false)}
                                         disabled={autoScraping || !searchQuery.trim() || !kvkkChecked}
-                                        className="px-6 py-3 rounded-xl bg-electric text-white font-bold hover:bg-electric-light transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                        className="px-6 py-3 rounded-xl bg-electric text-text-primary font-bold hover:bg-electric-light transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                                         type="button"
                                     >
                                         {autoScraping ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Çek / Ara'}
@@ -250,7 +252,7 @@ export default function ScraperPage() {
                                 <div className="flex justify-center">
                                     <button
                                         onClick={handleSetupBrowser}
-                                        className="text-[11px] text-navy-400 hover:text-white underline decoration-navy-600 transition-colors"
+                                        className="text-[11px] text-navy-400 hover:text-text-primary underline decoration-navy-600 transition-colors"
                                     >
                                         ⚙️ Tarayıcıda Oturumu Hazırla (İlk Sefer İçin Giriş Yap)
                                     </button>
@@ -279,7 +281,7 @@ export default function ScraperPage() {
 (async () => {
   const isSearch = window.location.href.includes('/search/');
   const endpoint = isSearch ? '/api/bulk-add' : '/api/direct-add';
-  const server = 'http://localhost:3001';
+  const server = '${import.meta.env.VITE_SERVER_URL || 'http://localhost:3001'}';
   
   if (isSearch) {
     const items = Array.from(document.querySelectorAll('.artdeco-list__item')).slice(0, 10);
@@ -306,11 +308,11 @@ export default function ScraperPage() {
                                     </pre>
                                     <button
                                         onClick={() => {
-                                            const code = `(async () => { const isSearch = window.location.href.includes('/search/'); const endpoint = isSearch ? '/api/bulk-add' : '/api/direct-add'; const server = 'http://localhost:3001'; if (isSearch) { alert('Toplu tarama başlıyor (İlk 10 aday)...'); const items = Array.from(document.querySelectorAll('.artdeco-list__item')).slice(0, 10); const candidates = items.map(i => ({ text: i.innerText, url: i.querySelector('a')?.href })); const res = await fetch(server + endpoint, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ candidates }) }); const data = await res.json(); alert('Toplu Ekleme Başarılı: ' + data.addedCount + ' aday.'); } else { const text = document.body.innerText; const url = window.location.href; const res = await fetch(server + endpoint, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ text, url }) }); const data = await res.json(); alert('Aday Eklendi: ' + data.candidate.name); } })();`;
+                                            const code = `(async () => { const isSearch = window.location.href.includes('/search/'); const endpoint = isSearch ? '/api/bulk-add' : '/api/direct-add'; const server = '${import.meta.env.VITE_SERVER_URL || 'http://localhost:3001'}'; if (isSearch) {alert('Toplu tarama başlıyor (İlk 10 aday)...'); const items = Array.from(document.querySelectorAll('.artdeco-list__item')).slice(0, 10); const candidates = items.map(i => ({text: i.innerText, url: i.querySelector('a')?.href })); const res = await fetch(server + endpoint, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({candidates}) }); const data = await res.json(); alert('Toplu Ekleme Başarılı: ' + data.addedCount + ' aday.'); } else { const text = document.body.innerText; const url = window.location.href; const res = await fetch(server + endpoint, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({text, url}) }); const data = await res.json(); alert('Aday Eklendi: ' + data.candidate.name); } })();`;
                                             navigator.clipboard.writeText(code);
                                             alert('Pro Kod kopyalandı! Sales Navigator sayfasında konsola (F12) yapıştırın.');
                                         }}
-                                        className="absolute top-2 right-2 p-2 rounded-lg bg-emerald-500 text-white hover:bg-emerald-400 transition-all shadow-lg shadow-emerald-500/20 group-hover:scale-110 active:scale-95"
+                                        className="absolute top-2 right-2 p-2 rounded-lg bg-emerald-500 text-text-primary hover:bg-emerald-400 transition-all shadow-lg shadow-emerald-500/20 group-hover:scale-110 active:scale-95"
                                         title="Pro Kodu Kopyala"
                                     >
                                         <div className="flex items-center gap-2 text-xs font-bold px-2">
@@ -364,7 +366,7 @@ export default function ScraperPage() {
                                 />
                                 <label
                                     htmlFor="bulk-upload"
-                                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.06] text-navy-300 text-sm font-semibold hover:bg-white/[0.08] hover:text-white transition-all cursor-pointer ${loading ? 'opacity-50 pointer-events-none' : ''}`}
+                                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.06] text-navy-300 text-sm font-semibold hover:bg-white/[0.08] hover:text-text-primary transition-all cursor-pointer ${loading ? 'opacity-50 pointer-events-none' : ''}`}
                                 >
                                     <Upload className="w-4 h-4" />
                                     JSON Yükle
@@ -373,7 +375,7 @@ export default function ScraperPage() {
                                 <button
                                     onClick={handleParse}
                                     disabled={loading || !textInput.trim() || !kvkkChecked}
-                                    className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 text-white font-semibold shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 text-text-primary font-semibold shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {loading ? (
                                         <>
@@ -424,7 +426,7 @@ export default function ScraperPage() {
                                                 <CheckCircle2 className="w-6 h-6" />
                                             </div>
                                             <div>
-                                                <h3 className="text-lg font-bold text-white">Başarıyla Eklendi!</h3>
+                                                <h3 className="text-lg font-bold text-text-primary">Başarıyla Eklendi!</h3>
                                                 <p className="text-xs text-navy-400">{res.source}</p>
                                             </div>
                                         </div>

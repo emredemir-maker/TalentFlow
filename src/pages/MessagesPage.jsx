@@ -195,7 +195,7 @@ export default function MessagesPage() {
                                 className="flex items-center gap-4 p-4 cursor-pointer"
                                 onClick={() => setExpandedId(isExpanded ? null : msg.id)}
                             >
-                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-electric to-violet-accent flex items-center justify-center text-sm font-bold text-white shrink-0">
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-electric to-violet-accent flex items-center justify-center text-sm font-bold text-text-primary shrink-0">
                                     {msg.candidateName?.split(' ').map(n => n[0]).join('').substring(0, 2) || '?'}
                                 </div>
 
@@ -252,7 +252,7 @@ export default function MessagesPage() {
                                             <button
                                                 onClick={() => handleSimulateSend(msg)}
                                                 disabled={isLoading}
-                                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-[#0077B5] to-[#00A0DC] text-white text-[12px] font-semibold shadow-sm hover:shadow-md transition-all cursor-pointer disabled:opacity-50"
+                                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-[#0077B5] to-[#00A0DC] text-text-primary text-[12px] font-semibold shadow-sm hover:shadow-md transition-all cursor-pointer disabled:opacity-50"
                                             >
                                                 {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
                                                 Gönderimi Simüle Et

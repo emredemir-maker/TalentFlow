@@ -1,31 +1,30 @@
 // src/services/ai/interview.js
 import { getModel } from './config.js';
+import { parseAIJson, buildStructuredPrompt, sanitizeForPrompt } from './utils.js';
 
 export async function generateInterviewQuestions(candidate, starAnalysis, interviewType = 'technical') {
     const persona = interviewType === 'product' ? 'Product Manager' : (interviewType === 'culture' ? 'HR Director' : 'Technical Lead');
-    const prompt = `Sen kıdemli bir ${persona}sın. Aday ${candidate?.name} için mülakat soruları hazırla.
-    CV: ${JSON.stringify(candidate)}
-    STAR Analizi: ${JSON.stringify(starAnalysis)}
+    const instruction = `Sen kıdemli bir ${persona}sın. Aday için mülakat soruları hazırla.
     JSON array olarak dön ["soru1", "soru2", "soru3"]`;
+
+    const prompt = buildStructuredPrompt(instruction, {
+        "CANDIDATE": JSON.stringify(candidate),
+        "STAR_ANALYSIS": JSON.stringify(starAnalysis)
+    });
 
     const model = await getModel();
     const result = await model.generateContent(prompt);
-    try {
-        const clean = result.response.text().replace(/```json|```/gi, '').trim();
-        return JSON.parse(clean);
-    } catch (e) {
-        return ["Deneyimlerinizi anlatın.", "Teknik zorlukları nasıl aşarsınız?"];
-    }
+    return parseAIJson(result.response.text(), ["Deneyimlerinizi anlatın.", "Teknik zorlukları nasıl aşarsınız?"]);
 }
 
 export async function generateInterviewPaths(candidate, interviewType = 'technical') {
     const typeContexts = {
         technical: "Uzmanlık Lead personasıyla, mimari, derin bilgi, problem çözme ve saha tecrübesine odaklan.",
-        product: "Product Manager personasıyla, sadece ürün vizyonu, kullanıcı deneyimi (UX), önceliklendirme, metrikler ve iş değerine odaklan. Satış veya operasyon rolü ise iş geliştirme perspektifini ölçün.",
+        product: "Product Manager personasıyla, sadece ürün vizyonu, kullanıcı deneyimi (UX), önceliklendirme, metrikler ve iş değerine odaklan.",
         culture: "İK Direktörü personasıyla, iletişim becerileri, ekip uyumu, çatışma yönetimi ve şirket değerlerine odaklan."
     };
 
-    const prompt = `Sen kıdemli bir mülakatçısın. Aday ${candidate?.name} için 3 farklı mülakat rotası hazırla.
+    const instruction = `Sen kıdemli bir mülakatçısın. Aday için 3 farklı mülakat rotası hazırla.
     Tür: ${interviewType.toUpperCase()}. 
     Odak Noktası: ${typeContexts[interviewType] || typeContexts.technical}
     
@@ -43,20 +42,20 @@ export async function generateInterviewPaths(candidate, interviewType = 'technic
         }
       ] 
     }
+    
+    ÖNEMLİ: icon alanı "zap", "code", "users", "target", "box" değerlerinden biri olmalı.`;
 
-    ÖNEMLİ: icon alanı "zap", "code", "users", "target", "box" değerlerinden biri olmalı. 
-    İş Tanımı: ${candidate.matchedPositionTitle || candidate.position}
-    Aday Verisi: ${JSON.stringify(candidate)}`;
+    const prompt = buildStructuredPrompt(instruction, {
+        "TARGET_POSITION": candidate.matchedPositionTitle || candidate.position,
+        "CANDIDATE_DATA": JSON.stringify(candidate)
+    });
 
     const model = await getModel();
     try {
         const result = await model.generateContent(prompt);
-        const text = result.response.text();
-        const cleanJson = text.replace(/```json|```/gi, '').trim();
-        const parsed = JSON.parse(cleanJson);
+        const parsed = parseAIJson(result.response.text(), { paths: [] });
         const paths = parsed.paths || (Array.isArray(parsed) ? parsed : []);
 
-        // Yapıyı garantiye al
         return paths.map((p, i) => ({
             id: p.id || `p${i}`,
             title: p.title || 'Mülakat Rotası',
@@ -84,15 +83,12 @@ export async function generateInterviewPaths(candidate, interviewType = 'technic
 }
 
 export async function scoreInterviewSession(candidate, interviewType, questionsAndAnswers) {
-    const prompt = `Sen bir mülakat değerlendirme asistanısın. Aday ${candidate?.name} ile yapılan ${interviewType} mülakatını değerlendir.
+    const instruction = `Sen bir mülakat değerlendirme asistanısın. Aday ile yapılan ${interviewType} mülakatını değerlendir.
     
     ÖNEMLİ KURALLAR:
     1. Sadece sana gönderilen Soru-Cevap ikililerini değerlendir.
     2. Sorulmayan veya cevaplanmayan sorular için puan kırma, onları yok say. 
     3. Puanlamayı (0-100) sadece mevcut cevaplardaki kanıtlara göre yap.
-    
-    MÜLAKAT VERİSİ (QA):
-    ${JSON.stringify(questionsAndAnswers)}
     
     JSON formatında dön:
     { 
@@ -105,13 +101,15 @@ export async function scoreInterviewSession(candidate, interviewType, questionsA
         { "questionId": <id>, "score": <0-100>, "feedback": "Cevap analizi" }
       ] 
     }`;
+
+    const prompt = buildStructuredPrompt(instruction, {
+        "CANDIDATE": candidate?.name,
+        "QA_DATA": JSON.stringify(questionsAndAnswers)
+    });
+
     const model = await getModel();
     const result = await model.generateContent(prompt);
-    try {
-        return JSON.parse(result.response.text().replace(/```json|```/gi, '').trim());
-    } catch (e) {
-        return { overallScore: 50, summary: 'Hata' };
-    }
+    return parseAIJson(result.response.text(), { overallScore: 50, summary: 'Değerlendirme yapılamadı.' });
 }
 
 export async function generateFollowUpQuestion(candidate, interviewType, conversationHistory, mode = 'deepen', category = null) {
@@ -126,10 +124,7 @@ export async function generateFollowUpQuestion(candidate, interviewType, convers
         modeInstruction = "Adayın CV'sine ve şu ana kadarki mülakat akışına göre, henüz sorulmamış önemli bir alandan yeni bir soru sor.";
     }
 
-    const prompt = `Sen kıdemli bir ${persona}sın. Aday ${candidate?.name} ile mülakat yapıyorsun.
-    
-    ADAY CV: ${JSON.stringify(candidate)}
-    MÜLAKAT GEÇMİŞİ: ${JSON.stringify(conversationHistory)}
+    const instruction = `Sen kıdemli bir ${persona}sın. Aday ile mülakat yapıyorsun.
     
     GÖREV: ${modeInstruction}
     
@@ -145,17 +140,23 @@ export async function generateFollowUpQuestion(candidate, interviewType, convers
       "evaluationHint": "Mülakatçı için bu soruda neye dikkat etmesi gerektiğine dair kısa ipucu" 
     }`;
 
-    const model = getModel();
+    const prompt = buildStructuredPrompt(instruction, {
+        "CANDIDATE_CV": JSON.stringify(candidate),
+        "CONVERSATION_HISTORY": JSON.stringify(conversationHistory)
+    });
+
+    const model = await getModel();
     try {
         const result = await model.generateContent(prompt);
-        const text = result.response.text();
-        const cleanJson = text.replace(/```json|```/gi, '').trim();
-        return JSON.parse(cleanJson);
+        return parseAIJson(result.response.text(), {
+            question: category ? `${category} ile ilgili bir deneyiminden bahseder misin?` : "Biraz daha detaylandırır mısın?",
+            category: category || 'Genel'
+        });
     } catch (e) {
         console.error("Follow up error:", e);
         return {
-            question: category ? `${category} ile ilgili bir deneyiminden bahseder misin?` : "Biraz daha detaylandırır mısın?",
-            category: category || 'Genel'
+            question: "Biraz daha detaylandırır mısın?",
+            category: 'Genel'
         };
     }
 }

@@ -63,12 +63,28 @@ const storage = multer.diskStorage({
         cb(null, dir);
     },
     filename: function (req, file, cb) {
+        const ext = path.extname(file.originalname);
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, uniqueSuffix + '-' + file.originalname);
+        cb(null, `cv-${uniqueSuffix}${ext}`);
     }
 });
 
-const upload = multer({ storage: storage });
+const upload = multer({
+    storage: storage,
+    limits: { fileSize: 5 * 1024 * 1024 }, // 10MB Limit
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = [
+            'application/pdf',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/msword'
+        ];
+        if (allowedTypes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Desteklenmeyen dosya formatı. Sadece PDF ve DOCX yükleyebilirsiniz.'));
+        }
+    }
+});
 
 const app = express();
 const allowedOrigins = [
@@ -86,20 +102,23 @@ app.use(helmet({
 // app.use(xss());
 app.use(hpp());
 
-// Flexible CORS setup
+// Strict CORS setup
 app.use(cors({
     origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps or curl) 
+        // OR if origin is in allowed list
         if (!origin || allowedOrigins.includes(origin)) {
             callback(null, true);
         } else {
-            // Keep it loose for development, or strict if needed
-            // Currently allowing all to troubleshoot the "Failed to fetch"
-            callback(null, true);
+            console.warn(`🛑 Blocked CORS request from: ${origin}`);
+            callback(new Error('CORS Policy: Not allowed origin'));
         }
     },
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     credentials: true
 }));
-app.use(express.json({ limit: '10kb' })); // Body size limiting (GDPR data minimization principle)
+app.use(xss()); // Protect against XSS in body
+app.use(express.json({ limit: '50kb' })); // Body size limiting
 
 // Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

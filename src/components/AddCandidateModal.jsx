@@ -4,7 +4,10 @@ import { X, Upload, FileText, Check, AlertCircle, Loader2, Trash2, Files, Sparkl
 import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
 import { calculateMatchScore } from '../services/matchService';
-import { analyzeCandidateMatch } from '../services/geminiService';
+import { analyzeCandidateMatch, parseCandidateFromText } from '../services/geminiService';
+import { extractTextFromFile } from '../services/cvParser';
+import { storage } from '../config/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useNotifications } from '../context/NotificationContext';
 
 
@@ -14,6 +17,8 @@ export default function AddCandidateModal({ isOpen, onClose }) {
     const { positions } = usePositions();
     const openPositions = positions.filter(p => p.status === 'open');
     const [files, setFiles] = useState([]);
+    const [sourceType, setSourceType] = useState('İnsan Kaynakları');
+    const [sourceDetail, setSourceDetail] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [results, setResults] = useState(null); // { results: [{fileName, candidate, success, error}] }
@@ -48,25 +53,48 @@ export default function AddCandidateModal({ isOpen, onClose }) {
         setError(null);
         setResults(null);
 
-        const formData = new FormData();
-        files.forEach(file => {
-            formData.append('cvs', file);
-        });
-
         try {
-            const response = await fetch('http://localhost:3001/api/process-cv', {
-                method: 'POST',
-                body: formData,
-            });
+            const resultsData = [];
 
-            const data = await response.json();
+            for (const file of files) {
+                try {
+                    // Start parsing text in browser
+                    const text = await extractTextFromFile(file);
 
-            if (!response.ok) {
-                throw new Error(data.error || 'CV\'ler işlenirken bir hata oluştu.');
+                    if (!text || text.length < 50) {
+                        resultsData.push({ fileName: file.name, error: 'İçerik okunamadı veya çok kısa', success: false });
+                        continue;
+                    }
+
+                    // Call Gemini directly on client
+                    const candidate = await parseCandidateFromText(text, 'gemini-2.0-flash');
+                    if (!candidate) {
+                        resultsData.push({ fileName: file.name, error: 'AI ayrıştırma hatası', success: false });
+                        continue;
+                    }
+
+                    // Directly upload CV to Firebase Storage
+                    try {
+                        const fileExtension = file.name.split('.').pop();
+                        const uniqueName = `cvs/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExtension}`;
+                        const storageRef = ref(storage, uniqueName);
+                        await uploadBytes(storageRef, file);
+                        const fileUrl = await getDownloadURL(storageRef);
+                        candidate.cvUrl = fileUrl;
+                    } catch (uploadError) {
+                        console.error('Firebase Storage Upload Error:', uploadError);
+                        // Continue adding even if PDF upload fails
+                    }
+
+                    resultsData.push({ fileName: file.name, candidate, success: true });
+                } catch (err) {
+                    console.error(`Error processing ${file.name}:`, err);
+                    resultsData.push({ fileName: file.name, error: err.message, success: false });
+                }
             }
 
             // --- Otonom AI Matching Start ---
-            const processedResults = await Promise.all(data.results.map(async (res) => {
+            const processedResults = await Promise.all(resultsData.map(async (res) => {
                 if (!res.success) return res;
 
 
@@ -135,7 +163,8 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                         } : null,
 
                         appliedDate: new Date().toISOString().split('T')[0],
-                        source: 'Bulk CV Upload'
+                        source: sourceType,
+                        sourceDetail: sourceDetail || ''
                     };
 
                     await addCandidate(candidateData);
@@ -188,7 +217,7 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                                     multiple
                                     className="hidden"
                                 />
-                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${files.length > 0 ? 'bg-electric text-white' : 'bg-navy-800/20 text-text-muted group-hover:text-electric'}`}>
+                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${files.length > 0 ? 'bg-electric text-text-primary' : 'bg-navy-800/20 text-text-muted group-hover:text-electric'}`}>
                                     {files.length > 0 ? <Files className="w-7 h-7" /> : <Upload className="w-7 h-7" />}
                                 </div>
                                 <div className="text-center">
@@ -225,10 +254,48 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                                 </div>
                             )}
 
+                            {/* Kaynak Seçimi */}
+                            <div className="space-y-4 bg-navy-800/20 p-5 rounded-2xl border border-border-subtle">
+                                <div>
+                                    <p className="text-sm font-medium text-text-primary mb-2">Aday Kaynağı <span className="text-red-400">*</span></p>
+                                    <select
+                                        className="w-full bg-navy-900 border border-border-subtle rounded-xl px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-electric transition-colors"
+                                        value={sourceType}
+                                        onChange={(e) => {
+                                            setSourceType(e.target.value);
+                                            setSourceDetail('');
+                                        }}
+                                    >
+                                        <option value="İnsan Kaynakları">İnsan Kaynakları (Doğrudan Başvuru / Havuz)</option>
+                                        <option value="Referans">Çalışan Referansı</option>
+                                        <option value="İşe Alım Firması">Dış Kaynak / İşe Alım Firması (Agency)</option>
+                                        <option value="Kariyer Portalı">Kariyer Portalı (Kariyer.net, Yenibiriş vb.)</option>
+                                        <option value="Sosyal Medya">Sosyal Medya (LinkedIn, Twitter vb.)</option>
+                                    </select>
+                                </div>
+
+                                {['İşe Alım Firması', 'Kariyer Portalı', 'Sosyal Medya', 'Referans'].includes(sourceType) && (
+                                    <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                                        <p className="text-sm font-medium text-text-primary mb-2">
+                                            {sourceType === 'İşe Alım Firması' ? 'Firma Adını Girin:' :
+                                                sourceType === 'Referans' ? 'Referans Veren Kişi:' :
+                                                    'Platform / Mecra Adını Girin:'}
+                                        </p>
+                                        <input
+                                            type="text"
+                                            placeholder={sourceType === 'İşe Alım Firması' ? 'Örn: Michael Page...' : 'Örn: LinkedIn...'}
+                                            className="w-full bg-navy-900 border border-border-subtle rounded-xl px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-electric transition-colors"
+                                            value={sourceDetail}
+                                            onChange={(e) => setSourceDetail(e.target.value)}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+
                             <button
                                 onClick={handleUpload}
                                 disabled={files.length === 0 || loading}
-                                className="w-full py-4 rounded-2xl bg-gradient-to-r from-electric to-blue-600 text-white font-bold shadow-xl shadow-electric/20 hover:shadow-electric/40 disabled:opacity-50 disabled:shadow-none transition-all flex items-center justify-center gap-2"
+                                className="w-full py-4 rounded-2xl bg-gradient-to-r from-electric to-blue-600 text-text-primary font-bold shadow-xl shadow-electric/20 hover:shadow-electric/40 disabled:opacity-50 disabled:shadow-none transition-all flex items-center justify-center gap-2"
                             >
                                 {loading ? (
                                     <>
@@ -252,7 +319,7 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                                         <div key={idx} className={`p-4 rounded-2xl border transition-all ${res.success ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-red-500/5 border-red-500/20'}`}>
                                             <div className="flex items-center justify-between gap-4">
                                                 <div className="flex items-center gap-3 overflow-hidden">
-                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${res.success ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`}>
+                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${res.success ? 'bg-emerald-500 text-text-primary' : 'bg-red-500 text-text-primary'}`}>
                                                         {res.success ? <Check className="w-5 h-5 stroke-[3]" /> : <X className="w-5 h-5" />}
                                                     </div>
                                                     <div className="overflow-hidden">
@@ -290,7 +357,7 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                                 <button
                                     onClick={handleSaveAll}
                                     disabled={loading || !results.some(r => r.success)}
-                                    className="flex-1 py-4 rounded-2xl bg-electric text-white font-bold shadow-xl shadow-electric/20 hover:shadow-electric/40 transition-all flex items-center justify-center gap-2"
+                                    className="flex-1 py-4 rounded-2xl bg-electric text-text-primary font-bold shadow-xl shadow-electric/20 hover:shadow-electric/40 transition-all flex items-center justify-center gap-2"
                                 >
                                     {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
                                     <span>Tümünü Havuza Ekle</span>

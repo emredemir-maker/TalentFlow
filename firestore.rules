@@ -1,0 +1,70 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserData() {
+      return get(/databases/$(database)/documents/artifacts/talent-flow/public/data/users/$(request.auth.uid)).data;
+    }
+    
+    function isSuperAdmin() {
+      return isAuthenticated() && getUserData().role == 'super_admin';
+    }
+    
+    function isRecruiter() {
+      return isAuthenticated() && (getUserData().role == 'recruiter' || getUserData().role == 'super_admin');
+    }
+
+    // --- System Settings ---
+    match /artifacts/talent-flow/public/data/settings/{settingId} {
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin();
+    }
+
+    // --- Users Collection ---
+    match /artifacts/talent-flow/public/data/users/{userId} {
+      allow read: if isAuthenticated();
+      // Only super_admin can create/update other users, but users can update themselves (limited)
+      allow create: if isAuthenticated(); // Allow initial profile creation logic from AuthContext
+      allow update: if isSuperAdmin() || (request.auth.uid == userId);
+      allow delete: if isSuperAdmin();
+    }
+
+    // --- Invitations ---
+    match /artifacts/talent-flow/public/data/invitations/{inviteId} {
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin();
+    }
+
+    // --- Candidates ---
+    match /artifacts/talent-flow/public/data/candidates/{candidateId} {
+      allow read, write: if isRecruiter();
+    }
+    
+    // --- Positions ---
+    match /artifacts/talent-flow/public/data/positions/{posId} {
+      allow read: if isAuthenticated();
+      allow write: if isRecruiter();
+    }
+
+    // --- Departments ---
+    match /artifacts/talent-flow/public/data/departments/{deptId} {
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin();
+    }
+
+    // --- Messages / Queue ---
+    match /artifacts/talent-flow/public/data/messages/{msgId} {
+      allow read, write: if isRecruiter();
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

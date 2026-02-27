@@ -14,6 +14,8 @@ import { analyzeCandidateMatch } from '../services/geminiService';
 import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
 import { calculateMatchScore } from '../services/matchService';
+import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { db } from '../config/firebase';
 
 import InterviewSessionModal from './InterviewSessionModal';
 import InterviewHistory from './InterviewHistory';
@@ -54,6 +56,15 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
     const [aiLoading, setAiLoading] = useState(false);
     const [aiError, setAiError] = useState(null);
     const [jobDescription, setJobDescription] = useState('');
+    const [sources, setSources] = useState([]);
+
+    // Fetch sources
+    useEffect(() => {
+        const unsub = onSnapshot(query(collection(db, 'artifacts/talent-flow/public/data/sources'), orderBy('createdAt', 'asc')), (snap) => {
+            setSources(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
+        return unsub;
+    }, []);
 
 
     // Score Calculation (Uses enriched combinedScore from context)
@@ -203,7 +214,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                 <div className="shrink-0 p-6 border-b border-border-subtle print:border-black">
                     <div className="flex items-start justify-between mb-5">
                         <div className="flex items-center gap-4">
-                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-electric to-violet-accent flex items-center justify-center text-xl font-bold text-white print:bg-none print:text-black print:border print:border-black">
+                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-electric to-violet-accent flex items-center justify-center text-xl font-bold text-text-primary print:bg-none print:text-black print:border print:border-black">
                                 {candidate.name?.[0]}
                             </div>
                             <div>
@@ -434,6 +445,74 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                     ))}
                                 </div>
                             </Section>
+
+                            <Section title="Aday Kaynağı">
+                                <div className="space-y-3">
+                                    <div className="relative">
+                                        <select
+                                            value={candidate.source || ''}
+                                            onChange={(e) => updateCandidate(candidate.id, { source: e.target.value, sourceDetail: '' })}
+                                            className="w-full px-4 py-3 rounded-xl bg-navy-800/20 border border-border-subtle text-sm text-text-primary outline-none focus:border-electric/50 transition-all appearance-none cursor-pointer pr-9 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_10px_center]"
+                                        >
+                                            <option value="">Kaynak Seçin</option>
+                                            {sources.map(s => (
+                                                <option key={s.id} value={s.name}>{s.name}</option>
+                                            ))}
+                                            <option value="İnsan Kaynakları">İnsan Kaynakları</option>
+                                            <option value="Referans">Referans</option>
+                                            <option value="Diğer">Diğer</option>
+                                        </select>
+                                    </div>
+
+                                    {(() => {
+                                        const selectedSourceDoc = sources.find(s => s.name === candidate.source);
+                                        const hasSubSources = selectedSourceDoc?.subSources?.length > 0;
+
+                                        if (hasSubSources) {
+                                            return (
+                                                <div className="relative animate-in slide-in-from-top-1 duration-200">
+                                                    <select
+                                                        value={candidate.sourceDetail || ''}
+                                                        onChange={(e) => updateCandidate(candidate.id, { sourceDetail: e.target.value })}
+                                                        className="w-full px-4 py-3 rounded-xl bg-navy-800/40 border border-electric/20 text-sm text-text-primary outline-none focus:border-electric/50 transition-all appearance-none cursor-pointer pr-9 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_10px_center]"
+                                                    >
+                                                        <option value="">Alt Detay Seçin</option>
+                                                        {selectedSourceDoc.subSources.map(sub => (
+                                                            <option key={sub} value={sub}>{sub}</option>
+                                                        ))}
+                                                        <option value="Diğer">Diğer</option>
+                                                    </select>
+                                                </div>
+                                            );
+                                        }
+
+                                        if (candidate.source) {
+                                            return (
+                                                <input
+                                                    type="text"
+                                                    defaultValue={candidate.sourceDetail || ''}
+                                                    onBlur={(e) => {
+                                                        if (e.target.value !== (candidate.sourceDetail || '')) {
+                                                            updateCandidate(candidate.id, { sourceDetail: e.target.value });
+                                                        }
+                                                    }}
+                                                    placeholder="Kaynak detayını belirtin (örn. firma adı, kişi adı)..."
+                                                    className="w-full px-4 py-3 rounded-xl bg-navy-800/20 border border-border-subtle text-sm text-text-primary placeholder:text-text-muted outline-none focus:border-electric/50 transition-all animate-in slide-in-from-top-1 duration-200"
+                                                />
+                                            );
+                                        }
+                                        return null;
+                                    })()}
+
+                                    {candidate.source && (
+                                        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-electric/5 border border-electric/10 text-[11px] text-electric-light">
+                                            <Sparkles className="w-3 h-3" />
+                                            Kaynak: <strong>{candidate.source}</strong>
+                                            {candidate.sourceDetail && <span>→ {candidate.sourceDetail}</span>}
+                                        </div>
+                                    )}
+                                </div>
+                            </Section>
                         </div>
                     )}
 
@@ -512,7 +591,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                                                     <p className="text-[13px] text-navy-300 mb-4 max-w-[250px] mx-auto">Bu pozisyon için henüz detaylı yapay zeka analizi yapılmamış.</p>
                                                                     <button
                                                                         onClick={(e) => { e.stopPropagation(); handleRunAnalysis(); }}
-                                                                        className="text-xs font-bold text-white px-5 py-2.5 bg-electric rounded-xl shadow-[0_4px_12px_rgba(59,130,246,0.3)] hover:scale-105 transition-all"
+                                                                        className="text-xs font-bold text-text-primary px-5 py-2.5 bg-electric rounded-xl shadow-[0_4px_12px_rgba(59,130,246,0.3)] hover:scale-105 transition-all"
                                                                     >
                                                                         Tüm Pozisyonları Analiz Et
                                                                     </button>
@@ -535,7 +614,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                             {/* Start New Interview */}
                             <button
                                 onClick={() => setShowInterviewModal(true)}
-                                className="w-full py-4 rounded-2xl bg-gradient-to-r from-electric to-blue-600 hover:from-electric-light hover:to-blue-500 text-white font-bold text-sm shadow-lg shadow-electric/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                                className="w-full py-4 rounded-2xl bg-gradient-to-r from-electric to-blue-600 hover:from-electric-light hover:to-blue-500 text-text-primary font-bold text-sm shadow-lg shadow-electric/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
                             >
                                 <ClipboardCheck className="w-5 h-5" /> Yeni Mülakat Oturumu Başlat
                             </button>
@@ -640,7 +719,7 @@ function RangeInput({ label, value, onChange }) {
         <div className="space-y-2">
             <div className="flex justify-between items-center text-[11px] font-bold">
                 <span className="text-navy-300 uppercase tracking-tighter">{label}</span>
-                <span className="text-white px-2 py-0.5 rounded bg-white/10">%{value}</span>
+                <span className="text-text-primary px-2 py-0.5 rounded bg-white/10">%{value}</span>
             </div>
             <input
                 type="range" min="0" max="100" value={value}

@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { Settings, Palette, Globe, Bell, LayoutGrid, Hash, Mail, Calendar, CheckCircle, Loader2 } from 'lucide-react';
 import { connectGoogleWorkspace } from '../services/integrationService';
 
+
 export default function SettingsPage() {
     const { settings, loading, updateSettings } = useUserSettings();
     const { userProfile, userId } = useAuth();
@@ -11,7 +12,8 @@ export default function SettingsPage() {
 
     if (loading || !userProfile) {
         return (
-            <div className="flex items-center justify-center h-64">
+            <div className="flex items-center justify-center h-64 relative isolate min-h-screen">
+
                 <div className="w-8 h-8 border-[3px] border-navy-800 border-t-electric rounded-full animate-spin" />
             </div>
         );
@@ -36,7 +38,9 @@ export default function SettingsPage() {
     const isGoogleConnected = userProfile?.integrations?.google?.connected;
 
     return (
-        <div className="flex flex-col h-full bg-navy-950/20">
+        <div className="flex flex-col h-full bg-navy-950/20 relative isolate min-h-screen">
+
+
             {/* Header */}
             <header className="sticky top-0 z-40 px-6 lg:px-8 h-16 flex items-center justify-between border-b border-border-subtle bg-header-bg backdrop-blur-xl">
                 <div className="flex items-center gap-4">
@@ -164,7 +168,7 @@ export default function SettingsPage() {
                                         <button
                                             onClick={handleGoogleConnect}
                                             disabled={isConnectingGoogle}
-                                            className="relative px-5 py-2.5 rounded-xl text-xs font-black text-white bg-gradient-to-r from-electric to-blue-500 hover:shadow-[0_0_20px_rgba(59,130,246,0.5)] transition-all flex items-center gap-2 overflow-hidden group"
+                                            className="relative px-5 py-2.5 rounded-xl text-xs font-black text-text-primary bg-gradient-to-r from-electric to-blue-500 hover:shadow-[0_0_20px_rgba(59,130,246,0.5)] transition-all flex items-center gap-2 overflow-hidden group"
                                         >
                                             {isConnectingGoogle ? (
                                                 <Loader2 className="w-4 h-4 animate-spin" />

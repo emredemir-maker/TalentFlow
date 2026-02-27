@@ -40,6 +40,19 @@ export default function CandidateCard({ candidate, index = 0, onClick, isSelecte
 
     const gradient = AVATAR_GRADIENTS[index % AVATAR_GRADIENTS.length];
 
+    // Helper: Source-based colors (Border/Glow)
+    const getSourceAccent = () => {
+        if (!candidate.source) return 'border-border-subtle';
+        const s = candidate.source.toLowerCase();
+        if (s.includes('diğer')) return 'border-violet-500/30 shadow-[0_0_25px_rgba(139,92,246,0.1)]';
+        if (s.includes('işe alım') || s.includes('agency')) return 'border-amber-500/30 shadow-[0_0_25px_rgba(245,158,11,0.1)]';
+        if (s.includes('linkedin')) return 'border-blue-500/30 shadow-[0_0_25px_rgba(59,130,246,0.1)]';
+        if (s.includes('referans') || s.includes('referral')) return 'border-emerald-500/30 shadow-[0_0_25px_rgba(16,185,129,0.1)]';
+        return 'border-cyan-500/30 shadow-[0_0_25px_rgba(6,182,212,0.1)]';
+    };
+
+    const sourceAccent = getSourceAccent();
+
     return (
         <div
             onClick={(e) => {
@@ -50,11 +63,11 @@ export default function CandidateCard({ candidate, index = 0, onClick, isSelecte
             role="button"
             tabIndex={0}
             onKeyDown={(e) => e.key === 'Enter' && onClick?.(candidate)}
-            className={`group rounded-3xl p-6 cursor-pointer transition-all duration-300 relative overflow-hidden backdrop-blur-xl border flex flex-col
-            ${isSelected ? 'bg-gradient-to-br from-electric/10 to-transparent border-electric/40 shadow-[0_0_25px_rgba(59,130,246,0.15)] ring-1 ring-electric/30 scale-[1.01]' : 'bg-navy-900/10 hover:bg-navy-900/20 border-border-subtle hover:border-navy-400/20 hover:shadow-2xl hover:-translate-y-1'}
+            className={`group rounded-3xl p-6 cursor-pointer transition-all duration-500 relative overflow-hidden backdrop-blur-xl border flex flex-col
+            ${isSelected ? 'bg-gradient-to-br from-electric/10 to-transparent border-electric/40 shadow-[0_0_25px_rgba(59,130,246,0.15)] ring-1 ring-electric/30 scale-[1.01]' : `bg-navy-900/10 hover:bg-navy-900/20 ${sourceAccent} hover:shadow-2xl hover:-translate-y-1.5`}
             focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-electric/30 h-full`}
         >
-            <div className={`absolute top-0 right-0 w-40 h-40 bg-electric/10 rounded-full blur-[60px] -z-10 transition-opacity duration-300 pointer-events-none ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} />
+            <div className={`absolute top-0 right-0 w-48 h-48 bg-electric/5 rounded-full blur-[80px] -z-10 transition-opacity duration-500 pointer-events-none ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} />
             {/* Selection Checkbox */}
             <div className={`absolute top-4 right-4 z-10 selection-checkbox ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'} transition-opacity`}>
                 <div
@@ -74,7 +87,7 @@ export default function CandidateCard({ candidate, index = 0, onClick, isSelecte
             {/* Top: Avatar + Name + Score */}
             <div className="flex items-start justify-between mb-4 pr-8">
                 <div className="flex items-center gap-3 min-w-0">
-                    <div className={`w-11 h-11 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center text-sm font-bold text-white shrink-0 shadow-lg`}>
+                    <div className={`w-11 h-11 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center text-sm font-bold text-text-primary shrink-0 shadow-lg`}>
                         {getInitials(candidate.name)}
                     </div>
                     <div className="min-w-0">
@@ -109,7 +122,7 @@ export default function CandidateCard({ candidate, index = 0, onClick, isSelecte
                                         <span className="text-electric-light font-semibold uppercase tracking-wide">
                                             {candidate.matchedPositionTitle === displayTitle ? 'EŞLEŞEN:' : 'EN UYGUN:'}
                                         </span>
-                                        <span className="text-white font-bold truncate max-w-[120px]" title={displayTitle}>
+                                        <span className="text-text-primary font-bold truncate max-w-[120px]" title={displayTitle}>
                                             {displayTitle}
                                         </span>
                                         {displayScore > 0 && (
@@ -125,7 +138,7 @@ export default function CandidateCard({ candidate, index = 0, onClick, isSelecte
                                         <span className="text-emerald-400 font-semibold uppercase tracking-wide">
                                             Önerilen:
                                         </span>
-                                        <span className="text-white font-bold truncate max-w-[120px]" title={candidate.preAssessment.suggestedOpenPosition || candidate.preAssessment.potentialPosition}>
+                                        <span className="text-text-primary font-bold truncate max-w-[120px]" title={candidate.preAssessment.suggestedOpenPosition || candidate.preAssessment.potentialPosition}>
                                             {candidate.preAssessment.suggestedOpenPosition || candidate.preAssessment.potentialPosition}
                                         </span>
                                     </div>
@@ -204,6 +217,14 @@ export default function CandidateCard({ candidate, index = 0, onClick, isSelecte
                 <div className="flex items-center gap-2 text-[12px] text-navy-400">
                     <MapPin className="w-3.5 h-3.5 text-navy-500" />
                     <span>{candidate.location}</span>
+                    {candidate.source && (
+                        <>
+                            <span className="text-navy-600">•</span>
+                            <span className="text-[10px] font-bold text-navy-300 uppercase tracking-tighter bg-navy-800/20 px-1.5 py-0.5 rounded border border-white/5">
+                                {candidate.source} {candidate.sourceDetail && `(${candidate.sourceDetail})`}
+                            </span>
+                        </>
+                    )}
                 </div>
             </div>
 

@@ -1,11 +1,15 @@
 // src/components/Header.jsx
 import { useState, useRef, useEffect } from 'react';
-import { Search, Bell, X, Check, Trash2, Clock, Sparkles, AlertTriangle, Info } from 'lucide-react';
+import { Search, Bell, X, Check, Trash2, Clock, Sparkles, AlertTriangle, Info, LayoutGrid, Columns3, List, User, Sun, Moon } from 'lucide-react';
 import SystemScanner from './SystemScanner';
 import { useNotifications } from '../context/NotificationContext';
+import { useAuth } from '../context/AuthContext';
+import { useUserSettings } from '../context/UserSettingsContext';
 
-export default function Header({ title, searchQuery, onSearchChange }) {
+export default function Header({ title, searchQuery, onSearchChange, viewMode, setViewMode }) {
     const { notifications, unreadCount, markAsRead, markAllAsRead, clearAll } = useNotifications();
+    const { userProfile } = useAuth();
+    const { settings, updateSettings } = useUserSettings();
     const [showNotifications, setShowNotifications] = useState(false);
     const dropdownRef = useRef(null);
 
@@ -62,6 +66,22 @@ export default function Header({ title, searchQuery, onSearchChange }) {
 
                 <SystemScanner />
 
+                {/* View Mode Toggle (In Header now) */}
+                {setViewMode && (
+                    <div className="hidden lg:flex items-center gap-1 bg-navy-800/10 rounded-xl p-1 border border-border-subtle shadow-inner mx-2">
+                        {[
+                            { id: 'card', icon: LayoutGrid, label: 'Kılavuz' },
+                            { id: 'kanban', icon: Columns3, label: 'Kanban' },
+                            { id: 'list', icon: List, label: 'Liste' },
+                        ].map(v => (
+                            <button key={v.id} onClick={() => setViewMode(v.id)} title={v.label}
+                                className={`p-1.5 rounded-lg transition-all duration-200 ${viewMode === v.id ? 'bg-electric text-text-primary shadow-lg' : 'text-navy-500 hover:text-text-primary hover:bg-navy-800/40'}`}>
+                                <v.icon className="w-4 h-4" />
+                            </button>
+                        ))}
+                    </div>
+                )}
+
                 {/* Notification Bell */}
                 <div className="relative" ref={dropdownRef}>
                     <button
@@ -71,7 +91,7 @@ export default function Header({ title, searchQuery, onSearchChange }) {
                     >
                         <Bell className="w-4 h-4" />
                         {unreadCount > 0 && (
-                            <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-electric text-[10px] font-black text-white flex items-center justify-center border-2 border-header-bg animate-in zoom-in">
+                            <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-electric text-[10px] font-black text-text-primary flex items-center justify-center border-2 border-header-bg animate-in zoom-in">
                                 {unreadCount > 9 ? '9+' : unreadCount}
                             </span>
                         )}
@@ -136,6 +156,35 @@ export default function Header({ title, searchQuery, onSearchChange }) {
                             </div>
                         </div>
                     )}
+                </div>
+
+                {/* Theme Toggle */}
+                <button
+                    onClick={() => updateSettings({ theme: settings?.theme === 'light' ? 'dark' : 'light' })}
+                    title="Temayı Değiştir"
+                    className="w-10 h-10 rounded-2xl flex items-center justify-center bg-navy-800/20 hover:bg-navy-800/40 border border-border-subtle transition-all"
+                >
+                    {settings?.theme === 'light' ? <Moon className="w-5 h-5 text-navy-500" /> : <Sun className="w-5 h-5 text-navy-400" />}
+                </button>
+
+                {/* Profile Badge */}
+                <div className="flex items-center gap-2.5 pl-3 border-l border-border-subtle">
+                    <div className="hidden md:block text-right">
+                        <div className="text-[12px] font-black text-text-primary tracking-tight leading-none mb-1">
+                            {userProfile?.displayName || 'Kullanıcı'}
+                        </div>
+                        <div className="text-[9px] font-bold text-navy-500 uppercase tracking-widest leading-none">
+                            {userProfile?.role === 'super_admin' ? 'Stratejik Yönetici' : 'Operatör'}
+                        </div>
+                    </div>
+                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 border border-white/10 flex items-center justify-center shadow-lg shadow-indigo-500/20 group cursor-pointer hover:scale-105 transition-all">
+                        {userProfile?.displayName ? (
+                            <span className="text-[14px] font-black text-text-primary">{userProfile.displayName.substring(0, 2).toUpperCase()}</span>
+                        ) : (
+                            <User className="w-5 h-5 text-text-primary" />
+                        )}
+                        <div className="absolute top-1 right-1 w-2.5 h-2.5 bg-emerald-500 border-2 border-header-bg rounded-full" />
+                    </div>
                 </div>
             </div>
         </header>

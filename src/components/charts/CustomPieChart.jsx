@@ -24,7 +24,7 @@ const CustomTooltip = ({ active, payload }) => {
                 <p className="text-[10px] font-black text-navy-400 uppercase tracking-widest mb-1">{payload[0].name}</p>
                 <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: payload[0].payload.fill }} />
-                    <span className="text-sm font-black text-white">{payload[0].value} Aday</span>
+                    <span className="text-sm font-black text-text-primary">{payload[0].value} Aday</span>
                 </div>
             </div>
         );
@@ -35,7 +35,7 @@ const CustomTooltip = ({ active, payload }) => {
 export default function CustomPieChart({ data }) {
     return (
         <div className="w-full h-full min-h-[220px]">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                 <PieChart>
                     <defs>
                         {COLORS.map((color, i) => (
@@ -73,7 +73,7 @@ export default function CustomPieChart({ data }) {
                         verticalAlign="bottom"
                         iconType="circle"
                         iconSize={8}
-                        formatter={(value) => <span className="text-[10px] font-black text-navy-400 uppercase tracking-tighter hover:text-white transition-colors ml-1">{value}</span>}
+                        formatter={(value) => <span className="text-[10px] font-black text-navy-400 uppercase tracking-tighter hover:text-text-primary transition-colors ml-1">{value}</span>}
                         wrapperStyle={{ bottom: 0 }}
                     />
                 </PieChart>

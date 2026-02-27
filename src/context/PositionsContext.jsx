@@ -48,18 +48,65 @@ export function PositionsProvider({ children }) {
         return () => unsubscribe();
     }, []);
 
-    // Add a new position
-    const addPosition = async (positionData) => {
+    // Add a new position (recruiter/admin creates directly as open)
+    const addPosition = async (positionData, initialStatus = 'open') => {
         try {
             await addDoc(collection(db, 'positions'), {
                 ...positionData,
-                status: 'open',
+                status: initialStatus,
                 matchedCandidates: [],
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp()
             });
         } catch (err) {
             console.error("Error adding position:", err);
+            throw err;
+        }
+    };
+
+    // Department user requests a position (pending_approval)
+    const addPositionRequest = async (positionData, requestedBy) => {
+        try {
+            await addDoc(collection(db, 'positions'), {
+                ...positionData,
+                status: 'pending_approval',
+                requestedBy: requestedBy || null,
+                matchedCandidates: [],
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
+            });
+        } catch (err) {
+            console.error("Error requesting position:", err);
+            throw err;
+        }
+    };
+
+    // Recruiter approves a pending position request
+    const approvePosition = async (id) => {
+        try {
+            const docRef = doc(db, 'positions', id);
+            await updateDoc(docRef, {
+                status: 'open',
+                approvedAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
+            });
+        } catch (err) {
+            console.error("Error approving position:", err);
+            throw err;
+        }
+    };
+
+    // Reject a pending position request
+    const rejectPosition = async (id, reason = '') => {
+        try {
+            const docRef = doc(db, 'positions', id);
+            await updateDoc(docRef, {
+                status: 'rejected',
+                rejectionReason: reason,
+                updatedAt: serverTimestamp()
+            });
+        } catch (err) {
+            console.error("Error rejecting position:", err);
             throw err;
         }
     };
@@ -99,6 +146,9 @@ export function PositionsProvider({ children }) {
         loading,
         error,
         addPosition,
+        addPositionRequest,
+        approvePosition,
+        rejectPosition,
         updatePosition,
         deletePosition,
         togglePositionStatus

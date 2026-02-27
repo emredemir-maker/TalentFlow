@@ -32,7 +32,7 @@ export default function LoginPage() {
                 await registerWithEmail(email, password, name);
                 setSuccess("Kaydınız başarıyla tamamlandı! Giriş yapılıyor...");
             }
-        } catch (err) {
+        } catch {
             // Error handling is managed by AuthContext
         }
     };
@@ -47,10 +47,10 @@ export default function LoginPage() {
 
             <div className="w-full max-w-md relative z-10 glass rounded-[40px] p-8 border border-white/10 shadow-2xl space-y-6 stagger">
                 <div className="text-center space-y-2">
-                    <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-electric to-violet-600 flex items-center justify-center mx-auto shadow-[0_8px_32px_rgba(59,130,246,0.3)] mb-6">
-                        <Sparkles className="w-10 h-10 text-white" />
+                    <div className="w-full h-32 flex items-center justify-center mx-auto mb-6">
+                        <img src="/logo.png" alt="TalentFlow" className="max-w-full max-h-full object-contain" />
                     </div>
-                    <h1 className="text-3xl font-black text-white tracking-tight">TalentFlow</h1>
+                    <h1 className="sr-only">TalentFlow</h1>
                     <p className="text-navy-400 font-medium">
                         {mode === 'login' ? 'Yapay Zeka Destekli İK Paneli' : 'Davetiyeyi Yanıtla'}
                     </p>
@@ -82,7 +82,7 @@ export default function LoginPage() {
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
                                     placeholder="Adınız ve soyadınız"
-                                    className="w-full pl-11 pr-5 py-4 bg-navy-900 border border-white/10 rounded-2xl text-white outline-none focus:border-electric transition-all text-sm"
+                                    className="w-full pl-11 pr-5 py-4 bg-navy-900 border border-white/10 rounded-2xl text-text-primary outline-none focus:border-electric transition-all text-sm"
                                 />
                             </div>
                         </div>
@@ -98,7 +98,7 @@ export default function LoginPage() {
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 placeholder="is@sirket.com"
-                                className="w-full pl-11 pr-5 py-4 bg-navy-900 border border-white/10 rounded-2xl text-white outline-none focus:border-electric transition-all text-sm"
+                                className="w-full pl-11 pr-5 py-4 bg-navy-900 border border-white/10 rounded-2xl text-text-primary outline-none focus:border-electric transition-all text-sm"
                             />
                         </div>
                     </div>
@@ -114,7 +114,7 @@ export default function LoginPage() {
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 placeholder="••••••••"
-                                className="w-full pl-11 pr-5 py-4 bg-navy-900 border border-white/10 rounded-2xl text-white outline-none focus:border-electric transition-all text-sm"
+                                className="w-full pl-11 pr-5 py-4 bg-navy-900 border border-white/10 rounded-2xl text-text-primary outline-none focus:border-electric transition-all text-sm"
                             />
                         </div>
                     </div>
@@ -122,7 +122,7 @@ export default function LoginPage() {
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full py-4 rounded-2xl bg-electric text-white font-bold flex items-center justify-center gap-3 hover:bg-electric-light transition-all active:scale-[0.98] shadow-xl shadow-electric/20 disabled:opacity-50"
+                        className="w-full py-4 rounded-2xl bg-electric text-text-primary font-bold flex items-center justify-center gap-3 hover:bg-electric-light transition-all active:scale-[0.98] shadow-xl shadow-electric/20 disabled:opacity-50"
                     >
                         {loading ? (
                             <Loader2 className="w-5 h-5 animate-spin" />
@@ -140,7 +140,7 @@ export default function LoginPage() {
                 <div className="space-y-3">
                     <button
                         onClick={loginWithGoogle}
-                        className="w-full py-3.5 rounded-2xl bg-white/5 border border-white/10 text-white font-bold flex items-center justify-center gap-3 hover:bg-white/10 transition-all text-sm"
+                        className="w-full py-3.5 rounded-2xl bg-white/5 border border-white/10 text-text-primary font-bold flex items-center justify-center gap-3 hover:bg-white/10 transition-all text-sm"
                     >
                         <img src="https://www.google.com/favicon.ico" alt="Google" className="w-4 h-4" />
                         Google ile Davam Et
@@ -148,7 +148,7 @@ export default function LoginPage() {
 
                     <button
                         onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
-                        className="w-full text-center text-xs font-bold text-navy-400 hover:text-white transition-colors"
+                        className="w-full text-center text-xs font-bold text-navy-400 hover:text-text-primary transition-colors"
                     >
                         {mode === 'login' ? 'Davetiyeniz mi var? Kaydolun' : 'Zaten hesabınız var mı? Giriş Yapın'}
                     </button>
@@ -157,8 +157,8 @@ export default function LoginPage() {
                 <div className="flex flex-col items-center gap-4 pt-4 border-t border-white/5">
                     <p className="text-[9px] text-navy-600 uppercase tracking-widest font-black">Powered by Gemini AI</p>
                     <div className="flex gap-4">
-                        <a href="#" className="text-[10px] text-navy-500 hover:text-white transition-colors">KVKK Aydınlatma Metni</a>
-                        <a href="#" className="text-[10px] text-navy-500 hover:text-white transition-colors">Gizlilik Politikası</a>
+                        <a href="#" className="text-[10px] text-navy-500 hover:text-text-primary transition-colors">KVKK Aydınlatma Metni</a>
+                        <a href="#" className="text-[10px] text-navy-500 hover:text-text-primary transition-colors">Gizlilik Politikası</a>
                     </div>
                 </div>
             </div>

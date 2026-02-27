@@ -42,7 +42,7 @@ export default function StarScoreCard({ analysis, candidate, onRefresh }) {
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <div>
-                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                    <h3 className="text-lg font-bold text-text-primary flex items-center gap-2">
                         <Target className="w-5 h-5 text-electric" />
                         STAR Analiz Skoru
                     </h3>
@@ -52,7 +52,7 @@ export default function StarScoreCard({ analysis, candidate, onRefresh }) {
                     <button
                         onClick={handleRefresh}
                         disabled={refreshing}
-                        className="p-2 rounded-xl bg-white/5 border border-white/10 text-navy-400 hover:text-white hover:bg-white/10 transition-all group/ref"
+                        className="p-2 rounded-xl bg-white/5 border border-white/10 text-navy-400 hover:text-text-primary hover:bg-white/10 transition-all group/ref"
                         title="Analizi Yenile (Detaylı Gerekçeler İçin)"
                     >
                         <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-electric' : 'group-hover/ref:rotate-180 transition-transform duration-500'}`} />
@@ -84,14 +84,14 @@ export default function StarScoreCard({ analysis, candidate, onRefresh }) {
                                                 score: scores[key],
                                                 reason: reason || "Bu aday eski bir AI modeli ile analiz edilmiş. Detaylı gerekçeler için lütfen sağ üstteki yenile butonuna basın."
                                             })}
-                                            className="p-0.5 rounded-md text-navy-500 hover:text-white transition-colors"
+                                            className="p-0.5 rounded-md text-navy-500 hover:text-text-primary transition-colors"
                                             title="Detayları Gör"
                                         >
                                             <Info className="w-3 h-3" />
                                         </button>
 
                                         {/* Tooltip on Hover */}
-                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-navy-800 border border-white/10 rounded-lg text-[10px] text-white opacity-0 invisible group-hover/item:opacity-100 group-hover/item:visible transition-all z-50 shadow-2xl pointer-events-none">
+                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-navy-800 border border-white/10 rounded-lg text-[10px] text-text-primary opacity-0 invisible group-hover/item:opacity-100 group-hover/item:visible transition-all z-50 shadow-2xl pointer-events-none">
                                             <div className="flex flex-col gap-1">
                                                 <span className="font-bold text-electric uppercase tracking-tighter">AI Gerekçesi:</span>
                                                 <span className="italic leading-relaxed">
@@ -122,7 +122,7 @@ export default function StarScoreCard({ analysis, candidate, onRefresh }) {
                         <Zap className="w-4 h-4" />
                     </div>
                     <div>
-                        <h4 className="text-sm font-bold text-white mb-1 flex items-center gap-2">
+                        <h4 className="text-sm font-bold text-text-primary mb-1 flex items-center gap-2">
                             AI Görüşü
                             {candidate?.matchedPositionTitle && (
                                 <span className="text-xs font-normal text-navy-400">({candidate.matchedPositionTitle})</span>
@@ -156,7 +156,7 @@ export default function StarScoreCard({ analysis, candidate, onRefresh }) {
                     <div className="w-full max-w-sm bg-navy-900 border border-white/10 rounded-2xl p-5 shadow-2xl relative animate-in zoom-in-95 duration-200">
                         <button
                             onClick={() => setSelectedDetail(null)}
-                            className="absolute top-4 right-4 text-navy-500 hover:text-white p-1 rounded-lg hover:bg-white/5"
+                            className="absolute top-4 right-4 text-navy-500 hover:text-text-primary p-1 rounded-lg hover:bg-white/5"
                         >
                             <X className="w-4 h-4" />
                         </button>
@@ -166,7 +166,7 @@ export default function StarScoreCard({ analysis, candidate, onRefresh }) {
                                 {selectedDetail.key[0]}
                             </span>
                             <div>
-                                <h4 className="text-sm font-bold text-white uppercase tracking-tighter">{selectedDetail.label}</h4>
+                                <h4 className="text-sm font-bold text-text-primary uppercase tracking-tighter">{selectedDetail.label}</h4>
                                 <p className="text-xs text-navy-400">Yapay Zeka Skor Gerekçesi</p>
                             </div>
                         </div>

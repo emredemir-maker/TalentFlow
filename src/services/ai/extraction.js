@@ -1,5 +1,6 @@
 // src/services/ai/extraction.js
 import { getModel } from './config.js';
+import { parseAIJson, buildStructuredPrompt, sanitizeForPrompt } from './utils.js';
 
 const EXTRACTOR_PROMPT = `
 Sen kıdemli ve son derece analitik bir İşe Alım Yöneticisisin. Görevin, adayı derinlemesine analiz etmek.
@@ -30,45 +31,39 @@ Sen kıdemli ve son derece analitik bir İşe Alım Yöneticisisin. Görevin, ad
 }
 `;
 
-export async function extractCandidateEvidence(jobDescription, candidateProfile) {
+export async function extractCandidateEvidence(jobDescription, candidateProfile, modelId = 'gemini-2.0-flash') {
     const sanitizedCandidate = {
         name: candidateProfile.name,
         position: candidateProfile.position,
         experience: candidateProfile.experience,
         skills: candidateProfile.skills,
-        description: candidateProfile.description || candidateProfile.about || '',
-        cvData: candidateProfile.cvData || '', // Fallback to cvData to prevent AI performance loss if the raw CV is deleted
+        description: sanitizeForPrompt(candidateProfile.description || candidateProfile.about || ''),
+        cvData: sanitizeForPrompt(candidateProfile.cvData || ''),
         experiences: candidateProfile.experiences || []
     };
 
-    const prompt = `${EXTRACTOR_PROMPT}\n## İŞ TANIMI\n${jobDescription}\n\n## ADAY VERİSİ\n${JSON.stringify(sanitizedCandidate, null, 2)}\n\nSadece JSON yanıtı ver.`;
+    const prompt = buildStructuredPrompt(EXTRACTOR_PROMPT, {
+        "JOB_DESCRIPTION": jobDescription,
+        "CANDIDATE_DATA": JSON.stringify(sanitizedCandidate, null, 2)
+    });
 
-    const model = await getModel();
+    const model = await getModel(modelId);
     const result = await model.generateContent(prompt);
-    try {
-        const text = result.response.text();
-        const cleanJson = text.replace(/```json|```/g, '').trim();
-        return JSON.parse(cleanJson);
-    } catch (e) {
-        throw new Error("AI extraction failed to parse JSON.");
-    }
+    const parsed = parseAIJson(result.response.text());
+    if (!parsed) throw new Error("AI extraction failed to parse JSON.");
+    return parsed;
 }
 
 export async function extractPositionFromJD(jdText) {
-    const prompt = `Lütfen aşağıdaki iş tanımı metnini analiz et ve bilgileri ayıkla.
+    const instruction = `Lütfen aşağıdaki iş tanımı metnini analiz et ve bilgileri ayıkla.
     Sadece JSON olarak dön:
-    { "title": "Pozisyon Adı", "requirements": ["şart1", "şart2"], "description": "Kısa özet" }
-    
-    Metin: ${jdText}`;
+    { "title": "Pozisyon Adı", "requirements": ["şart1", "şart2"], "description": "Kısa özet" }`;
+
+    const prompt = buildStructuredPrompt(instruction, { "JD_METNI": sanitizeForPrompt(jdText) });
 
     const model = await getModel();
     const result = await model.generateContent(prompt);
-    try {
-        const clean = result.response.text().replace(/```json|```/gi, '').trim();
-        return JSON.parse(clean);
-    } catch (e) {
-        return { title: "Bilinmeyen Pozisyon", requirements: [], description: "" };
-    }
+    return parseAIJson(result.response.text(), { title: "Bilinmeyen Pozisyon", requirements: [], description: "" });
 }
 
 export async function quickCandidateScreening(candidateProfile, openPositions) {
@@ -77,19 +72,13 @@ export async function quickCandidateScreening(candidateProfile, openPositions) {
         position: candidateProfile.position,
         experience: candidateProfile.experience,
         skills: candidateProfile.skills,
-        description: candidateProfile.description || candidateProfile.about || '',
-        cvData: candidateProfile.cvData || '', // Essential for AI scoring after GDPR raw CV deletion
+        description: sanitizeForPrompt(candidateProfile.description || candidateProfile.about || ''),
+        cvData: sanitizeForPrompt(candidateProfile.cvData || ''),
     };
 
     const positionsText = openPositions.map(p => `- ${p.title}: ${p.requirements?.join(', ')}`).join('\n');
 
-    const prompt = `Sen bir Yetenek Yönetimi Uzmanısın. Amacın, adayı sistemdeki AÇIK POZİSYONLARLA genel bir bakış açısıyla kıyaslamaktır.
-    
-    AÇIK POZİSYONLAR:
-    ${positionsText || "Sistemde açık pozisyon bulunmuyor."}
-    
-    ADAY VERİSİ:
-    ${JSON.stringify(sanitizedCandidate, null, 2)}
+    const instruction = `Sen bir Yetenek Yönetimi Uzmanısın. Amacın, adayı sistemdeki AÇIK POZİSYONLARLA genel bir bakış açısıyla kıyaslamaktır.
     
     Sadece JSON formatında çıktı ver:
     {
@@ -99,13 +88,12 @@ export async function quickCandidateScreening(candidateProfile, openPositions) {
       "reasoning": "Açıklama"
     }`;
 
+    const prompt = buildStructuredPrompt(instruction, {
+        "OPEN_POSITIONS": positionsText || "Sistemde açık pozisyon bulunmuyor.",
+        "CANDIDATE_DATA": JSON.stringify(sanitizedCandidate, null, 2)
+    });
+
     const model = await getModel();
     const result = await model.generateContent(prompt);
-    try {
-        const text = result.response.text();
-        const cleanJson = text.replace(/```json|```/g, '').trim();
-        return JSON.parse(cleanJson);
-    } catch (e) {
-        return { suitability: "Potansiyel", reasoning: "Analiz tamamlanamadı." };
-    }
+    return parseAIJson(result.response.text(), { suitability: "Potansiyel", reasoning: "Analiz tamamlanamadı." });
 }

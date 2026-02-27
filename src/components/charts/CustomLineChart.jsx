@@ -20,7 +20,7 @@ const CustomTooltip = ({ active, payload, label }) => {
                         <span className="text-lg font-black text-electric">{payload[0].value}</span>
                     </div>
                     <div>
-                        <p className="text-[11px] font-black text-white uppercase tracking-wider">Aday Başvurusu</p>
+                        <p className="text-[11px] font-black text-text-primary uppercase tracking-wider">Aday Başvurusu</p>
                         <p className="text-[9px] text-emerald-400 font-bold tracking-tight">↑ %12 artış</p>
                     </div>
                 </div>
@@ -33,7 +33,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 export default function CustomLineChart({ data }) {
     return (
         <div className="w-full h-full min-h-[300px] mt-4">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                 <AreaChart
                     data={data}
                     margin={{ top: 10, right: 10, left: -20, bottom: 0 }}

@@ -20,7 +20,7 @@ export default function InterviewHistory({ sessions = [] }) {
                 <div className="w-16 h-16 rounded-full bg-white/[0.02] border border-white/[0.05] flex items-center justify-center mb-4 relative z-10 group-hover:scale-110 transition-transform duration-500 shadow-xl shadow-black/20">
                     <MessageSquare className="w-8 h-8 text-electric/60 group-hover:text-electric transition-colors duration-500" />
                 </div>
-                <p className="text-sm font-semibold text-white mb-2 relative z-10">Kayıt Bulunamadı</p>
+                <p className="text-sm font-semibold text-text-primary mb-2 relative z-10">Kayıt Bulunamadı</p>
                 <p className="text-xs text-navy-400 relative z-10 max-w-[200px] leading-relaxed">Yeni bir değerlendirme süreci başlatmak için ilk mülakat oturumunu oluşturun.</p>
             </div>
         );
@@ -87,7 +87,7 @@ export default function InterviewHistory({ sessions = [] }) {
                             </div>
                             <div className="flex-1 min-w-0 z-10">
                                 <div className="flex items-center gap-3 mb-1">
-                                    <span className="text-sm font-bold text-white tracking-tight">{session.typeLabel}</span>
+                                    <span className="text-sm font-bold text-text-primary tracking-tight">{session.typeLabel}</span>
                                     <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm ${session.finalScore >= 70 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : session.finalScore >= 40 ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
                                         Skor: {session.finalScore}
                                     </span>
@@ -110,11 +110,11 @@ export default function InterviewHistory({ sessions = [] }) {
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="p-3 rounded-xl bg-electric/5 border border-electric/10 text-center">
                                         <p className="text-[9px] text-navy-500 uppercase font-bold">AI Puanı</p>
-                                        <p className="text-lg font-black text-white">{session.aiOverallScore}</p>
+                                        <p className="text-lg font-black text-text-primary">{session.aiOverallScore}</p>
                                     </div>
                                     <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/10 text-center">
                                         <p className="text-[9px] text-navy-500 uppercase font-bold">Son Puan</p>
-                                        <p className="text-lg font-black text-white">{session.finalScore}</p>
+                                        <p className="text-lg font-black text-text-primary">{session.finalScore}</p>
                                     </div>
                                 </div>
 
@@ -150,7 +150,7 @@ export default function InterviewHistory({ sessions = [] }) {
                                             <div className="flex items-start gap-2">
                                                 <span className="text-[9px] font-bold text-electric bg-electric/10 px-1.5 py-0.5 rounded shrink-0">Q{i + 1}</span>
                                                 <div className="flex-1 min-w-0">
-                                                    <p className="text-[11px] text-white font-medium">{q.question}</p>
+                                                    <p className="text-[11px] text-text-primary font-medium">{q.question}</p>
                                                     <p className="text-[10px] text-navy-400 mt-1 whitespace-pre-wrap">{q.answer || '(Cevap verilmedi)'}</p>
                                                     {q.aiFeedback && (
                                                         <p className="text-[9px] text-navy-500 mt-1 italic">AI: {q.aiFeedback}</p>
@@ -177,7 +177,7 @@ export default function InterviewHistory({ sessions = [] }) {
                                 {/* Print */}
                                 <button
                                     onClick={() => handlePrintSession(session)}
-                                    className="w-full py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.06] text-navy-300 hover:text-white text-xs font-bold transition-all flex items-center justify-center gap-2"
+                                    className="w-full py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.06] text-navy-300 hover:text-text-primary text-xs font-bold transition-all flex items-center justify-center gap-2"
                                 >
                                     <Printer className="w-3.5 h-3.5" /> PDF Çıktı Al
                                 </button>

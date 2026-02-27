@@ -252,7 +252,7 @@ export default function InterviewSessionModal({ candidate, onClose, onSessionSav
                             {typeInfo?.icon ? <typeInfo.icon className={`w-4 h-4 text-${typeInfo.color}`} /> : <MessageSquare className="w-4 h-4 text-electric" />}
                         </div>
                         <div>
-                            <h2 className="text-sm font-bold text-white">
+                            <h2 className="text-sm font-bold text-text-primary">
                                 {phase === 'type-select' ? 'Yeni Mülakat Oturumu' : phase === 'paths' ? 'Başlangıç Rotası Seçin' : phase === 'scoring' ? 'AI Puanlama...' : phase === 'review' ? 'Sonuçlar' : `${typeInfo?.label}`}
                             </h2>
                             <p className="text-[10px] text-navy-400">
@@ -287,7 +287,7 @@ export default function InterviewSessionModal({ candidate, onClose, onSessionSav
                                         <type.icon className={`w-6 h-6 text-${type.color}`} />
                                     </div>
                                     <div className="flex-1">
-                                        <h3 className="text-sm font-bold text-white mb-0.5">{type.label}</h3>
+                                        <h3 className="text-sm font-bold text-text-primary mb-0.5">{type.label}</h3>
                                         <p className="text-[11px] text-navy-400">{type.desc}</p>
                                     </div>
                                     <ChevronRight className="w-5 h-5 text-navy-500 group-hover:text-electric transition-colors" />
@@ -324,7 +324,7 @@ export default function InterviewSessionModal({ candidate, onClose, onSessionSav
                                                     </div>
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center justify-between mb-1">
-                                                            <h3 className="text-sm font-bold text-white">{path.title}</h3>
+                                                            <h3 className="text-sm font-bold text-text-primary">{path.title}</h3>
                                                             <ChevronRight className="w-4 h-4 text-navy-500 group-hover:text-electric transition-colors" />
                                                         </div>
                                                         <p className="text-[11px] text-navy-400 mb-3">{path.description}</p>
@@ -356,14 +356,14 @@ export default function InterviewSessionModal({ candidate, onClose, onSessionSav
                                 {conversation.map((c, i) => (
                                     <button key={i}
                                         onClick={() => { saveCurrentAnswer(); setActiveIdx(i); setCurrentAnswer(conversation[i]?.answer || ''); }}
-                                        className={`w-8 h-8 rounded-lg text-[10px] font-bold transition-all relative ${activeIdx === i ? 'bg-electric text-white shadow-lg shadow-electric/30 scale-110'
+                                        className={`w-8 h-8 rounded-lg text-[10px] font-bold transition-all relative ${activeIdx === i ? 'bg-electric text-text-primary shadow-lg shadow-electric/30 scale-110'
                                             : c.answer?.trim() ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                                                 : 'bg-white/5 text-navy-500 hover:bg-white/10'
                                             }`}
                                         title={c.question?.substring(0, 60) || ''}
                                     >
                                         {i + 1}
-                                        {c.isFollowUp && <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-violet-500 border border-navy-900 flex items-center justify-center"><GitBranch className="w-1.5 h-1.5 text-white" /></span>}
+                                        {c.isFollowUp && <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-violet-500 border border-navy-900 flex items-center justify-center"><GitBranch className="w-1.5 h-1.5 text-text-primary" /></span>}
                                     </button>
                                 ))}
                                 {isLoading && (loadingAction === 'deepen' || loadingAction === 'new') && (
@@ -380,11 +380,11 @@ export default function InterviewSessionModal({ candidate, onClose, onSessionSav
                                         {/* Question */}
                                         <div className={`p-5 rounded-2xl border ${currentQ.isFollowUp ? 'bg-violet-500/5 border-violet-500/20' : 'bg-white/[0.03] border-electric/20'}`}>
                                             <div className="flex items-start gap-3 mb-3">
-                                                <span className={`shrink-0 w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold shadow-lg ${currentQ.isFollowUp ? 'bg-violet-500 text-white shadow-violet-500/20' : 'bg-electric text-white shadow-electric/20'}`}>
+                                                <span className={`shrink-0 w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold shadow-lg ${currentQ.isFollowUp ? 'bg-violet-500 text-text-primary shadow-violet-500/20' : 'bg-electric text-text-primary shadow-electric/20'}`}>
                                                     Q{activeIdx + 1}
                                                 </span>
                                                 <div className="flex-1">
-                                                    <p className="text-sm text-white font-semibold leading-relaxed">{currentQ.question}</p>
+                                                    <p className="text-sm text-text-primary font-semibold leading-relaxed">{currentQ.question}</p>
                                                     <div className="flex items-center gap-2 mt-2">
                                                         <span className="text-[9px] text-navy-500 bg-white/5 px-2 py-0.5 rounded">{currentQ.category}</span>
                                                         {currentQ.isFollowUp && (
@@ -406,7 +406,7 @@ export default function InterviewSessionModal({ candidate, onClose, onSessionSav
                                                     });
                                                 }}
                                                 placeholder="Adayın cevabını buraya not alın..."
-                                                className="w-full h-28 p-4 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white placeholder-navy-600 outline-none focus:border-electric/50 transition-all resize-none"
+                                                className="w-full h-28 p-4 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-text-primary placeholder-navy-600 outline-none focus:border-electric/50 transition-all resize-none"
                                             />
                                             {currentQ.evaluationHint && (
                                                 <p className="text-[9px] text-navy-500 mt-2 italic flex items-center gap-1">
@@ -432,10 +432,10 @@ export default function InterviewSessionModal({ candidate, onClose, onSessionSav
                                                         <div className={`w-7 h-7 rounded-lg bg-${mode.color}/10 flex items-center justify-center shrink-0`}>
                                                             <mode.icon className={`w-3.5 h-3.5 text-${mode.color}`} />
                                                         </div>
-                                                        <span className="text-[10px] font-bold text-navy-300 group-hover:text-white truncate transition-colors">{mode.label}</span>
+                                                        <span className="text-[10px] font-bold text-navy-300 group-hover:text-text-primary truncate transition-colors">{mode.label}</span>
                                                         {isLoading && loadingAction === `cat-${mode.id}` && (
                                                             <div className="absolute inset-0 bg-navy-900/80 flex items-center justify-center">
-                                                                <Loader2 className="w-3.5 h-3.5 text-white animate-spin" />
+                                                                <Loader2 className="w-3.5 h-3.5 text-text-primary animate-spin" />
                                                             </div>
                                                         )}
                                                     </button>
@@ -486,7 +486,7 @@ export default function InterviewSessionModal({ candidate, onClose, onSessionSav
                             {/* Score */}
                             <div className="p-6 rounded-2xl bg-gradient-to-br from-electric/10 to-transparent border border-electric/20 text-center">
                                 <p className="text-[10px] text-navy-400 font-bold uppercase tracking-widest mb-2">AI Genel Mülakat Puanı</p>
-                                <div className="text-5xl font-black text-white mb-1">{aiResult.overallScore}<span className="text-lg text-navy-400">/100</span></div>
+                                <div className="text-5xl font-black text-text-primary mb-1">{aiResult.overallScore}<span className="text-lg text-navy-400">/100</span></div>
                                 <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold mt-2 ${aiResult.overallScore >= 70 ? 'bg-emerald-500/20 text-emerald-400' : aiResult.overallScore >= 40 ? 'bg-amber-500/20 text-amber-400' : 'bg-red-500/20 text-red-400'}`}>{aiResult.overallVerdict}</span>
                                 <p className="text-sm text-navy-300 mt-3 leading-relaxed">{aiResult.summary}</p>
                             </div>
@@ -524,20 +524,20 @@ export default function InterviewSessionModal({ candidate, onClose, onSessionSav
                                 <div className="flex items-center gap-4">
                                     <input type="range" min="0" max="100" value={finalScore} onChange={(e) => setFinalScore(parseInt(e.target.value))}
                                         className="flex-1 h-2 bg-navy-800 rounded-lg appearance-none cursor-pointer accent-amber-500" />
-                                    <span className="text-2xl font-black text-white w-16 text-right">{finalScore}</span>
+                                    <span className="text-2xl font-black text-text-primary w-16 text-right">{finalScore}</span>
                                 </div>
                                 <textarea value={interviewerNotes} onChange={(e) => setInterviewerNotes(e.target.value)}
                                     placeholder="Mülakatçı notları (isteğe bağlı)..."
-                                    className="w-full h-20 p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-white placeholder-navy-600 outline-none focus:border-amber-500/50 resize-none" />
+                                    className="w-full h-20 p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] text-sm text-text-primary placeholder-navy-600 outline-none focus:border-amber-500/50 resize-none" />
                             </div>
 
                             {/* Actions */}
                             <div className="flex gap-3">
-                                <button onClick={handlePrint} className="px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.06] text-navy-300 hover:text-white transition-all text-sm flex items-center gap-2">
+                                <button onClick={handlePrint} className="px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.06] text-navy-300 hover:text-text-primary transition-all text-sm flex items-center gap-2">
                                     <Printer className="w-4 h-4" /> PDF
                                 </button>
                                 <button onClick={handleSaveSession} disabled={saving}
-                                    className="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2">
+                                    className="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-text-primary font-bold text-sm shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2">
                                     {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Save className="w-4 h-4" /> Mülakat Kaydını Kaydet</>}
                                 </button>
                             </div>

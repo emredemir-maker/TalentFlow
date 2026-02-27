@@ -178,7 +178,7 @@ export default function AIAnalysisPanel({ result, loading, error, onRetry, title
                 {onRetry && (
                     <button
                         onClick={() => onRetry()}
-                        className="px-6 py-2.5 rounded-xl bg-electric hover:bg-electric-hover text-white font-bold text-sm shadow-lg shadow-electric/20 transition-all hover:scale-105 active:scale-95 flex items-center gap-2"
+                        className="px-6 py-2.5 rounded-xl bg-electric hover:bg-electric-hover text-text-primary font-bold text-sm shadow-lg shadow-electric/20 transition-all hover:scale-105 active:scale-95 flex items-center gap-2"
                     >
                         <Sparkles className="w-4 h-4" />
                         Analizi Başlat

@@ -143,20 +143,20 @@ export default function AIMatchPage() {
                     <div className="lg:col-span-2 space-y-6">
                         <div className="glass rounded-3xl p-6 border border-white/[0.06] h-full">
                             <div className="flex items-center justify-between mb-6">
-                                <h3 className="text-white font-bold flex items-center gap-2">
+                                <h3 className="text-text-primary font-bold flex items-center gap-2">
                                     <Briefcase className="w-5 h-5 text-electric" />
                                     Pozisyon Seçimi
                                 </h3>
                                 {!isAddingNewPosition ? (
                                     <button
                                         onClick={() => setIsAddingNewPosition(true)}
-                                        className="text-[11px] font-bold text-electric hover:text-white transition-colors flex items-center gap-1 uppercase tracking-wider"
+                                        className="text-[11px] font-bold text-electric hover:text-text-primary transition-colors flex items-center gap-1 uppercase tracking-wider"
                                     >
                                         <PlusCircle className="w-3.5 h-3.5" />
                                         Yeni Pozisyon
                                     </button>
                                 ) : (
-                                    <button onClick={() => setIsAddingNewPosition(false)} className="text-navy-500 hover:text-white transition-colors">
+                                    <button onClick={() => setIsAddingNewPosition(false)} className="text-navy-500 hover:text-text-primary transition-colors">
                                         <X className="w-4 h-4" />
                                     </button>
                                 )}
@@ -169,11 +169,11 @@ export default function AIMatchPage() {
                                         value={newPositionName}
                                         onChange={(e) => setNewPositionName(e.target.value)}
                                         placeholder="Pozisyon adı girin (örn: CTO)"
-                                        className="flex-1 px-4 py-2 rounded-xl bg-navy-950/50 border border-white/[0.06] text-sm text-white outline-none focus:border-electric/40"
+                                        className="flex-1 px-4 py-2 rounded-xl bg-navy-950/50 border border-white/[0.06] text-sm text-text-primary outline-none focus:border-electric/40"
                                     />
                                     <button
                                         onClick={handleAddNewPosition}
-                                        className="px-4 py-2 rounded-xl bg-electric text-white text-sm font-bold shadow-lg shadow-electric/20"
+                                        className="px-4 py-2 rounded-xl bg-electric text-text-primary text-sm font-bold shadow-lg shadow-electric/20"
                                     >
                                         Ekle
                                     </button>
@@ -190,7 +190,7 @@ export default function AIMatchPage() {
                                             : 'bg-white/[0.02] border-white/5 hover:border-white/10 hover:bg-white/[0.04]'
                                             }`}
                                     >
-                                        <p className={`text-[13px] font-bold truncate ${selectedPositionId === pos.id ? 'text-white' : 'text-navy-300'}`}>
+                                        <p className={`text-[13px] font-bold truncate ${selectedPositionId === pos.id ? 'text-text-primary' : 'text-navy-300'}`}>
                                             {pos.title}
                                         </p>
                                         <p className="text-[10px] text-navy-500 font-medium mt-1">
@@ -242,8 +242,8 @@ export default function AIMatchPage() {
                                             key={skill}
                                             onClick={() => toggleSkill(skill)}
                                             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${selectedSkills.includes(skill)
-                                                ? 'bg-electric text-white border-electric shadow-lg shadow-electric/20'
-                                                : 'bg-white/5 border-white/5 text-navy-400 hover:text-white hover:border-white/10'
+                                                ? 'bg-electric text-text-primary border-electric shadow-lg shadow-electric/20'
+                                                : 'bg-white/5 border-white/5 text-navy-400 hover:text-text-primary hover:border-white/10'
                                                 }`}
                                         >
                                             {skill}
@@ -271,7 +271,7 @@ export default function AIMatchPage() {
                     {/* 2. Model & Action */}
                     <div className="space-y-6">
                         <div className="glass rounded-3xl p-6 border border-white/[0.06]">
-                            <h3 className="text-white font-bold flex items-center gap-2 mb-6">
+                            <h3 className="text-text-primary font-bold flex items-center gap-2 mb-6">
                                 <Layers className="w-5 h-5 text-electric" />
                                 Analiz Kontrolü
                             </h3>
@@ -309,7 +309,7 @@ export default function AIMatchPage() {
                                 <button
                                     onClick={handleStartMatching}
                                     disabled={isProcessing || !generatedJobDescription.trim() || filteredCandidates.length === 0}
-                                    className={`w-full py-5 rounded-2xl flex flex-col items-center justify-center gap-2 font-bold text-white shadow-xl transition-all ${isProcessing
+                                    className={`w-full py-5 rounded-2xl flex flex-col items-center justify-center gap-2 font-bold text-text-primary shadow-xl transition-all ${isProcessing
                                         ? 'bg-navy-700 cursor-not-allowed'
                                         : 'bg-gradient-to-br from-electric to-blue-600 hover:shadow-electric/30 hover:-translate-y-1 active:scale-95'
                                         }`}
@@ -355,7 +355,7 @@ export default function AIMatchPage() {
                 {/* Results List */}
                 <div className="space-y-4">
                     <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                        <h3 className="text-lg font-bold text-text-primary flex items-center gap-2">
                             <TrendingUp className="w-5 h-5 text-electric-light" />
                             Eşleşme Sonuçları
                         </h3>
@@ -380,7 +380,7 @@ export default function AIMatchPage() {
                                     <MatchScoreRing score={match.score || match.matchScore} size={56} />
 
                                     <div className="flex-1 min-w-0">
-                                        <h4 className="text-lg font-bold text-white group-hover:text-electric-light transition-colors">{match.name}</h4>
+                                        <h4 className="text-lg font-bold text-text-primary group-hover:text-electric-light transition-colors">{match.name}</h4>
                                         <p className="text-sm text-navy-400 font-medium">{match.position}</p>
                                         <p className="text-xs text-navy-300 mt-2 line-clamp-1 opacity-70 italic">"{match.summary || match.aiAnalysis?.summary}"</p>
                                     </div>
@@ -393,7 +393,7 @@ export default function AIMatchPage() {
                                             }`}>
                                             {(match.score || match.matchScore) >= 85 ? 'Liyakatli' : (match.score || match.matchScore) >= 70 ? 'Uygun' : (match.score || match.matchScore) >= 50 ? 'Gelişebilir' : 'Eksik'}
                                         </div>
-                                        <button className="p-3 rounded-xl hover:bg-white/[0.06] text-navy-500 hover:text-white transition-all">
+                                        <button className="p-3 rounded-xl hover:bg-white/[0.06] text-navy-500 hover:text-text-primary transition-all">
                                             <MoreVertical className="w-5 h-5" />
                                         </button>
                                     </div>
@@ -405,7 +405,7 @@ export default function AIMatchPage() {
                             <div className="w-20 h-20 rounded-full bg-navy-950 flex items-center justify-center mb-6 border border-white/5">
                                 <Users className="w-10 h-10 opacity-30" />
                             </div>
-                            <h4 className="text-white font-bold text-lg mb-2">Simülasyon Bekleniyor</h4>
+                            <h4 className="text-text-primary font-bold text-lg mb-2">Simülasyon Bekleniyor</h4>
                             <p className="text-sm text-center max-w-sm px-4">
                                 Pozisyon ve yetkinlikleri seçtikten sonra analizi başlatarak en uygun adayları listeleyebilirsiniz.
                             </p>

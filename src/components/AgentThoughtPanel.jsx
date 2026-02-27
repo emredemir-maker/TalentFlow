@@ -50,7 +50,7 @@ export default function AgentThoughtPanel({ isProcessing, reasoning, decision })
                     <BrainCircuit className="w-5 h-5" />
                 </div>
                 <div>
-                    <h3 className="text-sm font-bold text-white">Ajan Düşünce Süreci</h3>
+                    <h3 className="text-sm font-bold text-text-primary">Ajan Düşünce Süreci</h3>
                     <p className="text-xs text-navy-400 font-mono">
                         {isProcessing ? 'Analiz motoru çalışıyor...' : 'Analiz tamamlandı.'}
                     </p>
@@ -71,7 +71,7 @@ export default function AgentThoughtPanel({ isProcessing, reasoning, decision })
                             )}
 
                             {/* Icon Bubble */}
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 border transition-all duration-500 ${status === 'completed' ? 'bg-electric text-white border-electric shadow-[0_0_15px_rgba(59,130,246,0.5)]' :
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 border transition-all duration-500 ${status === 'completed' ? 'bg-electric text-text-primary border-electric shadow-[0_0_15px_rgba(59,130,246,0.5)]' :
                                     status === 'active' ? 'bg-navy-900 text-electric border-electric animate-pulse shadow-[0_0_20px_rgba(59,130,246,0.3)]' :
                                         'bg-navy-950 text-navy-600 border-navy-800'
                                 }`}>
@@ -80,7 +80,7 @@ export default function AgentThoughtPanel({ isProcessing, reasoning, decision })
 
                             {/* Text Content */}
                             <div className="pt-1">
-                                <h4 className={`text-sm font-bold transition-colors ${status === 'active' ? 'text-electric-light' : 'text-white'}`}>
+                                <h4 className={`text-sm font-bold transition-colors ${status === 'active' ? 'text-electric-light' : 'text-text-primary'}`}>
                                     {step.label}
                                 </h4>
                                 <p className="text-xs text-navy-400 mt-1 leading-relaxed">

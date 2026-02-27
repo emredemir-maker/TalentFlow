@@ -220,7 +220,7 @@ export default function SystemScanner() {
                     <div className="w-12 h-12 rounded-full bg-electric/10 flex items-center justify-center mb-4 mx-auto">
                         <Brain className="w-6 h-6 text-electric" />
                     </div>
-                    <h3 className="text-lg font-bold text-white text-center mb-2">Sistem Taraması</h3>
+                    <h3 className="text-lg font-bold text-text-primary text-center mb-2">Sistem Taraması</h3>
                     <p className="text-sm text-navy-300 text-center mb-6">
                         5 Aşamalı Otonom Ajan (Scout, Researcher, Analyst, Engagement, Recruiter) tüm aday havuzunu tarayacak ve güncelleyecektir.
                     </p>
@@ -233,7 +233,7 @@ export default function SystemScanner() {
                                 onChange={(e) => setForceRescan(e.target.checked)}
                                 className="w-4 h-4 rounded border-white/20 bg-navy-900 text-electric focus:ring-electric"
                             />
-                            <span className="text-sm text-white">Detaylı Deterministik Skorlama Yap (Tüm Adaylar)</span>
+                            <span className="text-sm text-text-primary">Detaylı Deterministik Skorlama Yap (Tüm Adaylar)</span>
                         </label>
                         {forceRescan && (
                             <p className="text-xs text-orange-400 mt-2 ml-7">
@@ -243,8 +243,8 @@ export default function SystemScanner() {
                     </div>
 
                     <div className="flex gap-3">
-                        <button onClick={() => setShowConfirm(false)} className="flex-1 py-2.5 rounded-xl border border-white/10 text-navy-300 hover:text-white font-medium transition-all">İptal</button>
-                        <button onClick={() => handleScan(forceRescan)} className="flex-1 py-2.5 rounded-xl bg-electric text-white font-bold hover:bg-electric-hover transition-all flex items-center justify-center gap-2">
+                        <button onClick={() => setShowConfirm(false)} className="flex-1 py-2.5 rounded-xl border border-white/10 text-navy-300 hover:text-text-primary font-medium transition-all">İptal</button>
+                        <button onClick={() => handleScan(forceRescan)} className="flex-1 py-2.5 rounded-xl bg-electric text-text-primary font-bold hover:bg-electric-hover transition-all flex items-center justify-center gap-2">
                             <Play className="w-4 h-4 fill-current" /> Başlat
                         </button>
                     </div>
@@ -258,7 +258,7 @@ export default function SystemScanner() {
         <>
             <button
                 onClick={() => scanning ? setShowMonitor(true) : setShowConfirm(true)}
-                className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all relative group overflow-hidden ${scanning ? 'bg-electric/10 border-electric/30 text-electric' : 'bg-white/[0.04] border-white/[0.06] text-navy-400 hover:text-white hover:bg-white/[0.08]'}`}
+                className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all relative group overflow-hidden ${scanning ? 'bg-electric/10 border-electric/30 text-electric' : 'bg-white/[0.04] border-white/[0.06] text-navy-400 hover:text-text-primary hover:bg-white/[0.08]'}`}
                 title="Sistem Taraması"
             >
                 {scanning ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
@@ -273,7 +273,7 @@ export default function SystemScanner() {
                         {/* Status Header */}
                         <div className="p-6 border-b border-white/5 flex justify-between items-center bg-navy-800/50">
                             <div>
-                                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                                <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
                                     {scanning ? (
                                         <>
                                             <span className="relative flex h-3 w-3">
@@ -293,7 +293,7 @@ export default function SystemScanner() {
                                     {scanning ? 'Ajanlar aktif olarak analiz yapıyor.' : 'Tüm işlemler başarıyla tamamlandı.'}
                                 </p>
                             </div>
-                            <button onClick={handleStop} className="p-2 hover:bg-white/5 rounded-lg text-navy-400 hover:text-white transition-colors">
+                            <button onClick={handleStop} className="p-2 hover:bg-white/5 rounded-lg text-navy-400 hover:text-text-primary transition-colors">
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
@@ -313,7 +313,7 @@ export default function SystemScanner() {
                                 <div className="flex flex-col items-center animate-in zoom-in-95 duration-300">
                                     {/* Avatar Ring */}
                                     <div className="w-20 h-20 rounded-full bg-navy-800 border-4 border-navy-700 flex items-center justify-center mb-4 relative">
-                                        <span className="text-2xl font-bold text-white">{currentCandidate.name?.[0]}</span>
+                                        <span className="text-2xl font-bold text-text-primary">{currentCandidate.name?.[0]}</span>
                                         <div className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-navy-900 border border-white/10 flex items-center justify-center shadow-lg">
                                             {activeStage === 'scout' && <Eye className="w-4 h-4 text-blue-400 animate-pulse" />}
                                             {activeStage === 'researcher' && <GitBranch className="w-4 h-4 text-cyan-400 animate-pulse" />}
@@ -323,7 +323,7 @@ export default function SystemScanner() {
                                         </div>
                                     </div>
 
-                                    <h3 className="text-xl font-bold text-white mb-1">{currentCandidate.name}</h3>
+                                    <h3 className="text-xl font-bold text-text-primary mb-1">{currentCandidate.name}</h3>
                                     <p className="text-sm text-navy-400 mb-6">{currentCandidate.position}</p>
 
                                     {/* Active Stage Indicator */}
@@ -343,13 +343,13 @@ export default function SystemScanner() {
                                     <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
                                         <CheckCircle className="w-8 h-8 text-emerald-400" />
                                     </div>
-                                    <h3 className="text-2xl font-bold text-white mb-2">İşlem Tamamlandı</h3>
+                                    <h3 className="text-2xl font-bold text-text-primary mb-2">İşlem Tamamlandı</h3>
                                     <p className="text-navy-400 mb-8 max-w-sm">
                                         {candidates.length} aday tarandı. {aiCount} yeni AI analizi yapıldı ve {updatedCount} profil güncellendi.
                                     </p>
                                     <button
                                         onClick={handleStop}
-                                        className="px-8 py-3 rounded-xl bg-white/5 border border-white/10 text-white font-bold hover:bg-white/10 transition-all"
+                                        className="px-8 py-3 rounded-xl bg-white/5 border border-white/10 text-text-primary font-bold hover:bg-white/10 transition-all"
                                     >
                                         Kapat
                                     </button>
@@ -362,7 +362,7 @@ export default function SystemScanner() {
                         <div className="grid grid-cols-3 divide-x divide-white/5 border-t border-white/5 bg-navy-950/30">
                             <div className="p-4 text-center">
                                 <div className="text-xs text-navy-500 uppercase font-bold tracking-wider mb-1">Taranan</div>
-                                <div className="text-xl font-bold text-white">{processedCount} / {candidates.length}</div>
+                                <div className="text-xl font-bold text-text-primary">{processedCount} / {candidates.length}</div>
                             </div>
                             <div className="p-4 text-center">
                                 <div className="text-xs text-navy-500 uppercase font-bold tracking-wider mb-1">AI Analiz</div>
