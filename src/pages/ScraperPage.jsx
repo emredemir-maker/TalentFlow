@@ -126,7 +126,7 @@ export default function ScraperPage() {
         setAutoResults([]);
 
         try {
-            const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+            const serverUrl = import.meta.env.PROD ? '' : (import.meta.env.VITE_SERVER_URL || 'http://localhost:3001');
             const response = await fetch(`${serverUrl}/api/scrape?q=${encodeURIComponent(searchQuery)}&visual=${visual}`);
 
             if (!response.ok) {
@@ -165,7 +165,7 @@ export default function ScraperPage() {
     const handleSetupBrowser = async () => {
         setAutoScraping(true);
         try {
-            const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+            const serverUrl = import.meta.env.PROD ? '' : (import.meta.env.VITE_SERVER_URL || 'http://localhost:3001');
             await fetch(`${serverUrl}/api/scrape?q=https://www.linkedin.com/login&visual=true`);
         } catch (err) {
             alert('Tarayıcı açılamadı: ' + err.message);
@@ -308,7 +308,9 @@ export default function ScraperPage() {
                                     </pre>
                                     <button
                                         onClick={() => {
-                                            const code = `(async () => { const isSearch = window.location.href.includes('/search/'); const endpoint = isSearch ? '/api/bulk-add' : '/api/direct-add'; const server = '${import.meta.env.VITE_SERVER_URL || 'http://localhost:3001'}'; if (isSearch) {alert('Toplu tarama başlıyor (İlk 10 aday)...'); const items = Array.from(document.querySelectorAll('.artdeco-list__item')).slice(0, 10); const candidates = items.map(i => ({text: i.innerText, url: i.querySelector('a')?.href })); const res = await fetch(server + endpoint, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({candidates}) }); const data = await res.json(); alert('Toplu Ekleme Başarılı: ' + data.addedCount + ' aday.'); } else { const text = document.body.innerText; const url = window.location.href; const res = await fetch(server + endpoint, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({text, url}) }); const data = await res.json(); alert('Aday Eklendi: ' + data.candidate.name); } })();`;
+                                            const prodUrl = 'https://talentflow-84bb6.web.app';
+                                            const server = import.meta.env.PROD ? prodUrl : (import.meta.env.VITE_SERVER_URL || 'http://localhost:3001');
+                                            const code = `(async () => { const isSearch = window.location.href.includes('/search/'); const endpoint = isSearch ? '/api/bulk-add' : '/api/direct-add'; const server = '${server}'; if (isSearch) {alert('Toplu tarama başlıyor (İlk 10 aday)...'); const items = Array.from(document.querySelectorAll('.artdeco-list__item')).slice(0, 10); const candidates = items.map(i => ({text: i.innerText, url: i.querySelector('a')?.href })); const res = await fetch(server + endpoint, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({candidates}) }); const data = await res.json(); alert('Toplu Ekleme Başarılı: ' + data.addedCount + ' aday.'); } else { const text = document.body.innerText; const url = window.location.href; const res = await fetch(server + endpoint, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({text, url}) }); const data = await res.json(); alert('Aday Eklendi: ' + data.candidate.name); } })();`;
                                             navigator.clipboard.writeText(code);
                                             alert('Pro Kod kopyalandı! Sales Navigator sayfasında konsola (F12) yapıştırın.');
                                         }}

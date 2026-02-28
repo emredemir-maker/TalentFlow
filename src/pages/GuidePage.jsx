@@ -5,7 +5,7 @@ import {
     BookOpen, ChevronRight, LayoutDashboard,
     GitBranch, ArrowRight, Star, Globe,
     BarChart3, Settings, Briefcase, Award,
-    X, CheckCircle2, AlertCircle, MousePointer2,
+    X, CheckCircle2, AlertCircle, MousePointer2, Activity,
     Database, Clock, Heart, MessageSquare,
     Upload, Brain, Layers, FileText,
     Building2, Unlock, Send, Eye, UserCog, Link2
@@ -140,27 +140,45 @@ const FEATURES_DETAIL = [
         )
     },
     {
-        id: 'interview',
-        icon: Zap,
-        title: "Asistanlı Canlı Mülakat",
-        desc: "AI asistanı ile mülakat yapın. Sizin yerinize not tutan, adayın cevaplarını gerçek zamanlı analiz eden ve 'Follow-up' sorular öneren akıllı sistem.",
-        color: "text-violet-400",
-        bgColor: "bg-violet-400/10",
+        id: 'shadow-observer',
+        icon: Eye,
+        title: "Shadow Observer: Canlı Y.Z. Gözlemcisi",
+        desc: "Mülakatın her saniyesini dinleyen 'Gölge Gözlemci' ile tanışın. Gemini 2.0 Multimodal Audio altyapısıyla çalışır; hem sizin hem de adayın sesini dijital olarak analiz eder.",
+        color: "text-emerald-400",
+        bgColor: "bg-emerald-400/10",
         howItWorks: [
-            "Aday dosyasındaki 'Mülakat Oturumu' butonunu kullanın.",
-            "AI asistanının sunduğu stratejik başlangıç rotalarından birini seçin.",
-            "Adayın yanıtlarını girdikçe, AI teknik açıkları yakalamak için yeni sorular önerir.",
-            "Otomatik transkript ve yetkinlik bazlı puanlama ile mülakatı sonuçlandırın."
+            "Interview Bridge: 'Botu Toplantıya Sok' diyerek Meet/Zoom sekmesini ve 'SİSTEM SESİNİ' paylaşın.",
+            "Hibrit Miksaj: Sistem, mikrofonunuzu ve toplantı sesini AudioContext üzerinden birleştirerek kusursuz analiz yapar.",
+            "Canlı STAR Denetimi: Adayın cevapları konuşma anında S-T-A-R kriterlerine ve mantık bütünlüğüne göre skorlanır.",
+            "Taktiksel Rehberlik: AI asistanı mülakat sırasında yan panelden 'Derinleş' veya 'Soru Grubu Değiştir' gibi taktikler fısıldar."
         ],
         preview: (
-            <div className="space-y-3">
-                <div className="bg-violet-500/10 border border-violet-500/20 p-3 rounded-xl">
-                    <div className="text-[10px] text-violet-400 font-bold mb-1 italic">Dinamik Soru Önerisi:</div>
-                    <div className="text-xs text-text-primary leading-relaxed">"Mimari geçiş sürecinde yaşadığınız en büyük teknik darboğazı nasıl aştınız?"</div>
+            <div className="space-y-4">
+                <div className="flex items-center justify-between px-1">
+                    <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="text-[10px] font-black text-text-primary uppercase tracking-tighter">MÜLAKAT KÖPRÜSÜ AKTİF</span>
+                    </div>
+                    <ShieldCheck className="w-4 h-4 text-emerald-400" />
                 </div>
-                <div className="flex gap-2">
-                    <div className="flex-1 h-7 bg-white/5 rounded-lg border border-white/5 flex items-center justify-center text-[10px] text-navy-300">Derinleş (+)</div>
-                    <div className="flex-1 h-7 bg-white/5 rounded-lg border border-white/5 flex items-center justify-center text-[10px] text-navy-300">Yeni Soru (⚡)</div>
+                <div className="grid grid-cols-4 gap-1.5">
+                    {['S', 'T', 'A', 'R'].map(s => (
+                        <div key={s} className="bg-white/5 border border-white/10 p-2 rounded-lg text-center">
+                            <div className="text-[8px] text-navy-500 font-bold mb-1">{s}</div>
+                            <div className="h-1 w-full bg-navy-800 rounded-full overflow-hidden">
+                                <div className="h-full bg-emerald-500 w-3/4" />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                <div className="bg-emerald-500/5 border border-emerald-500/20 p-2.5 rounded-xl">
+                    <div className="flex items-center gap-2 mb-1">
+                        <Activity className="w-3 h-3 text-emerald-400" />
+                        <span className="text-[9px] text-emerald-400 font-bold uppercase">Intel Stream</span>
+                    </div>
+                    <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                        <div className="h-full bg-emerald-500 w-2/3 animate-[shimmer_2s_infinite]" />
+                    </div>
                 </div>
             </div>
         )
@@ -620,13 +638,13 @@ export default function GuidePage() {
                         />
                         <StepItem
                             num="04"
-                            title="Canlı Mülakat Oturumu"
-                            desc="Uygulama üzerinden bir mülakat modu seçin ve mülakata başlayın. AI asistanının önerdiği derinleşme sorularıyla adayı zorlayın."
+                            title="Gölge Gözlemci & Mülakat Köprüsü"
+                            desc="İçerideki 'Botu Toplantıya Sok' butonunu kullanarak mülakat sekmesini paylaşın. AI, adayı ve sizi eş zamanlı dinleyerek STAR denetimi yapmaya başlar."
                         />
                         <StepItem
                             num="05"
-                            title="İletişimi Tamamlayın"
-                            desc="'Mesaj Gönder' diyerek adaya Meet linkini gönderin ve takviminize işleyin. Tüm süreç tek bir ekranda biter."
+                            title="Veda ve Raporlama"
+                            desc="Mülakat bittiğinde dinleme anında durur. AI, konuşulanları saniyeler içinde analiz eder ve STAR metodolojisine göre puanlanmış raporu önünüze sürer."
                         />
                     </div>
                 </section>

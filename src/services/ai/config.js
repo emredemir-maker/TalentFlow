@@ -2,7 +2,8 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { db } from '../../config/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 
-const DEFAULT_MODEL = 'gemini-2.0-flash';
+const DEFAULT_GEMINI_MODEL = 'gemini-2.0-flash'; // High speed Flash 2.0
+const DEFAULT_CLAUDE_MODEL = 'claude-3-7-sonnet-latest';
 let genAI = null;
 let currentApiKey = null;
 
@@ -22,7 +23,7 @@ export async function getGlobalGeminiKey() {
 /**
  * Initializes and returns a Gemini model with deterministic settings.
  */
-export async function getModel(modelId = DEFAULT_MODEL) {
+export async function getModel(modelId = DEFAULT_GEMINI_MODEL) {
     const apiKey = await getGlobalGeminiKey();
     if (!apiKey) {
         throw new Error('Gemini API anahtarı bulunamadı. Lütfen Sistem Ayarları üzerinden anahtarınızı ekleyin.');

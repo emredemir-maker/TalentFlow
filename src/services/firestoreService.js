@@ -56,8 +56,75 @@ export async function saveUserSettings(userId, settings) {
     await setDoc(docRef, { ...settings, updatedAt: serverTimestamp() }, { merge: true });
 }
 
-// ==================== SEED DATA REMOVED FOR PRODUCTION ====================
+// ==================== SEED DATA FOR TESTING ====================
 export async function seedCandidates() {
-    console.warn('[TalentFlow] Seeding is disabled in production.');
-    return 0;
+    const candidates = [
+        {
+            name: "Oğuzhan Çağlıyan (TEST KAYIT)",
+            email: "oguzhan.test@talentflow.ai",
+            position: "Senior Backend Developer",
+            matchedPositionTitle: "Senior Backend Developer",
+            experience: 8,
+            skills: ["Go", "Node.js", "Postgres", "Redis", "System Design"],
+            department: "Teknoloji",
+            status: "ai_analysis",
+            source: "İnsan Kaynakları",
+            matchScore: 92,
+            initialAiScore: 92,
+            about: "8+ yıl tecrübeli backend mühendisi. Yüksek ölçekli sistemler ve mikroservis mimarileri konusunda uzman. Trendyol ve Getir gibi firmalarda kritik projelerde yer aldı.",
+            aiAnalysis: {
+                score: 92,
+                summary: "Adayın teknik derinliği oldukça yüksek. Özellikle Go ve Redis deneyimi pozisyonun gereklilikleri ile tam örtüşüyor. STAR metodolojisine göre aksiyonları net."
+            }
+        },
+        {
+            name: "Selin Yıldız (TEST KAYIT)",
+            email: "selin.test@talentflow.ai",
+            position: "Senior Product Manager",
+            matchedPositionTitle: "Product Manager",
+            experience: 6,
+            skills: ["Product Roadmap", "A/B Testing", "Mixpanel", "Jira", "Agile"],
+            department: "Ürün Yönetimi",
+            status: "ai_analysis",
+            source: "Referans",
+            sourceDetail: "Ahmet Yılmaz",
+            matchScore: 88,
+            initialAiScore: 88,
+            about: "E-ticaret ve Fintech sektörlerinde 6 yıllık ürün yönetimi tecrübesi. Veri odaklı karar alma mekanizmaları ve kullanıcı deneyimi optimizasyonunda başarılı sonuçlar elde etti.",
+            aiAnalysis: {
+                score: 88,
+                summary: "Ürün vizyonu ve metrik takibi yetkinlikleri güçlü. Fintech projelerindeki başarıları somut kanıtlarla desteklenmiş."
+            }
+        },
+        {
+            name: "Mert Demir (TEST KAYIT)",
+            email: "mert.test@talentflow.ai",
+            position: "HR Team Lead",
+            matchedPositionTitle: "HR Manager",
+            experience: 12,
+            skills: ["Leadership", "Conflict Management", "OKRs", "Strategic Hiring"],
+            department: "İş Destek",
+            status: "ai_analysis",
+            source: "LinkedIn",
+            matchScore: 85,
+            initialAiScore: 85,
+            about: "Küresel ölçekli teknoloji şirketlerinde 10+ yıl İK ve ekip yönetimi deneyimi. Şirket kültürü inşası ve performans sistemleri kurulumunda uzman.",
+            aiAnalysis: {
+                score: 85,
+                summary: "Yönetim becerileri ve şirket kültürüne uyumu oldukça yüksek görünüyor. Stratejik bakış açısı gelişmiş."
+            }
+        }
+    ];
+
+    let count = 0;
+    for (const c of candidates) {
+        try {
+            await addCandidate(c);
+            count++;
+        } catch (e) {
+            console.error("Seeding error for", c.name, e);
+        }
+    }
+    console.log(`✅ [TalentFlow] seeded ${count} candidates.`);
+    return count;
 }

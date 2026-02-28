@@ -12,37 +12,15 @@ export const connectGoogleWorkspace = async (userId) => {
         provider.addScope('https://www.googleapis.com/auth/gmail.modify');
         provider.addScope('https://www.googleapis.com/auth/calendar.events');
 
-        // Force consent screen to potentially get refresh tokens
+        // Force consent screen and ensure all scopes are included
         provider.setCustomParameters({
             prompt: 'consent',
-            access_type: 'offline'
+            access_type: 'offline',
+            include_granted_scopes: 'true'
         });
 
         const auth = getAuth();
-        let result;
-
-        // Try linking to existing account first to keep them on the same Firebase user
-        if (auth.currentUser) {
-            // Some users might already be signed in via Google with basic scopes
-            // To get new scopes, we must reauthenticate them or link them
-            // In Firebase v9, linkWithPopup can throw if already linked with the same provider. 
-            // Better to use signInWithPopup to 're-auth' with extra scopes if they are already a Google user,
-            // OR use linkWithPopup if they logged in with Email. 
-            // We can safely try linkWithPopup first.
-            try {
-                result = await linkWithPopup(auth.currentUser, provider);
-            } catch (linkError) {
-                if (linkError.code === 'auth/credential-already-in-use' || linkError.code === 'auth/provider-already-linked') {
-                    // Already linked, so we just need to re-auth to request new scopes
-                    result = await signInWithPopup(auth, provider);
-                } else {
-                    throw linkError;
-                }
-            }
-        } else {
-            // Shouldn't happen if they are on settings page, but fallback
-            result = await signInWithPopup(auth, provider);
-        }
+        const result = await signInWithPopup(auth, provider);
 
         // Get the OAuth token from the result
         const credential = GoogleAuthProvider.credentialFromResult(result);
@@ -74,6 +52,22 @@ export const connectGoogleWorkspace = async (userId) => {
         }
 
         return { success: false, error: errorMessage };
+    }
+};
+
+export const disconnectGoogleWorkspace = async (userId) => {
+    try {
+        const userRef = doc(db, USERS_PATH, userId);
+        await updateDoc(userRef, {
+            'integrations.google': {
+                connected: false,
+                disconnectedAt: new Date().toISOString()
+            }
+        });
+        return { success: true };
+    } catch (error) {
+        console.error("Google Workspace Disconnect Error:", error);
+        return { success: false, error: error.message };
     }
 };
 
@@ -111,8 +105,9 @@ export const sendDirectEmail = async (userId, token, emailData) => {
         const data = await response.json();
         if (!response.ok) {
             // Check for revoked tokens
-            if (response.status === 401) throw new Error("Oturum süresi dolmuş veya yetki kaldırılmış. Lütfen tekrar bağlanın.");
-            throw new Error(data.error?.message || 'E-posta gönderilemedi');
+            if (response.status === 401) throw new Error("Oturum süresi dolmuş veya yetki kaldırılmış. Lütfen Google bağlantısını yenileyin.");
+            if (response.status === 403) throw new Error("Erişim yetkisi yetersiz (403). Lütfen Google hesabınızı tekrar bağlayıp tüm izinleri onaylayın.");
+            throw new Error(data.error?.message || `E-posta gönderilemedi (${response.status})`);
         }
 
         return { success: true, messageId: data.id };
@@ -154,8 +149,9 @@ export const createDirectCalendarEvent = async (userId, token, eventData) => {
 
         const data = await response.json();
         if (!response.ok) {
-            if (response.status === 401) throw new Error("Oturum süresi dolmuş. Lütfen tekrar bağlanın.");
-            throw new Error(data.error?.message || 'Takvim etkinliği oluşturulamadı');
+            if (response.status === 401) throw new Error("Oturum süresi dolmuş veya yetki kaldırılmış. Lütfen Google bağlantısını yenileyin.");
+            if (response.status === 403) throw new Error("Takvime erişim yetkisi yetersiz (403). Lütfen Google hesabınızı tekrar bağlayıp tüm izinleri onaylayın.");
+            throw new Error(data.error?.message || `Takvim etkinliği oluşturulamadı (${response.status})`);
         }
 
         return {
@@ -176,9 +172,10 @@ export const checkGmailMessages = async (token, query) => {
         });
 
         if (!searchResponse.ok) {
-            if (searchResponse.status === 401) throw new Error("Oturum süresi dolmuş. Lütfen tekrar bağlanın.");
+            if (searchResponse.status === 401) throw new Error("Oturum süresi dolmuş veya yetki kaldırılmış. Lütfen Google bağlantısını yenileyin.");
+            if (searchResponse.status === 403) throw new Error("Maillerinizi okuma yetkisi yetersiz (403). Lütfen Google hesabınızı tekrar bağlayıp tüm izinleri onaylayın.");
             const errData = await searchResponse.json();
-            throw new Error(errData.error?.message || 'Mail aranırken bir hata oluştu');
+            throw new Error(errData.error?.message || `Mail aranırken bir hata oluştu (${searchResponse.status})`);
         }
 
         const searchData = await searchResponse.json();

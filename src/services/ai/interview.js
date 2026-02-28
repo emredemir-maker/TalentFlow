@@ -12,9 +12,14 @@ export async function generateInterviewQuestions(candidate, starAnalysis, interv
         "STAR_ANALYSIS": JSON.stringify(starAnalysis)
     });
 
-    const model = await getModel();
-    const result = await model.generateContent(prompt);
-    return parseAIJson(result.response.text(), ["Deneyimlerinizi anlatın.", "Teknik zorlukları nasıl aşarsınız?"]);
+    try {
+        const model = await getModel();
+        const result = await model.generateContent(prompt);
+        return parseAIJson(result.response.text(), ["Deneyimlerinizi anlatın.", "Teknik zorlukları nasıl aşarsınız?"]);
+    } catch (e) {
+        console.error("Interview questions error:", e);
+        return ["Deneyimlerinizi anlatın.", "Teknik zorlukları nasıl aşarsınız?"];
+    }
 }
 
 export async function generateInterviewPaths(candidate, interviewType = 'technical') {
@@ -50,13 +55,13 @@ export async function generateInterviewPaths(candidate, interviewType = 'technic
         "CANDIDATE_DATA": JSON.stringify(candidate)
     });
 
-    const model = await getModel();
     try {
+        const model = await getModel();
         const result = await model.generateContent(prompt);
         const parsed = parseAIJson(result.response.text(), { paths: [] });
         const paths = parsed.paths || (Array.isArray(parsed) ? parsed : []);
 
-        return paths.map((p, i) => ({
+        const finalPaths = paths.map((p, i) => ({
             id: p.id || `p${i}`,
             title: p.title || 'Mülakat Rotası',
             description: p.description || 'Aday değerlendirme süreci',
@@ -66,6 +71,9 @@ export async function generateInterviewPaths(candidate, interviewType = 'technic
                     { ...q, question: q.question || q.text || 'Soru bulunamadı' }
             )
         }));
+
+        if (finalPaths.length === 0) throw new Error("No paths generated");
+        return finalPaths;
     } catch (e) {
         console.error("Interview paths error:", e);
         return [{
@@ -107,9 +115,14 @@ export async function scoreInterviewSession(candidate, interviewType, questionsA
         "QA_DATA": JSON.stringify(questionsAndAnswers)
     });
 
-    const model = await getModel();
-    const result = await model.generateContent(prompt);
-    return parseAIJson(result.response.text(), { overallScore: 50, summary: 'Değerlendirme yapılamadı.' });
+    try {
+        const model = await getModel();
+        const result = await model.generateContent(prompt);
+        return parseAIJson(result.response.text(), { overallScore: 50, summary: 'Değerlendirme yapılamadı.' });
+    } catch (e) {
+        console.error("Scoring error:", e);
+        return { overallScore: 50, overallVerdict: 'Nötr', summary: 'AI değerlendirmesi yapılamadı.', questionScores: [], strengths: [], weaknesses: [] };
+    }
 }
 
 export async function generateFollowUpQuestion(candidate, interviewType, conversationHistory, mode = 'deepen', category = null) {
@@ -145,8 +158,8 @@ export async function generateFollowUpQuestion(candidate, interviewType, convers
         "CONVERSATION_HISTORY": JSON.stringify(conversationHistory)
     });
 
-    const model = await getModel();
     try {
+        const model = await getModel();
         const result = await model.generateContent(prompt);
         return parseAIJson(result.response.text(), {
             question: category ? `${category} ile ilgili bir deneyiminden bahseder misin?` : "Biraz daha detaylandırır mısın?",

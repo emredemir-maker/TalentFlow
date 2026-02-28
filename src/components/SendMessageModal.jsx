@@ -126,6 +126,9 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
                     currentMeetLink = eventResult.meetLink || eventResult.htmlLink;
                     finalContent = applyScheduleToText(finalContent, interviewDate, interviewTime, currentMeetLink);
                 } else {
+                    if (eventResult.error?.includes('403') || eventResult.error?.toLowerCase().includes('permission')) {
+                        throw new Error("Takvime erişim yetkisi alınamadı. Lütfen bağlantıyı yenileyip Takvim kutucuğunu onayladığınızdan emin olun.");
+                    }
                     throw new Error("Takvim etkinliği oluşturulamadı: " + eventResult.error);
                 }
             }
@@ -139,6 +142,9 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
                 });
 
                 if (!emailResult.success) {
+                    if (emailResult.error?.includes('403') || emailResult.error?.toLowerCase().includes('permission')) {
+                        throw new Error("E-posta gönderim yetkisi alınamadı. Lütfen Google bağlantısını yenileyerek tüm izin kutucuklarını onayladığınızdan emin olun.");
+                    }
                     throw new Error("E-posta gönderilemedi: " + emailResult.error);
                 }
             }
@@ -150,7 +156,18 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
                 status: 'sent',
                 trackingId: trackingId,
                 purpose: purpose,
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
+                // Include interview details for history tracking
+                interviewDetails: purpose === 'interview' ? {
+                    date: interviewDate,
+                    time: interviewTime,
+                    duration: duration,
+                    type: interviewType,
+                    typeLabel: interviewType === 'initial' ? 'Tanışma Mülakatı' :
+                        interviewType === 'technical' ? 'Teknik Mülakat' :
+                            interviewType === 'fit' ? 'Kültür Uyumu' : 'Final Mülakatı',
+                    meetLink: currentMeetLink
+                } : null
             });
             onClose();
 

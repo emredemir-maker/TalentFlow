@@ -27,6 +27,9 @@
 
   --color-cyan-accent: #06b6d4;
   --color-violet-accent: #8b5cf6;
+  --color-toxic-violet: #a855f7;
+  --color-neon-cyan: #22d3ee;
+  --color-cyber-blue: #3b82f6;
 
   --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
@@ -372,6 +375,7 @@ body {
   padding: 1px;
   background: linear-gradient(135deg, #3b82f6, #06b6d4);
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
   pointer-events: none;
@@ -437,4 +441,99 @@ select option {
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.2);
+}
+
+/* ==================== CYBER-SURGICAL DESIGN SYSTEM ==================== */
+
+.cyber-glass {
+  background: rgba(10, 10, 20, 0.7);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow:
+    0 10px 40px -10px rgba(0, 0, 0, 0.5),
+    inset 0 0 20px rgba(59, 130, 246, 0.05);
+}
+
+.cyber-border-gradient {
+  background: linear-gradient(var(--navy-950), var(--navy-950)) padding-box,
+    linear-gradient(135deg, rgba(59, 130, 246, 0.5), rgba(168, 85, 247, 0.5)) border-box;
+  border: 1px solid transparent;
+}
+
+.neon-glow-blue {
+  text-shadow: 0 0 10px rgba(59, 130, 246, 0.5), 0 0 20px rgba(59, 130, 246, 0.2);
+}
+
+.neon-glow-violet {
+  text-shadow: 0 0 10px rgba(168, 85, 247, 0.5), 0 0 20px rgba(168, 85, 247, 0.2);
+}
+
+.scan-line {
+  position: relative;
+  overflow: hidden;
+}
+
+.scan-line::after {
+  content: '';
+  position: absolute;
+  top: -100%;
+  left: 0;
+  width: 100%;
+  height: 50%;
+  background: linear-gradient(to bottom, transparent, rgba(34, 211, 238, 0.05), transparent);
+  animation: scan-vertical 4s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes scan-vertical {
+  0% {
+    top: -100%;
+  }
+
+  100% {
+    top: 200%;
+  }
+}
+
+.tech-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.data-stream-bg {
+  mask-image: linear-gradient(to bottom, black, transparent);
+  opacity: 0.1;
+  pointer-events: none;
+}
+
+/* HUD Text */
+.hud-text {
+  font-family: 'JetBrains Mono', 'Inter', monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+@keyframes glitch-skew {
+  0% {
+    transform: skew(0deg);
+  }
+
+  20% {
+    transform: skew(-1deg);
+  }
+
+  40% {
+    transform: skew(1deg);
+  }
+
+  100% {
+    transform: skew(0deg);
+  }
+}
+
+.animate-glitch {
+  animation: glitch-skew 1s infinite alternate-reverse;
 }

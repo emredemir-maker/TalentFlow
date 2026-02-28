@@ -21,7 +21,7 @@ export default function StarScoreCard({ analysis, candidate, onRefresh }) {
     };
 
     const totalScore = Math.round(
-        (scores.Situation + scores.Task + scores.Action + scores.Result) / 4 * 10
+        ((Number(scores.Situation) || 0) + (Number(scores.Task) || 0) + (Number(scores.Action) || 0) + (Number(scores.Result) || 0)) / 4 * 10
     );
 
     const handleRefresh = async () => {
@@ -35,74 +35,58 @@ export default function StarScoreCard({ analysis, candidate, onRefresh }) {
     };
 
     return (
-        <div className="glass rounded-3xl p-6 border border-white/[0.06] relative overflow-hidden group">
+        <div className="cyber-glass rounded-[2rem] p-6 border border-white/10 relative overflow-hidden group tech-grid h-full flex flex-col">
             {/* Background Glow */}
-            <div className="absolute top-0 right-0 w-64 h-64 bg-electric/5 rounded-full blur-3xl -z-10 group-hover:bg-electric/10 transition-colors duration-500" />
+            <div className="absolute top-0 right-0 w-48 h-48 bg-electric/5 rounded-full blur-[80px] -z-10 pointer-events-none" />
 
             {/* Header */}
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between mb-5 shrink-0">
                 <div>
-                    <h3 className="text-lg font-bold text-text-primary flex items-center gap-2">
-                        <Target className="w-5 h-5 text-electric" />
-                        STAR Analiz Skoru
+                    <h3 className="text-xs font-black text-text-primary flex items-center gap-2 hud-text tracking-widest neon-glow-blue">
+                        <Target className="w-4 h-4 text-electric" />
+                        STAR ANALİZ SKORU
                     </h3>
-                    <p className="text-xs text-navy-400 mt-1">Yapay Zeka Destekli Mülakat Değerlendirmesi</p>
                 </div>
                 <div className="flex items-center gap-4">
                     <button
                         onClick={handleRefresh}
                         disabled={refreshing}
-                        className="p-2 rounded-xl bg-white/5 border border-white/10 text-navy-400 hover:text-text-primary hover:bg-white/10 transition-all group/ref"
-                        title="Analizi Yenile (Detaylı Gerekçeler İçin)"
+                        className="p-2 rounded-xl bg-white/5 border border-white/10 text-navy-400 hover:text-text-primary transition-all"
                     >
-                        <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-electric' : 'group-hover/ref:rotate-180 transition-transform duration-500'}`} />
+                        <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-electric' : ''}`} />
                     </button>
                     <div className="flex flex-col items-end">
-                        <span className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-br from-white to-navy-400">
+                        <span className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-br from-electric to-white hud-text">
                             {totalScore}
                         </span>
-                        <span className="text-[10px] font-bold text-navy-500 uppercase tracking-widest">Genel Puan</span>
+                        <span className="text-[10px] font-black text-navy-600 uppercase tracking-widest">SKOR</span>
                     </div>
                 </div>
             </div>
 
             {/* STAR Breakdown */}
-            <div className="space-y-4">
+            <div className="space-y-4 flex-1 overflow-y-auto custom-scrollbar pr-1">
                 {Object.entries(STAR_CRITERIA).map(([key, config]) => {
                     const reason = scores.Details?.[key]?.reason;
                     return (
-                        <div key={key} className="space-y-1.5 group/item relative">
-                            <div className="flex justify-between text-xs font-semibold text-navy-300">
-                                <span className="flex items-center gap-1.5">
-                                    <span className={`w-1.5 h-1.5 rounded-full ${config.color.replace('text', 'bg')}`} />
+                        <div key={key} className="space-y-2 group/item relative">
+                            <div className="flex justify-between text-xs font-bold text-navy-400">
+                                <span className="flex items-center gap-2">
+                                    <span className={`w-2 h-2 rounded-full ${config.color.replace('text', 'bg')}`} />
                                     {config.label}
-                                    <div className="relative flex items-center">
-                                        <button
-                                            onClick={() => setSelectedDetail({
-                                                key,
-                                                ...config,
-                                                score: scores[key],
-                                                reason: reason || "Bu aday eski bir AI modeli ile analiz edilmiş. Detaylı gerekçeler için lütfen sağ üstteki yenile butonuna basın."
-                                            })}
-                                            className="p-0.5 rounded-md text-navy-500 hover:text-text-primary transition-colors"
-                                            title="Detayları Gör"
-                                        >
-                                            <Info className="w-3 h-3" />
-                                        </button>
-
-                                        {/* Tooltip on Hover */}
-                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-navy-800 border border-white/10 rounded-lg text-[10px] text-text-primary opacity-0 invisible group-hover/item:opacity-100 group-hover/item:visible transition-all z-50 shadow-2xl pointer-events-none">
-                                            <div className="flex flex-col gap-1">
-                                                <span className="font-bold text-electric uppercase tracking-tighter">AI Gerekçesi:</span>
-                                                <span className="italic leading-relaxed">
-                                                    "{reason || "Detaylı gerekçe için analizi yenileyin."}"
-                                                </span>
-                                            </div>
-                                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-navy-800" />
-                                        </div>
-                                    </div>
+                                    <button
+                                        onClick={() => setSelectedDetail({
+                                            key,
+                                            ...config,
+                                            score: scores[key],
+                                            reason: reason || "Yenileme gerekli."
+                                        })}
+                                        className="text-navy-600 hover:text-text-primary transition-colors"
+                                    >
+                                        <Info className="w-3 h-3" />
+                                    </button>
                                 </span>
-                                <span className={config.color}>{scores[key]}/10</span>
+                                <span className={`${config.color} font-black`}>{scores[key]}/10</span>
                             </div>
                             <div className="h-2 bg-navy-900/50 rounded-full overflow-hidden">
                                 <div
@@ -113,41 +97,6 @@ export default function StarScoreCard({ analysis, candidate, onRefresh }) {
                         </div>
                     );
                 })}
-            </div>
-
-            {/* AI Summary */}
-            <div className="mt-6 pt-6 border-t border-white/[0.06]">
-                <div className="flex gap-3">
-                    <div className="p-2 rounded-xl bg-electric/10 text-electric border border-electric/20 h-fit">
-                        <Zap className="w-4 h-4" />
-                    </div>
-                    <div>
-                        <h4 className="text-sm font-bold text-text-primary mb-1 flex items-center gap-2">
-                            AI Görüşü
-                            {candidate?.matchedPositionTitle && (
-                                <span className="text-xs font-normal text-navy-400">({candidate.matchedPositionTitle})</span>
-                            )}
-                        </h4>
-                        <p className="text-xs text-navy-300 leading-relaxed italic mb-3">
-                            "{scores.Summary}"
-                        </p>
-
-                        {/* Highlights from Past Experiences */}
-                        {candidate?.aiAnalysis?.reasons?.length > 0 && (
-                            <div className="space-y-2 mt-3 pl-3 border-l border-white/5">
-                                <h5 className="text-[10px] font-bold text-navy-500 uppercase tracking-widest">Öne Çıkan Geçmiş Deneyimler:</h5>
-                                <div className="space-y-1.5 font-medium">
-                                    {candidate.aiAnalysis.reasons.map((reason, idx) => (
-                                        <div key={idx} className="flex gap-2 text-[11px] text-navy-200">
-                                            <span className="text-electric-light shrink-0">•</span>
-                                            <span>{reason}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
             </div>
 
             {/* Detail Modal Overlay */}
@@ -224,13 +173,6 @@ export default function StarScoreCard({ analysis, candidate, onRefresh }) {
                     </div>
                 </div>
             )}
-
-            {/* Interview Session Prompt */}
-            <div className="glass rounded-3xl p-6 border border-white/[0.06] mt-6 text-center">
-                <MessageSquare className="w-8 h-8 text-electric mx-auto mb-3 opacity-60" />
-                <p className="text-sm text-navy-300 mb-1 font-medium">Mülakat Oturumu</p>
-                <p className="text-[10px] text-navy-500">Aday kartındaki "Değerlendirme" sekmesinden veya sol paneldeki "Yeni Mülakat Oturumu" butonundan interaktif mülakat başlatabilirsiniz.</p>
-            </div>
         </div>
     );
 }

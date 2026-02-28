@@ -2,6 +2,7 @@
 // Context provider for managing job positions
 
 import { createContext, useContext, useState, useEffect } from 'react';
+import { useAuth } from './AuthContext';
 import { db } from '../config/firebase';
 import {
     collection,
@@ -15,6 +16,8 @@ import {
     orderBy
 } from 'firebase/firestore';
 
+const POSITIONS_COLLECTION = 'artifacts/talent-flow/public/data/positions';
+
 const PositionsContext = createContext();
 
 export function usePositions() {
@@ -22,36 +25,48 @@ export function usePositions() {
 }
 
 export function PositionsProvider({ children }) {
+    const { isAuthenticated } = useAuth();
     const [positions, setPositions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     // Initial listener for real-time updates
     useEffect(() => {
-        setLoading(true);
-        const q = query(collection(db, 'positions'), orderBy('createdAt', 'desc'));
+        if (!isAuthenticated) return;
 
-        const unsubscribe = onSnapshot(q, (snapshot) => {
+        setLoading(true);
+        const positionsRef = collection(db, POSITIONS_COLLECTION);
+
+        const unsubscribe = onSnapshot(positionsRef, (snapshot) => {
             const positionsList = snapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data(),
-                createdAt: doc.data().createdAt?.toDate()?.toLocaleDateString('tr-TR') || new Date().toLocaleDateString('tr-TR')
+                createdAtLabel: doc.data().createdAt?.toDate()?.toLocaleDateString('tr-TR') || new Date().toLocaleDateString('tr-TR')
             }));
+
+            // Client-side sorting (Rule 2)
+            positionsList.sort((a, b) => {
+                const aTime = a.createdAt?.toMillis?.() || 0;
+                const bTime = b.createdAt?.toMillis?.() || 0;
+                return bTime - aTime;
+            });
+
             setPositions(positionsList);
             setLoading(false);
+            setError(null);
         }, (err) => {
-            console.error("Positions listener error:", err);
+            console.error("[TalentFlow] Positions listener error:", err);
             setError("Pozisyonlar yüklenirken hata oluştu.");
             setLoading(false);
         });
 
         return () => unsubscribe();
-    }, []);
+    }, [isAuthenticated]);
 
     // Add a new position (recruiter/admin creates directly as open)
     const addPosition = async (positionData, initialStatus = 'open') => {
         try {
-            await addDoc(collection(db, 'positions'), {
+            await addDoc(collection(db, POSITIONS_COLLECTION), {
                 ...positionData,
                 status: initialStatus,
                 matchedCandidates: [],
@@ -67,7 +82,7 @@ export function PositionsProvider({ children }) {
     // Department user requests a position (pending_approval)
     const addPositionRequest = async (positionData, requestedBy) => {
         try {
-            await addDoc(collection(db, 'positions'), {
+            await addDoc(collection(db, POSITIONS_COLLECTION), {
                 ...positionData,
                 status: 'pending_approval',
                 requestedBy: requestedBy || null,
@@ -84,7 +99,7 @@ export function PositionsProvider({ children }) {
     // Recruiter approves a pending position request
     const approvePosition = async (id) => {
         try {
-            const docRef = doc(db, 'positions', id);
+            const docRef = doc(db, POSITIONS_COLLECTION, id);
             await updateDoc(docRef, {
                 status: 'open',
                 approvedAt: serverTimestamp(),
@@ -99,7 +114,7 @@ export function PositionsProvider({ children }) {
     // Reject a pending position request
     const rejectPosition = async (id, reason = '') => {
         try {
-            const docRef = doc(db, 'positions', id);
+            const docRef = doc(db, POSITIONS_COLLECTION, id);
             await updateDoc(docRef, {
                 status: 'rejected',
                 rejectionReason: reason,
@@ -114,7 +129,7 @@ export function PositionsProvider({ children }) {
     // Update an existing position
     const updatePosition = async (id, updates) => {
         try {
-            const docRef = doc(db, 'positions', id);
+            const docRef = doc(db, POSITIONS_COLLECTION, id);
             await updateDoc(docRef, {
                 ...updates,
                 updatedAt: serverTimestamp()
@@ -128,7 +143,7 @@ export function PositionsProvider({ children }) {
     // Delete a position
     const deletePosition = async (id) => {
         try {
-            await deleteDoc(doc(db, 'positions', id));
+            await deleteDoc(doc(db, POSITIONS_COLLECTION, id));
         } catch (err) {
             console.error("Error deleting position:", err);
             throw err;

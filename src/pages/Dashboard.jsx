@@ -37,10 +37,11 @@ import {
     Sparkles,
     ArrowUpRight,
     Tag,
-    Share2,
-    Layers
+    Layers,
+    RotateCcw
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
+import { seedCandidates } from '../services/firestoreService';
 
 
 const STATUS_OPTIONS = [
@@ -115,6 +116,7 @@ export default function Dashboard() {
     const [bulkUpdateType, setBulkUpdateType] = useState(null); // 'stage' | 'source'
     const [isBulkUpdateOpen, setIsBulkUpdateOpen] = useState(false);
     const [isBulkUpdating, setIsBulkUpdating] = useState(false);
+    const [isSeeding, setIsSeeding] = useState(false);
 
 
     // Sort by match score descending + apply stat filter
@@ -571,8 +573,27 @@ export default function Dashboard() {
                         <p className="text-sm text-text-muted max-w-sm relative z-10">
                             {searchQuery || departmentFilter !== 'all' || statusFilter !== 'all' || statFilter
                                 ? 'Filtreleri değiştirerek tekrar deneyin.'
-                                : 'Aday havuzunuz boş. Yeni bir aday ekleyerek başlayabilirsiniz.'}
+                                : 'Aday havuzunuz boş. Yeni bir aday ekleyerek başlayabilir veya test verilerini yükleyebilirsiniz.'}
                         </p>
+                        {!searchQuery && departmentFilter === 'all' && statusFilter === 'all' && !statFilter && (
+                            <button
+                                onClick={async () => {
+                                    setIsSeeding(true);
+                                    try {
+                                        await seedCandidates();
+                                    } catch (e) {
+                                        console.error(e);
+                                    } finally {
+                                        setIsSeeding(false);
+                                    }
+                                }}
+                                disabled={isSeeding}
+                                className="mt-4 px-6 py-2.5 rounded-xl bg-navy-800/40 hover:bg-navy-800 border border-border-subtle hover:border-electric/30 text-text-primary text-[13px] font-bold transition-all flex items-center gap-2 relative z-10 shadow-lg"
+                            >
+                                {isSeeding ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4 text-electric" />}
+                                {isSeeding ? 'Veriler Yükleniyor...' : 'Test Verilerini (Dummy CV) Yükle'}
+                            </button>
+                        )}
                     </div>
                 )}
 

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useUserSettings } from '../context/UserSettingsContext';
 import { useAuth } from '../context/AuthContext';
 import { Settings, Palette, Globe, Bell, LayoutGrid, Hash, Mail, Calendar, CheckCircle, Loader2 } from 'lucide-react';
-import { connectGoogleWorkspace } from '../services/integrationService';
+import { connectGoogleWorkspace, disconnectGoogleWorkspace } from '../services/integrationService';
 
 
 export default function SettingsPage() {
@@ -24,9 +24,27 @@ export default function SettingsPage() {
         try {
             const res = await connectGoogleWorkspace(userId);
             if (res.success) {
+                alert(`✅ Google hesabı (${res.email}) başarıyla bağlandı!`);
                 window.location.reload();
             } else {
                 alert(`Bağlantı hatası: ${res.error}`);
+            }
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setIsConnectingGoogle(false);
+        }
+    };
+
+    const handleGoogleDisconnect = async () => {
+        if (!window.confirm("Google bağlantısını kesmek istediğinizden emin misiniz?")) return;
+        setIsConnectingGoogle(true);
+        try {
+            const res = await disconnectGoogleWorkspace(userId);
+            if (res.success) {
+                window.location.reload();
+            } else {
+                alert(`Bağlantı kesme hatası: ${res.error}`);
             }
         } catch (err) {
             console.error(err);
@@ -159,10 +177,11 @@ export default function SettingsPage() {
                                 <div>
                                     {isGoogleConnected ? (
                                         <button
-                                            onClick={() => alert('Bağlantıyı kesmek için sistem yöneticisine başvurun.')}
-                                            className="px-4 py-2 rounded-xl text-xs font-bold text-red-400 bg-red-500/10 hover:bg-red-500/20 transition-all border border-red-500/20"
+                                            onClick={handleGoogleDisconnect}
+                                            disabled={isConnectingGoogle}
+                                            className="px-4 py-2 rounded-xl text-xs font-bold text-red-400 bg-red-500/10 hover:bg-red-500/20 transition-all border border-red-500/20 disabled:opacity-50"
                                         >
-                                            Bağlantıyı Kes
+                                            {isConnectingGoogle ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Bağlantıyı Kes'}
                                         </button>
                                     ) : (
                                         <button
