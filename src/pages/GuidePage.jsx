@@ -27,13 +27,13 @@ const FEATURES_DETAIL = [
         ],
         preview: (
             <div className="space-y-4">
-                <div className="border-2 border-dashed border-white/10 rounded-2xl p-6 text-center bg-white/[0.02]">
+                <div className="border-2 border-dashed border-text-primary/10 rounded-2xl p-6 text-center bg-text-primary/[0.02]">
                     <Upload className="w-8 h-8 text-blue-400 mx-auto mb-2 animate-bounce" />
                     <div className="text-[10px] text-navy-400 font-bold uppercase tracking-widest">Ayrıştırma Motoru Hazır</div>
                 </div>
-                <div className="flex items-center gap-3 bg-white/5 p-2 rounded-xl border border-white/10 animate-pulse">
+                <div className="flex items-center gap-3 bg-text-primary/5 p-2 rounded-xl border border-text-primary/10 animate-pulse">
                     <FileText className="w-4 h-4 text-navy-400" />
-                    <div className="h-2 w-24 bg-white/10 rounded-full" />
+                    <div className="h-2 w-24 bg-text-primary/10 rounded-full" />
                     <div className="ml-auto text-[8px] text-emerald-400 font-bold">ANALİZ TAMAMLANDI</div>
                 </div>
             </div>
@@ -61,11 +61,11 @@ const FEATURES_DETAIL = [
                 </div>
                 <div className="space-y-2">
                     {[1, 2].map(i => (
-                        <div key={i} className="bg-white/5 border border-white/10 p-2 rounded-lg flex items-center gap-2">
+                        <div key={i} className="bg-text-primary/5 border border-text-primary/10 p-2 rounded-lg flex items-center gap-2">
                             <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-navy-700 to-navy-600" />
                             <div className="flex-1 space-y-1">
-                                <div className="h-1.5 w-12 bg-white/10 rounded" />
-                                <div className="h-1 w-20 bg-white/5 rounded" />
+                                <div className="h-1.5 w-12 bg-text-primary/10 rounded" />
+                                <div className="h-1 w-20 bg-text-primary/5 rounded" />
                             </div>
                             <div className="text-[8px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded">Aktif Süreç</div>
                         </div>
@@ -121,7 +121,7 @@ const FEATURES_DETAIL = [
         ],
         preview: (
             <div className="space-y-3">
-                <div className="flex items-center justify-between bg-white/5 p-3 rounded-xl border border-white/10">
+                <div className="flex items-center justify-between bg-text-primary/5 p-3 rounded-xl border border-text-primary/10">
                     <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-lg bg-amber-400/20 flex items-center justify-center text-amber-400"><Briefcase className="w-4 h-4" /></div>
                         <div>
@@ -131,10 +131,10 @@ const FEATURES_DETAIL = [
                     </div>
                     <div className="text-[10px] text-emerald-400 border border-emerald-400/20 px-2 py-0.5 rounded-full">Optimize Edildi</div>
                 </div>
-                <div className="bg-white/[0.02] border border-white/5 rounded-xl p-4 space-y-2">
-                    <div className="h-2 w-1/3 bg-white/10 rounded-full" />
-                    <div className="h-1.5 w-full bg-white/5 rounded-full" />
-                    <div className="h-1.5 w-5/6 bg-white/5 rounded-full" />
+                <div className="bg-text-primary/[0.02] border border-text-primary/5 rounded-xl p-4 space-y-2">
+                    <div className="h-2 w-1/3 bg-text-primary/10 rounded-full" />
+                    <div className="h-1.5 w-full bg-text-primary/5 rounded-full" />
+                    <div className="h-1.5 w-5/6 bg-text-primary/5 rounded-full" />
                 </div>
             </div>
         )
@@ -163,7 +163,7 @@ const FEATURES_DETAIL = [
                 </div>
                 <div className="grid grid-cols-4 gap-1.5">
                     {['S', 'T', 'A', 'R'].map(s => (
-                        <div key={s} className="bg-white/5 border border-white/10 p-2 rounded-lg text-center">
+                        <div key={s} className="bg-text-primary/5 border border-text-primary/10 p-2 rounded-lg text-center">
                             <div className="text-[8px] text-navy-500 font-bold mb-1">{s}</div>
                             <div className="h-1 w-full bg-navy-800 rounded-full overflow-hidden">
                                 <div className="h-full bg-emerald-500 w-3/4" />
@@ -176,7 +176,7 @@ const FEATURES_DETAIL = [
                         <Activity className="w-3 h-3 text-emerald-400" />
                         <span className="text-[9px] text-emerald-400 font-bold uppercase">Intel Stream</span>
                     </div>
-                    <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                    <div className="h-1.5 w-full bg-text-primary/5 rounded-full overflow-hidden">
                         <div className="h-full bg-emerald-500 w-2/3 animate-[shimmer_2s_infinite]" />
                     </div>
                 </div>
@@ -197,7 +197,7 @@ const FEATURES_DETAIL = [
             "Tüm süreç sonunda takvim etkinliği ve aday dosyası senkronize edilir."
         ],
         preview: (
-            <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-4 flex flex-col gap-3">
+            <div className="bg-text-primary/[0.03] border border-text-primary/10 rounded-2xl p-4 flex flex-col gap-3">
                 <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-lg p-1.5"><svg viewBox="0 0 24 24" className="w-full h-full"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" /><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" /><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" /><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" /></svg></div>
                     <div className="text-[11px] font-bold text-text-primary uppercase tracking-wider">Sync Active</div>
@@ -227,7 +227,7 @@ const FEATURES_DETAIL = [
                 <ShieldCheck className="w-8 h-8 text-cyan-400" />
                 <div className="text-[10px] font-bold text-text-primary uppercase tracking-widest">Veri Koruma Kalkanı</div>
                 <div className="flex gap-1 mt-1">
-                    <div className="w-24 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                    <div className="w-24 h-1.5 bg-text-primary/5 rounded-full overflow-hidden">
                         <div className="h-full w-4/5 bg-cyan-500" />
                     </div>
                 </div>
@@ -249,7 +249,7 @@ const FEATURES_DETAIL = [
         ],
         preview: (
             <div className="space-y-3">
-                <div className="flex items-center justify-between bg-white/5 p-3 rounded-xl border border-white/10">
+                <div className="flex items-center justify-between bg-text-primary/5 p-3 rounded-xl border border-text-primary/10">
                     <div className="flex items-center gap-2">
                         <div className="w-7 h-7 rounded-lg bg-amber-400/20 flex items-center justify-center"><UserCog className="w-3.5 h-3.5 text-amber-400" /></div>
                         <div>
@@ -281,7 +281,7 @@ const FEATURES_DETAIL = [
         preview: (
             <div className="space-y-2">
                 {['LinkedIn', 'Referans', 'Headhunter'].map((s, i) => (
-                    <div key={i} className="flex items-center justify-between bg-white/5 p-2 rounded-lg border border-white/5">
+                    <div key={i} className="flex items-center justify-between bg-text-primary/5 p-2 rounded-lg border border-text-primary/5">
                         <span className="text-[9px] text-navy-300 font-bold uppercase">{s}</span>
                         <div className="flex items-center gap-1">
                             <div className="h-1.5 rounded-full bg-teal-500" style={{ width: `${60 - i * 15}px` }} />
@@ -332,7 +332,7 @@ const FEATURES_DETAIL = [
         ],
         preview: (
             <div className="space-y-2">
-                <div className="bg-white/5 p-2 rounded-xl border border-white/10 flex items-center gap-2">
+                <div className="bg-text-primary/5 p-2 rounded-xl border border-text-primary/10 flex items-center gap-2">
                     <div className="w-6 h-6 rounded-full bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center text-[7px] font-bold text-text-primary">Y.Z</div>
                     <div className="flex-1">
                         <div className="text-[10px] font-black text-text-primary">POTANSİYEL EŞLEŞME</div>
@@ -381,12 +381,12 @@ export default function GuidePage() {
                             <div className="text-2xl font-black text-text-primary">3s</div>
                             <div className="text-[9px] text-text-muted font-bold uppercase tracking-widest">CV Analizi</div>
                         </div>
-                        <div className="w-px h-10 bg-white/10" />
+                        <div className="w-px h-10 bg-text-primary/10" />
                         <div className="flex flex-col items-center gap-2">
                             <div className="text-2xl font-black text-text-primary">%90</div>
                             <div className="text-[9px] text-text-muted font-bold uppercase tracking-widest">Tahmin Skoru</div>
                         </div>
-                        <div className="w-px h-10 bg-white/10" />
+                        <div className="w-px h-10 bg-text-primary/10" />
                         <div className="flex flex-col items-center gap-2">
                             <div className="text-2xl font-black text-text-primary">24/7</div>
                             <div className="text-[9px] text-text-muted font-bold uppercase tracking-widest">Akıllı Asistan</div>
@@ -429,8 +429,8 @@ export default function GuidePage() {
 
                     <div className="relative">
                         <div className="absolute -inset-10 bg-electric/10 blur-[100px] rounded-full" />
-                        <div className="relative border border-white/10 rounded-[2.5rem] overflow-hidden shadow-2xl bg-navy-950/80 p-1 backdrop-blur-2xl">
-                            <div className="p-6 border-b border-white/5 bg-white/[0.02] flex items-center justify-between">
+                        <div className="relative border border-text-primary/10 rounded-[2.5rem] overflow-hidden shadow-2xl bg-navy-950/80 p-1 backdrop-blur-2xl">
+                            <div className="p-6 border-b border-text-primary/5 bg-text-primary/[0.02] flex items-center justify-between">
                                 <div className="flex gap-1.5 pt-1">
                                     <div className="w-2.5 h-2.5 rounded-full bg-red-500/40" />
                                     <div className="w-2.5 h-2.5 rounded-full bg-amber-500/40" />
@@ -443,20 +443,20 @@ export default function GuidePage() {
                             </div>
                             <div className="p-8 space-y-6">
                                 <div className="space-y-3">
-                                    <div className="h-4 w-3/4 bg-white/10 rounded-full animate-pulse" />
-                                    <div className="h-4 w-1/2 bg-white/5 rounded-full" />
+                                    <div className="h-4 w-3/4 bg-text-primary/10 rounded-full animate-pulse" />
+                                    <div className="h-4 w-1/2 bg-text-primary/5 rounded-full" />
                                 </div>
                                 <div className="grid grid-cols-2 gap-4 pt-4">
                                     <div className="h-12 rounded-2xl bg-electric/20 border border-electric/30 flex items-center justify-center gap-2">
                                         <div className="w-2 h-2 rounded-full bg-electric animate-ping" />
                                         <div className="w-12 h-2 bg-white/20 rounded-full" />
                                     </div>
-                                    <div className="h-12 rounded-2xl bg-white/5 border border-white/10" />
+                                    <div className="h-12 rounded-2xl bg-text-primary/5 border border-text-primary/10" />
                                 </div>
                                 <div className="pt-6 space-y-3">
-                                    <div className="h-2 w-full bg-white/[0.04] rounded-full" />
-                                    <div className="h-2 w-full bg-white/[0.04] rounded-full" />
-                                    <div className="h-2 w-2/3 bg-white/[0.04] rounded-full" />
+                                    <div className="h-2 w-full bg-text-primary/[0.04] rounded-full" />
+                                    <div className="h-2 w-full bg-text-primary/[0.04] rounded-full" />
+                                    <div className="h-2 w-2/3 bg-text-primary/[0.04] rounded-full" />
                                 </div>
                             </div>
                         </div>
@@ -487,7 +487,7 @@ export default function GuidePage() {
                                     className={`flex items-center gap-4 p-4 rounded-2xl border transition-all duration-300 text-left relative group overflow-hidden
                                         ${selectedFeature?.id === f.id
                                             ? 'bg-gradient-to-r from-navy-800 to-navy-900 border-white/20 shadow-xl shadow-black/20'
-                                            : 'bg-white/[0.02] border-white/[0.05] hover:bg-white/[0.04] hover:border-white/10'}`}
+                                            : 'bg-text-primary/[0.02] border-white/[0.05] hover:bg-text-primary/[0.04] hover:border-text-primary/10'}`}
                                 >
                                     {selectedFeature?.id === f.id && (
                                         <div className={`absolute left-0 top-0 bottom-0 w-1 ${f.bgColor.replace('/10', '')}`} />
@@ -509,8 +509,8 @@ export default function GuidePage() {
                         {/* Right Detail Panel */}
                         <div className="flex-1 relative">
                             {!selectedFeature ? (
-                                <div className="h-full rounded-[3rem] border-2 border-dashed border-white/5 flex flex-col items-center justify-center text-center p-12 space-y-6 animate-pulse">
-                                    <div className="w-20 h-20 rounded-full bg-white/[0.02] flex items-center justify-center">
+                                <div className="h-full rounded-[3rem] border-2 border-dashed border-text-primary/5 flex flex-col items-center justify-center text-center p-12 space-y-6 animate-pulse">
+                                    <div className="w-20 h-20 rounded-full bg-text-primary/[0.02] flex items-center justify-center">
                                         <MousePointer2 className="w-8 h-8 text-navy-600" />
                                     </div>
                                     <div className="space-y-2">
@@ -528,7 +528,7 @@ export default function GuidePage() {
                                         <div className="bg-navy-950/60 rounded-[2.9rem] p-8 md:p-12 h-full flex flex-col">
                                             <div className="flex items-start justify-between mb-10">
                                                 <div className="flex items-center gap-5">
-                                                    <div className={`w-14 h-14 rounded-2xl ${selectedFeature.bgColor} flex items-center justify-center border border-white/5 shadow-lg`}>
+                                                    <div className={`w-14 h-14 rounded-2xl ${selectedFeature.bgColor} flex items-center justify-center border border-text-primary/5 shadow-lg`}>
                                                         <selectedFeature.icon className={`w-7 h-7 ${selectedFeature.color}`} />
                                                     </div>
                                                     <div>
@@ -556,7 +556,7 @@ export default function GuidePage() {
                                                         <div className="space-y-4">
                                                             {selectedFeature.howItWorks.map((step, i) => (
                                                                 <div key={i} className="flex gap-5 group/step">
-                                                                    <div className="w-6 h-6 rounded-lg bg-navy-800 border border-white/10 flex items-center justify-center text-[10px] font-black text-navy-400 group-hover/step:text-electric transition-colors shrink-0">
+                                                                    <div className="w-6 h-6 rounded-lg bg-navy-800 border border-text-primary/10 flex items-center justify-center text-[10px] font-black text-navy-400 group-hover/step:text-electric transition-colors shrink-0">
                                                                         {i + 1}
                                                                     </div>
                                                                     <p className="text-sm text-navy-300 leading-relaxed font-medium">{step}</p>
@@ -565,7 +565,7 @@ export default function GuidePage() {
                                                         </div>
                                                     </div>
 
-                                                    <div className="p-6 rounded-3xl bg-white/[0.02] border border-white/[0.04] flex gap-4 items-start">
+                                                    <div className="p-6 rounded-3xl bg-text-primary/[0.02] border border-white/[0.04] flex gap-4 items-start">
                                                         <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
                                                         <div className="space-y-1">
                                                             <div className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Profesyonel İpucu</div>
@@ -583,16 +583,16 @@ export default function GuidePage() {
                                                         </h4>
                                                         <div className="flex gap-1">
                                                             <div className="h-1 w-8 rounded-full bg-electric-light/20" />
-                                                            <div className="h-1 w-4 rounded-full bg-white/10" />
+                                                            <div className="h-1 w-4 rounded-full bg-text-primary/10" />
                                                         </div>
                                                     </div>
                                                     <div className="relative group/preview mt-4">
                                                         <div className={`absolute -inset-4 bg-gradient-to-br from-white/5 to-transparent rounded-[2.5rem] blur-2xl opacity-0 group-hover/preview:opacity-100 transition-opacity duration-700`} />
-                                                        <div className="relative border border-white/10 rounded-[2.5rem] bg-navy-900/60 p-10 shadow-3xl backdrop-blur-md">
+                                                        <div className="relative border border-text-primary/10 rounded-[2.5rem] bg-navy-900/60 p-10 shadow-3xl backdrop-blur-md">
                                                             <div className="absolute top-6 right-8 flex gap-2">
-                                                                <div className="w-2 h-2 rounded-full bg-white/[0.05]" />
-                                                                <div className="w-2 h-2 rounded-full bg-white/[0.05]" />
-                                                                <div className="w-2 h-2 rounded-full bg-white/[0.05]" />
+                                                                <div className="w-2 h-2 rounded-full bg-text-primary/[0.05]" />
+                                                                <div className="w-2 h-2 rounded-full bg-text-primary/[0.05]" />
+                                                                <div className="w-2 h-2 rounded-full bg-text-primary/[0.05]" />
                                                             </div>
                                                             <div className="animate-in fade-in zoom-in-95 duration-500">
                                                                 {selectedFeature.preview}
@@ -610,7 +610,7 @@ export default function GuidePage() {
                 </section>
 
                 {/* 2. Step by Step Guide (Workflow) */}
-                <section className="space-y-12 bg-white/[0.02] border border-white/[0.06] rounded-[3rem] p-12 relative overflow-hidden">
+                <section className="space-y-12 bg-text-primary/[0.02] border border-white/[0.06] rounded-[3rem] p-12 relative overflow-hidden">
                     <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none"><Rocket className="w-48 h-48 text-text-primary" /></div>
 
                     <div className="max-w-3xl">
@@ -682,8 +682,8 @@ function FeatureCard({ icon: Icon, title, desc, color, bgColor, onClick, isActiv
             onClick={onClick}
             className={`group p-8 rounded-3xl border transition-all duration-300 cursor-pointer relative overflow-hidden
                 ${isActive
-                    ? 'bg-white/10 border-white/20 scale-[1.02] shadow-[0_0_40px_rgba(255,255,255,0.05)]'
-                    : 'bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.05] hover:border-white/10'}`}
+                    ? 'bg-text-primary/10 border-white/20 scale-[1.02] shadow-[0_0_40px_rgba(255,255,255,0.05)]'
+                    : 'bg-text-primary/[0.03] border-white/[0.06] hover:bg-text-primary/[0.05] hover:border-text-primary/10'}`}
         >
             <div className={`w-14 h-14 rounded-2xl ${bgColor} flex items-center justify-center mb-6 ring-8 ring-transparent group-hover:ring-white/5 transition-all`}>
                 <Icon className={`w-7 h-7 ${color}`} />
@@ -705,7 +705,7 @@ function FeatureCard({ icon: Icon, title, desc, color, bgColor, onClick, isActiv
 function StepItem({ num, title, desc }) {
     return (
         <div className="relative pl-12 md:pl-16 group">
-            <div className="absolute left-0 top-0 w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-xs font-black text-navy-400 group-hover:bg-electric group-hover:text-text-primary group-hover:border-electric transition-all shadow-xl">
+            <div className="absolute left-0 top-0 w-12 h-12 rounded-2xl bg-text-primary/5 border border-text-primary/10 flex items-center justify-center text-xs font-black text-navy-400 group-hover:bg-electric group-hover:text-text-primary group-hover:border-electric transition-all shadow-xl">
                 {num}
             </div>
             <div className="space-y-1">

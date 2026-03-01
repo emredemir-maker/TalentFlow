@@ -13,15 +13,15 @@ import {
 const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
         return (
-            <div className="glass px-5 py-4 rounded-[1.5rem] border border-white/10 shadow-2xl animate-scale-in">
-                <p className="text-[10px] font-black text-navy-500 uppercase tracking-[0.2em] mb-2">{label}</p>
+            <div className="bg-bg-secondary/90 backdrop-blur-xl px-5 py-4 rounded-[1.5rem] border border-border-subtle shadow-2xl animate-scale-in">
+                <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-2">{label}</p>
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-electric/10 flex items-center justify-center border border-electric/20 outline outline-4 outline-electric/5">
-                        <span className="text-lg font-black text-electric">{payload[0].value}</span>
+                    <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center border border-cyan-500/20 outline outline-4 outline-cyan-500/5">
+                        <span className="text-lg font-black text-cyan-500">{payload[0].value}</span>
                     </div>
                     <div>
                         <p className="text-[11px] font-black text-text-primary uppercase tracking-wider">Aday Başvurusu</p>
-                        <p className="text-[9px] text-emerald-400 font-bold tracking-tight">↑ %12 artış</p>
+                        <p className="text-[9px] text-emerald-500 font-bold tracking-tight">↑ %12 artış</p>
                     </div>
                 </div>
             </div>
@@ -55,21 +55,21 @@ export default function CustomLineChart({ data }) {
                             </feMerge>
                         </filter>
                     </defs>
-                    <CartesianGrid strokeDasharray="6 6" stroke="rgba(255,255,255,0.03)" vertical={false} />
+                    <CartesianGrid strokeDasharray="6 6" stroke="currentColor" strokeOpacity={0.1} vertical={false} className="text-text-muted/30" />
                     <XAxis
                         dataKey="date"
-                        stroke="rgba(255,255,255,0.2)"
-                        fontSize={10}
-                        fontWeight={800}
+                        stroke="currentColor"
+                        strokeOpacity={0.3}
+                        className="text-text-muted font-black"
                         tickLine={false}
                         axisLine={false}
                         tickMargin={15}
                         dy={5}
                     />
                     <YAxis
-                        stroke="rgba(255,255,255,0.2)"
-                        fontSize={10}
-                        fontWeight={800}
+                        stroke="currentColor"
+                        strokeOpacity={0.3}
+                        className="text-text-muted font-black"
                         tickLine={false}
                         axisLine={false}
                         tickMargin={15}

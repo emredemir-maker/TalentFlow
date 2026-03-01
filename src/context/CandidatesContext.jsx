@@ -68,6 +68,8 @@ export function CandidatesProvider({ children }) {
         }
     };
 
+    const [sourceColors, setSourceColors] = useState({});
+
     useEffect(() => {
         // Rule 3: Do NOT fetch data until authenticated
         if (authLoading || !isAuthenticated) {
@@ -76,19 +78,16 @@ export function CandidatesProvider({ children }) {
 
         setLoading(true);
 
-        // onSnapshot for real-time listening (no complex queries - Rule 2)
+        // onSnapshot for real-time listening for candidates
         const candidatesRef = collection(db, CANDIDATES_COLLECTION);
-
-        const unsubscribe = onSnapshot(
+        const unsubCandidates = onSnapshot(
             candidatesRef,
             (snapshot) => {
                 const candidateList = snapshot.docs.map((doc) => ({
                     id: doc.id,
                     ...doc.data(),
                 }));
-                // Sort by createdAt desc locally since we can't use complex queries easily
                 candidateList.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
-
                 setCandidates(candidateList);
                 setLoading(false);
                 setError(null);
@@ -100,7 +99,23 @@ export function CandidatesProvider({ children }) {
             }
         );
 
-        return () => unsubscribe();
+        // onSnapshot for sources to get colors
+        const sourcesRef = collection(db, 'artifacts/talent-flow/public/data/sources');
+        const unsubSources = onSnapshot(sourcesRef, (snapshot) => {
+            const colors = {};
+            snapshot.docs.forEach(doc => {
+                const data = doc.data();
+                if (data.name && data.color) {
+                    colors[data.name.toLowerCase()] = data.color;
+                }
+            });
+            setSourceColors(colors);
+        });
+
+        return () => {
+            unsubCandidates();
+            unsubSources();
+        };
     }, [isAuthenticated, authLoading]);
 
 
@@ -280,6 +295,7 @@ export function CandidatesProvider({ children }) {
         subSourceFilter,
         setSubSourceFilter,
         subSourcesOptions,
+        sourceColors,
 
         // Navigation / Detailed View
         viewCandidateId,

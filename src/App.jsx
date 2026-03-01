@@ -88,7 +88,7 @@ function AppContent() {
   };
 
   return (
-    <div className="flex min-h-screen bg-navy-950 transition-colors duration-300">
+    <div className="flex min-h-screen bg-bg-primary transition-colors duration-500">
       <Sidebar
         activeView={activeView}
         onNavigate={setActiveView}
@@ -96,8 +96,8 @@ function AppContent() {
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
       />
       <main
-        className={`flex-1 min-h-screen transition-all duration-300 pb-16 md:pb-0
-          ${sidebarCollapsed ? 'md:ml-[72px]' : 'md:ml-[220px]'}`}
+        className={`flex-1 min-h-screen transition-all duration-300 pb-12 md:pb-0 min-w-0
+          ${sidebarCollapsed ? 'md:ml-[72px]' : 'md:ml-[240px]'}`}
       >
         {renderPage()}
       </main>

@@ -287,7 +287,7 @@ export default function SuperAdminPage() {
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left">
-                            <thead className="bg-white/[0.02] text-[10px] text-navy-500 uppercase font-black tracking-widest">
+                            <thead className="bg-bg-primary text-[10px] text-text-muted uppercase font-black tracking-widest">
                                 <tr>
                                     <th className="px-6 py-4">Kullanıcı</th>
                                     <th className="px-6 py-4">Rol</th>
@@ -320,7 +320,7 @@ export default function SuperAdminPage() {
                                                         </span>
                                                     ))}
                                                     {!(u.departments?.length > 0 || u.department) && (
-                                                        <span className="px-2 py-0.5 rounded bg-navy-800 text-navy-500">Atanmamış</span>
+                                                        <span className="px-2 py-0.5 rounded bg-bg-primary text-text-muted">Atanmamış</span>
                                                     )}
                                                 </div>
                                             ) : (
@@ -374,7 +374,7 @@ export default function SuperAdminPage() {
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left">
-                            <thead className="bg-white/[0.02] text-[10px] text-navy-500 uppercase font-black tracking-widest">
+                            <thead className="bg-bg-primary text-[10px] text-text-muted uppercase font-black tracking-widest">
                                 <tr>
                                     <th className="px-6 py-4">E-posta</th>
                                     <th className="px-6 py-4">Rol</th>
@@ -562,7 +562,7 @@ export default function SuperAdminPage() {
                                                 }}
                                                 className={`px-3 py-3 rounded-xl text-[10px] font-bold text-left transition-all border ${editingUser.departments?.includes(dept)
                                                     ? 'bg-amber-500/10 border-amber-500/30 text-amber-400 font-black ring-1 ring-amber-500/50'
-                                                    : 'bg-navy-900 border-white/5 text-navy-400 hover:border-white/10'
+                                                    : 'bg-bg-primary border border-border-subtle text-text-muted hover:border-text-muted/10'
                                                     }`}
                                             >
                                                 {dept}

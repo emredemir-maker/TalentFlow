@@ -24,21 +24,21 @@ import {
 const SEVERITY_CONFIG = {
     critical: {
         label: 'Kritik',
-        color: 'text-red-400',
+        color: 'text-red-600 dark:text-red-400',
         bg: 'bg-red-500/10',
         ring: 'ring-red-500/20',
         icon: AlertTriangle,
     },
     moderate: {
         label: 'Orta',
-        color: 'text-amber-400',
+        color: 'text-amber-600 dark:text-amber-400',
         bg: 'bg-amber-500/10',
         ring: 'ring-amber-500/20',
         icon: AlertTriangle,
     },
     minor: {
         label: 'Düşük',
-        color: 'text-blue-400',
+        color: 'text-blue-600 dark:text-blue-400',
         bg: 'bg-blue-500/10',
         ring: 'ring-blue-500/20',
         icon: CheckCircle,
@@ -46,18 +46,18 @@ const SEVERITY_CONFIG = {
 };
 
 const RECOMMENDATION_CONFIG = {
-    hire: { label: 'İşe Al', color: 'text-emerald-400', bg: 'bg-emerald-500/10', icon: '🟢' },
-    strong_consider: { label: 'Güçlü Aday', color: 'text-blue-400', bg: 'bg-blue-500/10', icon: '🔵' },
-    consider: { label: 'Değerlendir', color: 'text-amber-400', bg: 'bg-amber-500/10', icon: '🟡' },
-    pass: { label: 'Uygun Değil', color: 'text-red-400', bg: 'bg-red-500/10', icon: '🔴' },
+    hire: { label: 'İşe Al', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-500/10', icon: '🟢' },
+    strong_consider: { label: 'Güçlü Aday', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-500/10', icon: '🔵' },
+    consider: { label: 'Değerlendir', color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-500/10', icon: '🟡' },
+    pass: { label: 'Uygun Değil', color: 'text-red-600 dark:text-red-400', bg: 'bg-red-500/10', icon: '🔴' },
 };
 
 function ScoreCircle({ value, label, size = 'sm' }) {
     const getColor = (v) => {
-        if (v >= 80) return { stroke: '#22c55e', text: 'text-green-400' };
-        if (v >= 60) return { stroke: '#3b82f6', text: 'text-blue-400' };
-        if (v >= 40) return { stroke: '#f59e0b', text: 'text-amber-400' };
-        return { stroke: '#ef4444', text: 'text-red-400' };
+        if (v >= 80) return { stroke: '#10b981', text: 'text-emerald-600 dark:text-emerald-400' };
+        if (v >= 60) return { stroke: '#3b82f6', text: 'text-blue-600 dark:text-blue-400' };
+        if (v >= 40) return { stroke: '#f59e0b', text: 'text-amber-600 dark:text-amber-400' };
+        return { stroke: '#ef4444', text: 'text-red-600 dark:text-red-400' };
     };
 
     const dim = size === 'lg' ? 80 : 48;
@@ -75,7 +75,8 @@ function ScoreCircle({ value, label, size = 'sm' }) {
                 >
                     <circle
                         cx={dim / 2} cy={dim / 2} r={radius}
-                        fill="none" stroke="#1e293b" strokeWidth={strokeW}
+                        fill="none" stroke="currentColor" strokeOpacity={0.1} strokeWidth={strokeW}
+                        className="text-border-subtle"
                     />
                     <circle
                         cx={dim / 2} cy={dim / 2} r={radius}
@@ -127,9 +128,9 @@ export default function AIAnalysisPanel({ result, loading, error, onRetry, title
 
                 <div className="grid grid-cols-4 gap-3">
                     {Array.from({ length: 4 }).map((_, i) => (
-                        <div key={i} className="p-3 rounded-xl bg-navy-800/10">
-                            <div className="skeleton w-10 h-10 rounded-full mx-auto mb-2" />
-                            <div className="skeleton w-full h-2 rounded" />
+                        <div key={i} className="p-3 rounded-xl bg-bg-primary border border-border-subtle">
+                            <div className="skeleton w-10 h-10 rounded-full mx-auto mb-2 opacity-20" />
+                            <div className="skeleton w-full h-2 rounded opacity-10" />
                         </div>
                     ))}
                 </div>
@@ -148,15 +149,13 @@ export default function AIAnalysisPanel({ result, loading, error, onRetry, title
                     <span className="text-[13px] font-semibold text-red-400">Analiz Hatası</span>
                 </div>
                 <p className="text-[12px] text-text-muted leading-relaxed">{error}</p>
-                {onRetry && (
-                    <button
-                        onClick={onRetry}
-                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-navy-800/20 border border-border-subtle text-[12px] text-text-muted hover:bg-navy-800/40 transition-all cursor-pointer"
-                    >
-                        <RefreshCw className="w-3.5 h-3.5" />
-                        Tekrar Dene
-                    </button>
-                )}
+                <button
+                    onClick={onRetry}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-bg-primary border border-border-subtle text-[12px] text-text-muted hover:text-text-primary transition-all cursor-pointer"
+                >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    Tekrar Dene
+                </button>
             </div>
         );
     }
@@ -165,7 +164,7 @@ export default function AIAnalysisPanel({ result, loading, error, onRetry, title
     // ===== EMPTY STATE =====
     if (!result) {
         return (
-            <div className="flex flex-col items-center justify-center py-12 px-4 rounded-xl bg-navy-800/10 border border-border-subtle text-center space-y-4 animate-fade-in">
+            <div className="flex flex-col items-center justify-center py-12 px-4 rounded-xl bg-bg-primary border border-border-subtle text-center space-y-4 animate-fade-in shadow-inner">
                 <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-electric/20 to-violet-500/20 flex items-center justify-center mb-2">
                     <Brain className="w-8 h-8 text-electric-light" />
                 </div>
@@ -178,7 +177,7 @@ export default function AIAnalysisPanel({ result, loading, error, onRetry, title
                 {onRetry && (
                     <button
                         onClick={() => onRetry()}
-                        className="px-6 py-2.5 rounded-xl bg-electric hover:bg-electric-hover text-text-primary font-bold text-sm shadow-lg shadow-electric/20 transition-all hover:scale-105 active:scale-95 flex items-center gap-2"
+                        className="px-6 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-white font-black text-sm shadow-xl shadow-cyan-500/20 transition-all hover:scale-105 active:scale-95 flex items-center gap-2"
                     >
                         <Sparkles className="w-4 h-4" />
                         Analizi Başlat
@@ -211,7 +210,7 @@ export default function AIAnalysisPanel({ result, loading, error, onRetry, title
                         {onRetry && (
                             <button
                                 onClick={() => onRetry()}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-navy-800/20 border border-border-subtle text-[10px] font-bold text-text-muted hover:text-text-primary hover:bg-navy-800/40 transition-all"
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-primary border border-border-subtle text-[10px] font-black text-text-muted hover:text-text-primary transition-all"
                                 title="Yapay Zeka Analizini Yenile"
                             >
                                 <RefreshCw className="w-3 h-3" />
@@ -240,8 +239,8 @@ export default function AIAnalysisPanel({ result, loading, error, onRetry, title
             {result.summary && (
                 <div>
                     <SectionHeader icon={Brain} title="Genel Değerlendirme" />
-                    <p className="text-[13px] text-text-secondary leading-relaxed p-3 rounded-xl bg-navy-800/10 border border-border-subtle">
-                        {result.summary}
+                    <p className="text-[13px] text-text-secondary leading-relaxed p-4 rounded-xl bg-bg-primary border border-border-subtle shadow-inner italic">
+                        "{result.summary}"
                     </p>
                 </div>
             )}
@@ -252,13 +251,13 @@ export default function AIAnalysisPanel({ result, loading, error, onRetry, title
                     <SectionHeader icon={TrendingUp} title="Eşleşen Yetenekler" />
                     <div className="space-y-2">
                         {result.topSkills.map((item, i) => (
-                            <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
-                                <div className="w-6 h-6 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0 mt-0.5">
-                                    <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
+                            <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10 shadow-sm">
+                                <div className="w-6 h-6 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0 mt-0.5 border border-emerald-500/20">
+                                    <CheckCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                                 </div>
                                 <div className="min-w-0">
-                                    <div className="text-[13px] font-semibold text-emerald-500">{item.skill}</div>
-                                    <div className="text-[11px] text-emerald-500/70 mt-0.5">{item.relevance}</div>
+                                    <div className="text-[13px] font-black text-emerald-600 dark:text-emerald-400 lowercase tracking-wide first-letter:uppercase">{item.skill}</div>
+                                    <div className="text-[11px] text-text-muted mt-0.5 leading-tight">{item.relevance}</div>
                                 </div>
                             </div>
                         ))}
@@ -283,9 +282,9 @@ export default function AIAnalysisPanel({ result, loading, error, onRetry, title
                                             {sev.label}
                                         </span>
                                     </div>
-                                    <div className="flex items-start gap-2 mt-1">
-                                        <ChevronRight className="w-3 h-3 text-text-muted shrink-0 mt-0.5" />
-                                        <span className="text-[11px] text-text-muted">{item.suggestion}</span>
+                                    <div className="flex items-start gap-2 mt-2">
+                                        <ChevronRight className="w-3 h-3 text-text-muted shrink-0 mt-0.5 opacity-40" />
+                                        <span className="text-[11px] text-text-muted font-medium italic">"{item.suggestion}"</span>
                                     </div>
                                 </div>
                             );
@@ -298,13 +297,13 @@ export default function AIAnalysisPanel({ result, loading, error, onRetry, title
             {result.personalizedMessage && (
                 <div>
                     <SectionHeader icon={MessageSquare} title="LinkedIn DM Taslağı" />
-                    <div className="relative p-4 rounded-xl bg-navy-800/10 border border-border-subtle">
-                        <p className="text-[13px] text-text-secondary leading-relaxed whitespace-pre-wrap pr-8">
+                    <div className="relative p-5 rounded-xl bg-bg-primary border border-border-subtle shadow-inner">
+                        <p className="text-[13px] text-text-secondary leading-relaxed whitespace-pre-wrap pr-10 font-medium">
                             {result.personalizedMessage}
                         </p>
                         <button
                             onClick={handleCopyDM}
-                            className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-navy-800/20 border border-border-subtle flex items-center justify-center text-text-muted hover:text-electric-light hover:bg-navy-800/40 transition-all cursor-pointer"
+                            className="absolute top-4 right-4 w-8 h-8 rounded-lg bg-bg-secondary border border-border-subtle flex items-center justify-center text-text-muted hover:text-cyan-500 transition-all cursor-pointer shadow-sm active:scale-90"
                             title="Mesajı kopyala"
                         >
                             {dmCopied

@@ -86,42 +86,42 @@ export default function OpportunityHub() {
     };
 
     function scoreToColor(score) {
-        if (score >= 85) return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
-        if (score >= 70) return 'text-blue-400 bg-blue-500/10 border-blue-500/20';
-        return 'text-amber-400 bg-amber-500/10 border-amber-500/20';
+        if (score >= 85) return 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
+        if (score >= 70) return 'text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 border-cyan-500/20';
+        return 'text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/20';
     }
 
     if (groupedOpportunities.length === 0) {
         return (
-            <div className="glass rounded-3xl p-8 border border-border-subtle text-center">
-                <div className="w-16 h-16 rounded-2xl bg-navy-800/10 flex items-center justify-center mx-auto mb-4 text-navy-500">
-                    <Layout className="w-8 h-8 opacity-20" />
+            <div className="bg-bg-primary rounded-2xl p-6 border border-border-subtle text-center shadow-inner">
+                <div className="w-12 h-12 rounded-xl bg-bg-secondary flex items-center justify-center mx-auto mb-3 text-text-muted opacity-40">
+                    <Layout className="w-6 h-6" />
                 </div>
-                <h3 className="text-text-primary font-bold mb-1">Fırsat Havuzu Boş</h3>
-                <p className="text-xs text-text-muted">Adaylar analiz edildikçe %{THRESHOLD} barajını aşan eşleşmeler burada görünecek.</p>
+                <h3 className="text-text-primary font-black uppercase tracking-widest text-[11px] mb-1">Fırsat Havuzu Boş</h3>
+                <p className="text-[10px] text-text-muted font-bold opacity-60">Adaylar analiz edildikçe %{THRESHOLD} barajını aşan eşleşmeler burada görünecek.</p>
             </div>
         );
     }
 
     return (
-        <div className="glass rounded-3xl p-6 border border-border-subtle relative overflow-hidden">
+        <div className="bg-bg-secondary/40 backdrop-blur-xl rounded-[1.5rem] p-4 border border-border-subtle relative overflow-hidden shadow-2xl">
             {/* Background Effects */}
-            <div className="absolute top-0 right-0 w-64 h-64 bg-electric/5 rounded-full blur-3xl -z-10" />
+            <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/5 rounded-full blur-3xl -z-10" />
 
             {/* Header */}
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
-                    <div className="p-2 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                    <div className="p-2 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 shadow-sm">
                         <Lightbulb className="w-5 h-5" />
                     </div>
                     <div>
-                        <h3 className="text-lg font-bold text-text-primary">Fırsat Havuzu</h3>
-                        <p className="text-xs text-text-muted">%{THRESHOLD}+ uyumluluk barajını aşan adaylar</p>
+                        <h3 className="text-base font-black text-text-primary tracking-tight uppercase">Fırsat Havuzu</h3>
+                        <p className="text-[9px] text-text-muted font-bold opacity-60 tracking-tight"> uyumluluk barajını aşan adaylar</p>
                     </div>
                 </div>
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-navy-800/20 border border-border-subtle text-xs font-medium text-text-secondary">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                    <span>{groupedOpportunities.length} Aday</span>
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-bg-primary border border-border-subtle text-[10px] font-black text-text-secondary shadow-inner">
+                    <Sparkles className="w-3 h-3 text-amber-500" />
+                    <span className="uppercase tracking-widest">{groupedOpportunities.length} ADAY</span>
                 </div>
             </div>
 
@@ -134,50 +134,51 @@ export default function OpportunityHub() {
                     return (
                         <div
                             key={c.id}
-                            className="group relative rounded-2xl bg-navy-800/10 border border-border-subtle hover:bg-navy-800/20 hover:border-navy-400/20 transition-all overflow-hidden"
+                            className="group relative rounded-2xl bg-bg-primary border border-border-subtle hover:bg-bg-secondary/40 transition-all overflow-hidden shadow-lg p-0.5"
                         >
                             {/* Candidate Header */}
-                            <div className="p-4 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+                            <div className="p-3 flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
                                 <div
-                                    className="flex items-center gap-4 cursor-pointer flex-1 min-w-0"
+                                    className="flex items-center gap-3 cursor-pointer flex-1 min-w-0"
                                     onClick={() => handleNavigateToCandidate(c.id)}
                                 >
-                                    <div className="relative w-12 h-12 rounded-2xl bg-gradient-to-br from-navy-800 to-navy-900 border border-white/[0.05] flex items-center justify-center text-sm font-bold text-text-primary shrink-0 shadow-lg">
+                                    <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-bg-secondary to-bg-primary border border-border-subtle flex items-center justify-center text-xs font-black text-text-primary shrink-0 shadow-lg group-hover:scale-105 transition-transform">
                                         {c.name?.split(' ').map(n => n[0]).join('').toUpperCase() || '?'}
                                         {c.hasInterview && (
-                                            <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-navy-900 flex items-center justify-center shadow-lg" title="Mülakat Tamamlandı">
-                                                <CheckCircle2 className="w-3 h-3 text-text-primary" />
+                                            <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 border-[2px] border-bg-primary flex items-center justify-center shadow-lg" title="Mülakat Tamamlandı">
+                                                <CheckCircle2 className="w-3 text-white" />
                                             </div>
                                         )}
                                     </div>
                                     <div className="min-w-0">
-                                        <h4 className="font-bold text-text-primary text-[13px] truncate hover:text-electric transition-colors">{c.name}</h4>
-                                        <p className="text-[11px] text-text-muted truncate">{c.position}</p>
+                                        <h4 className="font-black text-text-primary text-[12px] truncate group-hover:text-cyan-600 dark:group-hover:text-cyan-400 transition-colors uppercase tracking-tight">{c.name}</h4>
+                                        <p className="text-[9px] text-text-muted font-bold truncate opacity-70 uppercase tracking-tighter">{c.position}</p>
                                     </div>
                                 </div>
 
-                                <div className="flex items-center gap-2 w-full sm:w-auto">
+                                <div className="flex items-center gap-1.5 w-full sm:w-auto">
                                     <button
                                         onClick={() => handleNavigateToCandidate(c.id)}
-                                        className="flex-1 sm:flex-none px-3 py-2 rounded-lg bg-navy-800/20 hover:bg-navy-800/40 text-[10px] font-bold text-text-muted border border-border-subtle flex items-center justify-center gap-1.5 transition-all uppercase tracking-widest"
+                                        className="flex-1 sm:flex-none px-2.5 py-1.5 rounded-lg bg-bg-secondary border border-border-subtle text-[9px] font-black text-text-muted hover:text-text-primary transition-all uppercase tracking-widest shadow-sm"
                                     >
-                                        <Eye className="w-3 h-3" /> Detay
+                                        <Eye className="w-3 h-3" />
                                     </button>
                                     <button
                                         onClick={() => setExpandedId(isExpanded ? null : c.id)}
-                                        className="flex-1 sm:flex-none px-3 py-2 rounded-lg bg-electric/10 hover:bg-electric/20 text-[10px] font-bold text-electric border border-electric/20 flex items-center justify-center gap-1.5 transition-all"
+                                        className="flex-1 sm:flex-none px-3 py-1.5 rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20 flex items-center justify-center gap-1.5 transition-all font-black text-[9px] uppercase tracking-widest shadow-sm"
                                     >
-                                        {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                                         {entry.positions.length} Pozisyon
+                                        {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                                     </button>
                                 </div>
                             </div>
 
-                            {/* Qualifying Positions (always show inline summary) */}
-                            <div className="px-4 pb-3">
-                                <div className="flex flex-wrap gap-1.5">
+                            {/* Qualifying Positions Labels */}
+                            <div className="px-4 pb-4">
+                                <div className="flex flex-wrap gap-2">
                                     {entry.positions.map(p => (
-                                        <span key={p.title} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold border ${scoreToColor(p.combinedScore)}`}>
+                                        <span key={p.title} className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-black border uppercase tracking-tighter shadow-sm ${scoreToColor(p.combinedScore)}`}>
+                                            <Sparkles className="w-3 h-3 opacity-60" />
                                             {p.title} • %{p.combinedScore}
                                         </span>
                                     ))}
@@ -186,25 +187,27 @@ export default function OpportunityHub() {
 
                             {/* Expanded Details */}
                             {isExpanded && (
-                                <div className="px-4 pb-4 animate-in slide-in-from-top-2 duration-200 space-y-2">
+                                <div className="px-4 pb-4 animate-in slide-in-from-top-2 duration-200 space-y-3">
                                     {entry.positions.map(p => (
-                                        <div key={p.title} className="p-3 rounded-xl bg-navy-950/20 border border-border-subtle">
-                                            <div className="flex items-center justify-between mb-2">
-                                                <span className="text-xs font-bold text-text-primary">{p.title}</span>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-[10px] text-text-muted">AI: %{p.aiScore}</span>
+                                        <div key={p.title} className="p-4 rounded-2xl bg-bg-secondary/50 border border-border-subtle shadow-inner">
+                                            <div className="flex items-center justify-between mb-3 border-b border-border-subtle pb-2">
+                                                <span className="text-[12px] font-black text-text-primary uppercase tracking-tight">{p.title}</span>
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-[10px] text-text-muted font-bold opacity-60">AI: %{p.aiScore}</span>
                                                     {c.hasInterview && (
-                                                        <span className="text-[10px] text-blue-400">Mülakat: %{c.interviewScore}</span>
+                                                        <span className="text-[10px] text-cyan-500 font-bold">Mülakat: %{c.interviewScore}</span>
                                                     )}
-                                                    <span className={`text-[10px] font-black px-1.5 py-0.5 rounded border ${scoreToColor(p.combinedScore)}`}>
+                                                    <span className={`text-[11px] font-black px-2 py-0.5 rounded-xl border shadow-sm ${scoreToColor(p.combinedScore)}`}>
                                                         %{p.combinedScore}
                                                     </span>
                                                 </div>
                                             </div>
                                             {p.summary && (
-                                                <div className="flex items-start gap-2">
-                                                    <TrendingUp className="w-3 h-3 text-emerald-500 mt-0.5 shrink-0" />
-                                                    <p className="text-[10px] text-text-secondary leading-relaxed">{p.summary}</p>
+                                                <div className="flex items-start gap-3">
+                                                    <div className="p-1 rounded-lg bg-emerald-500/10 text-emerald-500 shrink-0">
+                                                        <TrendingUp className="w-3.5 h-3.5" />
+                                                    </div>
+                                                    <p className="text-[11px] text-text-secondary leading-relaxed font-bold italic">"{p.summary}"</p>
                                                 </div>
                                             )}
                                         </div>

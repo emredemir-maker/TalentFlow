@@ -1,19 +1,18 @@
 // src/pages/LoginPage.jsx
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { LogIn, Sparkles, AlertCircle, Loader2, Mail, Lock, User, ArrowLeft, CheckCircle } from 'lucide-react';
+import { LogIn, Sparkles, AlertCircle, Loader2, Mail, Lock, User, CheckCircle, Zap } from 'lucide-react';
+import Logo from '../components/Logo';
 
 export default function LoginPage() {
     const { loginWithGoogle, loginWithEmail, registerWithEmail, loading, error } = useAuth();
 
-    // UI State
-    const [mode, setMode] = useState('login'); // 'login' or 'register'
+    const [mode, setMode] = useState('login');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [name, setName] = useState('');
     const [success, setSuccess] = useState(null);
 
-    // URL parameter check for invitation
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const inviteEmail = params.get('invite');
@@ -30,83 +29,76 @@ export default function LoginPage() {
                 await loginWithEmail(email, password);
             } else {
                 await registerWithEmail(email, password, name);
-                setSuccess("Kaydınız başarıyla tamamlandı! Giriş yapılıyor...");
+                setSuccess("Registration successful! Accessing systems...");
             }
         } catch {
-            // Error handling is managed by AuthContext
         }
     };
 
     return (
-        <div className="min-h-screen bg-navy-950 flex flex-col items-center justify-center p-6 relative overflow-hidden">
-            {/* Background elements */}
-            <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
-                <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-electric/10 rounded-full blur-[120px] animate-pulse" />
-                <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-violet-600/10 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '2s' }} />
-            </div>
+        <div className="min-h-screen bg-bg-primary flex flex-col items-center justify-center p-6 relative overflow-hidden transition-colors duration-500">
+            {/* Ambient Background Glows */}
+            <div className="fixed top-[-15%] left-[-15%] w-[60%] h-[60%] bg-cyan-500/10 rounded-full blur-[160px] pointer-events-none animate-pulse" />
+            <div className="fixed bottom-[-15%] right-[-15%] w-[60%] h-[60%] bg-violet-600/10 rounded-full blur-[160px] pointer-events-none animate-stitch-float" />
 
-            <div className="w-full max-w-md relative z-10 glass rounded-[40px] p-8 border border-white/10 shadow-2xl space-y-6 stagger">
-                <div className="text-center space-y-2">
-                    <div className="w-full h-32 flex items-center justify-center mx-auto mb-6">
-                        <img src="/logo.png" alt="TalentFlow" className="max-w-full max-h-full object-contain" />
+            <div className="w-full max-w-md relative z-10 bg-bg-secondary/40 backdrop-blur-3xl rounded-[3rem] p-10 border border-border-subtle shadow-2xl space-y-10 animate-fade-in">
+
+                {/* Logo Area */}
+                <div className="text-center space-y-6">
+                    <div className="flex flex-col items-center gap-6">
+                        <Logo size={100} showText={true} className="flex-col items-center !gap-6" />
                     </div>
-                    <h1 className="sr-only">TalentFlow</h1>
-                    <p className="text-navy-400 font-medium">
-                        {mode === 'login' ? 'Yapay Zeka Destekli İK Paneli' : 'Davetiyeyi Yanıtla'}
-                    </p>
                 </div>
 
                 {error && (
-                    <div className="flex items-start gap-3 p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-medium animate-in fade-in slide-in-from-top-2">
+                    <div className="flex items-start gap-3 p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-bold animate-in zoom-in-95">
                         <AlertCircle className="w-5 h-5 shrink-0" />
                         <p>{error}</p>
                     </div>
                 )}
 
                 {success && (
-                    <div className="flex items-start gap-3 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm font-medium animate-in fade-in slide-in-from-top-2">
+                    <div className="flex items-start gap-3 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm font-bold animate-in zoom-in-95">
                         <CheckCircle className="w-5 h-5 shrink-0" />
                         <p>{success}</p>
                     </div>
                 )}
 
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    {mode === 'register' && (
-                        <div className="space-y-1.5">
-                            <label className="text-[10px] text-navy-500 uppercase font-black tracking-widest ml-1">Ad Soyad</label>
-                            <div className="relative">
-                                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-navy-500" />
-                                <input
-                                    type="text"
-                                    required
-                                    value={name}
-                                    onChange={(e) => setName(e.target.value)}
-                                    placeholder="Adınız ve soyadınız"
-                                    className="w-full pl-11 pr-5 py-4 bg-navy-900 border border-white/10 rounded-2xl text-text-primary outline-none focus:border-electric transition-all text-sm"
-                                />
-                            </div>
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    <div className="space-y-2">
+                        <label className="text-[10px] text-text-muted uppercase font-black tracking-[0.2em] ml-2 opacity-60">Görünen Ad</label>
+                        <div className="relative group">
+                            <User className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted group-focus-within:text-cyan-500 transition-colors" />
+                            <input
+                                type="text"
+                                required
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                placeholder="Ad Soyad"
+                                className="w-full pl-12 pr-6 py-4 bg-bg-primary border border-border-subtle rounded-2xl text-text-primary outline-none focus:border-cyan-500/50 focus:bg-bg-primary/80 transition-all text-sm font-bold placeholder:text-text-muted/40 shadow-inner"
+                            />
                         </div>
-                    )}
+                    </div>
 
-                    <div className="space-y-1.5">
-                        <label className="text-[10px] text-navy-500 uppercase font-black tracking-widest ml-1">E-posta</label>
-                        <div className="relative">
-                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-navy-500" />
+                    <div className="space-y-2">
+                        <label className="text-[10px] text-text-muted uppercase font-black tracking-[0.2em] ml-2 opacity-60">Erişim Sinyali (E-posta)</label>
+                        <div className="relative group">
+                            <Mail className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted group-focus-within:text-cyan-500 transition-colors" />
                             <input
                                 type="email"
                                 required
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                placeholder="is@sirket.com"
-                                className="w-full pl-11 pr-5 py-4 bg-navy-900 border border-white/10 rounded-2xl text-text-primary outline-none focus:border-electric transition-all text-sm"
+                                placeholder="ad@sirket.com"
+                                className="w-full pl-12 pr-6 py-4 bg-bg-primary border border-border-subtle rounded-2xl text-text-primary outline-none focus:border-cyan-500/50 focus:bg-bg-primary/80 transition-all text-sm font-bold placeholder:text-text-muted/40 shadow-inner"
                             />
                         </div>
                     </div>
 
-                    <div className="space-y-1.5">
-                        <label className="text-[10px] text-navy-500 uppercase font-black tracking-widest ml-1">Şifre</label>
-                        <div className="relative">
-                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-navy-500" />
+                    <div className="space-y-3">
+                        <label className="text-[11px] text-text-muted uppercase font-black tracking-[0.2em] ml-2 opacity-60">Güvenlik Anahtarı (Şifre)</label>
+                        <div className="relative group">
+                            <Lock className="absolute left-6 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-text-muted transition-colors group-focus-within:text-cyan-500" />
                             <input
                                 type="password"
                                 required
@@ -114,7 +106,7 @@ export default function LoginPage() {
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 placeholder="••••••••"
-                                className="w-full pl-11 pr-5 py-4 bg-navy-900 border border-white/10 rounded-2xl text-text-primary outline-none focus:border-electric transition-all text-sm"
+                                className="w-full pl-14 pr-6 py-5 bg-bg-primary border border-border-subtle rounded-2xl text-text-primary outline-none focus:border-cyan-500/50 focus:bg-bg-primary/80 transition-all text-sm font-bold placeholder:text-text-muted/40 shadow-inner"
                             />
                         </div>
                     </div>
@@ -122,44 +114,43 @@ export default function LoginPage() {
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full py-4 rounded-2xl bg-electric text-text-primary font-bold flex items-center justify-center gap-3 hover:bg-electric-light transition-all active:scale-[0.98] shadow-xl shadow-electric/20 disabled:opacity-50"
+                        className="w-full py-5 rounded-2xl bg-cyan-500 text-white font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 shadow-lg shadow-cyan-500/20 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 transition-all group"
                     >
                         {loading ? (
-                            <Loader2 className="w-5 h-5 animate-spin" />
+                            <Loader2 className="w-6 h-6 animate-spin" />
                         ) : (
-                            mode === 'login' ? 'Giriş Yap' : 'Kaydı Tamamla'
+                            <>
+                                <span className="text-sm">SİSTEME GİRİŞ YAP</span>
+                                <Sparkles className="w-4 h-4 group-hover:rotate-12 transition-transform" />
+                            </>
                         )}
                     </button>
                 </form>
 
-                <div className="relative py-2">
-                    <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/5"></div></div>
-                    <div className="relative flex justify-center text-xs uppercase"><span className="bg-navy-900 px-2 text-navy-500 font-black tracking-widest">VEYA</span></div>
+                <div className="relative py-4">
+                    <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border-subtle opacity-50"></div></div>
+                    <div className="relative flex justify-center text-[10px] uppercase font-black tracking-[0.3em]"><span className="bg-bg-secondary/40 backdrop-blur-3xl px-4 text-text-muted opacity-40 italic">Güvenli Kimlik Doğrulama</span></div>
                 </div>
 
-                <div className="space-y-3">
+                <div className="space-y-4">
                     <button
                         onClick={loginWithGoogle}
-                        className="w-full py-3.5 rounded-2xl bg-white/5 border border-white/10 text-text-primary font-bold flex items-center justify-center gap-3 hover:bg-white/10 transition-all text-sm"
+                        className="w-full py-4 rounded-2xl bg-bg-primary border border-border-subtle text-text-primary font-bold flex items-center justify-center gap-3 hover:bg-bg-primary/80 transition-all text-sm shadow-xl"
                     >
                         <img src="https://www.google.com/favicon.ico" alt="Google" className="w-4 h-4" />
-                        Google ile Davam Et
+                        Google Nexus ile Doğrula
                     </button>
 
                     <button
                         onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
-                        className="w-full text-center text-xs font-bold text-navy-400 hover:text-text-primary transition-colors"
+                        className="w-full text-center text-[10px] font-black text-text-muted hover:text-cyan-500 transition-colors uppercase tracking-[0.2em] opacity-60 hover:opacity-100"
                     >
-                        {mode === 'login' ? 'Davetiyeniz mi var? Kaydolun' : 'Zaten hesabınız var mı? Giriş Yapın'}
+                        {mode === 'login' ? 'Kayıtlı Değil Misiniz? Hesap Oluşturun' : 'Zaten Kayıtlı Mısınız? Sisteme Giriş Yapın'}
                     </button>
                 </div>
 
-                <div className="flex flex-col items-center gap-4 pt-4 border-t border-white/5">
-                    <p className="text-[9px] text-navy-600 uppercase tracking-widest font-black">Powered by Gemini AI</p>
-                    <div className="flex gap-4">
-                        <a href="#" className="text-[10px] text-navy-500 hover:text-text-primary transition-colors">KVKK Aydınlatma Metni</a>
-                        <a href="#" className="text-[10px] text-navy-500 hover:text-text-primary transition-colors">Gizlilik Politikası</a>
-                    </div>
+                <div className="pt-8 border-t border-border-subtle opacity-50 text-center">
+                    <p className="text-[10px] text-text-muted uppercase tracking-[0.2em] font-black opacity-40">Nöral Motor Dağıtımı: Kararlı v2.4.0</p>
                 </div>
             </div>
         </div>

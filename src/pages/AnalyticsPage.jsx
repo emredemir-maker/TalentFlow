@@ -296,33 +296,37 @@ export default function AnalyticsPage() {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center min-h-screen">
-                <div className="w-10 h-10 border-[3px] border-navy-800 border-t-electric rounded-full animate-spin" />
+            <div className="flex flex-col items-center justify-center min-h-screen bg-bg-primary gap-6">
+                <div className="relative w-20 h-20">
+                    <div className="absolute inset-0 border-[3px] border-border-subtle rounded-full" />
+                    <div className="absolute inset-0 border-[3px] border-cyan-500 border-t-transparent rounded-full animate-spin" />
+                </div>
+                <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.3em] animate-pulse">SİSTEM ANALİZ EDİLİYOR...</p>
             </div>
         );
     }
 
     return (
-        <div className="h-screen bg-[#020617] text-text-primary flex flex-col overflow-hidden">
+        <div className="h-screen bg-bg-primary text-text-primary flex flex-col overflow-hidden transition-colors duration-500">
             <Header title="Stratejik Analitik" />
 
             {/* DASHBOARD TOP BAR */}
-            <div className="px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/[0.05] bg-navy-950/50 backdrop-blur-sm shrink-0">
+            <div className="px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border-subtle bg-bg-secondary/40 backdrop-blur-sm shrink-0">
                 <div className="flex items-center gap-4">
-                    <div className="p-2 rounded-xl bg-electric/10 border border-electric/20 shrink-0">
-                        <Zap className="w-5 h-5 text-electric animate-pulse" />
+                    <div className="p-3 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 shrink-0 shadow-lg">
+                        <Zap className="w-6 h-6 text-cyan-500 animate-pulse" />
                     </div>
                     <div>
                         <h2 className="text-lg font-black tracking-tighter text-text-primary uppercase hud-text">STRATEJİK KOMUTA MERKEZİ</h2>
                         <div className="flex items-center gap-2 mt-0.5">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            <p className="text-[10px] text-navy-500 font-black uppercase tracking-widest">SİSTEM ÇALIŞIYOR: {candidates.length} AKTİF KAYIT</p>
+                            <p className="text-[10px] text-text-muted font-black uppercase tracking-widest">SİSTEM ÇALIŞIYOR: {candidates.length} AKTİF KAYIT</p>
                         </div>
                     </div>
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <nav className="flex items-center gap-1 p-1 bg-white/[0.03] rounded-xl border border-white/10">
+                    <nav className="flex items-center gap-1 p-1 bg-bg-secondary p-1 rounded-xl border border-border-subtle">
                         {[
                             { id: 'overview', label: 'GENEL BAKIŞ', icon: Activity },
                             { id: 'acquisition', label: 'EDİNME & KAYNAK', icon: Globe },
@@ -331,7 +335,7 @@ export default function AnalyticsPage() {
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-[10px] font-black tracking-[0.1em] transition-all uppercase ${activeTab === tab.id ? 'bg-electric text-white shadow-xl shadow-electric/30 scale-[1.02]' : 'text-navy-500 hover:text-navy-300'}`}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-[10px] font-black tracking-[0.1em] transition-all uppercase ${activeTab === tab.id ? 'bg-cyan-500 text-white shadow-xl shadow-cyan-500/30 scale-[1.02]' : 'text-text-muted hover:text-text-secondary'}`}
                             >
                                 <tab.icon className="w-3.5 h-3.5" />
                                 {tab.label}
@@ -339,14 +343,14 @@ export default function AnalyticsPage() {
                         ))}
                     </nav>
 
-                    <div className="h-8 w-px bg-white/10 hidden md:block mx-1"></div>
+                    <div className="h-8 w-px bg-border-subtle hidden md:block mx-1"></div>
 
-                    <div className="flex items-center gap-1 bg-navy-900/50 p-1 rounded-xl border border-white/5">
+                    <div className="flex items-center gap-1 bg-bg-secondary p-1 rounded-xl border border-border-subtle">
                         {['7d', '30d'].map(r => (
                             <button
                                 key={r}
                                 onClick={() => setTimeRange(r)}
-                                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${timeRange === r ? 'bg-white/10 text-white' : 'text-navy-500 hover:text-navy-300'}`}
+                                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${timeRange === r ? 'bg-cyan-500/10 text-cyan-500 shadow-sm' : 'text-text-muted hover:text-text-secondary'}`}
                             >
                                 {r === '7d' ? '7G' : '30G'}
                             </button>
@@ -369,21 +373,21 @@ export default function AnalyticsPage() {
                             </div>
 
                             <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-                                <div className="xl:col-span-8 glass rounded-[2.5rem] p-8 border border-white/[0.08] relative overflow-hidden h-[360px]">
-                                    <h3 className="text-lg font-black text-text-primary flex items-center gap-2 uppercase tracking-tighter mb-6"><Activity className="w-5 h-5 text-electric-light" /> PERFORMANS TRENDİ</h3>
+                                <div className="xl:col-span-8 stitch-glass rounded-[2.5rem] p-8 border border-border-subtle relative overflow-hidden h-[360px] shadow-2xl">
+                                    <h3 className="text-lg font-black text-text-primary flex items-center gap-2 uppercase tracking-tighter mb-6"><Activity className="w-5 h-5 text-cyan-400" /> PERFORMANS TRENDİ</h3>
                                     <div className="h-[240px]"><CustomLineChart data={trendsData} /></div>
                                 </div>
-                                <div className="xl:col-span-4 glass rounded-[2.5rem] p-8 border border-white/[0.08] flex flex-col h-[360px]">
+                                <div className="xl:col-span-4 stitch-glass rounded-[2.5rem] p-8 border border-border-subtle flex flex-col h-[360px] shadow-2xl">
                                     <h3 className="text-lg font-black text-text-primary mb-6 flex items-center gap-2 uppercase tracking-tighter"><Layers className="w-5 h-5 text-amber-400" /> DÖNÜŞÜM HUNİSİ</h3>
                                     <div className="flex-1 flex flex-col justify-between py-2 overflow-hidden">
                                         {funnelData.map((stage, idx) => (
                                             <div key={stage.name} className="relative group/funnel animate-fade-in-up" style={{ animationDelay: `${idx * 100}ms` }}>
                                                 <div className="flex justify-between items-end mb-1.5">
-                                                    <span className="text-[10px] font-black text-navy-400 uppercase tracking-widest">{stage.name}</span>
+                                                    <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">{stage.name}</span>
                                                     <span className="text-sm font-black text-text-primary">{stage.count}</span>
                                                 </div>
-                                                <div className="h-2 bg-navy-950 rounded-full overflow-hidden border border-white/5">
-                                                    <div className="h-full rounded-full transition-all duration-1000 ease-out" style={{ width: `${Math.max(5, (stage.count / (candidates.length || 1)) * 100)}%`, backgroundColor: stage.color }} />
+                                                <div className="h-2 bg-bg-primary rounded-full overflow-hidden border border-border-subtle">
+                                                    <div className="h-full rounded-full transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(var(--stage-color),0.3)]" style={{ width: `${Math.max(5, (stage.count / (candidates.length || 1)) * 100)}%`, backgroundColor: stage.color }} />
                                                 </div>
                                             </div>
                                         ))}
@@ -392,23 +396,23 @@ export default function AnalyticsPage() {
                             </div>
 
                             {/* Integrated Positions Matrix */}
-                            <div className="glass rounded-[2.5rem] p-8 border border-white/[0.08] relative overflow-hidden group">
+                            <div className="glass rounded-[2.5rem] p-8 border border-border-subtle relative overflow-hidden group shadow-2xl">
                                 <h3 className="text-lg font-black text-text-primary flex items-center gap-3 uppercase tracking-tighter mb-8"><Briefcase className="w-5 h-5 text-violet-400" /> POZİSYON PERFORMANS MATRİSİ</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                                     {positionStatusData.slice(0, 4).map((pos, idx) => (
-                                        <div key={pos.name} className="p-5 rounded-[1.5rem] bg-white/[0.02] border border-white/[0.05] hover:border-violet-500/30 transition-all">
+                                        <div key={pos.name} className="p-5 rounded-[1.5rem] bg-bg-secondary border border-border-subtle hover:border-violet-500/30 transition-all shadow-sm">
                                             <div className="flex justify-between items-start mb-4">
                                                 <div className="min-w-0 flex-1">
                                                     <h4 className="text-[11px] font-black text-text-primary truncate uppercase tracking-tight">{pos.name}</h4>
-                                                    <p className="text-[9px] text-navy-500 font-black uppercase mt-1">{pos.total} ADAY</p>
+                                                    <p className="text-[9px] text-text-muted font-black uppercase mt-1">{pos.total} ADAY</p>
                                                 </div>
                                                 <div className="text-lg font-black text-violet-400">%{pos.avgScore}</div>
                                             </div>
                                             <div className="space-y-3">
                                                 {[['İŞE ALIM', pos.hired, 'emerald-500'], ['MÜLAKAT', pos.interview, 'blue-500']].map(([label, val, color]) => (
                                                     <div key={label} className="space-y-1">
-                                                        <div className="flex justify-between text-[8px] font-black uppercase"><span className={`text-${color.replace('-500', '-400')}`}>{label}</span><span className="text-text-primary">{val}</span></div>
-                                                        <div className="h-1 bg-navy-950 rounded-full overflow-hidden"><div className={`h-full bg-${color}`} style={{ width: `${(val / (pos.total || 1)) * 100}%` }} /></div>
+                                                        <div className="flex justify-between text-[8px] font-black uppercase"><span className={`text-${color.replace('-500', '-400')}`}>{label}</span><span className="text-text-primary font-black">{val}</span></div>
+                                                        <div className="h-1 bg-bg-primary rounded-full overflow-hidden border border-border-subtle/5"><div className={`h-full bg-${color}`} style={{ width: `${(val / (pos.total || 1)) * 100}%` }} /></div>
                                                     </div>
                                                 ))}
                                             </div>
@@ -421,29 +425,29 @@ export default function AnalyticsPage() {
 
                     {activeTab === 'acquisition' && (
                         <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 animate-fade-in h-[600px]">
-                            <div className="xl:col-span-5 glass rounded-[2.5rem] p-8 border border-white/[0.08] flex flex-col min-h-0">
+                            <div className="xl:col-span-5 stitch-glass rounded-[2.5rem] p-8 border border-border-subtle flex flex-col min-h-0 shadow-2xl">
                                 <div className="flex items-center justify-between mb-8">
                                     <h3 className="text-lg font-black text-text-primary flex items-center gap-2 uppercase tracking-tighter"><Globe className="w-5 h-5 text-cyan-400" /> KAYNAK ANALİZİ</h3>
-                                    <div className="flex bg-navy-900/50 rounded-xl p-1 border border-white/10 shrink-0">
-                                        <button onClick={() => setActiveSourceTab('source')} className={`px-4 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${activeSourceTab === 'source' ? 'bg-cyan-500 text-white' : 'text-navy-500'}`}>Kanal</button>
-                                        <button onClick={() => setActiveSourceTab('subSource')} className={`px-4 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${activeSourceTab === 'subSource' ? 'bg-cyan-500 text-white' : 'text-navy-500'}`}>Detay</button>
+                                    <div className="flex bg-bg-primary rounded-xl p-1 border border-border-subtle shrink-0">
+                                        <button onClick={() => setActiveSourceTab('source')} className={`px-4 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${activeSourceTab === 'source' ? 'bg-cyan-500 text-white shadow-lg' : 'text-text-muted hover:text-text-secondary'}`}>Kanal</button>
+                                        <button onClick={() => setActiveSourceTab('subSource')} className={`px-4 py-1.5 text-[10px] font-black uppercase rounded-lg transition-all ${activeSourceTab === 'subSource' ? 'bg-cyan-500 text-white shadow-lg' : 'text-text-muted hover:text-text-secondary'}`}>Detay</button>
                                     </div>
                                 </div>
                                 <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
                                     {(activeSourceTab === 'source' ? sourceList : subSourceList).map((item) => (
-                                        <div key={item.name} className="flex justify-between items-center bg-white/[0.02] border border-white/[0.05] p-5 rounded-2xl hover:border-cyan-500/30 transition-all">
+                                        <div key={item.name} className="flex justify-between items-center bg-bg-secondary border border-border-subtle p-5 rounded-2xl hover:border-cyan-500/30 transition-all shadow-sm">
                                             <div className="min-w-0 pr-4">
                                                 <span className="text-sm font-black text-text-primary uppercase tracking-tight block truncate mb-1">{item.name}</span>
-                                                <span className="text-[10px] font-bold text-navy-500 uppercase tracking-widest">{item.value} ADAY</span>
+                                                <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">{item.value} ADAY</span>
                                             </div>
                                             <div className="flex items-center gap-5 shrink-0">
                                                 <div className="flex flex-col items-end">
-                                                    <span className="text-[10px] text-navy-500 font-black uppercase tracking-widest mb-1">UYUM</span>
+                                                    <span className="text-[10px] text-text-muted font-black uppercase tracking-widest mb-1">UYUM</span>
                                                     <span className="text-sm font-black text-cyan-400">%{item.percentage}</span>
                                                 </div>
-                                                <div className="w-px h-8 bg-white/5"></div>
+                                                <div className="w-px h-8 bg-border-subtle"></div>
                                                 <div className="flex flex-col items-end">
-                                                    <span className="text-[10px] text-navy-500 font-black uppercase tracking-widest mb-1">BAŞARI</span>
+                                                    <span className="text-[10px] text-text-muted font-black uppercase tracking-widest mb-1">BAŞARI</span>
                                                     <span className="text-sm font-black text-emerald-400">%{item.successRate}</span>
                                                 </div>
                                             </div>
@@ -451,38 +455,39 @@ export default function AnalyticsPage() {
                                     ))}
                                 </div>
                             </div>
-                            <div className="xl:col-span-4 glass rounded-[2.5rem] p-8 border border-white/[0.08] flex flex-col min-h-0">
-                                <h3 className="text-lg font-black text-text-primary mb-8 flex items-center gap-2 uppercase tracking-tighter"><Zap className="w-5 h-5 text-electric-light" /> YETENEK MATRİSİ</h3>
+                            <div className="xl:col-span-4 stitch-glass rounded-[2.5rem] p-8 border border-border-subtle flex flex-col min-h-0 shadow-2xl">
+                                <h3 className="text-lg font-black text-text-primary mb-8 flex items-center gap-2 uppercase tracking-tighter"><Zap className="w-5 h-5 text-cyan-400" /> YETENEK MATRİSİ</h3>
                                 <div className="flex flex-wrap gap-3 overflow-y-auto custom-scrollbar flex-1 pr-2 content-start">
                                     {topSkills.map(([skill, count]) => (
-                                        <div key={skill} className="px-5 py-3 rounded-2xl bg-white/[0.03] border border-white/[0.06] hover:border-electric/30 hover:bg-electric/5 transition-all group flex items-center gap-4">
-                                            <span className="text-sm font-bold text-navy-200 uppercase tracking-tight">{skill}</span>
-                                            <span className="text-xs font-black text-electric bg-electric/10 px-2 py-1 rounded-lg">{count}</span>
+                                        <div key={skill} className="px-5 py-3 rounded-2xl bg-bg-secondary border border-border-subtle hover:border-cyan-400/30 hover:bg-cyan-500/5 transition-all group flex items-center gap-4 shadow-sm">
+                                            <span className="text-sm font-black text-text-primary uppercase tracking-tight">{skill}</span>
+                                            <span className="text-xs font-black text-cyan-400 bg-cyan-500/10 px-2 py-1 rounded-lg">{count}</span>
                                         </div>
                                     ))}
                                 </div>
                             </div>
-                            <div className="xl:col-span-3 glass rounded-[2.5rem] p-8 border border-white/[0.08] flex flex-col items-center justify-center relative min-h-0">
+                            <div className="xl:col-span-3 bg-bg-primary/40 backdrop-blur-xl rounded-[2.5rem] p-8 border border-border-subtle flex flex-col items-center justify-center relative min-h-0 shadow-2xl overflow-hidden group">
+                                <div className="absolute inset-0 bg-cyan-500/5 opacity-0 group-hover:opacity-100 transition-opacity blur-3xl -z-10" />
                                 <GaugeChart value={avgMatchScore} size={200} />
                                 <span className="text-4xl font-black text-text-primary tracking-tighter mt-4">%{avgMatchScore}</span>
-                                <span className="text-[10px] font-black text-electric uppercase tracking-[0.2em] mt-2">OPTIMAL UYUMLULUK</span>
+                                <span className="text-[10px] font-black text-cyan-600 dark:text-cyan-400 uppercase tracking-[0.2em] mt-2">OPTIMAL UYUMLULUK</span>
                             </div>
                         </div>
                     )}
 
 
                     {activeTab === 'responses' && (
-                        <div className="glass rounded-[2.5rem] border border-white/[0.08] overflow-hidden animate-fade-in h-[600px] flex flex-col">
-                            <div className="flex items-center justify-between border-b border-white/[0.08] px-8 bg-white/[0.01]">
+                        <div className="stitch-glass rounded-[2.5rem] border border-border-subtle overflow-hidden animate-fade-in h-[600px] flex flex-col shadow-2xl">
+                            <div className="flex items-center justify-between border-b border-border-subtle px-8 bg-bg-secondary/40">
                                 <div className="flex">
-                                    <button onClick={() => setTableTab('responses')} className={`px-8 py-6 text-xs font-black border-b-2 transition-all uppercase tracking-widest ${tableTab === 'responses' ? 'border-electric text-text-primary' : 'border-transparent text-navy-500'}`}>YANIT TAKİBİ ({sentMessages.length})</button>
-                                    <button onClick={() => setTableTab('pending')} className={`px-8 py-6 text-xs font-black border-b-2 transition-all uppercase tracking-widest ${tableTab === 'pending' ? 'border-amber-400 text-amber-400' : 'border-transparent text-navy-500'}`}>TASLAKLAR ({pendingApprovals.length})</button>
+                                    <button onClick={() => setTableTab('responses')} className={`px-8 py-6 text-xs font-black border-b-2 transition-all uppercase tracking-widest ${tableTab === 'responses' ? 'border-cyan-500 text-text-primary' : 'border-transparent text-text-muted'}`}>YANIT TAKİBİ ({sentMessages.length})</button>
+                                    <button onClick={() => setTableTab('pending')} className={`px-8 py-6 text-xs font-black border-b-2 transition-all uppercase tracking-widest ${tableTab === 'pending' ? 'border-amber-400 text-amber-500' : 'border-transparent text-text-muted'}`}>TASLAKLAR ({pendingApprovals.length})</button>
                                 </div>
                             </div>
                             <div className="flex-1 overflow-auto custom-scrollbar">
                                 <table className="w-full text-left border-collapse min-w-[1000px]">
-                                    <thead className="sticky top-0 bg-navy-950"><tr className="border-b border-white/[0.08]"><th className="px-8 py-6 text-[10px] font-black text-navy-500 uppercase tracking-widest">Aday</th><th className="px-8 py-6 text-[10px] font-black text-navy-500 uppercase tracking-widest">Pozisyon</th><th className="px-8 py-6 text-[10px] font-black text-navy-500 uppercase tracking-widest">Tarih</th><th className="px-8 py-6 text-[10px] font-black text-navy-500 uppercase tracking-widest">Durum</th><th className="px-8 py-6 text-[10px] font-black text-navy-500 uppercase tracking-widest text-right">Aksiyon</th></tr></thead>
-                                    <tbody className="divide-y divide-white/[0.02]">
+                                    <thead className="sticky top-0 bg-bg-secondary border-b border-border-subtle z-10 shadow-sm"><tr className="border-b border-border-subtle"><th className="px-8 py-6 text-[10px] font-black text-text-muted uppercase tracking-widest">Aday</th><th className="px-8 py-6 text-[10px] font-black text-text-muted uppercase tracking-widest">Pozisyon</th><th className="px-8 py-6 text-[10px] font-black text-text-muted uppercase tracking-widest">Tarih</th><th className="px-8 py-6 text-[10px] font-black text-text-muted uppercase tracking-widest">Durum</th><th className="px-8 py-6 text-[10px] font-black text-text-muted uppercase tracking-widest text-right">Aksiyon</th></tr></thead>
+                                    <tbody className="divide-y divide-border-subtle/20 bg-bg-primary/10">
                                         {(tableTab === 'responses' ? sentMessages : pendingApprovals).map((msg, idx) => (
                                             <TableRow key={idx} msg={msg} type={tableTab === 'responses' ? 'sent' : 'pending'} index={idx} onProcess={() => openResponseModal(msg)} onCheckMail={() => handleCheckEmail(msg)} />
                                         ))}
@@ -497,28 +502,28 @@ export default function AnalyticsPage() {
             {/* AI MODAL */}
             {processingResponse && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-navy-950/80 backdrop-blur-xl" onClick={() => setProcessingResponse(null)} />
-                    <div className="relative w-full max-w-xl glass rounded-[3rem] p-8 border border-white/10 space-y-6 animate-scale-in">
+                    <div className="absolute inset-0 bg-bg-primary/80 backdrop-blur-xl" onClick={() => setProcessingResponse(null)} />
+                    <div className="relative w-full max-w-xl bg-bg-primary border border-border-subtle rounded-[3rem] p-10 space-y-8 animate-scale-in shadow-3xl">
                         <div className="flex items-center justify-between">
-                            <h3 className="text-xl font-black text-text-primary flex items-center gap-3 uppercase hud-text"><Sparkles className="w-6 h-6 text-electric" /> Yanıt Analizi</h3>
-                            <button onClick={() => setProcessingResponse(null)} className="p-3 hover:bg-white/5 rounded-2xl text-navy-400"><X className="w-5 h-5" /></button>
+                            <h3 className="text-2xl font-black text-text-primary flex items-center gap-4 uppercase tracking-tighter"><Sparkles className="w-7 h-7 text-cyan-500" /> Yanıt Analizi</h3>
+                            <button onClick={() => setProcessingResponse(null)} className="p-3 hover:bg-bg-secondary rounded-2xl text-text-muted transition-colors"><X className="w-6 h-6" /></button>
                         </div>
                         {!processingResponse.result ? (
                             <div className="space-y-6">
                                 {processingResponse.checkingMail ? (
-                                    <div className="h-56 flex flex-col items-center justify-center gap-4 bg-navy-950 border border-white/10 rounded-[1.5rem] animate-pulse">
-                                        <RefreshCw className="w-10 h-10 text-electric animate-spin" />
-                                        <p className="text-[10px] text-navy-400 font-bold uppercase tracking-widest">Gmail Taranıyor...</p>
+                                    <div className="h-56 flex flex-col items-center justify-center gap-4 bg-bg-secondary border border-border-subtle rounded-[1.5rem] animate-pulse">
+                                        <RefreshCw className="w-10 h-10 text-cyan-500 animate-spin" />
+                                        <p className="text-[10px] text-text-muted font-black uppercase tracking-widest">Gmail Taranıyor...</p>
                                     </div>
                                 ) : (
-                                    <textarea className="w-full h-56 bg-navy-950 border border-white/10 rounded-[1.5rem] p-6 text-sm text-text-primary outline-none focus:border-electric/50 transition-all resize-none" placeholder="Yanıtı buraya yapıştırın veya 'Mail Ara' butonuna tıklayın..." value={processingResponse.emailText} onChange={(e) => setProcessingResponse(prev => ({ ...prev, emailText: e.target.value }))} />
+                                    <textarea className="w-full h-56 bg-bg-secondary border border-border-subtle rounded-[1.5rem] p-6 text-sm text-text-primary outline-none focus:border-cyan-500/50 transition-all resize-none shadow-inner" placeholder="Yanıtı buraya yapıştırın veya 'Mail Ara' butonuna tıklayın..." value={processingResponse.emailText} onChange={(e) => setProcessingResponse(prev => ({ ...prev, emailText: e.target.value }))} />
                                 )}
-                                <button onClick={handleProcessResponse} disabled={processingResponse.checkingMail || !processingResponse.emailText.trim()} className="w-full py-4 rounded-[1.5rem] bg-electric text-text-primary font-black uppercase tracking-widest text-xs disabled:opacity-30 shadow-xl shadow-electric/20 active:scale-95 transition-all">Analiz Et</button>
+                                <button onClick={handleProcessResponse} disabled={processingResponse.checkingMail || !processingResponse.emailText.trim()} className="w-full py-4 rounded-[1.5rem] bg-cyan-500 text-white font-black uppercase tracking-widest text-[11px] disabled:opacity-30 shadow-xl shadow-cyan-500/20 active:scale-95 transition-all">Analiz Et</button>
                             </div>
                         ) : (
                             <div className="space-y-6">
-                                <div className="p-6 rounded-3xl bg-white/5 border border-white/10"><p className="text-sm italic text-navy-200">"{processingResponse.result.summary}"</p></div>
-                                <button onClick={() => setProcessingResponse(null)} className="w-full py-4 rounded-[1.5rem] bg-white text-navy-950 font-black tracking-widest text-xs uppercase active:scale-95 transition-all">Kapat</button>
+                                <div className="p-6 rounded-3xl bg-bg-secondary border border-border-subtle shadow-inner"><p className="text-sm italic text-text-secondary leading-relaxed">"{processingResponse.result.summary}"</p></div>
+                                <button onClick={() => setProcessingResponse(null)} className="w-full py-4 rounded-[1.5rem] bg-bg-primary text-text-primary font-black tracking-widest text-xs uppercase active:scale-95 transition-all shadow-md">Kapat</button>
                             </div>
                         )}
                     </div>
@@ -530,10 +535,10 @@ export default function AnalyticsPage() {
 
 function KPICard({ title, value, icon: IconComponent, trend, isPositive, color, iconColor }) {
     return (
-        <div className={`glass rounded-[2rem] p-6 border border-white/[0.08] relative overflow-hidden group hover:border-white/20 transition-all duration-500`}>
+        <div className={`stitch-glass rounded-[2rem] p-6 border border-border-subtle relative overflow-hidden group hover:border-cyan-400/30 transition-all duration-500 shadow-xl`}>
             <div className={`absolute -inset-1 bg-gradient-to-br ${color} opacity-40 group-hover:opacity-100 transition-opacity blur-[40px] -z-10`} />
             <div className="flex justify-between items-start mb-4">
-                <div className={`p-4 rounded-2xl bg-navy-950/50 border border-white/5 ${iconColor}`}>
+                <div className={`p-4 rounded-2xl bg-bg-secondary border border-border-subtle shadow-inner ${iconColor}`}>
                     {IconComponent && <IconComponent className="w-6 h-6" />}
                 </div>
                 {trend && (
@@ -543,7 +548,7 @@ function KPICard({ title, value, icon: IconComponent, trend, isPositive, color, 
                 )}
             </div>
             <div>
-                <p className="text-xs font-black text-navy-400 uppercase tracking-widest mb-1">{title}</p>
+                <p className="text-xs font-black text-text-muted uppercase tracking-widest mb-1">{title}</p>
                 <h3 className="text-3xl font-black text-text-primary tracking-tighter">{value}</h3>
             </div>
         </div>
@@ -553,20 +558,20 @@ function KPICard({ title, value, icon: IconComponent, trend, isPositive, color, 
 function TableRow({ msg, type, onProcess, onCheckMail, index }) {
     const isPending = type === 'pending';
     return (
-        <tr className="hover:bg-white/[0.03] transition-all group animate-fade-in-up" style={{ animationDelay: `${index * 30}ms` }}>
+        <tr className="hover:bg-bg-secondary/40 transition-all group animate-fade-in-up" style={{ animationDelay: `${index * 30}ms` }}>
             <td className="px-8 py-6">
                 <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-navy-800 flex items-center justify-center text-xs font-black text-white border border-white/5 shadow-xl">
+                    <div className="w-12 h-12 rounded-2xl bg-bg-secondary flex items-center justify-center text-xs font-black text-text-primary border border-border-subtle shadow-xl">
                         {msg.candidateName?.substring(0, 2).toUpperCase()}
                     </div>
                     <div>
                         <p className="text-sm font-black text-text-primary uppercase tracking-tight">{msg.candidateName}</p>
-                        <p className="text-[10px] font-bold text-navy-600 uppercase tracking-widest mt-0.5">#{msg.candidateId?.substring(0, 8) || 'SYSTEM'}</p>
+                        <p className="text-[10px] font-bold text-text-muted uppercase tracking-widest mt-0.5 opacity-60">#{msg.candidateId?.substring(0, 8) || 'SYSTEM'}</p>
                     </div>
                 </div>
             </td>
-            <td className="px-8 py-6 text-xs font-black text-navy-300 uppercase tracking-tighter">{msg.candidatePosition}</td>
-            <td className="px-8 py-6 text-[11px] font-bold text-navy-500 uppercase tracking-widest">{msg.createdAt?.toDate?.()?.toLocaleDateString('tr-TR') || '-'}</td>
+            <td className="px-8 py-6 text-xs font-black text-text-secondary uppercase tracking-tighter">{msg.candidatePosition}</td>
+            <td className="px-8 py-6 text-[11px] font-bold text-text-muted uppercase tracking-widest">{msg.createdAt?.toDate?.()?.toLocaleDateString('tr-TR') || '-'}</td>
             <td className="px-8 py-6">
                 <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-[0.1em] border ${isPending ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'}`}>
                     {isPending ? 'BEKLEMEDE' : 'TAMAMLANDI'}
@@ -578,15 +583,15 @@ function TableRow({ msg, type, onProcess, onCheckMail, index }) {
                         <button
                             onClick={onCheckMail}
                             title="Gmail'den otomatik tara"
-                            className="p-3 rounded-xl bg-white/[0.03] border border-white/10 text-navy-400 hover:text-text-primary hover:bg-white/10 transition-all group/btn"
+                            className="p-3 rounded-xl bg-bg-secondary border border-border-subtle text-text-muted hover:text-cyan-400 hover:border-cyan-400/30 transition-all group/btn"
                         >
                             <Search className="w-4 h-4 group-hover/btn:scale-110 transition-transform" />
                         </button>
-                        <button onClick={onProcess} className="px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-text-primary text-[10px] font-black uppercase tracking-widest hover:bg-electric hover:border-electric transition-all shadow-lg active:scale-95">İşle</button>
+                        <button onClick={onProcess} className="px-5 py-2.5 rounded-xl bg-bg-secondary border border-border-subtle text-text-primary text-[10px] font-black uppercase tracking-widest hover:bg-cyan-500 hover:border-cyan-500 hover:text-white transition-all shadow-lg active:scale-95">İşle</button>
                     </div>
                 )}
                 {isPending && (
-                    <button className="px-6 py-2.5 rounded-xl bg-electric text-white text-[10px] font-black uppercase tracking-widest hover:bg-electric-light transition-all shadow-xl shadow-electric/20 active:scale-95">Onayla</button>
+                    <button className="px-6 py-2.5 rounded-xl bg-cyan-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-cyan-400 transition-all shadow-xl shadow-cyan-500/20 active:scale-95">Onayla</button>
                 )}
             </td>
         </tr>
@@ -598,10 +603,10 @@ function EmptyRow({ message }) {
         <tr>
             <td colSpan={5} className="px-8 py-20 text-center">
                 <div className="flex flex-col items-center gap-4">
-                    <div className="w-16 h-16 rounded-[1.5rem] bg-white/5 flex items-center justify-center">
-                        <FileText className="w-6 h-6 text-navy-600" />
+                    <div className="w-20 h-20 rounded-[2rem] bg-bg-secondary border border-border-subtle flex items-center justify-center shadow-inner">
+                        <FileText className="w-8 h-8 text-text-muted opacity-40" />
                     </div>
-                    <p className="text-xs text-navy-500">{message}</p>
+                    <p className="text-[11px] text-text-muted font-black uppercase tracking-widest opacity-60">{message}</p>
                 </div>
             </td>
         </tr>

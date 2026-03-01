@@ -20,7 +20,8 @@
   --color-border-subtle: var(--border-subtle);
   --color-header-bg: var(--header-bg);
 
-  --color-electric: #3b82f6;
+  --color-electric: #22d3ee;
+  --color-violet-accent: #8b5cf6;
   --color-electric-light: #60a5fa;
   --color-electric-dark: #2563eb;
   --color-electric-glow: rgba(59, 130, 246, 0.15);
@@ -35,7 +36,9 @@
 }
 
 :root {
+  /* DARK THEME (Default) */
   --navy-950: #020617;
+  /* Deepest Midnight */
   --navy-900: #0f172a;
   --navy-800: #1e293b;
   --navy-700: #334155;
@@ -46,20 +49,32 @@
   --navy-200: #e2e8f0;
   --navy-100: #f1f5f9;
 
+  --bg-primary: var(--navy-950);
+  --bg-secondary: var(--navy-900);
+  --bg-secondary-rgb: 15, 23, 42;
+
   --text-primary: #ffffff;
   --text-secondary: #e2e8f0;
-  --text-muted: #64748b;
-  --border-subtle: rgba(255, 255, 255, 0.08);
-  --header-bg: rgba(15, 23, 42, 0.8);
+  --text-muted: #94a3b8;
 
-  --glass-bg: rgba(15, 23, 42, 0.7);
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --card-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  --border-subtle: rgba(255, 255, 255, 0.1);
+  --header-bg: rgba(2, 6, 23, 0.9);
+  --glass-bg: rgba(15, 23, 42, 0.95);
+  /* Increased opacity for readability */
+  --glass-border: rgba(255, 255, 255, 0.1);
+
+  --card-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.5);
+  --grid-color: rgba(34, 211, 238, 0.05);
+
+  --electric: #22d3ee;
+  --violet-accent: #8b5cf6;
+  --neural-gradient: linear-gradient(135deg, #22d3ee 0%, #3b82f6 50%, #8b5cf6 100%);
 }
 
 [data-theme='light'] {
-  --navy-950: #f8fafc;
-  --navy-900: #ffffff;
+  /* LIGHT THEME */
+  --navy-950: #ffffff;
+  --navy-900: #f8fafc;
   --navy-800: #f1f5f9;
   --navy-700: #e2e8f0;
   --navy-600: #94a3b8;
@@ -69,43 +84,43 @@
   --navy-200: #1e293b;
   --navy-100: #0f172a;
 
-  --text-primary: #0f172a;
+  --bg-primary: #f1f5f9;
+  --bg-secondary: #ffffff;
+  --bg-secondary-rgb: 255, 255, 255;
+
+  --text-primary: #020617;
   --text-secondary: #334155;
   --text-muted: #64748b;
-  --border-subtle: rgba(15, 23, 42, 0.08);
-  --header-bg: rgba(248, 250, 252, 0.9);
 
+  --border-subtle: rgba(15, 23, 42, 0.1);
+  --header-bg: rgba(255, 255, 255, 0.95);
   --glass-bg: rgba(255, 255, 255, 0.85);
-  --glass-border: rgba(15, 23, 42, 0.05);
-  --card-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.04), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
+  --glass-border: rgba(15, 23, 42, 0.08);
+
+  --card-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.1);
+  --grid-color: rgba(34, 211, 238, 0.12);
+  --neural-gradient: linear-gradient(135deg, #0891b2 0%, #2563eb 50%, #7c3aed 100%);
 }
 
-/* Fix text contrast inside primary colored containers in light mode */
+/* Contrast Fixes for Buttons in Light Mode */
 [data-theme='light'] .bg-electric,
 [data-theme='light'] .bg-blue-500,
-[data-theme='light'] .bg-emerald-500,
-[data-theme='light'] .bg-red-500,
 [data-theme='light'] .bg-violet-500,
-[data-theme='light'] .bg-cyan-500,
-[data-theme='light'] .bg-amber-500 {
-  color: #ffffff;
+[data-theme='light'] .bg-cyan-500 {
+  color: #ffffff !important;
 }
 
-[data-theme='light'] .bg-electric .text-text-primary,
-[data-theme='light'] .bg-electric .text-text-muted,
-[data-theme='light'] .bg-blue-500 .text-text-primary,
-[data-theme='light'] .bg-emerald-500 .text-text-primary,
-[data-theme='light'] .bg-red-500 .text-text-primary,
-[data-theme='light'] .bg-violet-500 .text-text-primary,
-[data-theme='light'] .bg-cyan-500 .text-text-primary,
-[data-theme='light'] .bg-amber-500 .text-text-primary {
+[data-theme='light'] .bg-electric *,
+[data-theme='light'] .bg-blue-500 *,
+[data-theme='light'] .bg-violet-500 *,
+[data-theme='light'] .bg-cyan-500 * {
   color: #ffffff !important;
 }
 
 /* ==================== BASE STYLES ==================== */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #334155 transparent;
+  scrollbar-color: var(--text-muted) transparent;
 }
 
 *::-webkit-scrollbar {
@@ -118,21 +133,21 @@
 }
 
 *::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: var(--text-muted);
   border-radius: 999px;
+  opacity: 0.3;
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: var(--cyan-accent);
 }
 
 body {
-  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
-  background-color: var(--navy-950);
-  color: var(--text-secondary);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  transition: background-color 0.3s, color 0.3s;
+  transition: background-color 0.4s ease;
 }
 
 /* ==================== ANIMATIONS ==================== */
@@ -161,12 +176,24 @@ body {
 @keyframes slide-in-right {
   from {
     opacity: 0;
-    transform: translateX(100%);
+    transform: translateX(40px);
   }
 
   to {
     opacity: 1;
     transform: translateX(0);
+  }
+}
+
+@keyframes stitch-slide-right {
+  0% {
+    opacity: 0;
+    transform: translateX(60px) skewX(-2deg);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateX(0) skewX(0deg);
   }
 }
 
@@ -249,11 +276,15 @@ body {
 }
 
 .animate-slide-in-right {
-  animation: slide-in-right 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: slide-in-right 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-stitch-slide-right {
+  animation: stitch-slide-right 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .animate-scale-in {
-  animation: scale-in 0.25s ease-out both;
+  animation: scale-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 /* Stagger children */
@@ -312,9 +343,9 @@ body {
 
 /* Skeleton shimmer */
 .skeleton {
-  background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);
+  background: linear-gradient(90deg, var(--bg-primary) 25%, var(--bg-secondary) 50%, var(--bg-primary) 75%);
   background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
+  animation: shimmer 2s infinite linear;
 }
 
 /* Match Score Ring */
@@ -332,7 +363,7 @@ body {
 
 .score-ring__bg {
   fill: none;
-  stroke: #1e293b;
+  stroke: var(--border-subtle);
   stroke-width: 4;
 }
 
@@ -446,13 +477,11 @@ select option {
 /* ==================== CYBER-SURGICAL DESIGN SYSTEM ==================== */
 
 .cyber-glass {
-  background: rgba(10, 10, 20, 0.7);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  box-shadow:
-    0 10px 40px -10px rgba(0, 0, 0, 0.5),
-    inset 0 0 20px rgba(59, 130, 246, 0.05);
+  background: rgba(var(--bg-secondary-rgb), 0.96);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  border: 1px solid var(--border-subtle);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
 }
 
 .cyber-border-gradient {
@@ -498,8 +527,8 @@ select option {
 
 .tech-grid {
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+    linear-gradient(var(--grid-color) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
   background-size: 20px 20px;
 }
 
@@ -511,9 +540,9 @@ select option {
 
 /* HUD Text */
 .hud-text {
-  font-family: 'JetBrains Mono', 'Inter', monospace;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  font-family: 'Inter', system-ui, sans-serif;
+  letter-spacing: -0.02em;
+  font-weight: 900;
 }
 
 @keyframes glitch-skew {
@@ -534,6 +563,135 @@ select option {
   }
 }
 
-.animate-glitch {
-  animation: glitch-skew 1s infinite alternate-reverse;
+
+/* ==================== STITCH UI - PREMIUM DESIGN CORE ==================== */
+
+:root {
+  --stitch-radius-lg: 24px;
+  --stitch-radius-md: 18px;
+}
+
+/* Advanced Layered Glassmorphism */
+.stitch-glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--card-shadow);
+}
+
+/* The "Stitch" Border Effect */
+.stitch-border {
+  position: relative;
+}
+
+.stitch-border::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: var(--neural-gradient);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0.3;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.stitch-border:hover::after {
+  opacity: 0.8;
+}
+
+/* Premium Card with Inner Glow */
+.stitch-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--stitch-radius-lg);
+  overflow: hidden;
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--card-shadow);
+}
+
+.stitch-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(34, 211, 238, 0.3);
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(34, 211, 238, 0.05);
+}
+
+/* Kinetic Shimmer Button */
+.stitch-button {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  background: var(--neural-gradient);
+  color: white !important;
+  font-weight: 800;
+}
+
+.stitch-button:active {
+  scale: 0.96;
+}
+
+.stitch-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: 0.6s;
+}
+
+.stitch-button:hover::before {
+  left: 100%;
+}
+
+/* Floating Animation */
+@keyframes stitch-float {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.animate-stitch-float {
+  animation: stitch-float 5s ease-in-out infinite;
+}
+
+/* Text Clipping for Headers - HIGH CONTRAST VERSION */
+.stitch-text-gradient {
+  background: var(--neural-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.4)) saturate(1.5);
+  /* Enhanced shadow and saturation for better readability */
+}
+
+/* Custom Scrollbar Premium */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.2);
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.4);
 }

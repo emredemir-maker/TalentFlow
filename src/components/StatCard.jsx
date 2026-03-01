@@ -1,38 +1,59 @@
 // src/components/StatCard.jsx
-// Animated stat card with icon, subtle glow, and click-to-filter
+// Premium Stitch UI stat card with advanced glass effects and organic hover
+import React from 'react';
 
-export default function StatCard({ icon: Icon, iconColor = 'text-electric', bgColor = 'bg-electric/10', value, label, trend, onClick, isActive = false }) {
+export default function StatCard({ icon: Icon, iconColor = 'text-cyan-500', bgColor = 'bg-cyan-500/10', value, label, trend, onClick, isActive = false }) {
     return (
         <div
             onClick={onClick}
-            className={`relative rounded-2xl p-3 overflow-hidden transition-all duration-500 group
-                ${onClick ? 'cursor-pointer hover:-translate-y-1' : ''}
-                ${isActive
-                    ? 'bg-gradient-to-br from-electric/20 to-electric/5 border border-electric/40 shadow-[0_0_20px_rgba(59,130,246,0.15)] scale-[1.01]'
-                    : 'bg-navy-800/10 hover:bg-navy-800/20 border border-border-subtle hover:border-navy-400/20 shadow-md'
-                }
+            className={`stitch-card group relative p-3 h-full flex flex-col justify-between transition-all duration-300
+                ${onClick ? 'cursor-pointer hover:bg-bg-secondary/40' : ''}
+                ${isActive ? 'border-cyan-500/40 scale-[1.02] shadow-[0_20px_40px_rgba(6,182,212,0.15)] bg-cyan-500/10 dark:bg-cyan-500/20' : 'bg-bg-primary shadow-inner'}
             `}
         >
-            <div className={`absolute top-0 right-0 w-24 h-24 rounded-full blur-[40px] transition-opacity duration-500 -z-10 ${isActive ? 'bg-electric/20 opacity-100' : 'bg-navy-700/5 opacity-0 group-hover:opacity-100'}`} />
-            <div className="flex items-center justify-between mb-2">
-                <div className={`w-8 h-8 rounded-lg ${isActive ? 'bg-electric/20 text-electric-light' : bgColor} flex items-center justify-center transition-all`}>
-                    <Icon className={`w-4 h-4 ${isActive ? 'text-electric-light' : iconColor}`} />
+            {/* Ambient Background Glow */}
+            <div className={`absolute -top-10 -right-10 w-32 h-32 rounded-full blur-[60px] opacity-20 transition-all duration-700 group-hover:opacity-40 -z-10 
+                ${isActive ? 'bg-cyan-500 scale-150' : 'bg-bg-secondary'}`}
+            />
+
+            <div className="flex items-start justify-between">
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-500
+                    ${isActive
+                        ? 'bg-cyan-500 text-white rotate-6 scale-110 shadow-[0_0_20px_rgba(6,182,212,0.5)]'
+                        : `${bgColor} ${iconColor} group-hover:scale-110 group-hover:-rotate-3`
+                    }
+                `}>
+                    <Icon className="w-4 h-4" />
                 </div>
+
                 {trend && (
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-lg ${trend > 0
-                        ? 'text-emerald-500 bg-emerald-500/10'
-                        : 'text-red-500 bg-red-500/10'
-                        }`}>
+                    <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-black
+                        ${trend > 0
+                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                            : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                        }
+                    `}>
+                        <span className="flex h-1.5 w-1.5 rounded-full bg-current animate-pulse" />
                         {trend > 0 ? '+' : ''}{trend}%
-                    </span>
+                    </div>
                 )}
             </div>
-            <div className="text-xl font-black tracking-tight mb-0 transition-colors text-text-primary">
-                {value}
+
+            <div className="mt-3">
+                <div className="text-[9px] font-black uppercase tracking-[0.2em] text-text-muted mb-0.5 group-hover:text-text-secondary transition-colors opacity-70">
+                    {label}
+                </div>
+                <div className="text-xl font-black text-text-primary tracking-tight flex items-baseline gap-1">
+                    {value}
+                    <span className="text-[8px] font-black text-text-muted opacity-40 group-hover:text-cyan-500 transition-colors uppercase tracking-widest">/ HAVUZ</span>
+                </div>
             </div>
-            <div className={`text-[9px] font-bold uppercase tracking-widest transition-colors ${isActive ? 'text-electric-light' : 'text-text-muted'}`}>
-                {label}
-            </div>
+
+            {/* Bottom Accent Line */}
+            <div className={`absolute bottom-0 left-0 h-1 transition-all duration-500 rounded-full
+                ${isActive ? 'w-full bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.6)]' : 'w-0 bg-bg-secondary group-hover:w-1/3'}`}
+            />
         </div>
     );
 }
+

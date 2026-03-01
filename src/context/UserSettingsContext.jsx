@@ -26,17 +26,27 @@ export function UserSettingsProvider({ children }) {
 
     useEffect(() => {
         if (authLoading || !isAuthenticated || !userId) {
+            // Load theme from localStorage as fallback even if not logged in
+            const localTheme = localStorage.getItem('tf_theme');
+            if (localTheme) {
+                setSettings(prev => ({ ...prev, theme: localTheme }));
+            }
             return;
         }
 
-        // Firestore path: /artifacts/talent-flow/users/{userId}/settings
-        const settingsDocRef = doc(db, `artifacts/talent-flow/users/${userId}/settings`, 'preferences');
+        // Firestore path corrected: /artifacts/talent-flow/public/data/users/{userId}/settings/preferences
+        const settingsPath = `artifacts/talent-flow/public/data/users/${userId}/settings`;
+        const settingsDocRef = doc(db, settingsPath, 'preferences');
 
         const unsubscribe = onSnapshot(
             settingsDocRef,
             (snapshot) => {
                 if (snapshot.exists()) {
-                    setSettings({ ...DEFAULT_SETTINGS, ...snapshot.data() });
+                    const data = snapshot.data();
+                    setSettings({ ...DEFAULT_SETTINGS, ...data });
+                    if (data.theme) {
+                        localStorage.setItem('tf_theme', data.theme);
+                    }
                 } else {
                     // Initialize default settings for new user
                     setDoc(settingsDocRef, DEFAULT_SETTINGS).catch(console.error);
@@ -45,8 +55,11 @@ export function UserSettingsProvider({ children }) {
                 setLoading(false);
             },
             (err) => {
-                console.error('[TalentFlow] Settings snapshot error:', err);
-                setSettings(DEFAULT_SETTINGS);
+                console.warn('[TalentFlow] Settings snapshot error (possibly permission):', err);
+                const localTheme = localStorage.getItem('tf_theme');
+                if (localTheme) {
+                    setSettings(prev => ({ ...prev, theme: localTheme }));
+                }
                 setLoading(false);
             }
         );
@@ -56,12 +69,26 @@ export function UserSettingsProvider({ children }) {
 
     const updateSettings = useCallback(
         async (updates) => {
+            // Optimistic update
+            setSettings(prev => {
+                const newSettings = { ...prev, ...updates };
+                if (updates.theme) {
+                    localStorage.setItem('tf_theme', updates.theme);
+                }
+                return newSettings;
+            });
+
             if (!userId) return;
-            const settingsDocRef = doc(db, `artifacts/talent-flow/users/${userId}/settings`, 'preferences');
+            const settingsDocRef = doc(db, `artifacts/talent-flow/public/data/users/${userId}/settings`, 'preferences');
             try {
                 await updateDoc(settingsDocRef, updates);
             } catch (err) {
-                await setDoc(settingsDocRef, { ...settings, ...updates });
+                console.error("Firestore updateSettings error:", err);
+                try {
+                    await setDoc(settingsDocRef, { ...settings, ...updates }, { merge: true });
+                } catch (innerErr) {
+                    console.error("Firestore setDoc settings error:", innerErr);
+                }
             }
         },
         [userId, settings]

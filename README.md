@@ -7,9 +7,10 @@ TalentFlow, modern işe alım süreçlerini otomatize eden, Google Gemini AI tab
 ## 🎨 Tasarım Estetiği (Battle Station HUD)
 
 Uygulama, "Strategic Command Center" (Stratejik Komuta Merkezi) estetiği ile tasarlanmıştır. 
-- **Glassmorphism**: Saydam katmanlar ve projenin derinliğini yansıtan neon efektler.
-- **HUD (Head-Up Display)**: Veri yoğunluğunu optimize eden, tek ekranda kritik bilgileri sunan kompakt grid yapısı.
-- **Vibrant UX**: Mikro-animasyonlar ve dinamik hover efektleri ile premium bir kullanıcı deneyimi.
+- **Stitch UI & Glassmorphism**: Saydam katmanlar, projenin derinliğini yansıtan neon efektler ve projenin her iki modda (Açık/Koyu) kusursuz görünmesini sağlayan **Stitch UI** mimarisi.
+- **HUD (Head-Up Display) & Compact Design**: Veri yoğunluğunu maksimize eden, beyaz boşlukları minimize edilmiş, tek ekranda kritik bilgileri sunan ultra-kompakt grid yapısı.
+- **Dynamic Theme Engine**: CSS değişkenleri tabanlı `navy` renk sistemi ile aydınlık ve karanlık modlar arasında yumuşak, görsel kalıntı bırakmayan geçişler.
+- **Vibrant UX**: Mikro-animasyonlar ve dinamik hover efektleri ile premium bir "Battle Station" deneyimi.
 
 ---
 
@@ -19,8 +20,8 @@ TalentFlow, modern bir Full-Stack mimarisine sahiptir:
 
 ### Frontend
 - **Framework**: React 19 (Vite)
-- **Styling**: Tailwind CSS 4.x (Vanilla CSS + Modern Tokens)
-- **State Management**: React Context API (Real-time Firestore Listeners)
+- **Styling**: Tailwind CSS 4.x + Global CSS Variables (Theme-aware navy color system)
+- **State Management**: React Context API & UserSettingsContext (Theme & Layout preferences)
 - **Routing**: React Router DOM 7
 - **Grafikler**: Recharts (HUD tarzı analitik kartlar)
 - **İkonlar**: Lucide React

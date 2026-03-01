@@ -21,12 +21,12 @@ import InterviewSessionModal from './InterviewSessionModal';
 import InterviewHistory from './InterviewHistory';
 
 const STATUS_CONFIG = {
-    ai_analysis: { label: 'AI Analiz', dot: 'bg-violet-400', color: 'text-violet-400', next: 'review' },
-    review: { label: 'İnceleme', dot: 'bg-amber-400', color: 'text-amber-400', next: 'interview' },
-    interview: { label: 'Mülakat', dot: 'bg-blue-400', color: 'text-blue-400', next: 'offer' },
-    offer: { label: 'Teklif', dot: 'bg-cyan-400', color: 'text-cyan-400', next: 'hired' },
-    hired: { label: 'İşe Alındı', dot: 'bg-emerald-400', color: 'text-emerald-400', next: null },
-    rejected: { label: 'Red', dot: 'bg-red-400', color: 'text-red-400', next: null },
+    ai_analysis: { label: 'AI Analiz', dot: 'bg-violet-500', color: 'text-violet-600 dark:text-violet-400', next: 'review' },
+    review: { label: 'İnceleme', dot: 'bg-amber-500', color: 'text-amber-600 dark:text-amber-400', next: 'interview' },
+    interview: { label: 'Mülakat', dot: 'bg-blue-500', color: 'text-blue-600 dark:text-blue-400', next: 'offer' },
+    offer: { label: 'Teklif', dot: 'bg-cyan-500', color: 'text-cyan-600 dark:text-cyan-400', next: 'hired' },
+    hired: { label: 'İşe Alındı', dot: 'bg-emerald-500', color: 'text-emerald-600 dark:text-emerald-400', next: null },
+    rejected: { label: 'Red', dot: 'bg-red-500', color: 'text-red-600 dark:text-red-400', next: null },
 };
 
 const REJECTION_REASONS = [
@@ -207,14 +207,14 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
 
     return (
         <>
-            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] print:hidden" onClick={onClose} />
-            <div className="fixed top-0 right-0 h-full w-full max-w-[560px] z-[70] flex flex-col bg-navy-900 border-l border-border-subtle shadow-2xl animate-slide-in-right overflow-hidden print:static print:w-full print:max-w-none print:shadow-none print:bg-white print:text-black">
+            <div className="fixed inset-0 bg-bg-primary/40 backdrop-blur-md z-[60] print:hidden animate-in fade-in duration-500" onClick={onClose} />
+            <div className="fixed top-0 right-0 h-full w-full max-w-[580px] z-[70] flex flex-col bg-bg-secondary/80 backdrop-blur-3xl border-l border-border-subtle shadow-2xl animate-stitch-slide-right overflow-hidden print:static print:w-full print:max-w-none print:shadow-none print:bg-white print:text-black">
 
                 {/* ===== HEADER ===== */}
-                <div className="shrink-0 p-6 border-b border-border-subtle print:border-black">
+                <div className="shrink-0 p-6 border-b border-border-subtle print:border-black relative z-10">
                     <div className="flex items-start justify-between mb-5">
                         <div className="flex items-center gap-4">
-                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-electric to-violet-accent flex items-center justify-center text-xl font-bold text-text-primary print:bg-none print:text-black print:border print:border-black">
+                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-xl font-black text-white shadow-lg shadow-cyan-500/20 print:bg-none print:text-black print:border print:border-black">
                                 {candidate.name?.[0]}
                             </div>
                             <div>
@@ -224,23 +224,23 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                 <div className="flex flex-wrap items-center gap-2 mt-2 print:hidden">
                                     {/* STATUS BADGE & SWITCHER */}
                                     <div className="relative group/status">
-                                        <div className={`flex items-center gap-2 px-2.5 py-1 rounded-lg bg-navy-800/20 border border-border-subtle cursor-pointer hover:bg-navy-800/40 transition-all`}>
-                                            <span className={`w-2 h-2 rounded-full ${status.dot}`} />
-                                            <span className="text-[11px] text-text-secondary font-bold uppercase tracking-wider">{status.label}</span>
+                                        <div className={`flex items-center gap-2 px-3 py-1 rounded-xl bg-bg-primary border border-border-subtle cursor-pointer hover:bg-bg-secondary transition-all shadow-inner`}>
+                                            <span className={`w-2 h-2 rounded-full ${status.dot} shadow-sm`} />
+                                            <span className="text-[10px] text-text-secondary font-black uppercase tracking-[0.05em]">{status.label}</span>
                                             {candidate.rejectionReason && (
-                                                <span className="text-[10px] text-red-400/80 font-medium lowercase italic">({REJECTION_REASONS.find(r => r.id === candidate.rejectionReason)?.label})</span>
+                                                <span className="text-[10px] text-red-500/80 font-black lowercase italic opacity-80">({REJECTION_REASONS.find(r => r.id === candidate.rejectionReason)?.label})</span>
                                             )}
                                         </div>
 
                                         {/* Status Dropdown */}
-                                        <div className="absolute top-full left-0 mt-2 w-56 bg-navy-900 border border-border-subtle rounded-xl shadow-2xl opacity-0 invisible group-hover/status:opacity-100 group-hover/status:visible transition-all z-[80] p-1.5 backdrop-blur-xl">
+                                        <div className="absolute top-full left-0 mt-3 w-64 bg-bg-secondary border border-border-subtle rounded-3xl shadow-2xl opacity-0 invisible group-hover/status:opacity-100 group-hover/status:visible transition-all z-[80] p-2 backdrop-blur-2xl animate-in slide-in-from-top-2">
                                             {Object.entries(STATUS_CONFIG).map(([key, config]) => (
                                                 <button
                                                     key={key}
                                                     onClick={() => updateCandidate(candidate.id, { status: key, rejectionReason: null })}
-                                                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-[11px] font-bold transition-all ${candidate.status === key ? 'bg-navy-800/40 text-text-primary' : 'text-text-muted hover:bg-navy-800/20 hover:text-text-primary'}`}
+                                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-left text-[11px] font-black uppercase tracking-tight transition-all ${candidate.status === key ? 'bg-cyan-500 text-white shadow-lg shadow-cyan-500/20' : 'text-text-muted hover:bg-bg-primary hover:text-text-primary'}`}
                                                 >
-                                                    <span className={`w-2 h-2 rounded-full ${config.dot}`} />
+                                                    <span className={`w-2 h-2 rounded-full ${config.dot} ${candidate.status === key ? 'shadow-[0_0_8px_white]' : ''}`} />
                                                     {config.label}
                                                 </button>
                                             ))}
@@ -251,7 +251,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                     {status.next && (
                                         <button
                                             onClick={() => updateCandidate(candidate.id, { status: status.next, rejectionReason: null })}
-                                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-electric/10 border border-electric/20 text-electric-light text-[10px] font-bold hover:bg-electric/20 transition-all"
+                                            className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-600 dark:text-cyan-400 text-[10px] font-black uppercase tracking-tight hover:bg-cyan-500/20 transition-all shadow-sm"
                                         >
                                             Sonraki Aşama
                                             <ChevronRight className="w-3 h-3" />
@@ -261,16 +261,16 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                     {/* Reject Button & Sub-reasons */}
                                     {candidate.status !== 'rejected' && candidate.status !== 'hired' && (
                                         <div className="relative group/reject">
-                                            <button className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-500/5 border border-red-500/10 text-red-400/60 text-[10px] font-bold hover:bg-red-500/10 hover:text-red-400 transition-all">
+                                            <button className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-red-500/5 border border-red-500/10 text-red-500/60 text-[10px] font-black uppercase tracking-tight hover:bg-red-500/10 hover:text-red-500 transition-all shadow-sm">
                                                 Reddet
                                             </button>
-                                            <div className="absolute top-full left-0 mt-2 w-40 bg-navy-900 border border-border-subtle rounded-xl shadow-2xl opacity-0 invisible group-hover/reject:opacity-100 group-hover/reject:visible transition-all z-[80] p-1.5 backdrop-blur-xl">
-                                                <div className="px-3 py-1.5 text-[9px] font-bold text-text-muted uppercase tracking-widest border-b border-border-subtle mb-1">Neden?</div>
+                                            <div className="absolute top-full left-0 mt-3 w-48 bg-bg-secondary border border-border-subtle rounded-3xl shadow-2xl opacity-0 invisible group-hover/reject:opacity-100 group-hover/reject:visible transition-all z-[80] p-2 backdrop-blur-2xl animate-in slide-in-from-top-2">
+                                                <div className="px-4 py-2 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] border-b border-border-subtle/50 mb-2 opacity-60 italic">Neden?</div>
                                                 {REJECTION_REASONS.map(reason => (
                                                     <button
                                                         key={reason.id}
                                                         onClick={() => updateCandidate(candidate.id, { status: 'rejected', rejectionReason: reason.id })}
-                                                        className="w-full text-left px-3 py-2 rounded-lg text-[11px] font-bold text-navy-400 hover:bg-red-500/10 hover:text-red-400 transition-all"
+                                                        className="w-full text-left px-4 py-2.5 rounded-2xl text-[11px] font-black text-text-muted hover:bg-red-500/10 hover:text-red-500 transition-all uppercase tracking-tight"
                                                     >
                                                         {reason.label}
                                                     </button>
@@ -281,26 +281,26 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                 </div>
                             </div>
                         </div>
-                        <div className="flex items-center gap-2 print:hidden">
+                        <div className="flex items-center gap-2 print:hidden relative z-10">
                             <button
                                 onClick={() => {
                                     setViewCandidateId(candidate.id);
                                     window.dispatchEvent(new CustomEvent('changeView', { detail: 'candidate-process' }));
                                     onClose();
                                 }}
-                                className="px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition-all font-bold text-[11px] flex gap-2 items-center shadow-sm"
+                                className="px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-all font-black text-[10px] uppercase tracking-widest flex gap-2 items-center shadow-lg shadow-emerald-500/5"
                                 title="Adayın Detaylı Arayüzüne Git"
                             >
                                 <ExternalLink className="w-4 h-4" />
-                                Portal Görünümü
+                                PORTAL
                             </button>
-                            <button onClick={() => setShowSendModal(true)} className="p-2 rounded-lg bg-electric/10 border border-electric/20 text-electric-light hover:bg-electric/20 transition-all shadow-sm" title="Aday İletişimi (Mülakat/Red)">
+                            <button onClick={() => setShowInterviewModal(true)} className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/20 transition-all shadow-sm" title="Aday İletişimi (Mülakat/Red)">
                                 <Mail className="w-4 h-4" />
                             </button>
-                            <button onClick={handlePrintReport} className="p-2 rounded-lg bg-navy-800/20 text-text-muted hover:text-text-primary" title="Rapor Al">
+                            <button onClick={handlePrintReport} className="p-2.5 rounded-xl bg-bg-primary border border-border-subtle text-text-muted hover:text-text-primary transition-all shadow-inner" title="Rapor Al">
                                 <Printer className="w-4 h-4" />
                             </button>
-                            <button onClick={onClose} className="p-2 rounded-lg bg-navy-800/20 text-text-muted hover:text-text-primary">
+                            <button onClick={onClose} className="p-2.5 rounded-xl bg-bg-primary border border-border-subtle text-text-muted hover:text-text-primary transition-all shadow-inner">
                                 <X className="w-4 h-4" />
                             </button>
                         </div>
@@ -308,8 +308,8 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                 </div>
 
 
-                <div className="flex items-center gap-6 p-5 rounded-2xl bg-navy-800/10 border border-border-subtle mb-4 relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-electric/5 rounded-full -mr-16 -mt-16 blur-3xl group-hover:bg-electric/10 transition-colors" />
+                <div className="flex items-center gap-6 p-6 rounded-[2rem] bg-bg-primary/50 border border-border-subtle mb-4 relative overflow-hidden group shadow-inner">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full -mr-16 -mt-16 blur-3xl group-hover:bg-cyan-500/10 transition-colors" />
 
                     <div className="relative">
                         <MatchScoreRing
@@ -339,9 +339,9 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                             <div className="flex flex-col mb-1 border-l border-border-subtle pl-3">
                                 {candidate.hasInterview ? (
                                     <div className="flex items-center gap-1.5 opacity-80">
-                                        <span className="text-[9px] font-bold text-violet-400">AI: %{Math.round(activeMatch.aiScore)}</span>
-                                        <span className="text-navy-500">•</span>
-                                        <span className="text-[9px] font-bold text-blue-400">Mülakat: %{activeMatch.interviewScore}</span>
+                                        <span className="text-[9px] font-black text-violet-600 dark:text-violet-400">AI: %{Math.round(activeMatch.aiScore)}</span>
+                                        <span className="text-text-muted opacity-30">•</span>
+                                        <span className="text-[9px] font-black text-blue-600 dark:text-blue-400">Mülakat: %{activeMatch.interviewScore}</span>
                                     </div>
                                 ) : (
                                     <div className="flex items-center gap-1.5 grayscale opacity-50">
@@ -359,7 +359,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
 
                     <div className="flex flex-col gap-2">
                         {activeMatch.isHighMatch ? (
-                            <div className="px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 text-[11px] font-bold border border-emerald-500/20 flex items-center gap-2 shadow-lg shadow-emerald-500/5">
+                            <div className="px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[11px] font-black border border-emerald-500/20 flex items-center gap-2 shadow-lg shadow-emerald-500/5 uppercase tracking-tighter">
                                 <Star className="w-3.5 h-3.5" /> Güçlü Aday
                             </div>
                         ) : (
@@ -391,10 +391,10 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
-                            className={`flex-1 flex flex-col items-center py-2.5 rounded-xl transition-all ${activeTab === tab.id ? 'bg-electric/10 text-electric-light shadow-inner shadow-electric/5 ring-1 ring-electric/20' : 'text-text-muted hover:bg-navy-800/10'}`}
+                            className={`flex-1 flex flex-col items-center py-2.5 rounded-xl transition-all ${activeTab === tab.id ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 shadow-inner ring-1 ring-cyan-500/20' : 'text-text-muted hover:bg-bg-primary'}`}
                         >
-                            <tab.icon className={`w-4 h-4 mb-1.5 ${activeTab === tab.id ? 'text-electric-light' : 'text-text-muted'}`} />
-                            <span className="text-[10px] font-bold uppercase tracking-tight">{tab.label}</span>
+                            <tab.icon className={`w-4 h-4 mb-1.5 ${activeTab === tab.id ? 'text-cyan-600 dark:text-cyan-400' : 'text-text-muted opacity-60'}`} />
+                            <span className="text-[10px] font-black uppercase tracking-tight">{tab.label}</span>
                         </button>
                     ))}
                 </div>
@@ -407,17 +407,17 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                     {/* TAB: PROFILE */}
                     {activeTab === 'profile' && (
                         <div className="space-y-6">
-                            <Section title="AI Görüşü & Öne Çıkanlar">
+                            <Section title="AI INSIGHTS & HIGHLIGHTS">
                                 <div className="space-y-4">
-                                    <p className="text-sm text-text-secondary leading-relaxed italic border-l-2 border-electric/30 pl-4 py-1">
+                                    <p className="text-[13px] text-text-secondary leading-relaxed italic border-l-2 border-cyan-500/30 pl-4 py-1 font-bold">
                                         {candidate.aiAnalysis?.summary || activeMatch.reasons[0] || candidate.summary || candidate.about || 'Aday hakkında özet bilgi bulunmuyor.'}
                                     </p>
 
                                     {candidate.aiAnalysis?.reasons?.length > 0 && (
                                         <div className="grid grid-cols-1 gap-2 mt-2">
                                             {candidate.aiAnalysis.reasons.map((r, i) => (
-                                                <div key={i} className="flex gap-2 p-2 rounded-lg bg-navy-800/20 border border-border-subtle text-[11px] text-text-secondary">
-                                                    <Sparkles className="w-3 h-3 text-electric-light shrink-0 mt-0.5" />
+                                                <div key={i} className="flex gap-2 p-3 rounded-xl bg-bg-primary border border-border-subtle text-[11px] text-text-secondary font-bold shadow-inner">
+                                                    <Sparkles className="w-3.5 h-3.5 text-cyan-500 shrink-0 mt-0.5" />
                                                     <span>{r}</span>
                                                 </div>
                                             ))}
@@ -436,10 +436,10 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                 </div>
                             </Section>
 
-                            <Section title="Teknik Yetkinlikler">
+                            <Section title="TECHNICAL STACK">
                                 <div className="flex flex-wrap gap-2">
                                     {candidate.skills?.map(skill => (
-                                        <span key={skill} className="px-3 py-1.5 rounded-lg bg-navy-800/10 border border-border-subtle text-xs text-text-secondary">
+                                        <span key={skill} className="px-3 py-1.5 rounded-xl bg-bg-primary border border-border-subtle text-[11px] font-black text-text-secondary shadow-inner uppercase tracking-tighter">
                                             {skill}
                                         </span>
                                     ))}
@@ -448,19 +448,19 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
 
                             <Section title="Aday Kaynağı">
                                 <div className="space-y-3">
-                                    <div className="relative">
+                                    <div className="relative group">
                                         <select
                                             value={candidate.source || ''}
                                             onChange={(e) => updateCandidate(candidate.id, { source: e.target.value, sourceDetail: '' })}
-                                            className="w-full px-4 py-3 rounded-xl bg-navy-800/20 border border-border-subtle text-sm text-text-primary outline-none focus:border-electric/50 transition-all appearance-none cursor-pointer pr-9 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_10px_center]"
+                                            className="w-full px-5 py-3 rounded-2xl bg-bg-primary border border-border-subtle text-[13px] font-bold text-text-primary outline-none focus:border-cyan-500 transition-all appearance-none cursor-pointer pr-10 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_15px_center] shadow-inner"
                                         >
-                                            <option value="">Kaynak Seçin</option>
+                                            <option value="" className="bg-bg-primary">Kaynak Seçin</option>
                                             {sources.map(s => (
-                                                <option key={s.id} value={s.name}>{s.name}</option>
+                                                <option key={s.id} value={s.name} className="bg-bg-primary">{s.name}</option>
                                             ))}
-                                            <option value="İnsan Kaynakları">İnsan Kaynakları</option>
-                                            <option value="Referans">Referans</option>
-                                            <option value="Diğer">Diğer</option>
+                                            <option value="İnsan Kaynakları" className="bg-bg-primary">İnsan Kaynakları</option>
+                                            <option value="Referans" className="bg-bg-primary">Referans</option>
+                                            <option value="Diğer" className="bg-bg-primary">Diğer</option>
                                         </select>
                                     </div>
 
@@ -474,13 +474,13 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                                     <select
                                                         value={candidate.sourceDetail || ''}
                                                         onChange={(e) => updateCandidate(candidate.id, { sourceDetail: e.target.value })}
-                                                        className="w-full px-4 py-3 rounded-xl bg-navy-800/40 border border-electric/20 text-sm text-text-primary outline-none focus:border-electric/50 transition-all appearance-none cursor-pointer pr-9 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_10px_center]"
+                                                        className="w-full px-5 py-3 rounded-2xl bg-bg-primary border border-cyan-500/20 text-[13px] font-bold text-text-primary outline-none focus:border-cyan-500 transition-all appearance-none cursor-pointer pr-10 bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_15px_center] shadow-sm"
                                                     >
-                                                        <option value="">Alt Detay Seçin</option>
+                                                        <option value="" className="bg-bg-primary">Alt Detay Seçin</option>
                                                         {selectedSourceDoc.subSources.map(sub => (
-                                                            <option key={sub} value={sub}>{sub}</option>
+                                                            <option key={sub} value={sub} className="bg-bg-primary">{sub}</option>
                                                         ))}
-                                                        <option value="Diğer">Diğer</option>
+                                                        <option value="Diğer" className="bg-bg-primary">Diğer</option>
                                                     </select>
                                                 </div>
                                             );
@@ -496,8 +496,8 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                                             updateCandidate(candidate.id, { sourceDetail: e.target.value });
                                                         }
                                                     }}
-                                                    placeholder="Kaynak detayını belirtin (örn. firma adı, kişi adı)..."
-                                                    className="w-full px-4 py-3 rounded-xl bg-navy-800/20 border border-border-subtle text-sm text-text-primary placeholder:text-text-muted outline-none focus:border-electric/50 transition-all animate-in slide-in-from-top-1 duration-200"
+                                                    placeholder="Kaynak detayını belirtin..."
+                                                    className="w-full px-5 py-3 rounded-2xl bg-bg-primary border border-border-subtle text-[13px] font-bold text-text-primary placeholder:text-text-muted outline-none focus:border-cyan-500 transition-all animate-in slide-in-from-top-1 duration-200 shadow-inner"
                                                 />
                                             );
                                         }
@@ -505,7 +505,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                     })()}
 
                                     {candidate.source && (
-                                        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-electric/5 border border-electric/10 text-[11px] text-electric-light">
+                                        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-cyan-500/5 border border-cyan-500/10 text-[11px] text-cyan-600 dark:text-cyan-400 font-black uppercase tracking-tighter">
                                             <Sparkles className="w-3 h-3" />
                                             Kaynak: <strong>{candidate.source}</strong>
                                             {candidate.sourceDetail && <span>→ {candidate.sourceDetail}</span>}
@@ -526,10 +526,10 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                 <button
                                     onClick={handleRunAnalysis}
                                     disabled={aiLoading}
-                                    className="flex items-center gap-1.5 px-3 py-2 bg-electric-light/10 text-electric-light rounded-lg hover:bg-electric-light/20 text-xs font-bold transition-all disabled:opacity-50 shrink-0"
+                                    className="flex items-center gap-1.5 px-4 py-2.5 bg-cyan-500 text-white rounded-xl hover:bg-cyan-600 text-[11px] font-black uppercase tracking-widest transition-all disabled:opacity-50 shrink-0 shadow-lg shadow-cyan-500/20"
                                 >
                                     {aiLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-                                    Yeniden Analiz Et
+                                    YENİDEN ANALİZ
                                 </button>
                             </div>
 
@@ -542,7 +542,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                     const hasAI = !!posAnalysis;
 
                                     return (
-                                        <div key={pos.id} className={`rounded-xl border transition-all duration-300 overflow-hidden ${isExpanded ? 'bg-navy-950/20 border-electric/30 shadow-[0_4px_24px_rgba(59,130,246,0.1)]' : 'bg-navy-800/10 border-border-subtle hover:bg-navy-800/20'}`}>
+                                        <div key={pos.id} className={`rounded-[2.5rem] border transition-all duration-300 overflow-hidden ${isExpanded ? 'bg-bg-primary border-cyan-500/30 shadow-xl' : 'bg-bg-primary/50 border-border-subtle hover:bg-bg-primary'}`}>
                                             <div
                                                 className="p-4 cursor-pointer flex justify-between items-center group select-none"
                                                 onClick={() => setExpandedPositionId(isExpanded ? null : pos.id)}
@@ -556,17 +556,17 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                                     )}
                                                 </div>
                                                 <div className="flex items-center gap-4">
-                                                    <span className={`text-[11px] font-bold px-2 py-1 rounded-md flex items-center gap-1 shadow-sm ${match.score >= 70 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-navy-800/20 text-text-muted border-border-subtle'}`}>
+                                                    <span className={`text-[11px] font-black px-3 py-1 rounded-xl flex items-center gap-1.5 shadow-sm ${match.score >= 70 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' : 'bg-bg-primary text-text-muted border-border-subtle'}`}>
                                                         {match.score >= 70 ? '🟢' : '🟡'} %{match.score}
                                                     </span>
-                                                    <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${isExpanded ? 'bg-electric/20' : 'bg-navy-800/20 group-hover:bg-navy-800/40'}`}>
-                                                        <ChevronRight className={`w-4 h-4 text-text-muted transition-transform duration-300 ${isExpanded ? 'rotate-90 text-electric-light' : ''}`} />
+                                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${isExpanded ? 'bg-cyan-500/20' : 'bg-bg-primary group-hover:bg-bg-secondary shadow-inner'}`}>
+                                                        <ChevronRight className={`w-4 h-4 text-text-muted transition-transform duration-300 ${isExpanded ? 'rotate-90 text-cyan-600 dark:text-cyan-400 font-black' : ''}`} />
                                                     </div>
                                                 </div>
                                             </div>
 
                                             {isExpanded && (
-                                                <div className="px-5 pb-5 border-t border-border-subtle pt-5 bg-navy-950/10 animate-in slide-in-from-top-2 duration-200">
+                                                <div className="px-6 pb-6 border-t border-border-subtle pt-6 bg-bg-secondary/20 animate-in slide-in-from-top-2 duration-200">
                                                     {posAnalysis ? (
                                                         <AIAnalysisPanel
                                                             result={posAnalysis}
@@ -580,20 +580,20 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                                         <div className="text-center py-8">
                                                             {aiLoading ? (
                                                                 <div className="flex flex-col items-center gap-3">
-                                                                    <Loader2 className="w-6 h-6 text-electric animate-spin" />
-                                                                    <p className="text-sm font-medium text-electric-light">AI Analizi Sürüyor...</p>
+                                                                    <Loader2 className="w-8 h-8 text-cyan-500 animate-spin" />
+                                                                    <p className="text-xs font-black uppercase tracking-widest text-cyan-600 dark:text-cyan-400">AI Deep Scanning...</p>
                                                                 </div>
                                                             ) : (
                                                                 <>
-                                                                    <div className="w-12 h-12 rounded-full bg-navy-800 flex items-center justify-center mx-auto mb-3">
-                                                                        <Brain className="w-6 h-6 text-navy-400" />
+                                                                    <div className="w-20 h-20 rounded-[1.5rem] bg-bg-primary border border-border-subtle flex items-center justify-center mx-auto mb-4 italic shadow-inner">
+                                                                        <Brain className="w-10 h-10 text-text-muted opacity-30" />
                                                                     </div>
-                                                                    <p className="text-[13px] text-navy-300 mb-4 max-w-[250px] mx-auto">Bu pozisyon için henüz detaylı yapay zeka analizi yapılmamış.</p>
+                                                                    <p className="text-[13px] text-text-muted mb-6 max-w-[280px] mx-auto font-black italic opacity-60 uppercase tracking-tight leading-relaxed">Bu pozisyon için henüz detaylı yapay zeka analizi yapılmamış.</p>
                                                                     <button
                                                                         onClick={(e) => { e.stopPropagation(); handleRunAnalysis(); }}
-                                                                        className="text-xs font-bold text-text-primary px-5 py-2.5 bg-electric rounded-xl shadow-[0_4px_12px_rgba(59,130,246,0.3)] hover:scale-105 transition-all"
+                                                                        className="text-[11px] font-black uppercase tracking-widest text-text-primary px-6 py-3 bg-cyan-500 rounded-xl shadow-lg shadow-cyan-500/20 hover:scale-105 active:scale-95 transition-all"
                                                                     >
-                                                                        Tüm Pozisyonları Analiz Et
+                                                                        BAŞLAT
                                                                     </button>
                                                                 </>
                                                             )}
@@ -614,9 +614,9 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                             {/* Start New Interview */}
                             <button
                                 onClick={() => setShowInterviewModal(true)}
-                                className="w-full py-4 rounded-2xl bg-gradient-to-r from-electric to-blue-600 hover:from-electric-light hover:to-blue-500 text-text-primary font-bold text-sm shadow-lg shadow-electric/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                                className="w-full py-4 rounded-3xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-cyan-500/20 transition-all active:scale-[0.98] flex items-center justify-center gap-3"
                             >
-                                <ClipboardCheck className="w-5 h-5" /> Yeni Mülakat Oturumu Başlat
+                                <ClipboardCheck className="w-5 h-5" /> YENİ MÜLAKAT OTURUMU
                             </button>
 
                             {/* Interview History */}
@@ -680,7 +680,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                         </a>
                     )}
 
-                    <button onClick={handlePrintReport} className="py-2.5 px-4 rounded-xl bg-navy-800/10 border border-border-subtle text-[13px] font-semibold text-text-muted hover:text-text-primary transition-all flex items-center gap-2">
+                    <button onClick={handlePrintReport} className="py-2.5 px-4 rounded-xl bg-bg-primary border border-border-subtle text-[13px] font-black text-text-muted hover:text-text-primary transition-all flex items-center gap-2">
                         <Printer className="w-4 h-4" />
                     </button>
 
@@ -704,27 +704,27 @@ function Section({ title, children }) {
 
 function MiniCard({ label, value, icon: Icon }) {
     return (
-        <div className="p-3 rounded-xl bg-navy-800/10 border border-border-subtle">
-            <div className="flex items-center gap-1.5 mb-1.5">
+        <div className="p-4 rounded-2xl bg-bg-primary border border-border-subtle shadow-inner">
+            <div className="flex items-center gap-1.5 mb-2 opacity-70">
                 <Icon className="w-3.5 h-3.5 text-text-muted" />
-                <span className="text-[9px] uppercase tracking-widest text-text-muted font-black">{label}</span>
+                <span className="text-[10px] uppercase tracking-widest text-text-muted font-black">{label}</span>
             </div>
-            <div className="text-[13px] font-bold text-text-primary truncate">{value || '---'}</div>
+            <div className="text-[13px] font-black text-text-secondary truncate">{value || '---'}</div>
         </div>
     );
 }
 
 function RangeInput({ label, value, onChange }) {
     return (
-        <div className="space-y-2">
-            <div className="flex justify-between items-center text-[11px] font-bold">
-                <span className="text-navy-300 uppercase tracking-tighter">{label}</span>
-                <span className="text-text-primary px-2 py-0.5 rounded bg-white/10">%{value}</span>
+        <div className="space-y-3">
+            <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
+                <span className="text-text-muted">{label}</span>
+                <span className="text-text-primary px-2 py-0.5 rounded bg-bg-primary border border-border-subtle">%{value}</span>
             </div>
             <input
                 type="range" min="0" max="100" value={value}
                 onChange={e => onChange(parseInt(e.target.value))}
-                className="w-full h-1.5 bg-navy-800 rounded-lg appearance-none cursor-pointer accent-electric"
+                className="w-full h-1.5 bg-bg-primary border border-border-subtle rounded-lg appearance-none cursor-pointer accent-cyan-500"
             />
         </div>
     );

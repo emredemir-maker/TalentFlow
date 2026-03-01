@@ -60,14 +60,24 @@ export default function SourceManagementPage() {
     ];
 
     useEffect(() => {
-        if (!isSuperAdmin) return;
+        if (!isSuperAdmin) {
+            // If auth is loaded but not super admin, we should stop loading anyway
+            // because the return in render handles the restricted access UI
+            if (user !== undefined) setLoading(false);
+            return;
+        }
+
         const q = query(collection(db, SOURCES_PATH), orderBy('createdAt', 'asc'));
         const unsub = onSnapshot(q, (snap) => {
             setSources(snap.docs.map(d => ({ id: d.id, ...d.data() })));
             setLoading(false);
+        }, (err) => {
+            console.error('Sources error:', err);
+            setLoading(false);
         });
         return unsub;
-    }, [isSuperAdmin]);
+    }, [isSuperAdmin, user]);
+
 
     // Derived: Search filtered sources
     const filteredSources = useMemo(() => {
@@ -124,22 +134,6 @@ export default function SourceManagementPage() {
                 }
             } else if (modalType === 'detail') {
                 // Sub-source Logic
-                let parentId = formData.parentSourceId;
-
-                // Handle creating new main source if needed
-                if (formData.isNewMain) {
-                    const newMainRef = await addDoc(collection(db, SOURCES_PATH), {
-                        name: formData.mainName.trim(),
-                        icon: formData.icon || 'Globe',
-                        color: formData.color || '#3b82f6',
-                        subSources: [],
-                        createdBy: user?.uid,
-                        createdAt: serverTimestamp(),
-                        updatedAt: serverTimestamp()
-                    });
-                    parentId = newMainRef.id;
-                }
-
                 if (!parentId) throw new Error("Lütfen bir ana kaynak seçin.");
 
                 const parentSource = sources.find(s => s.id === parentId);
@@ -155,7 +149,7 @@ export default function SourceManagementPage() {
             setShowModal(false);
             setFormData({ name: '', icon: 'Globe', color: '#3b82f6', isNewMain: false, parentSourceId: '' });
         } catch (err) {
-            console.error('Source save error:', err);
+            console.error('Kaynak kaydetme hatası:', err);
             alert('Hata: ' + err.message);
         } finally {
             setSaving(false);
@@ -214,7 +208,7 @@ export default function SourceManagementPage() {
     if (!isSuperAdmin) {
         return (
             <div className="min-h-screen flex items-center justify-center p-8 text-center">
-                <div className="glass p-12 rounded-[3rem] border border-white/5 space-y-4">
+                <div className="glass p-12 rounded-[3rem] border border-text-primary/5 space-y-4">
                     <Shield className="w-16 h-16 text-red-500/50 mx-auto" />
                     <h2 className="text-2xl font-black text-text-primary">Erişim Reddedildi</h2>
                     <p className="text-navy-400 max-w-xs">Bu yönetim paneli sadece Süper Admin yetkisine sahip kullanıcılar içindir.</p>
@@ -248,7 +242,7 @@ export default function SourceManagementPage() {
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 placeholder="Kaynak veya alt detay ara..."
-                                className="w-full bg-white/[0.03] border border-white/10 rounded-2xl py-3.5 pl-12 pr-4 text-sm text-text-primary outline-none focus:border-electric/50 transition-all backdrop-blur-xl"
+                                className="w-full bg-text-primary/[0.03] border border-text-primary/10 rounded-2xl py-3.5 pl-12 pr-4 text-sm text-text-primary outline-none focus:border-electric/50 transition-all backdrop-blur-xl"
                             />
                         </div>
                     </div>
@@ -256,7 +250,7 @@ export default function SourceManagementPage() {
                     <div className="flex items-center gap-3">
                         <button
                             onClick={() => openModal('main')}
-                            className="px-6 py-4 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-white/20 text-text-primary font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-2 active:scale-95"
+                            className="px-6 py-4 rounded-2xl bg-text-primary/[0.03] border border-text-primary/10 hover:border-white/20 text-text-primary font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-2 active:scale-95"
                         >
                             <PlusCircle className="w-4 h-4 text-indigo-400" /> Ana Kaynak Ekle
                         </button>
@@ -276,8 +270,8 @@ export default function SourceManagementPage() {
                         <span className="text-navy-500 text-[10px] font-black uppercase tracking-widest">Veriler Yükleniyor...</span>
                     </div>
                 ) : sources.length === 0 ? (
-                    <div className="text-center py-32 glass rounded-[4rem] border border-white/[0.04] space-y-6">
-                        <div className="w-24 h-24 rounded-full bg-white/5 mx-auto flex items-center justify-center">
+                    <div className="text-center py-32 glass rounded-[4rem] border border-text-primary/[0.04] space-y-6">
+                        <div className="w-24 h-24 rounded-full bg-text-primary/5 mx-auto flex items-center justify-center">
                             <Layers className="w-10 h-10 text-navy-700" />
                         </div>
                         <div className="space-y-2">
@@ -291,7 +285,7 @@ export default function SourceManagementPage() {
                             <button
                                 onClick={handleSeedDefaults}
                                 disabled={saving}
-                                className="px-8 py-4 rounded-2xl bg-white/5 border border-white/10 text-navy-300 font-bold text-xs uppercase tracking-widest hover:bg-white/10 transition-all flex items-center gap-2"
+                                className="px-8 py-4 rounded-2xl bg-text-primary/5 border border-text-primary/10 text-navy-300 font-bold text-xs uppercase tracking-widest hover:bg-white/10 transition-all flex items-center gap-2"
                             >
                                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 text-amber-500" />}
                                 Hazır Sistem Önerilerini Yükle
@@ -310,14 +304,14 @@ export default function SourceManagementPage() {
                                     {/* Card Glow */}
                                     <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent rounded-[2.5rem] opacity-0 group-hover:opacity-100 transition-opacity blur-2xl -z-10" />
 
-                                    <div className={`glass rounded-[2.5rem] border transition-all duration-500 overflow-hidden ${isExpanded ? 'border-indigo-500/30 shadow-indigo-500/10' : 'border-white/[0.06] hover:border-white/15'}`}>
+                                    <div className={`glass rounded-[2.5rem] border transition-all duration-500 overflow-hidden ${isExpanded ? 'border-indigo-500/30 shadow-indigo-500/10' : 'border-text-primary/[0.06] hover:border-white/15'}`}>
                                         <div
                                             className="p-8 cursor-pointer relative"
                                             onClick={() => setExpandedSource(isExpanded ? null : source.id)}
                                         >
                                             <div className="flex items-start justify-between">
                                                 <div className="flex items-center gap-5">
-                                                    <div className="w-16 h-16 rounded-[1.5rem] flex items-center justify-center border border-white/5 shadow-inner" style={{ background: `linear-gradient(135deg, ${sourceColor}20, ${sourceColor}05)` }}>
+                                                    <div className="w-16 h-16 rounded-[1.5rem] flex items-center justify-center border border-text-primary/5 shadow-inner" style={{ background: `linear-gradient(135deg, ${sourceColor}20, ${sourceColor}05)` }}>
                                                         <SourceIcon className="w-8 h-8" style={{ color: sourceColor }} />
                                                     </div>
                                                     <div className="space-y-1">
@@ -335,13 +329,13 @@ export default function SourceManagementPage() {
                                                 <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0">
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); openModal('edit_main', source); }}
-                                                        className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-navy-400 hover:text-text-primary transition-all"
+                                                        className="w-10 h-10 rounded-xl bg-text-primary/5 border border-text-primary/10 flex items-center justify-center text-navy-400 hover:text-text-primary transition-all"
                                                     >
                                                         <Edit3 className="w-4 h-4" />
                                                     </button>
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); handleDeleteSource(source); }}
-                                                        className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-navy-400 hover:text-red-400 transition-all"
+                                                        className="w-10 h-10 rounded-xl bg-text-primary/5 border border-text-primary/10 flex items-center justify-center text-navy-400 hover:text-red-400 transition-all"
                                                     >
                                                         <Trash2 className="w-4 h-4" />
                                                     </button>
@@ -352,7 +346,7 @@ export default function SourceManagementPage() {
                                             {!isExpanded && source.subSources?.length > 0 && (
                                                 <div className="mt-8 flex flex-wrap gap-2">
                                                     {source.subSources.slice(0, 3).map(sub => (
-                                                        <span key={sub} className="px-3 py-1.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-[10px] font-bold text-navy-400">
+                                                        <span key={sub} className="px-3 py-1.5 rounded-xl bg-text-primary/[0.03] border border-text-primary/[0.06] text-[10px] font-bold text-navy-400">
                                                             {sub}
                                                         </span>
                                                     ))}
@@ -371,7 +365,7 @@ export default function SourceManagementPage() {
 
                                         {/* EXPANDED CONTENT */}
                                         {isExpanded && (
-                                            <div className="border-t border-white/[0.06] bg-black/10 p-8 space-y-6 animate-in fade-in slide-in-from-top-4 duration-500">
+                                            <div className="border-t border-text-primary/[0.06] bg-black/10 p-8 space-y-6 animate-in fade-in slide-in-from-top-4 duration-500">
                                                 <div className="flex items-center justify-between">
                                                     <div className="flex items-center gap-2">
                                                         <LayoutGrid className="w-4 h-4 text-indigo-400" />
@@ -387,13 +381,13 @@ export default function SourceManagementPage() {
 
                                                 <div className="grid grid-cols-1 gap-2">
                                                     {source.subSources?.length === 0 ? (
-                                                        <div className="py-8 text-center border-2 border-dashed border-white/5 rounded-3xl">
+                                                        <div className="py-8 text-center border-2 border-dashed border-text-primary/5 rounded-3xl">
                                                             <Info className="w-6 h-6 text-navy-700 mx-auto mb-2" />
                                                             <p className="text-xs text-navy-600 font-medium italic">Henüz bu kategoriye özel bir detay eklenmedi.</p>
                                                         </div>
                                                     ) : (
                                                         source.subSources.map(sub => (
-                                                            <div key={sub} className="group/sub flex items-center justify-between p-4 rounded-2xl bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.05] hover:border-white/10 transition-all">
+                                                            <div key={sub} className="group/sub flex items-center justify-between p-4 rounded-2xl bg-text-primary/[0.02] border border-text-primary/[0.04] hover:bg-white/[0.05] hover:border-text-primary/10 transition-all">
                                                                 <div className="flex items-center gap-3">
                                                                     <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
                                                                     <span className="text-sm font-bold text-navy-200">{sub}</span>
@@ -423,7 +417,7 @@ export default function SourceManagementPage() {
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-navy-950/90 backdrop-blur-2xl animate-fade-in" onClick={() => setShowModal(false)} />
 
-                    <div className="relative w-full max-w-lg glass rounded-[3rem] border border-white/10 p-10 shadow-[0_32px_128px_rgba(0,0,0,0.8)] animate-scale-in">
+                    <div className="relative w-full max-w-lg glass rounded-[3rem] border border-text-primary/10 p-10 shadow-[0_32px_128px_rgba(0,0,0,0.8)] animate-scale-in">
 
                         {/* Decorative Background Glows */}
                         <div className="absolute -top-24 -right-24 w-64 h-64 bg-indigo-600/20 rounded-full blur-[100px] -z-10" />
@@ -443,7 +437,7 @@ export default function SourceManagementPage() {
                                     <p className="text-[10px] text-navy-500 font-bold uppercase tracking-[0.2em] mt-0.5">Yönetim Paneli Girişi</p>
                                 </div>
                             </div>
-                            <button onClick={() => setShowModal(false)} className="w-12 h-12 rounded-2xl hover:bg-white/5 border border-transparent hover:border-white/10 text-navy-500 hover:text-text-primary transition-all flex items-center justify-center">
+                            <button onClick={() => setShowModal(false)} className="w-12 h-12 rounded-2xl hover:bg-text-primary/5 border border-transparent hover:border-text-primary/10 text-navy-500 hover:text-text-primary transition-all flex items-center justify-center">
                                 <X className="w-6 h-6" />
                             </button>
                         </div>
@@ -459,7 +453,7 @@ export default function SourceManagementPage() {
                                             type="text" required value={formData.name}
                                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                             placeholder="Örn: Kariyer.net, Linkedin İlan, Firma X"
-                                            className="w-full px-6 py-5 bg-white/[0.03] border border-white/10 rounded-[1.5rem] text-text-primary outline-none focus:border-indigo-500/50 transition-all text-sm font-bold shadow-inner"
+                                            className="w-full px-6 py-5 bg-text-primary/[0.03] border border-text-primary/10 rounded-[1.5rem] text-text-primary outline-none focus:border-indigo-500/50 transition-all text-sm font-bold shadow-inner"
                                         />
                                     </div>
 
@@ -481,7 +475,7 @@ export default function SourceManagementPage() {
                                                     type="text" required value={formData.mainName || ''}
                                                     onChange={(e) => setFormData({ ...formData, mainName: e.target.value })}
                                                     placeholder="Yeni ana kaynak adı (Örn: Sosyal Medya)"
-                                                    className="w-full px-5 py-4 bg-navy-950 border border-white/5 rounded-2xl text-sm text-text-primary outline-none focus:border-indigo-500"
+                                                    className="w-full px-5 py-4 bg-navy-950 border border-text-primary/5 rounded-2xl text-sm text-text-primary outline-none focus:border-indigo-500"
                                                 />
                                                 <div className="flex items-center justify-between gap-4">
                                                     <div className="flex-1 space-y-2">
@@ -521,7 +515,7 @@ export default function SourceManagementPage() {
                                                 <select
                                                     value={formData.parentSourceId}
                                                     onChange={(e) => setFormData({ ...formData, parentSourceId: e.target.value })}
-                                                    className="w-full px-6 py-5 bg-white/[0.03] border border-white/10 rounded-[1.5rem] text-text-primary outline-none focus:border-indigo-500/50 transition-all text-sm font-bold appearance-none shadow-inner"
+                                                    className="w-full px-6 py-5 bg-text-primary/[0.03] border border-text-primary/10 rounded-[1.5rem] text-text-primary outline-none focus:border-indigo-500/50 transition-all text-sm font-bold appearance-none shadow-inner"
                                                     required
                                                 >
                                                     <option value="" disabled className="bg-navy-900">Bir ana kaynak seçin...</option>
@@ -545,14 +539,14 @@ export default function SourceManagementPage() {
                                             type="text" required value={formData.name}
                                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                             placeholder="Örn: Sosyal Medya, İşe Alım Firması"
-                                            className="w-full px-6 py-5 bg-white/[0.03] border border-white/10 rounded-[1.5rem] text-text-primary outline-none focus:border-indigo-500/50 transition-all text-sm font-bold shadow-inner"
+                                            className="w-full px-6 py-5 bg-text-primary/[0.03] border border-text-primary/10 rounded-[1.5rem] text-text-primary outline-none focus:border-indigo-500/50 transition-all text-sm font-bold shadow-inner"
                                         />
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                         <div className="space-y-4">
                                             <label className="text-[10px] text-navy-500 uppercase font-black tracking-widest ml-1">İkon Tasarımı</label>
-                                            <div className="grid grid-cols-4 gap-2 p-4 bg-white/[0.02] border border-white/5 rounded-[1.5rem]">
+                                            <div className="grid grid-cols-4 gap-2 p-4 bg-text-primary/[0.02] border border-text-primary/5 rounded-[1.5rem]">
                                                 {Object.keys(ICONS).map(iconName => {
                                                     const IconComp = ICONS[iconName];
                                                     return (
@@ -569,7 +563,7 @@ export default function SourceManagementPage() {
                                         </div>
                                         <div className="space-y-4">
                                             <label className="text-[10px] text-navy-500 uppercase font-black tracking-widest ml-1">Marka Rengi</label>
-                                            <div className="grid grid-cols-5 gap-2.5 p-4 bg-white/[0.02] border border-white/5 rounded-[1.5rem]">
+                                            <div className="grid grid-cols-5 gap-2.5 p-4 bg-text-primary/[0.02] border border-text-primary/5 rounded-[1.5rem]">
                                                 {COLORS.map(c => (
                                                     <button
                                                         key={c} type="button"

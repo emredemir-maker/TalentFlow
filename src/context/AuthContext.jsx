@@ -80,9 +80,19 @@ export function AuthProvider({ children }) {
         });
 
         async function handleInitialProfile(currentUser) {
+            if (!currentUser || !currentUser.email) return;
             try {
                 const emailLower = currentUser.email.toLowerCase();
                 const isPrimaryAdmin = INITIAL_SUPER_ADMINS.includes(emailLower);
+
+                // Safety check for user doc
+                const userDocRef = doc(db, USERS_PATH, currentUser.uid);
+                const docSnap = await getDoc(userDocRef);
+                if (docSnap.exists()) {
+                    setUserProfile(docSnap.data());
+                    return;
+                }
+
                 const allUsersSnap = await getDocs(query(collection(db, USERS_PATH)));
                 const isFirstUser = allUsersSnap.empty;
 
@@ -96,7 +106,8 @@ export function AuthProvider({ children }) {
                         status: 'active',
                         createdAt: serverTimestamp()
                     };
-                    await setDoc(doc(db, USERS_PATH, currentUser.uid), firstProfile);
+                    await setDoc(userDocRef, firstProfile);
+                    setUserProfile(firstProfile);
                 } else {
                     const q = query(collection(db, INVITATIONS_PATH),
                         where("email", "==", emailLower),
@@ -117,11 +128,12 @@ export function AuthProvider({ children }) {
                             status: 'active',
                             createdAt: serverTimestamp()
                         };
-                        await setDoc(doc(db, USERS_PATH, currentUser.uid), newProfile);
+                        await setDoc(userDocRef, newProfile);
                         await updateDoc(doc(db, INVITATIONS_PATH, inviteDoc.id), {
                             status: 'accepted',
                             acceptedAt: serverTimestamp()
                         });
+                        setUserProfile(newProfile);
                     } else {
                         await signOut(auth);
                         setError('Erişim yetkiniz bulunmuyor.');

@@ -250,25 +250,25 @@ export default function LiveObserverPanel({ candidate, onTranscriptUpdate, onAiS
 
     const STAR_LABELS = { S: 'Situation', T: 'Task', A: 'Action', R: 'Result' };
     const STAR_COLORS = {
-        S: 'text-emerald-400 bg-emerald-500/10',
-        T: 'text-sapphire-400 bg-sapphire-500/10',
-        A: 'text-violet-400 bg-violet-500/10',
-        R: 'text-amber-400 bg-amber-500/10'
+        S: 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10',
+        T: 'text-blue-600 dark:text-blue-400 bg-blue-500/10',
+        A: 'text-violet-600 dark:text-violet-400 bg-violet-500/10',
+        R: 'text-amber-600 dark:text-amber-400 bg-amber-500/10'
     };
 
     return (
-        <div className="flex flex-col h-full bg-navy-950/40 border-l border-white/10 w-[340px] shadow-2xl overflow-hidden relative tech-grid shrink-0 animate-in slide-in-from-right duration-500">
+        <div className="flex flex-col h-full bg-bg-primary/60 backdrop-blur-md border-l border-border-subtle w-[360px] shadow-2xl overflow-hidden relative tech-grid shrink-0 animate-in slide-in-from-right duration-700">
             {/* Background Ornaments */}
             <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-electric/5 to-transparent pointer-events-none" />
 
             {/* Header: Cyber Status */}
-            <div className="p-4 border-b border-white/[0.05] flex items-center justify-between relative z-10 bg-black/20">
-                <div className="flex items-center gap-2">
-                    <div className={`w-1.5 h-1.5 rounded-full ${isListening ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)] animate-pulse' : 'bg-navy-700'}`} />
-                    <h3 className="text-[10px] font-black hud-text text-text-primary tracking-widest uppercase opacity-80">Observer HUD</h3>
+            <div className="p-5 border-b border-border-subtle flex items-center justify-between relative z-10 bg-bg-secondary/40 backdrop-blur-sm">
+                <div className="flex items-center gap-3">
+                    <div className={`w-2 h-2 rounded-full ${isListening ? 'bg-red-500 shadow-[0_0_12px_rgba(239,68,68,0.6)] animate-pulse' : 'bg-bg-secondary shadow-inner'}`} />
+                    <h3 className="text-[11px] font-black text-text-primary tracking-[0.2em] uppercase opacity-90">OBSERVER HUD</h3>
                 </div>
                 <div className="flex items-center gap-2">
-                    <span className="text-[8px] font-bold text-electric hud-text px-2 py-0.5 rounded bg-electric/10 border border-electric/20">v2.0</span>
+                    <span className="text-[9px] font-black text-cyan-500 px-2.5 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/20 shadow-sm">v2.4 PRO</span>
                 </div>
             </div>
 
@@ -276,11 +276,13 @@ export default function LiveObserverPanel({ candidate, onTranscriptUpdate, onAiS
             <div className="flex-1 overflow-y-auto p-4 space-y-5 relative z-10 custom-scrollbar">
 
                 {/* Integration Panel */}
-                <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.05] space-y-3 relative group overflow-hidden">
-                    <div className="absolute inset-0 bg-gradient-to-br from-electric/5 to-transparent opacity-50" />
-                    <div className="flex items-center justify-between mb-1 relative z-10">
-                        <span className="text-[9px] text-navy-400 font-bold hud-text uppercase tracking-wider">Sync Connection</span>
-                        <div className={`px-2 py-0.5 rounded text-[8px] font-black hud-text uppercase ${botStatus === 'connected' ? 'text-emerald-400' : botStatus === 'joining' ? 'text-amber-400' : 'text-navy-500'}`}>
+                <div className="p-5 rounded-3xl bg-bg-secondary border border-border-subtle space-y-4 relative group overflow-hidden shadow-inner">
+                    <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 via-transparent to-violet-500/5 opacity-50" />
+                    <div className="flex items-center justify-between mb-1 relative z-10 px-1">
+                        <span className="text-[9px] text-text-muted font-black uppercase tracking-widest flex items-center gap-2">
+                            <RefreshCw className={`w-3 h-3 ${isJoining ? 'animate-spin' : ''}`} /> SYNC CONNECTION
+                        </span>
+                        <div className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest shadow-sm ${botStatus === 'connected' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' : botStatus === 'joining' ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20' : 'bg-bg-primary text-text-muted border border-border-subtle'}`}>
                             {botStatus}
                         </div>
                     </div>
@@ -288,67 +290,66 @@ export default function LiveObserverPanel({ candidate, onTranscriptUpdate, onAiS
                     <div className="relative z-10">
                         <input
                             type="text"
-                            placeholder="Meeting URL (Meet/Zoom/Teams)"
+                            placeholder="Mülakat Linki (Meet/Zoom/Teams)"
                             value={meetingUrl}
                             onChange={(e) => setMeetingUrl(e.target.value)}
-                            className="w-full bg-black/40 border border-white/10 rounded-lg p-2.5 text-[10px] text-text-primary placeholder-navy-700 focus:border-electric/50 outline-none transition-all hud-text"
+                            className="w-full bg-bg-primary border border-border-subtle rounded-2xl p-3.5 text-[11px] text-text-primary placeholder-text-muted/40 focus:border-cyan-500/50 outline-none transition-all shadow-inner font-black"
                         />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-3">
                         <button
                             onClick={() => handleJoinMeeting(false)}
                             disabled={isJoining || botStatus === 'connected'}
-                            className={`py-2.5 rounded-lg flex items-center justify-center gap-2 transition-all font-bold text-[9px] hud-text relative z-10 
+                            className={`p-3 rounded-2xl flex items-center justify-center gap-2 transition-all font-black text-[10px] uppercase tracking-widest relative z-10 shadow-sm 
                                 ${botStatus === 'connected'
-                                    ? 'bg-navy-800 text-navy-500 border border-white/5 opacity-50 cursor-not-allowed'
+                                    ? 'bg-bg-primary text-text-muted border border-border-subtle opacity-50 cursor-not-allowed'
                                     : isJoining
-                                        ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
-                                        : 'bg-electric hover:shadow-[0_0_15px_rgba(59,130,246,0.3)] text-white'}`}
+                                        ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                                        : 'bg-cyan-500 hover:shadow-lg hover:shadow-cyan-500/20 text-white'}`}
                         >
-                            {isJoining ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mic className="w-3 h-3" />}
-                            BOTU TOPLANTıya SOK
+                            {isJoining ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mic className="w-4 h-4" />}
+                            BAĞLAN
                         </button>
 
                         <button
                             onClick={botStatus === 'connected' ? stopListening : () => handleJoinMeeting(true)}
                             disabled={isJoining}
-                            className={`py-2.5 rounded-lg flex items-center justify-center gap-2 transition-all font-bold text-[9px] hud-text relative z-10 
+                            className={`p-3 rounded-2xl flex items-center justify-center gap-2 transition-all font-black text-[10px] uppercase tracking-widest relative z-10 shadow-sm 
                                 ${botStatus === 'connected'
-                                    ? 'bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20'
-                                    : 'bg-white/[0.05] border border-white/10 text-text-primary hover:bg-white/[0.1]'}`}
+                                    ? 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 hover:bg-red-500/20'
+                                    : 'bg-bg-primary border-border-subtle text-text-primary hover:bg-bg-secondary'}`}
                         >
-                            {botStatus === 'connected' ? <MicOff className="w-3 h-3" /> : <Activity className="w-3 h-3 text-emerald-400" />}
-                            {botStatus === 'connected' ? "BAĞLANTIYI KES" : "HIZLI TEST (YEREL)"}
+                            {botStatus === 'connected' ? <MicOff className="w-4 h-4" /> : <Activity className="w-4 h-4 text-emerald-500" />}
+                            {botStatus === 'connected' ? "AYRIL" : "TEST ET"}
                         </button>
                     </div>
 
                     {/* Bot Deployment Log */}
                     {(isJoining || botLogs.length > 0) && (
-                        <div className="space-y-2">
-                            <div className="p-2 bg-black/60 rounded-lg border border-white/5 font-mono text-[8px] space-y-1 animate-in fade-in duration-500">
+                        <div className="space-y-3">
+                            <div className="p-3 bg-bg-primary border border-border-subtle rounded-2xl font-mono text-[9px] space-y-1.5 animate-in fade-in duration-500 shadow-inner">
                                 {botLogs.map((log, i) => (
-                                    <div key={i} className={`flex gap-2 ${log && log.startsWith('✅') ? 'text-emerald-400' : 'text-navy-400'}`}>
+                                    <div key={i} className={`flex gap-3 leading-relaxed ${log && log.startsWith('✅') ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-text-muted/70'}`}>
                                         <span className="shrink-0 opacity-40">[{new Date().toLocaleTimeString('tr-TR', { hour12: false, second: '2-digit', minute: '2-digit' })}]</span>
                                         <span>{log || '...'}</span>
                                     </div>
                                 ))}
                             </div>
                             {botStatus === 'connected' && meetingUrl && (
-                                <div className="space-y-2">
-                                    <div className="p-2 bg-emerald-500/5 border border-emerald-500/20 rounded-lg flex items-start gap-2 animate-in slide-in-from-top-1">
-                                        <ShieldCheck className="w-3 h-3 text-emerald-400 mt-0.5 shrink-0" />
-                                        <div className="space-y-1">
-                                            <p className="text-[7px] leading-tight text-emerald-300 font-bold uppercase tracking-tighter italic">
-                                                MÜLAKAT KÖPRÜSÜ AKTİF: Hem sizin hem adayınızın sesi dijital olarak analiz ediliyor.
+                                <div className="space-y-3 animate-in fade-in slide-in-from-top-4 duration-500">
+                                    <div className="p-3 bg-emerald-500/5 border border-emerald-500/20 rounded-[1.5rem] flex items-start gap-3 shadow-sm">
+                                        <ShieldCheck className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
+                                        <div className="space-y-1.5">
+                                            <p className="text-[10px] leading-relaxed text-emerald-700 dark:text-emerald-400 font-black uppercase tracking-tight italic">
+                                                MÜLAKAT KÖPRÜSÜ AKTİF.
                                             </p>
-
                                         </div>
                                     </div>
-                                    <div className="p-2 bg-amber-500/5 border border-amber-500/20 rounded-lg flex items-start gap-2">
-                                        <AlertTriangle className="w-3 h-3 text-amber-400 mt-0.5 shrink-0" />
-                                        <p className="text-[7px] leading-tight text-amber-300 font-bold uppercase tracking-tighter italic">
-                                            YASAL UYARI: Mülakatın kayıt ve analiz edildiğini adaya bildirdiğinizden emin olun.
+                                    <div className="p-3 bg-amber-500/5 border border-amber-500/20 rounded-[1.5rem] flex items-start gap-3 shadow-sm">
+                                        <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                                        <p className="text-[10px] leading-relaxed text-amber-700 dark:text-amber-300 font-black uppercase tracking-tight italic">
+                                            Yasal bilgilendirme yapıldı.
                                         </p>
                                     </div>
                                 </div>
@@ -359,37 +360,39 @@ export default function LiveObserverPanel({ candidate, onTranscriptUpdate, onAiS
 
                 {/* Status: Presence Control */}
                 {botStatus === 'connected' && (
-                    <div className="grid grid-cols-2 gap-2 mt-2 px-1">
-                        <div className="p-2 rounded-xl bg-emerald-500/5 border border-emerald-500/10 flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            <span className="text-[9px] font-bold text-navy-400">PARTICIPANTS: {presenceData.participantCount}</span>
+                    <div className="grid grid-cols-2 gap-3 px-1">
+                        <div className="p-3 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 flex items-center justify-center gap-2 shadow-sm">
+                            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                            <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">LIVE: {presenceData.participantCount}</span>
                         </div>
-                        <div className="p-2 rounded-xl bg-electric/5 border border-electric/10 flex items-center gap-2">
-                            <Activity className="w-3 h-3 text-electric" />
-                            <span className="text-[9px] font-bold text-navy-400">SIGNAL: {presenceData.signalQuality}</span>
+                        <div className="p-3 rounded-2xl bg-cyan-500/5 border border-cyan-500/10 flex items-center justify-center gap-2 shadow-sm">
+                            <Activity className="w-4 h-4 text-cyan-500" />
+                            <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">{presenceData.signalQuality}</span>
                         </div>
                     </div>
                 )}
 
                 {/* STAR Reality Check */}
-                <div className="space-y-3">
+                <div className="space-y-4 px-1">
                     <div className="flex items-center justify-between px-1">
-                        <span className="text-[9px] text-navy-400 font-bold hud-text tracking-widest flex items-center gap-1.5">
-                            <ShieldCheck className="w-3 h-3 text-emerald-400" /> STAR INTEGRITY
+                        <span className="text-[10px] text-text-muted font-black uppercase tracking-[0.2em] flex items-center gap-2">
+                            <ShieldCheck className="w-5 h-5 text-emerald-500" /> STAR INTEGRITY
                         </span>
-                        <span className="text-[10px] text-text-primary font-black hud-text">{logicIntegrity}%</span>
+                        <div className="px-3 py-1 rounded-xl bg-bg-primary border border-border-subtle text-[11px] font-black text-text-primary tabular-nums">
+                            {logicIntegrity}%
+                        </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-3">
                         {Object.entries(starScores).map(([key, score]) => (
-                            <div key={key} className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.04] space-y-1.5 relative overflow-hidden">
+                            <div key={key} className="p-4 rounded-[1.5rem] bg-bg-secondary border border-border-subtle space-y-2 relative overflow-hidden group hover:border-border-subtle/40 transition-all shadow-inner">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-[8px] font-bold text-navy-500 hud-text">{STAR_LABELS[key]}</span>
-                                    <span className={`text-[8px] font-black hud-text ${score > 70 ? 'text-emerald-400' : score > 30 ? 'text-amber-400' : 'text-red-400'}`}>{score}</span>
+                                    <span className="text-[9px] font-black text-text-muted uppercase tracking-widest group-hover:text-text-primary transition-colors">{STAR_LABELS[key]}</span>
+                                    <span className={`text-[10px] font-black tabular-nums ${score > 70 ? 'text-emerald-600 dark:text-emerald-400' : score > 30 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`}>{score}</span>
                                 </div>
-                                <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+                                <div className="h-1.5 bg-bg-primary rounded-full overflow-hidden border border-border-subtle/5">
                                     <div
-                                        className={`h-full transition-all duration-700 ${key === 'S' ? 'bg-emerald-500' : key === 'T' ? 'bg-blue-500' : key === 'A' ? 'bg-violet-500' : 'bg-amber-500'}`}
+                                        className={`h-full transition-all duration-1000 ease-out ${key === 'S' ? 'bg-emerald-500' : key === 'T' ? 'bg-blue-500' : key === 'A' ? 'bg-violet-600' : 'bg-amber-500'}`}
                                         style={{ width: `${score}%` }}
                                     />
                                 </div>
@@ -400,20 +403,20 @@ export default function LiveObserverPanel({ candidate, onTranscriptUpdate, onAiS
 
                 {/* Feed Stream */}
                 <div className="flex-1 flex flex-col min-h-0 space-y-3">
-                    <span className="text-[9px] text-navy-400 font-bold hud-text tracking-widest flex items-center gap-1.5 px-1 uppercase">
-                        <MessageSquare className="w-3 h-3 text-electric" /> Intel Stream
+                    <span className="text-[9px] text-text-muted font-black hud-text tracking-widest flex items-center gap-1.5 px-1 uppercase">
+                        <MessageSquare className="w-3 h-3 text-cyan-500" /> Intel Stream
                     </span>
                     <div className="flex-1 space-y-3 overflow-y-auto custom-scrollbar pr-1">
                         {transcriptFeed.length === 0 ? (
-                            <div className="py-12 text-center rounded-xl bg-white/[0.01] border border-dashed border-white/5">
-                                <p className="text-[9px] text-navy-600 hud-text uppercase tracking-tight">Listening for data pulse...</p>
+                            <div className="py-12 text-center rounded-xl bg-bg-primary border border-border-subtle">
+                                <p className="text-[9px] text-text-muted hud-text uppercase tracking-tight">Listening for data pulse...</p>
                             </div>
                         ) : (
                             transcriptFeed.slice().reverse().map((t, idx) => (
-                                <div key={t.id} className={`p-3 rounded-xl border transition-all duration-500 ${idx === 0 ? 'bg-electric/5 border-electric/30 scale-[1.02]' : 'bg-white/[0.02] border-white/5 opacity-60'}`}>
-                                    <p className="text-[10px] text-navy-100 leading-relaxed font-medium">"{t.text}"</p>
+                                <div key={t.id} className={`p-3 rounded-xl border transition-all duration-500 ${idx === 0 ? 'bg-cyan-500/5 border-cyan-500/30 scale-[1.02]' : 'bg-bg-primary border-border-subtle opacity-60'}`}>
+                                    <p className="text-[10px] text-text-primary leading-relaxed font-black">"{t.text}"</p>
                                     <div className="mt-1.5 flex justify-end">
-                                        <div className={`w-1 h-1 rounded-full ${idx === 0 ? 'bg-electric animate-ping' : 'bg-navy-700'}`} />
+                                        <div className={`w-1 h-1 rounded-full ${idx === 0 ? 'bg-cyan-500 animate-ping' : 'bg-text-muted'}`} />
                                     </div>
                                 </div>
                             ))
@@ -423,13 +426,13 @@ export default function LiveObserverPanel({ candidate, onTranscriptUpdate, onAiS
 
                 {/* AI Tactical Recommendations */}
                 {currentAiInsight && (
-                    <div className="p-4 rounded-xl bg-violet-500/5 border border-violet-500/20 relative overflow-hidden animate-in slide-in-from-bottom-2">
-                        <div className="absolute top-0 left-0 w-1 h-full bg-violet-500" />
-                        <div className="flex items-start gap-3">
-                            <Sparkles className="w-4 h-4 text-violet-400 shrink-0 mt-0.5" />
+                    <div className="p-6 rounded-[2rem] bg-bg-secondary border border-border-subtle relative overflow-hidden animate-in slide-in-from-bottom-5 duration-700 shadow-xl">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-violet-500/5 rounded-full blur-3xl" />
+                        <div className="flex items-start gap-4 relative z-10">
+                            <Sparkles className="w-5 h-5 text-violet-600 dark:text-violet-400 shrink-0 mt-0.5" />
                             <div>
-                                <h4 className="text-[9px] font-black text-violet-400 mb-1 hud-text uppercase tracking-widest">Tactical Advice</h4>
-                                <p className="text-[10px] text-navy-100 leading-relaxed font-semibold">
+                                <h4 className="text-[10px] font-black text-violet-600 dark:text-violet-400 mb-2 uppercase tracking-[0.2em]">TACTICAL ADVICE</h4>
+                                <p className="text-[11px] text-text-primary leading-relaxed font-black italic">
                                     {currentAiInsight}
                                 </p>
                             </div>
@@ -440,10 +443,10 @@ export default function LiveObserverPanel({ candidate, onTranscriptUpdate, onAiS
 
             {/* Visualizer Footer */}
             {botStatus === 'connected' && (
-                <div className="p-3 bg-black/40 border-t border-white/5">
-                    <div className="h-8 flex items-end justify-center gap-1 px-4">
+                <div className="p-4 bg-bg-secondary/60 border-t border-border-subtle backdrop-blur-md">
+                    <div className="h-10 flex items-end justify-center gap-1.5 px-6">
                         {waveHeight.map((h, i) => (
-                            <div key={i} className="flex-1 rounded-t-sm bg-electric/40 transition-all duration-150" style={{ height: `${h / 3}%` }} />
+                            <div key={i} className="flex-1 rounded-t-full bg-cyan-400 opacity-60 transition-all duration-150 shadow-[0_0_10px_rgba(96,165,250,0.3)]" style={{ height: `${h / 2.5}%` }} />
                         ))}
                     </div>
                 </div>

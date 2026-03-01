@@ -1,33 +1,27 @@
-// src/components/CandidateCard.jsx
-// Premium candidate card with match score ring
-
 import MatchScoreRing from './MatchScoreRing';
-import { MapPin, Briefcase, Clock, ArrowUpRight, ShieldAlert, Sparkles } from 'lucide-react';
-
+import { MapPin, Briefcase, Clock, ArrowUpRight, ShieldAlert, Sparkles, Brain, Zap, GraduationCap } from 'lucide-react';
+import { useCandidates } from '../context/CandidatesContext';
 
 const STATUS_CONFIG = {
-    ai_analysis: { label: 'AI Analiz', classes: 'bg-violet-500/10 text-violet-400 ring-violet-500/20' },
-    review: { label: 'İnceleme', classes: 'bg-amber-500/10 text-amber-400 ring-amber-500/20' },
-    interview: { label: 'Mülakat', classes: 'bg-blue-500/10 text-blue-400 ring-blue-500/20' },
-    offer: { label: 'Teklif', classes: 'bg-cyan-500/10 text-cyan-400 ring-cyan-500/20' },
-    hired: { label: 'İşe Alındı', classes: 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/20' },
-    rejected: { label: 'Red', classes: 'bg-red-500/10 text-red-400 ring-red-500/20' },
+    ai_analysis: { label: 'SİNYAL: AI ANALİZİ', classes: 'bg-violet-500/20 text-violet-700 dark:text-violet-400 border-violet-500/30' },
+    review: { label: 'SİNYAL: MANUEL İNCELEME', classes: 'bg-amber-500/20 text-amber-800 dark:text-amber-400 border-amber-500/30' },
+    interview: { label: 'SİNYAL: İLETİŞİM AKTİF', classes: 'bg-blue-500/20 text-blue-800 dark:text-blue-400 border-blue-500/30' },
+    offer: { label: 'SİNYAL: TEKLİF AŞAMASI', classes: 'bg-cyan-500/20 text-cyan-800 dark:text-cyan-400 border-cyan-500/30' },
+    hired: { label: 'SİNYAL: İŞE ALINDI', classes: 'bg-emerald-500/20 text-emerald-800 dark:text-emerald-400 border-emerald-500/30' },
+    rejected: { label: 'SİNYAL: BAĞLANTI KESİLDİ', classes: 'bg-red-500/20 text-red-800 dark:text-red-400 border-red-500/30' },
 };
-
 
 const REJECTION_REASONS = [
     { id: 'not_suitable', label: 'Uygun Değil' },
-    { id: 'declined', label: 'Kabul Etmedi' },
+    { id: 'declined', label: 'Reddedildi' },
     { id: 'wrong_entry', label: 'Hatalı Kayıt' }
 ];
 
 const AVATAR_GRADIENTS = [
-    'from-indigo-500 to-purple-600',
-    'from-blue-500 to-cyan-500',
-    'from-emerald-500 to-teal-500',
-    'from-amber-500 to-orange-500',
-    'from-pink-500 to-rose-500',
-    'from-violet-500 to-indigo-500',
+    'from-electric via-blue-500 to-indigo-600',
+    'from-violet-500 via-purple-500 to-fuchsia-600',
+    'from-cyan-500 via-teal-500 to-emerald-600',
+    'from-amber-500 via-orange-500 to-rose-600',
 ];
 
 function getInitials(name) {
@@ -35,236 +29,142 @@ function getInitials(name) {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
 }
 
-export default function CandidateCard({ candidate, index = 0, onClick, isSelected, onSelect }) {
+export default function CandidateCard({ candidate, index = 0, onClick, isSelected, onSelect, draggable, onDragStart }) {
+    const { sourceColors } = useCandidates();
     const status = STATUS_CONFIG[candidate.status] || STATUS_CONFIG.ai_analysis;
-
     const gradient = AVATAR_GRADIENTS[index % AVATAR_GRADIENTS.length];
 
-    // Helper: Source-based colors (Border/Glow)
-    const getSourceAccent = () => {
-        if (!candidate.source) return 'border-border-subtle';
-        const s = candidate.source.toLowerCase();
-        if (s.includes('diğer')) return 'border-violet-500/30 shadow-[0_0_25px_rgba(139,92,246,0.1)]';
-        if (s.includes('işe alım') || s.includes('agency')) return 'border-amber-500/30 shadow-[0_0_25px_rgba(245,158,11,0.1)]';
-        if (s.includes('linkedin')) return 'border-blue-500/30 shadow-[0_0_25px_rgba(59,130,246,0.1)]';
-        if (s.includes('referans') || s.includes('referral')) return 'border-emerald-500/30 shadow-[0_0_25px_rgba(16,185,129,0.1)]';
-        return 'border-cyan-500/30 shadow-[0_0_25px_rgba(6,182,212,0.1)]';
-    };
-
-    const sourceAccent = getSourceAccent();
+    // Get source color
+    const sourceName = (candidate.source || '').toLowerCase();
+    const scColor = sourceColors[sourceName] || '#3b82f6'; // Default to blue if not found
 
     return (
         <div
+            draggable={draggable}
+            onDragStart={onDragStart}
             onClick={(e) => {
                 if (!e.target.closest('.selection-checkbox')) {
                     onClick?.(candidate);
                 }
             }}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => e.key === 'Enter' && onClick?.(candidate)}
-            className={`group rounded-3xl p-6 cursor-pointer transition-all duration-500 relative overflow-hidden backdrop-blur-xl border flex flex-col
-            ${isSelected ? 'bg-gradient-to-br from-electric/10 to-transparent border-electric/40 shadow-[0_0_25px_rgba(59,130,246,0.15)] ring-1 ring-electric/30 scale-[1.01]' : `bg-navy-900/10 hover:bg-navy-900/20 ${sourceAccent} hover:shadow-2xl hover:-translate-y-1.5`}
-            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-electric/30 h-full`}
+            className={`stitch-card group p-4 cursor-pointer transition-all duration-500 relative flex flex-col h-full
+            ${isSelected ? 'border-electric shadow-[0_0_20px_rgba(59,130,246,0.3)] scale-[1.01]' : 'hover:-translate-y-1'}`}
+            style={{
+                borderLeft: !isSelected ? `3px solid ${scColor}` : undefined,
+                boxShadow: !isSelected ? `0 4px 20px -5px ${scColor}20` : undefined
+            }}
         >
-            <div className={`absolute top-0 right-0 w-48 h-48 bg-electric/5 rounded-full blur-[80px] -z-10 transition-opacity duration-500 pointer-events-none ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} />
+            {/* Ambient Source Gradient */}
+            <div
+                className="absolute top-0 left-0 w-32 h-32 blur-[60px] opacity-10 pointer-events-none -z-10"
+                style={{ backgroundColor: scColor }}
+            />
             {/* Selection Checkbox */}
-            <div className={`absolute top-4 right-4 z-10 selection-checkbox ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'} transition-opacity`}>
+            <div className={`absolute top-4 right-4 z-10 selection-checkbox ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-all`}>
                 <div
                     onClick={(e) => {
                         e.stopPropagation();
                         onSelect?.();
                     }}
-                    className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${isSelected
-                        ? 'bg-electric border-electric text-text-primary'
-                        : 'bg-navy-800/20 border-border-subtle hover:border-electric/50'
+                    className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${isSelected
+                        ? 'bg-electric border-electric text-white'
+                        : 'bg-bg-secondary/40 border-border-subtle hover:border-electric'
                         }`}
                 >
-                    {isSelected && <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>}
+                    {isSelected && <Zap className="w-3.5 h-3.5 fill-current" />}
                 </div>
             </div>
 
-            {/* Top: Avatar + Name + Score */}
-            <div className="flex items-start justify-between mb-4 pr-8">
+            {/* Top Section */}
+            <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3 min-w-0">
-                    <div className={`w-11 h-11 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center text-sm font-bold text-text-primary shrink-0 shadow-lg`}>
-                        {getInitials(candidate.name)}
+                    <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${gradient} p-[2px] shadow-lg group-hover:rotate-3 transition-transform duration-500 shrink-0`}>
+                        <div className="w-full h-full rounded-[10px] bg-bg-secondary border border-border-subtle/10 flex items-center justify-center text-sm font-black text-white dark:text-white">
+                            {getInitials(candidate.name)}
+                        </div>
                     </div>
-                    <div className="min-w-0">
-                        <h3 className="text-[15px] font-semibold text-text-primary truncate">
+                    <div className="min-w-0 flex-1">
+                        <h3 className="text-[13px] font-black text-text-primary uppercase tracking-tight group-hover:text-cyan-400 transition-colors leading-tight break-words line-clamp-2">
                             {candidate.name}
                         </h3>
-                        <p className="text-[12px] text-navy-400 truncate">{candidate.position}</p>
-
-
-                        {(() => {
-                            // 1. Start with the explicitly assigned match information
-                            let displayScore = candidate.matchScore || 0;
-                            let displayTitle = candidate.matchedPositionTitle;
-
-                            // 2. If we have a specific assigned position, ensure we use THAT analysis score if it exists
-                            if (displayTitle && candidate.positionAnalyses?.[displayTitle]) {
-                                displayScore = candidate.positionAnalyses[displayTitle].score;
-                            }
-                            // 3. Otherwise, find the absolute best match found across all positions analyzed
-                            else if (candidate.positionAnalyses) {
-                                Object.entries(candidate.positionAnalyses).forEach(([title, analysis]) => {
-                                    if (analysis && analysis.score > displayScore) {
-                                        displayScore = analysis.score;
-                                        displayTitle = title;
-                                    }
-                                });
-                            }
-
-                            if (displayTitle) {
-                                return (
-                                    <div className="flex items-center gap-1.5 mt-1.5 text-xs">
-                                        <span className="text-electric-light font-semibold uppercase tracking-wide">
-                                            {candidate.matchedPositionTitle === displayTitle ? 'EŞLEŞEN:' : 'EN UYGUN:'}
-                                        </span>
-                                        <span className="text-text-primary font-bold truncate max-w-[120px]" title={displayTitle}>
-                                            {displayTitle}
-                                        </span>
-                                        {displayScore > 0 && (
-                                            <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${displayScore >= 70 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-navy-500/20 text-navy-300'}`}>
-                                                %{Math.round(displayScore)}
-                                            </span>
-                                        )}
-                                    </div>
-                                );
-                            } else if (candidate.preAssessment) {
-                                return (
-                                    <div className="flex items-center gap-1.5 mt-1.5 text-xs">
-                                        <span className="text-emerald-400 font-semibold uppercase tracking-wide">
-                                            Önerilen:
-                                        </span>
-                                        <span className="text-text-primary font-bold truncate max-w-[120px]" title={candidate.preAssessment.suggestedOpenPosition || candidate.preAssessment.potentialPosition}>
-                                            {candidate.preAssessment.suggestedOpenPosition || candidate.preAssessment.potentialPosition}
-                                        </span>
-                                    </div>
-                                )
-                            }
-                            return null;
-                        })()}
-
-
+                        <p className="text-[9px] font-black text-text-muted opacity-60 uppercase tracking-widest mt-0.5 truncate">{candidate.position}</p>
                     </div>
                 </div>
-                <div className="flex flex-col items-end">
-                    {(() => {
-                        const displayScore = Math.round(candidate.combinedScore || 0);
-                        const hasAi = !!(candidate.aiAnalysis || candidate.positionAnalyses);
-                        const hasInterview = !!(candidate.interviewSessions?.length > 0);
-
-                        return (
-                            <>
-                                <MatchScoreRing score={displayScore} size={48} />
-                                <div className="flex flex-col items-end mt-1">
-                                    {hasInterview && (
-                                        <div className="flex items-center gap-0.5 text-blue-400">
-                                            <ShieldAlert className="w-2.5 h-2.5" />
-                                            <span className="text-[8px] font-black uppercase tracking-tighter">Verified</span>
-                                        </div>
-                                    )}
-                                    {hasAi && !hasInterview && (
-                                        <div className="flex items-center gap-0.5 text-electric-light">
-                                            <Sparkles className="w-2.5 h-2.5" />
-                                            <span className="text-[8px] font-black uppercase tracking-tighter">AI Only</span>
-                                        </div>
-                                    )}
-                                    {hasAi && hasInterview && (
-                                        <div className="flex items-center gap-0.5 text-emerald-400">
-                                            <Sparkles className="w-2.5 h-2.5" />
-                                            <span className="text-[8px] font-black uppercase tracking-tighter">Full Match</span>
-                                        </div>
-                                    )}
-                                </div>
-                            </>
-                        );
-                    })()}
+                <div className="relative shrink-0 ml-2">
+                    <MatchScoreRing score={Math.round(candidate.combinedScore || 0)} size={44} strokeWidth={3} />
+                    {candidate.combinedScore >= 80 && (
+                        <div className="absolute -top-1 -right-1">
+                            <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                        </div>
+                    )}
                 </div>
             </div>
 
-            {/* Status badge */}
-            <div className="mb-3">
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wide ring-1 ring-inset ${status.classes}`}>
+            {/* Status Badge */}
+            <div className="mb-4">
+                <span className={`inline-flex items-center px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-[0.1em] border ${status.classes}`}>
+                    <span className="w-1.5 h-1.5 rounded-full bg-current mr-2 animate-pulse" />
                     {status.label}
-                    {candidate.status === 'rejected' && candidate.rejectionReason && (
-                        <span className="ml-1 opacity-75 font-medium border-l border-current pl-1 ml-1.5">
-                            {REJECTION_REASONS.find(r => r.id === candidate.rejectionReason)?.label}
-                        </span>
-                    )}
                 </span>
             </div>
 
-            {/* Meta */}
-            <div className="space-y-1.5 mb-4">
-                {/* Human-in-the-Loop Warning */}
-                {candidate.matchScore > 0 && candidate.matchScore < 75 && (
-                    <div className="flex items-center gap-2 p-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-300 text-[11px] font-bold animate-in slide-in-from-left-2">
-                        <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
-                        <span>Manuel İnceleme Gerekli</span>
+            {/* Meta Data */}
+            <div className="grid grid-cols-2 gap-2 mb-4">
+                <div className="flex items-center gap-2 text-[10px] font-black text-text-primary bg-bg-primary/40 p-2 rounded-xl border border-border-subtle group-hover:border-electric/30 transition-all">
+                    <Briefcase className="w-3 h-3 text-text-muted group-hover:text-electric transition-colors shrink-0" />
+                    <span className="truncate">{candidate.company || candidate.department || 'Şirket Verisi Yok'}</span>
+                </div>
+                <div className="flex items-center gap-2 text-[10px] font-black text-text-primary bg-bg-primary/40 p-2 rounded-xl border border-border-subtle group-hover:border-electric/30 transition-all">
+                    <Clock className="w-3 h-3 text-text-muted group-hover:text-violet-400 transition-colors shrink-0" />
+                    <span>{candidate.experience || 0} Yıl</span>
+                </div>
+                <div className="flex items-center gap-2 text-[10px] font-black text-text-primary bg-bg-primary/40 p-2 rounded-xl border border-border-subtle group-hover:border-electric/30 transition-all">
+                    <GraduationCap className="w-3 h-3 text-text-muted group-hover:text-cyan-400 transition-colors shrink-0" />
+                    <span className="truncate">{candidate.education || 'Eğitim Yok'}</span>
+                </div>
+                <div className="flex items-center gap-2 text-[10px] font-black text-text-primary bg-bg-primary/40 p-2 rounded-xl border border-border-subtle group-hover:border-electric/30 transition-all">
+                    <MapPin className="w-3 h-3 text-text-muted group-hover:text-emerald-400 transition-colors shrink-0" />
+                    <span className="truncate">{candidate.location || 'Konum Yok'}</span>
+                </div>
+
+                {candidate.source && (
+                    <div
+                        className="col-span-2 flex items-center gap-2 px-2.5 py-1.5 rounded-xl border transition-all shadow-sm"
+                        style={{
+                            backgroundColor: `${scColor}10`,
+                            borderColor: `${scColor}20`,
+                            color: scColor
+                        }}
+                    >
+                        <Zap className="w-3 h-3" />
+                        <span className="text-[9px] font-black uppercase tracking-widest truncate">
+                            {candidate.source}
+                        </span>
                     </div>
                 )}
-
-                <div className="flex items-center gap-2 text-[12px] text-navy-400">
-                    <Briefcase className="w-3.5 h-3.5 text-navy-500" />
-                    <span>{candidate.department}</span>
-                    <span className="text-navy-600">•</span>
-                    <Clock className="w-3.5 h-3.5 text-navy-500" />
-                    <span>{candidate.experience} yıl</span>
-                </div>
-                <div className="flex items-center gap-2 text-[12px] text-navy-400">
-                    <MapPin className="w-3.5 h-3.5 text-navy-500" />
-                    <span>{candidate.location}</span>
-                    {candidate.source && (
-                        <>
-                            <span className="text-navy-600">•</span>
-                            <span className="text-[10px] font-bold text-navy-300 uppercase tracking-tighter bg-navy-800/20 px-1.5 py-0.5 rounded border border-white/5">
-                                {candidate.source} {candidate.sourceDetail && `(${candidate.sourceDetail})`}
-                            </span>
-                        </>
-                    )}
-                </div>
             </div>
-
-            {/* Skills */}
-            {candidate.skills && candidate.skills.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mb-4">
-                    {candidate.skills.slice(0, 3).map((skill) => (
-                        <span
-                            key={skill}
-                            className="px-2 py-0.5 rounded-md text-[11px] font-medium text-text-secondary bg-navy-800/20 border border-border-subtle"
-                        >
-                            {skill}
-                        </span>
-                    ))}
-                    {candidate.skills.length > 3 && (
-                        <span className="px-2 py-0.5 rounded-md text-[11px] font-medium text-navy-500 bg-white/[0.02]">
-                            +{candidate.skills.length - 3}
-                        </span>
-                    )}
-                </div>
-            )}
 
             {/* AI Insight Highlight */}
             {(candidate.aiAnalysis?.summary || candidate.summary) && (
-                <div className="mb-4 p-2.5 rounded-xl bg-electric/5 border border-electric/10 group/insight">
-                    <div className="flex items-center gap-1.5 mb-1 text-[10px] font-bold text-electric-light uppercase tracking-widest">
-                        <Sparkles className="w-3 h-3" /> AI Görüşü
+                <div className="mb-6 p-4 rounded-2xl bg-electric/5 border border-border-subtle relative overflow-hidden group/insight hover:bg-electric/10 transition-colors">
+                    <div className="flex items-center gap-2 mb-2">
+                        <Brain className="w-4 h-4 text-electric" />
+                        <span className="text-[10px] font-black text-electric-light uppercase tracking-widest">Nöral Görü</span>
                     </div>
-                    <p className="text-[11px] text-text-secondary leading-relaxed line-clamp-2 italic group-hover/insight:line-clamp-none transition-all duration-300">
+                    <p className="text-[12px] text-text-primary leading-relaxed line-clamp-2 italic font-medium">
                         "{candidate.aiAnalysis?.summary || candidate.summary}"
                     </p>
+                    <div className="absolute bottom-0 right-0 p-1 opacity-20">
+                        <Zap className="w-8 h-8 text-electric" />
+                    </div>
                 </div>
             )}
 
             {/* Footer */}
-            <div className="flex items-center justify-between pt-4 border-t border-border-subtle mt-auto">
-                <span className="text-[12px] font-bold text-text-muted">{candidate.salary}</span>
-                <div className="flex items-center gap-1 text-[12px] text-electric opacity-0 group-hover:opacity-100 transition-all transform group-hover:translate-x-1">
-                    <span className="font-extrabold uppercase tracking-wide">Detayları Gör</span>
-                    <ArrowUpRight className="w-4 h-4" />
+            <div className="flex items-center justify-end pt-4 border-t border-border-subtle mt-auto -mx-4 px-4 -mb-4 pb-4 rounded-b-[24px] bg-bg-secondary/20">
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-primary border border-border-subtle text-[9px] font-black text-text-primary uppercase tracking-widest group-hover:bg-electric group-hover:text-white transition-all shadow-lg shadow-black/5">
+                    <span>İncele</span>
+                    <ArrowUpRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
                 </div>
             </div>
         </div>

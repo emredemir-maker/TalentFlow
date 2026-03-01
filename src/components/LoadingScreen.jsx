@@ -1,26 +1,43 @@
 // src/components/LoadingScreen.jsx
 // Premium loading screen with branded animation
 
-import { Zap } from 'lucide-react';
+import Logo from './Logo';
 
 export default function LoadingScreen({ message = 'Yükleniyor...', subtext = '' }) {
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center gap-6 bg-navy-900">
-            {/* Animated logo */}
-            <div className="relative">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-electric to-cyan-accent flex items-center justify-center shadow-[0_0_40px_rgba(59,130,246,0.3)] animate-pulse">
-                    <Zap className="w-8 h-8 text-text-primary" />
-                </div>
-                <div className="absolute inset-0 w-16 h-16 rounded-2xl bg-gradient-to-br from-electric to-cyan-accent opacity-30 blur-xl" />
+        <div className="min-h-screen flex flex-col items-center justify-center gap-8 bg-navy-950 relative overflow-hidden">
+            {/* Background ambient glows - High Impact */}
+            <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-cyan-500/10 rounded-full blur-[160px] animate-pulse" />
+            <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-violet-600/10 rounded-full blur-[160px] animate-pulse delay-700" />
+
+            {/* Branded Neural Logo - Hero Scale */}
+            <div className="relative animate-stitch-float">
+                <Logo size={120} showText={false} className="drop-shadow-[0_0_50px_rgba(34,211,238,0.3)]" />
             </div>
 
-            {/* Spinner */}
-            <div className="w-10 h-10 border-[3px] border-navy-800 border-t-electric rounded-full animate-spin" />
+            {/* Text & Phase Indicator */}
+            <div className="text-center relative z-10 space-y-4">
+                <div className="flex items-baseline justify-center gap-1">
+                    <span className="text-3xl font-black text-white uppercase tracking-tighter">TALENT</span>
+                    <span className="text-3xl font-black stitch-text-gradient uppercase tracking-tighter italic">FLOW</span>
+                </div>
+                <div className="flex flex-col items-center gap-2">
+                    <p className="text-xs font-black text-text-muted uppercase tracking-[0.4em] opacity-60 animate-pulse">
+                        SİSTEM BAŞLATILIYOR
+                    </p>
+                    <p className="text-[10px] font-black text-cyan-400 uppercase tracking-widest italic opacity-80">
+                        {message}
+                    </p>
+                </div>
+            </div>
 
-            {/* Text */}
-            <div className="text-center">
-                <div className="text-sm font-medium text-navy-300">{message}</div>
-                {subtext && <div className="text-xs text-navy-500 mt-1">{subtext}</div>}
+            {/* Neural Progress track */}
+            <div className="mt-8 w-64 h-1.5 bg-navy-900 rounded-full overflow-hidden relative border border-border-subtle shadow-inner">
+                <div className="absolute top-0 left-0 h-full w-full bg-gradient-to-r from-cyan-400 via-blue-500 to-violet-500 animate-[loading-shimmer_2s_infinite] shadow-[0_0_15px_rgba(34,211,238,0.5)]" />
+            </div>
+
+            <div className="absolute bottom-12 text-[9px] font-black text-text-muted uppercase tracking-[0.3em] opacity-30">
+                NEURAL ENGINE v2.4.0 • SECURE ACCESS
             </div>
         </div>
     );
