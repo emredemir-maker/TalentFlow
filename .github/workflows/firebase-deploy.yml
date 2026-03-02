@@ -18,20 +18,19 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      - name: Install Dependencies (Root)
+      - name: Install Dependencies
         run: npm install
 
       - name: Build Frontend
         run: npm run build
 
-      - name: Install Dependencies (Functions)
+      - name: Install Functions Dependencies
         working-directory: ./functions
         run: npm install
 
       - name: Deploy to Firebase
-        uses: FirebaseExtended/action-hosting-deploy@v0
+        uses: w9jds/firebase-action@master
         with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TALENTFLOW_84BB6 }}
-          projectId: talentflow-84bb6
-          channelId: live
+          args: deploy --project talentflow-84bb6
+        env:
+          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
