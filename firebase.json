@@ -3,6 +3,7 @@
         "rules": "firestore.rules"
     },
     "hosting": {
+        "site": "talentflow-84bb6",
         "public": "dist",
         "ignore": [
             "firebase.json",
