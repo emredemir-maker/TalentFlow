@@ -12,7 +12,16 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import xss from 'xss-clean';
 import hpp from 'hpp';
+import admin from 'firebase-admin';
+
 dotenv.config();
+
+// Initialize Firebase Admin (using local default or environment)
+if (!admin.apps.length) {
+    admin.initializeApp();
+}
+
+const db = admin.firestore();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -133,22 +142,32 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
-// Load API Key from .env
-function getApiKey() {
-    const key = process.env.VITE_GEMINI_API_KEY;
-    if (!key || key.trim() === '' || key === 'null' || key === 'undefined') {
-        console.warn('⚠️ VITE_GEMINI_API_KEY is missing in environment variables. AI features will not work.');
-        return null;
+// Load API Key from .env with Firestore Fallback
+async function getApiKey() {
+    // 1. Try Environment Variable
+    const key = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+    if (key && key.trim() !== '' && key !== 'null' && key !== 'undefined') {
+        return key;
     }
-    return key;
-}
 
-const API_KEY = getApiKey();
-const genAI = API_KEY ? new GoogleGenerativeAI(API_KEY) : null;
+    // 2. Fallback to Firestore (System Settings)
+    try {
+        const settingsDoc = await db.doc('artifacts/talent-flow/public/data/settings/api_keys').get();
+        if (settingsDoc.exists && settingsDoc.data().gemini) {
+            console.log('✅ Gemini API key fetched from Firestore.');
+            return settingsDoc.data().gemini;
+        }
+    } catch (err) {
+        console.warn('⚠️ Could not fetch Gemini API key from Firestore:', err.message);
+    }
+
+    console.warn('⚠️ Gemini API key is missing. AI features will not work.');
+    return null;
+}
 
 // Gemini Parser Function
 async function parseProfile(text, modelId = 'gemini-2.0-flash') {
-    const apiKey = getApiKey();
+    const apiKey = await getApiKey();
     if (!apiKey) {
         console.error('Gemini Parse Error: API Key missing');
         return null;
@@ -518,7 +537,8 @@ async function handleDirectUrl(url, res, isVisual = false) {
             return res.json({ candidates: [], message: 'LinkedIn bu sayfayı görmemizi engelledi (Giriş duvarı). Lütfen "Tarayıcıda Oturumu Hazırla" butonunu kullanarak giriş yapın.' });
         }
 
-        const candidate = await parseProfile(bodyText, 'gemini-pro');
+        const apiKey = await getApiKey();
+        const candidate = apiKey ? await parseProfile(bodyText, 'gemini-pro') : null;
         if (candidate && candidate.name && candidate.name !== 'Belirtilmemiş') {
             candidate.linkedinUrl = url;
             candidate.source = 'Direct URL Scrape';

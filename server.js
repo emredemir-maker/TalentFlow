@@ -12,7 +12,15 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import xss from 'xss-clean';
 import hpp from 'hpp';
+import admin from 'firebase-admin';
+
 dotenv.config();
+
+// Initialize Firebase Admin
+if (!admin.apps.length) {
+    admin.initializeApp();
+}
+const db = admin.firestore();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -133,22 +141,34 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
-// Load API Key from .env
-function getApiKey() {
-    const key = process.env.VITE_GEMINI_API_KEY;
-    if (!key || key.trim() === '' || key === 'null' || key === 'undefined') {
-        console.warn('⚠️ VITE_GEMINI_API_KEY is missing in environment variables. AI features will not work.');
-        return null;
+// Load API Key (Priority: Env -> Firestore)
+async function getApiKey() {
+    // 1. Check process.env (Vite convention or standard)
+    const envKey = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+    if (envKey && envKey !== 'null' && envKey !== 'undefined' && envKey.length > 5) {
+        return envKey;
     }
-    return key;
+
+    // 2. Fallback to Firestore (System Settings)
+    try {
+        const settingsRef = db.doc('artifacts/talent-flow/public/data/settings/api_keys');
+        const doc = await settingsRef.get();
+        if (doc.exists && doc.data().gemini) {
+            return doc.data().gemini;
+        }
+    } catch (err) {
+        console.error('Firestore API Key fetch error:', err);
+    }
+
+    console.warn('⚠️ Gemini API Key is missing in BOTH environment and Firestore. AI features will not work.');
+    return null;
 }
 
-const API_KEY = getApiKey();
-const genAI = API_KEY ? new GoogleGenerativeAI(API_KEY) : null;
+// genAI will be initialized per function call to ensure latest API key
 
 // Gemini Parser Function
 async function parseProfile(text, modelId = 'gemini-2.0-flash') {
-    const apiKey = getApiKey();
+    const apiKey = await getApiKey();
     if (!apiKey) {
         console.error('Gemini Parse Error: API Key missing');
         return null;
