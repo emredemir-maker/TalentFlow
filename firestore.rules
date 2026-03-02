@@ -6,11 +6,11 @@ service cloud.firestore {
     function isAuthenticated() {
       return request.auth != null;
     }
-    
-    function getUserData() {
-      return get(/databases/$(database)/documents/artifacts/talent-flow/public/data/users/$(request.auth.uid)).data;
-    }
 
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
     function isSuperAdmin() {
       return isAuthenticated() && 
         (request.auth.token.email == 'emre.demir@infoset.app' || 
