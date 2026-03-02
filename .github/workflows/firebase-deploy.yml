@@ -23,6 +23,15 @@ jobs:
 
       - name: Build Frontend
         run: npm run build
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY || 'AIzaSyDFJfVrKGBnIsCXBldxpeIDlE_OxxJPKbQ' }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN || 'talentflow-84bb6.firebaseapp.com' }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID || 'talentflow-84bb6' }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET || 'talentflow-84bb6.firebasestorage.app' }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID || '132883257197' }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID || '1:132883257197:web:9c569a6c8fa52b0cfe6c64' }}
+          VITE_SERVER_URL: https://talentflow-84bb6.web.app
+          VITE_APP_URL: https://talentflow-84bb6.web.app
 
       - name: Install Functions Dependencies
         working-directory: ./functions
