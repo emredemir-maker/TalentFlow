@@ -34,3 +34,5 @@ jobs:
           args: deploy --project talentflow-84bb6
         env:
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+# Trigger redeploy
