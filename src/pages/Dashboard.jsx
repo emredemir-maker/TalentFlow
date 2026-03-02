@@ -272,7 +272,7 @@ export default function Dashboard() {
             </div>
 
             <div className="px-4 lg:px-6 py-4">
-                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 stagger">
+                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 stagger">
                     <StatCard icon={Users} iconColor="text-cyan-600 dark:text-cyan-400" bgColor="bg-cyan-500/10" value={stats.total} label="Yetenek Havuzu"
                         isActive={statFilter === '__total__'}
                         onClick={() => setStatFilter(statFilter === '__total__' ? null : '__total__')} />

@@ -93,10 +93,8 @@ export function AuthProvider({ children }) {
                     return;
                 }
 
-                const allUsersSnap = await getDocs(query(collection(db, USERS_PATH)));
-                const isFirstUser = allUsersSnap.empty;
-
-                if (isPrimaryAdmin || isFirstUser) {
+                // Removed isFirstUser check to avoid permission errors
+                if (isPrimaryAdmin) {
                     const firstProfile = {
                         uid: currentUser.uid,
                         email: emailLower,
@@ -179,56 +177,89 @@ export function AuthProvider({ children }) {
     const registerWithEmail = async (email, password, name) => {
         setLoading(true);
         setError(null);
+        console.log(`[Registration] Starting for ${email}...`);
         try {
-            // 1. Check if invitation exists OR is primary admin OR DB is empty
-            const isPrimaryAdmin = INITIAL_SUPER_ADMINS.includes(email.toLowerCase());
-            const allUsersSnap = await getDocs(query(collection(db, USERS_PATH)));
-            const isFirstUser = allUsersSnap.empty;
+            // 1. Check if invitation exists OR is primary admin
+            const emailLower = email.trim().toLowerCase();
+            const isPrimaryAdmin = INITIAL_SUPER_ADMINS.includes(emailLower);
 
-            const q = query(collection(db, INVITATIONS_PATH),
-                where("email", "==", email.toLowerCase()),
-                where("status", "==", "pending")
-            );
-            const inviteSnap = await getDocs(q);
+            console.log(`[Registration] Checking invitations for ${emailLower}...`);
+            let invitation = null;
+            let inviteDocId = null;
 
-            if (inviteSnap.empty && !isPrimaryAdmin && !isFirstUser) {
-                throw new Error("Geçerli bir davetiyeniz bulunmuyor.");
+            try {
+                const q = query(collection(db, INVITATIONS_PATH),
+                    where("email", "==", emailLower),
+                    where("status", "==", "pending")
+                );
+                const inviteSnap = await getDocs(q);
+                if (!inviteSnap.empty) {
+                    invitation = inviteSnap.docs[0].data();
+                    inviteDocId = inviteSnap.docs[0].id;
+                    console.log(`[Registration] Found valid invitation.`);
+                }
+            } catch (snapErr) {
+                console.error("[Registration] Invitation check failed:", snapErr);
+                // If it's a permission error here, it means the 'allow read: if true' rule isn't working as expected
+                if (!isPrimaryAdmin) {
+                    throw new Error(`Davetiye kontrolü başarısız: ${snapErr.message}`);
+                }
             }
 
-            const inviteDoc = !inviteSnap.empty ? inviteSnap.docs[0] : null;
-            const invitation = inviteDoc ? inviteDoc.data() : null;
+            if (!invitation && !isPrimaryAdmin) {
+                console.warn(`[Registration] No invitation and not primary admin.`);
+                throw new Error("Geçerli bir davetiyeniz bulunmuyor. Lütfen administratörden davet isteyeniz.");
+            }
 
             // 2. Create Auth User
-            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            console.log(`[Registration] Creating auth user...`);
+            const userCredential = await createUserWithEmailAndPassword(auth, emailLower, password);
             const newUser = userCredential.user;
 
             // 3. Set Display Name
+            console.log(`[Registration] Updating profile display name...`);
             await updateProfile(newUser, { displayName: name });
 
             // 4. Create User Profile
+            console.log(`[Registration] Creating Firestore profile...`);
             const profile = {
                 uid: newUser.uid,
                 email: newUser.email,
                 displayName: name,
                 photoURL: '',
-                role: (isPrimaryAdmin || isFirstUser) ? 'super_admin' : (invitation?.role || 'recruiter'),
+                role: isPrimaryAdmin ? 'super_admin' : (invitation?.role || 'recruiter'),
                 departments: invitation?.departments ? invitation.departments : (invitation?.department ? [invitation.department] : []),
                 status: 'active',
                 createdAt: serverTimestamp()
             };
-            await setDoc(doc(db, USERS_PATH, newUser.uid), profile);
+
+            try {
+                await setDoc(doc(db, USERS_PATH, newUser.uid), profile);
+                console.log(`[Registration] Firestore profile created.`);
+            } catch (profileErr) {
+                console.error("[Registration] Profile creation error:", profileErr);
+                throw new Error(`Profil oluşturulamadı: ${profileErr.message}`);
+            }
 
             // 5. Mark invitation as accepted (if it existed)
-            if (inviteDoc) {
-                await updateDoc(doc(db, INVITATIONS_PATH, inviteDoc.id), {
-                    status: 'accepted',
-                    acceptedAt: serverTimestamp()
-                });
+            if (inviteDocId) {
+                try {
+                    await updateDoc(doc(db, INVITATIONS_PATH, inviteDocId), {
+                        status: 'accepted',
+                        acceptedAt: serverTimestamp()
+                    });
+                    console.log(`[Registration] Invitation marked as accepted.`);
+                } catch (inviteUpdateErr) {
+                    console.error("[Registration] Failed to update invitation status:", inviteUpdateErr);
+                    // Non-critical error, we still continue
+                }
             }
 
             setUserProfile(profile);
+            console.log(`[Registration] Success!`);
             return newUser;
         } catch (err) {
+            console.error("[Registration] General error:", err);
             setError(err.message);
             setLoading(false);
             throw err;

@@ -43,9 +43,9 @@ export default function StatCard({ icon: Icon, iconColor = 'text-cyan-500', bgCo
                 <div className="text-[9px] font-black uppercase tracking-[0.2em] text-text-muted mb-0.5 group-hover:text-text-secondary transition-colors opacity-70">
                     {label}
                 </div>
-                <div className="text-xl font-black text-text-primary tracking-tight flex items-baseline gap-1">
+                <div className="text-fluid-xl font-black text-text-primary tracking-tight flex items-baseline gap-1 truncate">
                     {value}
-                    <span className="text-[8px] font-black text-text-muted opacity-40 group-hover:text-cyan-500 transition-colors uppercase tracking-widest">/ HAVUZ</span>
+                    <span className="text-[8px] font-black text-text-muted opacity-40 group-hover:text-cyan-500 transition-colors uppercase tracking-widest hidden sm:inline">/ HAVUZ</span>
                 </div>
             </div>
 

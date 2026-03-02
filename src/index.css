@@ -148,6 +148,33 @@ body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   transition: background-color 0.4s ease;
+  font-size: 14px;
+  /* Default base size decreased slightly */
+}
+
+@media (max-width: 1400px) {
+  html {
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 1200px) {
+  html {
+    font-size: 12px;
+  }
+}
+
+/* Fluid Typography Utilities */
+.text-fluid-3xl {
+  font-size: clamp(1.5rem, 4vw, 1.875rem);
+}
+
+.text-fluid-2xl {
+  font-size: clamp(1.25rem, 3vw, 1.5rem);
+}
+
+.text-fluid-xl {
+  font-size: clamp(1rem, 2.5vw, 1.25rem);
 }
 
 /* ==================== ANIMATIONS ==================== */
@@ -596,7 +623,7 @@ select option {
   mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
-  opacity: 0.3;
+  opacity: 0.2;
   pointer-events: none;
   transition: opacity 0.3s ease;
 }

@@ -365,7 +365,7 @@ export default function AnalyticsPage() {
 
                     {activeTab === 'overview' && (
                         <div className="space-y-6 animate-fade-in">
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-6">
                                 <KPICard title="Aktif Havuz" value={candidates.length} icon={Users} trend="+12%" isPositive color="from-blue-500/20 to-blue-600/5" iconColor="text-blue-400" />
                                 <KPICard title="Yetenek Skoru" value={`${avgMatchScore}%`} icon={BrainCircuit} trend="+3.4%" isPositive color="from-violet-500/20 to-violet-600/5" iconColor="text-violet-400" />
                                 <KPICard title="Yanıt Bekleyen" value={messageStats.sent - messageStats.replied} icon={Clock} trend="-5%" isPositive={false} color="from-amber-500/20 to-amber-600/5" iconColor="text-amber-400" />
@@ -548,8 +548,8 @@ function KPICard({ title, value, icon: IconComponent, trend, isPositive, color, 
                 )}
             </div>
             <div>
-                <p className="text-xs font-black text-text-muted uppercase tracking-widest mb-1">{title}</p>
-                <h3 className="text-3xl font-black text-text-primary tracking-tighter">{value}</h3>
+                <p className="text-[10px] font-black text-text-muted uppercase tracking-widest mb-1 truncate">{title}</p>
+                <h3 className="text-fluid-3xl font-black text-text-primary tracking-tighter truncate">{value}</h3>
             </div>
         </div>
     );

@@ -14,7 +14,7 @@ import {
 import { db } from '../config/firebase';
 
 const CANDIDATES_PATH = 'artifacts/talent-flow/public/data/candidates';
-const USERS_PATH = 'artifacts/talent-flow/users';
+const USERS_PATH = 'artifacts/talent-flow/public/data/users';
 
 export async function addCandidate(candidateData) {
     const candidatesRef = collection(db, CANDIDATES_PATH);

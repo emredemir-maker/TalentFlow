@@ -11,62 +11,50 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/artifacts/talent-flow/public/data/users/$(request.auth.uid)).data;
     }
 
-    
     function isSuperAdmin() {
-      return isAuthenticated() && (getUserData().role == 'super_admin' || request.auth.token.email == 'emre.demir@infoset.app');
+      return isAuthenticated() && 
+        (request.auth.token.email == 'emre.demir@infoset.app' || 
+         (exists(/databases/$(database)/documents/artifacts/talent-flow/public/data/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/artifacts/talent-flow/public/data/users/$(request.auth.uid)).data.role == 'super_admin'));
     }
 
-    
     function isRecruiter() {
-      return isAuthenticated() && (getUserData().role == 'recruiter' || isSuperAdmin());
+      return isAuthenticated() && 
+        (isSuperAdmin() || 
+         (exists(/databases/$(database)/documents/artifacts/talent-flow/public/data/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/artifacts/talent-flow/public/data/users/$(request.auth.uid)).data.role == 'recruiter'));
     }
 
-    // --- System Settings ---
-    match /artifacts/talent-flow/public/data/settings/{settingId} {
-      allow read: if isAuthenticated();
+    // --- Critical Path: Invitations ---
+    // Anyone (even unauthenticated) MUST be able to check if an invitation exists
+    // for their email during registration.
+    match /artifacts/talent-flow/public/data/invitations/{inviteId} {
+      allow read: if true;
       allow write: if isSuperAdmin();
     }
 
-    // --- Users Collection ---
+    // --- Users & Settings ---
     match /artifacts/talent-flow/public/data/users/{userId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
+      allow read, create: if isAuthenticated();
       allow update: if isSuperAdmin() || (request.auth.uid == userId);
       allow delete: if isSuperAdmin();
+      
+      match /{allChildren=**} {
+        allow read, write: if isAuthenticated() && (request.auth.uid == userId || isSuperAdmin());
+      }
     }
 
-    // --- Invitations ---
-    match /artifacts/talent-flow/public/data/invitations/{inviteId} {
-      allow read: if isAuthenticated();
-      allow write: if isSuperAdmin();
-    }
-
-    // --- Candidates ---
-    match /artifacts/talent-flow/public/data/candidates/{candidateId} {
-      allow read, write: if isRecruiter();
-    }
-    
-    // --- Positions ---
-    match /artifacts/talent-flow/public/data/positions/{posId} {
+    // --- Candidates, Positions, Departments, etc. ---
+    // Broad rule for talent-flow data to ensure recruiters can work
+    match /artifacts/talent-flow/public/data/{collectionName}/{docId} {
       allow read: if isAuthenticated();
       allow write: if isRecruiter();
     }
 
-    // --- Departments ---
-    match /artifacts/talent-flow/public/data/departments/{deptId} {
+    // Recursive match for any other talent-flow paths
+    match /artifacts/talent-flow/{allPaths=**} {
       allow read: if isAuthenticated();
       allow write: if isSuperAdmin();
-    }
-
-    // --- Sources ---
-    match /artifacts/talent-flow/public/data/sources/{sourceId} {
-      allow read: if isAuthenticated();
-      allow write: if isSuperAdmin();
-    }
-
-    // --- Messages / Queue ---
-    match /artifacts/talent-flow/public/data/messages/{msgId} {
-      allow read, write: if isRecruiter();
     }
 
     // Default deny

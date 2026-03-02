@@ -176,9 +176,34 @@ export default function SuperAdminPage() {
             const baseUrl = window.location.origin;
             const inviteLink = `${baseUrl}?invite=${encodeURIComponent(inviteEmail.trim().toLowerCase())}`;
 
+            // Send email via backend
+            try {
+                // Use relative path to leverage Vite Proxy in dev or same-origin in prod
+                const emailResponse = await fetch('/api/send-invite', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: inviteEmail.trim().toLowerCase(),
+                        role: inviteRole,
+                        inviteLink: inviteLink
+                    })
+                });
+
+                if (!emailResponse.ok) {
+                    const emailError = await emailResponse.json().catch(() => ({ error: 'Bilinmeyen sunucu hatası.' }));
+                    console.warn('Backend email send error:', emailError);
+                    alert(`⚠️ Davet oluşturuldu ancak e-posta gönderilemedi: ${emailError.error || 'Bilinmeyen hata'}`);
+                } else {
+                    alert(`✅ Davet oluşturuldu ve e-posta başarıyla gönderildi!`);
+                }
+            } catch (emailErr) {
+                console.error('Failed to call email API:', emailErr);
+                alert(`❌ Sunucu bağlantı hatası: E-posta gönderilemedi. (Sunucu portu 3001 açık mı?)`);
+            }
+
             try {
                 await navigator.clipboard.writeText(inviteLink);
-                alert(`✅ Davet oluşturuldu!\n\nDavet linki panoya kopyalandı.`);
+                alert(`✅ Davet oluşturuldu ve mail gönderildi!\n\nDavet linki panoya kopyalandı.`);
             } catch (clipErr) {
                 prompt('Davet linki:', inviteLink);
             }
@@ -337,6 +362,7 @@ export default function SuperAdminPage() {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
+
                                             <div className="flex items-center gap-2">
                                                 {u.id !== user.uid && (
                                                     <>

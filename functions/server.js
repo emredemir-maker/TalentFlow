@@ -122,7 +122,7 @@ app.use(cors({
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     credentials: true
 }));
-app.use(xss()); // Protect against XSS in body
+// app.use(xss()); // Protect against XSS in body
 app.use(express.json({ limit: '50kb' })); // Body size limiting
 
 // Serve static files from uploads directory
@@ -609,8 +609,10 @@ app.post('/api/process-cv', upload.array('cvs', 20), async (req, res) => {
 // Invite Email Endpoint
 app.post('/api/send-invite', async (req, res) => {
     const { email, role, inviteLink } = req.body;
+    console.log(`✉️ Received invite request for: ${email}, role: ${role}`);
 
     if (!email || !inviteLink) {
+        console.warn('❌ Missing email or inviteLink in request');
         return res.status(400).json({ error: 'Email ve davet linki gereklidir.' });
     }
 
@@ -621,15 +623,20 @@ app.post('/api/send-invite', async (req, res) => {
 
     try {
         const transporter = nodemailer.createTransport({
-            service: 'gmail',
+            host: 'smtp.gmail.com',
+            port: 465,
+            secure: true,
             auth: {
                 user: process.env.EMAIL_USER,
-                pass: process.env.EMAIL_PASS // App Password is required for Gmail
+                pass: process.env.EMAIL_PASS
             },
+            connectionTimeout: 10000,
+            greetingTimeout: 5000,
+            socketTimeout: 20000
         });
 
-        // Verify transporter connection
-        await transporter.verify();
+        // Skip extra verify() call if it hangs, sendMail will throw if failed
+        // await transporter.verify();
 
         const mailOptions = {
             from: `"TalentFlow" <${process.env.EMAIL_USER}>`,
