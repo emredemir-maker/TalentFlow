@@ -5,7 +5,7 @@ import {
     X, Zap, Users, Box, Loader2, Sparkles, ChevronRight,
     Save, Award, AlertTriangle, TrendingUp, TrendingDown,
     Printer, MessageSquare, GitBranch, Code, Target,
-    ArrowDown, PlusCircle, Flag, ShieldCheck
+    ArrowDown, PlusCircle, Flag, ShieldCheck, Video, ExternalLink
 } from 'lucide-react';
 import {
     generateInterviewPaths,
@@ -33,12 +33,19 @@ const COMPETENCY_MODES = [
 const PATH_ICON_MAP = { code: Code, users: Users, target: Target, zap: Zap, box: Box };
 
 
-export default function InterviewSessionModal({ candidate, onClose, onSessionSaved }) {
+export default function InterviewSessionModal({ candidate, onClose, onSessionSaved, initialSession }) {
     const { updateCandidate } = useCandidates();
 
     // Flow: type-select → paths → interview → scoring → review
     const [phase, setPhase] = useState('type-select');
     const [interviewType, setInterviewType] = useState(null);
+
+    // Auto trigger if initial session passed
+    useEffect(() => {
+        if (initialSession && initialSession.type) {
+            handleSelectType(initialSession.type);
+        }
+    }, [initialSession]);
 
     // Path selection
     const [paths, setPaths] = useState([]);
@@ -197,11 +204,13 @@ export default function InterviewSessionModal({ candidate, onClose, onSessionSav
         setSaving(true);
         try {
             const session = {
-                id: `interview_${Date.now()}`,
+                id: initialSession ? initialSession.id : `interview_${Date.now()}`,
+                status: 'completed',
                 type: interviewType,
                 typeLabel: INTERVIEW_TYPES.find(t => t.id === interviewType)?.label || interviewType,
                 pathTitle: selectedPath?.title || '',
-                date: new Date().toISOString(),
+                date: initialSession?.date || new Date().toISOString(),
+                time: initialSession?.time,
                 // Sadece cevaplanmış soruları kaydet
                 questions: conversation
                     .filter(c => c.answer?.trim())
@@ -228,7 +237,18 @@ export default function InterviewSessionModal({ candidate, onClose, onSessionSav
                 starScores: isLiveMode ? starScores : null
             };
             const existing = candidate.interviewSessions || [];
-            await updateCandidate(candidate.id, { interviewSessions: [...existing, session] });
+            let newSessions = [...existing];
+            if (initialSession) {
+                const idx = newSessions.findIndex(s => s.id === initialSession.id);
+                if (idx !== -1) {
+                    newSessions[idx] = { ...newSessions[idx], ...session };
+                } else {
+                    newSessions.push(session);
+                }
+            } else {
+                newSessions.push(session);
+            }
+            await updateCandidate(candidate.id, { interviewSessions: newSessions });
             onSessionSaved?.(session);
             onClose();
         } catch (err) {
@@ -290,6 +310,14 @@ export default function InterviewSessionModal({ candidate, onClose, onSessionSav
                                     <>
                                         <span className="w-1 h-1 rounded-full bg-text-muted opacity-30" />
                                         <span className="text-[10px] text-electric font-black uppercase tracking-widest">{selectedPath.title}</span>
+                                    </>
+                                )}
+                                {initialSession?.meetLink && (
+                                    <>
+                                        <span className="w-1 h-1 rounded-full bg-text-muted opacity-30 ml-2" />
+                                        <a href={initialSession.meetLink} target="_blank" rel="noopener noreferrer" className="ml-2 px-3 py-1 bg-cyan-500/20 border border-cyan-500/30 text-cyan-500 dark:text-cyan-400 rounded-lg text-[10px] uppercase font-black hover:bg-cyan-500/30 transition-all flex items-center gap-1.5 shadow-sm">
+                                            <Video className="w-3 h-3" /> Toplantıya Katıl
+                                        </a>
                                     </>
                                 )}
                             </div>

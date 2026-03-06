@@ -49,7 +49,8 @@ TalentFlow, modern bir Full-Stack mimarisine sahiptir:
 
 ### 2. Akıllı Aday Yönetimi (Candidate Portal)
 - **AI STAR Analizi**: Özgeçmişleri S (Situation), T (Task), A (Action), R (Result) bazında 100 üzerinden puanlama.
-- **Dinamik Mülakat Planlama**: Google Takvim üzerinden Meet linki oluşturarak otomatik mülakat planlama.
+- **Dinamik Mülakat Planlama**: Google Takvim üzerinden Meet linki oluşturarak otomatik mülakat planlama ve seans geçmişinden tek tıkla mülakata (veya doğrudan toplantı linkine) katılma.
+- **Canlı Gözlemci (Live Observer)**: Aday ile yapılan mülakatlarda sadece adayın sesini veya hem aday hem mülakatçının sesini (opsiyonel filtreleme ile) dinleyerek anlık transkript çıkaran ve AI tüyolar veren eşzamanlı sistem.
 - **Mesaj Kuyruğu**: Adaylara gönderilen e-postaların ve hatırlatıcıların merkezi yönetimi.
 
 ### 3. Pozisyon & Departman İş Akışı

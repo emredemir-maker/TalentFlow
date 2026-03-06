@@ -47,6 +47,7 @@ export default function CandidateProcessPage() {
     const { positions } = usePositions();
     const [sendModalPurpose, setSendModalPurpose] = useState(null);
     const [showInterviewModal, setShowInterviewModal] = useState(false);
+    const [plannedSessionToStart, setPlannedSessionToStart] = useState(null);
     const [activeTab, setActiveTab] = useState('overview'); // ['overview', 'interviews', 'cv']
 
     const candidate = useMemo(() => {
@@ -409,7 +410,7 @@ export default function CandidateProcessPage() {
                                         <h3 className="text-[12px] font-black text-text-primary tracking-widest uppercase">Seans Geçmişi</h3>
                                     </div>
                                     <button
-                                        onClick={() => setShowInterviewModal(true)}
+                                        onClick={() => { setPlannedSessionToStart(null); setShowInterviewModal(true); }}
                                         className="px-5 py-2.5 rounded-xl bg-cyan-500 text-white font-black text-[10px] uppercase tracking-widest shadow-lg shadow-cyan-500/20 hover:scale-105 active:scale-95 transition-all"
                                     >
                                         Yeni Seans
@@ -417,7 +418,13 @@ export default function CandidateProcessPage() {
                                 </div>
                                 <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
                                     {candidate.interviewSessions?.length > 0 ? (
-                                        <InterviewHistory sessions={candidate.interviewSessions} />
+                                        <InterviewHistory
+                                            sessions={candidate.interviewSessions}
+                                            onStartSession={(session) => {
+                                                setPlannedSessionToStart(session);
+                                                setShowInterviewModal(true);
+                                            }}
+                                        />
                                     ) : (
                                         <div className="h-full flex flex-col items-center justify-center text-center py-20 opacity-40">
                                             <MessageSquare className="w-12 h-12 text-text-muted mb-4" />
@@ -482,8 +489,9 @@ export default function CandidateProcessPage() {
             {showInterviewModal && (
                 <InterviewSessionModal
                     candidate={candidate}
-                    onClose={() => setShowInterviewModal(false)}
-                    onSessionSaved={() => setShowInterviewModal(false)}
+                    initialSession={plannedSessionToStart}
+                    onClose={() => { setShowInterviewModal(false); setPlannedSessionToStart(null); }}
+                    onSessionSaved={() => { setShowInterviewModal(false); setPlannedSessionToStart(null); }}
                 />
             )}
         </div>

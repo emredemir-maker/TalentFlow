@@ -9,7 +9,7 @@ import {
 const TYPE_ICONS = { technical: Zap, culture: Users, product: Box };
 const TYPE_COLORS = { technical: 'cyan-500', culture: 'emerald-500', product: 'violet-500' };
 
-export default function InterviewHistory({ sessions = [] }) {
+export default function InterviewHistory({ sessions = [], onStartSession }) {
     const [expandedId, setExpandedId] = useState(null);
 
     if (!sessions || sessions.length === 0) {
@@ -123,8 +123,13 @@ export default function InterviewHistory({ sessions = [] }) {
                                         <div className="flex gap-3">
                                             <span className="px-4 py-2 rounded-xl bg-bg-secondary text-[10px] font-black text-text-muted border border-border-subtle uppercase tracking-widest">Süre: {session.duration || '-'} dk</span>
                                             {session.meetLink && (
-                                                <a href={session.meetLink} target="_blank" rel="noopener noreferrer" className="px-5 py-2 rounded-xl bg-cyan-500 text-[10px] font-black text-white shadow-lg shadow-cyan-500/20 uppercase tracking-widest hover:bg-cyan-600 transition-all">Toplantıya Katıl</a>
+                                                <a href={session.meetLink} target="_blank" rel="noopener noreferrer" className="px-5 py-2 rounded-xl bg-cyan-500 text-[10px] font-black text-white shadow-lg shadow-cyan-500/20 uppercase tracking-widest hover:bg-cyan-600 transition-all flex items-center justify-center">Toplantıya Katıl</a>
                                             )}
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); onStartSession?.(session); }}
+                                                className="px-5 py-2 rounded-xl bg-emerald-500 text-[10px] font-black text-white shadow-lg shadow-emerald-500/20 uppercase tracking-widest hover:bg-emerald-600 transition-all border border-emerald-500">
+                                                Mülakatı Başlat
+                                            </button>
                                         </div>
                                     </div>
                                 ) : (

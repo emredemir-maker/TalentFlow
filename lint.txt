@@ -1,0 +1,449 @@
+
+> talentflow@0.0.0 lint
+> eslint .
+
+
+D:\TAlentFlow\TalentFlow\fix-colors.js
+  1:1  error  Parsing error: Unexpected character '�'
+
+D:\TAlentFlow\TalentFlow\functions\server.js
+   12:8   error  'rateLimit' is defined but never used. Allowed unused vars must match /^[A-Z_]/u             no-unused-vars
+   13:8   error  'xss' is defined but never used. Allowed unused vars must match /^[A-Z_]/u                   no-unused-vars
+   66:24  error  'process' is not defined                                                                     no-undef
+   66:51  error  'process' is not defined                                                                     no-undef
+   66:82  error  'process' is not defined                                                                     no-undef
+  108:5   error  'process' is not defined                                                                     no-undef
+  109:5   error  'process' is not defined                                                                     no-undef
+  148:17  error  'process' is not defined                                                                     no-undef
+  148:52  error  'process' is not defined                                                                     no-undef
+  178:11  error  'model' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u        no-unused-vars
+  419:35  error  'isVeryShort' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+  485:60  error  'e' is defined but never used                                                                no-unused-vars
+  485:63  error  Empty block statement                                                                        no-empty
+  612:33  error  'process' is not defined                                                                     no-undef
+  639:10  error  'process' is not defined                                                                     no-undef
+  639:37  error  'process' is not defined                                                                     no-undef
+  650:23  error  'process' is not defined                                                                     no-undef
+  651:23  error  'process' is not defined                                                                     no-undef
+  662:36  error  'process' is not defined                                                                     no-undef
+  719:42  error  'Buffer' is not defined                                                                      no-undef
+  729:29  error  'Buffer' is not defined                                                                      no-undef
+  775:24  error  'Buffer' is not defined                                                                      no-undef
+  778:20  error  'Buffer' is not defined                                                                      no-undef
+  838:14  error  'process' is not defined                                                                     no-undef
+  841:16  error  'process' is not defined                                                                     no-undef
+  841:83  error  'process' is not defined                                                                     no-undef
+
+D:\TAlentFlow\TalentFlow\server.js
+   12:8   error  'rateLimit' is defined but never used. Allowed unused vars must match /^[A-Z_]/u             no-unused-vars
+   13:8   error  'xss' is defined but never used. Allowed unused vars must match /^[A-Z_]/u                   no-unused-vars
+   65:24  error  'process' is not defined                                                                     no-undef
+   65:51  error  'process' is not defined                                                                     no-undef
+   65:82  error  'process' is not defined                                                                     no-undef
+  107:5   error  'process' is not defined                                                                     no-undef
+  108:5   error  'process' is not defined                                                                     no-undef
+  147:20  error  'process' is not defined                                                                     no-undef
+  147:55  error  'process' is not defined                                                                     no-undef
+  179:11  error  'model' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u        no-unused-vars
+  420:35  error  'isVeryShort' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+  486:60  error  'e' is defined but never used                                                                no-unused-vars
+  486:63  error  Empty block statement                                                                        no-empty
+  612:33  error  'process' is not defined                                                                     no-undef
+  639:10  error  'process' is not defined                                                                     no-undef
+  639:37  error  'process' is not defined                                                                     no-undef
+  650:23  error  'process' is not defined                                                                     no-undef
+  651:23  error  'process' is not defined                                                                     no-undef
+  662:36  error  'process' is not defined                                                                     no-undef
+  719:42  error  'Buffer' is not defined                                                                      no-undef
+  729:29  error  'Buffer' is not defined                                                                      no-undef
+  775:24  error  'Buffer' is not defined                                                                      no-undef
+  778:20  error  'Buffer' is not defined                                                                      no-undef
+  838:14  error  'process' is not defined                                                                     no-undef
+  841:16  error  'process' is not defined                                                                     no-undef
+  841:83  error  'process' is not defined                                                                     no-undef
+
+D:\TAlentFlow\TalentFlow\src\App.jsx
+  10:32  error  'useNotifications' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+  42:20  error  'error' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u    no-unused-vars
+
+D:\TAlentFlow\TalentFlow\src\components\AIAnalysisPanel.jsx
+  326:32  error  'Icon' is defined but never used  no-unused-vars
+
+D:\TAlentFlow\TalentFlow\src\components\AddCandidateModal.jsx
+  16:13  error  'addNotification' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+D:\TAlentFlow\TalentFlow\src\components\AgentThoughtPanel.jsx
+  29:13  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  27 |     useEffect(() => {
+  28 |         if (isProcessing) {
+> 29 |             setCurrentStep(0);
+     |             ^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  30 |             const interval = setInterval(() => {
+  31 |                 setCurrentStep(prev => (prev < STEPS.length - 1 ? prev + 1 : prev));
+  32 |             }, 1500); // 1.5s per step  react-hooks/set-state-in-effect
+
+D:\TAlentFlow\TalentFlow\src\components\CandidateDrawer.jsx
+   45:12  error  'updatingStatus' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u     no-unused-vars
+   45:28  error  'setUpdatingStatus' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+   46:11  error  'reportRef' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u          no-unused-vars
+   51:12  error  'showJobInput' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u       no-unused-vars
+   51:26  error  'setShowJobInput' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u    no-unused-vars
+   55:12  error  'aiResult' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u           no-unused-vars
+   58:12  error  'jobDescription' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u     no-unused-vars
+   58:28  error  'setJobDescription' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+  705:41  error  'Icon' is defined but never used                                                                   no-unused-vars
+
+D:\TAlentFlow\TalentFlow\src\components\InterviewHistory.jsx
+  3:20  error  'useRef' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+D:\TAlentFlow\TalentFlow\src\components\InterviewSessionModal.jsx
+  48:8   warning  React Hook useEffect has a missing dependency: 'handleSelectType'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  76:12  error    'liveTranscript' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                       no-unused-vars
+  76:28  error    'setLiveTranscript' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                    no-unused-vars
+
+D:\TAlentFlow\TalentFlow\src\components\LiveObserverPanel.jsx
+    9:10  error  'checkStarLogicGemini' is defined but never used. Allowed unused vars must match /^[A-Z_]/u          no-unused-vars
+   10:10  error  'getModel' is defined but never used. Allowed unused vars must match /^[A-Z_]/u                      no-unused-vars
+   21:12  error  'lastTranscriptChunk' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+   27:11  error  'recognitionRef' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u       no-unused-vars
+   28:11  error  'audioChunksRef' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u       no-unused-vars
+   88:85  error  'e' is defined but never used                                                                        no-unused-vars
+  253:11  error  'processMockChunk' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u     no-unused-vars
+
+D:\TAlentFlow\TalentFlow\src\components\LoadingScreen.jsx
+  6:68  error  'subtext' is assigned a value but never used  no-unused-vars
+
+D:\TAlentFlow\TalentFlow\src\components\SendMessageModal.jsx
+  42:22  error    'setMeetLink' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                          no-unused-vars
+  43:12  error    'autoMeet' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                             no-unused-vars
+  43:22  error    'setAutoMeet' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                          no-unused-vars
+  51:8   warning  React Hook useEffect has missing dependencies: 'generateDM' and 'interviewType'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+
+D:\TAlentFlow\TalentFlow\src\components\StarScoreCard.jsx
+  11:51  error  'candidate' is defined but never used  no-unused-vars
+
+D:\TAlentFlow\TalentFlow\src\components\StatCard.jsx
+  5:42  error  'Icon' is defined but never used  no-unused-vars
+
+D:\TAlentFlow\TalentFlow\src\components\SystemScanner.jsx
+   36:30  error    Error: Cannot access variable before it is declared
+
+`handleScan` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+  34 |     useEffect(() => {
+  35 |         if (positions.length > prevPositionsCount.current && prevPositionsCount.current > 0) {
+> 36 |             setTimeout(() => handleScan(false), 1000);
+     |                              ^^^^^^^^^^ `handleScan` accessed before it is declared
+  37 |         }
+  38 |         prevPositionsCount.current = positions.length;
+  39 |     }, [positions.length]);
+
+   45 |     };
+   46 |
+>  47 |     const handleScan = async (isForce = false) => {
+      |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  48 |         // If clicking from the confirm modal, use the state. If auto-triggered, use argument.
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  49 |         const effectiveForce = typeof isForce === 'boolean' ? isForce : forceRescan;
+      …
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 213 |         }
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 214 |     };
+      | ^^^^^^^ `handleScan` is declared here
+  215 |
+  216 |     if (showConfirm && !scanning) {
+  217 |         return createPortal(  react-hooks/immutability
+   39:8   warning  React Hook useEffect has a missing dependency: 'handleScan'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    react-hooks/exhaustive-deps
+  108:23  error    'missingAnalyses' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  no-unused-vars
+
+D:\TAlentFlow\TalentFlow\src\context\AuthContext.jsx
+  310:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+D:\TAlentFlow\TalentFlow\src\context\CandidatesContext.jsx
+   16:87  error  'role' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                            no-unused-vars
+  163:9   error  Unreachable code                                                                                                                no-unreachable
+  312:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+D:\TAlentFlow\TalentFlow\src\context\MessageQueueContext.jsx
+   5:34  error  'query' is defined but never used. Allowed unused vars must match /^[A-Z_]/u                                                    no-unused-vars
+  64:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+D:\TAlentFlow\TalentFlow\src\context\NotificationContext.jsx
+  11:9   error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+   9 |     useEffect(() => {
+  10 |         const count = notifications.filter(n => !n.read).length;
+> 11 |         setUnreadCount(count);
+     |         ^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  12 |     }, [notifications]);
+  13 |
+  14 |     const addNotification = useCallback((notification) => {  react-hooks/set-state-in-effect
+  53:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            react-refresh/only-export-components
+
+D:\TAlentFlow\TalentFlow\src\context\PositionsContext.jsx
+  15:5   error  'query' is defined but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       no-unused-vars
+  16:5   error  'orderBy' is defined but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     no-unused-vars
+  23:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     react-refresh/only-export-components
+  37:9   error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  35 |         if (!isAuthenticated) return;
+  36 |
+> 37 |         setLoading(true);
+     |         ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  38 |         const positionsRef = collection(db, POSITIONS_COLLECTION);
+  39 |
+  40 |         const unsubscribe = onSnapshot(positionsRef, (snapshot) => {  react-hooks/set-state-in-effect
+
+D:\TAlentFlow\TalentFlow\src\context\UserSettingsContext.jsx
+   32:17  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  30 |             const localTheme = localStorage.getItem('tf_theme');
+  31 |             if (localTheme) {
+> 32 |                 setSettings(prev => ({ ...prev, theme: localTheme }));
+     |                 ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  33 |             }
+  34 |             return;
+  35 |         }  react-hooks/set-state-in-effect
+  119:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        react-refresh/only-export-components
+
+D:\TAlentFlow\TalentFlow\src\pages\AIMatchPage.jsx
+  62:13  error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  60 |     useEffect(() => {
+  61 |         if (activePosition) {
+> 62 |             setSelectedSkills(activePosition.skills || []);
+     |             ^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  63 |         }
+  64 |     }, [selectedPositionId, allPositions]);
+  65 |  react-hooks/set-state-in-effect
+  64:8   warning  React Hook useEffect has a missing dependency: 'activePosition'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           react-hooks/exhaustive-deps
+
+D:\TAlentFlow\TalentFlow\src\pages\AnalyticsPage.jsx
+  402:79  error  'idx' is defined but never used  no-unused-vars
+
+D:\TAlentFlow\TalentFlow\src\pages\Dashboard.jsx
+   43:10  error  'seedCandidates' is defined but never used. Allowed unused vars must match /^[A-Z_]/u              no-unused-vars
+   95:12  error  'isDeleting' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u         no-unused-vars
+  109:28  error  'setBulkUpdateType' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+  111:12  error  'isBulkUpdating' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u     no-unused-vars
+  112:12  error  'isSeeding' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u          no-unused-vars
+  112:23  error  'setIsSeeding' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u       no-unused-vars
+  118:45  error  Empty block statement                                                                              no-empty
+  604:71  error  'index' is defined but never used                                                                  no-unused-vars
+
+D:\TAlentFlow\TalentFlow\src\pages\GuidePage.jsx
+  679:30  error  'Icon' is defined but never used  no-unused-vars
+
+D:\TAlentFlow\TalentFlow\src\pages\LoginPage.jsx
+  20:13  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  18 |         const inviteEmail = params.get('invite');
+  19 |         if (inviteEmail) {
+> 20 |             setEmail(inviteEmail);
+     |             ^^^^^^^^ Avoid calling setState() directly within an effect
+  21 |             setMode('register');
+  22 |         }
+  23 |     }, []);  react-hooks/set-state-in-effect
+  34:17  error  Empty block statement                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               no-empty
+
+D:\TAlentFlow\TalentFlow\src\pages\MessagesPage.jsx
+  294:27  error  'Icon' is defined but never used  no-unused-vars
+
+D:\TAlentFlow\TalentFlow\src\pages\PositionsPage.jsx
+   8:34  error  'doc' is defined but never used. Allowed unused vars must match /^[A-Z_]/u                    no-unused-vars
+   8:39  error  'getDoc' is defined but never used. Allowed unused vars must match /^[A-Z_]/u                 no-unused-vars
+  40:33  error  'analyzeCandidateMatch' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+D:\TAlentFlow\TalentFlow\src\pages\SettingsPage.jsx
+  213:29  error  'Icon' is defined but never used  no-unused-vars
+
+D:\TAlentFlow\TalentFlow\src\pages\SourceManagementPage.jsx
+  137:22  error  'parentId' is not defined  no-undef
+  139:65  error  'parentId' is not defined  no-undef
+  143:55  error  'parentId' is not defined  no-undef
+
+D:\TAlentFlow\TalentFlow\src\pages\SuperAdminPage.jsx
+   51:12  error  'loading' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+  233:22  error  'clipErr' is defined but never used                                                      no-unused-vars
+
+D:\TAlentFlow\TalentFlow\src\services\ai\communication.js
+  54:14  error  'e' is defined but never used  no-unused-vars
+
+D:\TAlentFlow\TalentFlow\src\services\ai\gemini-logic.js
+   3:23  error  'buildStructuredPrompt' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+  49:83  error  'context' is defined but never used                                                           no-unused-vars
+
+D:\TAlentFlow\TalentFlow\src\services\ai\interview.js
+  3:46  error  'sanitizeForPrompt' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+D:\TAlentFlow\TalentFlow\src\services\ai\utils.js
+  23:18  error  'innerE' is defined but never used  no-unused-vars
+
+D:\TAlentFlow\TalentFlow\src\services\integrationService.js
+    1:39  error  'linkWithPopup' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+  203:22  error  'e' is defined but never used                                                         no-unused-vars
+
+D:\TAlentFlow\TalentFlow\src\services\matchService.js
+  2:10  error  'analyzeCandidateMatch' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+D:\TAlentFlow\TalentFlow\test_mail.js
+   7:26  error  'process' is not defined  no-undef
+   8:33  error  'process' is not defined  no-undef
+   8:58  error  'process' is not defined  no-undef
+  13:19  error  'process' is not defined  no-undef
+  14:19  error  'process' is not defined  no-undef
+  23:30  error  'process' is not defined  no-undef
+  24:17  error  'process' is not defined  no-undef
+
+D:\TAlentFlow\TalentFlow\tmp_check_all_paths.js
+   3:45  error  'listCollections' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+  10:13  error  'process' is not defined                                                                no-undef
+  11:17  error  'process' is not defined                                                                no-undef
+  12:16  error  'process' is not defined                                                                no-undef
+  13:20  error  'process' is not defined                                                                no-undef
+  14:24  error  'process' is not defined                                                                no-undef
+  15:12  error  'process' is not defined                                                                no-undef
+
+D:\TAlentFlow\TalentFlow\tmp_check_all_paths_2.js
+   8:13  error  'process' is not defined  no-undef
+   9:17  error  'process' is not defined  no-undef
+  10:16  error  'process' is not defined  no-undef
+  11:20  error  'process' is not defined  no-undef
+  12:24  error  'process' is not defined  no-undef
+  13:12  error  'process' is not defined  no-undef
+
+D:\TAlentFlow\TalentFlow\tmp_check_cand_final.js
+   8:13  error  'process' is not defined  no-undef
+   9:17  error  'process' is not defined  no-undef
+  10:16  error  'process' is not defined  no-undef
+  11:20  error  'process' is not defined  no-undef
+  12:24  error  'process' is not defined  no-undef
+  13:12  error  'process' is not defined  no-undef
+
+D:\TAlentFlow\TalentFlow\tmp_check_paths.js
+   3:45  error  'limit' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+   3:52  error  'query' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+   8:13  error  'process' is not defined                                                      no-undef
+   9:17  error  'process' is not defined                                                      no-undef
+  10:16  error  'process' is not defined                                                      no-undef
+  11:20  error  'process' is not defined                                                      no-undef
+  12:24  error  'process' is not defined                                                      no-undef
+  13:12  error  'process' is not defined                                                      no-undef
+
+D:\TAlentFlow\TalentFlow\tmp_check_root_pos.js
+   3:45  error  'limit' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+   3:52  error  'query' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+   8:13  error  'process' is not defined                                                      no-undef
+   9:17  error  'process' is not defined                                                      no-undef
+  10:16  error  'process' is not defined                                                      no-undef
+  11:20  error  'process' is not defined                                                      no-undef
+  12:24  error  'process' is not defined                                                      no-undef
+  13:12  error  'process' is not defined                                                      no-undef
+
+D:\TAlentFlow\TalentFlow\tmp_check_users.js
+   8:13  error  'process' is not defined  no-undef
+   9:17  error  'process' is not defined  no-undef
+  10:16  error  'process' is not defined  no-undef
+  11:20  error  'process' is not defined  no-undef
+  12:24  error  'process' is not defined  no-undef
+  13:12  error  'process' is not defined  no-undef
+
+D:\TAlentFlow\TalentFlow\tmp_diagnose.js
+   8:13  error  'process' is not defined  no-undef
+   9:17  error  'process' is not defined  no-undef
+  10:16  error  'process' is not defined  no-undef
+  11:20  error  'process' is not defined  no-undef
+  12:24  error  'process' is not defined  no-undef
+  13:12  error  'process' is not defined  no-undef
+
+D:\TAlentFlow\TalentFlow\tmp_find_candidates.js
+   8:13  error  'process' is not defined  no-undef
+   9:17  error  'process' is not defined  no-undef
+  10:16  error  'process' is not defined  no-undef
+  11:20  error  'process' is not defined  no-undef
+  12:24  error  'process' is not defined  no-undef
+  13:12  error  'process' is not defined  no-undef
+
+D:\TAlentFlow\TalentFlow\tmp_inspect_data.js
+   8:13  error  'process' is not defined  no-undef
+   9:17  error  'process' is not defined  no-undef
+  10:16  error  'process' is not defined  no-undef
+  11:20  error  'process' is not defined  no-undef
+  12:24  error  'process' is not defined  no-undef
+  13:12  error  'process' is not defined  no-undef
+
+D:\TAlentFlow\TalentFlow\tmp_inspect_positions.js
+   3:45  error  'limit' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+   3:52  error  'query' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+   8:13  error  'process' is not defined                                                      no-undef
+   9:17  error  'process' is not defined                                                      no-undef
+  10:16  error  'process' is not defined                                                      no-undef
+  11:20  error  'process' is not defined                                                      no-undef
+  12:24  error  'process' is not defined                                                      no-undef
+  13:12  error  'process' is not defined                                                      no-undef
+
+D:\TAlentFlow\TalentFlow\tmp_migrate_data.js
+   3:58  error  'deleteDoc' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+   8:13  error  'process' is not defined                                                          no-undef
+   9:17  error  'process' is not defined                                                          no-undef
+  10:16  error  'process' is not defined                                                          no-undef
+  11:20  error  'process' is not defined                                                          no-undef
+  12:24  error  'process' is not defined                                                          no-undef
+  13:12  error  'process' is not defined                                                          no-undef
+
+D:\TAlentFlow\TalentFlow\tmp_recheck_root.js
+   8:13  error  'process' is not defined  no-undef
+   9:17  error  'process' is not defined  no-undef
+  10:16  error  'process' is not defined  no-undef
+  11:20  error  'process' is not defined  no-undef
+  12:24  error  'process' is not defined  no-undef
+  13:12  error  'process' is not defined  no-undef
+
+D:\TAlentFlow\TalentFlow\tmp_verify_nested_pos.js
+   8:13  error  'process' is not defined  no-undef
+   9:17  error  'process' is not defined  no-undef
+  10:16  error  'process' is not defined  no-undef
+  11:20  error  'process' is not defined  no-undef
+  12:24  error  'process' is not defined  no-undef
+  13:12  error  'process' is not defined  no-undef
+
+✖ 227 problems (223 errors, 4 warnings)
+

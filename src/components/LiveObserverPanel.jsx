@@ -21,12 +21,14 @@ export default function LiveObserverPanel({ candidate, onTranscriptUpdate, onAiS
     const [lastTranscriptChunk, setLastTranscriptChunk] = useState('');
     const [botLogs, setBotLogs] = useState([]);
     const [presenceData, setPresenceData] = useState({ participantCount: 1, signalQuality: 'EXCELLENT' });
+    const [captureInterviewer, setCaptureInterviewer] = useState(false);
 
     const mediaRecorderRef = useRef(null);
     const recognitionRef = useRef(null);
     const audioChunksRef = useRef([]);
     const isListeningRef = useRef(false);
     const activeStreamsRef = useRef([]);
+    const interviewerGainRef = useRef(null);
 
     // Simulate waveform
     const [waveHeight, setWaveHeight] = useState([20, 40, 60, 30, 80, 40, 20]);
@@ -64,6 +66,12 @@ export default function LiveObserverPanel({ candidate, onTranscriptUpdate, onAiS
             if (audioContext) audioContext.close();
         };
     }, [isListening, botStatus]);
+
+    useEffect(() => {
+        if (interviewerGainRef.current) {
+            interviewerGainRef.current.gain.value = captureInterviewer ? 1.0 : 0;
+        }
+    }, [captureInterviewer]);
 
     useEffect(() => {
         if (isActive === false && isListeningRef.current) {
@@ -132,15 +140,21 @@ export default function LiveObserverPanel({ candidate, onTranscriptUpdate, onAiS
             const dest = audioCtx.createMediaStreamDestination();
 
             // GAIN STAGE: Boost audio for better Gemini recognition
-            const gainNode = audioCtx.createGain();
-            gainNode.gain.value = 1.5;
+            const gainNode1 = audioCtx.createGain(); // Candidate (Display)
+            const gainNode2 = audioCtx.createGain(); // Interviewer (Mic)
+
+            gainNode1.gain.value = 1.5;
+            gainNode2.gain.value = captureInterviewer ? 1.0 : 0; // Controlled by toggle
+
+            interviewerGainRef.current = gainNode2;
 
             const source1 = audioCtx.createMediaStreamSource(displayStream);
             const source2 = audioCtx.createMediaStreamSource(userMicStream);
 
-            source1.connect(gainNode);
-            source2.connect(gainNode);
-            gainNode.connect(dest);
+            source1.connect(gainNode1);
+            source2.connect(gainNode2);
+            gainNode1.connect(dest);
+            gainNode2.connect(dest);
 
             const mixedStream = dest.stream;
 
@@ -295,6 +309,18 @@ export default function LiveObserverPanel({ candidate, onTranscriptUpdate, onAiS
                             onChange={(e) => setMeetingUrl(e.target.value)}
                             className="w-full bg-bg-primary border border-border-subtle rounded-2xl p-3.5 text-[11px] text-text-primary placeholder-text-muted/40 focus:border-cyan-500/50 outline-none transition-all shadow-inner font-black"
                         />
+                    </div>
+
+                    <div className="flex items-center justify-between p-3 rounded-2xl bg-bg-primary border border-border-subtle shadow-inner relative z-10">
+                        <span className="text-[10px] font-black text-text-muted uppercase tracking-widest flex items-center gap-2">
+                            Mülakatçı Sesini Ekle
+                        </span>
+                        <button
+                            onClick={() => setCaptureInterviewer(!captureInterviewer)}
+                            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${captureInterviewer ? 'bg-cyan-500' : 'bg-bg-secondary border-border-subtle'}`}
+                        >
+                            <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${captureInterviewer ? 'translate-x-4' : 'translate-x-0'}`} />
+                        </button>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">

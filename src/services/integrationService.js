@@ -12,9 +12,8 @@ export const connectGoogleWorkspace = async (userId) => {
         provider.addScope('https://www.googleapis.com/auth/gmail.modify');
         provider.addScope('https://www.googleapis.com/auth/calendar.events');
 
-        // Force consent screen and ensure all scopes are included
+        // Request offline token but don't force consent screen if already granted
         provider.setCustomParameters({
-            prompt: 'consent',
             access_type: 'offline',
             include_granted_scopes: 'true'
         });
