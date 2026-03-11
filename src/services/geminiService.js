@@ -118,3 +118,36 @@ export async function analyzeCandidateMatch(jobDescription, candidateProfile, mo
         personalizedMessage: `Merhabalar ${candidateProfile.name}. Profilinizi inceledim. ${evidence.evidence.summary}`
     };
 }
+
+export async function analyzeComparativeCandidates(candidates, modelId = 'gemini-2.0-flash') {
+    const instruction = `Sen kıdemli bir İK Stratejistisin. Aşağıda sana verilen ${candidates.length} adayı birbirleriyle kıyasla.
+    Adayların güçlü yönlerini, birbirlerine göre üstünlüklerini ve zayıf kaldıkları noktaları analiz et.
+    
+    ÇIKTI FORMATI (Sadece JSON):
+    {
+      "winner": "Eğer varsa en öne çıkan aday ismi yoksa 'Kararsız'",
+      "comparisonSummary": "Genel kıyas dökümü (Turkish)",
+      "candidatesInsights": [
+        {
+          "name": "Aday İsmi",
+          "strength": "En büyük fark yaratan özelliği",
+          "weakness": "Diğer adaylara göre zayıf kaldığı nokta",
+          "fitScore": 0-100 arası sayı
+        }
+      ],
+      "recruitingAdvice": "İK ekibine bu adaylar özelinde stratejik tavsiye (Turkish)"
+    }`;
+
+    const candidateData = candidates.map(c => ({
+        name: c.name,
+        experience: c.experience,
+        skills: c.skills,
+        summary: c.aiAnalysis?.summary || c.summary,
+        score: c.combinedScore || c.matchScore
+    }));
+
+    const prompt = buildStructuredPrompt(instruction, { "ADAY_LISTESI": JSON.stringify(candidateData) });
+    const model = await getModel(modelId);
+    const result = await model.generateContent(prompt);
+    return parseAIJson(result.response.text());
+}

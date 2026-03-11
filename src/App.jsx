@@ -2,12 +2,14 @@
 // Main application with collapsible sidebar and view routing
 
 import { useState, useEffect } from 'react';
+import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { CandidatesProvider } from './context/CandidatesContext';
 import { PositionsProvider } from './context/PositionsContext';
 import { UserSettingsProvider, useUserSettings } from './context/UserSettingsContext';
 import { MessageQueueProvider } from './context/MessageQueueContext';
-import { NotificationProvider, useNotifications } from './context/NotificationContext';
+import { NotificationProvider } from './context/NotificationContext';
+
 import Sidebar from './components/Sidebar';
 import LoadingScreen from './components/LoadingScreen';
 import Dashboard from './pages/Dashboard';
@@ -21,6 +23,7 @@ import AnalyticsPage from './pages/AnalyticsPage';
 import GuidePage from './pages/GuidePage';
 import DepartmentManagementPage from './pages/DepartmentManagementPage';
 import SourceManagementPage from './pages/SourceManagementPage';
+import LiveInterviewPage from './pages/LiveInterviewPage';
 
 export default function App() {
   return (
@@ -29,7 +32,10 @@ export default function App() {
         <UserSettingsProvider>
           <NotificationProvider>
             <MessageQueueProvider>
-              <AppContent />
+              <Routes>
+                <Route path="/interview/:sessionId" element={<LiveInterviewPage />} />
+                <Route path="/*" element={<AppContent />} />
+              </Routes>
             </MessageQueueProvider>
           </NotificationProvider>
         </UserSettingsProvider>

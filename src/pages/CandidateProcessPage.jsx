@@ -2,7 +2,6 @@
 import { useMemo, useState } from 'react';
 import Header from '../components/Header';
 import StarScoreCard from '../components/StarScoreCard';
-import InterviewSessionModal from '../components/InterviewSessionModal';
 import InterviewHistory from '../components/InterviewHistory';
 import SendMessageModal from '../components/SendMessageModal';
 import { useCandidates } from '../context/CandidatesContext';
@@ -29,7 +28,9 @@ import {
     ExternalLink,
     User,
     X,
+    Video,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { analyzeCandidateMatch } from '../services/geminiService';
 import { createMessage, MESSAGE_STATUS } from '../services/messageQueueService';
 
@@ -45,8 +46,8 @@ const STATUS_LABELS = {
 export default function CandidateProcessPage() {
     const { candidates, viewCandidateId, setViewCandidateId, updateCandidate } = useCandidates();
     const { positions } = usePositions();
+    const navigate = useNavigate();
     const [sendModalPurpose, setSendModalPurpose] = useState(null);
-    const [showInterviewModal, setShowInterviewModal] = useState(false);
     const [plannedSessionToStart, setPlannedSessionToStart] = useState(null);
     const [activeTab, setActiveTab] = useState('overview'); // ['overview', 'interviews', 'cv']
 
@@ -409,20 +410,44 @@ export default function CandidateProcessPage() {
                                         <MessageSquare className="w-5 h-5 text-cyan-500" />
                                         <h3 className="text-[12px] font-black text-text-primary tracking-widest uppercase">Seans Geçmişi</h3>
                                     </div>
-                                    <button
-                                        onClick={() => { setPlannedSessionToStart(null); setShowInterviewModal(true); }}
-                                        className="px-5 py-2.5 rounded-xl bg-cyan-500 text-white font-black text-[10px] uppercase tracking-widest shadow-lg shadow-cyan-500/20 hover:scale-105 active:scale-95 transition-all"
-                                    >
-                                        Yeni Seans
-                                    </button>
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            onClick={async () => {
+                                                const sessId = `iv-${candidate.id.substring(0, 4)}-${Date.now().toString().slice(-4)}`;
+                                                const newSession = {
+                                                    id: sessId,
+                                                    status: 'planned',
+                                                    date: new Date().toISOString(),
+                                                    type: 'live_corporate',
+                                                    typeLabel: 'Canlı Kurumsal Mülakat',
+                                                    isLiveMode: true,
+                                                    timestamp: new Date().toISOString()
+                                                };
+
+                                                try {
+                                                    await updateCandidate(candidate.id, {
+                                                        interviewSessions: [...(candidate.interviewSessions || []), newSession],
+                                                        status: 'interview'
+                                                    });
+                                                    navigate(`/interview/${sessId}`);
+                                                } catch (err) {
+                                                    console.error("Failed to create live session:", err);
+                                                    navigate(`/interview/${sessId}`);
+                                                }
+                                            }}
+                                            className="px-5 py-2.5 rounded-xl bg-violet-600 text-white font-black text-[10px] uppercase tracking-widest shadow-lg shadow-violet-500/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
+                                        >
+                                            <Video className="w-4 h-4" />
+                                            Yeni Canlı Mülakat
+                                        </button>
+                                    </div>
                                 </div>
                                 <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
                                     {candidate.interviewSessions?.length > 0 ? (
                                         <InterviewHistory
                                             sessions={candidate.interviewSessions}
                                             onStartSession={(session) => {
-                                                setPlannedSessionToStart(session);
-                                                setShowInterviewModal(true);
+                                                navigate(`/interview/${session.id}`);
                                             }}
                                         />
                                     ) : (
@@ -484,14 +509,6 @@ export default function CandidateProcessPage() {
                     initialPurpose={sendModalPurpose}
                     onSent={handleMessageSent}
                     onClose={() => setSendModalPurpose(null)}
-                />
-            )}
-            {showInterviewModal && (
-                <InterviewSessionModal
-                    candidate={candidate}
-                    initialSession={plannedSessionToStart}
-                    onClose={() => { setShowInterviewModal(false); setPlannedSessionToStart(null); }}
-                    onSessionSaved={() => { setShowInterviewModal(false); setPlannedSessionToStart(null); }}
                 />
             )}
         </div>

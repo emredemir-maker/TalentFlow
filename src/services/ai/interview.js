@@ -22,16 +22,24 @@ export async function generateInterviewQuestions(candidate, starAnalysis, interv
     }
 }
 
-export async function generateInterviewPaths(candidate, interviewType = 'technical') {
+export async function generateInterviewPaths(candidate, interviewType = 'comprehensive') {
     const typeContexts = {
         technical: "Uzmanlık Lead personasıyla, mimari, derin bilgi, problem çözme ve saha tecrübesine odaklan.",
         product: "Product Manager personasıyla, sadece ürün vizyonu, kullanıcı deneyimi (UX), önceliklendirme, metrikler ve iş değerine odaklan.",
-        culture: "İK Direktörü personasıyla, iletişim becerileri, ekip uyumu, çatışma yönetimi ve şirket değerlerine odaklan."
+        culture: "İK Direktörü personasıyla, iletişim becerileri, ekip uyumu, çatışma yönetimi ve şirket değerlerine odaklan.",
+        comprehensive: "Üç farklı mülakat türünü harmanla: 1. Teknik Seçimler ve Derinlik, 2. Ürün Vizyonu ve Kullanıcı Odaklılık, 3. Kurum Kültürü ve Değerler."
     };
 
-    const instruction = `Sen kıdemli bir mülakatçısın. Aday için 3 farklı mülakat rotası hazırla.
+    const instruction = `Sen kıdemli bir mülakat stratejistisin. Aday için 3 farklı mülakat rotası hazırla.
     Tür: ${interviewType.toUpperCase()}. 
-    Odak Noktası: ${typeContexts[interviewType] || typeContexts.technical}
+    Odak Noktası: ${typeContexts[interviewType] || typeContexts.comprehensive}
+    
+    ÖNEMLİ: Eğer mülakat türü COMPREHENSIVE ise, 'paths' dizisindeki:
+    - 1. rota TEKNİK (konuşulan teknolojiler, mimari tercihler), 
+    - 2. rota ÜRÜN (feedback döngüleri, metrikler, vizyon), 
+    - 3. rota KURUM KÜLTÜRÜ (iletişim, problem çözme kültürü, uyum) odaklı olmalıdır.
+    
+    Her rota için adayın CV'sindeki ${candidate.experience} yıllık tecrübesine uygun, gerçekçi ve derinlemesine 4 adet soru ekle.
     
     JSON formatında tam olarak şu yapıda dön:
     { 
@@ -48,11 +56,11 @@ export async function generateInterviewPaths(candidate, interviewType = 'technic
       ] 
     }
     
-    ÖNEMLİ: icon alanı "zap", "code", "users", "target", "box" değerlerinden biri olmalı.`;
+    ÖNEMLİ: icon alanı 1. rota için "code" veya "zap", 2. rota için "target", 3. rota için "users" olmalıdır.`;
 
     const prompt = buildStructuredPrompt(instruction, {
         "TARGET_POSITION": candidate.matchedPositionTitle || candidate.position,
-        "CANDIDATE_DATA": JSON.stringify(candidate)
+        "CANDIDATE_DATA": sanitizeForPrompt(JSON.stringify(candidate))
     });
 
     try {

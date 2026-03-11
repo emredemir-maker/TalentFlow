@@ -3,11 +3,11 @@
 import { useState, useRef } from 'react';
 import {
     Clock, Zap, Users, Box, ChevronDown, TrendingUp, TrendingDown,
-    Printer, MessageSquare, FileText, CalendarDays, User, ShieldCheck
+    Printer, MessageSquare, FileText, CalendarDays, User, ShieldCheck, Brain, Video
 } from 'lucide-react';
 
-const TYPE_ICONS = { technical: Zap, culture: Users, product: Box };
-const TYPE_COLORS = { technical: 'cyan-500', culture: 'emerald-500', product: 'violet-500' };
+const TYPE_ICONS = { technical: Zap, culture: Users, product: Box, live_corporate: Video };
+const TYPE_COLORS = { technical: 'cyan-500', culture: 'emerald-500', product: 'violet-500', live_corporate: 'violet-500' };
 
 export default function InterviewHistory({ sessions = [], onStartSession }) {
     const [expandedId, setExpandedId] = useState(null);

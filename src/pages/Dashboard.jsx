@@ -10,6 +10,7 @@ import CandidateDrawer from '../components/CandidateDrawer';
 import AddCandidateModal from '../components/AddCandidateModal';
 import OpportunityHub from '../components/OpportunityHub';
 import BulkUpdateModal from '../components/BulkUpdateModal';
+import CandidateComparisonModal from '../components/CandidateComparisonModal';
 import {
     Users,
     UserPlus,
@@ -37,7 +38,8 @@ import {
     Tag,
     Layers,
     RotateCcw,
-    Share2
+    Share2,
+    ArrowRight
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { seedCandidates } from '../services/firestoreService';
@@ -87,6 +89,8 @@ export default function Dashboard() {
         subSourceFilter,
         setSubSourceFilter,
         subSourcesOptions,
+        compareIds,
+        clearCompareSelection,
     } = useCandidates();
 
     const [selectedCandidate, setSelectedCandidate] = useState(null);
@@ -110,6 +114,7 @@ export default function Dashboard() {
     const [isBulkUpdateOpen, setIsBulkUpdateOpen] = useState(false);
     const [isBulkUpdating, setIsBulkUpdating] = useState(false);
     const [isSeeding, setIsSeeding] = useState(false);
+    const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
 
     const sortedCandidates = useMemo(() => {
         let list = [...filteredCandidates];
@@ -399,8 +404,6 @@ export default function Dashboard() {
                     </div>
 
                     <div className="flex items-center gap-4 w-full xl:w-auto justify-center xl:justify-end">
-                        {/* Selected Count / Actions moved to a floating bar at the bottom for better visibility? 
-                            Nah, keep but fix contrast. */}
                         {selectedIds.size > 0 ? (
                             <div className="flex items-center gap-3 animate-in slide-in-from-bottom-4 duration-500">
                                 <div className="px-5 py-2.5 bg-electric/10 rounded-2xl border border-electric/30 text-[13px] font-black text-text-primary shadow-sm">
@@ -729,6 +732,48 @@ export default function Dashboard() {
                 </div>,
                 document.body
             )}
+
+            {/* Floating Comparison Bar */}
+            {compareIds.length > 0 && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-bottom-10 duration-500">
+                    <div className="bg-bg-secondary/90 backdrop-blur-xl border border-violet-500/30 rounded-[2rem] p-3 pl-6 flex items-center gap-6 shadow-[0_20px_50px_rgba(0,0,0,0.5)] ring-1 ring-white/5">
+                        <div className="flex items-center gap-3 border-r border-border-subtle pr-6">
+                            <div className="w-10 h-10 rounded-xl bg-violet-500/20 flex items-center justify-center">
+                                <Columns3 className="w-5 h-5 text-violet-400" />
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-black uppercase text-text-muted opacity-60">Karşılaştırma</p>
+                                <p className="text-sm font-black text-text-primary uppercase tracking-tight">{compareIds.length} Aday Seçildi</p>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={clearCompareSelection}
+                                className="px-4 py-2 text-[10px] font-black text-text-muted hover:text-red-400 transition-colors uppercase tracking-widest"
+                            >
+                                Sıfırla
+                            </button>
+                            <button
+                                onClick={() => setIsCompareModalOpen(true)}
+                                disabled={compareIds.length < 2}
+                                className={`px-8 py-3 rounded-2xl font-black text-[13px] uppercase tracking-[0.1em] transition-all shadow-lg flex items-center gap-2 ${compareIds.length < 2
+                                    ? 'bg-bg-primary text-text-muted opacity-50 cursor-not-allowed'
+                                    : 'bg-violet-600 text-white hover:bg-violet-500 shadow-violet-500/20 hover:scale-105'
+                                    }`}
+                            >
+                                <span>Şimdi Karşılaştır</span>
+                                <ArrowRight className="w-4 h-4" />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <CandidateComparisonModal
+                isOpen={isCompareModalOpen}
+                onClose={() => setIsCompareModalOpen(false)}
+            />
         </div>
     );
 }

@@ -7,10 +7,14 @@ import { AuthProvider } from './context/AuthContext';
 import App from './App';
 import './index.css';
 
+import { BrowserRouter } from 'react-router-dom';
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <AuthProvider>
-      <App />
-    </AuthProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <App />
+      </AuthProvider>
+    </BrowserRouter>
   </StrictMode>
 );

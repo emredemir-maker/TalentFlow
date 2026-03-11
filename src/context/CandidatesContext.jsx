@@ -18,6 +18,7 @@ export function CandidatesProvider({ children }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [viewCandidateId, setViewCandidateId] = useState(null);
+    const [compareIds, setCompareIds] = useState([]);
 
     // Filter states (client-side filtering per Rule 2)
     const [searchQuery, setSearchQuery] = useState('');
@@ -67,6 +68,18 @@ export function CandidatesProvider({ children }) {
             throw err;
         }
     };
+
+    const toggleCompareCandidate = (id) => {
+        setCompareIds(prev => {
+            if (prev.includes(id)) {
+                return prev.filter(i => i !== id);
+            }
+            if (prev.length >= 4) return prev; // Limit to 4 candidates
+            return [...prev, id];
+        });
+    };
+
+    const clearCompareSelection = () => setCompareIds([]);
 
     const [sourceColors, setSourceColors] = useState({});
 
@@ -300,6 +313,11 @@ export function CandidatesProvider({ children }) {
         // Navigation / Detailed View
         viewCandidateId,
         setViewCandidateId,
+
+        // Comparison
+        compareIds,
+        toggleCompareCandidate,
+        clearCompareSelection,
     };
 
     return (

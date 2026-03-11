@@ -1,5 +1,5 @@
 import MatchScoreRing from './MatchScoreRing';
-import { MapPin, Briefcase, Clock, ArrowUpRight, ShieldAlert, Sparkles, Brain, Zap, GraduationCap } from 'lucide-react';
+import { MapPin, Briefcase, Clock, ArrowUpRight, ShieldAlert, Sparkles, Brain, Zap, GraduationCap, Columns3 } from 'lucide-react';
 import { useCandidates } from '../context/CandidatesContext';
 
 const STATUS_CONFIG = {
@@ -30,7 +30,8 @@ function getInitials(name) {
 }
 
 export default function CandidateCard({ candidate, index = 0, onClick, isSelected, onSelect, draggable, onDragStart }) {
-    const { sourceColors } = useCandidates();
+    const { sourceColors, compareIds, toggleCompareCandidate } = useCandidates();
+    const isComparing = compareIds.includes(candidate.id);
     const status = STATUS_CONFIG[candidate.status] || STATUS_CONFIG.ai_analysis;
     const gradient = AVATAR_GRADIENTS[index % AVATAR_GRADIENTS.length];
 
@@ -161,7 +162,21 @@ export default function CandidateCard({ candidate, index = 0, onClick, isSelecte
             )}
 
             {/* Footer */}
-            <div className="flex items-center justify-end pt-4 border-t border-border-subtle mt-auto -mx-4 px-4 -mb-4 pb-4 rounded-b-[24px] bg-bg-secondary/20">
+            <div className="flex items-center justify-between pt-4 border-t border-border-subtle mt-auto -mx-4 px-4 -mb-4 pb-4 rounded-b-[24px] bg-bg-secondary/20">
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        toggleCompareCandidate(candidate.id);
+                    }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[9px] font-black uppercase tracking-widest transition-all shadow-sm ${isComparing
+                        ? 'bg-violet-500 border-violet-500 text-white'
+                        : 'bg-bg-primary border-border-subtle text-text-muted hover:border-violet-500 hover:text-violet-500'
+                        }`}
+                >
+                    <Columns3 className="w-3 h-3" />
+                    <span>{isComparing ? 'Seçildi' : 'Karşılaştır'}</span>
+                </button>
+
                 <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-primary border border-border-subtle text-[9px] font-black text-text-primary uppercase tracking-widest group-hover:bg-electric group-hover:text-white transition-all shadow-lg shadow-black/5">
                     <span>İncele</span>
                     <ArrowUpRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />

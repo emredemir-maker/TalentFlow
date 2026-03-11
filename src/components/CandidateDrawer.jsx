@@ -17,7 +17,7 @@ import { calculateMatchScore } from '../services/matchService';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
-import InterviewSessionModal from './InterviewSessionModal';
+import { useNavigate } from 'react-router-dom';
 import InterviewHistory from './InterviewHistory';
 
 const STATUS_CONFIG = {
@@ -41,6 +41,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
     const candidate = allCandidates.find(c => c.id === initialCandidate?.id) || initialCandidate;
 
     const { positions } = usePositions();
+    const navigate = useNavigate();
 
     const [updatingStatus, setUpdatingStatus] = useState(false);
     const reportRef = useRef(null);
@@ -294,7 +295,30 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                 <ExternalLink className="w-4 h-4" />
                                 PORTAL
                             </button>
-                            <button onClick={() => setShowInterviewModal(true)} className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/20 transition-all shadow-sm" title="Aday İletişimi (Mülakat/Red)">
+                            <button
+                                onClick={async () => {
+                                    const sessId = `iv-${candidate.id.substring(0, 4)}-${Date.now().toString().slice(-4)}`;
+                                    const newSession = {
+                                        id: sessId,
+                                        status: 'planned',
+                                        date: new Date().toISOString(),
+                                        type: 'live_corporate',
+                                        typeLabel: 'Canlı Kurumsal Mülakat',
+                                        isLiveMode: true,
+                                        timestamp: new Date().toISOString()
+                                    };
+                                    try {
+                                        await updateCandidate(candidate.id, {
+                                            interviewSessions: [...(candidate.interviewSessions || []), newSession],
+                                            status: 'interview'
+                                        });
+                                        navigate(`/interview/${sessId}`);
+                                    } catch (err) {
+                                        console.error("Failed to create live session:", err);
+                                        navigate(`/interview/${sessId}`);
+                                    }
+                                }}
+                                className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/20 transition-all shadow-sm" title="Yeni Canlı Mülakat">
                                 <Mail className="w-4 h-4" />
                             </button>
                             <button onClick={handlePrintReport} className="p-2.5 rounded-xl bg-bg-primary border border-border-subtle text-text-muted hover:text-text-primary transition-all shadow-inner" title="Rapor Al">
@@ -613,28 +637,46 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
                             {/* Start New Interview */}
                             <button
-                                onClick={() => setShowInterviewModal(true)}
+                                onClick={async () => {
+                                    const sessId = `iv-${candidate.id.substring(0, 4)}-${Date.now().toString().slice(-4)}`;
+                                    const newSession = {
+                                        id: sessId,
+                                        status: 'planned',
+                                        date: new Date().toISOString(),
+                                        type: 'live_corporate',
+                                        typeLabel: 'Canlı Kurumsal Mülakat',
+                                        isLiveMode: true,
+                                        timestamp: new Date().toISOString()
+                                    };
+                                    try {
+                                        await updateCandidate(candidate.id, {
+                                            interviewSessions: [...(candidate.interviewSessions || []), newSession],
+                                            status: 'interview'
+                                        });
+                                        navigate(`/interview/${sessId}`);
+                                    } catch (err) {
+                                        console.error("Failed to create live session:", err);
+                                        navigate(`/interview/${sessId}`);
+                                    }
+                                }}
                                 className="w-full py-4 rounded-3xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-cyan-500/20 transition-all active:scale-[0.98] flex items-center justify-center gap-3"
                             >
-                                <ClipboardCheck className="w-5 h-5" /> YENİ MÜLAKAT OTURUMU
+                                <ClipboardCheck className="w-5 h-5" /> YENİ CANLI MÜLAKAT
                             </button>
 
                             {/* Interview History */}
-                            <InterviewHistory sessions={candidate.interviewSessions} />
+                            <InterviewHistory
+                                sessions={candidate.interviewSessions}
+                                onStartSession={(session) => {
+                                    navigate(`/interview/${session.id}`);
+                                }}
+                            />
 
                             {/* Manual Assessment Card (simple override) */}
 
                         </div>
                     )}
 
-                    {/* Interview Session Modal */}
-                    {showInterviewModal && (
-                        <InterviewSessionModal
-                            candidate={candidate}
-                            onClose={() => setShowInterviewModal(false)}
-                            onSessionSaved={() => setShowInterviewModal(false)}
-                        />
-                    )}
 
                     {/* PRINT-ONLY EVALUATION REPORT (Point 4) */}
                     <div className="hidden print:block space-y-8 mt-10">
