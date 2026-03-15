@@ -41,13 +41,15 @@ export function PositionsProvider({ children }) {
             const positionsList = snapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data(),
-                createdAtLabel: doc.data().createdAt?.toDate()?.toLocaleDateString('tr-TR') || new Date().toLocaleDateString('tr-TR')
+                createdAtLabel: (typeof doc.data().createdAt?.toDate === 'function') 
+                    ? doc.data().createdAt.toDate().toLocaleDateString('tr-TR') 
+                    : new Date().toLocaleDateString('tr-TR')
             }));
 
             // Client-side sorting (Rule 2)
             positionsList.sort((a, b) => {
-                const aTime = a.createdAt?.toMillis?.() || 0;
-                const bTime = b.createdAt?.toMillis?.() || 0;
+                const aTime = (typeof a.createdAt?.toMillis === 'function') ? a.createdAt.toMillis() : 0;
+                const bTime = (typeof b.createdAt?.toMillis === 'function') ? b.createdAt.toMillis() : 0;
                 return bTime - aTime;
             });
 

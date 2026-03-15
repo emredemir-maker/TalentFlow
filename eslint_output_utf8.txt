@@ -1,0 +1,65 @@
+﻿
+D:\TAlentFlow\TalentFlow\src\App.jsx
+   5:25  error  'useLocation' is defined but never used. Allowed unused vars must match /^[A-Z_]/u     no-unused-vars
+  48:20  error  'error' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+D:\TAlentFlow\TalentFlow\src\components\Header.jsx
+  10:34  error  'title' is defined but never used                                                                  no-unused-vars
+  10:41  error  'searchQuery' is defined but never used                                                            no-unused-vars
+  10:54  error  'onSearchChange' is defined but never used                                                         no-unused-vars
+  10:70  error  'viewMode' is defined but never used                                                               no-unused-vars
+  10:80  error  'setViewMode' is defined but never used                                                            no-unused-vars
+  11:13  error  'notifications' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u      no-unused-vars
+  11:41  error  'markAsRead' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u         no-unused-vars
+  11:53  error  'markAllAsRead' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u      no-unused-vars
+  11:68  error  'clearAll' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u           no-unused-vars
+  12:13  error  'userProfile' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u        no-unused-vars
+  13:13  error  'settings' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u           no-unused-vars
+  13:23  error  'updateSettings' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u     no-unused-vars
+  14:12  error  'showNotifications' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+  28:11  error  'getTypeIcon' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u        no-unused-vars
+  38:11  error  'formatTime' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u         no-unused-vars
+
+D:\TAlentFlow\TalentFlow\src\components\Sidebar.jsx
+  20:13  error  'logout' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u       no-unused-vars
+  20:21  error  'userProfile' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+D:\TAlentFlow\TalentFlow\src\pages\Dashboard.jsx
+    2:20  error  'useCallback' is defined but never used. Allowed unused vars must match /^[A-Z_]/u                          no-unused-vars
+    2:33  error  'useMemo' is defined but never used. Allowed unused vars must match /^[A-Z_]/u                              no-unused-vars
+    5:10  error  'analyzeCandidateMatch' is defined but never used. Allowed unused vars must match /^[A-Z_]/u                no-unused-vars
+   58:9   error  'candidates' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                  no-unused-vars
+   60:9   error  'filteredCandidates' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u          no-unused-vars
+   61:9   error  'stats' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                       no-unused-vars
+   62:9   error  'departments' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                 no-unused-vars
+   63:9   error  'loading' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                     no-unused-vars
+   65:9   error  'searchQuery' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                 no-unused-vars
+   66:9   error  'setSearchQuery' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u              no-unused-vars
+   67:9   error  'departmentFilter' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u            no-unused-vars
+   68:9   error  'setDepartmentFilter' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u         no-unused-vars
+   69:9   error  'statusFilter' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                no-unused-vars
+   70:9   error  'setStatusFilter' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u             no-unused-vars
+   71:9   error  'experienceFilter' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u            no-unused-vars
+   72:9   error  'setExperienceFilter' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u         no-unused-vars
+   73:9   error  'positionFilter' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u              no-unused-vars
+   74:9   error  'setPositionFilter' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u           no-unused-vars
+   75:9   error  'matchPositions' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u              no-unused-vars
+   76:9   error  'deleteCandidate' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u             no-unused-vars
+   77:9   error  'sourceFilter' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                no-unused-vars
+   78:9   error  'setSourceFilter' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u             no-unused-vars
+   79:9   error  'sourcesOptions' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u              no-unused-vars
+   80:9   error  'subSourceFilter' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u             no-unused-vars
+   81:9   error  'setSubSourceFilter' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u          no-unused-vars
+   82:9   error  'subSourcesOptions' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u           no-unused-vars
+   87:12  error  'selectedCandidate' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u           no-unused-vars
+   87:31  error  'setSelectedCandidate' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u        no-unused-vars
+   94:25  error  'setIsAnalyzing' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u              no-unused-vars
+   95:29  error  'setAnalyzeProgress' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u          no-unused-vars
+   96:26  error  'setAnalyzeTotal' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u             no-unused-vars
+   97:37  error  'setAnalyzeCurrentCandidate' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+   98:33  error  'setAnalyzeCurrentStage' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u      no-unused-vars
+   99:31  error  'setAnalyzePosCurrent' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u        no-unused-vars
+  100:29  error  'setAnalyzePosTotal' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u          no-unused-vars
+
+Ô£û 54 problems (54 errors, 0 warnings)
+

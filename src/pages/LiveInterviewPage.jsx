@@ -5,8 +5,8 @@ import {
     Video, Mic, MicOff, VideoOff, Settings, X,
     ShieldCheck, Camera, Monitor, Sparkles, Brain, Zap,
     MessageSquare, Users, AlertCircle, CheckCircle2,
-    Send, Play, Info, Copy, Check, ChevronRight, HelpCircle, Activity,
-    Target, Box, Code, Loader2, AlertTriangle, TrendingUp, Award, ChevronDown, RefreshCw, User, Flag
+    Send, Play, Info, Copy, Check, ChevronRight, HelpCircle, Activity, ArrowRight,
+    Target, Box, Code, Loader2, AlertTriangle, TrendingUp, Award, ChevronDown, RefreshCw, User, Flag, Star, FileText, ExternalLink
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCandidates } from '../context/CandidatesContext';
@@ -377,24 +377,36 @@ export default function LiveInterviewPage() {
     }
 
     if (!isAuthenticated) return (
-        <div className="min-h-screen bg-[#0a0a0b] flex items-center justify-center p-6">
+        <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6 text-white font-sans">
             <div className="text-center space-y-4">
-                <AlertCircle className="w-12 h-12 text-red-500 mx-auto" />
-                <h1 className="text-xl font-bold text-white">Yetkisiz Erişim</h1>
-                <p className="text-gray-400">Lütfen giriş yapın.</p>
+                <AlertCircle className="w-12 h-12 text-red-500 mx-auto animate-pulse" />
+                <h1 className="text-2xl font-black italic uppercase tracking-tighter">Oturum Doğrulanamadı</h1>
+                <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">Lütfen giriş yaparak tekrar deneyin.</p>
+                <button 
+                  onClick={() => navigate('/')}
+                  className="mt-6 px-8 py-3 bg-white text-black rounded-2xl font-black text-[11px] uppercase tracking-widest"
+                >
+                  Ana Sayfaya Dön
+                </button>
             </div>
         </div>
     );
 
-    if (!candidateData) {
+    if (!candidateData && !candidatesLoading) {
         return (
-            <div className="min-h-screen bg-[#0a0a0b] flex flex-col items-center justify-center p-6 gap-4">
-                <AlertCircle className="w-12 h-12 text-amber-500" />
-                <h1 className="text-xl font-bold text-white">Oturum Bulunamadı</h1>
-                <p className="text-gray-400">Geçersiz veya süresi dolmuş mülakat linki.</p>
+            <div className="min-h-screen bg-[#0F172A] flex flex-col items-center justify-center p-6 gap-6 text-white font-sans italic">
+                <div className="w-20 h-20 rounded-3xl bg-amber-500/10 flex items-center justify-center border border-amber-500/20">
+                    <AlertCircle className="w-10 h-10 text-amber-500" />
+                </div>
+                <div className="text-center space-y-2">
+                    <h1 className="text-2xl font-black italic uppercase tracking-tighter">Oturum Geçersiz</h1>
+                    <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest max-w-xs mx-auto">
+                        Mülakat kaydı bulunamadı veya bu seans için yetkiniz yok.
+                    </p>
+                </div>
                 <button
-                    onClick={() => navigate('/candidate')}
-                    className="px-6 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-black uppercase tracking-widest hover:bg-white/10"
+                    onClick={() => navigate('/')}
+                    className="px-10 py-4 rounded-2xl bg-white text-black text-[11px] font-black uppercase tracking-widest shadow-2xl hover:scale-105 transition-all"
                 >
                     Kontrol Paneline Dön
                 </button>
@@ -402,754 +414,446 @@ export default function LiveInterviewPage() {
         );
     }
 
+    if (!candidateData) return <LoadingScreen message="Oturum doğrulanıyor..." />;
+
     if (phase === 'lobby') {
-        return (
-            <div className="fixed inset-0 z-[200] bg-bg-primary flex items-center justify-center p-6 overflow-hidden">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(99,102,241,0.05),transparent)] pointer-events-none" />
+        if (isRecruiter) {
+            return (
+                <div className="min-h-screen bg-[#F0F2F5] font-sans flex flex-col text-[#1E293B] overflow-hidden">
+                    <header className="h-[72px] bg-white border-b border-slate-200 flex items-center justify-between px-10 shrink-0 z-20">
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-2xl bg-[#0F172A] flex items-center justify-center shadow-2xl shadow-[#0F172A]/20">
+                                <Video className="w-6 h-6 text-white" />
+                            </div>
+                            <div>
+                                <h1 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] leading-none mb-1">Mülakatlar</h1>
+                                <h2 className="text-[15px] font-black text-[#0F172A] uppercase tracking-tighter italic">Pre-flight Kontrolü</h2>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-8">
+                            <div className="flex items-center gap-6">
+                                <button onClick={() => setShowSettings(true)} className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-400 hover:bg-slate-100 transition-all"><Settings className="w-5 h-5" /></button>
+                                <button className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-400 hover:bg-slate-100 transition-all"><HelpCircle className="w-5 h-5" /></button>
+                            </div>
+                            <div className="h-10 w-px bg-slate-200" />
+                            <div className="flex items-center gap-4">
+                                <div className="text-right">
+                                    <p className="text-[13px] font-black text-[#0F172A] uppercase tracking-tight">{userProfile?.name || 'Ahmet Yılmaz'}</p>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Senior Recruiter</p>
+                                </div>
+                                <div className="w-12 h-12 rounded-2xl bg-slate-100 border-2 border-white shadow-lg flex items-center justify-center overflow-hidden">
+                                     <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Ahmet" alt="User" />
+                                </div>
+                            </div>
+                        </div>
+                    </header>
 
-                <div className="max-w-6xl w-full grid grid-cols-1 lg:grid-cols-2 gap-12 items-center relative z-10">
-
-                    {/* Left: Video Preview */}
-                    <div className="space-y-8">
-                        <div className="relative group">
-                            <div className="absolute -inset-1 bg-gradient-to-r from-violet-600 to-cyan-500 rounded-[3rem] blur opacity-20 group-hover:opacity-30 transition duration-1000"></div>
-                            <div className="relative aspect-video rounded-[2.5rem] bg-bg-secondary border border-border-subtle overflow-hidden shadow-2xl stitch-glass">
+                    <main className="flex-1 p-10 flex gap-10 max-w-[1800px] mx-auto w-full overflow-hidden">
+                        {/* Sol Panel: Kamera ve Aday Özeti */}
+                        <div className="w-[450px] flex flex-col gap-8 shrink-0">
+                            <div className="relative aspect-[4/3] rounded-[3rem] bg-[#0F172A] overflow-hidden shadow-2xl group border-4 border-white">
                                 {isVideoOn && stream ? (
-                                    <video
-                                        ref={videoRef}
-                                        autoPlay
-                                        muted
-                                        playsInline
-                                        className="w-full h-full object-cover scale-x-[-1]"
-                                    />
+                                    <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover scale-x-[-1]" />
                                 ) : (
                                     <div className="w-full h-full flex flex-col items-center justify-center gap-4">
-                                        <div className="w-20 h-20 rounded-full bg-bg-primary flex items-center justify-center border border-border-subtle shadow-inner">
-                                            <Camera className="w-10 h-10 text-text-muted opacity-40" />
-                                        </div>
-                                        <p className="text-sm font-black text-text-muted uppercase tracking-widest italic opacity-60">Kamera Kapalı</p>
+                                        <Camera className="w-12 h-12 text-white/10" />
+                                        <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em]">Cihaz Bekleniyor</span>
                                     </div>
                                 )}
-                            </div>
-                        </div>
-
-                        {/* Controls */}
-                        <div className="flex items-center justify-center gap-6">
-                            <button
-                                onClick={() => setIsMicOn(!isMicOn)}
-                                className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-all border shadow-lg ${isMicOn ? 'bg-bg-secondary border-border-subtle text-text-primary hover:bg-bg-primary' : 'bg-red-500/20 border-red-500/40 text-red-500'}`}
-                            >
-                                {isMicOn ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />}
-                            </button>
-                            <button
-                                onClick={() => setIsVideoOn(!isVideoOn)}
-                                className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-all border shadow-lg ${isVideoOn ? 'bg-bg-secondary border-border-subtle text-text-primary hover:bg-bg-primary' : 'bg-red-500/20 border-red-500/40 text-red-500'}`}
-                            >
-                                {isVideoOn ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
-                            </button>
-                            <button
-                                onClick={() => setShowSettings(true)}
-                                className="w-16 h-16 rounded-2xl bg-bg-secondary border border-border-subtle text-text-muted flex items-center justify-center hover:text-text-primary transition-all shadow-lg"
-                            >
-                                <Settings className="w-6 h-6" />
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Right: Info */}
-                    <div className="space-y-10">
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-3">
-                                <div className="w-12 h-12 rounded-2xl bg-violet-600/10 border border-violet-500/20 flex items-center justify-center">
-                                    <Sparkles className="w-6 h-6 text-violet-500" />
+                                <div className="absolute top-4 right-4 px-4 py-2 bg-emerald-500/90 backdrop-blur-md rounded-2xl flex items-center gap-2 border border-emerald-400/50">
+                                    <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                                    <span className="text-[9px] font-black text-white uppercase tracking-widest">Sistem Hazır</span>
                                 </div>
-                                <h1 className="text-4xl font-black text-text-primary uppercase italic tracking-tighter">
-                                    {isRecruiter ? 'Kurumsal Mülakat Odanız' : 'Mülakat Katılımı'}
-                                </h1>
-                            </div>
-                            <div className="flex flex-col gap-2">
-                                <p className="text-lg text-text-secondary font-medium leading-relaxed max-w-md">
-                                    {isRecruiter
-                                        ? (candidateData ? `"${candidateData.name}" için mülakat odası hazır.` : 'Mülakat için bağlantı kuruluyor...')
-                                        : `Sayın ${candidateData?.name || 'Aday'}, TalentFlow AI mülakatına hoş geldiniz.`
-                                    }
-                                </p>
-                                {isRecruiter && (
-                                    <button
-                                        onClick={copyLink}
-                                        className="flex items-center gap-2 text-[10px] font-black uppercase text-cyan-500 hover:text-cyan-400 transition-colors w-fit group"
-                                    >
-                                        <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center group-hover:bg-cyan-500/20 transition-all">
-                                            {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                                        </div>
-                                        {copied ? 'Link Kopyalandı!' : 'Mülakat Linkini Kopyala'}
+                                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-black/40 backdrop-blur-2xl p-2.5 rounded-[2rem] border border-white/10 opacity-0 group-hover:opacity-100 transition-all duration-500">
+                                    <button onClick={() => setIsVideoOn(!isVideoOn)} className={"w-12 h-12 rounded-xl flex items-center justify-center " + (isVideoOn ? 'bg-white/10 text-white' : 'bg-red-500 text-white')}>
+                                        {isVideoOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
                                     </button>
-                                )}
-                            </div>
-                        </div>
-
-                        {!isRecruiter && (
-                            <div className="grid grid-cols-1 gap-4">
-                                <div className="flex items-start gap-3 p-4 bg-bg-secondary/40 rounded-2xl border border-border-subtle">
-                                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0">
-                                        <Camera className="w-4 h-4 text-emerald-500" />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <p className="text-[10px] font-black uppercase text-text-primary">1. Ekipman Kontrolü</p>
-                                        <p className="text-[9px] font-bold text-text-muted opacity-70">Görüntünüzün net ve sesinizin duyulur olduğundan emin olun.</p>
-                                    </div>
-                                </div>
-                                <div className="flex items-start gap-3 p-4 bg-bg-secondary/40 rounded-2xl border border-border-subtle">
-                                    <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center shrink-0">
-                                        <AlertCircle className="w-4 h-4 text-orange-500" />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <p className="text-[10px] font-black uppercase text-text-primary">2. Ortam Hazırlığı</p>
-                                        <p className="text-[9px] font-bold text-text-muted opacity-70">Sessiz ve iyi aydınlatılmış bir ortam tercih edin.</p>
-                                    </div>
-                                </div>
-                                <div className="flex items-start gap-3 p-4 bg-bg-secondary/40 rounded-2xl border border-border-subtle">
-                                    <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center shrink-0">
-                                        <ShieldCheck className="w-4 h-4 text-violet-500" />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <p className="text-[10px] font-black uppercase text-text-primary">3. KVKK ve Gizlilik</p>
-                                        <p className="text-[9px] font-bold text-text-muted opacity-70">Görüşme kayıt altına alınacak ve analiz edilecektir.</p>
-                                    </div>
+                                    <button onClick={() => setIsMicOn(!isMicOn)} className={"w-12 h-12 rounded-xl flex items-center justify-center " + (isMicOn ? 'bg-white/10 text-white' : 'bg-red-500 text-white')}>
+                                        {isMicOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+                                    </button>
                                 </div>
                             </div>
-                        ) || (
-                                <div className="h-0 invisible"></div>
-                            )}
 
-                        <div className="space-y-6">
-                            {/* Copy Link for Recruiter */}
-                            {isRecruiter && (
-                                <div className="p-6 rounded-[2rem] bg-bg-secondary/60 border border-border-subtle space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <h4 className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em]">Paylaşım Linki</h4>
-                                        <button
-                                            onClick={copyLink}
-                                            className="flex items-center gap-2 text-[10px] font-black uppercase text-violet-500 hover:text-violet-600 transition-all"
-                                        >
-                                            {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                                            {copied ? 'Kopyalandı' : 'Linki Kopyala'}
-                                        </button>
+                            <div className="bg-white rounded-[3rem] p-8 border border-slate-200 shadow-xl relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50 rounded-bl-[5rem] -mr-10 -mt-10" />
+                                <div className="flex items-center gap-5 relative z-10 mb-8">
+                                    <div className="w-20 h-20 rounded-[2rem] bg-slate-100 overflow-hidden border-4 border-white shadow-xl">
+                                        <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${candidateData?.name}`} alt="Candidate" />
                                     </div>
-                                    <div className="p-3 bg-bg-primary rounded-xl border border-border-subtle text-[11px] font-mono text-text-secondary truncate">
-                                        {window.location.href}
-                                    </div>
-                                </div>
-                            )}
-
-                            {!isRecruiter && (
-                                <div className={`p-6 rounded-[2rem] border transition-all ${hasConsent ? 'bg-emerald-500/5 border-emerald-500/30' : 'bg-bg-secondary border-border-subtle hover:border-violet-500/40'}`}>
-                                    <div className="flex gap-4">
-                                        <div className="pt-1">
-                                            <button
-                                                onClick={() => setHasConsent(!hasConsent)}
-                                                className={`w-6 h-6 rounded-lg border flex items-center justify-center transition-all ${hasConsent ? 'bg-emerald-500 border-emerald-500' : 'bg-bg-primary border-border-subtle'}`}
-                                            >
-                                                {hasConsent && <CheckCircle2 className="w-4 h-4 text-white" />}
-                                            </button>
-                                        </div>
-                                        <div className="flex-1 space-y-2">
-                                            <h4 className="text-sm font-black text-text-primary uppercase tracking-tight italic">Görüntü ve Ses Kaydı Onayı</h4>
-                                            <p className="text-xs text-text-muted leading-relaxed font-bold opacity-70">
-                                                Bu mülakat, değerlendirme sürecinin bir parçası olarak kaydedilecek ve TalentFlow AI tarafından analiz edilecektir.
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Recruiter Prep Card */}
-                            {isRecruiter && (
-                                <div className="space-y-6">
-                                    {/* Strategy Selector */}
-                                    <div className="flex bg-white/5 p-1.5 rounded-2xl border border-white/10">
-                                        {[
-                                            { id: 'comprehensive', label: 'Karma', icon: Sparkles },
-                                            { id: 'technical', label: 'Teknik', icon: Code },
-                                            { id: 'product', label: 'Product', icon: Box },
-                                            { id: 'culture', label: 'Kültür', icon: Users }
-                                        ].map(strat => (
-                                            <button
-                                                key={strat.id}
-                                                onClick={() => {
-                                                    setActiveStrategy(strat.id);
-                                                    setAvailablePaths([]); // Clear old paths to trigger reload
-                                                }}
-                                                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl transition-all text-[10px] font-black uppercase tracking-widest ${activeStrategy === strat.id
-                                                    ? 'bg-violet-600 text-white shadow-lg'
-                                                    : 'text-white/40 hover:text-white hover:bg-white/5'
-                                                    }`}
-                                            >
-                                                <strat.icon className="w-3.5 h-3.5" />
-                                                {strat.label}
-                                            </button>
-                                        ))}
-                                    </div>
-
-                                    {/* AI Path Selection */}
-                                    <div className="bg-white/5 border border-white/10 rounded-3xl p-6 backdrop-blur-xl relative">
-                                        <div className="flex items-center justify-between mb-6">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-xl bg-violet-600/20 flex items-center justify-center">
-                                                    <Target className="w-5 h-5 text-violet-400" />
-                                                </div>
-                                                <div>
-                                                    <h3 className="text-white font-bold text-sm">3 Farklı Senaryo Hazır</h3>
-                                                    <p className="text-[10px] text-gray-500 uppercase tracking-widest font-black">Lütfen Birini Seçiniz</p>
-                                                </div>
+                                    <div>
+                                        <div className="flex items-center gap-3 mb-1">
+                                            <h3 className="text-2xl font-black text-[#0F172A] tracking-tighter italic uppercase">{candidateData?.name}</h3>
+                                            <div className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full flex items-center gap-1.5 border border-emerald-100">
+                                                <Sparkles className="w-3 h-3" />
+                                                <span className="text-[9px] font-black uppercase tracking-widest">AI SKOR: 88</span>
                                             </div>
-                                            {pathLoading && <Loader2 className="w-4 h-4 text-violet-400 animate-spin" />}
                                         </div>
-
-                                        <div className="grid grid-cols-1 gap-3">
-                                            {availablePaths.length > 0 ? availablePaths.map(path => {
-                                                const PathIcon = {
-                                                    zap: Zap,
-                                                    code: Code,
-                                                    users: Users,
-                                                    target: Target,
-                                                    box: Box
-                                                }[path.icon] || Target;
-
-                                                return (
-                                                    <button
-                                                        key={path.id}
-                                                        onClick={() => handleSelectPath(path)}
-                                                        className={`p-4 rounded-2xl border transition-all text-left group ${selectedPathId === path.id
-                                                            ? 'bg-violet-600/20 border-violet-500/50 ring-1 ring-violet-500/50'
-                                                            : 'bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/20'}`}
-                                                    >
-                                                        <div className="flex items-start gap-4">
-                                                            <div className={`p-2.5 rounded-xl transition-all ${selectedPathId === path.id ? 'bg-violet-500 text-white' : 'bg-white/10 text-gray-400 group-hover:bg-white/20'}`}>
-                                                                <PathIcon className="w-4 h-4" />
-                                                            </div>
-                                                            <div className="flex-1 pr-6">
-                                                                <div className="text-xs font-black text-white mb-1 uppercase tracking-tight">{path.title}</div>
-                                                                <div className="text-[10px] text-gray-400 leading-relaxed line-clamp-2 italic">{path.description}</div>
-                                                            </div>
-                                                            {selectedPathId === path.id && (
-                                                                <div className="self-center">
-                                                                    <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                                                                        <Check className="w-3 h-3 text-white" />
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </button>
-                                                );
-                                            }) : (
-                                                <div className="py-12 flex flex-col items-center justify-center opacity-40">
-                                                    <Loader2 className="w-6 h-6 animate-spin mb-3" />
-                                                    <p className="text-[10px] font-black uppercase tracking-widest">Senaryolar Çıkartılıyor...</p>
-                                                </div>
-                                            )}
-                                        </div>
+                                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest leading-none">Senior Product Designer</p>
                                     </div>
                                 </div>
-                            )}
-
-                            {/* CTA */}
-                            <div className="sticky bottom-0 bg-gradient-to-t from-bg-primary via-bg-primary pt-6 pb-2">
-                                <button
-                                    onClick={() => setPhase('active')}
-                                    disabled={!isRecruiter && !hasConsent}
-                                    className={`w-full py-6 rounded-[2rem] text-sm font-black uppercase tracking-[0.2em] shadow-2xl transition-all flex items-center justify-center gap-4 ${(isRecruiter || hasConsent)
-                                        ? 'bg-violet-600 text-white hover:bg-violet-500 hover:scale-[1.02] shadow-violet-500/40 active:scale-95'
-                                        : 'bg-white/5 text-white/20 cursor-not-allowed opacity-50'
-                                        }`}
-                                >
-                                    <Play className="w-5 h-5" />
-                                    {isRecruiter ? 'Mülakatı Başlat' : 'Odaya Giriş Yap'}
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-bg-secondary/40 border border-border-subtle/50 w-fit">
-                            <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                            <span className="text-[10px] font-black text-text-muted uppercase tracking-[0.1em]">AES-256 Şifreli Güvenli Hat</span>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Settings Modal - Local to Lobby */}
-                {showSettings && <SettingsModal onClose={() => setShowSettings(false)} devices={devices} selectedDevices={selectedDevices} onDeviceChange={changeDevice} />}
-            </div>
-        );
-    }
-
-    // Settings Modal Component for reuse
-    function SettingsModal({ onClose, devices, selectedDevices, onDeviceChange }) {
-        return (
-            <div className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
-                <div className="bg-bg-primary border border-border-subtle w-full max-w-md rounded-[2.5rem] overflow-hidden shadow-2xl stitch-glass animate-in zoom-in-95 duration-200">
-                    <div className="p-8 space-y-8">
-                        <div className="flex items-center justify-between">
-                            <h3 className="text-xl font-black text-text-primary uppercase tracking-tight italic">Cihaz Ayarları</h3>
-                            <button onClick={onClose} className="w-10 h-10 rounded-full bg-bg-secondary border border-border-subtle flex items-center justify-center text-text-muted hover:text-text-primary transition-all">
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-
-                        <div className="space-y-6">
-                            <div className="space-y-3">
-                                <label className="text-[10px] font-black uppercase text-text-muted tracking-[0.2em]">Kamera</label>
-                                <select
-                                    value={selectedDevices.videoId}
-                                    onChange={(e) => onDeviceChange('videoId', e.target.value)}
-                                    className="w-full h-14 bg-bg-secondary border border-border-subtle rounded-2xl px-4 text-sm font-bold text-text-primary outline-none focus:ring-2 focus:ring-violet-500/20 transition-all appearance-none"
-                                >
-                                    <option value="">Varsayılan Kamera</option>
-                                    {devices.video.map(dev => <option key={dev.deviceId} value={dev.deviceId}>{dev.label || `Kamera ${dev.deviceId.substring(0, 5)}`}</option>)}
-                                </select>
-                            </div>
-                            <div className="space-y-3">
-                                <label className="text-[10px] font-black uppercase text-text-muted tracking-[0.2em]">Mikrofon</label>
-                                <select
-                                    value={selectedDevices.audioId}
-                                    onChange={(e) => onDeviceChange('audioId', e.target.value)}
-                                    className="w-full h-14 bg-bg-secondary border border-border-subtle rounded-2xl px-4 text-sm font-bold text-text-primary outline-none focus:ring-2 focus:ring-violet-500/20 transition-all appearance-none"
-                                >
-                                    <option value="">Varsayılan Mikrofon</option>
-                                    {devices.audio.map(dev => <option key={dev.deviceId} value={dev.deviceId}>{dev.label || `Mikrofon ${dev.deviceId.substring(0, 5)}`}</option>)}
-                                </select>
-                            </div>
-                        </div>
-
-                        <button
-                            onClick={onClose}
-                            className="w-full py-5 rounded-2xl bg-violet-600 text-white text-[11px] font-black uppercase tracking-widest shadow-xl shadow-violet-500/20 hover:scale-[1.02] transition-all"
-                        >
-                            Kaydet ve Kapat
-                        </button>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
-    // ====== ACTIVE INTERVIEW PHASE ======
-    return (
-        <div className="fixed inset-0 z-[200] bg-[#0a0a0c] flex flex-col overflow-hidden text-white font-sans">
-            {/* Top Bar */}
-            <header className="h-16 shrink-0 border-b border-white/5 bg-black/40 backdrop-blur-xl px-6 flex items-center justify-between z-20">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-violet-600 flex items-center justify-center shadow-lg shadow-violet-600/20">
-                        <Video className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                        <h2 className="text-[10px] font-black tracking-[0.2em] text-white/40 uppercase">TalentFlow Canlı Mülakat</h2>
-                        <p className="text-xs font-black tracking-tight text-white/90 uppercase">{candidateData?.name || 'Session Active'}</p>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 animate-pulse">
-                        <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                        <span className="text-[10px] font-black tracking-[0.1em] uppercase">REC LIVE</span>
-                    </div>
-                    <div className="h-6 w-[1px] bg-white/10 mx-2" />
-                    <button
-                        onClick={() => setShowSettings(true)}
-                        className="p-2.5 rounded-xl hover:bg-white/5 transition-all text-white/40 hover:text-white"
-                    >
-                        <Settings className="w-5 h-5" />
-                    </button>
-                    <button
-                        onClick={() => navigate(-1)}
-                        className="px-6 py-2.5 rounded-[1rem] bg-white/5 border border-white/10 hover:bg-red-600 hover:border-red-500 transition-all text-[10px] font-black uppercase tracking-widest"
-                    >
-                        Ayrıl
-                    </button>
-                </div>
-            </header>
-
-            <div className="flex-1 flex overflow-hidden p-6 gap-6 relative">
-                {/* Left: Main Stage */}
-                <div className="flex-1 flex flex-col gap-6">
-                    <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 relative">
-
-                        {/* Remote Video (Mocked) */}
-                        <div className="relative group overflow-hidden rounded-[3rem] bg-zinc-900 border border-white/5 shadow-2xl stitch-glass-light transition-all duration-700">
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
-                            {/* Candidate/Recruiter Avatar Mask */}
-                            <div className="w-full h-full flex flex-col items-center justify-center gap-6">
-                                <div className="w-32 h-32 rounded-full border border-white/5 bg-white/[0.02] flex items-center justify-center relative">
-                                    <div className="absolute inset-0 rounded-full border border-violet-500/30 animate-pulse" />
-                                    <Users className="w-12 h-12 text-white/10" />
+                                <div className="grid grid-cols-2 gap-6 pt-6 border-t border-slate-100">
+                                    <div>
+                                        <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.2em] mb-1">Tecrübe</p>
+                                        <p className="text-[13px] font-black text-[#0F172A] italic uppercase">8+ Yıl</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.2em] mb-1">Lokasyon</p>
+                                        <p className="text-[13px] font-black text-[#0F172A] italic uppercase">İstanbul (Remote)</p>
+                                    </div>
                                 </div>
-                                <div className="text-center space-y-1">
-                                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20">Bağlantı Kuruluyor</p>
-                                    <p className="text-sm font-black italic uppercase tracking-widest text-violet-400">
-                                        {isRecruiter ? 'Aday Bekleniyor' : 'Yönetici Bekleniyor'}
+                            </div>
+                            
+                            <div className="bg-[#F0FDF4] rounded-[2.5rem] p-6 border border-emerald-100 flex items-start gap-4">
+                                <div className="w-10 h-10 rounded-2xl bg-white border border-emerald-200 flex items-center justify-center shrink-0">
+                                    <Brain className="w-5 h-5 text-emerald-500" />
+                                </div>
+                                <div>
+                                    <h4 className="text-[10px] font-black text-emerald-800 uppercase tracking-widest mb-1 italic">AI Mülakat Notu</h4>
+                                    <p className="text-[11px] font-bold text-emerald-600/80 leading-snug italic">
+                                        Aday, kompleks sistem tasarımı konusunda teknik olarak çok güçlü ancak kriz yönetimi senaryolarında daha derinlemesine sorgulanması önerilir.
                                     </p>
                                 </div>
                             </div>
-
-                            {/* Overlay Info */}
-                            <div className="absolute top-8 left-8 flex items-center gap-3">
-                                <span className="px-3 py-1.5 rounded-lg bg-black/60 backdrop-blur-md border border-white/10 text-[10px] font-black uppercase tracking-widest">
-                                    {isRecruiter ? 'ADAY SİNYALİ' : 'GÖRÜŞMECİ SİNYALİ'}
-                                </span>
-                            </div>
                         </div>
 
-                        {/* Local Video */}
-                        <div className="relative group overflow-hidden rounded-[3rem] bg-zinc-900 border border-white/5 shadow-2xl stitch-glass-light h-full transition-all duration-700">
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none z-10" />
-                            {isVideoOn && stream ? (
-                                <video
-                                    ref={videoRef}
-                                    autoPlay
-                                    muted
-                                    playsInline
-                                    className="w-full h-full object-cover scale-x-[-1]"
-                                />
-                            ) : (
-                                <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-zinc-950">
-                                    <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center border border-white/5">
-                                        <VideoOff className="w-8 h-8 text-white/20" />
+                        {/* Orta/Sağ Panel: Strateji ve Başlat */}
+                        <div className="flex-1 flex flex-col gap-8 overflow-hidden">
+                            <div className="bg-white rounded-[3.5rem] p-10 border border-slate-200 shadow-2xl flex-1 flex flex-col overflow-hidden">
+                                <div className="flex items-center justify-between mb-8 pb-8 border-b border-slate-100">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600">
+                                            <FileText className="w-6 h-6" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-xl font-black text-[#0F172A] tracking-tighter italic uppercase">Seçilen Soru Seti: Ürün Tasarımı - Senior</h3>
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">Eşleşme Oranı %92 • 12 Soru Tanımlı</p>
+                                        </div>
                                     </div>
-                                    <span className="text-[9px] font-black uppercase tracking-widest text-white/20">Kamera Kısıtlandı</span>
+                                    <button className="text-[10px] font-black text-blue-600 uppercase tracking-widest border-b-2 border-blue-600 pb-1 hover:text-blue-700 transition-colors">Seti Değiştir</button>
                                 </div>
-                            )}
 
-                            {/* Label */}
-                            <div className="absolute top-8 left-8 flex items-center gap-3 z-20">
-                                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/60 backdrop-blur-md border border-white/10 text-[10px] font-black uppercase tracking-widest ${isMicOn ? 'text-emerald-400' : 'text-red-400'}`}>
-                                    {isMicOn && (
-                                        <div className="flex items-center gap-0.5 mr-1">
-                                            <div className="w-0.5 h-2 bg-emerald-500 animate-pulse" />
-                                            <div className="w-0.5 h-3 bg-emerald-500 animate-pulse delay-75" />
-                                            <div className="w-0.5 h-2 bg-emerald-500 animate-pulse delay-150" />
+                                <div className="flex-1 overflow-y-auto space-y-4 pr-4">
+                                    {questions.map((q, idx) => (
+                                        <div key={q.id} className="group flex items-center gap-6 p-6 rounded-[2rem] border-2 border-slate-50 hover:border-blue-100 hover:bg-blue-50/30 transition-all">
+                                            <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-[15px] font-black text-[#0F172A] group-hover:bg-white transition-all shadow-sm">
+                                                {String(idx + 1).padStart(2, '0')}
+                                            </div>
+                                            <p className="flex-1 text-[13px] font-bold text-[#475569] leading-relaxed italic line-clamp-2">
+                                                {q.text}
+                                            </p>
+                                            <div className="px-4 py-1.5 rounded-xl bg-white border border-slate-100 text-[9px] font-black text-slate-400 uppercase tracking-widest">{q.category}</div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="mt-8 pt-8 flex items-center gap-8 border-t border-slate-100">
+                                    <div className="flex-1 bg-blue-50/50 rounded-[2.5rem] p-6 border border-blue-100 flex items-center gap-6">
+                                        <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white shrink-0">
+                                            <Info className="w-5 h-5" />
+                                        </div>
+                                        <p className="text-[11px] font-bold text-blue-800 italic leading-snug">
+                                            Mülakat süresi <span className="font-black">45 dakika</span> olarak planlanmıştır. Butona tıkladığınızda aday bekleme odasından görüşmeye alınacaktır.
+                                        </p>
+                                    </div>
+                                    <button 
+                                        onClick={() => setPhase('active')}
+                                        disabled={!selectedPathId || pathLoading}
+                                        className="h-[80px] px-12 rounded-[2.5rem] bg-[#0F172A] hover:bg-black text-white font-black text-base transition-all shadow-2xl flex items-center gap-6 italic group min-w-[300px]"
+                                    >
+                                        Mülakatı Başlat <Play className="w-6 h-6 fill-current group-hover:translate-x-2 transition-transform" />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </main>
+                </div>
+            );
+        } else {
+            // Aday Hazırlık Odası
+            return (
+                <div className="min-h-screen bg-[#F0F2F5] font-sans flex flex-col items-center justify-center p-8 text-[#1E293B] italic overflow-hidden">
+                    <div className="max-w-[1400px] w-full flex flex-col gap-12">
+                        <div className="flex flex-col items-center text-center">
+                            <h1 className="text-[64px] font-black text-[#0F172A] tracking-tighter uppercase italic leading-[0.9] mb-4">Mülakata <span className="text-blue-600 underline underline-offset-8">Hazır Mısın?</span></h1>
+                            <p className="text-lg font-bold text-slate-400 max-w-2xl">Cihazlarınızı kontrol edin ve hazır olduğunuzda giriş yapın. Mülakat odasına bağlanmadan önceki son adımdasınız.</p>
+                        </div>
+
+                        <div className="grid grid-cols-12 gap-10">
+                            <div className="col-span-12 lg:col-span-7 flex flex-col gap-6">
+                                <div className="relative aspect-video rounded-[3.5rem] bg-slate-200 overflow-hidden shadow-2xl border-4 border-white group">
+                                    {isVideoOn && stream ? (
+                                        <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover scale-x-[-1]" />
+                                    ) : (
+                                        <div className="w-full h-full flex flex-col items-center justify-center bg-zinc-950">
+                                            <Camera className="w-20 h-20 text-white/10" />
                                         </div>
                                     )}
-                                    LOKAL SİNYAL {isMicOn ? 'AKTİF' : 'SESSIZ'}
+                                    <div className="absolute top-8 right-8 px-5 py-2.5 bg-emerald-500 rounded-3xl flex items-center gap-2 border border-emerald-400 shadow-xl">
+                                        <div className="w-2.5 h-2.5 rounded-full bg-white animate-pulse" />
+                                        <span className="text-[10px] font-black text-white uppercase tracking-widest">SİNYAL GÜÇLÜ</span>
+                                    </div>
+                                    <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-4 bg-white/10 backdrop-blur-3xl p-3 rounded-[2.5rem] border border-white/20">
+                                        <button onClick={() => setIsMicOn(!isMicOn)} className={"w-14 h-14 rounded-2xl flex items-center justify-center transition-all " + (isMicOn ? 'bg-white text-black shadow-xl' : 'bg-red-500 text-white')}>
+                                            {isMicOn ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />}
+                                        </button>
+                                        <button onClick={() => setIsVideoOn(!isVideoOn)} className={"w-14 h-14 rounded-2xl flex items-center justify-center transition-all " + (isVideoOn ? 'bg-white text-black shadow-xl' : 'bg-red-500 text-white')}>
+                                            {isVideoOn ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
+                                        </button>
+                                        <button onClick={() => setShowSettings(true)} className="w-14 h-14 rounded-2xl bg-white/20 text-white flex items-center justify-center hover:bg-white hover:text-black transition-all">
+                                            <Settings className="w-6 h-6" />
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-3 gap-6">
+                                    <div className="bg-white/40 backdrop-blur-md rounded-[2.5rem] p-6 border border-white border-white/50 flex items-center gap-4 shadow-sm">
+                                        <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100"><Mic className="w-6 h-6" /></div>
+                                        <div>
+                                            <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">MİKROFON</p>
+                                            <p className="text-[12px] font-black text-[#0F172A] italic uppercase truncate">MacBook Pro Mic</p>
+                                        </div>
+                                    </div>
+                                    <div className="bg-white/40 backdrop-blur-md rounded-[2.5rem] p-6 border border-white border-white/50 flex items-center gap-4 shadow-sm">
+                                        <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100"><Camera className="w-6 h-6" /></div>
+                                        <div>
+                                            <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">KAMERA</p>
+                                            <p className="text-[12px] font-black text-[#0F172A] italic uppercase truncate">FaceTime HD</p>
+                                        </div>
+                                    </div>
+                                    <div className="bg-white/40 backdrop-blur-md rounded-[2.5rem] p-6 border border-white border-white/50 flex items-center gap-4 shadow-sm">
+                                        <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100"><Zap className="w-6 h-6" /></div>
+                                        <div>
+                                            <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">BAĞLANTI</p>
+                                            <p className="text-[12px] font-black text-[#0F172A] italic uppercase truncate">120 Mbps (Fiber)</p>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    </div>
 
-                    {/* Bottom Controls Panel */}
-                    <div className="h-24 shrink-0 flex items-center justify-between px-12 rounded-[2.5rem] bg-white/[0.03] border border-white/5 backdrop-blur-xl shadow-2xl">
-                        <div className="flex items-center gap-4">
-                            <button
-                                onClick={() => alert("Ekran Paylaşımı özelliği yakında eklenecektir.")}
-                                className="p-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all text-white/60 hover:text-white group"
-                            >
-                                <Monitor className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                            </button>
-                            <button
-                                onClick={() => alert("Sohbet paneli yakında eklenecektir.")}
-                                className="p-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all text-white/60 hover:text-white group"
-                            >
-                                <MessageSquare className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                            </button>
-                        </div>
+                            <div className="col-span-12 lg:col-span-5 flex flex-col gap-6">
+                                <div className="bg-white rounded-[3.5rem] p-10 border border-slate-200 shadow-2xl relative overflow-hidden flex-1">
+                                    <div className="flex items-center gap-5 mb-10">
+                                        <div className="w-16 h-16 rounded-[1.5rem] bg-indigo-950 overflow-hidden shadow-xl border-4 border-white flex items-center justify-center">
+                                             <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Caner" alt="Recruiter" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-xl font-black text-[#0F172A] tracking-tighter italic uppercase">Caner Yıldırım</h3>
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Kıdemli İK Yöneticisi</p>
+                                            <div className="flex gap-1.5 mt-2">
+                                                <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded-md text-[8px] font-black uppercase">Teknoloji</span>
+                                                <span className="px-2 py-0.5 bg-slate-50 text-slate-500 rounded-md text-[8px] font-black uppercase">10+ Yıl Deneyim</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <p className="text-[13px] font-bold text-slate-500 leading-relaxed italic border-l-4 border-blue-600 pl-6 py-4 mb-10">
+                                        "Geleceğin liderlerini arıyoruz. Bugün sizinle teknik yetkinliklerinizin yanı sıra problem çözme yaklaşımınızı konuşacağız."
+                                    </p>
+                                    
+                                    <div className="bg-slate-50/80 rounded-[2rem] p-8 border border-slate-100 mb-10">
+                                        <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-widest mb-6 flex items-center gap-2">
+                                            <ShieldCheck className="w-5 h-5 text-emerald-500" /> MÜLAKAT KURALLARI
+                                        </h4>
+                                        <div className="space-y-4">
+                                            {[
+                                                "Sessiz ve iyi aydınlatılmış bir ortamda bulunduğunuzdan emin olun.",
+                                                "Mülakat süresince internet tarayıcınızda başka sekme açmayın.",
+                                                "Mülakat kaydedilecektir. Gizlilik sözleşmesi geçerlidir."
+                                            ].map((rule, idx) => (
+                                                <div key={idx} className="flex gap-4 items-start">
+                                                    <div className="w-6 h-6 rounded-full bg-black text-white text-[10px] font-black flex items-center justify-center shrink-0">{idx + 1}</div>
+                                                    <p className="text-[12px] font-bold text-slate-500 leading-tight italic">{rule}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
 
-                        <div className="flex items-center gap-4 scale-110">
-                            <button
-                                onClick={() => setIsMicOn(!isMicOn)}
-                                className={`p-5 rounded-2xl transition-all border shadow-xl ${isMicOn ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-red-600/20 border-red-500/40 text-red-500'}`}
-                            >
-                                {isMicOn ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />}
-                            </button>
-                            <button
-                                onClick={() => setIsVideoOn(!isVideoOn)}
-                                className={`p-5 rounded-2xl transition-all border shadow-xl ${isVideoOn ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-red-600/20 border-red-500/40 text-red-500'}`}
-                            >
-                                {isVideoOn ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
-                            </button>
-                        </div>
-
-                        <div className="flex items-center gap-4">
-                            {isRecruiter && simIndex < transcriptData.length && (
-                                <button
-                                    onClick={triggerNextSim}
-                                    className="px-6 py-4 rounded-2xl bg-violet-600/20 border border-violet-500/30 text-violet-400 text-[10px] font-black uppercase tracking-widest hover:bg-violet-600/30 transition-all flex items-center gap-2"
-                                >
-                                    <ChevronRight className="w-4 h-4" />
-                                    Simülasyona Devam Et
-                                </button>
-                            )}
-                            <button
-                                onClick={handleFinishInterview}
-                                className="px-8 py-4 rounded-2xl bg-red-600 text-white text-[10px] font-black uppercase tracking-widest shadow-xl shadow-red-600/40 hover:scale-105 active:scale-95 transition-all"
-                            >
-                                Görüşmeyi Bitir ve Kaydet
-                            </button>
+                                    <div className="space-y-4">
+                                        <div className="flex items-center gap-3 px-6">
+                                            <input type="checkbox" checked={hasConsent} onChange={(e) => setHasConsent(e.target.checked)} id="kvkk" className="w-5 h-5 accent-blue-600 cursor-pointer" />
+                                            <label htmlFor="kvkk" className="text-[11px] font-black text-slate-500 uppercase italic cursor-pointer">KVKK Şartlarını Onaylıyorum</label>
+                                        </div>
+                                        <button 
+                                            onClick={() => setPhase('active')}
+                                            disabled={!hasConsent}
+                                            className="w-full h-20 rounded-[2.5rem] bg-indigo-950 hover:bg-black text-white font-black text-lg transition-all shadow-2xl flex items-center justify-center gap-6 italic group disabled:opacity-20"
+                                        >
+                                            <span className="relative z-10">MÜLAKATA KATIL</span>
+                                            <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center group-hover:bg-white group-hover:text-black transition-all">
+                                                <Zap className="w-6 h-6" />
+                                            </div>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
+            );
+        }
+    }
 
-                {/* Right: AI Observation Sidebar */}
-                {isRecruiter && (
-                    <div className="w-[440px] shrink-0 h-full flex flex-col gap-5 overflow-hidden pb-2">
-
-                        {/* Questions Card (Compact) */}
-                        <section className="h-[18%] shrink-0 rounded-[2.5rem] bg-white/[0.03] border border-white/5 backdrop-blur-2xl p-6 flex flex-col shadow-2xl overflow-hidden relative group stitch-glass">
-                            <div className="flex items-center justify-between mb-3 shrink-0">
-                                <div className="flex items-center gap-2">
-                                    <div className="p-1.5 rounded-lg bg-violet-500/10 text-violet-400">
-                                        <HelpCircle className="w-3.5 h-3.5" />
-                                    </div>
-                                    <span className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] italic">Mülakat Planı</span>
-                                </div>
-                                <span className="px-2 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[8px] font-black text-emerald-500">HAZIR</span>
+    return (
+        <div className="fixed inset-0 z-[200] bg-slate-50 flex flex-col overflow-hidden text-slate-900 font-sans italic">
+            <header className="h-[64px] shrink-0 border-b border-slate-200 bg-white px-8 flex items-center justify-between z-20">
+                <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center">
+                            <Video className="w-5 h-5 text-white" />
+                        </div>
+                        <h2 className="text-[13px] font-black text-slate-900 uppercase tracking-tighter italic">Live Interview</h2>
+                    </div>
+                </div>
+                <button
+                    onClick={handleFinishInterview}
+                    className="px-8 py-3 rounded-[1.2rem] bg-red-600 text-white hover:bg-red-700 font-black text-[11px] tracking-widest uppercase transition-all italic"
+                >
+                    Mülakatı Sonlandır
+                </button>
+            </header>
+            <div className="flex-1 flex p-6 gap-6 overflow-hidden">
+                <div className="flex-1 bg-slate-900 rounded-[3.5rem] relative overflow-hidden shadow-2xl border-[6px] border-white group/video transition-all">
+                     <div className="absolute inset-0 bg-zinc-950">
+                         {(stream || !isRecruiter) ? (
+                            <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover scale-x-[-1]" />
+                         ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                                 <User className="w-40 h-40 text-white/5 blur-sm" />
                             </div>
+                         )}
+                     </div>
+                     
+                     <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-4 z-30 opacity-0 group-hover/video:opacity-100 transition-all bg-black/40 backdrop-blur-3xl px-6 py-4 rounded-[2.5rem] border border-white/10">
+                         <button onClick={() => setIsMicOn(!isMicOn)} className={"w-14 h-14 rounded-2xl flex items-center justify-center transition-all " + (isMicOn ? 'bg-white/10 text-white' : 'bg-red-600 text-white')}>
+                             {isMicOn ? <Mic className="w-6 h-6"/> : <MicOff className="w-6 h-6"/>}
+                         </button>
+                         <button onClick={() => setIsVideoOn(!isVideoOn)} className={"w-14 h-14 rounded-2xl flex items-center justify-center transition-all " + (isVideoOn ? 'bg-white/10 text-white' : 'bg-red-600 text-white')}>
+                             {isVideoOn ? <Video className="w-6 h-6"/> : <VideoOff className="w-6 h-6"/>}
+                         </button>
+                         <button onClick={handleFinishInterview} className="w-14 h-14 rounded-2xl bg-red-600 text-white flex items-center justify-center hover:scale-110 transition-all">
+                             <X className="w-6 h-6"/>
+                         </button>
+                     </div>
+                </div>
 
-                            <div className="flex-1 overflow-y-auto custom-scrollbar-dark pr-2 space-y-2">
-                                {questions.map((q, idx) => (
-                                    <button
-                                        key={q.id}
-                                        onClick={() => setCurrentQuestionIndex(idx)}
-                                        className={`w-full text-left p-3 rounded-xl border transition-all relative group/q ${currentQuestionIndex === idx
-                                            ? 'bg-violet-600/20 border-violet-500/30'
-                                            : 'bg-white/[0.01] border-white/5 hover:bg-white/[0.03]'
-                                            }`}
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <span className={`text-[8px] font-black ${currentQuestionIndex === idx ? 'text-violet-400' : 'text-white/20'}`}>0{idx + 1}</span>
-                                            <p className={`text-[10px] font-bold truncate ${currentQuestionIndex === idx ? 'text-white' : 'text-white/40'}`}>{q.text}</p>
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
+                {isRecruiter ? (
+                    <div className="w-[420px] flex flex-col gap-6 shrink-0 relative z-30">
+                        <section className="bg-white rounded-[3rem] p-8 border border-slate-200 shadow-2xl flex-1 flex flex-col overflow-hidden">
+                             <div className="flex items-center justify-between mb-6">
+                                <h3 className="text-[14px] font-black text-slate-900 uppercase italic tracking-tighter">Analytical Radar</h3>
+                                <div className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[9px] font-black uppercase">Canlı Analiz</div>
+                             </div>
+                             <div className="flex-1 space-y-6 overflow-y-auto pr-2 custom-scrollbar">
+                                 {Object.entries(starScores).map(([key, value]) => (
+                                     <div key={key} className="space-y-2">
+                                         <div className="flex items-center justify-between text-[11px] font-black text-slate-400">
+                                             <span className="uppercase">{key}</span>
+                                             <span className="text-blue-600 font-black">{value}%</span>
+                                         </div>
+                                         <div className="h-2 bg-slate-100 rounded-full overflow-hidden p-0.5 border border-slate-200">
+                                              <div 
+                                                className="h-full rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 transition-all duration-1000" 
+                                                style={{width: value + '%' }} 
+                                              />
+                                         </div>
+                                     </div>
+                                 ))}
+                             </div>
+                             <div className="mt-8 pt-6 border-t border-slate-100">
+                                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                       <p className="text-[10px] font-black text-slate-400 uppercase mb-2">AI Özet Önerisi</p>
+                                       <p className="text-[11px] font-bold text-slate-600 italic leading-relaxed">
+                                            Adayın deneyimi teorik olarak güçlü, şimdi teknik mimari detaylarına odaklanın.
+                                       </p>
+                                  </div>
+                             </div>
                         </section>
 
-                        {/* Analitik Gözlem (Redesigned) */}
-                        <section className="h-[24%] shrink-0 rounded-[2.5rem] bg-white/[0.03] border border-white/5 backdrop-blur-2xl p-6 space-y-4 relative overflow-hidden group shadow-2xl stitch-glass">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500">
-                                        <Activity className="w-3.5 h-3.5" />
-                                    </div>
-                                    <span className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em]">Analitik Radar</span>
+                        <section className="bg-slate-900 rounded-[3rem] border border-white/10 h-[35%] flex flex-col overflow-hidden shadow-2xl p-8">
+                             <div className="flex items-center gap-3 mb-6">
+                                <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
+                                    <Brain className="w-4 h-4 text-white" />
                                 </div>
-                                <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10">
-                                    <span className="text-[8px] font-black text-white/30 uppercase tracking-widest">STAR</span>
-                                    <span className="text-xs font-black text-emerald-500">{logicIntegrity}%</span>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-2">
-                                {Object.entries(starScores).map(([key, value]) => (
-                                    <div key={key} className="p-3 rounded-2xl bg-white/[0.02] border border-white/5 group/star hover:bg-white/[0.04] transition-all">
-                                        <div className="flex items-center justify-between mb-1.5">
-                                            <span className="text-[8px] font-black text-white/40 uppercase tracking-widest group-hover:text-white transition-colors">
-                                                {key === 'S' ? 'Situation' : key === 'T' ? 'Task' : key === 'A' ? 'Action' : 'Result'}
-                                            </span>
-                                            <span className={`text-[9px] font-black ${value > 70 ? 'text-emerald-500' : 'text-amber-500'}`}>
-                                                %{value}
-                                            </span>
-                                        </div>
-                                        <div className="h-1 bg-white/5 rounded-full overflow-hidden">
-                                            <div
-                                                className={`h-full transition-all duration-1000 ${key === 'S' ? 'bg-emerald-500' :
-                                                    key === 'T' ? 'bg-blue-500' :
-                                                        key === 'A' ? 'bg-violet-500' : 'bg-amber-500'
-                                                    }`}
-                                                style={{ width: `${value}%` }}
-                                            />
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-
-                            <div className="p-3 rounded-xl bg-white/[0.01] border border-white/5 flex items-center justify-between overflow-hidden">
-                                <div className="flex flex-col gap-0.5">
-                                    <span className="text-[7px] font-black text-white/30 uppercase tracking-widest">Ses & Enerji Seviyesi</span>
-                                    <span className="text-[9px] font-bold text-cyan-400">STABIL SİNYAL</span>
-                                </div>
-                                <div className="h-4 flex items-end justify-center gap-0.5 w-24">
-                                    {waveHeight.map((h, i) => (
-                                        <div key={i} className="flex-1 rounded-t-sm bg-cyan-500/30 transition-all duration-300" style={{ height: `${h / 4}%` }} />
-                                    ))}
-                                </div>
-                            </div>
+                                <h3 className="text-[12px] font-black text-white uppercase italic tracking-widest">AI Recruiter Assistant</h3>
+                             </div>
+                             <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar" ref={transcriptRef}>
+                                  {transcript.slice(-3).map((line, idx) => (
+                                       <div key={idx} className="p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all">
+                                            <p className="text-[12px] font-medium text-white/90 italic leading-relaxed">"{line.text}"</p>
+                                       </div>
+                                  ))}
+                                  {transcript.length === 0 && (
+                                      <div className="flex flex-col items-center justify-center h-full text-center opacity-30">
+                                          <Mic className="w-8 h-8 text-white mb-2 animate-pulse" />
+                                          <p className="text-[10px] font-black text-white uppercase">Dinleniyor...</p>
+                                      </div>
+                                  )}
+                             </div>
                         </section>
-
-                        {/* AI Coach (Main Interaction Hub) */}
-                        <section className="flex-1 rounded-[2.5rem] bg-white/[0.02] border border-white/5 backdrop-blur-3xl p-6 overflow-hidden flex flex-col relative group shadow-2xl stitch-glass">
-                            <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-all pointer-events-none">
-                                <Brain className="w-24 h-24 text-violet-500 blur-sm" />
-                            </div>
-
-                            <div className="relative z-10 flex flex-col h-full italic">
-                                <header className="flex items-center justify-between mb-4 border-b border-white/5 pb-4">
-                                    <div className="flex flex-col">
-                                        <h3 className="text-[8px] font-black tracking-[0.3em] text-violet-400 uppercase opacity-60">Autonomous Intelligence</h3>
-                                        <p className="text-sm font-black italic uppercase tracking-tighter text-white">Otonom Koç Paneli</p>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        {isRecording && (
-                                            <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-red-500/10 border border-red-500/20">
-                                                <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                                                <span className="text-[7px] font-black text-red-500 uppercase tracking-widest">Live STT</span>
-                                            </div>
-                                        )}
-                                        <div className="w-10 h-10 rounded-xl bg-violet-600/20 border border-violet-500/30 flex items-center justify-center animate-pulse shadow-[0_0_15px_rgba(139,92,246,0.2)]">
-                                            <Brain className="w-5 h-5 text-violet-400" />
-                                        </div>
-                                    </div>
-                                </header>
-
-                                <div className="flex-1 overflow-y-auto custom-scrollbar-dark pr-2 mb-4 space-y-3">
-                                    {/* Action Content Area */}
-                                    {suggestedQuestion ? (
-                                        <div className="p-5 rounded-3xl bg-violet-600 border border-violet-400 shadow-[0_0_25px_rgba(139,92,246,0.25)] animate-in slide-in-from-top duration-500">
-                                            <div className="flex items-center justify-between mb-2.5">
-                                                <div className="flex items-center gap-2">
-                                                    <Sparkles className="w-3.5 h-3.5 text-white" />
-                                                    <span className="text-[8px] font-black uppercase text-violet-100 italic">AI Stratejik Soru</span>
+                    </div>
+                ) : (
+                    <div className="w-[420px] flex flex-col gap-6 shrink-0 relative z-30">
+                        <section className="bg-white rounded-[3.5rem] border border-slate-200 flex-1 flex flex-col overflow-hidden shadow-2xl p-8">
+                             <h3 className="text-[14px] font-black text-slate-900 uppercase italic tracking-tighter mb-8 border-l-4 border-blue-600 pl-4">Mülakat Akışı</h3>
+                             <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
+                                  {questions.map((q, idx) => (
+                                      <div key={idx} className={"p-6 rounded-3xl border transition-all duration-500 " + (idx === currentQuestionIndex ? 'border-blue-600 bg-blue-50/50 shadow-lg scale-[1.02]' : 'opacity-30 grayscale border-slate-100')}>
+                                           <div className="flex items-center gap-3 mb-2">
+                                                <div className={"w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black " + (idx === currentQuestionIndex ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-400')}>
+                                                    {idx + 1}
                                                 </div>
-                                                <button onClick={() => setSuggestedQuestion(null)} className="text-white/60 hover:text-white transition-colors p-1">
-                                                    <X className="w-3.5 h-3.5" />
-                                                </button>
-                                            </div>
-                                            <p className="text-[11px] font-black text-white leading-relaxed mb-3">
-                                                {suggestedQuestion.question}
-                                            </p>
-                                            {suggestedQuestion.evaluationHint && (
-                                                <div className="p-2.5 bg-white/10 rounded-xl border border-white/10 flex gap-2">
-                                                    <Info className="w-3 h-3 text-violet-100 shrink-0 mt-0.5" />
-                                                    <p className="text-[9px] text-violet-100/70 font-bold leading-normal italic">{suggestedQuestion.evaluationHint}</p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    ) : (
-                                        <div className="p-4 rounded-[2rem] bg-white/[0.02] border border-white/5 text-center flex flex-col items-center justify-center gap-2 min-h-[100px]">
-                                            <Sparkles className="w-4 h-4 text-violet-400/40" />
-                                            <p className="text-[9px] font-bold text-white/30 uppercase tracking-widest leading-relaxed px-4">
-                                                Adayı yönlendirmek için strateji butonlarını kullanın veya CV'den soru türetin
-                                            </p>
-                                        </div>
-                                    )}
-
-                                    {/* Insights List */}
-                                    {aiInsights.map((insight) => (
-                                        <div key={insight.id} className={`p-4 rounded-2xl border transition-all animate-fade-in ${insight.type === 'signal' ? 'bg-emerald-500/5 border-emerald-500/10' :
-                                            insight.type === 'suggestion' ? 'bg-amber-500/5 border-amber-500/10' :
-                                                'bg-white/[0.01] border-white/5'
-                                            }`}>
-                                            <div className="flex items-center gap-2 mb-2">
-                                                {insight.type === 'signal' && <Zap className="w-3 h-3 text-emerald-400" />}
-                                                {insight.type === 'suggestion' && <Sparkles className="w-3 h-3 text-amber-400" />}
-                                                {insight.type === 'info' && <Info className="w-3 h-3 text-violet-400" />}
-                                                <span className={`text-[8px] font-black uppercase tracking-widest ${insight.type === 'signal' ? 'text-emerald-400' :
-                                                    insight.type === 'suggestion' ? 'text-amber-400' :
-                                                        'text-violet-400'
-                                                    }`}>
-                                                    {insight.type === 'signal' ? 'Sinyal' : insight.type === 'suggestion' ? 'Öneri' : 'Bilgi'}
-                                                </span>
-                                            </div>
-                                            <p className={`text-[10px] leading-relaxed font-bold ${insight.type === 'suggestion' ? 'text-white' : 'text-white/60'}`}>
-                                                {insight.text}
-                                            </p>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                {/* Competency Generator Grid (Compact) */}
-                                <div className="grid grid-cols-4 gap-2 mb-4">
-                                    {[
-                                        { id: 'tech', label: 'Teknik', icon: Code, color: 'text-blue-400' },
-                                        { id: 'comm', label: 'İletişim', icon: MessageSquare, color: 'text-emerald-400' },
-                                        { id: 'leader', label: 'Liderlik', icon: Award, color: 'text-amber-400' },
-                                        { id: 'problem', label: 'Analitik', icon: Zap, color: 'text-violet-400' }
-                                    ].map((cat) => (
-                                        <button
-                                            key={cat.id}
-                                            onClick={() => handleGenerateAIQuestion('category', cat.label)}
-                                            disabled={coachGenerating}
-                                            className="flex flex-col items-center gap-1.5 p-2 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] hover:border-white/10 transition-all disabled:opacity-50"
-                                        >
-                                            <cat.icon className={`w-3 h-3 ${cat.color}`} />
-                                            <span className="text-[7px] font-black uppercase tracking-tighter text-white/40">{cat.label}</span>
-                                        </button>
-                                    ))}
-                                </div>
-
-                                {/* AI Interaction Controls */}
-                                <div className="flex items-center gap-2 mt-auto">
-                                    <button
-                                        onClick={() => handleGenerateAIQuestion('deepen')}
-                                        disabled={coachGenerating}
-                                        className="flex-1 h-11 rounded-xl bg-violet-600 border border-violet-400 text-[9px] font-black uppercase tracking-widest text-white shadow-lg shadow-violet-600/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                                    >
-                                        <Target className="w-3.5 h-3.5" />
-                                        Derinleş
-                                    </button>
-                                    <button
-                                        onClick={() => handleGenerateAIQuestion('resume')}
-                                        disabled={coachGenerating}
-                                        className="flex-1 h-11 rounded-xl bg-white/5 border border-white/10 text-[9px] font-black uppercase tracking-widest text-white/60 hover:bg-white/10 hover:text-white transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                                    >
-                                        <Box className="w-3.5 h-3.5" />
-                                        CV Sorusu
-                                    </button>
-                                </div>
-                            </div>
-                        </section>
-
-                        {/* Live Transcript (Compact Drawer at Bottom) */}
-                        <section className="h-[12%] shrink-0 rounded-[2.5rem] bg-black/40 border border-white/5 backdrop-blur-3xl p-5 flex flex-col shadow-2xl overflow-hidden relative group">
-                            <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse" />
-                                    <span className="text-[8px] font-black text-cyan-400 uppercase tracking-[0.2em] italic">Canlı Transcript</span>
-                                </div>
-                                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/5 border border-white/10">
-                                    <Activity className="w-2.5 h-2.5 text-white/20" />
-                                    <span className="text-[7px] font-bold text-white/40 uppercase">Aktif Dinleme</span>
-                                </div>
-                            </div>
-
-                            <div className="flex-1 overflow-y-auto custom-scrollbar-dark pr-2 space-y-2" ref={transcriptRef}>
-                                {transcript.slice(-3).map((line, idx) => {
-                                    const isSystem = line.role === 'SYSTEM';
-                                    const isAday = line.role === 'ADAY';
-                                    return (
-                                        <div key={idx} className="animate-fade-in transition-all">
-                                            <div className="flex flex-col gap-1">
-                                                <div className="flex items-center gap-2">
-                                                    <span className={`px-1.5 py-0.5 rounded-md border text-[7px] font-black uppercase tracking-widest ${isSystem ? 'bg-white/5 border-white/10 text-white/40' :
-                                                        isAday ? 'bg-cyan-500/10 border-cyan-500/20 text-cyan-400' :
-                                                            'bg-violet-500/10 border-violet-500/20 text-violet-400'
-                                                        }`}>
-                                                        {line.role}
-                                                    </span>
-                                                    <span className="text-[7px] font-medium text-white/20">{line.time}</span>
-                                                </div>
-                                                <p className={`text-[10px] leading-relaxed font-bold ${isSystem ? 'text-white/30 italic' : 'text-white/70'}`}>
-                                                    {line.text}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                                {isRecording && (
-                                    <div className="animate-pulse flex items-center gap-2 italic">
-                                        <span className="text-[7px] font-black text-cyan-500/50 uppercase">Dinleniyor...</span>
-                                    </div>
-                                )}
-                            </div>
+                                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Soru</span>
+                                           </div>
+                                           <p className="text-[14px] font-black text-[#0F172A] italic tracking-tight leading-snug">"{q.text}"</p>
+                                      </div>
+                                  ))}
+                             </div>
+                             <div className="mt-8 p-6 bg-slate-950 rounded-[2.5rem] text-white flex items-center justify-between">
+                                 <div>
+                                     <p className="text-[9px] font-black text-slate-500 uppercase mb-1">Kalan Süre</p>
+                                     <p className="text-xl font-black italic tracking-tighter">24:15</p>
+                                 </div>
+                                 <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center">
+                                     <Zap className="w-6 h-6 text-emerald-400 animate-pulse" />
+                                 </div>
+                             </div>
                         </section>
                     </div>
                 )}
             </div>
 
-            {/* Global Settings Modal for Active Phase */}
-            {showSettings && <SettingsModal onClose={() => setShowSettings(false)} devices={devices} selectedDevices={selectedDevices} onDeviceChange={changeDevice} />}
-
-            {/* Background elements */}
-            <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-violet-600/5 rounded-full blur-[180px] pointer-events-none -translate-y-1/2 translate-x-1/2" />
-            <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-cyan-600/5 rounded-full blur-[180px] pointer-events-none translate-y-1/2 -translate-x-1/2" />
+            {showSettings && (
+                <div className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-3xl flex items-center justify-center p-8">
+                    <div className="bg-white w-full max-w-2xl rounded-[4rem] p-12 shadow-2xl border border-white/20">
+                        <div className="flex items-center justify-between mb-10">
+                            <h2 className="text-3xl font-black text-[#0F172A] italic uppercase tracking-tighter">Cihaz Ayarları</h2>
+                            <button onClick={() => setShowSettings(false)} className="w-14 h-14 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center hover:bg-black hover:text-white transition-all">
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+                        <div className="space-y-8">
+                            <div className="space-y-4">
+                                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest pl-4">Kamera Seçimi</label>
+                                <select className="w-full h-16 bg-slate-50 border border-slate-200 rounded-3xl px-8 font-bold italic outline-none focus:border-blue-600 transition-all appearance-none cursor-pointer">
+                                    {devices.filter(d => d.kind === 'videoinput').map(d => (
+                                        <option key={d.deviceId} value={d.deviceId}>{d.label || `Kamera ${d.deviceId.slice(0,5)}`}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="space-y-4">
+                                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest pl-4">Mikrofon Seçimi</label>
+                                <select className="w-full h-16 bg-slate-50 border border-slate-200 rounded-3xl px-8 font-bold italic outline-none focus:border-blue-600 transition-all appearance-none cursor-pointer">
+                                    {devices.filter(d => d.kind === 'audioinput').map(d => (
+                                        <option key={d.deviceId} value={d.deviceId}>{d.label || `Mikrofon ${d.deviceId.slice(0,5)}`}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+                        <button onClick={() => setShowSettings(false)} className="w-full h-20 rounded-[2.5rem] bg-blue-600 hover:bg-blue-700 text-white font-black text-lg mt-12 transition-all shadow-xl shadow-blue-500/20 italic">
+                            AYARLARI KAYDET
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
-}
+};
 

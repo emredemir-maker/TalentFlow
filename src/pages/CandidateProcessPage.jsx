@@ -1,516 +1,500 @@
 // src/pages/CandidateProcessPage.jsx
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
-import StarScoreCard from '../components/StarScoreCard';
-import InterviewHistory from '../components/InterviewHistory';
-import SendMessageModal from '../components/SendMessageModal';
 import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
 import {
-    Github,
-    Linkedin,
-    Globe,
-    CheckCircle2,
-    Shield,
-    Terminal,
-    MapPin,
-    Cpu,
-    BadgeCheck,
-    Download,
-    Activity,
-    Briefcase,
-    Calendar,
-    MessageSquare,
-    Clock,
-    Mail,
-    Phone,
-    FileText,
-    ExternalLink,
-    User,
-    X,
-    Video,
+    Plus, Search, ChevronRight, Zap, Star, Brain, X,
+    Mail, Phone, Target, MessageSquare, Briefcase, TrendingUp, Users, ShieldCheck, Heart, ArrowRight, FileText, Clock, Sparkles, Filter, AlertCircle, Trophy, Globe, Code, Layers, Calendar, Edit3, Trash2, ChevronDown, CheckCircle2, Link2, ExternalLink, Video, Play
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { analyzeCandidateMatch } from '../services/geminiService';
-import { createMessage, MESSAGE_STATUS } from '../services/messageQueueService';
-
-const STATUS_LABELS = {
-    ai_analysis: 'AI Analiz',
-    review: 'İnceleme',
-    interview: 'Mülakat',
-    offer: 'Teklif',
-    hired: 'İşe Alındı',
-    rejected: 'Red'
-};
 
 export default function CandidateProcessPage() {
-    const { candidates, viewCandidateId, setViewCandidateId, updateCandidate } = useCandidates();
-    const { positions } = usePositions();
     const navigate = useNavigate();
-    const [sendModalPurpose, setSendModalPurpose] = useState(null);
-    const [plannedSessionToStart, setPlannedSessionToStart] = useState(null);
-    const [activeTab, setActiveTab] = useState('overview'); // ['overview', 'interviews', 'cv']
+    const { enrichedCandidates, viewCandidateId, setViewCandidateId, sourceColors, setPreselectedInterviewData } = useCandidates();
+    const candidates = enrichedCandidates || [];
+    const [searchQuery, setSearchQuery] = useState('');
+    const [activeDetailTab, setActiveDetailTab] = useState('ai_analysis');
+    const [expandedInterviewId, setExpandedInterviewId] = useState(null);
 
     const candidate = useMemo(() => {
         if (!viewCandidateId && candidates.length > 0) return candidates[0];
-        return candidates.find(c => c.id === viewCandidateId) || null;
+        return candidates.find(c => c.id === viewCandidateId) || (candidates.length > 0 ? candidates[0] : null);
     }, [candidates, viewCandidateId]);
 
-    const handleMessageSent = async (data) => {
-        try {
-            // 1. Log message to queue
-            await createMessage({
-                candidateId: data.candidateId,
-                candidateName: data.candidateName,
-                candidateEmail: candidate.email,
-                candidatePosition: candidate.matchedPositionTitle || candidate.position,
-                messageContent: data.subject + '\n\n' + (data.content || ''),
-                subject: data.subject,
-                trackingId: data.trackingId,
-                status: MESSAGE_STATUS.SENT,
-                purpose: data.purpose,
-                aiGenerated: true
-            });
+    const filteredCandidates = useMemo(() => {
+        return candidates.filter(c => 
+            c.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            c.position?.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+    }, [candidates, searchQuery]);
 
-            // 2. If it's an interview, create a planned session
-            const updates = {};
-            if (data.purpose === 'interview') {
-                if (candidate.status === 'review' || candidate.status === 'ai_analysis') {
-                    updates.status = 'interview';
-                }
-
-                // Append to interviewSessions
-                const newSession = {
-                    id: 'planned-' + Date.now(),
-                    status: 'planned',
-                    date: data.interviewDetails?.date,
-                    time: data.interviewDetails?.time,
-                    duration: data.interviewDetails?.duration,
-                    type: data.interviewDetails?.type,
-                    typeLabel: data.interviewDetails?.typeLabel,
-                    meetLink: data.interviewDetails?.meetLink,
-                    timestamp: new Date().toISOString()
-                };
-
-                const existingSessions = candidate.interviewSessions || [];
-                updates.interviewSessions = [...existingSessions, newSession];
-            }
-
-            if (Object.keys(updates).length > 0) {
-                await updateCandidate(candidate.id, updates);
-            }
-        } catch (err) {
-            console.error("Failed to log sent message:", err);
-        }
+    const parseFeedback = (text) => {
+        if (!text) return { pos: "", neg: "" };
+        const posSplit = text.split("Negatif (-):");
+        const pos = posSplit[0].replace("Pozitif (+):", "").trim();
+        const neg = posSplit[1] ? posSplit[1].trim() : "";
+        return { pos, neg };
     };
 
-    const handleTargetPositionChange = async (e) => {
-        const newValue = e.target.value;
-        if (!candidate || !newValue) return;
-        const posObj = positions?.find(p => p.title === newValue);
-        try {
-            const cachedAnalysis = candidate.positionAnalyses?.[newValue];
-            if (cachedAnalysis) {
-                await updateCandidate(candidate.id, {
-                    matchedPositionTitle: newValue,
-                    matchScore: cachedAnalysis.score,
-                    status: 'review',
-                    aiAnalysis: cachedAnalysis
-                });
-                return;
-            }
-            await updateCandidate(candidate.id, {
-                matchedPositionTitle: newValue,
-                matchScore: 0,
-                status: 'ai_analysis',
-                aiAnalysis: null
-            });
-            if (posObj) {
-                (async () => {
-                    try {
-                        const jobDesc = `${posObj.title}\n${(posObj.requirements || []).join(', ')}\n${posObj.description || ''}`;
-                        const result = await analyzeCandidateMatch(jobDesc, candidate);
-                        const updatedAnalyses = {
-                            ...(candidate.positionAnalyses || {}),
-                            [newValue]: result
-                        };
-                        await updateCandidate(candidate.id, {
-                            matchScore: result.score,
-                            status: 'review',
-                            aiAnalysis: result,
-                            summary: result.summary,
-                            matchedPositionTitle: newValue,
-                            positionAnalyses: updatedAnalyses
-                        });
-                    } catch (error) {
-                        console.error("Inline AI rescan error:", error);
-                    }
-                })();
-            }
-        } catch (err) {
-            console.error("Failed to change candidate position:", err);
-        }
+    const starAnalysis = candidate?.aiAnalysis?.starAnalysis || {
+        Situation: { reason: "Pozitif (+): Aday, çeşitli finansal projelerde ve kurumlarda çalışma deneyimine sahip. Negatif (-): Durumlar genellikle iyi tanımlanmış olsa da, some projelerin bağlamı daha detaylı açıklanabilirdi.", score: 9 },
+        Task: { reason: "Pozitif (+): Adayın görevleri genellikle net ve spesifik. Özellikle finansal sistemlerdeki görevleri iyi tanımlanmış. Negatif (-): Bazı görevlerin karmaşıklığı ve önemi daha vurgulanabilirdi.", score: 8 },
+        Action: { reason: "Pozitif (+): Teknik çözüm üretiminde proaktif bir yaklaşım sergiliyor. Azure ve Kubernetes geçişlerinde anahtar rol oynadı. Negatif (-): Bazı eylemlerin teknik zorluk seviyesi daha net belgelenebilirdi.", score: 9 },
+        Result: { reason: "Pozitif (+): Sistem uptime oranını %99.99 seviyesine çıkardı. Yıllık altyapı maliyetlerinde %30 tasarruf sağladı. Negatif (-): Uzun vadeli bakım stratejileri sonuç kısmında daha belirgin olabilirdi.", score: 10 }
     };
 
-    const handleRefreshAnalysis = async () => {
-        if (!candidate) return;
-        const currentPos = candidate.matchedPositionTitle;
-        if (!currentPos) return;
-        const posObj = positions?.find(p => p.title === currentPos);
-        if (!posObj) return;
-        try {
-            const jobDesc = `${posObj.title}\n${(posObj.requirements || []).join(', ')}\n${posObj.description || ''}`;
-            const result = await analyzeCandidateMatch(jobDesc, candidate);
-            const updatedAnalyses = {
-                ...(candidate.positionAnalyses || {}),
-                [currentPos]: result
-            };
-            await updateCandidate(candidate.id, {
-                matchScore: result.score,
-                aiAnalysis: result,
-                summary: result.summary,
-                positionAnalyses: updatedAnalyses
-            });
-        } catch (error) {
-            console.error("Manual refresh error:", error);
+    const careerHistory = candidate?.experiences || candidate?.careerHistory || [
+        { 
+            role: 'Lead Software Architect', 
+            company: 'Fintech Global', 
+            duration: '2021 - Günümüz', 
+            desc: 'Yüksek trafikli ödeme sistemlerinin mikroservis mimarisine taşınması.',
+            milestones: ['%99.99 Uptime Garantisi', 'Sistem Gecikmesinde %40 Azalma', '15 Kişilik Mühendislik Ekibi Yönetimi']
+        },
+        { 
+            role: 'Senior Full Stack Developer', 
+            company: 'Tech Solutions Inc', 
+            duration: '2018 - 2021', 
+            desc: 'Bulut tabanlı SaaS platformlarının geliştirilmesi ve ölçeklendirilmesi.',
+            milestones: ['Azure Cloud Geçişi Yönetimi', 'Yıllık 100k USD Maliyet Tasarrufu']
         }
+    ];
+
+    // Mock data removed - using candidate.interviewSessions from context
+
+    const getSourceLabel = (c) => {
+        if (!c?.source) return 'Manuel / PDF';
+        if (c.sourceDetail) return `${c.source} (${c.sourceDetail})`;
+        return c.source;
     };
 
-    const timeline = useMemo(() => {
-        if (!candidate) return [];
-        const current = candidate.status;
-        const isRejected = current === 'rejected';
-        const isHired = current === 'hired';
-        return [
-            { title: 'Başvuru Alındı', date: candidate.appliedDate || 'Bilinmiyor', status: 'completed' },
-            { title: 'AI Analizi', date: candidate.aiAnalysis ? 'Tamamlandı' : 'Bekleniyor', status: candidate.aiAnalysis ? 'completed' : 'upcoming' },
-            { title: 'Mülakat', date: current === 'interview' ? 'Aktif' : '-', status: (current === 'offer' || isHired || isRejected) ? 'completed' : (current === 'interview' ? 'upcoming' : 'pending') },
-            { title: 'Sonuç', date: isHired || isRejected ? 'Neticelendi' : '-', status: isRejected ? 'rejected' : (isHired ? 'completed' : 'pending') }
-        ];
-    }, [candidate]);
-
-    if (!candidate) return (
-        <div className="min-h-screen flex flex-col items-center justify-center p-8 text-center bg-bg-primary">
-            <Header title="Aday Süreç Portalı" />
-            <div className="bg-bg-secondary p-12 rounded-[2.5rem] border border-border-subtle max-w-sm shadow-2xl">
-                <Activity className="w-12 h-12 text-text-muted mx-auto mb-6" />
-                <h2 className="text-xl font-bold text-text-primary mb-2">Aktif Aday Seçilmedi</h2>
-                <p className="text-sm text-text-muted mb-8">Havuzda aktif aday bulunmamaktadır.</p>
-                <button onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'dashboard' }))} className="w-full py-3 bg-cyan-500 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all hover:bg-cyan-600 text-white shadow-lg shadow-cyan-500/20">Havuzu Görüntüle</button>
-            </div>
-        </div>
-    );
+    const getSourceColor = (src) => {
+        if (!src) return '#64748B'; // Default slate
+        const key = src.toLowerCase();
+        return sourceColors?.[key] || '#64748B';
+    };
 
     return (
-        <div className="min-h-screen bg-bg-primary flex flex-col transition-colors duration-500">
-            <Header title="Aday Süreç Komuta Merkezi" />
+        <div className="h-screen bg-[#F1F5F9] flex flex-col font-sans overflow-hidden">
+            <Header />
 
-            <div className="flex-1 flex flex-col lg:flex-row gap-5 p-5 lg:p-6 max-w-[1600px] mx-auto w-full">
-
-                {/* LEFT SIDEBAR: PROFILE & STATUS (FIXED WIDTH) */}
-                <aside className="w-full lg:w-96 flex flex-col gap-5 shrink-0">
-
-                    {/* Compact Profile Card */}
-                    <div className="bg-bg-secondary/40 backdrop-blur-xl rounded-[2.5rem] p-6 border border-border-subtle relative overflow-hidden group shadow-xl">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 rounded-full blur-3xl -z-10 -translate-y-1/2 translate-x-1/2" />
-
-                        <div className="flex items-center gap-4 mb-5">
-                            <div className="relative shrink-0">
-                                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-xl font-black text-white shadow-xl shadow-cyan-500/20">
-                                    {candidate.name?.substring(0, 2) || 'AD'}
-                                </div>
+            <div className="flex-1 flex overflow-hidden">
+                {/* LEFT: CANDIDATE LIST */}
+                <aside className="w-[30%] flex flex-col bg-white border-r border-[#E2E8F0]">
+                    <div className="p-4 pb-2 space-y-3">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h1 className="text-[16px] font-black text-[#0F172A] tracking-tighter">Aktif Süreç</h1>
+                                <p className="text-[9px] text-[#64748B] font-bold uppercase tracking-tight opacity-50">15 ADA • KIDEMLİ ÜRÜN MÜHENDİSİ</p>
                             </div>
-                            <div className="flex-1 min-w-0">
-                                <h2 className="text-xl font-black text-text-primary truncate">{candidate.name || 'İsimsiz'}</h2>
-                                <p className="text-[11px] font-black text-cyan-600 dark:text-cyan-400 mt-1.5 flex items-center gap-1.5 uppercase tracking-widest opacity-80">
-                                    <Terminal className="w-3.5 h-3.5" /> {candidate.id.substring(0, 8)}
-                                </p>
+                            <div className="flex gap-1.5">
+                                <button className="h-7 px-2.5 bg-[#F8FAFC] text-[#64748B] rounded-lg border border-[#E2E8F0] flex items-center gap-1 text-[8.5px] font-black hover:bg-white transition-all uppercase">Filtrele</button>
+                                <button className="h-7 px-2.5 bg-[#1E3A8A] text-white rounded-lg flex items-center gap-1 text-[8.5px] font-black hover:bg-[#162A62] transition-all uppercase">Yeni Aday</button>
                             </div>
                         </div>
-
-                        <div className="space-y-4 pt-4 border-t border-border-subtle">
-                            <div className="grid grid-cols-1 gap-3">
-                                <div className="flex flex-col gap-1.5">
-                                    <label className="text-[10px] uppercase tracking-widest text-text-muted font-black">Hedef Pozisyon</label>
-                                    <select
-                                        value={candidate.matchedPositionTitle || candidate.position || ''}
-                                        onChange={handleTargetPositionChange}
-                                        className="w-full bg-bg-primary border border-border-subtle rounded-xl px-3 py-2 text-xs font-bold text-text-secondary outline-none hover:bg-bg-secondary transition-all cursor-pointer"
-                                    >
-                                        <option value="" disabled>Seçin</option>
-                                        <option value={candidate.position || 'Mevcut'}>Mevcut Pozisyon</option>
-                                        {positions?.map(pos => <option key={pos.id} value={pos.title}>{pos.title}</option>)}
-                                    </select>
-                                </div>
-                                <div className="flex flex-col gap-1.5">
-                                    <label className="text-[10px] uppercase tracking-widest text-text-muted font-black">Süreç Durumu</label>
-                                    <select
-                                        value={candidate.status}
-                                        onChange={(e) => updateCandidate(candidate.id, { status: e.target.value })}
-                                        className="w-full bg-bg-primary border border-cyan-500/30 rounded-xl px-3 py-2 text-xs font-black text-cyan-600 dark:text-cyan-400 uppercase outline-none hover:border-cyan-500 transition-all cursor-pointer appearance-none"
-                                    >
-                                        {Object.entries(STATUS_LABELS).map(([key, label]) => (
-                                            <option key={key} value={key} className="bg-bg-primary text-text-primary">{label}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3 pt-2">
-                                <button onClick={() => setSendModalPurpose('general')} className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-bg-primary border border-border-subtle hover:bg-bg-secondary transition-all group shadow-sm">
-                                    <Mail className="w-4 h-4 text-text-muted group-hover:text-cyan-500" />
-                                    <span className="text-[11px] font-black text-text-muted group-hover:text-text-primary uppercase tracking-tight">Mesaj</span>
-                                </button>
-                                <button onClick={() => setSendModalPurpose('interview')} className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-bg-primary border border-border-subtle hover:bg-bg-secondary transition-all group shadow-sm">
-                                    <Calendar className="w-4 h-4 text-text-muted group-hover:text-emerald-500" />
-                                    <span className="text-[11px] font-black text-text-muted group-hover:text-text-primary uppercase tracking-tight">Planla</span>
-                                </button>
-                            </div>
+                        <div className="relative">
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-[#94A3B8]" />
+                            <input type="text" placeholder="Aday veya rol ara..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-[#F1F5F9] border-transparent focus:bg-white rounded-lg py-1.5 pl-8 pr-3 text-[11px] outline-none font-medium" />
                         </div>
                     </div>
-
-                    {/* Timeline & Quick Contact */}
-                    <div className="bg-bg-secondary/40 backdrop-blur-xl rounded-[2rem] p-6 border border-border-subtle shadow-xl">
-                        <div className="mb-6">
-                            <h3 className="text-[10px] font-black text-text-muted mb-5 uppercase tracking-[0.2em] flex items-center gap-2">
-                                <Clock className="w-4 h-4 text-emerald-500" /> Süreç Akışı
-                            </h3>
-                            <div className="space-y-6 relative pl-5 border-l border-border-subtle/50 ml-1">
-                                {timeline.map((step, idx) => (
-                                    <div key={idx} className="relative">
-                                        <div className={`absolute -left-[24.5px] top-1.5 w-2.5 h-2.5 rounded-full border-2 ${step.status === 'completed' ? 'bg-emerald-500 border-emerald-500/30' : step.status === 'upcoming' ? 'bg-cyan-500 border-white dark:border-navy-900 animate-pulse shadow-[0_0_12px_rgba(6,182,212,0.5)]' : 'bg-bg-primary border-border-subtle'}`} />
-                                        <div className="flex flex-col gap-0.5">
-                                            <span className={`text-[11px] font-black uppercase tracking-widest ${step.status === 'completed' ? 'text-text-primary' : step.status === 'upcoming' ? 'text-cyan-600 dark:text-cyan-400 font-black' : 'text-text-muted opacity-40 italic'}`}>{step.title}</span>
-                                            <span className="text-[10px] text-text-muted font-bold opacity-60 tracking-tight">{step.date}</span>
+                    <div className="flex-1 overflow-y-auto p-3 pt-1 space-y-1.5 custom-scrollbar bg-slate-50/10">
+                        {filteredCandidates.map(c => {
+                            const sourceLabel = getSourceLabel(c);
+                            const sourceColor = getSourceColor(c.source);
+                            const score = Math.round(c.bestScore || 0);
+                            
+                            return (
+                                <button key={c.id} onClick={() => setViewCandidateId(c.id)} className={`w-full group rounded-lg border transition-all flex items-center p-2.5 gap-3 relative ${c.id === candidate?.id ? 'bg-white border-[#1E3A8A] shadow-md border-[1.5px]' : 'bg-white border-[#E2E8F0] hover:border-blue-100'}`}>
+                                    <div className="w-8 h-8 rounded-lg bg-slate-100 overflow-hidden shrink-0 border border-black/5">
+                                        <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${c.name}`} className="w-full h-full object-cover" />
+                                    </div>
+                                    <div className="flex-1 min-w-0 flex items-center justify-between">
+                                        <div className="space-y-0 text-left">
+                                            <h4 className="text-[12px] font-black text-[#0F172A] truncate leading-tight">{c.name}</h4>
+                                            <div className="flex items-center gap-1 mt-0.5">
+                                                <span 
+                                                    className="text-[7px] font-black px-1.5 py-0 rounded uppercase flex items-center gap-0.5 whitespace-nowrap"
+                                                    style={{ color: sourceColor, backgroundColor: `${sourceColor}15` }}
+                                                >
+                                                    <Link2 className="w-2.5 h-2.5" /> {sourceLabel}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3 shrink-0">
+                                            <div className="text-center">
+                                                <span className="text-[7px] font-black text-[#94A3B8] uppercase block leading-none">Eşleşme</span>
+                                                <span className="text-[11px] font-black text-[#1E3A8A]">%{score} <Zap className="w-2 h-2 inline fill-amber-400 text-amber-400" /></span>
+                                            </div>
                                         </div>
                                     </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="pt-6 border-t border-border-subtle space-y-3">
-                            <div className="flex flex-col gap-2.5">
-                                <a href={`mailto:${candidate.email}`} className="flex items-center gap-3 p-3 rounded-xl bg-bg-primary border border-border-subtle hover:bg-bg-secondary transition-all shadow-inner">
-                                    <Mail className="w-4 h-4 text-text-muted" />
-                                    <span className="text-[12px] text-text-secondary font-bold truncate">{candidate.email || '-'}</span>
-                                </a>
-                                <div className="flex gap-2.5">
-                                    {candidate.linkedinUrl && (
-                                        <a href={candidate.linkedinUrl} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-2 p-3 rounded-xl bg-[#0077b5]/10 border border-[#0077b5]/20 hover:bg-[#0077b5]/20 transition-all shadow-sm">
-                                            <Linkedin className="w-4 h-4 text-[#0077b5]" />
-                                            <span className="text-[11px] font-black text-[#0077b5] uppercase tracking-tight">LinkedIn</span>
-                                        </a>
-                                    )}
-                                    <button onClick={() => setViewCandidateId(null)} className="p-3 rounded-xl bg-red-500/5 border border-red-500/10 text-red-500 hover:bg-red-500/20 transition-all shadow-sm">
-                                        <X className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
+                                </button>
+                            );
+                        })}
                     </div>
                 </aside>
 
-                {/* MAIN CONTENT: TABBED INTERFACE */}
-                <main className="flex-1 flex flex-col gap-6">
-
-                    {/* Tab Navigation */}
-                    <nav className="flex items-center gap-1.5 p-1.5 bg-bg-secondary/80 backdrop-blur-md rounded-2xl border border-border-subtle self-start shrink-0 shadow-lg relative z-20">
-                        {[
-                            { id: 'overview', label: 'AI Analizi', icon: Cpu },
-                            { id: 'interviews', label: 'Mülakatlar', icon: MessageSquare },
-                            { id: 'cv', label: 'Belge & Veri', icon: FileText }
-                        ].map(tab => (
-                            <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id)}
-                                className={`flex items-center gap-3 px-6 py-2.5 rounded-xl text-[12px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-cyan-500 text-white shadow-lg shadow-cyan-500/20' : 'text-text-muted hover:text-text-primary hover:bg-bg-primary'}`}
-                            >
-                                <tab.icon className="w-4 h-4" />
-                                {tab.label}
-                            </button>
-                        ))}
-                    </nav>
-
-                    {/* Tab Content Panels */}
-                    <div className="flex-1 min-h-0 bg-bg-secondary/40 backdrop-blur-2xl rounded-[2.5rem] border border-border-subtle p-6 shadow-2xl relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/5 rounded-full blur-[100px] -z-10 pointer-events-none" />
-
-                        {/* 1. OVERVIEW & STAR TAB */}
-                        {activeTab === 'overview' && (
-                            <div className="flex flex-col gap-4 h-full overflow-y-auto custom-scrollbar animate-fade-in pr-2">
-                                <div className="grid grid-cols-1 xl:grid-cols-5 gap-6 shrink-0 h-full">
-                                    <div className="xl:col-span-3 h-full">
-                                        <StarScoreCard
-                                            candidate={candidate}
-                                            onRefresh={handleRefreshAnalysis}
-                                            analysis={(() => {
-                                                if (candidate.aiAnalysis?.starAnalysis) {
-                                                    const star = candidate.aiAnalysis.starAnalysis;
-                                                    const getSafeScore = (val) => {
-                                                        if (typeof val === 'number') return val;
-                                                        if (typeof val === 'object' && val !== null && val.score !== undefined) return Number(val.score);
-                                                        return 0;
-                                                    };
-                                                    return {
-                                                        Summary: candidate.aiAnalysis.summary,
-                                                        Situation: getSafeScore(star.Situation),
-                                                        Task: getSafeScore(star.Task),
-                                                        Action: getSafeScore(star.Action),
-                                                        Result: getSafeScore(star.Result),
-                                                        Details: star
-                                                    };
-                                                }
-                                                const baseScore = candidate.matchScore ? candidate.matchScore / 10 : 0;
-                                                return {
-                                                    Summary: candidate.summary || "Analiz bekleniyor...",
-                                                    Situation: Math.round(baseScore), Task: Math.round(baseScore), Action: Math.round(baseScore), Result: Math.round(baseScore)
-                                                };
-                                            })()}
-                                        />
-                                    </div>
-
-                                    <div className="xl:col-span-2 bg-bg-primary/50 backdrop-blur-xl rounded-[2.5rem] p-8 border border-border-subtle flex flex-col shrink-0 shadow-inner overflow-hidden relative group h-full">
-                                        <div className="absolute top-0 right-0 w-48 h-48 bg-cyan-500/5 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity" />
-                                        <h3 className="text-[10px] font-black text-text-primary uppercase tracking-widest mb-6 flex items-center gap-2 relative z-10">
-                                            <div className="w-1.5 h-4 bg-cyan-500 rounded-full" /> AI ÖZET & STRATEJİK TESPİTLER
-                                        </h3>
-                                        <div className="flex-1 flex flex-col bg-bg-secondary/40 p-6 rounded-2xl border border-border-subtle relative z-10 shadow-inner">
-                                            <p className="text-[13px] text-text-secondary leading-relaxed italic font-black opacity-90">
-                                                "{candidate.summary || 'Analiz özeti bekleniyor.'}"
-                                            </p>
+                {/* RIGHT: ANALYTICAL PANEL */}
+                <main className="flex-1 bg-[#F8FAFC] overflow-y-auto custom-scrollbar p-5">
+                    {candidate ? (
+                        <div className="bg-white rounded-[20px] border border-[#E2E8F0] shadow-lg flex flex-col h-full overflow-hidden">
+                            <div className="bg-white sticky top-0 z-20 border-b border-[#F1F5F9]">
+                                <div className="px-6 py-4 flex items-center justify-between">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 rounded-xl border-[2.5px] border-white shadow-xl overflow-hidden shrink-0">
+                                            <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${candidate.name}`} className="w-full h-full object-cover" />
                                         </div>
-                                        <div className="mt-8 grid grid-cols-2 gap-4 relative z-10">
-                                            <div className="p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 shadow-sm">
-                                                <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-[0.2em] block mb-3">POZİTİF GÖSTERGELER</span>
-                                                <div className="flex flex-wrap gap-1.5">
-                                                    {candidate.aiAnalysis?.topSkills?.slice(0, 3).map((s, i) => (
-                                                        <span key={i} className="px-2 py-1 rounded bg-emerald-500/10 text-[9px] font-black text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 uppercase tracking-tighter shadow-sm">{s.skill || s}</span>
-                                                    )) || <span className="text-[9px] text-text-muted italic opacity-40">Veri yok</span>}
-                                                </div>
+                                        <div className="space-y-0.5">
+                                            <h2 className="text-[20px] font-black text-[#1E3A8A] tracking-tighter uppercase italic leading-none">{candidate.name}</h2>
+                                            <div className="flex items-center gap-1.5 text-[9px] font-black text-[#10B981] bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100/50 w-fit">
+                                                <Target className="w-2.5 h-2.5" /> İlk %2 Aday
                                             </div>
-                                            <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/10 shadow-sm">
-                                                <span className="text-[9px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-[0.2em] block mb-3">GELİŞİM ALANLARI</span>
-                                                <div className="flex flex-wrap gap-1.5">
-                                                    {candidate.aiAnalysis?.gapAnalysis?.slice(0, 3).map((g, i) => (
-                                                        <span key={i} className="px-2 py-1 rounded bg-amber-500/10 text-[9px] font-black text-amber-600 dark:text-amber-400 border border-amber-500/20 uppercase tracking-tighter shadow-sm">{g.gap || g}</span>
-                                                    )) || <span className="text-[9px] text-text-muted italic opacity-40">Veri yok</span>}
-                                                </div>
-                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col items-end gap-2">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[8.5px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-1.5"><Brain className="w-3 h-3 fill-blue-600" /> YZ Analiz Modu</span>
+                                            <button className="p-1 hover:bg-slate-50 rounded-lg text-slate-300"><X className="w-4 h-4" /></button>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        )}
 
-                        {/* 2. INTERVIEWS TAB */}
-                        {activeTab === 'interviews' && (
-                            <div className="bg-bg-secondary/40 backdrop-blur-xl rounded-[2rem] p-5 border border-border-subtle h-full flex flex-col animate-fade-in overflow-hidden shadow-xl">
-                                <div className="flex items-center justify-between mb-4 shrink-0 px-2">
-                                    <div className="flex items-center gap-3">
-                                        <MessageSquare className="w-5 h-5 text-cyan-500" />
-                                        <h3 className="text-[12px] font-black text-text-primary tracking-widest uppercase">Seans Geçmişi</h3>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <button
-                                            onClick={async () => {
-                                                const sessId = `iv-${candidate.id.substring(0, 4)}-${Date.now().toString().slice(-4)}`;
-                                                const newSession = {
-                                                    id: sessId,
-                                                    status: 'planned',
-                                                    date: new Date().toISOString(),
-                                                    type: 'live_corporate',
-                                                    typeLabel: 'Canlı Kurumsal Mülakat',
-                                                    isLiveMode: true,
-                                                    timestamp: new Date().toISOString()
-                                                };
-
-                                                try {
-                                                    await updateCandidate(candidate.id, {
-                                                        interviewSessions: [...(candidate.interviewSessions || []), newSession],
-                                                        status: 'interview'
-                                                    });
-                                                    navigate(`/interview/${sessId}`);
-                                                } catch (err) {
-                                                    console.error("Failed to create live session:", err);
-                                                    navigate(`/interview/${sessId}`);
-                                                }
-                                            }}
-                                            className="px-5 py-2.5 rounded-xl bg-violet-600 text-white font-black text-[10px] uppercase tracking-widest shadow-lg shadow-violet-500/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
-                                        >
-                                            <Video className="w-4 h-4" />
-                                            Yeni Canlı Mülakat
+                                <div className="flex px-6 gap-6">
+                                    {[
+                                        { id: 'ai_analysis', label: 'STAR Analizi', icon: <Brain className="w-3 h-3" /> },
+                                        { id: 'cv_match', label: 'CV & Uyum Çıkarımı', icon: <FileText className="w-3 h-3" /> },
+                                        { id: 'sessions', label: 'Mülakatlar', icon: <Video className="w-3 h-3 text-red-500" /> },
+                                        { id: 'interviews', label: 'Süreç Geçmişi', icon: <Clock className="w-3 h-3" /> }
+                                    ].map(tab => (
+                                        <button key={tab.id} onClick={() => setActiveDetailTab(tab.id)} className={`flex items-center gap-1.5 py-2.5 text-[9px] font-black uppercase tracking-widest relative ${activeDetailTab === tab.id ? 'text-blue-600' : 'text-[#94A3B8] hover:text-[#475569]'}`}>
+                                            {tab.icon} {tab.label}
+                                            {activeDetailTab === tab.id && <div className="absolute bottom-[-1px] left-0 right-0 h-0.5 bg-blue-600 shadow-[0_0_8px_blue]" />}
                                         </button>
-                                    </div>
-                                </div>
-                                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
-                                    {candidate.interviewSessions?.length > 0 ? (
-                                        <InterviewHistory
-                                            sessions={candidate.interviewSessions}
-                                            onStartSession={(session) => {
-                                                navigate(`/interview/${session.id}`);
-                                            }}
-                                        />
-                                    ) : (
-                                        <div className="h-full flex flex-col items-center justify-center text-center py-20 opacity-40">
-                                            <MessageSquare className="w-12 h-12 text-text-muted mb-4" />
-                                            <h4 className="text-xs font-black uppercase tracking-widest text-text-primary">Henüz Kayıt Yok</h4>
-                                        </div>
-                                    )}
+                                    ))}
                                 </div>
                             </div>
-                        )}
 
-                        {/* 3. CV & DATA TAB */}
-                        {activeTab === 'cv' && (
-                            <div className="h-full flex flex-col gap-6 animate-fade-in">
-                                <div className="bg-bg-secondary/40 backdrop-blur-xl rounded-[2.5rem] p-8 border border-border-subtle flex-1 flex flex-col items-center justify-center text-center relative overflow-hidden shadow-2xl">
-                                    <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/5 rounded-full blur-[100px] -z-10" />
-
-                                    <div className="w-20 h-20 rounded-3xl bg-bg-primary border border-border-subtle flex items-center justify-center mb-6 shadow-xl">
-                                        <FileText className="w-10 h-10 text-cyan-500/60" />
-                                    </div>
-
-                                    <h4 className="text-xl font-black text-text-primary mb-2">Orijinal Aday Özgeçmişi</h4>
-                                    <p className="text-[12px] text-text-muted max-w-sm mb-8 leading-relaxed font-bold opacity-70">
-                                        Adayın yüklemiş olduğu orijinal PDF/Docx belgesi güvenli ortamda saklanmaktadır. Görüntülemek için aşağıdaki butonu kullanın.
-                                    </p>
-
-                                    {candidate.cvUrl ? (
-                                        <div className="flex flex-col gap-4 w-full max-w-xs">
-                                            <a
-                                                href={candidate.cvUrl}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="w-full py-4 rounded-2xl bg-cyan-500 text-white font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-cyan-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3"
-                                            >
-                                                <ExternalLink className="w-4 h-4" /> CV'Yİ ŞİMDİ GÖRÜNTÜLE
-                                            </a>
-                                            <p className="text-[10px] text-text-muted font-black uppercase tracking-widest mt-2 opacity-50 italic">Belge yeni sekmede güvenli bir şekilde açılacaktır.</p>
-                                        </div>
-                                    ) : (
-                                        <div className="p-6 rounded-2xl bg-bg-primary/50 border border-border-subtle text-left font-mono text-xs text-text-secondary leading-relaxed whitespace-pre-wrap w-full max-w-2xl max-h-[400px] overflow-y-auto custom-scrollbar shadow-inner">
-                                            <div className="flex items-center gap-2 mb-4 text-amber-500/80 font-black uppercase tracking-tighter">
-                                                <Clock className="w-4 h-4" /> Orijinal Dosya Bulunamadı (Süre Aşımı)
+                            <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
+                                {activeDetailTab === 'ai_analysis' && (
+                                    <div className="space-y-6 animate-in fade-in duration-300">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="bg-[#EFF6FF] rounded-xl p-4 border border-blue-100 flex flex-col justify-between h-24">
+                                                <span className="text-[9px] font-black text-[#3B82F6] uppercase tracking-widest">STAR GÜVENİ</span>
+                                                <div className="text-[24px] font-black text-[#1E3A8A] italic uppercase">96%</div>
                                             </div>
-                                            {candidate.cvData || candidate.summary || "Detaylı döküm bulunamadı."}
+                                            <div className="bg-[#1E3A8A] rounded-xl p-4 shadow-lg flex flex-col justify-between h-24 text-white">
+                                                <span className="text-[9px] font-black text-blue-200/50 uppercase tracking-widest">KÜLTÜR UYUMU</span>
+                                                <div className="text-[24px] font-black italic uppercase">GÜÇLÜ</div>
+                                            </div>
                                         </div>
-                                    )}
-                                </div>
+                                        <div className="space-y-5">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-blue-600" />
+                                                <h3 className="text-[11px] font-black text-[#0F172A] uppercase tracking-[0.2em]">Detaylı STAR Değerlendirmesi</h3>
+                                            </div>
+                                            <div className="space-y-5">
+                                                {[
+                                                    { k: 'S', l: 'DURUM (SITUATION)', c: '#EFF6FF', tc: '#2563EB', r: starAnalysis.Situation.reason },
+                                                    { k: 'T', l: 'GÖREV (TASK)', c: '#F0FDFA', tc: '#0D9488', r: starAnalysis.Task.reason },
+                                                    { k: 'A', l: 'EYLEM (ACTION)', c: '#F5F3FF', tc: '#7C3AED', r: starAnalysis.Action.reason },
+                                                    { k: 'R', l: 'SONUÇ (RESULT)', c: '#F0FDF4', tc: '#16A34A', r: starAnalysis.Result.reason }
+                                                ].map((step, idx) => {
+                                                    const { pos, neg } = parseFeedback(step.r);
+                                                    return (
+                                                        <div key={idx} className="flex gap-4 group">
+                                                            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-[14px] font-black shadow-sm shrink-0" style={{ backgroundColor: step.c, color: step.tc }}>{step.k}</div>
+                                                            <div className="flex-1 space-y-2 pb-2">
+                                                                <h4 className="text-[10px] font-black text-[#0F172A] uppercase tracking-wider">{step.l}</h4>
+                                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                                    {pos && <div className="bg-emerald-50/40 border border-emerald-100/50 p-2.5 rounded-lg">
+                                                                        <div className="flex items-center gap-1 text-[8.5px] font-black text-emerald-600 uppercase mb-1"><ShieldCheck className="w-2.5 h-2.5" /> Pozitif</div>
+                                                                        <p className="text-[11px] text-[#475569] leading-relaxed">{pos}</p>
+                                                                    </div>}
+                                                                    {neg && <div className="bg-red-50/40 border border-red-100/50 p-2.5 rounded-lg">
+                                                                        <div className="flex items-center gap-1 text-[8.5px] font-black text-red-600 uppercase mb-1"><AlertCircle className="w-2.5 h-2.5" /> Negatif</div>
+                                                                        <p className="text-[11px] text-[#475569] leading-relaxed">{neg}</p>
+                                                                    </div>}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {activeDetailTab === 'cv_match' && (
+                                    <div className="space-y-6 animate-in fade-in duration-300">
+                                        {/* ENHANCED CV SUMMARY BOX */}
+                                        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 relative overflow-hidden group">
+                                            <div className="absolute right-6 top-6 flex items-center gap-2">
+                                                <span 
+                                                    className="text-[9px] font-black px-3 py-1 rounded-lg border flex items-center gap-1.5 shadow-sm"
+                                                    style={{ color: getSourceColor(candidate.source), backgroundColor: 'white', borderColor: `${getSourceColor(candidate.source)}40` }}
+                                                >
+                                                    <Link2 className="w-2.5 h-2.5" /> {getSourceLabel(candidate)} Kaynağı
+                                                </span>
+                                            </div>
+                                            <Brain className="absolute -right-8 -top-8 w-32 h-32 text-[#1E3A8A]/5 group-hover:scale-110 transition-transform" />
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <Target className="w-4 h-4 text-emerald-500" />
+                                                <h3 className="text-[12px] font-black text-[#1E3A8A] uppercase tracking-[0.2em]">Kapsamlı Pozisyon Uyum Analizi</h3>
+                                            </div>
+                                            <p className="text-[13px] text-[#475569] leading-relaxed font-medium italic pr-40">
+                                                "{candidate.name} teknik profili, Senior Architect pozisyonu ile **%{Math.round(candidate.bestScore || 0)}** uyum göstermektedir. Adayın özellikle yüksek trafikli sistemlerdeki başarısı kritik bir avantaj sunmaktadır."
+                                            </p>
+                                            <div className="mt-4 flex gap-3">
+                                                <div className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-[10px] font-black text-blue-600 flex items-center gap-1.5 shadow-sm italic">
+                                                    <Zap className="w-3 h-3 text-amber-500 fill-amber-500" /> %{Math.round(candidate.bestScore || 0)} Uyum Skoru Doğrulandı
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+                                            <div className="md:col-span-8 space-y-5">
+                                                <div className="flex items-center justify-between border-b border-[#F1F5F9] pb-2">
+                                                    <h3 className="text-[11px] font-black text-[#0F172A] uppercase tracking-[0.2em] flex items-center gap-2"><Clock className="w-4 h-4 text-blue-500" /> Kariyer Kronolojisi & Milestonelar</h3>
+                                                </div>
+                                                <div className="space-y-6 pl-2">
+                                                    {careerHistory.map((exp, i) => (
+                                                        <div key={i} className="relative pl-6 border-l-2 border-blue-50 pb-4 group">
+                                                            <div className="absolute -left-[5.5px] top-0 w-2.5 h-2.5 rounded-full bg-white border-2 border-blue-600 shadow-sm" />
+                                                            <div className="space-y-2">
+                                                                <div className="flex justify-between items-start">
+                                                                    <div>
+                                                                        <h4 className="text-[14px] font-black text-[#1E3A8A] uppercase tracking-tight">{exp.role}</h4>
+                                                                        <p className="text-[10px] font-bold text-[#64748B] uppercase">{exp.company}</p>
+                                                                    </div>
+                                                                    <span className="text-[10px] font-black text-[#94A3B8] bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100">{exp.duration}</span>
+                                                                </div>
+                                                                <p className="text-[12px] text-[#475569] leading-relaxed font-medium bg-slate-50/50 p-2 rounded-lg border border-slate-100/50">{exp.desc}</p>
+                                                                <div className="flex flex-wrap gap-2 mt-2">
+                                                                    {exp.milestones?.map((m, idx) => (
+                                                                        <span key={idx} className="flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-700 text-[9px] font-black rounded-lg border border-emerald-100 shadow-sm"><Trophy className="w-2.5 h-2.5" /> {m}</span>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div className="md:col-span-4 space-y-6">
+                                                <div className="space-y-4">
+                                                    <div className="flex items-center justify-between border-b pb-2">
+                                                        <h3 className="text-[10px] font-black text-[#94A3B8] uppercase tracking-[0.3em]">Teknik Ekosistem</h3>
+                                                    </div>
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        {(candidate.skills || ['Kubernetes', 'GoLang', 'React', 'Node.js', 'Redis', 'AWS']).map((s, i) => (
+                                                            <span key={i} className="px-2.5 py-1 bg-white border border-[#E2E8F0] rounded-lg text-[9px] font-black text-[#475569] shadow-sm uppercase">{s}</span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {activeDetailTab === 'sessions' && (
+                                    <div className="space-y-5 animate-in fade-in duration-300">
+                                        <div className="flex items-center justify-between border-b pb-2">
+                                            <h3 className="text-[11px] font-black uppercase text-[#0F172A] tracking-widest">Planlanmış ve Gerçekleşen Görüşmeler</h3>
+                                            <button 
+                                                onClick={() => {
+                                                    setPreselectedInterviewData({ candidateId: candidate.id });
+                                                    window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }));
+                                                }}
+                                                className="text-[9px] font-black text-blue-600 uppercase flex items-center gap-1 hover:underline hover:scale-105 transition-all"
+                                            >
+                                                <Plus className="w-3 h-3" /> MÜLAKAT PLANLA
+                                            </button>
+                                        </div>
+                                        
+                                        <div className="grid grid-cols-1 gap-3">
+                                            {(candidate.interviewSessions || []).length > 0 ? (
+                                                candidate.interviewSessions.map((session, sidx) => (
+                                                    <div key={sidx} className="bg-white border border-[#E2E8F0] rounded-2xl p-4 shadow-sm hover:border-blue-300 transition-all flex items-center justify-between group">
+                                                        <div className="flex items-center gap-4">
+                                                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center border ${session.status === 'live' ? 'bg-rose-50 border-rose-100 text-rose-600 animate-pulse' : 'bg-blue-50 border-blue-100 text-[#1E3A8A]'}`}>
+                                                                <Video className="w-6 h-6" />
+                                                            </div>
+                                                            <div className="space-y-0.5">
+                                                                <h4 className="text-[14px] font-black text-[#0F172A] uppercase tracking-tight">{session.title}</h4>
+                                                                <div className="flex items-center gap-3">
+                                                                    <span className="text-[10px] font-bold text-[#64748B] flex items-center gap-1"><Calendar className="w-3 h-3" /> {session.date}</span>
+                                                                    <span className="text-[10px] font-bold text-[#64748B] flex items-center gap-1"><Clock className="w-3 h-3" /> {session.time}</span>
+                                                                    <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-100/50">{session.interviewer}</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-3">
+                                                            {session.status === 'live' ? (
+                                                                <button 
+                                                                    onClick={() => {
+                                                                        navigate(`/live-interview/${session.id}`);
+                                                                    }}
+                                                                    className="bg-rose-600 text-white px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-700 shadow-lg shadow-rose-600/20"
+                                                                >
+                                                                    SEANSA KATIL
+                                                                </button>
+                                                            ) : (
+                                                                <div className="flex flex-col items-end">
+                                                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">DURUM</span>
+                                                                    <span className="text-[11px] font-black text-amber-500 uppercase italic">PLANLANDI</span>
+                                                                </div>
+                                                            )}
+                                                            <button 
+                                                                onClick={() => {
+                                                                    if (session.status === 'live') {
+                                                                        navigate(`/live-interview/${session.id}`);
+                                                                    } else {
+                                                                        setPreselectedInterviewData({ candidateId: candidate.id, sessionId: session.id });
+                                                                        window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }));
+                                                                    }
+                                                                }}
+                                                                className="p-2 text-slate-200 hover:text-blue-500 transition-colors"
+                                                                title="Mülakat Sayfasına Git"
+                                                            >
+                                                                <ExternalLink className="w-4 h-4" />
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => {
+                                                                    setPreselectedInterviewData({ candidateId: candidate.id, session });
+                                                                    window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }));
+                                                                }}
+                                                                className="p-2 text-slate-200 hover:text-blue-600 transition-colors"
+                                                            >
+                                                                <Edit3 className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <div className="py-16 flex flex-col items-center justify-center border-2 border-dashed border-slate-100 rounded-[32px] bg-slate-50/20">
+                                                    <div className="w-16 h-16 rounded-3xl bg-blue-50 flex items-center justify-center mb-4">
+                                                        <Video className="w-8 h-8 text-blue-200" />
+                                                    </div>
+                                                    <p className="text-[13px] text-slate-400 font-bold italic uppercase tracking-wider">Aktif bir mülakat bulunamadı</p>
+                                                    <button 
+                                                        onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }))}
+                                                        className="mt-4 px-6 py-2 bg-[#1E3A8A] text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-lg shadow-blue-900/10"
+                                                    >
+                                                        Sıradaki Mülakatı Planla
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {activeDetailTab === 'interviews' && (
+                                    <div className="space-y-5 animate-in fade-in duration-300">
+                                        <div className="flex items-center justify-between border-b pb-2">
+                                            <h3 className="text-[11px] font-black uppercase text-[#0F172A] tracking-widest">Süreç Yol Haritası</h3>
+                                            <button 
+                                                onClick={() => {
+                                                    setPreselectedInterviewData({ candidateId: candidate.id });
+                                                    window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }));
+                                                }}
+                                                className="text-[9px] font-black text-blue-600 uppercase flex items-center gap-1 hover:underline"
+                                            >
+                                                <Plus className="w-3 h-3" /> MÜLAKAT PLANLA
+                                            </button>
+                                        </div>
+                                        <div className="space-y-3">
+                                            {/* Static Initial Analysis Milestone */}
+                                            <div className="bg-white border border-[#E2E8F0] rounded-xl overflow-hidden shadow-sm">
+                                                <div className="p-4 flex items-center justify-between">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center border border-blue-100"><Brain className="w-5 h-5 text-blue-600" /></div>
+                                                        <div>
+                                                            <h4 className="text-[12px] font-black text-[#1E3A8A] uppercase tracking-tight">AI Detaylı CV Analizi</h4>
+                                                            <span className="text-[9px] font-bold text-[#64748B] flex items-center gap-1"><CheckCircle2 className="w-2.5 h-2.5 text-emerald-500" /> Tamamlandı</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <span className="text-[8px] font-black text-[#94A3B8] block uppercase">ANALİZ SKORU</span>
+                                                        <span className="text-[14px] font-black text-emerald-600">%{Math.round(candidate.bestScore || 0)}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Dynamic Sessions Milestone */}
+                                            {(candidate.interviewSessions || []).map((session, sidx) => (
+                                                <div key={sidx} className="bg-white border border-[#E2E8F0] rounded-xl overflow-hidden shadow-sm hover:border-blue-200 transition-all group">
+                                                    <div className="p-4 flex items-center justify-between">
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center border border-emerald-100"><Play className="w-4 h-4 text-emerald-600" /></div>
+                                                            <div>
+                                                                <h4 className="text-[12px] font-black text-[#1E3A8A] uppercase tracking-tight">{session.title}</h4>
+                                                                <span className="text-[9px] font-bold text-[#64748B] flex items-center gap-1">
+                                                                    <Calendar className="w-2.5 h-2.5" /> {session.date} • {session.status === 'live' ? 'Canlı Yayında' : 'Planlandı'}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                            <div className="flex items-center gap-3">
+                                                                <button 
+                                                                    onClick={() => {
+                                                                        setPreselectedInterviewData({ candidateId: candidate.id, sessionId: session.id });
+                                                                        window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }))
+                                                                    }}
+                                                                    className="opacity-0 group-hover:opacity-100 px-3 py-1 bg-black text-white rounded-lg text-[8px] font-black uppercase tracking-widest transition-all hover:bg-blue-600"
+                                                                >
+                                                                    YÖNET
+                                                                </button>
+                                                                <span className={`text-[8px] font-black px-2 py-0.5 rounded uppercase ${session.status === 'live' ? 'bg-rose-500 text-white animate-pulse shadow-sm' : 'bg-slate-100 text-slate-500'}`}>
+                                                                    {session.status === 'live' ? 'CANLI' : 'HAZIRDA'}
+                                                                </span>
+                                                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                                                    <button 
+                                                                        onClick={() => {
+                                                                            setPreselectedInterviewData({ candidateId: candidate.id, session });
+                                                                            window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }));
+                                                                        }}
+                                                                        className="p-1.5 text-slate-400 hover:text-blue-600"
+                                                                    >
+                                                                        <Edit3 className="w-3.5 h-3.5" />
+                                                                    </button>
+                                                                    <button className="p-1.5 text-slate-400 hover:text-red-600">
+                                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+
+                                            {/* Static Future Milestone Example */}
+                                            <div className="bg-white border border-[#E2E8F0] rounded-xl overflow-hidden shadow-sm opacity-50 grayscale">
+                                                <div className="p-4 flex items-center justify-between">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center border border-slate-100"><Trophy className="w-4 h-4 text-slate-400" /></div>
+                                                        <div>
+                                                            <h4 className="text-[12px] font-black text-slate-400 uppercase tracking-tight">Final Kararı ve Teklif</h4>
+                                                            <span className="text-[9px] font-bold text-slate-400 flex items-center gap-1">Hedeflenen Aşama</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
-                        )}
-                    </div>
+
+                            {/* COMPACT FOOTER */}
+                            <div className="bg-white border-t border-[#F1F5F9] px-6 py-4 flex items-center justify-between sticky bottom-0">
+                                <div className="flex gap-2">
+                                    <button className="h-8 px-4 bg-[#F8FAFC] text-[#64748B] rounded-lg text-[9px] font-black uppercase border border-[#E2E8F0]">Yorum</button>
+                                    <button className="h-8 px-4 text-[#EF4444] rounded-lg text-[9px] font-black uppercase border border-[#FEE2E2]">Ret</button>
+                                </div>
+                                <button className="h-9 px-6 bg-[#1E3A8A] text-white rounded-lg text-[10px] font-black uppercase tracking-widest shadow-md flex items-center gap-2">Final Turuna Taşı <ArrowRight className="w-3.5 h-3.5" /></button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="h-full flex flex-col items-center justify-center opacity-20"><Brain className="w-16 h-16 text-blue-900 mb-3 animate-pulse" /><h2 className="text-[11px] font-black uppercase tracking-[0.4em] text-blue-900">Yükleniyor</h2></div>
+                    )}
                 </main>
             </div>
-
-            {/* Modals */}
-            {sendModalPurpose && (
-                <SendMessageModal
-                    candidate={candidate}
-                    initialPurpose={sendModalPurpose}
-                    onSent={handleMessageSent}
-                    onClose={() => setSendModalPurpose(null)}
-                />
-            )}
         </div>
     );
 }

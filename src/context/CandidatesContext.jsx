@@ -1,3 +1,4 @@
+console.log("[TalentFlow] CandidatesContext.jsx module load start");
 // src/context/CandidatesContext.jsx
 // Candidates Context - Real-time Firestore listener with client-side filtering
 // Rule 2 Compliance: Uses onSnapshot without complex queries, filters client-side
@@ -19,6 +20,7 @@ export function CandidatesProvider({ children }) {
     const [error, setError] = useState(null);
     const [viewCandidateId, setViewCandidateId] = useState(null);
     const [compareIds, setCompareIds] = useState([]);
+    const [preselectedInterviewData, setPreselectedInterviewData] = useState(null); // For passing data to InterviewManagementPage
 
     // Filter states (client-side filtering per Rule 2)
     const [searchQuery, setSearchQuery] = useState('');
@@ -100,7 +102,11 @@ export function CandidatesProvider({ children }) {
                     id: doc.id,
                     ...doc.data(),
                 }));
-                candidateList.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+                candidateList.sort((a, b) => {
+                    const aTime = (typeof a.createdAt?.toMillis === 'function') ? a.createdAt.toMillis() : 0;
+                    const bTime = (typeof b.createdAt?.toMillis === 'function') ? b.createdAt.toMillis() : 0;
+                    return bTime - aTime;
+                });
                 setCandidates(candidateList);
                 setLoading(false);
                 setError(null);
@@ -135,29 +141,43 @@ export function CandidatesProvider({ children }) {
 
     // Enrich candidates with best match data and interview scores
     const enrichedCandidates = useMemo(() => {
-        return candidates.map(c => {
-            let bestAiScore = c.aiScore || c.aiAnalysis?.score || 0;
-            let bestTitle = c.matchedPositionTitle || null;
+        if (!Array.isArray(candidates)) return [];
 
-            if (c.positionAnalyses) {
-                Object.entries(c.positionAnalyses).forEach(([title, analysis]) => {
-                    if (analysis && analysis.score > bestAiScore) {
-                        bestAiScore = analysis.score;
-                        bestTitle = title;
-                    }
-                });
+        const enriched = candidates.map(c => {
+            if (!c) return null;
+            
+            let bestAiScore = Number(c.aiScore || c.matchScore || c.initialAiScore || c.aiAnalysis?.score || 0);
+            if (isNaN(bestAiScore)) bestAiScore = 0;
+            
+            let bestTitle = c.matchedPositionTitle || c.bestTitle || c.position || null;
+
+            if (c.positionAnalyses && typeof c.positionAnalyses === 'object') {
+                try {
+                    Object.entries(c.positionAnalyses).forEach(([title, analysis]) => {
+                        if (!analysis) return;
+                        const score = Number(analysis.score || analysis.matchScore || 0);
+                        if (!isNaN(score) && score > bestAiScore) {
+                            bestAiScore = score;
+                            bestTitle = title;
+                        }
+                    });
+                } catch (e) {
+                    console.warn("Failed to parse positionAnalyses for candidate:", c.id);
+                }
             }
 
             // Calculate Interview Score (if exists, use the latest session's finalScore)
-            const sessions = c.interviewSessions || [];
+            const sessions = Array.isArray(c.interviewSessions) ? c.interviewSessions : [];
             const hasInterview = sessions.length > 0;
-            const interviewScore = hasInterview
-                ? sessions[sessions.length - 1].finalScore
-                : null;
+            let interviewScore = null;
+            
+            if (hasInterview) {
+                const lastSession = sessions[sessions.length - 1];
+                interviewScore = Number(lastSession?.finalScore);
+                if (isNaN(interviewScore)) interviewScore = null;
+            }
 
             // Combined Score Calculation: 
-            // If interview exists, it's (AI + Interview) / 2.
-            // This is the "True Score" or "Index Score".
             let combinedScore = bestAiScore;
             if (interviewScore !== null) {
                 combinedScore = Math.round((bestAiScore + interviewScore) / 2);
@@ -165,22 +185,25 @@ export function CandidatesProvider({ children }) {
 
             return {
                 ...c,
-                bestScore: bestAiScore, // Original AI best
+                bestScore: bestAiScore,
                 bestTitle,
                 interviewScore,
                 combinedScore,
                 hasInterview
             };
-        });
+        }).filter(Boolean);
 
-        if (isDepartmentUser && userDepartments?.length > 0) {
-            return enrichedCandidates.filter(c =>
-                userDepartments.includes(c.department) ||
-                (c.visibleToDepartments && c.visibleToDepartments.some(d => userDepartments.includes(d)))
+        const safeIsDeptUser = !!isDepartmentUser;
+        const safeUserDepts = Array.isArray(userDepartments) ? userDepartments : [];
+
+        if (safeIsDeptUser && safeUserDepts.length > 0) {
+            return enriched.filter(c =>
+                c.department && safeUserDepts.includes(c.department) ||
+                (Array.isArray(c.visibleToDepartments) && c.visibleToDepartments.some(d => safeUserDepts.includes(d)))
             );
         }
 
-        return enrichedCandidates;
+        return enriched;
     }, [candidates, isDepartmentUser, userDepartments]);
 
     // Client-side filtering (Rule 2 - no orderBy/limit queries)
@@ -313,6 +336,8 @@ export function CandidatesProvider({ children }) {
         // Navigation / Detailed View
         viewCandidateId,
         setViewCandidateId,
+        preselectedInterviewData,
+        setPreselectedInterviewData,
 
         // Comparison
         compareIds,

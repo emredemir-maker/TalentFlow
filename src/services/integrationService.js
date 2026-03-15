@@ -164,6 +164,28 @@ export const createDirectCalendarEvent = async (userId, token, eventData) => {
     }
 };
 
+export const getCalendarEvents = async (token, timeMin, timeMax) => {
+    try {
+        const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}&singleEvents=true&orderBy=startTime`;
+        const response = await fetch(url, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+            if (response.status === 401) throw new Error("Oturum süresi dolmuş.");
+            throw new Error(data.error?.message || 'Takvim verileri alınamadı.');
+        }
+
+        return { success: true, events: data.items || [] };
+    } catch (error) {
+        console.error("Get Calendar Events Error:", error);
+        return { success: false, error: error.message };
+    }
+};
+
 export const checkGmailMessages = async (token, query) => {
     try {
         const searchResponse = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=1`, {

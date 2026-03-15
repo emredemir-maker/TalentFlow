@@ -4,117 +4,136 @@ import {
     LayoutDashboard,
     Users,
     Briefcase,
-    MessageSquare,
+    Calendar,
     BarChart3,
-    Settings,
+    MessageSquare,
+    Share2,
+    Building2,
+    BookOpen,
     Shield,
+    Settings,
+    LogOut,
     ChevronLeft,
     ChevronRight,
-    BookOpen,
-    Building2,
-    Database,
-    Zap,
-    LogOut
+    BrainCircuit
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import Logo from './Logo';
 
 export default function Sidebar({ activeView, onNavigate, collapsed, onToggleCollapse }) {
     const { logout, userProfile } = useAuth();
 
     const menuItems = [
-        { id: 'dashboard', label: 'Zeka Paneli', icon: LayoutDashboard },
-        { id: 'candidate-process', label: 'Aday Süreçleri', icon: Users },
-        { id: 'positions', label: 'Pozisyonlar', icon: Briefcase },
-        { id: 'messages', label: 'Mesaj Merkezi', icon: MessageSquare },
-        { id: 'analytics', label: 'Analitik', icon: BarChart3 },
-    ];
-
-    const managementItems = [
+        { id: 'dashboard', label: 'Kontrol Paneli', icon: LayoutDashboard },
+        { id: 'interviews', label: 'Mülakatlar', icon: Calendar },
+        { id: 'candidate-process', label: 'Adaylar', icon: Users },
+        { id: 'positions', label: 'Açık İlanlar', icon: Briefcase },
+        { id: 'analytics', label: 'Analitik Raporlar', icon: BarChart3 },
+        { id: 'messages', label: 'Mesajlaşma', icon: MessageSquare },
+        { id: 'sources', label: 'Kaynak Yönetimi', icon: Share2 },
         { id: 'departments', label: 'Departmanlar', icon: Building2 },
-        { id: 'sources', label: 'Kaynak Yönetimi', icon: Database },
+        { id: 'guide', label: 'Platform Kılavuzu', icon: BookOpen },
     ];
 
-    const footerItems = [
-        { id: 'guide', label: 'Kullanım Kılavuzu', icon: BookOpen },
-        { id: 'settings', label: 'Ayarlar', icon: Settings },
+    const adminItems = [
+        { id: 'super-admin', label: 'Sistem Yönetimi', icon: Shield },
+        { id: 'settings', label: 'Genel Ayarlar', icon: Settings },
     ];
-
-    if (userProfile?.role === 'super_admin') {
-        footerItems.unshift({ id: 'super-admin', label: 'Sistem Yönetimi', icon: Shield });
-    }
 
     const MenuItem = ({ item }) => (
         <button
             onClick={() => onNavigate(item.id)}
-            className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl transition-all duration-300 group relative
+            className={`w-full flex items-center gap-4 px-6 py-3.5 transition-all duration-200 group relative
                 ${activeView === item.id
-                    ? 'bg-electric text-white shadow-[0_8px_16px_-4px_rgba(59,130,246,0.4)] rotate-1'
-                    : 'text-text-muted hover:text-text-primary hover:bg-navy-800/20'
+                    ? 'bg-[#1E293B] text-white'
+                    : 'text-[#94A3B8] hover:text-white hover:bg-[#1E293B]/50'
                 }`}
         >
-            <item.icon className={`w-5 h-5 shrink-0 transition-transform duration-500 ${activeView === item.id ? 'scale-110' : 'group-hover:scale-110 group-hover:rotate-6'}`} />
-            {!collapsed && <span className="text-[13px] font-bold tracking-tight uppercase">{item.label}</span>}
-
+            <item.icon className={`w-4.5 h-4.5 shrink-0 ${activeView === item.id ? 'text-white' : 'text-[#64748B] group-hover:text-white'}`} />
+            {!collapsed && <span className="text-[13px] font-medium tracking-tight truncate">{item.label}</span>}
+            
             {activeView === item.id && (
-                <div className="absolute right-2 w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_8px_white]" />
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#2563EB]" />
             )}
         </button>
     );
 
     return (
-        <aside className={`fixed left-0 top-0 h-screen transition-all duration-500 z-50 p-2
-            ${collapsed ? 'w-[72px]' : 'w-[240px]'}`}>
+        <aside className={`fixed left-0 top-0 h-screen transition-all duration-300 z-50 bg-[#0A1629]
+            ${collapsed ? 'w-[80px]' : 'w-[240px]'} flex flex-col shadow-2xl`}>
 
-            <div className="h-full stitch-glass border border-border-subtle rounded-[32px] flex flex-col shadow-2xl overflow-hidden relative">
-
-                {/* Logo Section */}
-                <div className={`pt-8 pb-4 flex flex-col items-center justify-center transition-all duration-500 ${collapsed ? 'px-2' : 'px-6'}`}>
-                    <Logo
-                        size={collapsed ? 32 : 54}
-                        showText={!collapsed}
-                        className="transition-all duration-500"
-                    />
-                </div>
-
-                {/* Navigation Items */}
-                <div className="flex-1 px-3 space-y-8 overflow-y-auto custom-scrollbar">
-                    <div className="space-y-1">
-                        {!collapsed && <div className="px-4 mb-2 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] opacity-40 italic">Ana Konsol</div>}
-                        {menuItems.map(item => <MenuItem key={item.id} item={item} />)}
+            {/* Logo Section */}
+            <div className={`h-20 flex items-center ${collapsed ? 'justify-center' : 'px-8'}`}>
+                <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-blue-400 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                        <BrainCircuit className="w-5 h-5 text-white" />
                     </div>
-
-                    <div className="space-y-1">
-                        {!collapsed && <div className="px-4 mb-2 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] opacity-40 italic">Veri Yönetimi</div>}
-                        {managementItems.map(item => <MenuItem key={item.id} item={item} />)}
-                    </div>
-
-                    <div className="space-y-1">
-                        {!collapsed && <div className="px-4 mb-2 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] opacity-40 italic">Sistem Erişimi</div>}
-                        {footerItems.map(item => <MenuItem key={item.id} item={item} />)}
-                    </div>
+                    {!collapsed && (
+                        <div className="flex flex-col">
+                            <span className="text-white text-[16px] font-bold tracking-tight leading-none">TalentFlow</span>
+                            <span className="text-[#64748B] text-[9px] font-medium mt-1">AI Recruitment</span>
+                        </div>
+                    )}
                 </div>
-
-                {/* Sidebar Footer */}
-                <div className="p-3 bg-navy-800/10 border-t border-border-subtle mt-auto">
-                    <button
-                        onClick={logout}
-                        className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-red-500 hover:text-white hover:bg-red-500/20 transition-all group
-                            ${collapsed ? 'justify-center' : ''}`}
-                    >
-                        <LogOut className="w-5 h-5 group-hover:rotate-90 transition-transform duration-500" />
-                        {!collapsed && <span className="text-[13px] font-black uppercase tracking-widest">Çıkış Yap</span>}
-                    </button>
-                </div>
-
-                {/* Collapse Toggle */}
-                <button
-                    onClick={onToggleCollapse}
-                    className="absolute -right-0 top-1/2 -translate-y-1/2 w-8 h-12 bg-navy-800/20 hover:bg-navy-800/40 border-l border-y border-border-subtle rounded-l-xl flex items-center justify-center text-text-muted hover:text-text-primary transition-all backdrop-blur-md shadow-inner"
-                >
-                    {collapsed ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
-                </button>
             </div>
+
+            {/* Navigation Items */}
+            <nav className="flex-1 mt-2 space-y-0.5 overflow-y-auto custom-scrollbar">
+                <div className="mb-4">
+                    {!collapsed && (
+                        <h5 className="text-[10px] text-[#475569] font-bold px-8 mb-2 uppercase tracking-widest">
+                            Ana Menü
+                        </h5>
+                    )}
+                    {menuItems.map(item => <MenuItem key={item.id} item={item} />)}
+                </div>
+
+                <div className="pt-4">
+                    {!collapsed && (
+                        <h5 className="text-[10px] text-[#475569] font-bold px-8 mb-2 uppercase tracking-widest">
+                            Yönetim
+                        </h5>
+                    )}
+                    {adminItems.map(item => <MenuItem key={item.id} item={item} />)}
+                </div>
+            </nav>
+
+            {/* Bottom Profile Section */}
+            <div className="p-4 border-t border-[#1E293B] bg-[#0A1629]">
+                <div className={`flex items-center gap-3 ${collapsed ? 'justify-center' : 'px-2'} py-2`}>
+                    <div className="w-9 h-9 rounded-full bg-slate-700/50 border border-slate-600 overflow-hidden shrink-0">
+                         {userProfile?.imgUrl ? (
+                            <img src={userProfile.imgUrl} alt="User" className="w-full h-full object-cover" />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center text-white text-xs font-bold bg-gradient-to-tr from-slate-600 to-slate-500">
+                                {userProfile?.displayName?.[0] || 'A'}
+                            </div>
+                        )}
+                    </div>
+                    {!collapsed && (
+                        <div className="flex flex-col flex-1 min-w-0">
+                            <span className="text-white text-[13px] font-semibold truncate">{userProfile?.displayName || 'Alex Rivera'}</span>
+                            <span className="text-[#64748B] text-[11px] truncate">Lead Talent Partner</span>
+                        </div>
+                    )}
+                </div>
+                {!collapsed && (
+                    <button 
+                        onClick={logout}
+                        className="w-full flex items-center gap-3 px-2 py-2 text-[#64748B] hover:text-white transition-colors mt-1"
+                    >
+                        <LogOut className="w-4 h-4" />
+                        <span className="text-xs font-medium">Çıkış Yap</span>
+                    </button>
+                )}
+            </div>
+
+            {/* Collapse Toggle */}
+            <button
+                onClick={onToggleCollapse}
+                className="absolute -right-3 top-10 w-6 h-6 bg-[#1E293B] border border-slate-700 rounded-full flex items-center justify-center text-white/50 hover:text-white transition-all shadow-xl z-[60]"
+            >
+                {collapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
+            </button>
         </aside>
     );
 }

@@ -1,3 +1,4 @@
+console.log("[TalentFlow] AuthContext.jsx module load start");
 // src/context/AuthContext.jsx
 // Authentication Context - Rule 3 Compliance
 // Uses onAuthStateChanged to bind user session to global state

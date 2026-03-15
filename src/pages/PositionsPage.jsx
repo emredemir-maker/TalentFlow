@@ -49,7 +49,8 @@ const STATUS_LABELS = {
 
 export default function PositionsPage() {
     const { positions, loading, addPosition, addPositionRequest, approvePosition, rejectPosition, deletePosition, togglePositionStatus, updatePosition } = usePositions();
-    const { candidates, updateCandidate } = useCandidates();
+    const { enrichedCandidates, updateCandidate } = useCandidates();
+    const candidates = enrichedCandidates || [];
     const { isDepartmentUser, userDepartments, userProfile, user, role } = useAuth();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -434,7 +435,13 @@ export default function PositionsPage() {
                                                 <Users className="w-3.5 h-3.5 text-navy-500" />
                                                 <span className="text-[9px] font-black text-navy-500 uppercase tracking-widest">Adaylar</span>
                                             </div>
-                                            <p className="text-lg font-black text-text-primary">{pos.matchedCandidates?.length || 0}</p>
+                                            <p className="text-lg font-black text-text-primary">
+                                                {candidates.filter(c => 
+                                                    c.position === pos.title || 
+                                                    c.matchedPositionTitle === pos.title || 
+                                                    c.bestTitle === pos.title
+                                                ).length}
+                                            </p>
                                         </div>
                                         <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/[0.04]">
                                             <div className="flex items-center gap-2 mb-1">

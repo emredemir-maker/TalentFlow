@@ -1,8 +1,7 @@
+console.log("[TalentFlow] App.jsx module load start");
 // src/App.jsx
-// Main application with collapsible sidebar and view routing
-
 import { useState, useEffect } from 'react';
-import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
+import { Routes, Route, useLocation, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { CandidatesProvider } from './context/CandidatesContext';
 import { PositionsProvider } from './context/PositionsContext';
@@ -21,6 +20,7 @@ import SuperAdminPage from './pages/SuperAdminPage';
 import LoginPage from './pages/LoginPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import GuidePage from './pages/GuidePage';
+import InterviewManagementPage from './pages/InterviewManagementPage';
 import DepartmentManagementPage from './pages/DepartmentManagementPage';
 import SourceManagementPage from './pages/SourceManagementPage';
 import LiveInterviewPage from './pages/LiveInterviewPage';
@@ -33,8 +33,8 @@ export default function App() {
           <NotificationProvider>
             <MessageQueueProvider>
               <Routes>
-                <Route path="/interview/:sessionId" element={<LiveInterviewPage />} />
-                <Route path="/*" element={<AppContent />} />
+                <Route path="/live-interview/:sessionId" element={<LiveInterviewPage />} />
+                <Route path="/*" element={<AuthenticatedApp />} />
               </Routes>
             </MessageQueueProvider>
           </NotificationProvider>
@@ -44,14 +44,22 @@ export default function App() {
   );
 }
 
-function AppContent() {
+function AuthenticatedApp() {
   const { loading, error, isAuthenticated } = useAuth();
   const { settings } = useUserSettings();
   const [activeView, setActiveView] = useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const handleNav = (e) => setActiveView(e.detail);
+    const handleNav = (e) => {
+      if (typeof e.detail === 'string') {
+        setActiveView(e.detail);
+      } else if (e.detail?.view) {
+        setActiveView(e.detail.view);
+      }
+    };
     window.addEventListener('changeView', handleNav);
     return () => window.removeEventListener('changeView', handleNav);
   }, []);
@@ -85,10 +93,12 @@ function AppContent() {
       case 'analytics': return <AnalyticsPage />;
       case 'candidate-process': return <CandidateProcessPage />;
       case 'positions': return <PositionsPage />;
+      case 'interviews': return <InterviewManagementPage />;
       case 'guide': return <GuidePage />;
       case 'super-admin': return <SuperAdminPage />;
       case 'departments': return <DepartmentManagementPage />;
       case 'sources': return <SourceManagementPage />;
+      case 'live-interview': return <LiveInterviewPage />;
       default: return <Dashboard />;
     }
   };
@@ -102,8 +112,8 @@ function AppContent() {
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
       />
       <main
-        className={`flex-1 min-h-screen transition-all duration-300 pb-12 md:pb-0 min-w-0
-          ${sidebarCollapsed ? 'md:ml-[72px]' : 'md:ml-[240px]'}`}
+        className={`flex-1 min-h-screen transition-all duration-300 min-w-0
+          ${sidebarCollapsed ? 'md:ml-[80px]' : 'md:ml-[240px]'}`}
       >
         {renderPage()}
       </main>
