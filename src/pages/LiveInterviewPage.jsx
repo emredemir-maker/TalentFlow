@@ -1,12 +1,12 @@
 // src/pages/LiveInterviewPage.jsx
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     Video, Mic, MicOff, VideoOff, Settings, X,
     ShieldCheck, Camera, Monitor, Sparkles, Brain, Zap,
     MessageSquare, Users, AlertCircle, CheckCircle2,
-    Send, Play, Info, Copy, Check, ChevronRight, HelpCircle, Activity, ArrowRight,
-    Target, Box, Code, Loader2, AlertTriangle, TrendingUp, Award, ChevronDown, RefreshCw, User, Flag, Star, FileText, ExternalLink
+    Send, Play, Info, Copy, Check, ChevronRight, HelpCircle, Activity, ArrowRight, ArrowLeft,
+    Target, Box, Code, Loader2, AlertTriangle, TrendingUp, Award, ChevronDown, RefreshCw, User, Flag, Star, FileText, ExternalLink, MoreVertical, Clock, ChevronLeft
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCandidates } from '../context/CandidatesContext';
@@ -17,17 +17,32 @@ export default function LiveInterviewPage() {
     const { sessionId } = useParams();
     const navigate = useNavigate();
     const { user, isAuthenticated, userProfile, role } = useAuth();
-    const { candidates, updateCandidate, loading: candidatesLoading } = useCandidates();
+    const { candidates, updateCandidate, loading: candidatesLoading, error: candidatesError } = useCandidates();
 
     const [phase, setPhase] = useState('lobby'); // lobby, active, finished
     const [isRecruiter, setIsRecruiter] = useState(false);
-    const [candidateData, setCandidateData] = useState(null);
+
+    const candidateData = useMemo(() => {
+        if (!candidates || !sessionId) return null;
+        const parts = sessionId.split('-');
+        const suffix = parts.length >= 2 ? parts[1] : null;
+        
+        // Comprehensive candidate lookup
+        return candidates.find(c => c.interviewSessions?.some(s => s.id === sessionId)) ||
+               (suffix ? candidates.find(c => c.id.substring(0, 4) === suffix) : null);
+    }, [candidates, sessionId]);
+
+    const session = useMemo(() => 
+        candidateData?.interviewSessions?.find(s => s.id === sessionId), 
+    [candidateData, sessionId]);
 
     // Media States
     const [isMicOn, setIsMicOn] = useState(true);
     const [isVideoOn, setIsVideoOn] = useState(true);
     const [stream, setStream] = useState(null);
     const videoRef = useRef(null);
+    const pipVideoRef = useRef(null);
+    const streamRef = useRef(null);
     const [copied, setCopied] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
 
@@ -42,50 +57,133 @@ export default function LiveInterviewPage() {
     // Simulation Controls
     const [simIndex, setSimIndex] = useState(0);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-    const [starScores, setStarScores] = useState({ S: 65, T: 40, A: 30, R: 10 });
+    const [starScores, setStarScores] = useState({
+        technical: 0,
+        communication: 0,
+        problemSolving: 0,
+        cultureFit: 0,
+        adaptability: 0
+    });
     const [waveHeight, setWaveHeight] = useState([20, 40, 60, 30, 80, 40, 20]);
     const [participantCount, setParticipantCount] = useState(1);
     const [availablePaths, setAvailablePaths] = useState([]);
     const [pathLoading, setPathLoading] = useState(false);
     const [selectedPathId, setSelectedPathId] = useState(null);
-    const [activeStrategy, setActiveStrategy] = useState('comprehensive'); // comprehensive, technical, product, culture
+    const [activeStrategy, setActiveStrategy] = useState(null); // technical, product, culture
+    const [isTypeSelected, setIsTypeSelected] = useState(false);
     const [logicIntegrity, setLogicIntegrity] = useState(45);
     const [coachGenerating, setCoachGenerating] = useState(false);
     const [suggestedQuestion, setSuggestedQuestion] = useState(null);
 
-    const [questions, setQuestions] = useState([
-        { id: 1, text: "Bize en son dahil olduğun projedeki teknik mimariden bahseder misin?", category: "Teknik", status: 'pending' },
-        { id: 2, text: "Büyük veri setleri ile çalışırken performans optimizasyonu için hangi yaklaşımları kullanıyorsun?", category: "Teknik", status: 'pending' },
-        { id: 3, text: "Takım arkadaşınla yaşadığın bir teknik görüş ayrılığını nasıl çözdün?", category: "Davranışsal", status: 'pending' },
-        { id: 4, text: "Kariyerinde seni en çok zorlayan teknik problem neydi?", category: "Deneyim", status: 'pending' }
-    ]);
+    const [questions, setQuestions] = useState([]);
+    const [isDataInitialized, setIsDataInitialized] = useState(false);
+    const [showActionsMenu, setShowActionsMenu] = useState(false);
+
+    // Initial Data Stabilization
+    useEffect(() => {
+        if (!candidatesLoading && candidates) {
+            // Give 500ms for useMemo to settle and candidateData to populate
+            const timer = setTimeout(() => setIsDataInitialized(true), 500);
+            return () => clearTimeout(timer);
+        }
+    }, [candidatesLoading, candidates]);
+
+    // Recruiter Heartbeat
+    useEffect(() => {
+        if (!isRecruiter || !sessionId || !candidateData) return;
+
+        console.log("[Presence] Recruiter session active. Starting heartbeat...");
+        
+        // Initial presence update
+        persistSessionData({ recruiterPresence: true, lastActive: new Date().toISOString() });
+
+        const heartbeatInterval = setInterval(() => {
+            persistSessionData({ 
+                recruiterPresence: true,
+                lastActive: new Date().toISOString()
+            });
+        }, 15000);
+
+        return () => {
+            clearInterval(heartbeatInterval);
+            persistSessionData({ recruiterPresence: false });
+        };
+    }, [isRecruiter, sessionId, candidateData?.id]);
+
+    // Phase 4: Session Lifecycle cleanup on window close
+    useEffect(() => {
+        if (!isRecruiter || !sessionId) return;
+        
+        const handleUnload = () => {
+            // Use sendBeacon for more reliable cleanup on close
+            // But since we are using Firestore, we'll try a standard update or rely on heartbeat timeout
+            persistSessionData({ recruiterPresence: false });
+        };
+
+        window.addEventListener('beforeunload', handleUnload);
+        return () => window.removeEventListener('beforeunload', handleUnload);
+    }, [isRecruiter, sessionId]);
+
+    // Recruiter Presence Check (for Candidates)
+    const isRecruiterActive = useMemo(() => {
+        if (isRecruiter) return true; // You are the recruiter
+        if (!session?.lastActive) return false;
+        
+        const lastActiveDate = new Date(session.lastActive);
+        const now = new Date();
+        const diffSeconds = (now - lastActiveDate) / 1000;
+        
+        return session.recruiterPresence && diffSeconds < 45; // 45 seconds buffer
+    }, [session?.lastActive, session?.recruiterPresence, isRecruiter]);
 
     // Generate AI Paths based on strategy
     useEffect(() => {
-        if (isRecruiter && candidateData) {
-            const fetchPaths = async () => {
-                setPathLoading(true);
-                try {
-                    const paths = await generateInterviewPaths(candidateData, activeStrategy);
-                    setAvailablePaths(paths);
-                    if (paths.length > 0) {
-                        setSelectedPathId(paths[0].id);
-                        setQuestions(paths[0].questions.map((q, i) => ({
-                            id: i + 1,
-                            text: q.question,
-                            category: q.category,
-                            status: 'pending'
-                        })));
-                    }
-                } catch (err) {
-                    console.error("Path generation error:", err);
-                } finally {
-                    setPathLoading(false);
-                }
-            };
-            fetchPaths();
+        // Stop if not recruiter or data missing
+        if (!isRecruiter || !candidateData?.id || !activeStrategy) return;
+
+        // CRITICAL: Stop if questions already exist in session to prevent infinite sync loop
+        if (session?.questions && session.questions.length > 0) {
+            // If local state is empty but session has questions, sync once
+            if (questions.length === 0) {
+                console.log("[LiveInterview] Syncing existing questions from session");
+                setQuestions(session.questions);
+                if (session.selectedPathId) setSelectedPathId(session.selectedPathId);
+            }
+            return;
         }
-    }, [isRecruiter, candidateData, activeStrategy]);
+
+        const fetchPaths = async () => {
+            if (pathLoading) return;
+            setPathLoading(true);
+            try {
+                console.log("[LiveInterview] Fetching paths for strategy:", activeStrategy);
+                const paths = await generateInterviewPaths(candidateData, activeStrategy);
+                setAvailablePaths(paths);
+                if (paths.length > 0) {
+                    const firstSet = paths[0].questions.map((q, i) => ({
+                        id: i + 1,
+                        text: q.question,
+                        category: q.category,
+                        status: 'pending',
+                        visibleToCandidate: false
+                    }));
+                    setSelectedPathId(paths[0].id);
+                    setQuestions(firstSet);
+                    
+                    await persistSessionData({ 
+                        questions: firstSet,
+                        activeStrategy: activeStrategy,
+                        selectedPathId: paths[0].id
+                    });
+                }
+            } catch (err) {
+                console.error("Path generation error:", err);
+            } finally {
+                setPathLoading(false);
+            }
+        };
+        fetchPaths();
+    }, [isRecruiter, candidateData?.id, activeStrategy, session?.questions?.length]);
 
     const handleSelectPath = (path) => {
         setSelectedPathId(path.id);
@@ -93,18 +191,20 @@ export default function LiveInterviewPage() {
             id: i + 1,
             text: q.question,
             category: q.category,
-            status: 'pending'
+            status: 'pending',
+            visibleToCandidate: false
         }));
         setQuestions(transformedQuestions);
+        persistSessionData({ 
+            questions: transformedQuestions, 
+            selectedPathId: path.id,
+            currentQuestionIndex: 0
+        });
     };
 
     // Live Data States
-    const [transcript, setTranscript] = useState([
-        { role: 'SYSTEM', text: 'Mülakat oturumu başlatıldı. AI asistanı hazır.', time: '00:00' }
-    ]);
-    const [aiInsights, setAiInsights] = useState([
-        { type: 'info', text: 'Adayın bağlandığı doğrulanıyor. AI asistanı ses profilini analiz ediyor.', id: 1 }
-    ]);
+    const [transcript, setTranscript] = useState([]);
+    const [aiInsights, setAiInsights] = useState([]);
 
     const transcriptRef = useRef(null);
 
@@ -115,45 +215,75 @@ export default function LiveInterviewPage() {
         }
     }, [transcript]);
 
-    const transcriptData = [
-        { role: 'MÜLAKATÇI', text: 'Hoş geldin, bugün bizimle olduğun için teşekkürler. Bize biraz deneyimlerinden bahseder misin?' },
-        { role: 'ADAY', text: 'Merhabalar, ben teşekkür ederim. Yaklaşık 5 yıldır full-stack geliştirici olarak çalışıyorum.' },
-        { role: 'ADAY', text: 'Özellikle yüksek trafikli sistemlerin ölçeklendirilmesi ve mikroservis mimarileri üzerine yoğunlaştım.' },
-        { role: 'MÜLAKATÇI', text: 'Harika. Peki bu mimarilerde karşılaştığın en büyük zorluk neydi?' }
-    ];
+    const simulationInsights = [];
 
-    const insightData = [
-        { type: 'signal', text: 'Aday "ölçeklendirme" konusunda özgüvenli bir ses tonuna sahip.', id: 2 },
-        { type: 'suggestion', text: 'Adayın mikroservisler arası iletişim tercihlerini (gRPC vs REST) sorabilirsiniz.', id: 3 },
-        { type: 'signal', text: 'Sinyal Tespit Edildi: Mimari sorumluluk bilinci yüksek.', id: 4 }
-    ];
-
+    // Handle side effects (redirects, phase transitions)
     useEffect(() => {
-        // Find candidate by sessionId (extracting part of ID if possible)
-        if (candidates && sessionId) {
-            // Logic: sessionId usually iv-[candidateIdSuffix]-[ts]
-            const parts = sessionId.split('-');
-            if (parts.length >= 2) {
-                const suffix = parts[1];
-                const found = candidates.find(c => c.id.substring(0, 4) === suffix);
-                if (found) setCandidateData(found);
+        if (!candidateData || !session) return;
+
+        // 1. Completion Redirects
+        if (session.status === 'completed' && phase !== 'finished') {
+            if (isRecruiter) {
+                console.log("[LiveInterview] Session completed. Redirecting recruiter to report...");
+                navigate(`/interview-report/${sessionId}`);
+            } else {
+                console.log("[LiveInterview] Session completed. Moving candidate to exit page.");
+                setPhase('finished');
+                navigate('/exit');
             }
+            return;
         }
-    }, [candidates, sessionId]);
 
+        // 2. AUTO-SYNC FOR CANDIDATES: If recruiter starts session (status: live), move to active
+        // Only trigger if candidate is already in waiting state (lobby_ready)
+        if (!isRecruiter && session.status === 'live' && phase === 'lobby_ready') {
+            console.log("[LiveInterview] Recruiter started room. Transitioning candidate to active...");
+            setPhase('active');
+        }
+
+        // 3. Sync session metadata in real-time
+        if (session.status === 'live') {
+            if (session.activeStrategy) setActiveStrategy(session.activeStrategy);
+            if (session.questions) setQuestions(session.questions);
+            if (session.selectedPathId) setSelectedPathId(session.selectedPathId);
+            if (session.currentQuestionIndex !== undefined) setCurrentQuestionIndex(session.currentQuestionIndex);
+            if (session.transcript) setTranscript(session.transcript);
+        }
+    }, [candidateData, session, phase, navigate, sessionId, isRecruiter]);
+
+    // Recruiter Role Detection
     useEffect(() => {
+        const isPublicRoute = window.location.pathname.startsWith('/join/');
+        if (isPublicRoute) {
+            setIsRecruiter(false);
+            return;
+        }
+
         if (isAuthenticated && (role || userProfile)) {
             const currentRole = role || userProfile?.role;
-            console.log("Current User Role:", currentRole);
             const isRec = currentRole === 'recruiter' || currentRole === 'admin' || currentRole === 'super_admin' || user?.email?.includes('recruiter');
             setIsRecruiter(isRec);
         }
     }, [isAuthenticated, role, userProfile, user]);
 
+    const persistSessionData = async (data) => {
+        if (!candidateData || !sessionId) return;
+        const updatedSessions = (candidateData.interviewSessions || []).map(s =>
+            s.id === sessionId ? { ...s, ...data } : s
+        );
+        return await updateCandidate(candidateData.id, { interviewSessions: updatedSessions });
+    };
+
     // Ensure video feed is applied whenever the video element mounts or stream changes
     useEffect(() => {
+        if (stream) {
+            streamRef.current = stream;
+        }
         if (stream && videoRef.current && isVideoOn) {
             videoRef.current.srcObject = stream;
+        }
+        if (stream && pipVideoRef.current) {
+            pipVideoRef.current.srcObject = stream;
         }
     }, [stream, phase, isVideoOn]);
 
@@ -165,7 +295,7 @@ export default function LiveInterviewPage() {
             // Use live transcript for context
             const result = await generateFollowUpQuestion(
                 candidateData,
-                'technical',
+                activeStrategy || 'technical',
                 transcript,
                 mode,
                 category
@@ -192,51 +322,108 @@ export default function LiveInterviewPage() {
     };
 
     const handleFinishInterview = async () => {
-        if (isRecruiter && candidateData) {
-            try {
-                // Save session results
-                const finalSessionData = {
-                    id: sessionId,
-                    status: 'completed',
-                    finalScore: logicIntegrity,
-                    aiOverallScore: logicIntegrity,
-                    starScores: starScores,
-                    logicIntegrity: logicIntegrity,
-                    aiSummary: "Mülakat başarıyla tamamlandı. Adayın teknik yetkinliği ve STAR uyumu analiz edildi.",
-                    questions: questions.map((q, idx) => ({
-                        ...q,
-                        answer: transcript.filter(t => t.role === 'ADAY')[idx]?.text || "Mülakat başarıyla tamamlandı.",
-                        aiScore: Math.floor(Math.random() * 40) + 60
-                    })),
-                    date: new Date().toISOString()
-                };
-
-                const updatedSessions = (candidateData.interviewSessions || []).map(s =>
-                    s.id === sessionId ? { ...s, ...finalSessionData } : s
-                );
-
-                await updateCandidate(candidateData.id, {
-                    interviewSessions: updatedSessions,
-                    status: 'Evaluation'
-                });
-            } catch (err) {
-                console.error("Error saving session:", err);
-            }
+        // STOP MEDIA TRACKS IMMEDIATELY
+        if (streamRef.current) {
+            streamRef.current.getTracks().forEach(track => track.stop());
+            streamRef.current = null;
         }
-
         if (stream) {
             stream.getTracks().forEach(track => track.stop());
+            setStream(null);
         }
-        navigate('/candidates');
+        setIsMicOn(false);
+        setIsVideoOn(false);
+        setIsRecording(false);
+
+        if (!isRecruiter) {
+            // Candidate finishing: Mark as finished in local state, persist, then logout and exit
+            setPhase('finished');
+            await persistSessionData({ 
+                status: 'completed',
+                candidateStatus: 'finished',
+                finishedAt: new Date().toISOString()
+            });
+            if (user?.isAnonymous) {
+                await logout();
+            }
+            navigate('/exit');
+            return;
+        }
+
+        // Recruiter finishing: Logic remains the same but ensure persistence
+        if (!window.confirm("Mülakatı sonlandırmak istediğinize emin misiniz?")) {
+            return;
+        }
+
+        setPhase('finished');
+
+        // Detailed save for recruiter
+        try {
+            console.log("[LiveInterview] Finishing session for recruiter:", candidateData.id, sessionId);
+
+            const finalSessionData = {
+                id: sessionId,
+                status: 'completed',
+                finalScore: logicIntegrity,
+                aiOverallScore: logicIntegrity,
+                starScores: starScores,
+                logicIntegrity: logicIntegrity,
+                transcript: transcript,
+                aiSummary: "Mülakat başarıyla tamamlandı. Adayın teknik yetkinliği ve STAR uyumu analiz edildi. " + 
+                           (transcript.length > 5 ? "Aday ile gerçekleştirilen detaylı diyaloglar üzerinden yetkinlik ölçümü yapıldı." : "Kısa süreli bir görüşme gerçekleştirildi."),
+                questions: questions.map((q, idx) => ({
+                    ...q,
+                    answer: transcript.filter(t => t.role === 'ADAY')[idx]?.text || (transcript.length > idx ? "İlgili diyalog kaydedildi." : "Cevap kaydedilmedi."),
+                    aiScore: Math.floor(Math.random() * 40) + 60
+                })),
+                date: new Date().toISOString()
+            };
+
+            const updatedSessions = (candidateData.interviewSessions || []).map(s =>
+                String(s.id) === String(sessionId) ? { ...s, ...finalSessionData } : s
+            );
+
+            await updateCandidate(candidateData.id, {
+                interviewSessions: updatedSessions,
+                status: 'Evaluation'
+            });
+            console.log("[LiveInterview] Session saved successfully.");
+            navigate(`/interview-report/${sessionId}`);
+        } catch (err) {
+            console.error("Error saving session:", err);
+            // Fallback to simpler persistence if detailed one fails
+            await persistSessionData({ 
+                status: 'completed',
+                completedAt: new Date().toISOString()
+            });
+            navigate(`/interview-report/${sessionId}`);
+        }
     };
 
     useEffect(() => {
-        if (phase === 'lobby') {
+        // Request media on mount if not already started
+        if (!streamRef.current) {
             requestMedia();
         }
+
+        // Cleanup on unmount
         return () => {
-            if (stream) stream.getTracks().forEach(track => track.stop());
+            if (streamRef.current) {
+                console.log("[LiveInterview] Final cleanup: Stopping media tracks...");
+                streamRef.current.getTracks().forEach(track => track.stop());
+                streamRef.current = null;
+            }
         };
+    }, []);
+
+    // Also stop stream if we transition to 'finished' phase
+    useEffect(() => {
+        if (phase === 'finished' && streamRef.current) {
+            console.log("[LiveInterview] Interview finished: Stopping media tracks...");
+            streamRef.current.getTracks().forEach(track => track.stop());
+            streamRef.current = null;
+            setStream(null);
+        }
     }, [phase]);
 
     const triggerNextSim = () => {
@@ -266,7 +453,8 @@ export default function LiveInterviewPage() {
 
     // Update Integrity when scores change
     useEffect(() => {
-        const avg = Math.round(Object.values(starScores).reduce((a, b) => a + b, 0) / 4);
+        const values = Object.values(starScores);
+        const avg = values.length > 0 ? Math.round(values.reduce((a, b) => a + b, 0) / values.length) : 0;
         setLogicIntegrity(avg);
     }, [starScores]);
 
@@ -278,53 +466,144 @@ export default function LiveInterviewPage() {
         return () => clearInterval(interval);
     }, []);
 
-    // Real-time Transcription (STT) Logic
+    // Real-time Transcription (STT) Engine - Robust Implementation
+    const recognitionRef = useRef(null);
+    const sttRestartTimerRef = useRef(null);
+    const phaseRef = useRef(phase);
+    const isMicOnRef = useRef(isMicOn);
+
+    // Keep refs in sync with state
+    useEffect(() => { phaseRef.current = phase; }, [phase]);
+    useEffect(() => { isMicOnRef.current = isMicOn; }, [isMicOn]);
+
     useEffect(() => {
-        if (phase === 'active' && isMicOn) {
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (SpeechRecognition) {
-                const recognition = new SpeechRecognition();
-                recognition.continuous = true;
-                recognition.interimResults = true;
-                recognition.lang = 'tr-TR';
-
-                recognition.onstart = () => setIsRecording(true);
-                recognition.onend = () => {
-                    setIsRecording(false);
-                    // Restart if still in active phase and mic is on
-                    if (phase === 'active' && isMicOn) {
-                        try { recognition.start(); } catch (e) { }
-                    }
-                };
-
-                recognition.onresult = (event) => {
-                    const lastResult = event.results[event.results.length - 1];
-                    if (lastResult.isFinal) {
-                        const text = lastResult[0].transcript;
-                        if (text.trim()) {
-                            // In a real multi-user scenario, role would come from WebSocket/Firebase
-                            // For now, we assume the local user is either Recruiter or Candidate
-                            const roleLabel = isRecruiter ? 'YÖNETİCİ' : 'ADAY';
-                            setTranscript(prev => [...prev, {
-                                role: roleLabel,
-                                text: text,
-                                time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
-                            }]);
-                        }
-                    }
-                };
-
-                try {
-                    recognition.start();
-                } catch (e) {
-                    console.error("STT Start Error:", e);
-                }
-
-                return () => {
-                    recognition.stop();
-                };
+        // Only run STT when interview is active and mic is on
+        if (phase !== 'active' || !isMicOn) {
+            // Cleanup if conditions no longer met
+            if (recognitionRef.current) {
+                try { recognitionRef.current.abort(); } catch (e) { /* ignore */ }
+                recognitionRef.current = null;
             }
+            if (sttRestartTimerRef.current) {
+                clearTimeout(sttRestartTimerRef.current);
+                sttRestartTimerRef.current = null;
+            }
+            setIsRecording(false);
+            return;
         }
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            console.warn("[STT] Web Speech API is not supported in this browser.");
+            return;
+        }
+
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'tr-TR';
+        recognition.maxAlternatives = 1;
+        recognitionRef.current = recognition;
+
+        const restartSTT = () => {
+            if (phaseRef.current !== 'active' || !isMicOnRef.current) return;
+            if (sttRestartTimerRef.current) clearTimeout(sttRestartTimerRef.current);
+            sttRestartTimerRef.current = setTimeout(() => {
+                if (phaseRef.current === 'active' && isMicOnRef.current && recognitionRef.current) {
+                    try {
+                        console.log("[STT] Restarting recognition...");
+                        recognitionRef.current.start();
+                    } catch (e) {
+                        console.warn("[STT] Restart failed, will retry:", e.message);
+                        restartSTT();
+                    }
+                }
+            }, 500);
+        };
+
+        recognition.onstart = () => {
+            console.log("[STT] Recognition started.");
+            setIsRecording(true);
+        };
+
+        recognition.onend = () => {
+            console.log("[STT] Recognition ended.");
+            setIsRecording(false);
+            // Auto-restart if still in active phase
+            restartSTT();
+        };
+
+        recognition.onerror = (event) => {
+            console.warn("[STT] Error:", event.error);
+            switch (event.error) {
+                case 'no-speech':
+                    // Normal - no speech detected, will restart
+                    break;
+                case 'audio-capture':
+                    console.error("[STT] Mic not accessible. Check browser permissions.");
+                    break;
+                case 'not-allowed':
+                    console.error("[STT] Mic permission denied by user.");
+                    break;
+                case 'network':
+                    console.warn("[STT] Network error, will retry...");
+                    break;
+                case 'aborted':
+                    // Intentional abort, no action needed
+                    return;
+                default:
+                    console.warn("[STT] Unknown error:", event.error);
+            }
+            // Don't restart on permission errors
+            if (event.error !== 'not-allowed' && event.error !== 'aborted') {
+                restartSTT();
+            }
+        };
+
+        recognition.onresult = (event) => {
+            const lastResult = event.results[event.results.length - 1];
+            if (lastResult.isFinal) {
+                const text = lastResult[0].transcript.trim();
+                const confidence = lastResult[0].confidence;
+                
+                if (text && text.length > 1) {
+                    console.log(`[STT] Final: "${text}" (confidence: ${(confidence * 100).toFixed(1)}%)`);
+                    const roleLabel = isRecruiter ? 'YÖNETİCİ' : 'ADAY';
+                    const newEntry = {
+                        role: roleLabel,
+                        text: text,
+                        confidence: Math.round(confidence * 100),
+                        time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                    };
+
+                    setTranscript(prev => [...prev, newEntry]);
+                    // Persist transcript to Firestore - done after state update
+                    persistSessionData({ transcript: [...transcript, newEntry] });
+                }
+            }
+        };
+
+        // Start recognition
+        try {
+            recognition.start();
+            console.log("[STT] Initial start...");
+        } catch (e) {
+            console.error("[STT] Initial start failed:", e);
+            restartSTT();
+        }
+
+        return () => {
+            console.log("[STT] Cleaning up...");
+            if (sttRestartTimerRef.current) {
+                clearTimeout(sttRestartTimerRef.current);
+                sttRestartTimerRef.current = null;
+            }
+            if (recognitionRef.current) {
+                try { recognitionRef.current.abort(); } catch (e) { /* ignore */ }
+                recognitionRef.current = null;
+            }
+            setIsRecording(false);
+        };
     }, [phase, isMicOn, isRecruiter]);
 
     useEffect(() => {
@@ -344,11 +623,12 @@ export default function LiveInterviewPage() {
 
     const requestMedia = async (constraints = { video: true, audio: true }) => {
         try {
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
+            if (streamRef.current) {
+                streamRef.current.getTracks().forEach(track => track.stop());
             }
             const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
             setStream(mediaStream);
+            streamRef.current = mediaStream;
             if (videoRef.current) {
                 videoRef.current.srcObject = mediaStream;
             }
@@ -372,27 +652,44 @@ export default function LiveInterviewPage() {
         setTimeout(() => setCopied(false), 2000);
     };
 
-    if (candidatesLoading) {
+    if (candidatesLoading || !isDataInitialized) {
         return <LoadingScreen message="Oturum verileri senkronize ediliyor..." subtext="Lütfen bekleyin" />;
     }
 
-    if (!isAuthenticated) return (
+    // Allow access without login if it's a candidate join link and session is valid
+    const isCandidateJoinRoute = window.location.pathname.startsWith('/join/');
+    const canContinue = isAuthenticated || (isCandidateJoinRoute && candidateData);
+
+    if (!canContinue) return (
         <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6 text-white font-sans">
-            <div className="text-center space-y-4">
-                <AlertCircle className="w-12 h-12 text-red-500 mx-auto animate-pulse" />
-                <h1 className="text-2xl font-black italic uppercase tracking-tighter">Oturum Doğrulanamadı</h1>
-                <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">Lütfen giriş yaparak tekrar deneyin.</p>
-                <button 
-                  onClick={() => navigate('/')}
-                  className="mt-6 px-8 py-3 bg-white text-black rounded-2xl font-black text-[11px] uppercase tracking-widest"
+            <div className="text-center space-y-6 max-w-sm">
+                <div className="w-20 h-20 rounded-3xl bg-red-500/10 flex items-center justify-center border border-red-500/20 mx-auto">
+                    <AlertCircle className="w-10 h-10 text-red-500 animate-pulse" />
+                </div>
+                <div className="space-y-2">
+                    <h1 className="text-2xl font-black italic uppercase tracking-tighter">Oturum Doğrulanamadı</h1>
+                    <p className="text-slate-400 font-bold uppercase text-[9px] tracking-[0.2em] leading-relaxed">
+                        Mülakat linki geçersiz olabilir veya süresi dolmuş olabilir. Lütfen linki kontrol edip tekrar deneyin.
+                    </p>
+                </div>
+                
+                {candidatesError && (
+                    <div className="p-3 bg-red-500/5 rounded-xl border border-red-500/10 text-[8px] font-bold text-red-400 uppercase tracking-widest">
+                        Sistem Hatası: {candidatesError}
+                    </div>
+                )}
+
+                <button
+                    onClick={() => navigate('/')}
+                    className="w-full h-14 bg-white text-black rounded-2xl font-black text-[11px] uppercase tracking-widest hover:scale-105 transition-all shadow-xl"
                 >
-                  Ana Sayfaya Dön
+                    Ana Sayfaya Dön
                 </button>
             </div>
         </div>
     );
 
-    if (!candidateData && !candidatesLoading) {
+    if (!candidateData && isDataInitialized) {
         return (
             <div className="min-h-screen bg-[#0F172A] flex flex-col items-center justify-center p-6 gap-6 text-white font-sans italic">
                 <div className="w-20 h-20 rounded-3xl bg-amber-500/10 flex items-center justify-center border border-amber-500/20">
@@ -419,151 +716,274 @@ export default function LiveInterviewPage() {
     if (phase === 'lobby') {
         if (isRecruiter) {
             return (
-                <div className="min-h-screen bg-[#F0F2F5] font-sans flex flex-col text-[#1E293B] overflow-hidden">
-                    <header className="h-[72px] bg-white border-b border-slate-200 flex items-center justify-between px-10 shrink-0 z-20">
-                        <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-2xl bg-[#0F172A] flex items-center justify-center shadow-2xl shadow-[#0F172A]/20">
-                                <Video className="w-6 h-6 text-white" />
+                <div className="h-screen bg-[#F8FAFC] font-sans flex flex-col text-[#0F172A] overflow-hidden italic">
+                    {/* COMPACT HEADER */}
+                    <header className="h-[48px] bg-white border-b border-slate-200 flex items-center justify-between px-5 shrink-0 z-20">
+                        <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-lg bg-[#0F172A] flex items-center justify-center">
+                                <Video className="w-4 h-4 text-white" />
                             </div>
                             <div>
-                                <h1 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] leading-none mb-1">Mülakatlar</h1>
-                                <h2 className="text-[15px] font-black text-[#0F172A] uppercase tracking-tighter italic">Pre-flight Kontrolü</h2>
+                                <h1 className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none">Live</h1>
+                                <h2 className="text-[12px] font-black text-[#0F172A] uppercase tracking-tighter italic leading-none">Preparation Hub</h2>
                             </div>
                         </div>
-                        <div className="flex items-center gap-8">
-                            <div className="flex items-center gap-6">
-                                <button onClick={() => setShowSettings(true)} className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-400 hover:bg-slate-100 transition-all"><Settings className="w-5 h-5" /></button>
-                                <button className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-400 hover:bg-slate-100 transition-all"><HelpCircle className="w-5 h-5" /></button>
-                            </div>
-                            <div className="h-10 w-px bg-slate-200" />
-                            <div className="flex items-center gap-4">
-                                <div className="text-right">
-                                    <p className="text-[13px] font-black text-[#0F172A] uppercase tracking-tight">{userProfile?.name || 'Ahmet Yılmaz'}</p>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Senior Recruiter</p>
-                                </div>
-                                <div className="w-12 h-12 rounded-2xl bg-slate-100 border-2 border-white shadow-lg flex items-center justify-center overflow-hidden">
-                                     <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Ahmet" alt="User" />
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={() => navigate('/')}
+                                className="px-3 py-1 rounded-lg bg-white text-red-600 border border-red-100 text-[8px] font-black uppercase tracking-wider hover:bg-red-600 hover:text-white transition-all cursor-pointer"
+                            >
+                                Mülakatı Kapat
+                            </button>
+                            <button onClick={() => setShowSettings(true)} className="p-1.5 rounded-lg bg-slate-50 text-slate-400 hover:bg-black hover:text-white transition-all border border-slate-100 cursor-pointer"><Settings className="w-4 h-4" /></button>
+                            <div className="h-5 w-px bg-slate-200" />
+                            <div className="flex items-center gap-2">
+                                <p className="text-[10px] font-black text-[#0F172A] uppercase tracking-tight leading-none hidden sm:block">{userProfile?.name?.split(' ')[0] || 'Ahmet'}</p>
+                                <div className="w-7 h-7 rounded-lg bg-slate-100 border border-white shadow-sm overflow-hidden">
+                                    <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${userProfile?.name || 'Ahmet'}`} alt="User" className="w-full h-full" />
                                 </div>
                             </div>
                         </div>
                     </header>
 
-                    <main className="flex-1 p-10 flex gap-10 max-w-[1800px] mx-auto w-full overflow-hidden">
-                        {/* Sol Panel: Kamera ve Aday Özeti */}
-                        <div className="w-[450px] flex flex-col gap-8 shrink-0">
-                            <div className="relative aspect-[4/3] rounded-[3rem] bg-[#0F172A] overflow-hidden shadow-2xl group border-4 border-white">
-                                {isVideoOn && stream ? (
-                                    <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover scale-x-[-1]" />
-                                ) : (
-                                    <div className="w-full h-full flex flex-col items-center justify-center gap-4">
-                                        <Camera className="w-12 h-12 text-white/10" />
-                                        <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em]">Cihaz Bekleniyor</span>
+                    {/* COMPACT MAIN - fills remaining space */}
+                    <main className="flex-1 p-3 flex gap-3 w-full overflow-hidden" style={{ maxHeight: 'calc(100vh - 48px)' }}>
+                        {/* Sol Panel: Aday Compact Info */}
+                        <div className="w-[300px] flex flex-col gap-2 shrink-0 overflow-hidden">
+                            <div className="bg-white rounded-[2rem] p-5 border border-slate-100 shadow-xl flex-1 flex flex-col gap-4 overflow-y-auto custom-scrollbar pb-8">
+                                {/* Name Row */}
+                                <div className="flex items-center gap-4">
+                                    <div className="w-14 h-14 rounded-2xl bg-slate-50 overflow-hidden border border-white shadow-xl shrink-0">
+                                        <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${candidateData?.name}`} alt="C" className="w-full h-full" />
                                     </div>
-                                )}
-                                <div className="absolute top-4 right-4 px-4 py-2 bg-emerald-500/90 backdrop-blur-md rounded-2xl flex items-center gap-2 border border-emerald-400/50">
-                                    <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
-                                    <span className="text-[9px] font-black text-white uppercase tracking-widest">Sistem Hazır</span>
-                                </div>
-                                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-black/40 backdrop-blur-2xl p-2.5 rounded-[2rem] border border-white/10 opacity-0 group-hover:opacity-100 transition-all duration-500">
-                                    <button onClick={() => setIsVideoOn(!isVideoOn)} className={"w-12 h-12 rounded-xl flex items-center justify-center " + (isVideoOn ? 'bg-white/10 text-white' : 'bg-red-500 text-white')}>
-                                        {isVideoOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
-                                    </button>
-                                    <button onClick={() => setIsMicOn(!isMicOn)} className={"w-12 h-12 rounded-xl flex items-center justify-center " + (isMicOn ? 'bg-white/10 text-white' : 'bg-red-500 text-white')}>
-                                        {isMicOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="bg-white rounded-[3rem] p-8 border border-slate-200 shadow-xl relative overflow-hidden">
-                                <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50 rounded-bl-[5rem] -mr-10 -mt-10" />
-                                <div className="flex items-center gap-5 relative z-10 mb-8">
-                                    <div className="w-20 h-20 rounded-[2rem] bg-slate-100 overflow-hidden border-4 border-white shadow-xl">
-                                        <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${candidateData?.name}`} alt="Candidate" />
-                                    </div>
-                                    <div>
-                                        <div className="flex items-center gap-3 mb-1">
-                                            <h3 className="text-2xl font-black text-[#0F172A] tracking-tighter italic uppercase">{candidateData?.name}</h3>
-                                            <div className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full flex items-center gap-1.5 border border-emerald-100">
-                                                <Sparkles className="w-3 h-3" />
-                                                <span className="text-[9px] font-black uppercase tracking-widest">AI SKOR: 88</span>
+                                    <div className="overflow-hidden flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <h3 className="text-[16px] font-black text-[#0F172A] tracking-tighter italic uppercase truncate leading-none">{candidateData?.name}</h3>
+                                            <div className="px-1.5 py-0.5 bg-blue-600 text-white rounded shrink-0">
+                                                <span className="text-[8px] font-black tracking-wider">AI: {candidateData?.bestScore || 88}</span>
                                             </div>
                                         </div>
-                                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest leading-none">Senior Product Designer</p>
+                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest truncate mt-1">{candidateData?.title || 'Senior UI Developer'}</p>
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-2 gap-6 pt-6 border-t border-slate-100">
-                                    <div>
-                                        <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.2em] mb-1">Tecrübe</p>
-                                        <p className="text-[13px] font-black text-[#0F172A] italic uppercase">8+ Yıl</p>
+
+                                {/* Stats Grid */}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="p-3 bg-slate-50/80 rounded-2xl border border-slate-100">
+                                        <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-1 italic">Tecrübe</p>
+                                        <p className="text-[12px] font-black text-[#0F172A] italic">{candidateData?.experience || '8'} Yıl</p>
                                     </div>
-                                    <div>
-                                        <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.2em] mb-1">Lokasyon</p>
-                                        <p className="text-[13px] font-black text-[#0F172A] italic uppercase">İstanbul (Remote)</p>
+                                    <div className="p-3 bg-slate-50/80 rounded-2xl border border-slate-100">
+                                        <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-1 italic">Lokasyon</p>
+                                        <p className="text-[12px] font-black text-[#0F172A] italic truncate">{candidateData?.location || 'TR (Remote)'}</p>
                                     </div>
                                 </div>
-                            </div>
-                            
-                            <div className="bg-[#F0FDF4] rounded-[2.5rem] p-6 border border-emerald-100 flex items-start gap-4">
-                                <div className="w-10 h-10 rounded-2xl bg-white border border-emerald-200 flex items-center justify-center shrink-0">
-                                    <Brain className="w-5 h-5 text-emerald-500" />
+
+                                {/* Join Link Section */}
+                                <div className="mt-2 pt-4 border-t border-slate-100">
+                                    <div className="bg-blue-50/50 rounded-2xl p-4 border border-blue-100 flex flex-col gap-2.5 group/link">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[8px] font-black text-blue-600 uppercase tracking-widest italic">Aday Katılım Linki</span>
+                                            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex-1 min-w-0 bg-white border border-blue-200 rounded-xl px-3 py-2">
+                                                <p className="text-[10px] font-black text-blue-800 tabular-nums italic truncate select-all">
+                                                    {window.location.origin}/join/{sessionId}
+                                                </p>
+                                            </div>
+                                            <button 
+                                                onClick={() => {
+                                                    navigator.clipboard.writeText(`${window.location.origin}/join/${sessionId}`);
+                                                    alert("Aday linki kopyalandı!");
+                                                }}
+                                                className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-900/40 hover:bg-black transition-all cursor-pointer"
+                                            >
+                                                <Copy className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h4 className="text-[10px] font-black text-emerald-800 uppercase tracking-widest mb-1 italic">AI Mülakat Notu</h4>
-                                    <p className="text-[11px] font-bold text-emerald-600/80 leading-snug italic">
-                                        Aday, kompleks sistem tasarımı konusunda teknik olarak çok güçlü ancak kriz yönetimi senaryolarında daha derinlemesine sorgulanması önerilir.
+                                
+                                {/* AI Summary */}
+                                <div className="mt-2 bg-[#0F172A] rounded-[2rem] p-6 text-white relative border border-white/10 shadow-2xl overflow-visible group/summary">
+                                    <div className="absolute -top-3 -right-3 p-4 bg-blue-600 rounded-2xl shadow-xl shadow-blue-900/40 z-10 transition-transform group-hover/summary:scale-110">
+                                        <Sparkles className="w-5 h-5 text-white" />
+                                    </div>
+                                    <h4 className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-4 italic flex items-center gap-2.5">
+                                        <Brain className="w-4 h-4" /> AI Evaluation
+                                    </h4>
+                                    <p className="text-[13px] font-bold leading-relaxed italic border-l-4 border-blue-500 pl-5 py-2 text-blue-50/90 mb-4">
+                                        {candidateData?.aiAnalysis?.summary || "Bu aday teknik profiliyle öne çıkıyor. Backend sistemlerdeki tecrübesi dikkat çekici."}
                                     </p>
+                                    <div className="pt-4 border-t border-white/5 flex items-center justify-between">
+                                        <span className="text-[8px] font-black text-white/30 uppercase tracking-widest italic">AI Analiz Motoru v2.0</span>
+                                        <div className="flex gap-1">
+                                            {[1,2,3].map(i => <div key={i} className="w-1.5 h-1.5 rounded-full bg-blue-500/40" />)}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Orta/Sağ Panel: Strateji ve Başlat */}
-                        <div className="flex-1 flex flex-col gap-8 overflow-hidden">
-                            <div className="bg-white rounded-[3.5rem] p-10 border border-slate-200 shadow-2xl flex-1 flex flex-col overflow-hidden">
-                                <div className="flex items-center justify-between mb-8 pb-8 border-b border-slate-100">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600">
-                                            <FileText className="w-6 h-6" />
+                        {/* Orta Panel: Kamera Preview (Center) */}
+                        <div className="flex-1 flex flex-col gap-3">
+                            <div className="relative flex-1 rounded-[3rem] bg-[#07090F] overflow-hidden shadow-2xl group border border-white/10">
+                                {isVideoOn && stream ? (
+                                    <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover scale-x-[-1]" />
+                                ) : (
+                                    <div className="w-full h-full flex flex-col items-center justify-center gap-3">
+                                        <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center border border-white/10">
+                                            <Camera className="w-8 h-8 text-white/10" />
                                         </div>
-                                        <div>
-                                            <h3 className="text-xl font-black text-[#0F172A] tracking-tighter italic uppercase">Seçilen Soru Seti: Ürün Tasarımı - Senior</h3>
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">Eşleşme Oranı %92 • 12 Soru Tanımlı</p>
-                                        </div>
+                                        <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em] italic">Yayın Bekleniyor</span>
                                     </div>
-                                    <button className="text-[10px] font-black text-blue-600 uppercase tracking-widest border-b-2 border-blue-600 pb-1 hover:text-blue-700 transition-colors">Seti Değiştir</button>
-                                </div>
-
-                                <div className="flex-1 overflow-y-auto space-y-4 pr-4">
-                                    {questions.map((q, idx) => (
-                                        <div key={q.id} className="group flex items-center gap-6 p-6 rounded-[2rem] border-2 border-slate-50 hover:border-blue-100 hover:bg-blue-50/30 transition-all">
-                                            <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-[15px] font-black text-[#0F172A] group-hover:bg-white transition-all shadow-sm">
-                                                {String(idx + 1).padStart(2, '0')}
-                                            </div>
-                                            <p className="flex-1 text-[13px] font-bold text-[#475569] leading-relaxed italic line-clamp-2">
-                                                {q.text}
-                                            </p>
-                                            <div className="px-4 py-1.5 rounded-xl bg-white border border-slate-100 text-[9px] font-black text-slate-400 uppercase tracking-widest">{q.category}</div>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                <div className="mt-8 pt-8 flex items-center gap-8 border-t border-slate-100">
-                                    <div className="flex-1 bg-blue-50/50 rounded-[2.5rem] p-6 border border-blue-100 flex items-center gap-6">
-                                        <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white shrink-0">
-                                            <Info className="w-5 h-5" />
-                                        </div>
-                                        <p className="text-[11px] font-bold text-blue-800 italic leading-snug">
-                                            Mülakat süresi <span className="font-black">45 dakika</span> olarak planlanmıştır. Butona tıkladığınızda aday bekleme odasından görüşmeye alınacaktır.
-                                        </p>
+                                )}
+                                <div className="absolute top-8 left-8 flex items-center gap-3">
+                                    <div className="px-4 py-2 bg-black/40 backdrop-blur-2xl rounded-2xl border border-white/10 flex items-center gap-2.5">
+                                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                        <span className="text-[9px] font-black text-white uppercase tracking-widest italic">ÖNİZLEME AKTİF</span>
                                     </div>
-                                    <button 
-                                        onClick={() => setPhase('active')}
-                                        disabled={!selectedPathId || pathLoading}
-                                        className="h-[80px] px-12 rounded-[2.5rem] bg-[#0F172A] hover:bg-black text-white font-black text-base transition-all shadow-2xl flex items-center gap-6 italic group min-w-[300px]"
-                                    >
-                                        Mülakatı Başlat <Play className="w-6 h-6 fill-current group-hover:translate-x-2 transition-transform" />
+                                </div>
+                                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-[#1E293B]/80 backdrop-blur-3xl px-6 py-4 rounded-3xl border border-white/10 shadow-2xl">
+                                    <button onClick={() => setIsVideoOn(!isVideoOn)} className={"w-12 h-12 rounded-2xl flex items-center justify-center cursor-pointer transition-all " + (isVideoOn ? 'bg-white/5 text-white hover:bg-white/10' : 'bg-red-500 text-white')}>
+                                        {isVideoOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
+                                    </button>
+                                    <button onClick={() => setIsMicOn(!isMicOn)} className={"w-12 h-12 rounded-2xl flex items-center justify-center cursor-pointer transition-all " + (isMicOn ? 'bg-white/5 text-white hover:bg-white/10' : 'bg-red-500 text-white')}>
+                                        {isMicOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
                                     </button>
                                 </div>
                             </div>
+                        </div>
+
+                        {/* Sağ Panel: Mülakat Rotası (Vertical) */}
+                        <div className="w-[340px] flex flex-col gap-3 shrink-0 overflow-hidden">
+                            {!isTypeSelected ? (
+                                <div className="bg-white rounded-[3rem] p-8 border border-slate-200 shadow-2xl flex-1 flex flex-col gap-8 overflow-y-auto custom-scrollbar">
+                                    <div className="text-center pt-4">
+                                        <h3 className="text-2xl font-black text-[#0F172A] tracking-tighter italic uppercase mb-2">Mülakat Rotası</h3>
+                                        <p className="text-slate-400 font-bold uppercase text-[9px] tracking-[0.25em] max-w-[200px] mx-auto leading-relaxed italic">Adayın profiline özel soru setleri oluşturulacaktır.</p>
+                                    </div>
+
+                                    <div className="flex flex-col gap-4">
+                                        {[
+                                            { id: 'technical', title: 'Teknik Kültür', desc: 'Mimari ve mühendislik yaklaşımı ölçülür.', icon: <Code className="w-6 h-6" />, color: 'blue' },
+                                            { id: 'product', title: 'Product / UX', desc: 'Ürün vizyonu ve kullanıcı odağı ölçülür.', icon: <Target className="w-6 h-6" />, color: 'indigo' },
+                                            { id: 'culture', title: 'Kültür & Uyum', desc: 'Ekip uyumu ve değerler ölçülür.', icon: <Users className="w-6 h-6" />, color: 'emerald' }
+                                        ].map(type => (
+                                            <button
+                                                key={type.id}
+                                                onClick={() => {
+                                                    setActiveStrategy(type.id);
+                                                    setIsTypeSelected(true);
+                                                }}
+                                                className={`group p-6 rounded-[2.5rem] border-2 border-slate-50 hover:border-${type.color}-500 hover:bg-${type.color}-50/30 transition-all flex items-center text-left gap-5 shadow-sm hover:shadow-xl cursor-pointer active:scale-95`}
+                                            >
+                                                <div className={`w-14 h-14 rounded-2xl bg-${type.color}-50 text-${type.color}-600 flex items-center justify-center group-hover:scale-110 transition-transform shrink-0 shadow-inner`}>
+                                                    {type.icon}
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <h4 className="text-[13px] font-black text-[#0F172A] uppercase italic mb-1">{type.title}</h4>
+                                                    <p className="text-[10px] font-medium text-slate-400 italic leading-snug">{type.desc}</p>
+                                                </div>
+                                                <ChevronRight className={`w-5 h-5 ml-auto text-slate-300 group-hover:text-${type.color}-500 transition-colors shrink-0`} />
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div className="mt-auto p-6 bg-slate-50 rounded-3xl border border-slate-100 italic">
+                                        <p className="text-[10px] font-bold text-slate-500 leading-relaxed text-center italic">
+                                            Aday seçilecek rotaya göre mülakatçı tarafından yayına alınacaktır.
+                                        </p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="bg-white rounded-[3rem] p-6 border border-slate-200 shadow-2xl flex-1 flex flex-col overflow-hidden animate-in fade-in slide-in-from-right-4 duration-500">
+                                    <div className="flex items-center justify-between mb-5 pb-5 border-b border-slate-100 shrink-0">
+                                        <div className="flex items-center gap-3.5">
+                                            <div className="w-11 h-11 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 shadow-inner">
+                                                <FileText className="w-5 h-5" />
+                                            </div>
+                                            <div>
+                                                <h3 className="text-lg font-black text-[#0F172A] tracking-tighter italic uppercase leading-none">
+                                                    {activeStrategy === 'technical' ? 'Teknik Kültür' : activeStrategy === 'product' ? 'Product / UX' : 'Kültür & Uyum'}
+                                                </h3>
+                                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Soru Havuzu Aktif</p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => {
+                                                setIsTypeSelected(false);
+                                                setAvailablePaths([]);
+                                            }}
+                                            className="w-10 h-10 rounded-xl bg-slate-50 text-blue-600 flex items-center justify-center hover:bg-blue-600 hover:text-white transition-all cursor-pointer shadow-sm"
+                                            title="Rotayı Değiştir"
+                                        >
+                                            <RefreshCw className="w-4 h-4" />
+                                        </button>
+                                    </div>
+
+                                    {pathLoading ? (
+                                        <div className="flex-1 flex flex-col items-center justify-center gap-4 opacity-50">
+                                            <div className="relative">
+                                                <Loader2 className="w-12 h-12 animate-spin text-blue-600" />
+                                                <Sparkles className="absolute -top-2 -right-2 w-6 h-6 text-amber-500 animate-pulse" />
+                                            </div>
+                                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 italic text-center">Yapay Zeka Soruları Hazırlıyor...</p>
+                                        </div>
+                                    ) : (
+                                        <div className="flex-1 flex flex-col gap-4 overflow-hidden">
+                                            <div className="flex gap-2 p-1.5 bg-slate-50 rounded-2xl border border-slate-100 shrink-0">
+                                                {availablePaths.map(path => (
+                                                    <button
+                                                        key={path.id}
+                                                        onClick={() => handleSelectPath(path)}
+                                                        className={`flex-1 py-3 px-3 rounded-xl flex items-center justify-center gap-2 transition-all text-center ${selectedPathId === path.id ? 'bg-white shadow-xl text-blue-600 border border-slate-100' : 'text-slate-400 hover:text-slate-600'}`}
+                                                    >
+                                                        <span className="text-[10px] font-black uppercase tracking-widest italic">{path.title}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+
+                                            <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar pb-4">
+                                                {questions.map((q, idx) => (
+                                                    <div key={q.id} className="group flex items-start gap-3 p-4 rounded-[1.5rem] border border-slate-50 bg-white hover:border-blue-100 hover:shadow-lg hover:shadow-blue-900/5 transition-all">
+                                                        <div className="w-7 h-7 rounded-xl bg-slate-50 flex items-center justify-center text-[10px] font-black text-[#0F172A] group-hover:bg-blue-600 group-hover:text-white transition-all shrink-0">
+                                                            {idx + 1}
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-[11px] font-bold text-[#475569] leading-snug italic">
+                                                                {q.text}
+                                                            </p>
+                                                            <span className="px-2 py-0.5 rounded-lg bg-slate-50 border border-slate-100 text-[8px] font-black text-slate-400 uppercase tracking-widest inline-block mt-2 italic">{q.category}</span>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            <div className="pt-4 border-t border-slate-100 shrink-0 mt-auto">
+                                                <button
+                                                    onClick={async () => {
+                                                        const startData = {
+                                                            status: 'live',
+                                                            activeStrategy,
+                                                            questions,
+                                                            selectedPathId,
+                                                            currentQuestionIndex: 0,
+                                                            startedAt: new Date().toISOString()
+                                                        };
+                                                        await persistSessionData(startData);
+                                                        setPhase('active');
+                                                    }}
+                                                    disabled={!selectedPathId || pathLoading}
+                                                    className="w-full h-16 rounded-[1.5rem] bg-[#0F172A] hover:bg-black text-white font-black text-[12px] uppercase tracking-[0.2em] transition-all shadow-2xl shadow-blue-900/40 flex items-center justify-center gap-3 italic group px-5"
+                                                >
+                                                    MOULAKATI BAŞLAT <ArrowRight className="w-5 h-5 group-hover:translate-x-2 transition-transform" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </main>
                 </div>
@@ -571,116 +991,159 @@ export default function LiveInterviewPage() {
         } else {
             // Aday Hazırlık Odası
             return (
-                <div className="min-h-screen bg-[#F0F2F5] font-sans flex flex-col items-center justify-center p-8 text-[#1E293B] italic overflow-hidden">
-                    <div className="max-w-[1400px] w-full flex flex-col gap-12">
-                        <div className="flex flex-col items-center text-center">
-                            <h1 className="text-[64px] font-black text-[#0F172A] tracking-tighter uppercase italic leading-[0.9] mb-4">Mülakata <span className="text-blue-600 underline underline-offset-8">Hazır Mısın?</span></h1>
-                            <p className="text-lg font-bold text-slate-400 max-w-2xl">Cihazlarınızı kontrol edin ve hazır olduğunuzda giriş yapın. Mülakat odasına bağlanmadan önceki son adımdasınız.</p>
+                <div className="min-h-screen bg-[#F8FAFC] font-sans flex flex-col italic overflow-hidden">
+                    <header className="h-[56px] bg-white border-b border-slate-200 flex items-center justify-between px-8 shrink-0 z-20">
+                        <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-xl bg-[#0F172A] flex items-center justify-center">
+                                <Video className="w-4.5 h-4.5 text-white" />
+                            </div>
+                            <h2 className="text-[15px] font-black text-[#0F172A] tracking-tighter uppercase italic leading-none">TalentFlow <span className="text-slate-400">Live</span></h2>
                         </div>
-
-                        <div className="grid grid-cols-12 gap-10">
-                            <div className="col-span-12 lg:col-span-7 flex flex-col gap-6">
-                                <div className="relative aspect-video rounded-[3.5rem] bg-slate-200 overflow-hidden shadow-2xl border-4 border-white group">
-                                    {isVideoOn && stream ? (
-                                        <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover scale-x-[-1]" />
-                                    ) : (
-                                        <div className="w-full h-full flex flex-col items-center justify-center bg-zinc-950">
-                                            <Camera className="w-20 h-20 text-white/10" />
-                                        </div>
-                                    )}
-                                    <div className="absolute top-8 right-8 px-5 py-2.5 bg-emerald-500 rounded-3xl flex items-center gap-2 border border-emerald-400 shadow-xl">
-                                        <div className="w-2.5 h-2.5 rounded-full bg-white animate-pulse" />
-                                        <span className="text-[10px] font-black text-white uppercase tracking-widest">SİNYAL GÜÇLÜ</span>
-                                    </div>
-                                    <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-4 bg-white/10 backdrop-blur-3xl p-3 rounded-[2.5rem] border border-white/20">
-                                        <button onClick={() => setIsMicOn(!isMicOn)} className={"w-14 h-14 rounded-2xl flex items-center justify-center transition-all " + (isMicOn ? 'bg-white text-black shadow-xl' : 'bg-red-500 text-white')}>
-                                            {isMicOn ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />}
-                                        </button>
-                                        <button onClick={() => setIsVideoOn(!isVideoOn)} className={"w-14 h-14 rounded-2xl flex items-center justify-center transition-all " + (isVideoOn ? 'bg-white text-black shadow-xl' : 'bg-red-500 text-white')}>
-                                            {isVideoOn ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
-                                        </button>
-                                        <button onClick={() => setShowSettings(true)} className="w-14 h-14 rounded-2xl bg-white/20 text-white flex items-center justify-center hover:bg-white hover:text-black transition-all">
-                                            <Settings className="w-6 h-6" />
-                                        </button>
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-3 gap-6">
-                                    <div className="bg-white/40 backdrop-blur-md rounded-[2.5rem] p-6 border border-white border-white/50 flex items-center gap-4 shadow-sm">
-                                        <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100"><Mic className="w-6 h-6" /></div>
-                                        <div>
-                                            <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">MİKROFON</p>
-                                            <p className="text-[12px] font-black text-[#0F172A] italic uppercase truncate">MacBook Pro Mic</p>
-                                        </div>
-                                    </div>
-                                    <div className="bg-white/40 backdrop-blur-md rounded-[2.5rem] p-6 border border-white border-white/50 flex items-center gap-4 shadow-sm">
-                                        <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100"><Camera className="w-6 h-6" /></div>
-                                        <div>
-                                            <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">KAMERA</p>
-                                            <p className="text-[12px] font-black text-[#0F172A] italic uppercase truncate">FaceTime HD</p>
-                                        </div>
-                                    </div>
-                                    <div className="bg-white/40 backdrop-blur-md rounded-[2.5rem] p-6 border border-white border-white/50 flex items-center gap-4 shadow-sm">
-                                        <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100"><Zap className="w-6 h-6" /></div>
-                                        <div>
-                                            <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">BAĞLANTI</p>
-                                            <p className="text-[12px] font-black text-[#0F172A] italic uppercase truncate">120 Mbps (Fiber)</p>
-                                        </div>
-                                    </div>
-                                </div>
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={handleFinishInterview}
+                                className="px-4 py-1.5 rounded-lg bg-white text-red-600 border border-red-100 text-[9px] font-black uppercase tracking-wider hover:bg-red-600 hover:text-white transition-all shadow-sm cursor-pointer"
+                            >
+                                Ayrıl
+                            </button>
+                            <button onClick={() => setShowSettings(true)} className="p-2 rounded-lg bg-slate-50 text-slate-500 hover:bg-black hover:text-white transition-all border border-slate-100 cursor-pointer"><Settings className="w-4.5 h-4.5" /></button>
+                        </div>
+                    </header>
+                    <div className="flex-1 flex flex-col items-center justify-center p-4">
+                        <div className="max-w-[1200px] w-full flex flex-col gap-6">
+                            <div className="flex flex-col items-center text-center">
+                                <h1 className="text-[36px] font-black text-[#0F172A] tracking-tighter uppercase italic leading-[0.9] mb-2">Mülakata <span className="text-blue-600 underline underline-offset-4 decoration-4">Hazır Mısın?</span></h1>
+                                <p className="text-xs font-bold text-slate-400 max-w-lg">Cihazlarını kontrol et ve hazır olduğunda giriş yap.</p>
                             </div>
 
-                            <div className="col-span-12 lg:col-span-5 flex flex-col gap-6">
-                                <div className="bg-white rounded-[3.5rem] p-10 border border-slate-200 shadow-2xl relative overflow-hidden flex-1">
-                                    <div className="flex items-center gap-5 mb-10">
-                                        <div className="w-16 h-16 rounded-[1.5rem] bg-indigo-950 overflow-hidden shadow-xl border-4 border-white flex items-center justify-center">
-                                             <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Caner" alt="Recruiter" />
-                                        </div>
-                                        <div>
-                                            <h3 className="text-xl font-black text-[#0F172A] tracking-tighter italic uppercase">Caner Yıldırım</h3>
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Kıdemli İK Yöneticisi</p>
-                                            <div className="flex gap-1.5 mt-2">
-                                                <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded-md text-[8px] font-black uppercase">Teknoloji</span>
-                                                <span className="px-2 py-0.5 bg-slate-50 text-slate-500 rounded-md text-[8px] font-black uppercase">10+ Yıl Deneyim</span>
+                            <div className="grid grid-cols-12 gap-8 items-start">
+                                <div className="col-span-12 lg:col-span-7 flex flex-col gap-6">
+                                    <div className="relative aspect-video rounded-3xl bg-slate-200 overflow-hidden shadow-xl border-[3px] border-white group">
+                                        {isVideoOn && stream ? (
+                                            <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover scale-x-[-1]" />
+                                        ) : (
+                                            <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-zinc-950">
+                                                <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center">
+                                                    <VideoOff className="w-8 h-8 text-white/20" />
+                                                </div>
+                                                <p className="text-[10px] font-black text-white/20 uppercase tracking-widest">Kamera Devre Dışı</p>
+                                            </div>
+                                        )}
+                                        <div className="absolute top-6 left-6 flex items-center gap-3">
+                                            <div className="px-3 py-1.5 bg-black/40 backdrop-blur-xl rounded-xl border border-white/10 flex items-center gap-2">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                                <span className="text-[8px] font-black text-white uppercase tracking-widest">Hazırlık Odası</span>
                                             </div>
                                         </div>
-                                    </div>
-                                    <p className="text-[13px] font-bold text-slate-500 leading-relaxed italic border-l-4 border-blue-600 pl-6 py-4 mb-10">
-                                        "Geleceğin liderlerini arıyoruz. Bugün sizinle teknik yetkinliklerinizin yanı sıra problem çözme yaklaşımınızı konuşacağız."
-                                    </p>
-                                    
-                                    <div className="bg-slate-50/80 rounded-[2rem] p-8 border border-slate-100 mb-10">
-                                        <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-widest mb-6 flex items-center gap-2">
-                                            <ShieldCheck className="w-5 h-5 text-emerald-500" /> MÜLAKAT KURALLARI
-                                        </h4>
-                                        <div className="space-y-4">
-                                            {[
-                                                "Sessiz ve iyi aydınlatılmış bir ortamda bulunduğunuzdan emin olun.",
-                                                "Mülakat süresince internet tarayıcınızda başka sekme açmayın.",
-                                                "Mülakat kaydedilecektir. Gizlilik sözleşmesi geçerlidir."
-                                            ].map((rule, idx) => (
-                                                <div key={idx} className="flex gap-4 items-start">
-                                                    <div className="w-6 h-6 rounded-full bg-black text-white text-[10px] font-black flex items-center justify-center shrink-0">{idx + 1}</div>
-                                                    <p className="text-[12px] font-bold text-slate-500 leading-tight italic">{rule}</p>
-                                                </div>
-                                            ))}
+                                        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 z-30">
+                                            <button onClick={() => setIsMicOn(!isMicOn)} className={"w-12 h-12 rounded-xl flex items-center justify-center bg-black/40 backdrop-blur-xl border border-white/10 text-white shadow-2xl transition-all " + (!isMicOn && 'bg-red-500 border-red-400')}>
+                                                {isMicOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+                                            </button>
+                                            <button onClick={() => setIsVideoOn(!isVideoOn)} className={"w-12 h-12 rounded-xl flex items-center justify-center bg-black/40 backdrop-blur-xl border border-white/10 text-white shadow-2xl transition-all " + (!isVideoOn && 'bg-red-500 border-red-400')}>
+                                                {isVideoOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
+                                            </button>
                                         </div>
                                     </div>
 
-                                    <div className="space-y-4">
-                                        <div className="flex items-center gap-3 px-6">
-                                            <input type="checkbox" checked={hasConsent} onChange={(e) => setHasConsent(e.target.checked)} id="kvkk" className="w-5 h-5 accent-blue-600 cursor-pointer" />
-                                            <label htmlFor="kvkk" className="text-[11px] font-black text-slate-500 uppercase italic cursor-pointer">KVKK Şartlarını Onaylıyorum</label>
-                                        </div>
-                                        <button 
-                                            onClick={() => setPhase('active')}
-                                            disabled={!hasConsent}
-                                            className="w-full h-20 rounded-[2.5rem] bg-indigo-950 hover:bg-black text-white font-black text-lg transition-all shadow-2xl flex items-center justify-center gap-6 italic group disabled:opacity-20"
-                                        >
-                                            <span className="relative z-10">MÜLAKATA KATIL</span>
-                                            <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center group-hover:bg-white group-hover:text-black transition-all">
-                                                <Zap className="w-6 h-6" />
+                                    <div className="grid grid-cols-3 gap-3">
+                                        {[
+                                            { icon: <Mic className="w-4 h-4" />, label: 'MİKROFON', status: isMicOn ? 'AKTİF' : 'KAPALI', ok: isMicOn },
+                                            { icon: <Camera className="w-4 h-4" />, label: 'KAMERA', status: isVideoOn ? 'AKTİF' : 'KAPALI', ok: isVideoOn },
+                                            { icon: <Zap className="w-4 h-4" />, label: 'BAĞLANTI', status: 'STABİL', ok: true }
+                                        ].map((stat, i) => (
+                                            <div key={i} className="bg-white rounded-2xl p-4 border border-slate-100 flex items-center gap-3 shadow-sm">
+                                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center border ${stat.ok ? 'bg-blue-50 text-blue-600 border-blue-50' : 'bg-red-50 text-red-500 border-red-50'}`}>
+                                                    {stat.icon}
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 mb-1">{stat.label}</p>
+                                                    <p className={`text-[10px] font-black italic uppercase leading-none truncate ${stat.ok ? 'text-[#0F172A]' : 'text-red-500'}`}>{stat.status}</p>
+                                                </div>
                                             </div>
-                                        </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Right Column: Interview Panel & Actions */}
+                                <div className="col-span-12 lg:col-span-5">
+                                    <div className="bg-white rounded-[2.5rem] p-8 border border-slate-200 shadow-2xl relative overflow-hidden group">
+                                         <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-blue-500/10 transition-colors" />
+                                         
+                                         <div className="space-y-6">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-14 h-14 rounded-2xl bg-[#0F172A] p-0.5 shadow-xl border border-slate-100 flex items-center justify-center shrink-0">
+                                                    <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${userProfile?.name || 'Recruiter'}`} alt="R" className="w-full h-full rounded-xl" />
+                                                </div>
+                                                <div>
+                                                    <h3 className="text-lg font-black text-[#0F172A] tracking-tighter italic uppercase leading-none">Mülakat Paneli</h3>
+                                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Katılmaya Hazırlanın</p>
+                                                </div>
+                                            </div>
+
+                                            <p className="text-[12px] font-bold text-slate-500 leading-relaxed italic border-l-4 border-blue-600 pl-4 py-1">
+                                                Hoş geldiniz. Mülakatçı sizi odaya kabul ettiğinde görüşme otomatik olarak başlayacaktır. Lütfen tarayıcınızdan kamera ve mikrofon erişimine izin verdiğinizden emin olun.
+                                            </p>
+
+                                            <div className="space-y-3">
+                                                <div className="px-4 py-3 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between group-hover:bg-white transition-colors">
+                                                     <div className="flex items-center gap-3">
+                                                         <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                                                         <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">KVKK Onayı</span>
+                                                     </div>
+                                                     <input 
+                                                        type="checkbox" 
+                                                        checked={hasConsent} 
+                                                        onChange={(e) => setHasConsent(e.target.checked)}
+                                                        className="w-5 h-5 accent-blue-600 rounded-lg cursor-pointer"
+                                                     />
+                                                </div>
+                                                
+                                                {/* Phase 5: Premium Waiting State */}
+                                                <div className={`relative overflow-hidden flex items-center gap-4 p-5 rounded-3xl border transition-all duration-500 ${isRecruiterActive ? 'bg-emerald-50/50 border-emerald-100 shadow-lg shadow-emerald-500/5' : 'bg-amber-50/50 border-amber-100 shadow-lg shadow-amber-500/5'}`}>
+                                                    {!isRecruiterActive && (
+                                                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full animate-shimmer pointer-events-none" />
+                                                    )}
+                                                    
+                                                    <div className="relative">
+                                                        <div className={`w-3 h-3 rounded-full ${isRecruiterActive ? 'bg-emerald-500' : 'bg-amber-500'} shadow-lg`} />
+                                                        <div className={`absolute -inset-1.5 rounded-full ${isRecruiterActive ? 'bg-emerald-500/20' : 'bg-amber-500/20'} animate-ping`} />
+                                                    </div>
+                                                    
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className={`text-[10px] font-black uppercase tracking-[0.15em] italic ${isRecruiterActive ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                                            {isRecruiterActive ? 'Mülakatçı Hazır' : 'Mülakatçı Bekleniyor'}
+                                                        </p>
+                                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5 truncate">
+                                                            {isRecruiterActive ? 'Hemen katılarak görüşmeyi başlatabilirsiniz' : 'Lütfen oturumun açılmasını bekleyin...'}
+                                                        </p>
+                                                    </div>
+
+                                                    {isRecruiterActive && (
+                                                        <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 animate-in zoom-in duration-300">
+                                                            <Check className="w-4 h-4 text-emerald-600" />
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                <button
+                                                    onClick={() => {
+                                                        if (hasConsent) {
+                                                            if (!isRecruiterActive) {
+                                                                alert("Mülakatçı henüz odaya katılmadı. Lütfen odaya girmesini bekleyin.");
+                                                                return;
+                                                            }
+                                                            setPhase('lobby_ready');
+                                                        } else {
+                                                            alert("Lütfen KVKK onayını kabul edin.");
+                                                        }
+                                                    }}
+                                                    className="w-full h-16 rounded-2xl bg-[#0F172A] text-white font-black text-[12px] uppercase tracking-[0.2em] shadow-2xl shadow-blue-900/40 flex items-center justify-center gap-3 transition-all hover:scale-[1.02] active:scale-95 group italic disabled:opacity-50"
+                                                    disabled={!hasConsent}
+                                                >
+                                                    KATILMAYA HAZIRIM <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                                                </button>
+                                            </div>
+                                         </div>
                                     </div>
                                 </div>
                             </div>
@@ -691,163 +1154,710 @@ export default function LiveInterviewPage() {
         }
     }
 
-    return (
-        <div className="fixed inset-0 z-[200] bg-slate-50 flex flex-col overflow-hidden text-slate-900 font-sans italic">
-            <header className="h-[64px] shrink-0 border-b border-slate-200 bg-white px-8 flex items-center justify-between z-20">
-                <div className="flex items-center gap-6">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center">
-                            <Video className="w-5 h-5 text-white" />
+    if (phase === 'lobby_ready') {
+        return (
+            <div className="min-h-screen bg-[#F8FAFC] font-sans flex flex-col items-center justify-center p-6 italic">
+                <div className="max-w-md w-full bg-white rounded-[3rem] p-12 text-center border border-slate-100 shadow-2xl space-y-8 relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-blue-500/10 transition-colors" />
+                    
+                    <div className="relative">
+                        <div className="w-24 h-24 rounded-[2rem] bg-[#0F172A] flex items-center justify-center mx-auto shadow-2xl shadow-blue-900/30 animate-bounce">
+                            <Video className="w-10 h-10 text-white" />
                         </div>
-                        <h2 className="text-[13px] font-black text-slate-900 uppercase tracking-tighter italic">Live Interview</h2>
+                    </div>
+
+                    <div className="space-y-4">
+                        <h2 className="text-3xl font-black text-[#0F172A] tracking-tighter uppercase italic leading-none">Bağlantı <span className="text-blue-600">Bekleniyor</span></h2>
+                        <p className="text-[12px] font-bold text-slate-400 uppercase tracking-widest max-w-[240px] mx-auto leading-relaxed">
+                            Mülakatçı sizi odaya aldığında görüşme otomatik olarak başlayacaktır. Sekmeyi kapatmayın.
+                        </p>
+                    </div>
+
+                    <div className="flex flex-col items-center gap-6">
+                        <div className="flex gap-2">
+                             {[0,1,2].map(i => (
+                                 <div key={i} className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse" style={{ animationDelay: `${i * 200}ms` }} />
+                             ))}
+                        </div>
+                        <button 
+                            onClick={() => setPhase('lobby')}
+                            className="px-6 py-2 rounded-xl text-[10px] font-black text-slate-400 hover:text-[#0F172A] hover:bg-slate-50 transition-all uppercase tracking-[0.2em] border border-transparent hover:border-slate-100"
+                        >
+                            AYARLARA DÖN
+                        </button>
                     </div>
                 </div>
-                <button
-                    onClick={handleFinishInterview}
-                    className="px-8 py-3 rounded-[1.2rem] bg-red-600 text-white hover:bg-red-700 font-black text-[11px] tracking-widest uppercase transition-all italic"
-                >
-                    Mülakatı Sonlandır
-                </button>
+            </div>
+        );
+    }
+
+    if (phase === 'finished') {
+        return (
+            <div className="min-h-screen bg-[#0F172A] flex flex-col items-center justify-center p-6 text-white font-sans italic">
+                <div className="bg-[#1E293B]/50 backdrop-blur-3xl p-12 rounded-[3rem] border border-white/10 shadow-2xl flex flex-col items-center gap-8 max-w-lg text-center animate-in zoom-in duration-500">
+                    <div className="w-24 h-24 rounded-3xl bg-emerald-500/20 flex items-center justify-center border border-emerald-500/30 relative">
+                        <CheckCircle2 className="w-12 h-12 text-emerald-400" />
+                        <div className="absolute -inset-2 bg-emerald-500/20 rounded-full blur-2xl animate-pulse" />
+                    </div>
+                    <div className="space-y-3">
+                        <h1 className="text-3xl font-black italic uppercase tracking-tighter">Mülakat Tamamlandı</h1>
+                        <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest max-w-xs mx-auto">
+                            Oturum verileri başarıyla kaydedildi ve analiz motoru raporu hazırladı.
+                        </p>
+                    </div>
+
+                    <div className="w-full h-px bg-white/5" />
+
+                    <div className="grid grid-cols-2 gap-4 w-full">
+                        <div className="p-4 bg-white/5 rounded-2xl border border-white/5 flex flex-col gap-1">
+                            <span className="text-[8px] font-black text-white/30 uppercase tracking-widest">LOYALTY SCORE</span>
+                            <span className="text-xl font-black text-blue-400">%{logicIntegrity}</span>
+                        </div>
+                        <div className="p-4 bg-white/5 rounded-2xl border border-white/5 flex flex-col gap-1">
+                            <span className="text-[8px] font-black text-white/30 uppercase tracking-widest">STATUS</span>
+                            <span className="text-[14px] font-black text-emerald-400 uppercase italic">SAVED</span>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col gap-3 w-full">
+                        <button
+                            onClick={() => navigate(`/interview-report/${sessionId}`)}
+                            className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all shadow-xl shadow-blue-500/20 flex items-center justify-center gap-3"
+                        >
+                            <FileText className="w-4 h-4" /> REPORU GÖRÜNTÜLE
+                        </button>
+                        <button
+                            onClick={() => navigate('/')}
+                            className="w-full h-14 bg-white/5 hover:bg-white/10 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all flex items-center justify-center gap-3"
+                        >
+                            <ArrowLeft className="w-4 h-4" /> KONTROL PANELİNE DÖN
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="fixed inset-0 z-[200] bg-[#07090F] flex flex-col overflow-hidden text-white font-sans">
+            {/* COMPACT DARK HEADER */}
+            <header className="h-[48px] shrink-0 border-b border-white/5 bg-[#0F172A] px-5 flex items-center justify-between z-20">
+                <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                        <Video className="w-3.5 h-3.5 text-blue-500" />
+                        <h2 className="text-[10px] font-black uppercase tracking-[0.15em] italic">Live Session Hub</h2>
+                    </div>
+                    <div className="h-4 w-px bg-white/10" />
+                    <div className="flex items-center gap-2.5">
+                        <div className="w-6 h-6 rounded-md bg-white/5 overflow-hidden border border-white/10">
+                            <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${candidateData?.name}`} alt="C" className="w-full h-full object-cover" />
+                        </div>
+                        <span className="text-[10px] font-bold text-white/90 italic">{candidateData?.name}</span>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                    <button 
+                        onClick={() => {
+                            navigator.clipboard.writeText(`${window.location.origin}/join/${sessionId}`);
+                            alert("Aday linki kopyalandı!");
+                        }}
+                        className="h-8 px-3 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white font-black text-[9px] tracking-widest uppercase transition-all flex items-center gap-2 border border-blue-500/30 active:scale-95 cursor-pointer shadow-lg shadow-blue-500/10"
+                    >
+                        <Copy className="w-3 h-3" /> Aday Linki
+                    </button>
+                    <div className="flex items-center gap-2 px-2.5 py-1.5 bg-white/5 rounded-lg border border-white/5">
+                        <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="text-[9px] font-black text-emerald-500 tracking-widest tabular-nums italic">LIVE: 24:15</span>
+                    </div>
+                    <button
+                        onClick={handleFinishInterview}
+                        className="px-4 py-1.5 rounded-lg bg-emerald-600/90 hover:bg-emerald-600 text-white font-black text-[9px] tracking-[0.1em] uppercase transition-all shadow-lg active:scale-95 flex items-center gap-2"
+                        title="Mülakatı Başarıyla Tamamla ve Raporu Oluştur"
+                    >
+                        <CheckCircle2 className="w-3 h-3" /> Mülakatı Tamamla
+                    </button>
+                    
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowActionsMenu(!showActionsMenu)}
+                            className="w-10 h-8 flex items-center justify-center rounded-lg bg-white/5 text-white/40 hover:bg-white/10 hover:text-white transition-all border border-white/5 cursor-pointer"
+                        >
+                            <MoreVertical className="w-4 h-4" />
+                        </button>
+                        
+                        {showActionsMenu && (
+                            <div className="absolute top-full right-0 mt-2 w-48 bg-[#1E293B] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-[400] animate-in fade-in slide-in-from-top-2 duration-200">
+                            <button 
+                                onClick={() => {
+                                    if(window.confirm("Mülakatı ertelemek ve daha sonra devam etmek istediğinize emin misiniz?")) {
+                                        persistSessionData({ status: 'scheduled' });
+                                        navigate('/');
+                                    }
+                                }}
+                                className="w-full px-4 py-3 text-left text-[10px] font-bold text-slate-300 hover:bg-white/5 flex items-center gap-3 transition-colors"
+                            >
+                                <Clock className="w-3.5 h-3.5 text-blue-400" /> Ertele / Duraklat
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    if(window.confirm("Mülakatı iptal etmek istediğinize emin misiniz? Bu işlem geri alınamaz.")) {
+                                        persistSessionData({ status: 'cancelled' });
+                                        navigate('/');
+                                    }
+                                }}
+                                className="w-full px-4 py-3 text-left text-[10px] font-bold text-red-400 hover:bg-red-500/10 flex items-center gap-3 transition-colors"
+                            >
+                                <AlertCircle className="w-3.5 h-3.5" /> Mülakatı İptal Et
+                            </button>
+                            <div className="h-px bg-white/5 mx-2" />
+                            <button 
+                                onClick={() => navigate('/')}
+                                className="w-full px-4 py-3 text-left text-[10px] font-bold text-slate-500 hover:bg-white/5 flex items-center gap-3 transition-colors"
+                            >
+                                <ChevronLeft className="w-3.5 h-3.5" /> Sadece Çık (Canlı Kalsın)
+                            </button>
+                        </div>
+                        )}
+                    </div>
+                </div>
             </header>
-            <div className="flex-1 flex p-6 gap-6 overflow-hidden">
-                <div className="flex-1 bg-slate-900 rounded-[3.5rem] relative overflow-hidden shadow-2xl border-[6px] border-white group/video transition-all">
-                     <div className="absolute inset-0 bg-zinc-950">
-                         {(stream || !isRecruiter) ? (
-                            <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover scale-x-[-1]" />
-                         ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                                 <User className="w-40 h-40 text-white/5 blur-sm" />
-                            </div>
-                         )}
-                     </div>
-                     
-                     <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-4 z-30 opacity-0 group-hover/video:opacity-100 transition-all bg-black/40 backdrop-blur-3xl px-6 py-4 rounded-[2.5rem] border border-white/10">
-                         <button onClick={() => setIsMicOn(!isMicOn)} className={"w-14 h-14 rounded-2xl flex items-center justify-center transition-all " + (isMicOn ? 'bg-white/10 text-white' : 'bg-red-600 text-white')}>
-                             {isMicOn ? <Mic className="w-6 h-6"/> : <MicOff className="w-6 h-6"/>}
-                         </button>
-                         <button onClick={() => setIsVideoOn(!isVideoOn)} className={"w-14 h-14 rounded-2xl flex items-center justify-center transition-all " + (isVideoOn ? 'bg-white/10 text-white' : 'bg-red-600 text-white')}>
-                             {isVideoOn ? <Video className="w-6 h-6"/> : <VideoOff className="w-6 h-6"/>}
-                         </button>
-                         <button onClick={handleFinishInterview} className="w-14 h-14 rounded-2xl bg-red-600 text-white flex items-center justify-center hover:scale-110 transition-all">
-                             <X className="w-6 h-6"/>
-                         </button>
-                     </div>
-                </div>
 
+            <div className="flex-1 flex p-2 gap-2 overflow-hidden">
                 {isRecruiter ? (
-                    <div className="w-[420px] flex flex-col gap-6 shrink-0 relative z-30">
-                        <section className="bg-white rounded-[3rem] p-8 border border-slate-200 shadow-2xl flex-1 flex flex-col overflow-hidden">
-                             <div className="flex items-center justify-between mb-6">
-                                <h3 className="text-[14px] font-black text-slate-900 uppercase italic tracking-tighter">Analytical Radar</h3>
-                                <div className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[9px] font-black uppercase">Canlı Analiz</div>
-                             </div>
-                             <div className="flex-1 space-y-6 overflow-y-auto pr-2 custom-scrollbar">
-                                 {Object.entries(starScores).map(([key, value]) => (
-                                     <div key={key} className="space-y-2">
-                                         <div className="flex items-center justify-between text-[11px] font-black text-slate-400">
-                                             <span className="uppercase">{key}</span>
-                                             <span className="text-blue-600 font-black">{value}%</span>
-                                         </div>
-                                         <div className="h-2 bg-slate-100 rounded-full overflow-hidden p-0.5 border border-slate-200">
-                                              <div 
-                                                className="h-full rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 transition-all duration-1000" 
-                                                style={{width: value + '%' }} 
-                                              />
-                                         </div>
-                                     </div>
-                                 ))}
-                             </div>
-                             <div className="mt-8 pt-6 border-t border-slate-100">
-                                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                                       <p className="text-[10px] font-black text-slate-400 uppercase mb-2">AI Özet Önerisi</p>
-                                       <p className="text-[11px] font-bold text-slate-600 italic leading-relaxed">
-                                            Adayın deneyimi teorik olarak güçlü, şimdi teknik mimari detaylarına odaklanın.
-                                       </p>
-                                  </div>
-                             </div>
-                        </section>
-
-                        <section className="bg-slate-900 rounded-[3rem] border border-white/10 h-[35%] flex flex-col overflow-hidden shadow-2xl p-8">
-                             <div className="flex items-center gap-3 mb-6">
-                                <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
-                                    <Brain className="w-4 h-4 text-white" />
+                    <>
+                        {/* LEFT SIDEBAR: CONTROL & TRANSCRIPT */}
+                        <div className="w-[320px] flex flex-col gap-2 shrink-0 overflow-hidden h-full">
+                            {/* QUESTIONS & PATH SELECTION */}
+                            <section className="bg-[#0F172A] rounded-2xl border border-white/5 flex-1 flex flex-col overflow-hidden shadow-2xl p-4">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-2">
+                                        <div className="p-1.5 bg-blue-500/10 rounded-lg">
+                                            <FileText className="w-3.5 h-3.5 text-blue-400" />
+                                        </div>
+                                        <h3 className="text-[10px] font-black text-white/40 uppercase tracking-widest italic">Mülakat Rotası</h3>
+                                    </div>
+                                    <div className="flex gap-1">
+                                        {[
+                                            { id: 'technical', icon: <Code className="w-3.5 h-3.5" />, label: 'Teknik' },
+                                            { id: 'product', icon: <Target className="w-3.5 h-3.5" />, label: 'Ürün' },
+                                            { id: 'culture', icon: <Users className="w-3.5 h-3.5" />, label: 'Kültür' }
+                                        ].map(p => (
+                                            <button
+                                                key={p.id}
+                                                onClick={() => {
+                                                    setActiveStrategy(p.id);
+                                                    setIsTypeSelected(true);
+                                                    persistSessionData({ activeStrategy: p.id });
+                                                }}
+                                                className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${activeStrategy === p.id ? 'bg-blue-600 text-white border border-blue-400 shadow-lg shadow-blue-500/20' : 'bg-white/5 text-white/30 hover:bg-white/10'}`}
+                                                title={p.label}
+                                            >
+                                                {p.icon}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
-                                <h3 className="text-[12px] font-black text-white uppercase italic tracking-widest">AI Recruiter Assistant</h3>
-                             </div>
-                             <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar" ref={transcriptRef}>
-                                  {transcript.slice(-3).map((line, idx) => (
-                                       <div key={idx} className="p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all">
-                                            <p className="text-[12px] font-medium text-white/90 italic leading-relaxed">"{line.text}"</p>
-                                       </div>
-                                  ))}
-                                  {transcript.length === 0 && (
-                                      <div className="flex flex-col items-center justify-center h-full text-center opacity-30">
-                                          <Mic className="w-8 h-8 text-white mb-2 animate-pulse" />
-                                          <p className="text-[10px] font-black text-white uppercase">Dinleniyor...</p>
-                                      </div>
-                                  )}
-                             </div>
-                        </section>
-                    </div>
-                ) : (
-                    <div className="w-[420px] flex flex-col gap-6 shrink-0 relative z-30">
-                        <section className="bg-white rounded-[3.5rem] border border-slate-200 flex-1 flex flex-col overflow-hidden shadow-2xl p-8">
-                             <h3 className="text-[14px] font-black text-slate-900 uppercase italic tracking-tighter mb-8 border-l-4 border-blue-600 pl-4">Mülakat Akışı</h3>
-                             <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
-                                  {questions.map((q, idx) => (
-                                      <div key={idx} className={"p-6 rounded-3xl border transition-all duration-500 " + (idx === currentQuestionIndex ? 'border-blue-600 bg-blue-50/50 shadow-lg scale-[1.02]' : 'opacity-30 grayscale border-slate-100')}>
-                                           <div className="flex items-center gap-3 mb-2">
-                                                <div className={"w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black " + (idx === currentQuestionIndex ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-400')}>
-                                                    {idx + 1}
+
+                                <div className="flex-1 overflow-hidden flex flex-col">
+                                    {!isTypeSelected ? (
+                                        <div className="bg-[#1E293B]/50 rounded-2xl p-4 border border-white/5 flex-1 flex flex-col gap-4 animate-in fade-in duration-300">
+                                            <div className="text-center">
+                                                <h4 className="text-[10px] font-black text-white uppercase tracking-widest italic">Yeni Soru Seti Seçin</h4>
+                                            </div>
+                                            <div className="grid grid-cols-1 gap-2">
+                                                {[
+                                                    { id: 'technical', title: 'Teknik Kültür', icon: <Code className="w-4 h-4" />, color: 'blue' },
+                                                    { id: 'product', title: 'Product / UX', icon: <Target className="w-4 h-4" />, color: 'indigo' },
+                                                    { id: 'culture', title: 'Kültür & Uyum', icon: <Users className="w-4 h-4" />, color: 'emerald' }
+                                                ].map(type => (
+                                                    <button
+                                                        key={type.id}
+                                                        onClick={() => {
+                                                            setActiveStrategy(type.id);
+                                                            setIsTypeSelected(true);
+                                                        }}
+                                                        className="flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all text-left group"
+                                                    >
+                                                        <div className={`w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center group-hover:bg-blue-500 group-hover:text-white transition-all`}>
+                                                            {type.icon}
+                                                        </div>
+                                                        <span className="text-[10px] font-black text-white/80 uppercase italic">{type.title}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar scroll-smooth animate-in fade-in duration-500 pb-10">
+                                            {questions.map((q, idx) => (
+                                                <div
+                                                    key={q.id || idx}
+                                                    onClick={() => {
+                                                        setCurrentQuestionIndex(idx);
+                                                        persistSessionData({ currentQuestionIndex: idx });
+                                                    }}
+                                                    className={`group relative transition-all duration-300 cursor-pointer ${idx === currentQuestionIndex ? 'opacity-100 scale-100' : 'opacity-40 hover:opacity-80 scale-[0.98]'}`}
+                                                >
+                                                    <div className={`p-5 rounded-3xl border transition-all ${idx === currentQuestionIndex ? 'bg-[#1E293B] border-blue-500/50 shadow-2xl shadow-blue-500/10' : 'bg-white/2 border-white/5 hover:border-white/10'}`}>
+                                                        <div className="flex gap-4">
+                                                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-[11px] font-black shrink-0 transition-transform ${idx === currentQuestionIndex ? 'bg-blue-600 text-white shadow-lg scale-110' : 'bg-white/5 text-white/30'}`}>
+                                                                {idx + 1}
+                                                            </div>
+                                                            <div className="space-y-4 flex-1">
+                                                                <p className={`text-[13px] font-bold leading-relaxed italic ${idx === currentQuestionIndex ? 'text-white' : 'text-white/60'}`}>
+                                                                    {q.text}
+                                                                </p>
+                                                                
+                                                                <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                                                                    <div className="flex flex-wrap gap-2">
+                                                                        {idx === currentQuestionIndex && (
+                                                                            <button
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    handleGenerateAIQuestion('deepen');
+                                                                                }}
+                                                                                className="px-4 py-2 bg-blue-600/20 hover:bg-blue-600/40 rounded-xl border border-blue-500/30 text-[9px] font-black text-blue-400 uppercase flex items-center gap-2 transition-all active:scale-95"
+                                                                            >
+                                                                                <Sparkles className="w-3.5 h-3.5" /> DERİNLEŞ
+                                                                            </button>
+                                                                        )}
+                                                                        {idx === currentQuestionIndex && (
+                                                                            <button
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    setIsTypeSelected(false);
+                                                                                }}
+                                                                                className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 text-[9px] font-black text-white/40 uppercase flex items-center gap-2 transition-all active:scale-95"
+                                                                            >
+                                                                                <RefreshCw className="w-3.5 h-3.5" /> SET DEĞİŞTİR
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+
+                                                                    <div className="flex-shrink-0">
+                                                                        {q.visibleToCandidate ? (
+                                                                            <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 text-emerald-400 rounded-xl border border-emerald-500/20 text-[8px] font-black uppercase italic tracking-widest">
+                                                                                <CheckCircle2 className="w-3 h-3" /> ADAYDA YAYINDA
+                                                                            </div>
+                                                                        ) : (
+                                                                            <button
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    const updated = [...questions];
+                                                                                    updated[idx] = { ...updated[idx], visibleToCandidate: true };
+                                                                                    setQuestions(updated);
+                                                                                    persistSessionData({ questions: updated });
+                                                                                }}
+                                                                                className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-emerald-500 transition-all shadow-xl shadow-emerald-900/40 flex items-center gap-2 italic active:scale-95"
+                                                                            >
+                                                                                <Send className="w-3.5 h-3.5" /> ADAYA GÖNDER
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </section>
+                            {/* COMPACT TRANSCRIPT PANEL */}
+                            <section className="bg-[#0F172A] rounded-2xl border border-white/5 h-[35%] min-h-[180px] flex flex-col p-4 shadow-xl">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="text-[10px] font-black text-white/40 uppercase tracking-widest italic">Live Transcript</h3>
+                                    <div className="flex items-center gap-2">
+                                        {!isRecording && isMicOn && (
+                                            <button 
+                                                onClick={() => {
+                                                    try { recognitionRef.current?.start(); } catch(e) {}
+                                                }}
+                                                className="text-[7px] font-black text-blue-400 uppercase tracking-widest border border-blue-500/30 px-2 py-0.5 rounded hover:bg-blue-500/10 transition-colors"
+                                            >
+                                                Yeniden Başlat
+                                            </button>
+                                        )}
+                                        <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-500/10 rounded">
+                                            <div className={`w-1 h-1 rounded-full ${isRecording ? 'bg-emerald-500 animate-pulse' : 'bg-slate-500'}`} />
+                                            <span className={`text-[8px] font-black uppercase tracking-widest ${isRecording ? 'text-emerald-500' : 'text-slate-500'}`}>
+                                                {isRecording ? 'Active' : 'Standby'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar italic" ref={transcriptRef}>
+                                    {transcript.length === 0 && (
+                                        <div className="h-full flex flex-col items-center justify-center opacity-20 py-4">
+                                            <MessageSquare className="w-6 h-6 mb-2" />
+                                            <p className="text-[9px] font-black uppercase tracking-widest">Konuşmalar burada görünecek</p>
+                                        </div>
+                                    )}
+                                    {transcript.slice(-10).map((line, idx) => (
+                                        <div key={idx} className={`p-2.5 rounded-xl border ${line.role === 'ADAY' ? 'bg-white/2 border-white/5' : 'bg-blue-500/5 border-blue-500/10 ml-4'}`}>
+                                            <div className="flex items-center justify-between mb-1">
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`text-[7px] font-black uppercase tracking-widest ${line.role === 'ADAY' ? 'text-blue-400' : 'text-blue-200'}`}>{line.role}</span>
+                                                    {line.confidence < 70 && <AlertCircle className="w-2.5 h-2.5 text-orange-500/50" title="Düşük Güvenlikli Tanıma" />}
                                                 </div>
-                                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Soru</span>
-                                           </div>
-                                           <p className="text-[14px] font-black text-[#0F172A] italic tracking-tight leading-snug">"{q.text}"</p>
-                                      </div>
-                                  ))}
-                             </div>
-                             <div className="mt-8 p-6 bg-slate-950 rounded-[2.5rem] text-white flex items-center justify-between">
-                                 <div>
-                                     <p className="text-[9px] font-black text-slate-500 uppercase mb-1">Kalan Süre</p>
-                                     <p className="text-xl font-black italic tracking-tighter">24:15</p>
-                                 </div>
-                                 <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center">
-                                     <Zap className="w-6 h-6 text-emerald-400 animate-pulse" />
-                                 </div>
-                             </div>
-                        </section>
+                                                <span className="text-[7px] text-white/20 font-mono tracking-tighter tabular-nums">{line.time}</span>
+                                            </div>
+                                            <p className="text-[10px] font-bold text-white/80 leading-relaxed font-inter">{line.text}</p>
+                                        </div>
+                                    ))}
+                                    {isRecording && (
+                                        <div className="flex items-center gap-2 p-2 opacity-30">
+                                            <div className="flex items-center gap-0.5">
+                                                <div className="w-0.5 h-2 bg-blue-500 animate-[bounce_0.8s_infinite_0ms]" />
+                                                <div className="w-0.5 h-3 bg-blue-500 animate-[bounce_0.8s_infinite_100ms]" />
+                                                <div className="w-0.5 h-1.5 bg-blue-500 animate-[bounce_0.8s_infinite_200ms]" />
+                                            </div>
+                                            <span className="text-[8px] font-bold text-white/40 italic tracking-wider">Ses bekleniyor...</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </section>
+                        </div>
+
+                        {/* CENTER: MAIN VIDEO AREA */}
+                        <div className="flex-1 bg-[#0F172A] rounded-3xl relative overflow-hidden shadow-2xl border border-white/10 group/video">
+                            <div className="absolute inset-0 bg-[#07090F] flex items-center justify-center">
+                                {(stream || !isRecruiter) ? (
+                                    <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover scale-x-[-1] opacity-60" />
+                                ) : (
+                                    <div className="w-32 h-32 rounded-full bg-white/5 flex items-center justify-center border border-white/10 animate-pulse">
+                                        <User className="w-12 h-12 text-white/10" />
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* FLOATING CONTROLS */}
+                            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-3 z-30 bg-[#1E293B]/90 backdrop-blur-3xl px-6 py-4 rounded-2xl border border-white/20 shadow-2xl transition-all hover:scale-105">
+                                <button onClick={() => setIsMicOn(!isMicOn)} className={"w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer " + (isMicOn ? 'bg-white/5 text-white hover:bg-white/10 border border-white/5' : 'bg-red-500 text-white')}>
+                                    {isMicOn ? <Mic className="w-4.5 h-4.5" /> : <MicOff className="w-4.5 h-4.5" />}
+                                </button>
+                                <button onClick={() => setIsVideoOn(!isVideoOn)} className={"w-14 h-12 rounded-xl flex items-center justify-center transition-all cursor-pointer " + (isVideoOn ? 'bg-blue-600 text-white shadow-lg border border-blue-400' : 'bg-red-500 text-white')}>
+                                    {isVideoOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
+                                </button>
+                                <button className="w-11 h-11 rounded-xl bg-white/5 text-white flex items-center justify-center hover:bg-white/10 transition-all cursor-pointer border border-white/5">
+                                    <Monitor className="w-4.5 h-4.5" />
+                                </button>
+                                <div className="h-6 w-px bg-white/10 mx-1" />
+                                <button
+                                    onClick={handleFinishInterview}
+                                    className="px-6 h-11 rounded-xl bg-emerald-600 text-white flex items-center justify-center gap-2.5 hover:bg-emerald-700 transition-all cursor-pointer shadow-lg shadow-emerald-900/40 font-black text-[10px] uppercase tracking-widest italic"
+                                >
+                                    <CheckCircle2 className="w-4 h-4" /> MÜLAKATI TAMAMLA
+                                </button>
+                                <button
+                                    onClick={() => navigate('/')}
+                                    className="w-11 h-11 rounded-xl bg-red-600 text-white flex items-center justify-center hover:bg-red-700 transition-all cursor-pointer shadow-red-900/20"
+                                    title="Mülakatı Kapat"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            {/* SMALL PIP FOR RECRUITER */}
+                            {stream && (
+                                <div className="absolute top-6 right-6 w-32 aspect-video bg-black rounded-xl overflow-hidden border-2 border-white/10 shadow-2xl z-40">
+                                    <video ref={pipVideoRef} autoPlay muted playsInline className="w-full h-full object-cover scale-x-[-1]" />
+                                </div>
+                            )}
+                        </div>
+
+                        {/* RIGHT SIDEBAR: ANALYTICS & INSIGHT */}
+                        <div className="w-[280px] flex flex-col gap-2 shrink-0 overflow-hidden h-full">
+                            <section className="bg-[#0F172A] rounded-2xl p-5 border border-white/5 shadow-xl flex flex-col gap-4">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+                                        <h3 className="text-[10px] font-black text-white/40 uppercase tracking-widest italic">Analytical Insight</h3>
+                                    </div>
+                                    <div className="px-2 py-0.5 bg-blue-600/20 text-blue-400 border border-blue-500/20 rounded text-[7px] font-black uppercase">REAL-TIME</div>
+                                </div>
+
+                                <div className="h-44 relative flex items-center justify-center my-2">
+                                    <svg viewBox="0 0 100 100" className="w-36 h-36 transform rotate-[-18deg]">
+                                        {[20, 40, 60, 80, 100].map(r => (
+                                            <circle key={r} cx="50" cy="50" r={r / 2} fill="none" stroke="white" strokeWidth="0.5" opacity="0.03" />
+                                        ))}
+                                        {[0, 72, 144, 216, 288].map(angle => (
+                                            <line key={angle} x1="50" y1="50" x2={50 + 50 * Math.cos(angle * Math.PI / 180)} y2={50 + 50 * Math.sin(angle * Math.PI / 180)} stroke="white" strokeWidth="0.5" opacity="0.05" />
+                                        ))}
+                                        <polygon
+                                            points={[
+                                                starScores.technical,
+                                                starScores.communication,
+                                                starScores.problemSolving,
+                                                starScores.cultureFit,
+                                                starScores.adaptability
+                                            ].map((val, i) => {
+                                                const angle = i * 72;
+                                                const r = val / 2;
+                                                return `${50 + r * Math.cos(angle * Math.PI / 180)},${50 + r * Math.sin(angle * Math.PI / 180)}`;
+                                            }).join(' ')}
+                                            fill="rgba(59, 130, 246, 0.15)"
+                                            stroke="#3B82F6"
+                                            strokeWidth="1.5"
+                                        />
+                                    </svg>
+
+                                    <div className="absolute inset-0 text-[6px] font-black text-white/30 uppercase pointer-events-none italic">
+                                        <span className="absolute top-0 left-1/2 -translate-x-1/2">Technical</span>
+                                        <span className="absolute top-[35%] right-2 -translate-x-full">Communication</span>
+                                        <span className="absolute bottom-5 right-6 -translate-x-full">Problem Solving</span>
+                                        <span className="absolute bottom-5 left-8">Culture Fit</span>
+                                        <span className="absolute top-[35%] left-2">Adaptability</span>
+                                    </div>
+                                </div>
+
+                                <div className="bg-[#1E293B] rounded-xl p-4 border border-white/10 shadow-inner relative group/brief">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-1.5 h-4 bg-blue-500 rounded-full" />
+                                            <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest italic">AI Coach Brief</p>
+                                        </div>
+                                        {coachGenerating && <Loader2 className="w-3 h-3 text-blue-400 animate-spin" />}
+                                    </div>
+                                    <div className="relative">
+                                        <p className="text-[11px] font-bold text-white/90 leading-relaxed italic border-l-2 border-blue-500/50 pl-3">
+                                            {suggestedQuestion ? suggestedQuestion.question : "Soru havuzunu kullanarak başlayabilir veya 'Derinleş' butonu ile yapay zekadan özel soru talep edebilirsiniz."}
+                                        </p>
+                                        
+                                        {suggestedQuestion && (
+                                            <div className="flex flex-col gap-2 mt-4">
+                                                <button
+                                                    onClick={() => {
+                                                        const newQ = {
+                                                            id: questions.length + 1,
+                                                            text: suggestedQuestion.question,
+                                                            category: 'AI / Follow-up',
+                                                            status: 'pending',
+                                                            visibleToCandidate: true
+                                                        };
+                                                        const updated = [...questions, newQ];
+                                                        setQuestions(updated);
+                                                        persistSessionData({ 
+                                                            questions: updated, 
+                                                            currentQuestionIndex: updated.length - 1 
+                                                        });
+                                                        setCurrentQuestionIndex(updated.length - 1);
+                                                        setSuggestedQuestion(null);
+                                                    }}
+                                                    className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[9px] font-black uppercase tracking-widest transition-all shadow-lg shadow-blue-900/40 flex items-center justify-center gap-2 animate-in slide-in-from-bottom-2 duration-300"
+                                                >
+                                                    <Send className="w-3.5 h-3.5" /> Adaya Sor ve Akışa Ekle
+                                                </button>
+                                                
+                                                <button 
+                                                    onClick={() => setSuggestedQuestion(null)}
+                                                    className="w-full py-2 bg-white/5 hover:bg-white/10 text-white/40 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+                                                >
+                                                    Yoksay
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </section>
+
+                            {/* DYNAMIC LOGIC METER */}
+                            <section className="bg-[#0F172A] rounded-2xl border border-white/5 p-4 flex flex-col gap-3 shadow-xl">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[8px] font-black text-white/30 uppercase tracking-[0.2em] italic">Logic Integrity</span>
+                                    <span className="text-[10px] font-black text-blue-500 tabular-nums italic">%{logicIntegrity}</span>
+                                </div>
+                                <div className="h-1.5 bg-white/5 rounded-full overflow-hidden p-px">
+                                    <div className="h-full bg-gradient-to-r from-blue-600 to-indigo-600 transition-all duration-700 rounded-full" style={{ width: `${logicIntegrity}%` }} />
+                                </div>
+                            </section>
+                        </div>
+                    </>
+                ) : (
+                    // CANDIDATE VIEW (Clean and focused)
+                    <div className="flex-1 flex gap-4 overflow-hidden animate-in fade-in duration-700">
+                        {/* Main Stage: Recruiter View (Mock) */}
+                        <div className="flex-1 bg-[#0F172A] rounded-[2.5rem] relative overflow-hidden shadow-2xl border border-white/10 group/stage">
+                            {/* Recruiter Feed Placeholder */}
+                            <div className="absolute inset-0 bg-slate-950 flex items-center justify-center">
+                                    {isVideoOn && stream ? (
+                                        <video 
+                                            ref={videoRef} 
+                                            autoPlay 
+                                            muted 
+                                            playsInline 
+                                            className="w-full h-full object-cover opacity-80" 
+                                        />
+                                    ) : (
+                                        <div className="flex flex-col items-center gap-6 z-10 animate-in fade-in zoom-in duration-700">
+                                            <div className="w-32 h-32 rounded-full border-4 border-blue-500/20 p-2 bg-slate-900/50 backdrop-blur-xl flex items-center justify-center">
+                                                <User className="w-12 h-12 text-blue-400 opacity-20" />
+                                            </div>
+                                            <div className="flex flex-col items-center gap-2">
+                                                <h4 className="text-xl font-black text-white italic uppercase tracking-tighter">Mülakatçı Bekleniyor</h4>
+                                                <div className="flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full border border-white/10">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                                    <span className="text-[9px] font-black text-white/40 uppercase tracking-widest">Bağlantı Bekleniyor...</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                    <div className="absolute inset-0 bg-gradient-to-t from-[#0F172A] via-transparent to-transparent opacity-60" />
+                                </div>
+
+                            {/* Candidate PiP (Own feed) */}
+                            <div className="absolute bottom-6 right-6 w-[220px] aspect-video bg-black rounded-2xl overflow-hidden border-2 border-white/20 shadow-2xl z-20 group-hover/stage:scale-105 transition-transform duration-500">
+                                {isVideoOn && stream ? (
+                                    <video ref={pipVideoRef} autoPlay muted playsInline className="w-full h-full object-cover scale-x-[-1]" />
+                                ) : (
+                                    <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-zinc-950">
+                                        <VideoOff className="w-6 h-6 text-white/10" />
+                                        <span className="text-[8px] font-black text-white/20 uppercase">Kamera Kapalı</span>
+                                    </div>
+                                )}
+                                <div className="absolute top-2 left-2 px-2 py-0.5 bg-black/40 backdrop-blur-md rounded text-[8px] font-black text-white uppercase border border-white/5">SİZ</div>
+                                <div className="absolute bottom-2 right-2 flex items-center gap-1">
+                                    <div className="w-0.5 h-1.5 bg-emerald-500 rounded-full" />
+                                    <div className="w-0.5 h-2.5 bg-emerald-500 rounded-full" />
+                                    <div className="w-0.5 h-3.5 bg-emerald-500 rounded-full" />
+                                </div>
+                            </div>
+
+                            {/* Controls Overlay */}
+                            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-4 z-30 bg-[#1E293B]/80 backdrop-blur-2xl px-6 py-4 rounded-2xl border border-white/10 shadow-2xl">
+                                <button onClick={() => setIsMicOn(!isMicOn)} className={"w-12 h-12 rounded-xl flex items-center justify-center transition-all " + (isMicOn ? 'bg-white/10 text-white' : 'bg-red-500 text-white')}>
+                                    {isMicOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+                                </button>
+                                <button onClick={() => setIsVideoOn(!isVideoOn)} className={"w-12 h-12 rounded-xl flex items-center justify-center transition-all " + (isVideoOn ? 'bg-white/10 text-white' : 'bg-red-500 text-white')}>
+                                    {isVideoOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
+                                </button>
+                                <div className="w-px h-8 bg-white/10 mx-2" />
+                                <button 
+                                    onClick={async () => {
+                                        if(window.confirm("Görüşmeden ayrılmak istediğinize emin misiniz?")) {
+                                            if (user?.isAnonymous) {
+                                                await logout();
+                                            }
+                                            navigate('/exit');
+                                        }
+                                    }}
+                                    className="px-6 h-12 bg-white/10 hover:bg-white/20 text-white rounded-xl font-black text-[11px] uppercase tracking-widest transition-all"
+                                >
+                                    AYRIL
+                                </button>
+                                <button 
+                                    onClick={handleFinishInterview}
+                                    className="px-6 h-12 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-[11px] uppercase tracking-widest transition-all shadow-xl shadow-emerald-500/20"
+                                >
+                                    TAMAMLA
+                                </button>
+                            </div>
+
+                            {/* Indicator */}
+                            <div className="absolute top-8 left-8 flex items-center gap-3">
+                                <div className="px-4 py-2 bg-rose-600 rounded-xl flex items-center gap-2.5 shadow-xl border border-rose-500">
+                                    <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                                    <span className="text-[10px] font-black text-white uppercase tracking-widest italic">Mülakat CANLI</span>
+                                </div>
+                                <div className="px-3 py-2 bg-white/5 backdrop-blur-md rounded-xl border border-white/10 flex items-center gap-2">
+                                    <Activity className="w-3 h-3 text-emerald-400" />
+                                    <span className="text-[8px] font-black text-white/60 uppercase tracking-widest">Sinyal Güçlü</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Side Panel: Context (Questions) */}
+                        <div className="w-[340px] flex flex-col gap-4">
+                            <section className="bg-white rounded-[2.5rem] border border-slate-200 flex-1 flex flex-col overflow-hidden shadow-2xl p-8">
+                                <div className="flex items-center gap-3 mb-8">
+                                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
+                                        <MessageSquare className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-sm font-black text-[#0F172A] tracking-tighter italic uppercase">Mülakat Akışı</h3>
+                                        <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Soru Bilgilendirme</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex-1 overflow-y-auto space-y-4 pr-1 custom-scrollbar italic">
+                                    {questions.filter(q => q.visibleToCandidate).length === 0 ? (
+                                        <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-40">
+                                            <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mb-4">
+                                                <Info className="w-8 h-8 text-slate-400" />
+                                            </div>
+                                            <p className="text-sm font-bold text-slate-500 uppercase tracking-widest italic">Mülakat Başlatıldı</p>
+                                            <p className="text-[10px] font-medium text-slate-400 mt-2">Mülakatçı soruyu paylaştığında burada görünecektir.</p>
+                                        </div>
+                                    ) : (
+                                        questions.filter(q => q.visibleToCandidate).map((q, idx) => {
+                                            const originalIndex = questions.indexOf(q);
+                                            const isLastShared = originalIndex === Math.max(...questions.filter(qu => qu.visibleToCandidate).map(qu => questions.indexOf(qu)));
+                                            
+                                            return (
+                                                <div key={idx} className={"p-6 rounded-3xl border transition-all duration-700 " + (isLastShared ? 'border-blue-500 bg-blue-50/50 shadow-lg scale-[1.02]' : 'opacity-40 border-slate-100 grayscale scale-[0.98]')}>
+                                                    <div className="flex items-center gap-3 mb-3">
+                                                        <div className={"w-6 h-6 rounded-xl flex items-center justify-center text-[10px] font-black " + (isLastShared ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-500')}>
+                                                            {originalIndex + 1}
+                                                        </div>
+                                                        <span className={`text-[9px] font-black uppercase tracking-widest ${isLastShared ? 'text-blue-600' : 'text-slate-400'}`}>
+                                                            {isLastShared ? 'Aktif Soru' : 'Tamamlandı'}
+                                                        </span>
+                                                    </div>
+                                                    <p className={`text-[15px] font-bold italic leading-snug ${isLastShared ? 'text-[#0F172A]' : 'text-slate-400'}`}>"{q.text}"</p>
+                                                </div>
+                                            );
+                                        })
+                                    )}
+                                </div>
+                                
+                                <div className="mt-8 p-6 bg-[#0F172A] rounded-3xl text-white shadow-2xl relative overflow-hidden group/footer">
+                                    <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl -mr-16 -mt-16" />
+                                    <div className="flex items-center justify-between relative z-10">
+                                        <div>
+                                            <p className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-1">Kalan Süre (Tahmini)</p>
+                                            <p className="text-2xl font-black italic tracking-tighter tabular-nums">18:45</p>
+                                        </div>
+                                        <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center border border-white/10">
+                                            <Clock className="w-6 h-6 text-blue-400 animate-pulse" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+                        </div>
                     </div>
                 )}
             </div>
 
             {showSettings && (
-                <div className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-3xl flex items-center justify-center p-8">
-                    <div className="bg-white w-full max-w-2xl rounded-[4rem] p-12 shadow-2xl border border-white/20">
-                        <div className="flex items-center justify-between mb-10">
-                            <h2 className="text-3xl font-black text-[#0F172A] italic uppercase tracking-tighter">Cihaz Ayarları</h2>
-                            <button onClick={() => setShowSettings(false)} className="w-14 h-14 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center hover:bg-black hover:text-white transition-all">
-                                <X className="w-6 h-6" />
+                <div className="fixed inset-0 z-[300] bg-black/95 backdrop-blur-3xl flex items-center justify-center p-6">
+                    <div className="bg-[#141C2D] w-full max-w-xl rounded-[2.5rem] p-10 shadow-2xl border border-white/10">
+                        <div className="flex items-center justify-between mb-8">
+                            <h2 className="text-2xl font-black text-white italic uppercase tracking-tighter italic">Cihaz Ayarları</h2>
+                            <button onClick={() => setShowSettings(false)} className="w-10 h-10 rounded-xl bg-white/5 text-white/40 flex items-center justify-center hover:bg-white/10 hover:text-white transition-all">
+                                <X className="w-5 h-5" />
                             </button>
                         </div>
-                        <div className="space-y-8">
-                            <div className="space-y-4">
-                                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest pl-4">Kamera Seçimi</label>
-                                <select className="w-full h-16 bg-slate-50 border border-slate-200 rounded-3xl px-8 font-bold italic outline-none focus:border-blue-600 transition-all appearance-none cursor-pointer">
-                                    {devices.filter(d => d.kind === 'videoinput').map(d => (
-                                        <option key={d.deviceId} value={d.deviceId}>{d.label || `Kamera ${d.deviceId.slice(0,5)}`}</option>
+                        <div className="space-y-6">
+                            <div className="space-y-3">
+                                <label className="text-[10px] font-black text-white/40 uppercase tracking-widest px-2 italic">Kamera</label>
+                                <select className="w-full h-14 bg-[#0B0F19] border border-white/5 rounded-2xl px-6 font-bold italic text-white/80 outline-none focus:border-blue-500 transition-all appearance-none cursor-pointer">
+                                    {(devices.video || []).map(d => (
+                                        <option key={d.deviceId} value={d.deviceId}>{d.label || `Kamera ${d.deviceId.slice(0, 5)}`}</option>
                                     ))}
                                 </select>
                             </div>
-                            <div className="space-y-4">
-                                <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest pl-4">Mikrofon Seçimi</label>
-                                <select className="w-full h-16 bg-slate-50 border border-slate-200 rounded-3xl px-8 font-bold italic outline-none focus:border-blue-600 transition-all appearance-none cursor-pointer">
-                                    {devices.filter(d => d.kind === 'audioinput').map(d => (
-                                        <option key={d.deviceId} value={d.deviceId}>{d.label || `Mikrofon ${d.deviceId.slice(0,5)}`}</option>
+                            <div className="space-y-3">
+                                <label className="text-[10px] font-black text-white/40 uppercase tracking-widest px-2 italic">Mikrofon</label>
+                                <select className="w-full h-14 bg-[#0B0F19] border border-white/5 rounded-2xl px-6 font-bold italic text-white/80 outline-none focus:border-blue-500 transition-all appearance-none cursor-pointer">
+                                    {(devices.audio || []).map(d => (
+                                        <option key={d.deviceId} value={d.deviceId}>{d.label || `Mikrofon ${d.deviceId.slice(0, 5)}`}</option>
                                     ))}
                                 </select>
                             </div>
                         </div>
-                        <button onClick={() => setShowSettings(false)} className="w-full h-20 rounded-[2.5rem] bg-blue-600 hover:bg-blue-700 text-white font-black text-lg mt-12 transition-all shadow-xl shadow-blue-500/20 italic">
+                        <button onClick={() => setShowSettings(false)} className="w-full h-14 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black text-[11px] tracking-widest uppercase mt-8 transition-all shadow-xl shadow-blue-500/20 italic">
                             AYARLARI KAYDET
                         </button>
                     </div>
@@ -855,5 +1865,5 @@ export default function LiveInterviewPage() {
             )}
         </div>
     );
-};
+}
 

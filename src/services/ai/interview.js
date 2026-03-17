@@ -22,32 +22,32 @@ export async function generateInterviewQuestions(candidate, starAnalysis, interv
     }
 }
 
-export async function generateInterviewPaths(candidate, interviewType = 'comprehensive') {
+export async function generateInterviewPaths(candidate, interviewType = 'technical') {
     const typeContexts = {
-        technical: "Uzmanlık Lead personasıyla, mimari, derin bilgi, problem çözme ve saha tecrübesine odaklan.",
-        product: "Product Manager personasıyla, sadece ürün vizyonu, kullanıcı deneyimi (UX), önceliklendirme, metrikler ve iş değerine odaklan.",
-        culture: "İK Direktörü personasıyla, iletişim becerileri, ekip uyumu, çatışma yönetimi ve şirket değerlerine odaklan.",
-        comprehensive: "Üç farklı mülakat türünü harmanla: 1. Teknik Seçimler ve Derinlik, 2. Ürün Vizyonu ve Kullanıcı Odaklılık, 3. Kurum Kültürü ve Değerler."
+        technical: "Teknik Kültür / Mühendislik Lead personasıyla, mimari, derin teknik bilgi, problem çözme ve saha tecrübesine odaklan.",
+        product: "Product Manager personasıyla, ürün vizyonu, kullanıcı deneyimi (UX), önceliklendirme, metrikler ve iş değerine odaklan.",
+        culture: "İK Direktörü personasıyla, iletişim becerileri, ekip uyumu, çatışma yönetimi ve şirket değerlerine odaklan."
     };
 
-    const instruction = `Sen kıdemli bir mülakat stratejistisin. Aday için 3 farklı mülakat rotası hazırla.
-    Tür: ${interviewType.toUpperCase()}. 
-    Odak Noktası: ${typeContexts[interviewType] || typeContexts.comprehensive}
+    const instruction = `Sen kıdemli bir mülakat stratejistisin. Aday için tam olarak 3 farklı mülakat soru seti (rota) hazırla.
+    Seçilen Mülakat Türü: ${interviewType.toUpperCase()}. 
+    Odak Noktası: ${typeContexts[interviewType] || typeContexts.technical}
     
-    ÖNEMLİ: Eğer mülakat türü COMPREHENSIVE ise, 'paths' dizisindeki:
-    - 1. rota TEKNİK (konuşulan teknolojiler, mimari tercihler), 
-    - 2. rota ÜRÜN (feedback döngüleri, metrikler, vizyon), 
-    - 3. rota KURUM KÜLTÜRÜ (iletişim, problem çözme kültürü, uyum) odaklı olmalıdır.
-    
-    Her rota için adayın CV'sindeki ${candidate.experience} yıllık tecrübesine uygun, gerçekçi ve derinlemesine 4 adet soru ekle.
+    KURALLAR:
+    1. Her set (path) tam olarak 3 adet soru içermelidir. Toplam 9 benzersiz soru hazırlanmalıdır.
+    2. Her soru adayın CV'sindeki ${candidate.experience} yıllık tecrübesine ve başvurduğu ${candidate.position} pozisyonuna doğrudan atıfta bulunmalıdır.
+    3. Sorular 'Deneyimlerine göre...', 'CV'nde bahsettiğin X projesinde...' gibi kişiselleştirilmiş başlamalıdır.
+    4. 1. Set: Isınma ve Temel Yetkinlikler (Mevcut CV verileri üzerinden).
+    5. 2. Set: Derinlemesine Sorgulama ve Teknik/Ürün Senaryoları.
+    6. 3. Set: Zorlayıcı Durumlar, Mimari Kararlar veya Vizyon.
     
     JSON formatında tam olarak şu yapıda dön:
     { 
       "paths": [
         { 
-          "id": "p1", 
-          "title": "Rota Başlığı", 
-          "description": "Rota Açıklaması", 
+          "id": "set1", 
+          "title": "Set Başlığı", 
+          "description": "Bu setin mülakattaki amacı", 
           "icon": "zap", 
           "questions": [
             { "question": "Soru metni", "category": "Kategori", "evaluationHint": "Değerlendirme ipucu" }
@@ -56,7 +56,7 @@ export async function generateInterviewPaths(candidate, interviewType = 'compreh
       ] 
     }
     
-    ÖNEMLİ: icon alanı 1. rota için "code" veya "zap", 2. rota için "target", 3. rota için "users" olmalıdır.`;
+    ÖNEMLİ: icon alanı "zap", "target", "users", "code", "brain", "activity" gibi Lucide ikon adları olabilir.`;
 
     const prompt = buildStructuredPrompt(instruction, {
         "TARGET_POSITION": candidate.matchedPositionTitle || candidate.position,
@@ -67,14 +67,17 @@ export async function generateInterviewPaths(candidate, interviewType = 'compreh
         const model = await getModel();
         const result = await model.generateContent(prompt);
         const parsed = parseAIJson(result.response.text(), { paths: [] });
-        const paths = parsed.paths || (Array.isArray(parsed) ? parsed : []);
+        let paths = parsed.paths || (Array.isArray(parsed) ? parsed : []);
 
+        // Ensure we have 3 paths
+        if (paths.length > 3) paths = paths.slice(0, 3);
+        
         const finalPaths = paths.map((p, i) => ({
-            id: p.id || `p${i}`,
-            title: p.title || 'Mülakat Rotası',
+            id: p.id || `set${i + 1}`,
+            title: p.title || `Set ${i + 1}`,
             description: p.description || 'Aday değerlendirme süreci',
-            icon: p.icon || 'target',
-            questions: (p.questions || []).map(q =>
+            icon: p.icon || (i === 0 ? 'zap' : i === 1 ? 'target' : 'users'),
+            questions: (p.questions || []).slice(0, 3).map(q =>
                 typeof q === 'string' ? { question: q, category: 'Genel' } :
                     { ...q, question: q.question || q.text || 'Soru bulunamadı' }
             )
@@ -85,14 +88,14 @@ export async function generateInterviewPaths(candidate, interviewType = 'compreh
     } catch (e) {
         console.error("Interview paths error:", e);
         return [{
-            id: 'default',
-            title: 'Genel Tanışma ve Değerlendirme',
-            description: 'Adayın genel yetkinliklerini ve deneyimini anlamaya yönelik standart rota.',
-            icon: 'users',
+            id: 'set1',
+            title: 'Hızlı Başlangıç Seti',
+            description: 'Adayın temel yetkinliklerini anlamaya yönelik hazır set.',
+            icon: 'zap',
             questions: [
-                { question: "Kariyer yolculuğunuzdan ve son dönemdeki projelerinizden bahseder misiniz?", category: "Deneyim" },
-                { question: "Sizi bu pozisyon için en güçlü aday yapan özellikleriniz nelerdir?", category: "Yetkinlik" },
-                { question: "Gelecek 2-3 yıl için kariyer hedefleriniz nelerdir?", category: "Vizyon" }
+                { question: "Mevcut tecrübelerinizden ve projelerinizden bahseder misiniz?", category: "Deneyim" },
+                { question: "CV'nizde bahsettiğiniz teknik araçları bu pozisyonda nasıl kullanırsınız?", category: "Yetkinlik" },
+                { question: "Ekip çalışması ve problem çözme yaklaşımınız nasıldır?", category: "Kültür" }
             ]
         }];
     }

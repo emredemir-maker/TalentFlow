@@ -1,5 +1,6 @@
 // src/pages/Dashboard.jsx
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
 import Header from '../components/Header';
@@ -36,11 +37,18 @@ export default function Dashboard() {
 
     const funnelData = useMemo(() => {
         const byStatus = stats.byStatus || {};
+        
+        // Accurate counts based on candidate statuses
         const hiredCount = byStatus.hired || 0;
         const offerCount = (byStatus.offer || 0) + hiredCount;
-        const interviewCount = (byStatus.interview || 0) + offerCount;
-        const reviewCount = (byStatus.review || 0) + interviewCount;
-        const analyzedCount = candidates.filter(c => (c.bestScore || 0) >= 1).length;
+        const interviewCount = (byStatus.interview || 0) + 
+                               (byStatus.Interview || 0) + 
+                               (byStatus.mülakat || 0) + offerCount;
+        const reviewCount = (byStatus.review || 0) + 
+                            (byStatus.Review || 0) + 
+                            (byStatus.değerlendirme || 0) + interviewCount;
+        
+        const analyzedCount = candidates.filter(c => c.aiAnalysis || c.cvSummary || (c.bestScore || 0) > 0).length;
         const aiScreenedCount = Math.max(analyzedCount, reviewCount);
 
         return [
@@ -52,33 +60,73 @@ export default function Dashboard() {
         ];
     }, [stats, candidates]);
 
-    const todayInterviews = useMemo(() => {
-        return candidates
-            .filter(c => c.hasInterview)
-            .map(c => ({
-                id: c.id,
-                name: c.name,
-                role: c.position,
-                time: c.interviewSessions?.[0]?.time || '10:00 AM'
-            }))
-            .slice(0, 4);
+    const weeklyPlan = useMemo(() => {
+        const now = new Date();
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const endOfWeek = new Date(startOfToday.getTime() + 7 * 24 * 60 * 60 * 1000);
+        
+        const sessionsMap = new Map(); // Use map to prevent duplicates for same candidate + time
+        
+        candidates.forEach(c => {
+            if (c.interviewSessions && Array.isArray(c.interviewSessions)) {
+                c.interviewSessions.forEach(s => {
+                    if (s.status === 'cancelled') return; // Skip cancelled sessions in weekly plan
+
+                    const sessionDatePart = s.date ? s.date.split('T')[0] : '';
+                    const sessionDate = new Date(sessionDatePart);
+                    const isLive = s.status === 'live';
+                    
+                    if (isLive || (sessionDate >= startOfToday && sessionDate <= endOfWeek)) {
+                        const key = `${c.id}-${sessionDatePart}-${s.time}`;
+                        const sessionData = {
+                            id: s.id,
+                            candidateId: c.id,
+                            name: c.name,
+                            role: c.position || c.bestTitle || 'Aday',
+                            time: s.time || '10:00',
+                            date: sessionDatePart,
+                            status: s.status,
+                            score: c.combinedScore || c.bestScore || 0,
+                            skills: c.skills?.slice(0, 2) || []
+                        };
+
+                        // If already exists, prefer live/completed over scheduled
+                        if (!sessionsMap.has(key) || s.status === 'live' || s.status === 'completed') {
+                            sessionsMap.set(key, sessionData);
+                        }
+                    }
+                });
+            }
+        });
+        
+        const sessions = Array.from(sessionsMap.values());
+        
+        return sessions.sort((a, b) => {
+            if (a.status === 'live' && b.status !== 'live') return -1;
+            if (b.status === 'live' && a.status !== 'live') return 1;
+            if (a.date !== b.date) return a.date.localeCompare(b.date);
+            return a.time.localeCompare(b.time);
+        }).slice(0, 5);
     }, [candidates]);
 
-    const dynamicMetrics = useMemo(() => {
-        const analyzedCount = candidates.filter(c => c.aiAnalysis || c.cvSummary).length;
-        const avgMatchArr = candidates.filter(c => (c.combinedScore || 0) > 0);
-        const avgMatch = avgMatchArr.length > 0 
-            ? Math.round(avgMatchArr.reduce((acc, curr) => acc + (curr.combinedScore || 0), 0) / avgMatchArr.length)
-            : 94;
+    const navigate = useNavigate();
 
-        const totalRoi = analyzedCount * 50 + (stats.byStatus?.interview || 0) * 150;
-        const hoursSaved = Math.round((analyzedCount * 45 + (stats.byStatus?.interview || 0) * 90) / 60);
+    const dynamicMetrics = useMemo(() => {
+        const analyzedCount = candidates.filter(c => c.aiAnalysis || c.cvSummary || (Number(c.bestScore) || 0) > 0).length;
+        const avgMatchArr = candidates.filter(c => (Number(c.bestScore) || 0) > 0);
+        const avgMatch = avgMatchArr.length > 0 
+            ? Math.round(avgMatchArr.reduce((acc, curr) => acc + (Number(curr.bestScore) || 0), 0) / avgMatchArr.length)
+            : 88;
+
+        const ivCount = (stats.byStatus?.interview || 0) + (stats.byStatus?.Interview || 0) + (stats.byStatus?.mülakat || 0) + (stats.byStatus?.Mülakat || 0);
+        const totalRoi = analyzedCount * 50 + ivCount * 150;
+        const hoursSaved = Math.round((analyzedCount * 25 + ivCount * 60) / 60);
 
         return {
             avgMatch,
-            roi: (totalRoi || 142500).toLocaleString(),
-            timeSaved: hoursSaved || 480,
-            recruitSpeed: "14.2 Gün"
+            roi: (totalRoi || 42500).toLocaleString(),
+            timeSaved: hoursSaved || 120,
+            recruitSpeed: "12.4 Gün"
         };
     }, [stats, candidates]);
 
@@ -198,27 +246,70 @@ export default function Dashboard() {
                         </div>
                     </div>
 
-                    {/* Agenda List */}
                     <div className="col-span-12 md:col-span-4 bg-white rounded-[20px] p-6 border border-[#E2E8F0] shadow-sm">
-                        <h3 className="text-[12px] font-black text-[#0F172A] uppercase tracking-widest italic mb-5">Günün Ajandası</h3>
+                        <div className="flex items-center justify-between mb-5">
+                            <h3 className="text-[12px] font-black text-[#0F172A] uppercase tracking-widest italic">Haftanın Planı</h3>
+                            <button onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }))} className="text-[9px] font-black text-blue-600 uppercase tracking-widest hover:underline">TÜMÜNÜ GÖR</button>
+                        </div>
                         <div className="space-y-4">
-                            {todayInterviews.map((int, i) => (
-                                <div key={i} className="flex gap-4 items-center group">
-                                    <div className="text-center min-w-[50px]">
-                                        <div className="text-[13px] font-black text-[#0F172A] leading-none mb-0.5">{int.time.split(' ')[0]}</div>
-                                        <div className="text-[8px] font-bold text-[#94A3B8] uppercase">{int.time.split(' ')[1]}</div>
-                                    </div>
-                                    <div className="flex-1 flex items-center justify-between gap-4 py-2 border-b border-[#F1F5F9] group-last:border-0 min-w-0">
-                                        <div className="min-w-0">
-                                            <h4 className="text-[12px] font-bold text-[#0F172A] group-hover:text-blue-600 transition-colors truncate">{int.name}</h4>
-                                            <p className="text-[9px] text-[#64748B] font-bold uppercase tracking-tight truncate">{int.role}</p>
+                            {weeklyPlan.map((int, i) => {
+                                const todayStr = new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0') + '-' + String(new Date().getDate()).padStart(2, '0');
+                                const isToday = int.date === todayStr;
+                                return (
+                                    <div key={i} className="flex gap-4 items-center group relative">
+                                        <div className="text-center min-w-[54px] py-1 px-2 rounded-lg bg-slate-50 border border-slate-100">
+                                            <div className="text-[11px] font-black text-[#0F172A] leading-none mb-0.5">{int.time}</div>
+                                            <div className={`text-[7px] font-bold uppercase ${isToday ? 'text-emerald-500' : 'text-[#94A3B8]'}`}>
+                                                {isToday ? 'BUGÜN' : new Date(int.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
+                                            </div>
                                         </div>
-                                        <button className="h-7 px-3 bg-[#10B981] text-white text-[8px] font-black rounded-md hover:bg-[#059669] transition-all uppercase tracking-widest flex items-center gap-1.5">
-                                            <MessageSquare className="w-3 h-3" /> KATIL
-                                        </button>
+                                        <div className="flex-1 flex items-center justify-between gap-4 py-1 border-b border-[#F1F5F9] group-last:border-0 min-w-0">
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-2">
+                                                    <h4 className="text-[12px] font-bold text-[#0F172A] group-hover:text-blue-600 transition-colors truncate">{int.name}</h4>
+                                                    <span className="text-[9px] font-black text-emerald-500 bg-emerald-50 px-1 rounded">%{int.score}</span>
+                                                    {/* Status Badge */}
+                                                    {int.status === 'live' ? (
+                                                        <span className="text-[7px] font-black bg-rose-50 text-rose-600 px-1.5 py-0.5 rounded border border-rose-100 animate-pulse">CANLI</span>
+                                                    ) : int.status === 'completed' ? (
+                                                        <span className="text-[7px] font-black bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded border border-emerald-100">TAMAMLANDI</span>
+                                                    ) : int.status === 'cancelled' ? (
+                                                        <span className="text-[7px] font-black bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200">İPTAL</span>
+                                                    ) : (
+                                                        <span className="text-[7px] font-black bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100">PLANLANDI</span>
+                                                    )}
+                                                </div>
+                                                <p className="text-[9px] text-[#64748B] font-bold uppercase tracking-tight truncate mb-1">{int.role}</p>
+                                                <div className="flex gap-1">
+                                                    {int.skills.map((s, idx) => (
+                                                        <span key={idx} className="text-[6px] font-black text-slate-400 bg-slate-100 px-1 py-0.5 rounded uppercase">{s}</span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <button 
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (int.status === 'completed') {
+                                                        navigate(`/interview-report/${int.id}`);
+                                                    } else {
+                                                        navigate(`/live-interview/${int.id}`);
+                                                    }
+                                                }}
+                                                className={`h-7 px-3 text-[8px] font-black rounded-lg transition-all uppercase tracking-widest flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95 ${
+                                                    int.status === 'completed' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-[#1E3A8A] hover:bg-blue-800 text-white'
+                                                }`}
+                                            >
+                                                {int.status === 'completed' ? 'RAPOR' : 'GÖRÜNTÜLE'}
+                                            </button>
+                                        </div>
                                     </div>
+                                );
+                            })}
+                            {weeklyPlan.length === 0 && (
+                                <div className="py-10 text-center">
+                                    <p className="text-[10px] font-bold text-slate-300 italic">Planlı mülakat bulunmuyor.</p>
                                 </div>
-                            ))}
+                            )}
                         </div>
                     </div>
 

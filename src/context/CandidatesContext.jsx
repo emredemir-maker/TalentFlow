@@ -5,7 +5,8 @@ console.log("[TalentFlow] CandidatesContext.jsx module load start");
 
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { signInAnonymously } from 'firebase/auth';
+import { db, auth } from '../config/firebase';
 import { useAuth } from './AuthContext';
 
 const CandidatesContext = createContext(null);
@@ -14,7 +15,7 @@ const CandidatesContext = createContext(null);
 const CANDIDATES_COLLECTION = 'artifacts/talent-flow/public/data/candidates';
 
 export function CandidatesProvider({ children }) {
-    const { isAuthenticated, loading: authLoading, isDepartmentUser, userDepartments, role } = useAuth();
+    const { isAuthenticated, loading: authLoading, isDepartmentUser, userDepartments, role, user } = useAuth();
     const [candidates, setCandidates] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -87,55 +88,132 @@ export function CandidatesProvider({ children }) {
 
     useEffect(() => {
         // Rule 3: Do NOT fetch data until authenticated
-        if (authLoading || !isAuthenticated) {
+        // EXCEPT for candidate join and live interview routes which handle their own validation
+        const isPublicAccessRoute = window.location.pathname.startsWith('/join/') || 
+                                     window.location.pathname.startsWith('/live-interview/') ||
+                                     window.location.pathname.startsWith('/interview-report/');
+
+        if (authLoading) {
+            return;
+        }
+
+        if (!isAuthenticated && !isPublicAccessRoute) {
+            // Not authenticated and not a public route? Reset loading and wait.
+            setLoading(false); 
             return;
         }
 
         setLoading(true);
+        let unsubCandidates = () => {};
+        let unsubSources = () => {};
 
         // onSnapshot for real-time listening for candidates
         const candidatesRef = collection(db, CANDIDATES_COLLECTION);
-        const unsubCandidates = onSnapshot(
-            candidatesRef,
-            (snapshot) => {
-                const candidateList = snapshot.docs.map((doc) => ({
-                    id: doc.id,
-                    ...doc.data(),
-                }));
-                candidateList.sort((a, b) => {
-                    const aTime = (typeof a.createdAt?.toMillis === 'function') ? a.createdAt.toMillis() : 0;
-                    const bTime = (typeof b.createdAt?.toMillis === 'function') ? b.createdAt.toMillis() : 0;
-                    return bTime - aTime;
-                });
-                setCandidates(candidateList);
-                setLoading(false);
-                setError(null);
-            },
-            (err) => {
-                console.error('[TalentFlow] Candidates snapshot error:', err);
-                setError(err.message);
-                setLoading(false);
-            }
-        );
 
-        // onSnapshot for sources to get colors
-        const sourcesRef = collection(db, 'artifacts/talent-flow/public/data/sources');
-        const unsubSources = onSnapshot(sourcesRef, (snapshot) => {
-            const colors = {};
-            snapshot.docs.forEach(doc => {
-                const data = doc.data();
-                if (data.name && data.color) {
-                    colors[data.name.toLowerCase()] = data.color;
+        // IF UNAUTHENTICATED candidate joining, DO NOT listen to the whole collection automatically
+        if (!isAuthenticated && isPublicAccessRoute) {
+            console.warn('[TalentFlow] Public access detected. Waiting for anonymous auth before starting listener...');
+            // If we are on a public route and not authenticated, and user is null (not even anonymous yet)
+            // then trigger anonymous sign-in. This ensures Firestore rules can be evaluated.
+            if (!user) {
+                console.log("[TalentFlow] Public route & unauthenticated. Triggering anonymous sign-in from CandidatesContext...");
+                signInAnonymously(auth).then(cred => {
+                    console.log("[TalentFlow] Anonymous sign-in success:", cred.user.uid);
+                }).catch(err => {
+                    console.error("[TalentFlow] Anonymous Sign-In Error:", err);
+                });
+            }
+            // Still set candidates to empty and loading false, as the actual listener will start
+            // once the 'user' object is populated by the anonymous sign-in (triggering re-run of useEffect)
+            setCandidates([]);
+            setLoading(false);
+            setError(null);
+            return;
+        }
+
+        // IF Anonymous or on public route, we might want a targeted listener to avoid permission errors
+        if (user?.isAnonymous || (!isAuthenticated && isPublicAccessRoute)) {
+            const pathParts = window.location.pathname.split('/');
+            const sessionIdFromUrl = pathParts.find(p => p.startsWith('iv-'));
+            
+            if (sessionIdFromUrl) {
+                // Extract candidateId: iv-{candidateId}-{timestamp}
+                const parts = sessionIdFromUrl.split('-');
+                const candidateId = parts[1];
+
+                if (candidateId) {
+                    console.log(`[TalentFlow] Public route detected. Starting TARGETED listener for candidate: ${candidateId}`);
+                    const candidateDocRef = doc(db, CANDIDATES_COLLECTION, candidateId);
+                    
+                    unsubCandidates = onSnapshot(candidateDocRef, (docSnap) => {
+                        if (docSnap.exists()) {
+                            setCandidates([{ id: docSnap.id, ...docSnap.data() }]);
+                            setLoading(false);
+                            console.log(`[TalentFlow] Targeted candidate data loaded.`);
+                        } else {
+                            console.warn(`[TalentFlow] Candidate document not found: ${candidateId}`);
+                            setCandidates([]);
+                            setLoading(false);
+                        }
+                    }, (err) => {
+                        console.error('[TalentFlow] Targeted candidate listener error:', err);
+                        setCandidates([]);
+                        setLoading(false);
+                    });
+                    return () => unsubCandidates && unsubCandidates();
                 }
+            }
+        }
+
+        console.log(`[TalentFlow] Starting global candidates listener (isAuthenticated: ${isAuthenticated}, isPublicAccessRoute: ${isPublicAccessRoute})`);
+        unsubCandidates = onSnapshot(
+                candidatesRef,
+                (snapshot) => {
+                    const candidateList = snapshot.docs.map((doc) => ({
+                        id: doc.id,
+                        ...doc.data(),
+                    }));
+                    candidateList.sort((a, b) => {
+                        const aTime = (typeof a.createdAt?.toMillis === 'function') ? a.createdAt.toMillis() : 0;
+                        const bTime = (typeof b.createdAt?.toMillis === 'function') ? b.createdAt.toMillis() : 0;
+                        return bTime - aTime;
+                    });
+                    setCandidates(candidateList);
+                    setLoading(false);
+                    setError(null);
+                },
+                (err) => {
+                    console.error('[TalentFlow] Candidates snapshot error:', err);
+                    // If it's a public route, don't crash the UI with permission errors
+                    if (isPublicAccessRoute && err.code === 'permission-denied') {
+                        setCandidates([]);
+                        setError(null);
+                    } else {
+                        setError(err.message);
+                    }
+                    setLoading(false);
+                }
+            );
+
+            // onSnapshot for sources to get colors
+            const sourcesRef = collection(db, 'artifacts/talent-flow/public/data/sources');
+            unsubSources = onSnapshot(sourcesRef, (snapshot) => {
+                const colors = {};
+                snapshot.docs.forEach(doc => {
+                    const data = doc.data();
+                    if (data.name && data.color) {
+                        colors[data.name.toLowerCase()] = data.color;
+                    }
+                });
+                setSourceColors(colors);
             });
-            setSourceColors(colors);
-        });
+
 
         return () => {
-            unsubCandidates();
-            unsubSources();
+            if (unsubCandidates) unsubCandidates();
+            if (unsubSources) unsubSources();
         };
-    }, [isAuthenticated, authLoading]);
+    }, [isAuthenticated, authLoading, user]); // Added user to deps to ensure anonymous transition triggers re-run
 
 
 
@@ -145,10 +223,10 @@ export function CandidatesProvider({ children }) {
 
         const enriched = candidates.map(c => {
             if (!c) return null;
-            
+
             let bestAiScore = Number(c.aiScore || c.matchScore || c.initialAiScore || c.aiAnalysis?.score || 0);
             if (isNaN(bestAiScore)) bestAiScore = 0;
-            
+
             let bestTitle = c.matchedPositionTitle || c.bestTitle || c.position || null;
 
             if (c.positionAnalyses && typeof c.positionAnalyses === 'object') {
@@ -170,14 +248,14 @@ export function CandidatesProvider({ children }) {
             const sessions = Array.isArray(c.interviewSessions) ? c.interviewSessions : [];
             const hasInterview = sessions.length > 0;
             let interviewScore = null;
-            
+
             if (hasInterview) {
                 const lastSession = sessions[sessions.length - 1];
                 interviewScore = Number(lastSession?.finalScore);
                 if (isNaN(interviewScore)) interviewScore = null;
             }
 
-            // Combined Score Calculation: 
+            // Combined Score Calculation:
             let combinedScore = bestAiScore;
             if (interviewScore !== null) {
                 combinedScore = Math.round((bestAiScore + interviewScore) / 2);

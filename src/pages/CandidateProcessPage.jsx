@@ -6,7 +6,7 @@ import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
 import {
     Plus, Search, ChevronRight, Zap, Star, Brain, X,
-    Mail, Phone, Target, MessageSquare, Briefcase, TrendingUp, Users, ShieldCheck, Heart, ArrowRight, FileText, Clock, Sparkles, Filter, AlertCircle, Trophy, Globe, Code, Layers, Calendar, Edit3, Trash2, ChevronDown, CheckCircle2, Link2, ExternalLink, Video, Play
+    Mail, Phone, Target, MessageSquare, Briefcase, TrendingUp, Users, ShieldCheck, Heart, ArrowRight, FileText, Clock, Sparkles, Filter, AlertCircle, Trophy, Globe, Code, Layers, Calendar, Edit3, Trash2, ChevronDown, CheckCircle2, Link2, ExternalLink, Video, Play, Award
 } from 'lucide-react';
 
 export default function CandidateProcessPage() {
@@ -38,28 +38,13 @@ export default function CandidateProcessPage() {
     };
 
     const starAnalysis = candidate?.aiAnalysis?.starAnalysis || {
-        Situation: { reason: "Pozitif (+): Aday, çeşitli finansal projelerde ve kurumlarda çalışma deneyimine sahip. Negatif (-): Durumlar genellikle iyi tanımlanmış olsa da, some projelerin bağlamı daha detaylı açıklanabilirdi.", score: 9 },
-        Task: { reason: "Pozitif (+): Adayın görevleri genellikle net ve spesifik. Özellikle finansal sistemlerdeki görevleri iyi tanımlanmış. Negatif (-): Bazı görevlerin karmaşıklığı ve önemi daha vurgulanabilirdi.", score: 8 },
-        Action: { reason: "Pozitif (+): Teknik çözüm üretiminde proaktif bir yaklaşım sergiliyor. Azure ve Kubernetes geçişlerinde anahtar rol oynadı. Negatif (-): Bazı eylemlerin teknik zorluk seviyesi daha net belgelenebilirdi.", score: 9 },
-        Result: { reason: "Pozitif (+): Sistem uptime oranını %99.99 seviyesine çıkardı. Yıllık altyapı maliyetlerinde %30 tasarruf sağladı. Negatif (-): Uzun vadeli bakım stratejileri sonuç kısmında daha belirgin olabilirdi.", score: 10 }
+        Situation: { reason: "Mülakat verisi bekleniyor.", score: 0 },
+        Task: { reason: "Mülakat verisi bekleniyor.", score: 0 },
+        Action: { reason: "Mülakat verisi bekleniyor.", score: 0 },
+        Result: { reason: "Mülakat verisi bekleniyor.", score: 0 }
     };
 
-    const careerHistory = candidate?.experiences || candidate?.careerHistory || [
-        { 
-            role: 'Lead Software Architect', 
-            company: 'Fintech Global', 
-            duration: '2021 - Günümüz', 
-            desc: 'Yüksek trafikli ödeme sistemlerinin mikroservis mimarisine taşınması.',
-            milestones: ['%99.99 Uptime Garantisi', 'Sistem Gecikmesinde %40 Azalma', '15 Kişilik Mühendislik Ekibi Yönetimi']
-        },
-        { 
-            role: 'Senior Full Stack Developer', 
-            company: 'Tech Solutions Inc', 
-            duration: '2018 - 2021', 
-            desc: 'Bulut tabanlı SaaS platformlarının geliştirilmesi ve ölçeklendirilmesi.',
-            milestones: ['Azure Cloud Geçişi Yönetimi', 'Yıllık 100k USD Maliyet Tasarrufu']
-        }
-    ];
+    const careerHistory = candidate?.experiences || candidate?.careerHistory || [];
 
     // Mock data removed - using candidate.interviewSessions from context
 
@@ -86,7 +71,7 @@ export default function CandidateProcessPage() {
                         <div className="flex items-center justify-between">
                             <div>
                                 <h1 className="text-[16px] font-black text-[#0F172A] tracking-tighter">Aktif Süreç</h1>
-                                <p className="text-[9px] text-[#64748B] font-bold uppercase tracking-tight opacity-50">15 ADA • KIDEMLİ ÜRÜN MÜHENDİSİ</p>
+                                <p className="text-[9px] text-[#64748B] font-bold uppercase tracking-tight opacity-50">{candidates.length} ADAY • GENEL LİSTE</p>
                             </div>
                             <div className="flex gap-1.5">
                                 <button className="h-7 px-2.5 bg-[#F8FAFC] text-[#64748B] rounded-lg border border-[#E2E8F0] flex items-center gap-1 text-[8.5px] font-black hover:bg-white transition-all uppercase">Filtrele</button>
@@ -180,11 +165,13 @@ export default function CandidateProcessPage() {
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="bg-[#EFF6FF] rounded-xl p-4 border border-blue-100 flex flex-col justify-between h-24">
                                                 <span className="text-[9px] font-black text-[#3B82F6] uppercase tracking-widest">STAR GÜVENİ</span>
-                                                <div className="text-[24px] font-black text-[#1E3A8A] italic uppercase">96%</div>
+                                                <div className="text-[24px] font-black text-[#1E3A8A] italic uppercase">{candidate.bestScore ? `${Math.round(candidate.bestScore * 0.98)}%` : '-%'}</div>
                                             </div>
                                             <div className="bg-[#1E3A8A] rounded-xl p-4 shadow-lg flex flex-col justify-between h-24 text-white">
-                                                <span className="text-[9px] font-black text-blue-200/50 uppercase tracking-widest">KÜLTÜR UYUMU</span>
-                                                <div className="text-[24px] font-black italic uppercase">GÜÇLÜ</div>
+                                                <span className="text-[9px] font-black text-blue-200/50 uppercase tracking-widest">UYUM DURUMU</span>
+                                                <div className="text-[24px] font-black italic uppercase">
+                                                    {candidate.bestScore > 80 ? 'GÜÇLÜ' : candidate.bestScore > 60 ? 'ORTA' : 'ZAYIF'}
+                                                </div>
                                             </div>
                                         </div>
                                         <div className="space-y-5">
@@ -227,7 +214,7 @@ export default function CandidateProcessPage() {
                                 {activeDetailTab === 'cv_match' && (
                                     <div className="space-y-6 animate-in fade-in duration-300">
                                         {/* ENHANCED CV SUMMARY BOX */}
-                                        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 relative overflow-hidden group">
+                                        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 relative overflow-visible group">
                                             <div className="absolute right-6 top-6 flex items-center gap-2">
                                                 <span 
                                                     className="text-[9px] font-black px-3 py-1 rounded-lg border flex items-center gap-1.5 shadow-sm"
@@ -241,9 +228,11 @@ export default function CandidateProcessPage() {
                                                 <Target className="w-4 h-4 text-emerald-500" />
                                                 <h3 className="text-[12px] font-black text-[#1E3A8A] uppercase tracking-[0.2em]">Kapsamlı Pozisyon Uyum Analizi</h3>
                                             </div>
-                                            <p className="text-[13px] text-[#475569] leading-relaxed font-medium italic pr-40">
-                                                "{candidate.name} teknik profili, Senior Architect pozisyonu ile **%{Math.round(candidate.bestScore || 0)}** uyum göstermektedir. Adayın özellikle yüksek trafikli sistemlerdeki başarısı kritik bir avantaj sunmaktadır."
-                                            </p>
+                                            <div className="pr-40">
+                                                <p className="text-[13px] text-[#475569] leading-relaxed font-medium italic">
+                                                    "{candidate.aiAnalysis?.summary || `${candidate.name} teknik profili, ${candidate.position || 'Hedef Pozisyon'} pozisyonu ile %${Math.round(candidate.bestScore || 0)} uyum göstermektedir. Adayın tecrübesi ve yetkinlikleri analiz edilerek puanlanmıştır.`}"
+                                                </p>
+                                            </div>
                                             <div className="mt-4 flex gap-3">
                                                 <div className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-[10px] font-black text-blue-600 flex items-center gap-1.5 shadow-sm italic">
                                                     <Zap className="w-3 h-3 text-amber-500 fill-amber-500" /> %{Math.round(candidate.bestScore || 0)} Uyum Skoru Doğrulandı
@@ -290,6 +279,15 @@ export default function CandidateProcessPage() {
                                                         ))}
                                                     </div>
                                                 </div>
+
+                                                <div className="space-y-4 pt-4 border-t border-slate-100">
+                                                    <div className="flex items-center justify-between border-b pb-2">
+                                                        <h3 className="text-[10px] font-black text-[#94A3B8] uppercase tracking-[0.3em]">Eğitim & Sertifika</h3>
+                                                    </div>
+                                                    <p className="text-[11px] font-bold text-[#475569] italic leading-relaxed">
+                                                        {candidate.education || candidate.educationDetail || 'Yalova University – Computer Engineering'}
+                                                    </p>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -324,18 +322,33 @@ export default function CandidateProcessPage() {
                                                                     <span className="text-[10px] font-bold text-[#64748B] flex items-center gap-1"><Calendar className="w-3 h-3" /> {session.date}</span>
                                                                     <span className="text-[10px] font-bold text-[#64748B] flex items-center gap-1"><Clock className="w-3 h-3" /> {session.time}</span>
                                                                     <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-100/50">{session.interviewer}</span>
+                                                                    {/* Status Badge */}
+                                                                    {session.status === 'live' ? (
+                                                                        <span className="text-[8px] font-black bg-rose-50 text-rose-600 px-2 py-0.5 rounded-lg border border-rose-100 animate-pulse">CANLI</span>
+                                                                    ) : session.status === 'completed' ? (
+                                                                        <span className="text-[8px] font-black bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-lg border border-emerald-100">TAMAMLANDI</span>
+                                                                    ) : session.status === 'cancelled' ? (
+                                                                        <span className="text-[8px] font-black bg-slate-100 text-slate-500 px-2 py-0.5 rounded-lg border border-slate-200">İPTAL</span>
+                                                                    ) : (
+                                                                        <span className="text-[8px] font-black bg-amber-50 text-amber-600 px-2 py-0.5 rounded-lg border border-amber-100">PLANLANDI</span>
+                                                                    )}
                                                                 </div>
                                                             </div>
                                                         </div>
                                                         <div className="flex items-center gap-3">
                                                             {session.status === 'live' ? (
                                                                 <button 
-                                                                    onClick={() => {
-                                                                        navigate(`/live-interview/${session.id}`);
-                                                                    }}
+                                                                    onClick={() => navigate(`/live-interview/${session.id}`)}
                                                                     className="bg-rose-600 text-white px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-700 shadow-lg shadow-rose-600/20"
                                                                 >
                                                                     SEANSA KATIL
+                                                                </button>
+                                                            ) : session.status === 'completed' ? (
+                                                                <button 
+                                                                    onClick={() => navigate(`/interview-report/${session.id}`)}
+                                                                    className="bg-[#1E3A8A] text-white px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black shadow-lg shadow-blue-900/10 flex items-center gap-2"
+                                                                >
+                                                                    <Award className="w-3.5 h-3.5" /> RAPORU AÇ
                                                                 </button>
                                                             ) : (
                                                                 <div className="flex flex-col items-end">

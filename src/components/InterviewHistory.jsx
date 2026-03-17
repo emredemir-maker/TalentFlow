@@ -142,14 +142,25 @@ export default function InterviewHistory({ sessions = [], onStartSession, onDele
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-3 mb-1.5">
                                         <h4 className="text-[15px] font-black text-slate-900 tracking-tight uppercase italic">{session.typeLabel || 'Tanımlanmamış Mülakat'}</h4>
-                                        {isPlanned ? (
-                                            <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100 animate-pulse text-[9px] font-black">
+                                        {session.status === 'live' ? (
+                                            <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-rose-50 text-rose-600 border border-rose-100 animate-pulse text-[9px] font-black">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                                                CANLI YAYIN
+                                            </div>
+                                        ) : session.status === 'completed' ? (
+                                            <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100 text-[9px] font-black">
                                                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                                AKTİF PLAN
+                                                TAMAMLANDI
+                                            </div>
+                                        ) : session.status === 'cancelled' ? (
+                                            <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-100 text-slate-500 border border-slate-200 text-[9px] font-black">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                                                İPTAL
                                             </div>
                                         ) : (
-                                            <div className="px-3 py-1 rounded-lg bg-slate-50 text-slate-400 border border-slate-100 text-[9px] font-black uppercase tracking-widest">
-                                                ARŞİV
+                                            <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-50 text-blue-600 border border-blue-100 text-[9px] font-black">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                                                PLANLANDI
                                             </div>
                                         )}
                                     </div>

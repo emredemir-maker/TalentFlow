@@ -37,7 +37,9 @@ import {
     Link as LinkIcon,
     Package,
     ArrowLeft,
-    Activity
+    Activity,
+    Trash2,
+    RefreshCw
 } from 'lucide-react';
 
 const USERS_PATH = 'artifacts/talent-flow/public/data/users';
@@ -56,6 +58,14 @@ export default function InterviewManagementPage() {
     const [saveStatus, setSaveStatus] = useState('idle');
     const [systemUsers, setSystemUsers] = useState([]);
     const [selectedInterviewer, setSelectedInterviewer] = useState(null);
+    const [openMenuId, setOpenMenuId] = useState(null);
+    
+    // Close menu when clicking outside
+    useEffect(() => {
+        const handleClickOutside = () => setOpenMenuId(null);
+        window.addEventListener('click', handleClickOutside);
+        return () => window.removeEventListener('click', handleClickOutside);
+    }, []);
     const [isSendingEmail, setIsSendingEmail] = useState(false);
     
     // New Manual Selection States
@@ -118,68 +128,74 @@ export default function InterviewManagementPage() {
         }
     }, [preselectedInterviewData, enrichedCandidates]);
 
-    const activeInterviews = useMemo(() => {
-        const sessionMap = new Map();
-        // Get local date in YYYY-MM-DD format for stable comparison
+    const { activeInterviews, pastInterviews, stats } = useMemo(() => {
+        const active = [];
+        const past = [];
+        
         const now = new Date();
         const todayStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
 
         (enrichedCandidates || []).forEach(c => {
             if (c.interviewSessions && Array.isArray(c.interviewSessions)) {
                 c.interviewSessions.forEach(session => {
-                    // Normalize session date for comparison
-                    // If date is like "23 Şub", it might be a legacy format. 
-                    // We only want to show sessions that are definitely today or in the future
-                    let compareDate = session.date;
-                    
-                    // Simple heuristic: if date doesn't look like YYYY-MM-DD, try to ignore or fix it
-                    // Most valid sessions should be YYYY-MM-DD from the new picker
-                    const isIsoDate = /^\d{4}-\d{2}-\d{2}$/.test(compareDate);
+                    const sessionDatePart = session.date ? session.date.split('T')[0] : '';
+                    const isIsoDate = /^\d{4}-\d{2}-\d{2}$/.test(sessionDatePart);
                     
                     const isLive = session.status === 'live';
-                    let isFutureOrToday = isIsoDate && compareDate >= todayStr;
+                    const isCompleted = session.status === 'completed';
+                    const isCancelled = session.status === 'cancelled';
+                    const isPostponed = session.status === 'postponed' || session.status === 'scheduled';
+                    const isFutureOrToday = isIsoDate && sessionDatePart >= todayStr;
 
-                    // If it's a legacy or malformed date (not YYYY-MM-DD), we filter it out unless it's LIVE
-                    if (isFutureOrToday || isLive) {
-                        // Normalize type to avoid duplicates like "prod" vs "PROD"
-                        const normType = String(session.type || 'general').trim().toLowerCase();
-                        const dedupKey = `${c.id}-${normType}`;
-                        
-                        // Rule: If we have multiple sessions for same candidate/type:
-                        // 1. Prefer LIVE sessions
-                        // 2. Otherwise keep the one we found first (or we could prefer the one closest to now)
-                        const existing = sessionMap.get(dedupKey);
-                        
-                        if (!existing || (isLive && existing.status !== 'live')) {
-                            sessionMap.set(dedupKey, {
-                                ...session,
-                                id: session.id || `${c.id}-${Date.now()}-${Math.random()}`,
-                                candidate: c,
-                                candidateName: c.name,
-                                role: c.position || c.bestTitle || 'Pozisyon',
-                                matchScore: c.bestScore || 0,
-                                normalizedType: normType
-                            });
-                        }
+                    const sessionData = {
+                        ...session,
+                        id: session.id || `${c.id}-${Date.now()}-${Math.random()}`,
+                        candidate: c,
+                        candidateName: c.name,
+                        role: c.position || c.bestTitle || 'Pozisyon',
+                        matchScore: c.bestScore || 0,
+                    };
+
+                    // Filtering logic: Live or Pending/Future goes to Active. Completed/Cancelled/Past goes to History.
+                    if (isLive || (isFutureOrToday && !isCompleted && !isCancelled)) {
+                        active.push(sessionData);
+                    } else {
+                        past.push(sessionData);
                     }
                 });
             }
         });
 
-        return Array.from(sessionMap.values()).sort((a,b) => {
+        const sortFn = (a, b) => {
             if (a.status === 'live' && b.status !== 'live') return -1;
             if (b.status === 'live' && a.status !== 'live') return 1;
-            
-            // Sort by date and time
             const dateA = a.date || '9999-99-99';
             const dateB = b.date || '9999-99-99';
             if (dateA !== dateB) return dateA.localeCompare(dateB);
-            
-            const timeA = a.time || '00:00';
-            const timeB = b.time || '00:00';
-            return timeA.localeCompare(timeB);
+            return (a.time || '00:00').localeCompare(b.time || '00:00');
+        };
+
+        const sortedActive = active.sort(sortFn);
+        const sortedPast = past.sort((a,b) => {
+            const dateA = a.date || '0000-00-00';
+            const dateB = b.date || '0000-00-00';
+            if (dateA !== dateB) return dateB.localeCompare(dateA); // Newest first
+            return (b.time || '00:00').localeCompare(a.time || '00:00');
         });
+
+        return {
+            activeInterviews: sortedActive,
+            pastInterviews: sortedPast,
+            stats: {
+                live: active.filter(i => i.status === 'live').length,
+                today: active.filter(i => (i.date?.split('T')[0] === todayStr)).length,
+                pending: active.filter(i => i.status !== 'live').length,
+                total: active.length + past.length
+            }
+        };
     }, [enrichedCandidates]);
+
+    const [viewTab, setViewTab] = useState('active'); // active, past
 
     const handleAutoPlan = async () => {
         if (!selectedCandidate) return;
@@ -248,8 +264,10 @@ export default function InterviewManagementPage() {
         }
 
         const typeLabel = interviewType === 'technical' ? 'Teknik' : (interviewType === 'hr' ? 'İK' : 'Product');
+        const joinLink = `${window.location.origin}/join/iv-${selectedCandidate.id.substring(0, 4)}-${Date.now()}`; // Mocking ID for preview
+        
         setEmailSubject(`Mülakat Daveti: ${typeLabel} Değerlendirmesi - ${selectedCandidate.name}`);
-        setEmailBody(`Merhaba ${selectedCandidate.name},\n\nTalentFlow ekibi olarak sizinle ${typeLabel} mülakatı gerçekleştirmek istiyoruz.\n\nMülakat Detayları:\n- Tarih: ${manualDate || 'Henüz Belirlenmedi'}\n- Saat: ${manualTime}\n- Platform: TalentFlow Workspace\n\nMülakat linkiniz: cognitive.slate/meet/${selectedCandidate.id.substring(0,8)}\n\nHerhangi bir sorunuz olursa bu mail üzerinden bizimle iletişime geçebilirsiniz.\n\nİyi çalışmalar dileriz.`);
+        setEmailBody(`Merhaba ${selectedCandidate.name},\n\nTalentFlow ekibi olarak sizinle ${typeLabel} mülakatı gerçekleştirmek istiyoruz.\n\nMülakat Detayları:\n- Tarih: ${manualDate || 'Henüz Belirlenmedi'}\n- Saat: ${manualTime}\n- Platform: TalentFlow Workspace\n\nMülakat linkiniz: ${joinLink}\n\nHerhangi bir sorunuz olursa bu mail üzerinden bizimle iletişime geçebilirsiniz.\n\nİyi çalışmalar dileriz.`);
         setIsEmailModalOpen(true);
     };
 
@@ -283,11 +301,12 @@ export default function InterviewManagementPage() {
         try {
             const interviewerName = selectedInterviewer?.displayName || currentUser?.displayName || 'Değerlendirici';
             
-            // Generate link
-            const meetLink = `https://meet.google.com/cog-${selectedCandidate.id.substring(0,3)}-${Math.random().toString(36).substring(7)}`;
+            // Using full ID for better lookup reliability in public pages
+            const sessionId = `iv-${selectedCandidate.id}-${Date.now()}`;
+            const meetLink = `${window.location.origin}/join/${sessionId}`;
 
             const newSession = {
-                id: `iv-${selectedCandidate.id.substring(0, 4)}-${Date.now()}`,
+                id: sessionId,
                 title: interviewType === 'technical' ? 'Teknik Mülakat' : (interviewType === 'hr' ? 'İK Filtre' : 'Product Mülakatı'),
                 date: slot ? slot.date : new Date().toISOString().split('T')[0],
                 time: slot ? slot.time : new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
@@ -331,6 +350,27 @@ export default function InterviewManagementPage() {
             console.error("Save interview error:", err);
             setSaveStatus('idle');
             alert("Kaydedilemedi: " + err.message);
+        }
+    };
+    
+    const handleDeleteSession = async (candidateId, sessionId) => {
+        if (!window.confirm("Bu mülakat seansını silmek istediğinize emin misiniz?")) return;
+        
+        const candidate = enrichedCandidates.find(c => c.id === candidateId);
+        if (!candidate) return;
+
+        const updatedSessions = (candidate.interviewSessions || []).filter(s => s.id !== sessionId);
+        
+        try {
+            await updateCandidate(candidateId, {
+                interviewSessions: updatedSessions,
+                hasInterview: updatedSessions.length > 0
+            });
+            setSaveStatus('success');
+            setTimeout(() => setSaveStatus('idle'), 1000);
+        } catch (err) {
+            console.error("Delete session error:", err);
+            alert("Silinemedi: " + err.message);
         }
     };
 
@@ -452,10 +492,21 @@ export default function InterviewManagementPage() {
 
                                 <div className="bg-[#F0FFF4] border border-[#C6F6D5] rounded-xl px-4 py-3 flex items-center justify-between">
                                     <div className="flex flex-col">
-                                        <label className="text-[8px] font-black text-[#22543D] uppercase tracking-[0.2em] mb-0.5">Mülakat Linki</label>
-                                        <span className="text-[11px] font-mono text-[#2F855A] font-black italic">cognitive.slate/meet/{selectedCandidate?.id.substring(0,8) || 'xxxx-xxxx'}</span>
+                                        <label className="text-[8px] font-black text-[#22543D] uppercase tracking-[0.2em] mb-0.5">Aday Katılım Linki</label>
+                                        <span className="text-[11px] font-mono text-[#2F855A] font-black italic">{window.location.origin}/join/{selectedCandidate?.id.substring(0,4)}...</span>
                                     </div>
-                                    <button className="p-2 text-[#2F855A] hover:bg-white rounded-lg transition-all"><Copy className="w-3.5 h-3.5" /></button>
+                                    <button 
+                                        onClick={() => {
+                                            if (selectedCandidate) {
+                                                const link = `${window.location.origin}/join/iv-${selectedCandidate.id}-NEW`;
+                                                navigator.clipboard.writeText(link);
+                                                alert("Link kopyalandı!");
+                                            }
+                                        }}
+                                        className="p-2 text-[#2F855A] hover:bg-white rounded-lg transition-all"
+                                    >
+                                        <Copy className="w-3.5 h-3.5" />
+                                    </button>
                                 </div>
 
                                 <div className="pt-2 flex flex-wrap gap-2">
@@ -564,10 +615,10 @@ export default function InterviewManagementPage() {
                     {/* STATS STRIP */}
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         {[
-                            { label: 'CANLI YAYIN', value: activeInterviews.filter(i => i.status === 'live').length, icon: Activity, color: 'text-rose-600', bg: 'bg-rose-50' },
-                            { label: 'BUGÜN', value: activeInterviews.filter(i => i.date === new Date().toISOString().split('T')[0]).length, icon: Calendar, color: 'text-blue-600', bg: 'bg-blue-50' },
-                            { label: 'BEKLEYEN', value: activeInterviews.filter(i => i.status === 'scheduled').length, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50' },
-                            { label: 'TOPLAM OPERASYON', value: activeInterviews.length, icon: Zap, color: 'text-emerald-600', bg: 'bg-emerald-50' }
+                            { label: 'CANLI YAYIN', value: stats.live, icon: Activity, color: 'text-rose-600', bg: 'bg-rose-50' },
+                            { label: 'BUGÜN', value: stats.today, icon: Calendar, color: 'text-blue-600', bg: 'bg-blue-50' },
+                            { label: 'BEKLEYEN', value: stats.pending, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50' },
+                            { label: 'TOPLAM OPERASYON', value: stats.total, icon: Zap, color: 'text-emerald-600', bg: 'bg-emerald-50' }
                         ].map((stat, i) => (
                             <div key={i} className={`p-4 rounded-[20px] bg-white border border-[#E2E8F0] shadow-sm flex items-center justify-between`}>
                                 <div className="flex flex-col">
@@ -583,8 +634,21 @@ export default function InterviewManagementPage() {
 
                     <div className="bg-white rounded-[24px] border border-[#E2E8F0] shadow-sm overflow-hidden flex-1 flex flex-col min-h-0">
                         <div className="p-4 border-b border-[#F1F5F9] flex items-center justify-between bg-slate-50/30">
-                            <div className="flex items-center gap-2">
-                                <h2 className="text-[13px] font-black text-[#0F172A] uppercase tracking-tighter">Planlanmış ve Aktif Seanslar</h2>
+                            <div className="flex items-center gap-6">
+                                <div className="flex items-center gap-1">
+                                    <button 
+                                        onClick={() => setViewTab('active')}
+                                        className={`px-4 py-1.5 text-[11px] font-black uppercase tracking-widest rounded-lg transition-all ${viewTab === 'active' ? 'bg-[#1E3A8A] text-white shadow-md' : 'text-slate-400 hover:text-[#1E3A8A]'}`}
+                                    >
+                                        Aktif Seanslar ({activeInterviews.length})
+                                    </button>
+                                    <button 
+                                        onClick={() => setViewTab('past')}
+                                        className={`px-4 py-1.5 text-[11px] font-black uppercase tracking-widest rounded-lg transition-all ${viewTab === 'past' ? 'bg-[#1E3A8A] text-white shadow-md' : 'text-slate-400 hover:text-[#1E3A8A]'}`}
+                                    >
+                                        Geçmiş ({pastInterviews.length})
+                                    </button>
+                                </div>
                             </div>
                             <div className="flex items-center gap-2">
                                 <div className="bg-white px-3 py-1 rounded-lg border border-[#E2E8F0] text-[10px] font-bold text-slate-500 flex items-center gap-2">
@@ -593,9 +657,9 @@ export default function InterviewManagementPage() {
                             </div>
                         </div>
 
-                        <div className="overflow-x-auto flex-1 min-h-0 custom-scrollbar">
-                            <table className="w-full text-left">
-                                <thead className="bg-[#F8FAFC] sticky top-0 z-10 border-b border-[#F1F5F9]">
+                        <div className="overflow-x-auto flex-1 min-h-[400px] custom-scrollbar overflow-y-visible">
+                            <table className="w-full text-left border-separate border-spacing-0">
+                                <thead className="bg-[#F8FAFC] sticky top-0 z-[60] border-b border-[#F1F5F9]">
                                     <tr>
                                         <th className="px-6 py-4 text-[10px] font-black text-[#64748B] uppercase tracking-widest">ADAY VE POZİSYON</th>
                                         <th className="px-6 py-4 text-[10px] font-black text-[#64748B] uppercase tracking-widest text-center">ZAMANLAMA</th>
@@ -605,14 +669,15 @@ export default function InterviewManagementPage() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-[#F1F5F9]">
-                                    {activeInterviews.map((int, idx) => {
+                                    {(viewTab === 'active' ? activeInterviews : pastInterviews).map((int, idx) => {
                                         const isToday = int.date === new Date().toISOString().split('T')[0];
+                                        const isCompleted = int.status === 'completed';
                                         return (
-                                            <tr key={idx} className={`hover:bg-blue-50/20 transition-all ${isToday ? 'bg-blue-50/10' : ''}`}>
+                                            <tr key={idx} className={`hover:bg-blue-50/20 transition-all ${isToday && !isCompleted ? 'bg-blue-50/10' : ''}`}>
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center gap-3">
                                                         <div className="w-8 h-8 bg-white border border-[#E2E8F0] text-[#1E3A8A] rounded-xl flex items-center justify-center text-[11px] font-black shadow-sm">
-                                                            {int.candidateName[0]}
+                                                            {int.candidateName ? int.candidateName[0] : 'A'}
                                                         </div>
                                                         <div className="flex flex-col">
                                                             <div className="flex items-center gap-2">
@@ -621,7 +686,7 @@ export default function InterviewManagementPage() {
                                                                     int.type === 'technical' ? 'bg-blue-50 text-blue-600' : (int.type === 'hr' ? 'bg-amber-50 text-amber-600' : 'bg-purple-50 text-purple-600')
                                                                 }`}>{int.type === 'technical' ? 'TEKNİK' : (int.type === 'hr' ? 'İK' : 'PROD')}</span>
                                                             </div>
-                                                            <span className="text-[11px] text-[#64748B] font-medium mt-1">{int.role}</span>
+                                                            <span className="text-[11px] text-[#64748B] font-medium mt-1 uppercase tracking-tighter">{int.role}</span>
                                                         </div>
                                                     </div>
                                                 </td>
@@ -633,44 +698,156 @@ export default function InterviewManagementPage() {
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center gap-2">
-                                                        <div className={`w-2 h-2 rounded-full ${int.status === 'live' ? 'bg-rose-500 animate-ping' : 'bg-amber-400'}`} />
-                                                        <span className={`text-[10px] font-black tracking-tight ${int.status === 'live' ? 'text-rose-600' : 'text-[#0F172A]'}`}>
-                                                            {int.status === 'live' ? 'CANLI YAYIN' : 'HAZIRDA BEKLİYOR'}
-                                                        </span>
+                                                        {int.status === 'live' ? (
+                                                            <>
+                                                                <div className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+                                                                <span className="text-[10px] font-black tracking-tight text-rose-600 uppercase">CANLI YAYIN</span>
+                                                            </>
+                                                        ) : int.status === 'completed' ? (
+                                                            <>
+                                                                <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                                                                <span className="text-[10px] font-black tracking-tight text-emerald-600 uppercase">TAMAMLANDI</span>
+                                                            </>
+                                                        ) : int.status === 'cancelled' ? (
+                                                            <>
+                                                                <div className="w-2 h-2 rounded-full bg-slate-400" />
+                                                                <span className="text-[10px] font-black tracking-tight text-slate-400 uppercase">İPTAL EDİLDİ</span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <div className="w-2 h-2 rounded-full bg-amber-400" />
+                                                                <span className="text-[10px] font-black tracking-tight text-[#0F172A] uppercase">
+                                                                    {int.status === 'postponed' ? 'ERTELENDİ / BEKLEMEDE' : 'HAZIRDA BEKLİYOR'}
+                                                                </span>
+                                                            </>
+                                                        )}
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center gap-2">
-                                                        <div className="w-6 h-6 rounded-full bg-slate-100 border border-white shadow-sm flex items-center justify-center text-[9px] font-bold text-[#1E3A8A]">
+                                                        <div className="w-6 h-6 rounded-lg bg-slate-100 border border-white shadow-sm flex items-center justify-center text-[9px] font-bold text-[#1E3A8A]">
                                                             {int.interviewer ? int.interviewer[0] : '?'}
                                                         </div>
-                                                        <span className="text-[12px] font-bold text-[#475569]">{int.interviewer || 'Atanmadı'}</span>
+                                                        <span className="text-[11px] font-bold text-[#475569] uppercase tracking-tighter">{int.interviewer || 'Atanmadı'}</span>
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4 text-right">
                                                     <div className="flex items-center justify-end gap-2">
+                                                        <button 
+                                                            onClick={() => {
+                                                                const link = `${window.location.origin}/join/${int.id}`;
+                                                                navigator.clipboard.writeText(link);
+                                                                alert("Aday katılım linki kopyalandı!");
+                                                            }}
+                                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-500 hover:text-blue-600 hover:border-blue-200 transition-all text-[9px] font-black uppercase tracking-widest cursor-pointer shadow-sm active:scale-95 group/copy"
+                                                            title="Aday Katılım Bağlantısını Kopyala"
+                                                        >
+                                                            <Copy className="w-3 h-3 group-hover/copy:scale-110 transition-transform" /> BAĞLANTIYI KOPYALA
+                                                        </button>
+                                                        {/* Status dependent primary actions */}
                                                         {int.status === 'live' ? (
                                                             <button 
                                                                 onClick={() => navigate(`/live-interview/${int.id}`)}
-                                                                className="bg-rose-600 text-white px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-rose-700 transition-all shadow-lg shadow-rose-600/20"
+                                                                className="bg-rose-600 text-white px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-rose-700 transition-all shadow-lg shadow-rose-600/20 active:scale-95"
                                                             >
                                                                 KATIL
+                                                            </button>
+                                                        ) : int.status === 'completed' ? (
+                                                            <button 
+                                                                onClick={() => navigate(`/interview-report/${int.id}`)}
+                                                                className="bg-[#1E3A8A] text-white px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-sm active:scale-95"
+                                                            >
+                                                                RAPOR
                                                             </button>
                                                         ) : (
                                                             <button 
                                                                 onClick={() => navigate(`/live-interview/${int.id}`)}
-                                                                className="bg-[#1E3A8A] text-white px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-blue-800 transition-all shadow-sm"
+                                                                className="bg-[#1E3A8A] text-white px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-blue-800 transition-all shadow-sm active:scale-95"
                                                             >
                                                                 BAŞLAT
                                                             </button>
                                                         )}
-                                                        <button className="p-2 text-slate-300 hover:text-slate-500 transition-colors"><MoreVertical className="w-4 h-4" /></button>
+
+                                                        {/* Actions Dropdown */}
+                                                        <div className="relative">
+                                                            <button 
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setOpenMenuId(openMenuId === int.id ? null : int.id);
+                                                                }}
+                                                                className={`p-2 rounded-lg transition-all border border-transparent ${openMenuId === int.id ? 'text-[#0F172A] bg-slate-100 border-slate-200' : 'text-slate-400 hover:text-[#0F172A] hover:bg-slate-100 hover:border-slate-200'}`}
+                                                            >
+                                                                <MoreHorizontal className="w-4 h-4" />
+                                                            </button>
+                                                            
+                                                            {openMenuId === int.id && (
+                                                                <div className="absolute top-full right-0 mt-1 w-52 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden z-[100] animate-in fade-in zoom-in-95 duration-100">
+                                                                    {(int.status === 'scheduled' || int.status === 'live' || int.status === 'postponed') && (
+                                                                        <div className="py-1">
+                                                                            <button 
+                                                                                onClick={async (e) => {
+                                                                                    e.stopPropagation();
+                                                                                    if (window.confirm("Bu mülakatı ertelemek ve statüsünü değiştirmek istediğinize emin misiniz?")) {
+                                                                                        const updatedSessions = int.candidate.interviewSessions.map(s => 
+                                                                                            s.id === int.id ? { ...s, status: 'postponed' } : s
+                                                                                        );
+                                                                                        await updateCandidate(int.candidate.id, { interviewSessions: updatedSessions });
+                                                                                        setOpenMenuId(null);
+                                                                                    }
+                                                                                }}
+                                                                                className="w-full px-4 py-2.5 text-left text-[11px] font-bold text-slate-600 hover:bg-slate-50 flex items-center gap-2 transition-colors border-b border-slate-50"
+                                                                            >
+                                                                                <Clock className="w-4 h-4" /> Ertele / Beklemeye Al
+                                                                            </button>
+                                                                            <button 
+                                                                                onClick={async (e) => {
+                                                                                    e.stopPropagation();
+                                                                                    if (window.confirm("Bu mülakatı iptal etmek istediğinize emin misiniz?")) {
+                                                                                        const updatedSessions = int.candidate.interviewSessions.map(s => 
+                                                                                            s.id === int.id ? { ...s, status: 'cancelled' } : s
+                                                                                        );
+                                                                                        await updateCandidate(int.candidate.id, { interviewSessions: updatedSessions });
+                                                                                        setOpenMenuId(null);
+                                                                                    }
+                                                                                }}
+                                                                                className="w-full px-4 py-2.5 text-left text-[11px] font-bold text-amber-600 hover:bg-amber-50 flex items-center gap-2 transition-colors border-b border-slate-50"
+                                                                            >
+                                                                                <AlertCircle className="w-4 h-4" /> Mülakatı İptal Et
+                                                                            </button>
+                                                                            <button 
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    setPreselectedInterviewData({ candidateId: int.candidate.id, session: int });
+                                                                                    setIsPlanningMode(true);
+                                                                                    setOpenMenuId(null);
+                                                                                }}
+                                                                                className="w-full px-4 py-2.5 text-left text-[11px] font-bold text-blue-600 hover:bg-blue-50 flex items-center gap-2 transition-colors border-b border-slate-50"
+                                                                            >
+                                                                                <RefreshCw className="w-4 h-4" /> Yeniden Planla
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
+                                                                    <div className="py-1 bg-slate-50/50">
+                                                                        <button 
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                handleDeleteSession(int.candidate.id, int.id);
+                                                                                setOpenMenuId(null);
+                                                                            }}
+                                                                            className="w-full px-4 py-2.5 text-left text-[11px] font-bold text-rose-600 hover:bg-rose-50 flex items-center gap-2 transition-colors"
+                                                                        >
+                                                                            <Trash2 className="w-4 h-4" /> Seansı Tamamen Sil
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </td>
                                             </tr>
                                         );
                                     })}
-                                    {activeInterviews.length === 0 && (
+                                    {(viewTab === 'active' ? activeInterviews : pastInterviews).length === 0 && (
                                         <tr>
                                             <td colSpan="5" className="px-6 py-20 text-center">
                                                 <div className="flex flex-col items-center gap-3">

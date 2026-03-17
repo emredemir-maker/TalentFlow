@@ -11,7 +11,8 @@ import {
     createUserWithEmailAndPassword,
     signInWithEmailAndPassword,
     sendPasswordResetEmail,
-    updateProfile
+    updateProfile,
+    signInAnonymously
 } from 'firebase/auth';
 import {
     doc,
@@ -48,6 +49,13 @@ export function AuthProvider({ children }) {
             if (currentUser) {
                 setUser(currentUser);
 
+                // If anonymous (candidate), skip heavy profile fetching
+                if (currentUser.isAnonymous) {
+                    setUserProfile({ role: 'candidate', isAnonymous: true });
+                    setLoading(false);
+                    return;
+                }
+
                 // Set up real-time listener for the user profile
                 const userDocRef = doc(db, USERS_PATH, currentUser.uid);
 
@@ -81,7 +89,7 @@ export function AuthProvider({ children }) {
         });
 
         async function handleInitialProfile(currentUser) {
-            if (!currentUser || !currentUser.email) return;
+            if (!currentUser || !currentUser.email || currentUser.isAnonymous) return;
             try {
                 const emailLower = currentUser.email.toLowerCase();
                 const isPrimaryAdmin = INITIAL_SUPER_ADMINS.includes(emailLower);
@@ -148,6 +156,18 @@ export function AuthProvider({ children }) {
             if (unsubscribeProfile) unsubscribeProfile();
         };
     }, []);
+
+    // Anonymous SignIn for Public Routes - Separate effect to handle dependency changes correctly
+    useEffect(() => {
+        const isPublicRoute = window.location.pathname.startsWith('/join/') || 
+                              window.location.pathname.startsWith('/live-interview/') || 
+                              window.location.pathname.startsWith('/interview-report/');
+
+        if (isPublicRoute && !user && !loading) {
+            console.log("[TalentFlow] Public route & unauthenticated. Triggering anonymous sign-in...");
+            signInAnonymously(auth).catch(err => console.error("Anonymous Sign-In Error:", err));
+        }
+    }, [user, loading]);
 
     const loginWithGoogle = async () => {
         setLoading(true);

@@ -1,15 +1,32 @@
 // src/components/Header.jsx
 import React from 'react';
-import { Search, Bell, Settings } from 'lucide-react';
+import { Search, Bell, Settings, Home, Video } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
 
-export default function Header() {
+export default function Header({ title }) {
+    const navigate = useNavigate();
     const { unreadCount } = useNotifications();
     const { userProfile } = useAuth();
 
     return (
         <header className="h-[88px] flex items-center justify-between px-8 bg-white/80 backdrop-blur-md border-b border-[#F1F5F9] sticky top-0 z-40">
+            <div className="flex items-center gap-6 mr-8">
+                <div onClick={() => navigate('/')} className="flex items-center gap-2 cursor-pointer group">
+                    <div className="w-9 h-9 rounded-xl bg-[#0F172A] flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <Video className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="hidden md:block">
+                        <h2 className="text-[18px] font-black text-[#0F172A] tracking-tighter uppercase italic leading-none">TalentFlow <span className="text-blue-600">Pro</span></h2>
+                        {title && <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1 italic">{title}</p>}
+                    </div>
+                </div>
+                <button onClick={() => navigate('/')} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-blue-600 transition-all" title="Anasayfa">
+                    <Home className="w-5 h-5" />
+                </button>
+            </div>
+
             {/* Search Bar */}
             <div className="flex-1 max-w-[480px]">
                 <div className="relative group">

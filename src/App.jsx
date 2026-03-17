@@ -24,6 +24,8 @@ import InterviewManagementPage from './pages/InterviewManagementPage';
 import DepartmentManagementPage from './pages/DepartmentManagementPage';
 import SourceManagementPage from './pages/SourceManagementPage';
 import LiveInterviewPage from './pages/LiveInterviewPage';
+import InterviewReportPage from './pages/InterviewReportPage';
+import CandidateExitPage from './pages/CandidateExitPage';
 
 export default function App() {
   return (
@@ -34,6 +36,9 @@ export default function App() {
             <MessageQueueProvider>
               <Routes>
                 <Route path="/live-interview/:sessionId" element={<LiveInterviewPage />} />
+                <Route path="/join/:sessionId" element={<LiveInterviewPage />} />
+                <Route path="/interview-report/:sessionId" element={<InterviewReportPage />} />
+                <Route path="/exit" element={<CandidateExitPage />} />
                 <Route path="/*" element={<AuthenticatedApp />} />
               </Routes>
             </MessageQueueProvider>
@@ -45,7 +50,7 @@ export default function App() {
 }
 
 function AuthenticatedApp() {
-  const { loading, error, isAuthenticated } = useAuth();
+  const { loading, error, isAuthenticated, user } = useAuth();
   const { settings } = useUserSettings();
   const [activeView, setActiveView] = useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -85,6 +90,11 @@ function AuthenticatedApp() {
     return <LoginPage />;
   }
 
+  // If user is anonymous (candidate), they should not see the dashboard
+  if (user?.isAnonymous) {
+    return <Navigate to="/exit" replace />;
+  }
+
   const renderPage = () => {
     switch (activeView) {
       case 'dashboard': return <Dashboard />;
@@ -99,6 +109,7 @@ function AuthenticatedApp() {
       case 'departments': return <DepartmentManagementPage />;
       case 'sources': return <SourceManagementPage />;
       case 'live-interview': return <LiveInterviewPage />;
+      case 'interview-report': return <InterviewReportPage />;
       default: return <Dashboard />;
     }
   };
