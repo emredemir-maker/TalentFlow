@@ -1,4 +1,3 @@
-console.log("[TalentFlow] App.jsx module load start");
 // src/App.jsx
 import { useState, useEffect } from 'react';
 import { Routes, Route, useLocation, Navigate, useNavigate } from 'react-router-dom';

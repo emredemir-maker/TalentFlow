@@ -10,7 +10,6 @@ export async function checkStarLogicGemini(transcript, context) {
     const instruction = `Aşağıdaki mülakat transcript parçasını STAR (Situation, Task, Action, Result) metodolojisine göre analiz et.
     
     Transcript: "${transcript}"
-    Aday: ${context?.candidate?.name || 'Aday'}
     
     GÖREV:
     1. Her bir STAR bileşeninin (S, T, A, R) bu parçada ne kadar kapsandığını 0-100 arası puanla.

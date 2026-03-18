@@ -33,7 +33,6 @@ Sen kıdemli ve son derece analitik bir İşe Alım Yöneticisisin. Görevin, ad
 
 export async function extractCandidateEvidence(jobDescription, candidateProfile, modelId = 'gemini-2.0-flash') {
     const sanitizedCandidate = {
-        name: candidateProfile.name,
         position: candidateProfile.position,
         experience: candidateProfile.experience,
         skills: candidateProfile.skills,
@@ -68,7 +67,6 @@ export async function extractPositionFromJD(jdText) {
 
 export async function quickCandidateScreening(candidateProfile, openPositions) {
     const sanitizedCandidate = {
-        name: candidateProfile.name,
         position: candidateProfile.position,
         experience: candidateProfile.experience,
         skills: candidateProfile.skills,

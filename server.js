@@ -82,7 +82,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
     storage: storage,
-    limits: { fileSize: 5 * 1024 * 1024 }, // 10MB Limit
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB Limit
     fileFilter: (req, file, cb) => {
         const allowedTypes = [
             'application/pdf',
@@ -124,8 +124,25 @@ const isAllowedOrigin = (origin) => {
 app.use(helmet({
     contentSecurityPolicy: false,
 }));
-// app.use(xss());
+app.use(xss());
 app.use(hpp());
+
+// Rate limiters
+const generalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 200,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Çok fazla istek gönderildi. Lütfen 15 dakika sonra tekrar deneyin.' }
+});
+
+const aiLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'AI istek limiti aşıldı. Lütfen 1 dakika sonra tekrar deneyin.' }
+});
 
 // Strict CORS setup
 app.use(cors({
@@ -140,8 +157,8 @@ app.use(cors({
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     credentials: true
 }));
-// app.use(xss()); // Protect against XSS in body
-app.use(express.json({ limit: '5mb' })); // Increased for long transcript logs
+app.use(express.json({ limit: '5mb' }));
+app.use(generalLimiter);
 
 // Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(uploadBaseDir, 'uploads')));
@@ -174,8 +191,6 @@ async function getApiKey() {
     return null;
 }
 
-// genAI will be initialized per function call to ensure latest API key
-
 // Gemini Parser Function
 async function parseProfile(text, modelId = 'gemini-2.0-flash') {
     const apiKey = await getApiKey();
@@ -184,9 +199,6 @@ async function parseProfile(text, modelId = 'gemini-2.0-flash') {
         return null;
     }
 
-    console.log(`🤖 Using model: ${modelId} for parsing...`);
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: modelId });
     const prompt = `You are a strict JSON parser.
     Extract the following fields from the LinkedIn profile text below:
     - name (Full Name)
@@ -198,7 +210,6 @@ async function parseProfile(text, modelId = 'gemini-2.0-flash') {
     - education (Last school/degree)
     - summary (Professional summary in TURKISH, max 400 chars)
 
-
     Mark missing fields as null.
     Add "source": "Auto Scraper".
     IMPORTANT: The input text might be in any language, but ALL output text fields MUST be in TURKISH.
@@ -209,12 +220,11 @@ async function parseProfile(text, modelId = 'gemini-2.0-flash') {
     Return ONLY raw JSON. No markdown.`;
 
     try {
-        console.log(`🤖 Using Gemini (${modelId}) to parse profile...`);
+        const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({ model: modelId });
         const result = await model.generateContent(prompt);
         let responseText = result.response.text();
 
-        // Clean markdown code blocks if present
         responseText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
 
         const json = JSON.parse(responseText);
@@ -227,7 +237,7 @@ async function parseProfile(text, modelId = 'gemini-2.0-flash') {
 }
 
 // Scrape Endpoint
-app.get('/api/scrape', async (req, res) => {
+app.get('/api/scrape', aiLimiter, async (req, res) => {
     const query = req.query.q;
     if (!query) return res.status(400).json({ error: 'Query parameter "q" is required.' });
 
@@ -548,7 +558,7 @@ async function handleDirectUrl(url, res, isVisual = false) {
             return res.json({ candidates: [], message: 'LinkedIn bu sayfayı görmemizi engelledi (Giriş duvarı). Lütfen "Tarayıcıda Oturumu Hazırla" butonunu kullanarak giriş yapın.' });
         }
 
-        const candidate = await parseProfile(bodyText, 'gemini-pro');
+        const candidate = await parseProfile(bodyText, 'gemini-2.0-flash');
         if (candidate && candidate.name && candidate.name !== 'Belirtilmemiş') {
             candidate.linkedinUrl = url;
             candidate.source = 'Direct URL Scrape';
@@ -568,7 +578,7 @@ async function handleDirectUrl(url, res, isVisual = false) {
 }
 
 // Direct Add from Browser Extension / Console Script
-app.post('/api/direct-add', async (req, res) => {
+app.post('/api/direct-add', aiLimiter, async (req, res) => {
     try {
         const { text, url } = req.body;
         console.log(`📥 Direct Add request for: ${url}`);
@@ -590,7 +600,7 @@ app.post('/api/direct-add', async (req, res) => {
 });
 
 // Process CV Uploads (Bulk)
-app.post('/api/process-cv', upload.array('cvs', 20), async (req, res) => {
+app.post('/api/process-cv', aiLimiter, upload.array('cvs', 20), async (req, res) => {
     try {
         if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'Dosya seçilmedi' });
 
@@ -638,7 +648,7 @@ app.post('/api/process-cv', upload.array('cvs', 20), async (req, res) => {
 
 // Gemini STT Endpoint (Audio to Text)
 const audioUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
-app.post('/api/gemini-stt', audioUpload.single('audio'), async (req, res) => {
+app.post('/api/gemini-stt', aiLimiter, audioUpload.single('audio'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: 'Ses dosyası bulunamadı' });
         

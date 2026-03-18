@@ -1,4 +1,3 @@
-console.log("[TalentFlow] CandidatesContext.jsx module load start");
 // src/context/CandidatesContext.jsx
 // Candidates Context - Real-time Firestore listener with client-side filtering
 // Rule 2 Compliance: Uses onSnapshot without complex queries, filters client-side
