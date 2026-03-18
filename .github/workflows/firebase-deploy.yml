@@ -40,7 +40,7 @@ jobs:
       - name: Deploy to Firebase
         uses: w9jds/firebase-action@master
         with:
-          args: deploy --project talentflow-84bb6
+          args: deploy --only hosting,firestore --project talentflow-84bb6
         env:
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
 
