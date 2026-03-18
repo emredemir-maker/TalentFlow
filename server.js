@@ -877,11 +877,21 @@ app.get('/api/session/:sessionId', async (req, res) => {
     const { sessionId } = req.params;
     if (!sessionId) return res.status(400).json({ error: 'sessionId required' });
     try {
+        // Optimisation: extract the 4-char prefix from the session ID (format: iv-XXXX-NNNN)
+        // and only scan the candidate whose ID starts with that prefix when possible.
+        const parts = sessionId.split('-'); // ['iv', '4charPrefix', '4digits']
+        const prefix = parts.length >= 2 ? parts[1] : null;
+
         const snapshot = await db.collection('artifacts/talent-flow/public/data/candidates').get();
         for (const docSnap of snapshot.docs) {
+            // Skip documents whose ID doesn't match the prefix — fast short-circuit
+            if (prefix && !docSnap.id.startsWith(prefix)) continue;
+
             const data = docSnap.data();
             const session = (data.interviewSessions || []).find(s => s.id === sessionId);
             if (session) {
+                const visibleQuestions = (session.questions || []).filter(q => q.visibleToCandidate);
+                console.log(`[GET /api/session] Found session ${sessionId} — ${visibleQuestions.length} visible question(s), status: ${session.candidateStatus}`);
                 return res.json({
                     found: true,
                     candidateId: docSnap.id,
@@ -890,9 +900,32 @@ app.get('/api/session/:sessionId', async (req, res) => {
                     candidateStatus: session.candidateStatus,
                     recruiterPresence: session.recruiterPresence,
                     lastActive: session.lastActive,
-                    questions: (session.questions || []).filter(q => q.visibleToCandidate),
+                    questions: visibleQuestions,
                     currentQuestionIndex: session.currentQuestionIndex,
                 });
+            }
+        }
+        // Fallback: second pass over the same snapshot without the prefix filter
+        if (prefix) {
+            for (const docSnap of snapshot.docs) {
+                if (docSnap.id.startsWith(prefix)) continue; // already checked above
+                const data = docSnap.data();
+                const session = (data.interviewSessions || []).find(s => s.id === sessionId);
+                if (session) {
+                    const visibleQuestions = (session.questions || []).filter(q => q.visibleToCandidate);
+                    console.log(`[GET /api/session] Fallback found session ${sessionId} — ${visibleQuestions.length} visible question(s)`);
+                    return res.json({
+                        found: true,
+                        candidateId: docSnap.id,
+                        candidateName: data.name,
+                        status: session.status,
+                        candidateStatus: session.candidateStatus,
+                        recruiterPresence: session.recruiterPresence,
+                        lastActive: session.lastActive,
+                        questions: visibleQuestions,
+                        currentQuestionIndex: session.currentQuestionIndex,
+                    });
+                }
             }
         }
         return res.status(404).json({ found: false, error: 'Seans bulunamadı.' });

@@ -298,7 +298,7 @@ export default function LiveInterviewPage() {
     }, [isAuthenticated, role, userProfile, user]);
 
     // Polling effect for candidates (anonymous users can't read Firestore directly)
-    // Polls /api/session/:sessionId every 3 seconds to get live session status and visible questions
+    // Polls /api/session/:sessionId every 2 seconds to get live session status and visible questions
     useEffect(() => {
         const isJoinRoute = window.location.pathname.startsWith('/join/');
         if (!isJoinRoute || isRecruiter) return;
@@ -307,13 +307,22 @@ export default function LiveInterviewPage() {
         const poll = async () => {
             try {
                 const res = await fetch(`/api/session/${sessionId}`);
-                if (!res.ok) return;
+                if (!res.ok) {
+                    console.warn(`[Candidate Polling] Server responded ${res.status} for session ${sessionId}`);
+                    return;
+                }
                 const data = await res.json();
                 if (data.found !== false) {
                     setApiSession(prev => ({ ...(prev || {}), ...data }));
-                    if (data.candidateId && !apiCandidateId) setApiCandidateId(data.candidateId);
+                    // Use functional update to avoid stale closure on apiCandidateId
+                    if (data.candidateId) setApiCandidateId(prev => prev || data.candidateId);
                     // Only sync candidate-visible questions (server already filters visibleToCandidate)
-                    if (Array.isArray(data.questions)) setQuestions(data.questions);
+                    if (Array.isArray(data.questions)) {
+                        console.log(`[Candidate Polling] ${data.questions.length} visible question(s) received`);
+                        setQuestions(data.questions);
+                    }
+                } else {
+                    console.warn('[Candidate Polling] Session not found yet, retrying...');
                 }
             } catch (e) {
                 console.warn('[Candidate Polling]', e.message);
@@ -321,9 +330,9 @@ export default function LiveInterviewPage() {
         };
 
         poll();
-        const interval = setInterval(poll, 3000);
+        const interval = setInterval(poll, 2000);
         return () => clearInterval(interval);
-    }, [sessionId, isRecruiter, apiCandidateId]);
+    }, [sessionId, isRecruiter]);
 
     // Elapsed time counter — starts when recruiter enters active phase
     useEffect(() => {
@@ -352,11 +361,14 @@ export default function LiveInterviewPage() {
                 updates: data 
             };
             
+            console.log('[persistSessionData] Sending to server:', { sessionId, candidateId, updates: Object.keys(data) });
             fetch(`${sUrl}/api/update-candidate-status`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
-            }).catch(e => console.warn("Background proxy sync failed", e)); // Fire and forget for UI speed
+            }).then(r => {
+                if (!r.ok) console.error('[persistSessionData] Server error:', r.status);
+            }).catch(e => console.warn('[persistSessionData] Network error:', e.message));
 
             // For recruiter: always do a localized sync to ensure UI sees the change instantly
             if (isRecruiter && candidateData?.id) {
@@ -613,7 +625,7 @@ export default function LiveInterviewPage() {
 
     useEffect(() => {
         // Only run STT when interview is active, mic is on, and we have a stream
-        if (phase !== 'active' || !isMicOn || !streamRef.current) {
+        if (phase !== 'active' || !isMicOn || !stream) {
              if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
                  mediaRecorderRef.current.onstop = null; // prevent looping
                  mediaRecorderRef.current.stop();
@@ -623,7 +635,7 @@ export default function LiveInterviewPage() {
              return;
         }
 
-        const audioTrack = streamRef.current.getAudioTracks()[0];
+        const audioTrack = stream.getAudioTracks()[0];
         if (!audioTrack) {
              console.warn("[STT] No audio track available.");
              return;
@@ -695,7 +707,7 @@ export default function LiveInterviewPage() {
              }
              setIsRecording(false);
         };
-    }, [phase, isMicOn, streamRef.current, isRecruiter]);
+    }, [phase, isMicOn, stream, isRecruiter]);
 
     useEffect(() => {
         const getDevices = async () => {
