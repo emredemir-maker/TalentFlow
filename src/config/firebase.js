@@ -13,17 +13,31 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+export const isFirebaseConfigured =
+  !!firebaseConfig.apiKey &&
+  firebaseConfig.apiKey !== 'your_api_key' &&
+  !!firebaseConfig.projectId &&
+  firebaseConfig.projectId !== 'your_project_id';
 
-// Initialize Firestore
-export const db = getFirestore(app);
+let app = null;
+let db = null;
+let auth = null;
+let storage = null;
+let googleProvider = null;
 
-// Initialize Auth
-export const auth = getAuth(app);
-export const googleProvider = new GoogleAuthProvider();
+if (isFirebaseConfigured) {
+  try {
+    app = initializeApp(firebaseConfig);
+    db = getFirestore(app);
+    auth = getAuth(app);
+    googleProvider = new GoogleAuthProvider();
+    storage = getStorage(app);
+  } catch (err) {
+    console.error('[Firebase] Initialization failed:', err);
+  }
+} else {
+  console.warn('[Firebase] Not configured — set VITE_FIREBASE_* environment variables to enable.');
+}
 
-// Initialize Storage
-export const storage = getStorage(app);
-
+export { db, auth, googleProvider, storage };
 export default app;

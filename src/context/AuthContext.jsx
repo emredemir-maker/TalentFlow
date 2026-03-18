@@ -26,7 +26,7 @@ import {
     updateDoc,
     onSnapshot
 } from 'firebase/firestore';
-import { auth, db, googleProvider } from '../config/firebase';
+import { auth, db, googleProvider, isFirebaseConfigured } from '../config/firebase';
 
 const AuthContext = createContext(null);
 
@@ -43,6 +43,12 @@ export function AuthProvider({ children }) {
     const [error, setError] = useState(null);
 
     useEffect(() => {
+        if (!isFirebaseConfigured || !auth) {
+            setError('Firebase yapılandırılmamış. Lütfen VITE_FIREBASE_* ortam değişkenlerini ayarlayın.');
+            setLoading(false);
+            return;
+        }
+
         let unsubscribeProfile = null;
 
         const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
