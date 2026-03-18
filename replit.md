@@ -78,3 +78,21 @@ Copy `.env.example` to `.env` and fill in:
 
 ## Package Manager
 npm (with package-lock.json)
+
+## Live Interview System Notes
+
+### Candidate Flow (Anonymous Users)
+- Candidates join via `/join/:sessionId` — they authenticate anonymously via Firebase Auth
+- Anonymous users **cannot read Firestore** (rules don't allow it), so `candidateData` from the CandidatesContext may be null
+- To handle this, `LiveInterviewPage` polls `GET /api/session/:sessionId` every 3 seconds — the server uses Firebase Admin SDK (bypasses auth rules) to fetch and return session status and only the questions marked `visibleToCandidate: true`
+- The `apiSession` state stores this polled data; `effectiveSession = session || apiSession` is used throughout the lifecycle effects
+
+### API Calls
+- All frontend-to-backend API calls must use **relative URLs** (e.g., `/api/gemini-stt`) — NOT `http://localhost:3001/...`
+- Vite proxy routes `/api/*` → `http://localhost:3001/api/*` (see `vite.config.js`)
+- `VITE_SERVER_URL` env var is optional; the default is `''` (empty string = relative URL)
+
+### Question Visibility
+- Questions in Firestore have a `visibleToCandidate` boolean field
+- Recruiters see ALL questions; candidates only see questions explicitly sent to them via "ADAYA GÖNDER"
+- The polling endpoint (`GET /api/session/:sessionId`) filters questions server-side before returning to candidates

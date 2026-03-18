@@ -24,6 +24,20 @@ export default function LiveInterviewPage() {
     const [phase, setPhase] = useState('lobby'); // lobby, active, finished
     const [isRecruiter, setIsRecruiter] = useState(false);
 
+    // Candidate-side API session (for anonymous users who can't read Firestore directly)
+    const [apiSession, setApiSession] = useState(null);
+    const [apiCandidateId, setApiCandidateId] = useState(null);
+
+    // Elapsed time timer (for recruiter active view)
+    const [elapsedTime, setElapsedTime] = useState(0);
+    const elapsedTimerRef = useRef(null);
+
+    // recognitionRef placeholder (legacy WebSpeech API ref, replaced by Gemini STT)
+    const recognitionRef = useRef(null);
+
+    // transcriptData for simulation (empty by default)
+    const transcriptData = [];
+
     const candidateData = useMemo(() => {
         if (!candidates || !sessionId) return null;
         const parts = sessionId.split('-');
@@ -220,11 +234,15 @@ export default function LiveInterviewPage() {
     const simulationInsights = [];
 
     // Handle side effects (redirects, phase transitions)
+    // effectiveSession: falls back to API-polled session data for anonymous candidates who can't read Firestore
     useEffect(() => {
-        if (!candidateData || !session) return;
+        const effectiveSession = session || apiSession;
+        if (!effectiveSession) return;
+        // For recruiter: also require candidateData to be present
+        if (isRecruiter && !candidateData) return;
 
         // 1. Completion Redirects
-        if (session.status === 'completed' && phase !== 'finished') {
+        if (effectiveSession.status === 'completed' && phase !== 'finished') {
             if (isRecruiter) {
                 console.log("[LiveInterview] Session completed. Redirecting recruiter to report...");
                 navigate(`/interview-report/${sessionId}`);
@@ -238,25 +256,29 @@ export default function LiveInterviewPage() {
 
         // 2. AUTO-SYNC FOR CANDIDATES: If recruiter starts session (status: live), move to active
         // Only trigger if candidate is already in waiting state (lobby_ready) and admitted by recruiter
-        if (!isRecruiter && session.status === 'live' && session.candidateStatus === 'admitted' && phase === 'lobby_ready') {
-            console.log("[LiveInterview] Recruiter started room and admitted candidate. Transitioning candidate to active...");
+        if (!isRecruiter && effectiveSession.status === 'live' && effectiveSession.candidateStatus === 'admitted' && phase === 'lobby_ready') {
+            console.log("[LiveInterview] Recruiter admitted candidate. Transitioning to active...");
             setPhase('active');
         }
 
         // 3. Sync session metadata in real-time
-        if (session?.status === 'live') {
-            if (session.activeStrategy) setActiveStrategy(session.activeStrategy);
-            if (session.questions) setQuestions(session.questions);
-            if (session.selectedPathId) setSelectedPathId(session.selectedPathId);
-            if (session.currentQuestionIndex !== undefined) setCurrentQuestionIndex(session.currentQuestionIndex);
-            if (session.transcript) setTranscript(session.transcript);
+        if (effectiveSession.status === 'live') {
+            if (isRecruiter) {
+                // Recruiter gets full session data from Firestore
+                if (session?.activeStrategy) setActiveStrategy(session.activeStrategy);
+                if (session?.questions) setQuestions(session.questions);
+                if (session?.selectedPathId) setSelectedPathId(session.selectedPathId);
+                if (session?.currentQuestionIndex !== undefined) setCurrentQuestionIndex(session.currentQuestionIndex);
+                if (session?.transcript) setTranscript(session.transcript);
+            }
+            // Candidate question sync is handled by the polling effect below (only visibleToCandidate questions)
         } else if (phase === 'lobby') {
             // Force questions to be hidden to candidate in lobby
             if (questions.some(q => q.visibleToCandidate)) {
                 setQuestions(prev => prev.map(q => ({ ...q, visibleToCandidate: false })));
             }
         }
-    }, [candidateData, session, phase, navigate, sessionId, isRecruiter, questions]);
+    }, [candidateData, session, apiSession, phase, navigate, sessionId, isRecruiter, questions]);
 
     // Recruiter Role Detection
     useEffect(() => {
@@ -275,15 +297,55 @@ export default function LiveInterviewPage() {
         }
     }, [isAuthenticated, role, userProfile, user]);
 
+    // Polling effect for candidates (anonymous users can't read Firestore directly)
+    // Polls /api/session/:sessionId every 3 seconds to get live session status and visible questions
+    useEffect(() => {
+        const isJoinRoute = window.location.pathname.startsWith('/join/');
+        if (!isJoinRoute || isRecruiter) return;
+        if (!sessionId) return;
+
+        const poll = async () => {
+            try {
+                const res = await fetch(`/api/session/${sessionId}`);
+                if (!res.ok) return;
+                const data = await res.json();
+                if (data.found !== false) {
+                    setApiSession(prev => ({ ...(prev || {}), ...data }));
+                    if (data.candidateId && !apiCandidateId) setApiCandidateId(data.candidateId);
+                    // Only sync candidate-visible questions (server already filters visibleToCandidate)
+                    if (Array.isArray(data.questions)) setQuestions(data.questions);
+                }
+            } catch (e) {
+                console.warn('[Candidate Polling]', e.message);
+            }
+        };
+
+        poll();
+        const interval = setInterval(poll, 3000);
+        return () => clearInterval(interval);
+    }, [sessionId, isRecruiter, apiCandidateId]);
+
+    // Elapsed time counter — starts when recruiter enters active phase
+    useEffect(() => {
+        if (phase === 'active' && isRecruiter) {
+            elapsedTimerRef.current = setInterval(() => {
+                setElapsedTime(t => t + 1);
+            }, 1000);
+        } else {
+            clearInterval(elapsedTimerRef.current);
+        }
+        return () => clearInterval(elapsedTimerRef.current);
+    }, [phase, isRecruiter]);
+
     const persistSessionData = async (data) => {
         if (!sessionId) return;
         
-        // Use candidateId from data if provided, otherwise fallback to candidateData
-        const candidateId = data.candidateId || candidateData?.id;
+        // Use candidateId from data if provided, otherwise fallback to candidateData or apiCandidateId (for anonymous users)
+        const candidateId = data.candidateId || candidateData?.id || apiCandidateId;
         if (!candidateId && !isRecruiter) return; // Anonymous joiner needs candidateId for proxy
 
         try {
-            const sUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+            const sUrl = import.meta.env.VITE_SERVER_URL || '';
             const payload = { 
                 sessionId, 
                 candidateId: candidateId || 'internal', 
@@ -521,7 +583,7 @@ export default function LiveInterviewPage() {
             const formData = new FormData();
             formData.append('audio', blob, 'chunk.webm');
 
-            const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+            const serverUrl = import.meta.env.VITE_SERVER_URL || '';
             
             const req = await fetch(`${serverUrl}/api/gemini-stt`, {
                 method: 'POST',
@@ -718,7 +780,10 @@ export default function LiveInterviewPage() {
         </div>
     );
 
-    if (!candidateData && isDataInitialized) {
+    // For candidates on /join/ routes: Firestore is unavailable for anonymous users.
+    // We use apiSession (polled from server) instead. Show a loading screen until polling starts.
+    const isJoinRoute = window.location.pathname.startsWith('/join/');
+    if (!candidateData && isDataInitialized && !isJoinRoute) {
         return (
             <div className="min-h-screen bg-[#0F172A] flex flex-col items-center justify-center p-6 gap-6 text-white font-sans italic">
                 <div className="w-20 h-20 rounded-3xl bg-amber-500/10 flex items-center justify-center border border-amber-500/20">
@@ -740,7 +805,12 @@ export default function LiveInterviewPage() {
         );
     }
 
-    if (!candidateData) return <LoadingScreen message="Oturum doğrulanıyor..." />;
+    // For /join/ routes: if candidateData is null but apiSession is loading, show loading screen
+    if (!candidateData && isJoinRoute && !apiSession) {
+        return <LoadingScreen message="Seans doğrulanıyor..." subtext="Lütfen bekleyin" />;
+    }
+
+    if (!candidateData && !isJoinRoute) return <LoadingScreen message="Oturum doğrulanıyor..." />;
 
     if (phase === 'lobby') {
         if (isRecruiter) {
@@ -1373,7 +1443,7 @@ export default function LiveInterviewPage() {
                                         <button
                                             onClick={async () => {
                                                 try {
-                                                    const sUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+                                                    const sUrl = import.meta.env.VITE_SERVER_URL || '';
                                                     await fetch(`${sUrl}/api/update-candidate-status`, {
                                                         method: 'POST',
                                                         headers: { 'Content-Type': 'application/json' },

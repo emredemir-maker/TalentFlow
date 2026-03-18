@@ -872,6 +872,36 @@ app.post('/api/google/create-calendar-event', async (req, res) => {
     }
 });
 
+// GET /api/session/:sessionId - Public endpoint for candidates to poll session status
+app.get('/api/session/:sessionId', async (req, res) => {
+    const { sessionId } = req.params;
+    if (!sessionId) return res.status(400).json({ error: 'sessionId required' });
+    try {
+        const snapshot = await db.collection('artifacts/talent-flow/public/data/candidates').get();
+        for (const docSnap of snapshot.docs) {
+            const data = docSnap.data();
+            const session = (data.interviewSessions || []).find(s => s.id === sessionId);
+            if (session) {
+                return res.json({
+                    found: true,
+                    candidateId: docSnap.id,
+                    candidateName: data.name,
+                    status: session.status,
+                    candidateStatus: session.candidateStatus,
+                    recruiterPresence: session.recruiterPresence,
+                    lastActive: session.lastActive,
+                    questions: (session.questions || []).filter(q => q.visibleToCandidate),
+                    currentQuestionIndex: session.currentQuestionIndex,
+                });
+            }
+        }
+        return res.status(404).json({ found: false, error: 'Seans bulunamadı.' });
+    } catch (err) {
+        console.error('GET /api/session error:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.post('/api/update-candidate-status', async (req, res) => {
     const { sessionId, candidateId, updates } = req.body;
     if (!sessionId || !candidateId || !updates) {
