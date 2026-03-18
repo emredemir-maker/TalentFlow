@@ -101,12 +101,24 @@ const app = express();
 const allowedOrigins = [
     'http://localhost:5173',
     'http://localhost:5174',
+    'http://localhost:5000',
     'http://127.0.0.1:5173',
     'http://127.0.0.1:5174',
+    'http://127.0.0.1:5000',
     'http://localhost:3000',
     process.env.VITE_APP_URL,
     process.env.APP_URL
 ].filter(Boolean);
+
+// Replit preview domains are dynamic — allow all *.replit.dev and *.replit.app origins
+const isAllowedOrigin = (origin) => {
+    if (!origin) return true; // curl / mobile / server-to-server
+    if (allowedOrigins.includes(origin)) return true;
+    if (/^https:\/\/.*\.replit\.dev$/.test(origin)) return true;
+    if (/^https:\/\/.*\.replit\.app$/.test(origin)) return true;
+    if (/^https:\/\/.*\.pike\.replit\.dev$/.test(origin)) return true;
+    return false;
+};
 
 // --- Security Middlewares ---
 app.use(helmet({
@@ -118,9 +130,7 @@ app.use(hpp());
 // Strict CORS setup
 app.use(cors({
     origin: (origin, callback) => {
-        // Allow requests with no origin (like mobile apps or curl) 
-        // OR if origin is in allowed list
-        if (!origin || allowedOrigins.includes(origin)) {
+        if (isAllowedOrigin(origin)) {
             callback(null, true);
         } else {
             console.warn(`🛑 Blocked CORS request from: ${origin}`);
