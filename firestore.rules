@@ -57,6 +57,12 @@ service cloud.firestore {
       allow write: if isSuperAdmin();
     }
 
+    // --- Live Interviews Collection ---
+    // Allows candidates (anonymous) to update their status/lobby presence
+    match /interviews/{sessionId} {
+      allow read, write: if true;
+    }
+
     // Default deny
     match /{document=**} {
       allow read, write: if false;

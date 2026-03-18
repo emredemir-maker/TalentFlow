@@ -1,3 +1,4 @@
+
 // src/pages/LiveInterviewPage.jsx
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -6,12 +7,13 @@ import {
     ShieldCheck, Camera, Monitor, Sparkles, Brain, Zap,
     MessageSquare, Users, AlertCircle, CheckCircle2,
     Send, Play, Info, Copy, Check, ChevronRight, HelpCircle, Activity, ArrowRight, ArrowLeft,
-    Target, Box, Code, Loader2, AlertTriangle, TrendingUp, Award, ChevronDown, RefreshCw, User, Flag, Star, FileText, ExternalLink, MoreVertical, Clock, ChevronLeft
+    Target, Box, Code, Loader2, AlertTriangle, TrendingUp, Award, ChevronDown, RefreshCw, User, Flag, Star, FileText, ExternalLink, MoreVertical, Clock, ChevronLeft, LogOut
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCandidates } from '../context/CandidatesContext';
 import { generateInterviewPaths, generateFollowUpQuestion } from '../services/geminiService';
 import LoadingScreen from '../components/LoadingScreen';
+import CandidateExitPage from './CandidateExitPage';
 
 export default function LiveInterviewPage() {
     const { sessionId } = useParams();
@@ -26,15 +28,15 @@ export default function LiveInterviewPage() {
         if (!candidates || !sessionId) return null;
         const parts = sessionId.split('-');
         const suffix = parts.length >= 2 ? parts[1] : null;
-        
+
         // Comprehensive candidate lookup
         return candidates.find(c => c.interviewSessions?.some(s => s.id === sessionId)) ||
-               (suffix ? candidates.find(c => c.id.substring(0, 4) === suffix) : null);
+            (suffix ? candidates.find(c => c.id.substring(0, 4) === suffix) : null);
     }, [candidates, sessionId]);
 
-    const session = useMemo(() => 
-        candidateData?.interviewSessions?.find(s => s.id === sessionId), 
-    [candidateData, sessionId]);
+    const session = useMemo(() =>
+        candidateData?.interviewSessions?.find(s => s.id === sessionId),
+        [candidateData, sessionId]);
 
     // Media States
     const [isMicOn, setIsMicOn] = useState(true);
@@ -93,12 +95,12 @@ export default function LiveInterviewPage() {
         if (!isRecruiter || !sessionId || !candidateData) return;
 
         console.log("[Presence] Recruiter session active. Starting heartbeat...");
-        
+
         // Initial presence update
         persistSessionData({ recruiterPresence: true, lastActive: new Date().toISOString() });
 
         const heartbeatInterval = setInterval(() => {
-            persistSessionData({ 
+            persistSessionData({
                 recruiterPresence: true,
                 lastActive: new Date().toISOString()
             });
@@ -113,7 +115,7 @@ export default function LiveInterviewPage() {
     // Phase 4: Session Lifecycle cleanup on window close
     useEffect(() => {
         if (!isRecruiter || !sessionId) return;
-        
+
         const handleUnload = () => {
             // Use sendBeacon for more reliable cleanup on close
             // But since we are using Firestore, we'll try a standard update or rely on heartbeat timeout
@@ -128,11 +130,11 @@ export default function LiveInterviewPage() {
     const isRecruiterActive = useMemo(() => {
         if (isRecruiter) return true; // You are the recruiter
         if (!session?.lastActive) return false;
-        
+
         const lastActiveDate = new Date(session.lastActive);
         const now = new Date();
         const diffSeconds = (now - lastActiveDate) / 1000;
-        
+
         return session.recruiterPresence && diffSeconds < 45; // 45 seconds buffer
     }, [session?.lastActive, session?.recruiterPresence, isRecruiter]);
 
@@ -169,8 +171,8 @@ export default function LiveInterviewPage() {
                     }));
                     setSelectedPathId(paths[0].id);
                     setQuestions(firstSet);
-                    
-                    await persistSessionData({ 
+
+                    await persistSessionData({
                         questions: firstSet,
                         activeStrategy: activeStrategy,
                         selectedPathId: paths[0].id
@@ -195,8 +197,8 @@ export default function LiveInterviewPage() {
             visibleToCandidate: false
         }));
         setQuestions(transformedQuestions);
-        persistSessionData({ 
-            questions: transformedQuestions, 
+        persistSessionData({
+            questions: transformedQuestions,
             selectedPathId: path.id,
             currentQuestionIndex: 0
         });
@@ -235,21 +237,26 @@ export default function LiveInterviewPage() {
         }
 
         // 2. AUTO-SYNC FOR CANDIDATES: If recruiter starts session (status: live), move to active
-        // Only trigger if candidate is already in waiting state (lobby_ready)
-        if (!isRecruiter && session.status === 'live' && phase === 'lobby_ready') {
-            console.log("[LiveInterview] Recruiter started room. Transitioning candidate to active...");
+        // Only trigger if candidate is already in waiting state (lobby_ready) and admitted by recruiter
+        if (!isRecruiter && session.status === 'live' && session.candidateStatus === 'admitted' && phase === 'lobby_ready') {
+            console.log("[LiveInterview] Recruiter started room and admitted candidate. Transitioning candidate to active...");
             setPhase('active');
         }
 
         // 3. Sync session metadata in real-time
-        if (session.status === 'live') {
+        if (session?.status === 'live') {
             if (session.activeStrategy) setActiveStrategy(session.activeStrategy);
             if (session.questions) setQuestions(session.questions);
             if (session.selectedPathId) setSelectedPathId(session.selectedPathId);
             if (session.currentQuestionIndex !== undefined) setCurrentQuestionIndex(session.currentQuestionIndex);
             if (session.transcript) setTranscript(session.transcript);
+        } else if (phase === 'lobby') {
+            // Force questions to be hidden to candidate in lobby
+            if (questions.some(q => q.visibleToCandidate)) {
+                setQuestions(prev => prev.map(q => ({ ...q, visibleToCandidate: false })));
+            }
         }
-    }, [candidateData, session, phase, navigate, sessionId, isRecruiter]);
+    }, [candidateData, session, phase, navigate, sessionId, isRecruiter, questions]);
 
     // Recruiter Role Detection
     useEffect(() => {
@@ -263,15 +270,42 @@ export default function LiveInterviewPage() {
             const currentRole = role || userProfile?.role;
             const isRec = currentRole === 'recruiter' || currentRole === 'admin' || currentRole === 'super_admin' || user?.email?.includes('recruiter');
             setIsRecruiter(isRec);
+        } else {
+            setIsRecruiter(false);
         }
     }, [isAuthenticated, role, userProfile, user]);
 
     const persistSessionData = async (data) => {
-        if (!candidateData || !sessionId) return;
-        const updatedSessions = (candidateData.interviewSessions || []).map(s =>
-            s.id === sessionId ? { ...s, ...data } : s
-        );
-        return await updateCandidate(candidateData.id, { interviewSessions: updatedSessions });
+        if (!sessionId) return;
+        
+        // Use candidateId from data if provided, otherwise fallback to candidateData
+        const candidateId = data.candidateId || candidateData?.id;
+        if (!candidateId && !isRecruiter) return; // Anonymous joiner needs candidateId for proxy
+
+        try {
+            const sUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+            const payload = { 
+                sessionId, 
+                candidateId: candidateId || 'internal', 
+                updates: data 
+            };
+            
+            fetch(`${sUrl}/api/update-candidate-status`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).catch(e => console.warn("Background proxy sync failed", e)); // Fire and forget for UI speed
+
+            // For recruiter: always do a localized sync to ensure UI sees the change instantly
+            if (isRecruiter && candidateData?.id) {
+                const updatedSessions = (candidateData.interviewSessions || []).map(s =>
+                    s.id === sessionId ? { ...s, ...data } : s
+                );
+                updateCandidate(candidateData.id, { interviewSessions: updatedSessions });
+            }
+        } catch (err) {
+            console.error("Session update failed", err);
+        }
     };
 
     // Ensure video feed is applied whenever the video element mounts or stream changes
@@ -338,7 +372,7 @@ export default function LiveInterviewPage() {
         if (!isRecruiter) {
             // Candidate finishing: Mark as finished in local state, persist, then logout and exit
             setPhase('finished');
-            await persistSessionData({ 
+            await persistSessionData({
                 status: 'completed',
                 candidateStatus: 'finished',
                 finishedAt: new Date().toISOString()
@@ -369,8 +403,8 @@ export default function LiveInterviewPage() {
                 starScores: starScores,
                 logicIntegrity: logicIntegrity,
                 transcript: transcript,
-                aiSummary: "Mülakat başarıyla tamamlandı. Adayın teknik yetkinliği ve STAR uyumu analiz edildi. " + 
-                           (transcript.length > 5 ? "Aday ile gerçekleştirilen detaylı diyaloglar üzerinden yetkinlik ölçümü yapıldı." : "Kısa süreli bir görüşme gerçekleştirildi."),
+                aiSummary: "Mülakat başarıyla tamamlandı. Adayın teknik yetkinliği ve STAR uyumu analiz edildi. " +
+                    (transcript.length > 5 ? "Aday ile gerçekleştirilen detaylı diyaloglar üzerinden yetkinlik ölçümü yapıldı." : "Kısa süreli bir görüşme gerçekleştirildi."),
                 questions: questions.map((q, idx) => ({
                     ...q,
                     answer: transcript.filter(t => t.role === 'ADAY')[idx]?.text || (transcript.length > idx ? "İlgili diyalog kaydedildi." : "Cevap kaydedilmedi."),
@@ -392,7 +426,7 @@ export default function LiveInterviewPage() {
         } catch (err) {
             console.error("Error saving session:", err);
             // Fallback to simpler persistence if detailed one fails
-            await persistSessionData({ 
+            await persistSessionData({
                 status: 'completed',
                 completedAt: new Date().toISOString()
             });
@@ -466,145 +500,140 @@ export default function LiveInterviewPage() {
         return () => clearInterval(interval);
     }, []);
 
-    // Real-time Transcription (STT) Engine - Robust Implementation
-    const recognitionRef = useRef(null);
-    const sttRestartTimerRef = useRef(null);
+    // Real-time Transcription Engine - Gemini Audio Implementation
+    const mediaRecorderRef = useRef(null);
+    const audioChunksRef = useRef([]);
+    const sttIntervalRef = useRef(null);
     const phaseRef = useRef(phase);
     const isMicOnRef = useRef(isMicOn);
-
+    
     // Keep refs in sync with state
     useEffect(() => { phaseRef.current = phase; }, [phase]);
     useEffect(() => { isMicOnRef.current = isMicOn; }, [isMicOn]);
+    
+    const liveTranscriptRef = useRef(transcript);
+    useEffect(() => { liveTranscriptRef.current = transcript; }, [transcript]);
+
+    const sendAudioToGemini = async (blob) => {
+        if (blob.size < 1000) return; // ignore empty/very short audio
+        
+        try {
+            const formData = new FormData();
+            formData.append('audio', blob, 'chunk.webm');
+
+            const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+            
+            const req = await fetch(`${serverUrl}/api/gemini-stt`, {
+                method: 'POST',
+                body: formData
+            });
+            const res = await req.json();
+
+            if (res.success && res.text) {
+                const cleanText = res.text.trim();
+                if (cleanText.length > 2 && !cleanText.toLowerCase().includes("sessizlik") && !cleanText.toLowerCase().includes("boş_ses")) {
+                     const roleLabel = isRecruiter ? 'YÖNETİCİ' : 'ADAY';
+                     const newEntry = {
+                         role: roleLabel,
+                         text: cleanText,
+                         confidence: 100, // Gemini provides literal text
+                         time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                     };
+
+                     setTranscript(prev => [...prev, newEntry]);
+                     persistSessionData({ transcript: [...liveTranscriptRef.current, newEntry] });
+                }
+            }
+        } catch (err) {
+            console.error("💥 Gemini Audio STT Error:", err);
+        }
+    };
 
     useEffect(() => {
-        // Only run STT when interview is active and mic is on
-        if (phase !== 'active' || !isMicOn) {
-            // Cleanup if conditions no longer met
-            if (recognitionRef.current) {
-                try { recognitionRef.current.abort(); } catch (e) { /* ignore */ }
-                recognitionRef.current = null;
-            }
-            if (sttRestartTimerRef.current) {
-                clearTimeout(sttRestartTimerRef.current);
-                sttRestartTimerRef.current = null;
-            }
-            setIsRecording(false);
-            return;
+        // Only run STT when interview is active, mic is on, and we have a stream
+        if (phase !== 'active' || !isMicOn || !streamRef.current) {
+             if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+                 mediaRecorderRef.current.onstop = null; // prevent looping
+                 mediaRecorderRef.current.stop();
+             }
+             if (sttIntervalRef.current) clearInterval(sttIntervalRef.current);
+             setIsRecording(false);
+             return;
         }
 
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechRecognition) {
-            console.warn("[STT] Web Speech API is not supported in this browser.");
-            return;
+        const audioTrack = streamRef.current.getAudioTracks()[0];
+        if (!audioTrack) {
+             console.warn("[STT] No audio track available.");
+             return;
         }
 
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = 'tr-TR';
-        recognition.maxAlternatives = 1;
-        recognitionRef.current = recognition;
+        const MediaRecorder = window.MediaRecorder;
+        if (!MediaRecorder) return;
 
-        const restartSTT = () => {
-            if (phaseRef.current !== 'active' || !isMicOnRef.current) return;
-            if (sttRestartTimerRef.current) clearTimeout(sttRestartTimerRef.current);
-            sttRestartTimerRef.current = setTimeout(() => {
-                if (phaseRef.current === 'active' && isMicOnRef.current && recognitionRef.current) {
-                    try {
-                        console.log("[STT] Restarting recognition...");
-                        recognitionRef.current.start();
-                    } catch (e) {
-                        console.warn("[STT] Restart failed, will retry:", e.message);
-                        restartSTT();
-                    }
-                }
-            }, 500);
-        };
+        let options = { mimeType: "audio/webm" };
+        const supportedTypes = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus"];
+        for (const type of supportedTypes) {
+             if (MediaRecorder.isTypeSupported(type)) {
+                  options.mimeType = type;
+                  break;
+             }
+        }
 
-        recognition.onstart = () => {
-            console.log("[STT] Recognition started.");
-            setIsRecording(true);
-        };
-
-        recognition.onend = () => {
-            console.log("[STT] Recognition ended.");
-            setIsRecording(false);
-            // Auto-restart if still in active phase
-            restartSTT();
-        };
-
-        recognition.onerror = (event) => {
-            console.warn("[STT] Error:", event.error);
-            switch (event.error) {
-                case 'no-speech':
-                    // Normal - no speech detected, will restart
-                    break;
-                case 'audio-capture':
-                    console.error("[STT] Mic not accessible. Check browser permissions.");
-                    break;
-                case 'not-allowed':
-                    console.error("[STT] Mic permission denied by user.");
-                    break;
-                case 'network':
-                    console.warn("[STT] Network error, will retry...");
-                    break;
-                case 'aborted':
-                    // Intentional abort, no action needed
-                    return;
-                default:
-                    console.warn("[STT] Unknown error:", event.error);
-            }
-            // Don't restart on permission errors
-            if (event.error !== 'not-allowed' && event.error !== 'aborted') {
-                restartSTT();
-            }
-        };
-
-        recognition.onresult = (event) => {
-            const lastResult = event.results[event.results.length - 1];
-            if (lastResult.isFinal) {
-                const text = lastResult[0].transcript.trim();
-                const confidence = lastResult[0].confidence;
-                
-                if (text && text.length > 1) {
-                    console.log(`[STT] Final: "${text}" (confidence: ${(confidence * 100).toFixed(1)}%)`);
-                    const roleLabel = isRecruiter ? 'YÖNETİCİ' : 'ADAY';
-                    const newEntry = {
-                        role: roleLabel,
-                        text: text,
-                        confidence: Math.round(confidence * 100),
-                        time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-                    };
-
-                    setTranscript(prev => [...prev, newEntry]);
-                    // Persist transcript to Firestore - done after state update
-                    persistSessionData({ transcript: [...transcript, newEntry] });
-                }
-            }
-        };
-
-        // Start recognition
         try {
-            recognition.start();
-            console.log("[STT] Initial start...");
-        } catch (e) {
-            console.error("[STT] Initial start failed:", e);
-            restartSTT();
+             // We use a strictly audio-only stream for recording chunks
+             const audioStream = new MediaStream([audioTrack]);
+             const recorder = new MediaRecorder(audioStream, options);
+             mediaRecorderRef.current = recorder;
+
+             recorder.ondataavailable = (e) => {
+                 if (e.data.size > 0) {
+                     audioChunksRef.current.push(e.data);
+                 }
+             };
+
+             recorder.onstop = () => {
+                 if (audioChunksRef.current.length > 0) {
+                     const blob = new Blob(audioChunksRef.current, { type: options.mimeType });
+                     audioChunksRef.current = [];
+                     sendAudioToGemini(blob);
+                 }
+                 // Restart if still active
+                 if (phaseRef.current === 'active' && isMicOnRef.current && streamRef.current?.getAudioTracks().length > 0) {
+                      try {
+                          recorder.start();
+                          setIsRecording(true);
+                      } catch (err) {
+                          console.error("STT restart err:", err);
+                      }
+                 } else {
+                      setIsRecording(false);
+                 }
+             };
+
+             // Initial start
+             recorder.start();
+             setIsRecording(true);
+
+             // Chunk logic: stop and thus flush & restart every 5 seconds
+             sttIntervalRef.current = setInterval(() => {
+                  if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+                       mediaRecorderRef.current.stop();
+                  }
+             }, 5000);
+
+        } catch (err) {
+             console.error("[STT] Init failed:", err);
         }
 
         return () => {
-            console.log("[STT] Cleaning up...");
-            if (sttRestartTimerRef.current) {
-                clearTimeout(sttRestartTimerRef.current);
-                sttRestartTimerRef.current = null;
-            }
-            if (recognitionRef.current) {
-                try { recognitionRef.current.abort(); } catch (e) { /* ignore */ }
-                recognitionRef.current = null;
-            }
-            setIsRecording(false);
+             if (sttIntervalRef.current) clearInterval(sttIntervalRef.current);
+             if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+                 mediaRecorderRef.current.onstop = null;
+                 mediaRecorderRef.current.stop();
+             }
+             setIsRecording(false);
         };
-    }, [phase, isMicOn, isRecruiter]);
+    }, [phase, isMicOn, streamRef.current, isRecruiter]);
 
     useEffect(() => {
         const getDevices = async () => {
@@ -672,7 +701,7 @@ export default function LiveInterviewPage() {
                         Mülakat linki geçersiz olabilir veya süresi dolmuş olabilir. Lütfen linki kontrol edip tekrar deneyin.
                     </p>
                 </div>
-                
+
                 {candidatesError && (
                     <div className="p-3 bg-red-500/5 rounded-xl border border-red-500/10 text-[8px] font-bold text-red-400 uppercase tracking-widest">
                         Sistem Hatası: {candidatesError}
@@ -792,7 +821,7 @@ export default function LiveInterviewPage() {
                                                     {window.location.origin}/join/{sessionId}
                                                 </p>
                                             </div>
-                                            <button 
+                                            <button
                                                 onClick={() => {
                                                     navigator.clipboard.writeText(`${window.location.origin}/join/${sessionId}`);
                                                     alert("Aday linki kopyalandı!");
@@ -804,7 +833,7 @@ export default function LiveInterviewPage() {
                                         </div>
                                     </div>
                                 </div>
-                                
+
                                 {/* AI Summary */}
                                 <div className="mt-2 bg-[#0F172A] rounded-[2rem] p-6 text-white relative border border-white/10 shadow-2xl overflow-visible group/summary">
                                     <div className="absolute -top-3 -right-3 p-4 bg-blue-600 rounded-2xl shadow-xl shadow-blue-900/40 z-10 transition-transform group-hover/summary:scale-110">
@@ -819,7 +848,7 @@ export default function LiveInterviewPage() {
                                     <div className="pt-4 border-t border-white/5 flex items-center justify-between">
                                         <span className="text-[8px] font-black text-white/30 uppercase tracking-widest italic">AI Analiz Motoru v2.0</span>
                                         <div className="flex gap-1">
-                                            {[1,2,3].map(i => <div key={i} className="w-1.5 h-1.5 rounded-full bg-blue-500/40" />)}
+                                            {[1, 2, 3].map(i => <div key={i} className="w-1.5 h-1.5 rounded-full bg-blue-500/40" />)}
                                         </div>
                                     </div>
                                 </div>
@@ -960,7 +989,24 @@ export default function LiveInterviewPage() {
                                                 ))}
                                             </div>
 
-                                            <div className="pt-4 border-t border-slate-100 shrink-0 mt-auto">
+                                            <div className="pt-4 border-t border-slate-100 shrink-0 mt-auto flex flex-col gap-4">
+                                                {/* STT Engine Diagnostic for Recruiter */}
+                                                <div className="p-4 bg-slate-50/50 rounded-[1.5rem] border border-slate-100/50 flex flex-col gap-3">
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className={`w-1.5 h-1.5 rounded-full ${isMicOn ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
+                                                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest italic">Ses Motoru Tanılama</span>
+                                                        </div>
+                                                        <span className="text-[7px] font-bold text-slate-400 uppercase tracking-[0.2em]">GERÇEK ZAMANLI</span>
+                                                    </div>
+                                                    <div className="h-10 flex items-center justify-center bg-white/50 rounded-xl border border-dashed border-slate-200 px-4 overflow-hidden relative">
+                                                        <p className="text-[9px] font-bold text-slate-600 italic truncate z-10 text-center">
+                                                            {transcript.length > 0 ? `"${transcript[transcript.length-1].text}"` : (isMicOn ? 'Mikrofon Bağlı - Konuşmanız algılanıyor...' : 'Lütfen Ses Ayarlarını Kontrol Edin')}
+                                                        </p>
+                                                        <div className="absolute left-0 bottom-0 h-0.5 bg-blue-500/10 transition-all duration-300" style={{ width: `${waveHeight[3]}%` }} />
+                                                    </div>
+                                                </div>
+
                                                 <button
                                                     onClick={async () => {
                                                         const startData = {
@@ -1067,9 +1113,9 @@ export default function LiveInterviewPage() {
                                 {/* Right Column: Interview Panel & Actions */}
                                 <div className="col-span-12 lg:col-span-5">
                                     <div className="bg-white rounded-[2.5rem] p-8 border border-slate-200 shadow-2xl relative overflow-hidden group">
-                                         <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-blue-500/10 transition-colors" />
-                                         
-                                         <div className="space-y-6">
+                                        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-blue-500/10 transition-colors" />
+
+                                        <div className="space-y-6">
                                             <div className="flex items-center gap-4">
                                                 <div className="w-14 h-14 rounded-2xl bg-[#0F172A] p-0.5 shadow-xl border border-slate-100 flex items-center justify-center shrink-0">
                                                     <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${userProfile?.name || 'Recruiter'}`} alt="R" className="w-full h-full rounded-xl" />
@@ -1085,40 +1131,60 @@ export default function LiveInterviewPage() {
                                             </p>
 
                                             <div className="space-y-3">
-                                                <div className="px-4 py-3 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between group-hover:bg-white transition-colors">
-                                                     <div className="flex items-center gap-3">
-                                                         <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                                                         <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">KVKK Onayı</span>
-                                                     </div>
-                                                     <input 
-                                                        type="checkbox" 
-                                                        checked={hasConsent} 
+                                                 <div className="px-4 py-3 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between group-hover:bg-white transition-colors">
+                                                    <div className="flex items-center gap-3">
+                                                        <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                                                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">KVKK Onayı</span>
+                                                    </div>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={hasConsent}
                                                         onChange={(e) => setHasConsent(e.target.checked)}
                                                         className="w-5 h-5 accent-blue-600 rounded-lg cursor-pointer"
-                                                     />
+                                                    />
                                                 </div>
-                                                
+
+                                                {/* STT / MIC TEST INDICATOR */}
+                                                <div className="px-4 py-3 bg-slate-50 rounded-2xl border border-slate-100 group-hover:bg-white transition-colors">
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <Mic className={`w-3.5 h-3.5 ${isMicOn ? 'text-blue-500' : 'text-slate-400'}`} />
+                                                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest italic">Ses Testi</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-0.5">
+                                                            {[1,2,3,4,5].map(i => (
+                                                                <div key={i} className={`w-1 rounded-full transition-all duration-75 ${isMicOn ? 'bg-blue-500' : 'bg-slate-200'}`} style={{ height: isMicOn ? `${waveHeight[i % waveHeight.length]}%` : '4px', minHeight: '4px' }} />
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                    <div className="h-8 flex items-center justify-center bg-black/5 rounded-xl border border-dashed border-white/10 px-3 overflow-hidden">
+                                                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest italic truncate">
+                                                            {isMicOn ? (isRecording ? 'Konuşmanız algılanıyor...' : 'Mikrofon Bağlı') : 'Lütfen Mikrofonu Açın'}
+                                                        </p>
+                                                    </div>
+                                                </div>
+
                                                 {/* Phase 5: Premium Waiting State */}
                                                 <div className={`relative overflow-hidden flex items-center gap-4 p-5 rounded-3xl border transition-all duration-500 ${isRecruiterActive ? 'bg-emerald-50/50 border-emerald-100 shadow-lg shadow-emerald-500/5' : 'bg-amber-50/50 border-amber-100 shadow-lg shadow-amber-500/5'}`}>
                                                     {!isRecruiterActive && (
                                                         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full animate-shimmer pointer-events-none" />
                                                     )}
-                                                    
+
                                                     <div className="relative">
-                                                        <div className={`w-3 h-3 rounded-full ${isRecruiterActive ? 'bg-emerald-500' : 'bg-amber-500'} shadow-lg`} />
-                                                        <div className={`absolute -inset-1.5 rounded-full ${isRecruiterActive ? 'bg-emerald-500/20' : 'bg-amber-500/20'} animate-ping`} />
+                                                        <div className={`w-3 h-3 rounded-full shadow-lg ${!isRecruiterActive ? 'bg-amber-500' : session?.status !== 'live' ? 'bg-blue-500' : 'bg-emerald-500'}`} />
+                                                        <div className={`absolute -inset-1.5 rounded-full animate-ping ${!isRecruiterActive ? 'bg-amber-500/20' : session?.status !== 'live' ? 'bg-blue-500/20' : 'bg-emerald-500/20'}`} />
                                                     </div>
-                                                    
+
                                                     <div className="flex-1 min-w-0">
-                                                        <p className={`text-[10px] font-black uppercase tracking-[0.15em] italic ${isRecruiterActive ? 'text-emerald-600' : 'text-amber-600'}`}>
-                                                            {isRecruiterActive ? 'Mülakatçı Hazır' : 'Mülakatçı Bekleniyor'}
+                                                        <p className={`text-[10px] font-black uppercase tracking-[0.15em] italic ${!isRecruiterActive ? 'text-amber-600' : session?.status !== 'live' ? 'text-blue-500' : 'text-emerald-600'}`}>
+                                                            {!isRecruiterActive ? 'Mülakatçı Bekleniyor' : session?.status !== 'live' ? 'Mülakatçı Hazırlanıyor' : 'Mülakatçı Hazır'}
                                                         </p>
                                                         <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5 truncate">
-                                                            {isRecruiterActive ? 'Hemen katılarak görüşmeyi başlatabilirsiniz' : 'Lütfen oturumun açılmasını bekleyin...'}
+                                                            {!isRecruiterActive ? 'Lütfen oturumun açılmasını bekleyin...' : session?.status !== 'live' ? 'Mülakatçı soruları ve salonu hazırlıyor...' : 'Hemen katılarak görüşmeyi başlatabilirsiniz'}
                                                         </p>
                                                     </div>
 
-                                                    {isRecruiterActive && (
+                                                    {isRecruiterActive && session?.status === 'live' && (
                                                         <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 animate-in zoom-in duration-300">
                                                             <Check className="w-4 h-4 text-emerald-600" />
                                                         </div>
@@ -1126,24 +1192,31 @@ export default function LiveInterviewPage() {
                                                 </div>
 
                                                 <button
-                                                    onClick={() => {
+                                                    onClick={async () => {
                                                         if (hasConsent) {
                                                             if (!isRecruiterActive) {
                                                                 alert("Mülakatçı henüz odaya katılmadı. Lütfen odaya girmesini bekleyin.");
                                                                 return;
                                                             }
-                                                            setPhase('lobby_ready');
+                                                            if (session?.status !== 'live') {
+                                                                alert("Mülakatçı henüz oturumu (Live) başlatmadı. Lütfen hazırlıkların bitmesini bekleyin.");
+                                                                return;
+                                                            }
+
+                                                             // Phase 6: Sync to DB via atomic proxy
+                                                             setPhase('lobby_ready');
+                                                             await persistSessionData({ candidateStatus: 'waiting_room' });
                                                         } else {
                                                             alert("Lütfen KVKK onayını kabul edin.");
                                                         }
                                                     }}
-                                                    className="w-full h-16 rounded-2xl bg-[#0F172A] text-white font-black text-[12px] uppercase tracking-[0.2em] shadow-2xl shadow-blue-900/40 flex items-center justify-center gap-3 transition-all hover:scale-[1.02] active:scale-95 group italic disabled:opacity-50"
-                                                    disabled={!hasConsent}
+                                                    className={`w-full h-16 rounded-2xl text-white font-black text-[12px] uppercase tracking-[0.2em] shadow-2xl flex items-center justify-center gap-3 transition-all hover:scale-[1.02] active:scale-95 group italic ${isRecruiterActive && session?.status === 'live' ? 'bg-[#0F172A] shadow-blue-900/40' : 'bg-slate-800 opacity-50 cursor-not-allowed'}`}
+                                                    disabled={!hasConsent || !isRecruiterActive || session?.status !== 'live'}
                                                 >
                                                     KATILMAYA HAZIRIM <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                                                 </button>
                                             </div>
-                                         </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1159,7 +1232,7 @@ export default function LiveInterviewPage() {
             <div className="min-h-screen bg-[#F8FAFC] font-sans flex flex-col items-center justify-center p-6 italic">
                 <div className="max-w-md w-full bg-white rounded-[3rem] p-12 text-center border border-slate-100 shadow-2xl space-y-8 relative overflow-hidden group">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-blue-500/10 transition-colors" />
-                    
+
                     <div className="relative">
                         <div className="w-24 h-24 rounded-[2rem] bg-[#0F172A] flex items-center justify-center mx-auto shadow-2xl shadow-blue-900/30 animate-bounce">
                             <Video className="w-10 h-10 text-white" />
@@ -1175,11 +1248,11 @@ export default function LiveInterviewPage() {
 
                     <div className="flex flex-col items-center gap-6">
                         <div className="flex gap-2">
-                             {[0,1,2].map(i => (
-                                 <div key={i} className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse" style={{ animationDelay: `${i * 200}ms` }} />
-                             ))}
+                            {[0, 1, 2].map(i => (
+                                <div key={i} className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse" style={{ animationDelay: `${i * 200}ms` }} />
+                            ))}
                         </div>
-                        <button 
+                        <button
                             onClick={() => setPhase('lobby')}
                             className="px-6 py-2 rounded-xl text-[10px] font-black text-slate-400 hover:text-[#0F172A] hover:bg-slate-50 transition-all uppercase tracking-[0.2em] border border-transparent hover:border-slate-100"
                         >
@@ -1192,6 +1265,9 @@ export default function LiveInterviewPage() {
     }
 
     if (phase === 'finished') {
+        if (!isRecruiter) {
+            return <CandidateExitPage />;
+        }
         return (
             <div className="min-h-screen bg-[#0F172A] flex flex-col items-center justify-center p-6 text-white font-sans italic">
                 <div className="bg-[#1E293B]/50 backdrop-blur-3xl p-12 rounded-[3rem] border border-white/10 shadow-2xl flex flex-col items-center gap-8 max-w-lg text-center animate-in zoom-in duration-500">
@@ -1257,69 +1333,116 @@ export default function LiveInterviewPage() {
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <button 
-                        onClick={() => {
-                            navigator.clipboard.writeText(`${window.location.origin}/join/${sessionId}`);
-                            alert("Aday linki kopyalandı!");
-                        }}
-                        className="h-8 px-3 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white font-black text-[9px] tracking-widest uppercase transition-all flex items-center gap-2 border border-blue-500/30 active:scale-95 cursor-pointer shadow-lg shadow-blue-500/10"
-                    >
-                        <Copy className="w-3 h-3" /> Aday Linki
-                    </button>
-                    <div className="flex items-center gap-2 px-2.5 py-1.5 bg-white/5 rounded-lg border border-white/5">
-                        <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
-                        <span className="text-[9px] font-black text-emerald-500 tracking-widest tabular-nums italic">LIVE: 24:15</span>
-                    </div>
-                    <button
-                        onClick={handleFinishInterview}
-                        className="px-4 py-1.5 rounded-lg bg-emerald-600/90 hover:bg-emerald-600 text-white font-black text-[9px] tracking-[0.1em] uppercase transition-all shadow-lg active:scale-95 flex items-center gap-2"
-                        title="Mülakatı Başarıyla Tamamla ve Raporu Oluştur"
-                    >
-                        <CheckCircle2 className="w-3 h-3" /> Mülakatı Tamamla
-                    </button>
-                    
-                    <div className="relative">
-                        <button
-                            onClick={() => setShowActionsMenu(!showActionsMenu)}
-                            className="w-10 h-8 flex items-center justify-center rounded-lg bg-white/5 text-white/40 hover:bg-white/10 hover:text-white transition-all border border-white/5 cursor-pointer"
-                        >
-                            <MoreVertical className="w-4 h-4" />
-                        </button>
-                        
-                        {showActionsMenu && (
-                            <div className="absolute top-full right-0 mt-2 w-48 bg-[#1E293B] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-[400] animate-in fade-in slide-in-from-top-2 duration-200">
-                            <button 
+                    {isRecruiter && (
+                        <>
+                            <button
                                 onClick={() => {
-                                    if(window.confirm("Mülakatı ertelemek ve daha sonra devam etmek istediğinize emin misiniz?")) {
-                                        persistSessionData({ status: 'scheduled' });
-                                        navigate('/');
-                                    }
+                                    navigator.clipboard.writeText(`${window.location.origin}/join/${sessionId}`);
+                                    alert("Aday linki kopyalandı!");
                                 }}
-                                className="w-full px-4 py-3 text-left text-[10px] font-bold text-slate-300 hover:bg-white/5 flex items-center gap-3 transition-colors"
+                                className="h-8 px-3 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white font-black text-[9px] tracking-widest uppercase transition-all flex items-center gap-2 border border-blue-500/30 active:scale-95 cursor-pointer shadow-lg shadow-blue-500/10"
                             >
-                                <Clock className="w-3.5 h-3.5 text-blue-400" /> Ertele / Duraklat
+                                <Copy className="w-3 h-3" /> Aday Linki
                             </button>
-                            <button 
-                                onClick={() => {
-                                    if(window.confirm("Mülakatı iptal etmek istediğinize emin misiniz? Bu işlem geri alınamaz.")) {
-                                        persistSessionData({ status: 'cancelled' });
-                                        navigate('/');
-                                    }
-                                }}
-                                className="w-full px-4 py-3 text-left text-[10px] font-bold text-red-400 hover:bg-red-500/10 flex items-center gap-3 transition-colors"
+
+                            {phase === 'active' && (
+                                <>
+                                    <div className="flex items-center gap-2 px-2.5 py-1.5 bg-white/5 rounded-lg border border-white/5">
+                                        <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
+                                        <span className="text-[9px] font-black text-emerald-500 tracking-widest tabular-nums italic">LIVE: {Math.floor(elapsedTime / 60).toString().padStart(2, '0')}:{String(elapsedTime % 60).padStart(2, '0')}</span>
+                                    </div>
+
+                                    {/* Aday Durum Göstergesi */}
+                                    {(!session?.candidateStatus || session.candidateStatus !== 'admitted') ? (
+                                        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${session?.candidateStatus === 'waiting_room' ? 'bg-amber-500/10 border-amber-500/20' : 'bg-rose-500/10 border-rose-500/20'}`}>
+                                            <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${session?.candidateStatus === 'waiting_room' ? 'bg-amber-500' : 'bg-rose-500'}`} />
+                                            <span className={`text-[9px] font-black tracking-widest uppercase ${session?.candidateStatus === 'waiting_room' ? 'text-amber-500' : 'text-rose-500'}`}>
+                                                {session?.candidateStatus === 'waiting_room' ? 'Aday Lobide Bekliyor' : 'Aday Henüz Girmedİ'}
+                                            </span>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                            <span className="text-[9px] font-black text-emerald-500 tracking-widest uppercase">
+                                                Aday Oturumda
+                                            </span>
+                                        </div>
+                                    )}
+
+                                    {(!session?.candidateStatus || session.candidateStatus !== 'admitted') && (
+                                        <button
+                                            onClick={async () => {
+                                                try {
+                                                    const sUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+                                                    await fetch(`${sUrl}/api/update-candidate-status`, {
+                                                        method: 'POST',
+                                                        headers: { 'Content-Type': 'application/json' },
+                                                        body: JSON.stringify({ sessionId, candidateId: candidateData.id, updates: { candidateStatus: 'admitted' } })
+                                                    });
+                                                } catch(e) {}
+                                                await persistSessionData({ candidateStatus: 'admitted' });
+                                            }}
+                                            className={`h-8 px-4 rounded-lg text-white font-black text-[9px] tracking-widest uppercase transition-all shadow-lg flex items-center gap-2 border mr-2 ${session?.candidateStatus === 'waiting_room' ? 'bg-amber-500 hover:bg-amber-600 border-amber-400 shadow-amber-500/20 animate-pulse' : 'bg-slate-700 hover:bg-slate-600 border-slate-600 shadow-slate-900/50 opacity-80 hover:opacity-100'}`}
+                                            title={session?.candidateStatus === 'waiting_room' ? 'Adayı İçeri Al' : 'Aday Henüz Lobide Değil. Yine de Odaya Zorla Al'}
+                                        >
+                                            <Users className="w-3 h-3" /> {session?.candidateStatus === 'waiting_room' ? 'Adayı İçeri Al' : 'İçeri Al (Fallback)'}
+                                        </button>
+                                    )}
+                                </>
+                            )}
+
+                            <button
+                                onClick={handleFinishInterview}
+                                className="px-4 py-1.5 rounded-lg bg-emerald-600/90 hover:bg-emerald-600 text-white font-black text-[9px] tracking-[0.1em] uppercase transition-all shadow-lg active:scale-95 flex items-center gap-2"
+                                title="Mülakatı Başarıyla Tamamla ve Raporu Oluştur"
                             >
-                                <AlertCircle className="w-3.5 h-3.5" /> Mülakatı İptal Et
+                                <CheckCircle2 className="w-3 h-3" /> Mülakatı Tamamla
                             </button>
-                            <div className="h-px bg-white/5 mx-2" />
-                            <button 
-                                onClick={() => navigate('/')}
-                                className="w-full px-4 py-3 text-left text-[10px] font-bold text-slate-500 hover:bg-white/5 flex items-center gap-3 transition-colors"
-                            >
-                                <ChevronLeft className="w-3.5 h-3.5" /> Sadece Çık (Canlı Kalsın)
-                            </button>
-                        </div>
-                        )}
-                    </div>
+
+                            <div className="relative">
+                                <button
+                                    onClick={() => setShowActionsMenu(!showActionsMenu)}
+                                    className="w-10 h-8 flex items-center justify-center rounded-lg bg-white/5 text-white/40 hover:bg-white/10 hover:text-white transition-all border border-white/5 cursor-pointer"
+                                >
+                                    <MoreVertical className="w-4 h-4" />
+                                </button>
+
+                                {showActionsMenu && (
+                                    <div className="absolute top-full right-0 mt-2 w-48 bg-[#1E293B] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-[400] animate-in fade-in slide-in-from-top-2 duration-200">
+                                        <button
+                                            onClick={() => {
+                                                if (window.confirm("Mülakatı ertelemek ve daha sonra devam etmek istediğinize emin misiniz?")) {
+                                                    persistSessionData({ status: 'scheduled' });
+                                                    navigate('/');
+                                                }
+                                            }}
+                                            className="w-full px-4 py-3 text-left text-[10px] font-bold text-slate-300 hover:bg-white/5 flex items-center gap-3 transition-colors"
+                                        >
+                                            <Clock className="w-3.5 h-3.5 text-blue-400" /> Ertele / Duraklat
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                if (window.confirm("Mülakatı iptal etmek istediğinize emin misiniz? Bu işlem geri alınamaz.")) {
+                                                    persistSessionData({ status: 'cancelled' });
+                                                    navigate('/');
+                                                }
+                                            }}
+                                            className="w-full px-4 py-3 text-left text-[10px] font-bold text-red-400 hover:bg-red-500/10 flex items-center gap-3 transition-colors"
+                                        >
+                                            <AlertCircle className="w-3.5 h-3.5" /> Mülakatı İptal Et
+                                        </button>
+                                        <div className="h-px bg-white/5 mx-2" />
+                                        <button
+                                            onClick={() => navigate('/')}
+                                            className="w-full px-4 py-3 text-left text-[10px] font-bold text-slate-500 hover:bg-white/5 flex items-center gap-3 transition-colors"
+                                        >
+                                            <ChevronLeft className="w-3.5 h-3.5" /> Sadece Çık (Canlı Kalsın)
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </>
+                    )}
                 </div>
             </header>
 
@@ -1407,7 +1530,7 @@ export default function LiveInterviewPage() {
                                                                 <p className={`text-[13px] font-bold leading-relaxed italic ${idx === currentQuestionIndex ? 'text-white' : 'text-white/60'}`}>
                                                                     {q.text}
                                                                 </p>
-                                                                
+
                                                                 <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
                                                                     <div className="flex flex-wrap gap-2">
                                                                         {idx === currentQuestionIndex && (
@@ -1458,21 +1581,21 @@ export default function LiveInterviewPage() {
                                                             </div>
                                                         </div>
                                                     </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                </section>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </section>
                             {/* COMPACT TRANSCRIPT PANEL */}
                             <section className="bg-[#0F172A] rounded-2xl border border-white/5 h-[35%] min-h-[180px] flex flex-col p-4 shadow-xl">
                                 <div className="flex items-center justify-between mb-3">
                                     <h3 className="text-[10px] font-black text-white/40 uppercase tracking-widest italic">Live Transcript</h3>
                                     <div className="flex items-center gap-2">
                                         {!isRecording && isMicOn && (
-                                            <button 
+                                            <button
                                                 onClick={() => {
-                                                    try { recognitionRef.current?.start(); } catch(e) {}
+                                                    try { recognitionRef.current?.start(); } catch (e) { }
                                                 }}
                                                 className="text-[7px] font-black text-blue-400 uppercase tracking-widest border border-blue-500/30 px-2 py-0.5 rounded hover:bg-blue-500/10 transition-colors"
                                             >
@@ -1625,7 +1748,7 @@ export default function LiveInterviewPage() {
                                         <p className="text-[11px] font-bold text-white/90 leading-relaxed italic border-l-2 border-blue-500/50 pl-3">
                                             {suggestedQuestion ? suggestedQuestion.question : "Soru havuzunu kullanarak başlayabilir veya 'Derinleş' butonu ile yapay zekadan özel soru talep edebilirsiniz."}
                                         </p>
-                                        
+
                                         {suggestedQuestion && (
                                             <div className="flex flex-col gap-2 mt-4">
                                                 <button
@@ -1639,9 +1762,9 @@ export default function LiveInterviewPage() {
                                                         };
                                                         const updated = [...questions, newQ];
                                                         setQuestions(updated);
-                                                        persistSessionData({ 
-                                                            questions: updated, 
-                                                            currentQuestionIndex: updated.length - 1 
+                                                        persistSessionData({
+                                                            questions: updated,
+                                                            currentQuestionIndex: updated.length - 1
                                                         });
                                                         setCurrentQuestionIndex(updated.length - 1);
                                                         setSuggestedQuestion(null);
@@ -1650,8 +1773,8 @@ export default function LiveInterviewPage() {
                                                 >
                                                     <Send className="w-3.5 h-3.5" /> Adaya Sor ve Akışa Ekle
                                                 </button>
-                                                
-                                                <button 
+
+                                                <button
                                                     onClick={() => setSuggestedQuestion(null)}
                                                     className="w-full py-2 bg-white/5 hover:bg-white/10 text-white/40 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
                                                 >
@@ -1682,30 +1805,30 @@ export default function LiveInterviewPage() {
                         <div className="flex-1 bg-[#0F172A] rounded-[2.5rem] relative overflow-hidden shadow-2xl border border-white/10 group/stage">
                             {/* Recruiter Feed Placeholder */}
                             <div className="absolute inset-0 bg-slate-950 flex items-center justify-center">
-                                    {isVideoOn && stream ? (
-                                        <video 
-                                            ref={videoRef} 
-                                            autoPlay 
-                                            muted 
-                                            playsInline 
-                                            className="w-full h-full object-cover opacity-80" 
-                                        />
-                                    ) : (
-                                        <div className="flex flex-col items-center gap-6 z-10 animate-in fade-in zoom-in duration-700">
-                                            <div className="w-32 h-32 rounded-full border-4 border-blue-500/20 p-2 bg-slate-900/50 backdrop-blur-xl flex items-center justify-center">
-                                                <User className="w-12 h-12 text-blue-400 opacity-20" />
-                                            </div>
-                                            <div className="flex flex-col items-center gap-2">
-                                                <h4 className="text-xl font-black text-white italic uppercase tracking-tighter">Mülakatçı Bekleniyor</h4>
-                                                <div className="flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full border border-white/10">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                                    <span className="text-[9px] font-black text-white/40 uppercase tracking-widest">Bağlantı Bekleniyor...</span>
-                                                </div>
+                                {isVideoOn && stream ? (
+                                    <video
+                                        ref={videoRef}
+                                        autoPlay
+                                        muted
+                                        playsInline
+                                        className="w-full h-full object-cover opacity-80"
+                                    />
+                                ) : (
+                                    <div className="flex flex-col items-center gap-6 z-10 animate-in fade-in zoom-in duration-700">
+                                        <div className="w-32 h-32 rounded-full border-4 border-blue-500/20 p-2 bg-slate-900/50 backdrop-blur-xl flex items-center justify-center">
+                                            <User className="w-12 h-12 text-blue-400 opacity-20" />
+                                        </div>
+                                        <div className="flex flex-col items-center gap-2">
+                                            <h4 className="text-xl font-black text-white italic uppercase tracking-tighter">Mülakatçı Bekleniyor</h4>
+                                            <div className="flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full border border-white/10">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                                <span className="text-[9px] font-black text-white/40 uppercase tracking-widest">Bağlantı Bekleniyor...</span>
                                             </div>
                                         </div>
-                                    )}
-                                    <div className="absolute inset-0 bg-gradient-to-t from-[#0F172A] via-transparent to-transparent opacity-60" />
-                                </div>
+                                    </div>
+                                )}
+                                <div className="absolute inset-0 bg-gradient-to-t from-[#0F172A] via-transparent to-transparent opacity-60" />
+                            </div>
 
                             {/* Candidate PiP (Own feed) */}
                             <div className="absolute bottom-6 right-6 w-[220px] aspect-video bg-black rounded-2xl overflow-hidden border-2 border-white/20 shadow-2xl z-20 group-hover/stage:scale-105 transition-transform duration-500">
@@ -1733,25 +1856,19 @@ export default function LiveInterviewPage() {
                                 <button onClick={() => setIsVideoOn(!isVideoOn)} className={"w-12 h-12 rounded-xl flex items-center justify-center transition-all " + (isVideoOn ? 'bg-white/10 text-white' : 'bg-red-500 text-white')}>
                                     {isVideoOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
                                 </button>
-                                <div className="w-px h-8 bg-white/10 mx-2" />
-                                <button 
-                                    onClick={async () => {
-                                        if(window.confirm("Görüşmeden ayrılmak istediğinize emin misiniz?")) {
+                                <button
+                                    onClick={() => {
+                                        if (window.confirm("Görüşmeden ayrılmak istediğinize emin misiniz?")) {
                                             if (user?.isAnonymous) {
-                                                await logout();
+                                                logout();
                                             }
                                             navigate('/exit');
                                         }
                                     }}
-                                    className="px-6 h-12 bg-white/10 hover:bg-white/20 text-white rounded-xl font-black text-[11px] uppercase tracking-widest transition-all"
+                                    className="px-8 h-12 bg-white/10 hover:bg-white/20 text-white rounded-xl font-black text-[11px] uppercase tracking-widest transition-all border border-white/5 flex items-center gap-2 active:scale-95"
+                                    title="Mülakatı Kapat ve Ayrıl"
                                 >
-                                    AYRIL
-                                </button>
-                                <button 
-                                    onClick={handleFinishInterview}
-                                    className="px-6 h-12 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-[11px] uppercase tracking-widest transition-all shadow-xl shadow-emerald-500/20"
-                                >
-                                    TAMAMLA
+                                    <LogOut className="w-4 h-4" /> AYRIL
                                 </button>
                             </div>
 
@@ -1794,7 +1911,7 @@ export default function LiveInterviewPage() {
                                         questions.filter(q => q.visibleToCandidate).map((q, idx) => {
                                             const originalIndex = questions.indexOf(q);
                                             const isLastShared = originalIndex === Math.max(...questions.filter(qu => qu.visibleToCandidate).map(qu => questions.indexOf(qu)));
-                                            
+
                                             return (
                                                 <div key={idx} className={"p-6 rounded-3xl border transition-all duration-700 " + (isLastShared ? 'border-blue-500 bg-blue-50/50 shadow-lg scale-[1.02]' : 'opacity-40 border-slate-100 grayscale scale-[0.98]')}>
                                                     <div className="flex items-center gap-3 mb-3">
@@ -1811,7 +1928,7 @@ export default function LiveInterviewPage() {
                                         })
                                     )}
                                 </div>
-                                
+
                                 <div className="mt-8 p-6 bg-[#0F172A] rounded-3xl text-white shadow-2xl relative overflow-hidden group/footer">
                                     <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl -mr-16 -mt-16" />
                                     <div className="flex items-center justify-between relative z-10">

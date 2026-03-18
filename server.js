@@ -131,7 +131,7 @@ app.use(cors({
     credentials: true
 }));
 // app.use(xss()); // Protect against XSS in body
-app.use(express.json({ limit: '50kb' })); // Body size limiting
+app.use(express.json({ limit: '5mb' })); // Increased for long transcript logs
 
 // Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(uploadBaseDir, 'uploads')));
@@ -626,6 +626,43 @@ app.post('/api/process-cv', upload.array('cvs', 20), async (req, res) => {
     }
 });
 
+// Gemini STT Endpoint (Audio to Text)
+const audioUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
+app.post('/api/gemini-stt', audioUpload.single('audio'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: 'Ses dosyası bulunamadı' });
+        
+        const apiKey = await getApiKey();
+        if (!apiKey) return res.status(500).json({ error: 'Gemini API Key eksik' });
+
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+        const mimeType = (req.file.mimetype || "audio/webm").split(';')[0];
+        const audioData = {
+            inlineData: {
+                data: req.file.buffer.toString("base64"),
+                mimeType: mimeType
+            }
+        };
+
+        console.log(`🎙️ Processing STT Audio Chunk (${mimeType}, ${(req.file.buffer.length / 1024).toFixed(1)}KB)`);
+
+        const result = await model.generateContent([
+            audioData,
+            "Bu ses dosyasındaki Türkçe konuşmaları metne dök. ÖNEMLİ: Sadece konuşulan sözcükleri yaz. Konuşma yoksa sadece boş bir dize döndür. 'Sessizlik', 'Ses yok', 'Boş' gibi ifadeler KULLANMA. Eğer konuşmacı mülakat yapıyorsa o bağlamda kelimeleri doğru seç."
+        ]);
+
+        const text = result.response.text().trim();
+        console.log(`✅ STT Result [${req.file.buffer.length}b]: "${text.substring(0, 80)}..."`);
+        
+        res.json({ success: true, text });
+    } catch (err) {
+        console.error('💥 Gemini STT Error:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Invite Email Endpoint
 app.post('/api/send-invite', async (req, res) => {
     const { email, role, inviteLink } = req.body;
@@ -832,6 +869,45 @@ app.post('/api/google/create-calendar-event', async (req, res) => {
         res.status(response.status).json({ success: false, error: data.error?.message || 'Calendar Create Error' });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+app.post('/api/update-candidate-status', async (req, res) => {
+    const { sessionId, candidateId, updates } = req.body;
+    if (!sessionId || !candidateId || !updates) {
+        return res.status(400).json({ error: "Missing required fields." });
+    }
+
+    try {
+        const candidateRef = db.doc(`artifacts/talent-flow/public/data/candidates/${candidateId}`);
+        await db.runTransaction(async (t) => {
+            const doc = await t.get(candidateRef);
+            if (!doc.exists) throw new Error("Candidate not found.");
+
+            const data = doc.data();
+            const sessions = data.interviewSessions || [];
+            
+            let updated = false;
+            const newSessions = sessions.map(session => {
+                if (session.id === sessionId) {
+                    updated = true;
+                    return { ...session, ...updates };
+                }
+                return session;
+            });
+
+            if (!updated) {
+                // Should we append? Usually it exists. Let's just append for safety.
+                newSessions.push({ id: sessionId, ...updates });
+            }
+
+            t.update(candidateRef, { interviewSessions: newSessions });
+        });
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error("Failed to update candidate session via proxy:", error);
+        res.status(500).json({ error: error.message });
     }
 });
 

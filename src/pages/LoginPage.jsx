@@ -1,7 +1,7 @@
 // src/pages/LoginPage.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { LogIn, Sparkles, AlertCircle, Loader2, Mail, Lock, User, CheckCircle, Zap } from 'lucide-react';
+import { LogIn, Sparkles, AlertCircle, Loader2, Mail, Lock, User, CheckCircle, Zap, Mic } from 'lucide-react';
 import Logo from '../components/Logo';
 
 export default function LoginPage() {
@@ -12,6 +12,78 @@ export default function LoginPage() {
     const [password, setPassword] = useState('');
     const [name, setName] = useState('');
     const [success, setSuccess] = useState(null);
+
+    // STT Diagnostic States
+    const [isMicActive, setIsMicActive] = useState(false);
+    const [sttResult, setSttResult] = useState('');
+    const mediaRecorderRef = useRef(null);
+    const sttIntervalRef = useRef(null);
+
+    const toggleSttTest = async () => {
+        if (isMicActive) {
+            if (sttIntervalRef.current) clearInterval(sttIntervalRef.current);
+            if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+                mediaRecorderRef.current.stop();
+            }
+            setIsMicActive(false);
+            setSttResult('');
+            return;
+        }
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mediaRecorder = new MediaRecorder(stream);
+            mediaRecorderRef.current = mediaRecorder;
+
+            mediaRecorder.onstop = async () => {
+                const chunks = mediaRecorder.audioChunks || [];
+                if (chunks.length === 0) return;
+                const blob = new Blob(chunks, { type: 'audio/webm' });
+                mediaRecorder.audioChunks = [];
+
+                if (blob.size < 2000) return;
+
+                const formData = new FormData();
+                formData.append('audio', blob, 'test.webm');
+
+                try {
+                    const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+                    const res = await fetch(`${serverUrl}/api/gemini-stt`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const data = await res.json();
+                    if (data.text) setSttResult(data.text);
+                } catch (e) {
+                    console.error("STT Test failed", e);
+                }
+            };
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (!mediaRecorder.audioChunks) mediaRecorder.audioChunks = [];
+                mediaRecorder.audioChunks.push(e.data);
+            };
+
+            mediaRecorder.start();
+            setIsMicActive(true);
+
+            sttIntervalRef.current = setInterval(() => {
+                if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+                    mediaRecorderRef.current.stop();
+                    mediaRecorderRef.current.start();
+                }
+            }, 4000);
+
+        } catch (err) {
+            alert("Mikrofon erişimi engellendi veya cihaz bulunamadı.");
+        }
+    };
+
+    useEffect(() => {
+        return () => {
+            if (sttIntervalRef.current) clearInterval(sttIntervalRef.current);
+        };
+    }, []);
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
@@ -149,8 +221,45 @@ export default function LoginPage() {
                     </button>
                 </div>
 
-                <div className="pt-8 border-t border-border-subtle opacity-50 text-center">
-                    <p className="text-[10px] text-text-muted uppercase tracking-[0.2em] font-black opacity-40">Nöral Motor Dağıtımı: Kararlı v2.4.0</p>
+                <div className="pt-8 space-y-4 border-t border-border-subtle overflow-hidden">
+                    <div className="flex items-center justify-between px-2">
+                        <div className="flex items-center gap-2">
+                            <Zap className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
+                            <span className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] opacity-60 italic">Sistem Tanılama</span>
+                        </div>
+                        <div className="h-1 flex-1 mx-4 bg-border-subtle/30 rounded-full" />
+                        <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">ÇALIŞIYOR</span>
+                    </div>
+
+                    <div className="p-4 bg-bg-primary/50 border border-border-subtle rounded-2xl flex flex-col gap-4 group/stt">
+                         <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className={`w-2.5 h-2.5 rounded-full ${isMicActive ? 'bg-cyan-500 shadow-cyan-500/50 animate-pulse' : 'bg-white/10'}`} />
+                                <span className={`text-[11px] font-black uppercase tracking-widest ${isMicActive ? 'text-white' : 'text-text-muted'}`}>STT Nöral Motor TESTİ</span>
+                            </div>
+                            <button 
+                                onClick={toggleSttTest}
+                                className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${isMicActive ? 'bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-white' : 'bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500 hover:text-white'}`}
+                            >
+                                {isMicActive ? 'MOTORU DURDUR' : 'MOTORU BAŞLAT'}
+                            </button>
+                         </div>
+
+                         <div className="relative h-12 flex items-center justify-center bg-black/20 rounded-xl border border-dashed border-border-subtle px-4 overflow-hidden">
+                             {sttResult ? (
+                                 <p className="text-[10px] font-bold text-cyan-400 italic animate-in fade-in slide-in-from-left-2 duration-500 truncate">
+                                     "{sttResult}"
+                                 </p>
+                             ) : (
+                                 <div className="flex items-center gap-2 opacity-30">
+                                     <Mic className="w-3.5 h-3.5 text-text-muted" />
+                                     <span className="text-[10px] font-black text-text-muted uppercase tracking-widest italic">{isMicActive ? 'Konuşmanız dinleniyor...' : 'Sesi metne dökmek için başlatın'}</span>
+                                 </div>
+                             )}
+                         </div>
+                    </div>
+
+                    <p className="text-[10px] text-center text-text-muted uppercase tracking-[0.2em] font-black opacity-40">Nöral Motor Dağıtımı: Kararlı v2.4.0</p>
                 </div>
             </div>
         </div>
