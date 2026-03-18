@@ -47,7 +47,7 @@ export default function LoginPage() {
                 formData.append('audio', blob, 'test.webm');
 
                 try {
-                    const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+                    const serverUrl = import.meta.env.VITE_SERVER_URL || '';
                     const res = await fetch(`${serverUrl}/api/gemini-stt`, {
                         method: 'POST',
                         body: formData
