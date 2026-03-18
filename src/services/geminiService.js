@@ -15,7 +15,9 @@ import {
     generateInterviewQuestions,
     generateInterviewPaths,
     scoreInterviewSession,
-    generateFollowUpQuestion
+    generateFollowUpQuestion,
+    analyzeSTARRealTime,
+    stripPII
 } from './ai/interview.js';
 import {
     generatePersonalizedDM,
@@ -31,6 +33,8 @@ export {
     generateInterviewPaths,
     scoreInterviewSession,
     generateFollowUpQuestion,
+    analyzeSTARRealTime,
+    stripPII,
     generatePersonalizedDM,
     analyzeResponseEmail
 };

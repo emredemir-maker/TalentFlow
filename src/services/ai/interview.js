@@ -2,13 +2,103 @@
 import { getModel } from './config.js';
 import { parseAIJson, buildStructuredPrompt, sanitizeForPrompt } from './utils.js';
 
+// ─── PII Stripping ────────────────────────────────────────────────────────────
+// Removes all personally-identifiable fields before sending candidate data to
+// any external AI model. Only professional/skill attributes are forwarded.
+const PII_FIELDS = [
+    'name', 'email', 'phone', 'mobile', 'tel',
+    'address', 'city', 'country', 'nationality', 'location',
+    'photo', 'photoURL', 'avatar', 'image', 'picture',
+    'linkedin', 'github', 'website', 'social', 'portfolio', 'url',
+    'dateOfBirth', 'birthDate', 'age', 'gender', 'sex',
+    'maritalStatus', 'religion', 'ethnicity', 'race',
+    'id', 'uid', 'cvUrl', 'color', 'interviewSessions',
+    'createdAt', 'updatedAt', 'addedAt', 'invitedAt',
+];
+
+export function stripPII(candidate) {
+    if (!candidate || typeof candidate !== 'object') return {};
+    const safe = { ...candidate };
+    for (const field of PII_FIELDS) {
+        delete safe[field];
+    }
+    // Strip name from free-text summary fields to prevent leakage
+    if (safe.summary && typeof safe.summary === 'string') {
+        safe.summary = safe.summary.replace(/\b[A-ZÇĞİÖŞÜ][a-zçğışöşü]+ [A-ZÇĞİÖŞÜ][a-zçğışöşü]+\b/g, 'Aday');
+    }
+    return safe;
+}
+
+// ─── Bias Guardrail Preamble ──────────────────────────────────────────────────
+// Injected into every evaluation prompt.
+const BIAS_GUARDRAIL = `
+ZORUNLU DEĞERLENDİRME KURALLARI (Bias Guardrail):
+1. Yalnızca gözlemlenebilir DAVRANIŞLARI ve somut KANITları değerlendir.
+2. Cinsiyet, yaş, etnisite, aksanlı konuşma, isimleri veya kişisel özellikler hiçbir zaman puanlamayı ETKİLEMEZ.
+3. İletişim tarzı (hızlı/yavaş konuşma, sözlü doldurucular) değil, içerik ve kanıt önemlidir.
+4. Mülakatçı sorusunda demografik özellik ima eden ifade tespit edersen bias_warning: true döndür.
+5. STAR çerçevesine (Durum, Görev, Eylem, Sonuç) göre değerlendir; çerçeve dışı çıkarım yapma.
+6. Eğer aday yeterli bilgi vermemişse düşük puan VER, tahmin ETME.
+`;
+
+// ─── Real-time STAR Analysis ──────────────────────────────────────────────────
+// Called automatically after each new ADAY transcript entry.
+// Evaluates the 5 competency dimensions displayed in the radar chart and
+// returns a recruiter-facing insight. Uses STAR as the evaluation framework.
+export async function analyzeSTARRealTime(anonymizedProfile, recentTranscript, currentQuestion) {
+    const instruction = `Sen tarafsız bir mülakat gözlemcisisin. Son aday konuşmasını STAR metodolojisini kullanarak 5 yetkinlik boyutunda değerlendir.
+
+${BIAS_GUARDRAIL}
+
+GÖREV:
+- STAR çerçevesini (Durum, Görev, Eylem, Sonuç) rehber olarak kullanarak aday cevabında aşağıdaki 5 yetkinliği 0-100 arasında puanla.
+- Puanı sadece bu konuşma anına ait kanıtlara dayandır; geçmiş hakkında tahminde bulunma.
+- Mülakatçıya kısa, eyleme geçirilebilir bir içgörü üret (Türkçe).
+- Sonraki soru için somut bir öneri sun (Türkçe).
+- Son recruiter sorusunda önyargı işareti varsa bias_warning: true yap ve bias_detail ile açıkla.
+
+JSON formatında SADECE şu yapıda dön (başka hiçbir metin ekleme):
+{
+  "scores": {
+    "technical": <0-100, Teknik bilgi/yetkinlik ne kadar güçlü sergilendi?>,
+    "communication": <0-100, İfade netliği, yapılandırma, STAR akışı ne kadar kuruldu?>,
+    "problemSolving": <0-100, Somut problem çözme adımları ve yaratıcılık ne kadar gösterildi?>,
+    "cultureFit": <0-100, Ekip çalışması, değerler, empati kanıtları ne kadar açıklandı?>,
+    "adaptability": <0-100, Belirsizlik, değişim, öğrenme esnekliği kanıtları ne kadar güçlüydü?>
+  },
+  "insight": "Tek cümle: adayın bu cevapta öne çıkan güçlü veya zayıf yönü",
+  "suggestion": "Tek cümle: mülakatçıya bir sonraki soru için öneri",
+  "bias_warning": false,
+  "bias_detail": null
+}`;
+
+    const prompt = buildStructuredPrompt(instruction, {
+        "ADAY_PROFİLİ": JSON.stringify(anonymizedProfile),
+        "GÜNCEL_SORU": currentQuestion || '(Recruiter tarafından sözlü soruldu)',
+        "SON_KONUŞMALAR": JSON.stringify(
+            recentTranscript.map(t => ({ rol: t.role, metin: t.text }))
+        )
+    });
+
+    try {
+        const model = await getModel();
+        const result = await model.generateContent(prompt);
+        return parseAIJson(result.response.text(), null);
+    } catch (e) {
+        console.error('[STAR RealTime]', e.message);
+        return null;
+    }
+}
+
+// ─── Existing Functions (PII stripped) ───────────────────────────────────────
+
 export async function generateInterviewQuestions(candidate, starAnalysis, interviewType = 'technical') {
     const persona = interviewType === 'product' ? 'Product Manager' : (interviewType === 'culture' ? 'HR Director' : 'Technical Lead');
     const instruction = `Sen kıdemli bir ${persona}sın. Aday için mülakat soruları hazırla.
     JSON array olarak dön ["soru1", "soru2", "soru3"]`;
 
     const prompt = buildStructuredPrompt(instruction, {
-        "CANDIDATE": JSON.stringify(candidate),
+        "CANDIDATE": JSON.stringify(stripPII(candidate)),
         "STAR_ANALYSIS": JSON.stringify(starAnalysis)
     });
 
@@ -23,6 +113,7 @@ export async function generateInterviewQuestions(candidate, starAnalysis, interv
 }
 
 export async function generateInterviewPaths(candidate, interviewType = 'technical') {
+    const safe = stripPII(candidate);
     const typeContexts = {
         technical: "Teknik Kültür / Mühendislik Lead personasıyla, mimari, derin teknik bilgi, problem çözme ve saha tecrübesine odaklan.",
         product: "Product Manager personasıyla, ürün vizyonu, kullanıcı deneyimi (UX), önceliklendirme, metrikler ve iş değerine odaklan.",
@@ -35,7 +126,7 @@ export async function generateInterviewPaths(candidate, interviewType = 'technic
     
     KURALLAR:
     1. Her set (path) tam olarak 3 adet soru içermelidir. Toplam 9 benzersiz soru hazırlanmalıdır.
-    2. Her soru adayın CV'sindeki ${candidate.experience} yıllık tecrübesine ve başvurduğu ${candidate.position} pozisyonuna doğrudan atıfta bulunmalıdır.
+    2. Her soru adayın CV'sindeki ${safe.experience} yıllık tecrübesine ve başvurduğu ${safe.position} pozisyonuna doğrudan atıfta bulunmalıdır.
     3. Sorular 'Deneyimlerine göre...', 'CV'nde bahsettiğin X projesinde...' gibi kişiselleştirilmiş başlamalıdır.
     4. 1. Set: Isınma ve Temel Yetkinlikler (Mevcut CV verileri üzerinden).
     5. 2. Set: Derinlemesine Sorgulama ve Teknik/Ürün Senaryoları.
@@ -59,8 +150,8 @@ export async function generateInterviewPaths(candidate, interviewType = 'technic
     ÖNEMLİ: icon alanı "zap", "target", "users", "code", "brain", "activity" gibi Lucide ikon adları olabilir.`;
 
     const prompt = buildStructuredPrompt(instruction, {
-        "TARGET_POSITION": candidate.matchedPositionTitle || candidate.position,
-        "CANDIDATE_DATA": sanitizeForPrompt(JSON.stringify(candidate))
+        "TARGET_POSITION": safe.matchedPositionTitle || safe.position,
+        "CANDIDATE_DATA": sanitizeForPrompt(JSON.stringify(safe))
     });
 
     try {
@@ -69,7 +160,6 @@ export async function generateInterviewPaths(candidate, interviewType = 'technic
         const parsed = parseAIJson(result.response.text(), { paths: [] });
         let paths = parsed.paths || (Array.isArray(parsed) ? parsed : []);
 
-        // Ensure we have 3 paths
         if (paths.length > 3) paths = paths.slice(0, 3);
         
         const finalPaths = paths.map((p, i) => ({
@@ -103,8 +193,10 @@ export async function generateInterviewPaths(candidate, interviewType = 'technic
 
 export async function scoreInterviewSession(candidate, interviewType, questionsAndAnswers) {
     const instruction = `Sen bir mülakat değerlendirme asistanısın. Aday ile yapılan ${interviewType} mülakatını değerlendir.
+
+${BIAS_GUARDRAIL}
     
-    ÖNEMLİ KURALLAR:
+    KURALLAR:
     1. Sadece sana gönderilen Soru-Cevap ikililerini değerlendir.
     2. Sorulmayan veya cevaplanmayan sorular için puan kırma, onları yok say. 
     3. Puanlamayı (0-100) sadece mevcut cevaplardaki kanıtlara göre yap.
@@ -122,7 +214,6 @@ export async function scoreInterviewSession(candidate, interviewType, questionsA
     }`;
 
     const prompt = buildStructuredPrompt(instruction, {
-        "CANDIDATE": candidate?.name,
         "QA_DATA": JSON.stringify(questionsAndAnswers)
     });
 
@@ -137,6 +228,7 @@ export async function scoreInterviewSession(candidate, interviewType, questionsA
 }
 
 export async function generateFollowUpQuestion(candidate, interviewType, conversationHistory, mode = 'deepen', category = null) {
+    const safe = stripPII(candidate);
     const persona = interviewType === 'product' ? 'Product Manager' : (interviewType === 'culture' ? 'İK Direktörü' : 'Technical Lead');
 
     let modeInstruction = "";
@@ -149,13 +241,16 @@ export async function generateFollowUpQuestion(candidate, interviewType, convers
     }
 
     const instruction = `Sen kıdemli bir ${persona}sın. Aday ile mülakat yapıyorsun.
+
+${BIAS_GUARDRAIL}
     
     GÖREV: ${modeInstruction}
     
-    ÖNEMLİ KURALLAR:
+    KURALLAR:
     1. Soru dili TÜRKÇE olmalıdır.
     2. Soru adayın CV'sindeki gerçek verilere dayanmalıdır.
     3. Daha önce sorulmuş soruların aynısını sorma.
+    4. Demografik özellik veya kişisel bilgi içeren soru üretme.
     
     JSON formatında şu yapıda dön:
     { 
@@ -165,8 +260,10 @@ export async function generateFollowUpQuestion(candidate, interviewType, convers
     }`;
 
     const prompt = buildStructuredPrompt(instruction, {
-        "CANDIDATE_CV": JSON.stringify(candidate),
-        "CONVERSATION_HISTORY": JSON.stringify(conversationHistory)
+        "CANDIDATE_PROFILE": JSON.stringify(safe),
+        "CONVERSATION_HISTORY": JSON.stringify(
+            conversationHistory.map(t => ({ rol: t.role, metin: t.text }))
+        )
     });
 
     try {
