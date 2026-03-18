@@ -1,0 +1,37 @@
+Run w9jds/firebase-action@master
+/usr/bin/docker run --name w9jdsfirebaseactionv15101_0320d0 --label 5df91e --workdir /github/workspace --rm -e "GCP_SA_KEY" -e "INPUT_ARGS" -e "HOME" -e "GITHUB_JOB" -e "GITHUB_REF" -e "GITHUB_SHA" -e "GITHUB_REPOSITORY" -e "GITHUB_REPOSITORY_OWNER" -e "GITHUB_REPOSITORY_OWNER_ID" -e "GITHUB_RUN_ID" -e "GITHUB_RUN_NUMBER" -e "GITHUB_RETENTION_DAYS" -e "GITHUB_RUN_ATTEMPT" -e "GITHUB_ACTOR_ID" -e "GITHUB_ACTOR" -e "GITHUB_WORKFLOW" -e "GITHUB_HEAD_REF" -e "GITHUB_BASE_REF" -e "GITHUB_EVENT_NAME" -e "GITHUB_SERVER_URL" -e "GITHUB_API_URL" -e "GITHUB_GRAPHQL_URL" -e "GITHUB_REF_NAME" -e "GITHUB_REF_PROTECTED" -e "GITHUB_REF_TYPE" -e "GITHUB_WORKFLOW_REF" -e "GITHUB_WORKFLOW_SHA" -e "GITHUB_REPOSITORY_ID" -e "GITHUB_TRIGGERING_ACTOR" -e "GITHUB_WORKSPACE" -e "GITHUB_ACTION" -e "GITHUB_EVENT_PATH" -e "GITHUB_ACTION_REPOSITORY" -e "GITHUB_ACTION_REF" -e "GITHUB_PATH" -e "GITHUB_ENV" -e "GITHUB_STEP_SUMMARY" -e "GITHUB_STATE" -e "GITHUB_OUTPUT" -e "RUNNER_OS" -e "RUNNER_ARCH" -e "RUNNER_NAME" -e "RUNNER_ENVIRONMENT" -e "RUNNER_TOOL_CACHE" -e "RUNNER_TEMP" -e "RUNNER_WORKSPACE" -e "ACTIONS_RUNTIME_URL" -e "ACTIONS_RUNTIME_TOKEN" -e "ACTIONS_CACHE_URL" -e "ACTIONS_RESULTS_URL" -e "ACTIONS_ORCHESTRATION_ID" -e GITHUB_ACTIONS=true -e CI=true -v "/var/run/docker.sock":"/var/run/docker.sock" -v "/home/runner/work/_temp":"/github/runner_temp" -v "/home/runner/work/_temp/_github_home":"/github/home" -v "/home/runner/work/_temp/_github_workflow":"/github/workflow" -v "/home/runner/work/_temp/_runner_file_commands":"/github/file_commands" -v "/home/runner/work/TalentFlow/TalentFlow":"/github/workspace" w9jds/firebase-action:v15.10.1 deploy --project talentflow-84bb6
+Storing GCP_SA_KEY in /opt/gcp_key.json
+Exporting GOOGLE_APPLICATION_CREDENTIALS=/opt/gcp_key.json
+(node:10) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+=== Deploying to 'talentflow-84bb6'...
+
+i  deploying firestore, functions, hosting
+i  firestore: ensuring required API firestore.googleapis.com is enabled...
+✔  firestore: required API firestore.googleapis.com is enabled
+i  firestore: ensuring required API firestore.googleapis.com is enabled...
+i  cloud.firestore: checking firestore.rules for compilation errors...
+⚠  [W] 10:14 - Unused function: isOwner.
+⚠  [W] 11:35 - Invalid variable name: request.
+✔  cloud.firestore: rules file firestore.rules compiled successfully
+i  functions: preparing codebase default for deployment
+i  functions: ensuring required API cloudfunctions.googleapis.com is enabled...
+i  functions: ensuring required API cloudbuild.googleapis.com is enabled...
+i  artifactregistry: ensuring required API artifactregistry.googleapis.com is enabled...
+✔  functions: required API cloudbuild.googleapis.com is enabled
+✔  artifactregistry: required API artifactregistry.googleapis.com is enabled
+✔  functions: required API cloudfunctions.googleapis.com is enabled
+⚠  functions: package.json indicates an outdated version of firebase-functions. Please upgrade using npm install --save firebase-functions@latest in your functions directory.
+⚠  functions: Please note that there will be breaking changes when you upgrade.
+i  functions: Loading and analyzing source code for codebase default to determine what to deploy
+Serving at port 8768
+
+[dotenv@17.3.1] injecting env (0) from .env -- tip: ⚙️  write to custom object with *** processEnv: myObject ***
+
+i  extensions: ensuring required API firebaseextensions.googleapis.com is enabled...
+✔  extensions: required API firebaseextensions.googleapis.com is enabled
+i  functions: preparing functions directory for uploading...
+i  functions: packaged /github/workspace/functions (60.89 KB) for uploading
+
+Error: Failed to list functions for talentflow-84bb6
