@@ -357,7 +357,7 @@ export default function LiveInterviewPage() {
             // For recruiter: also sync to candidates collection so the app's data stays consistent
             if (isRecruiter && candidateData?.id) {
                 const updatedSessions = (candidateData.interviewSessions || []).map(s =>
-                    s.id === sessionId ? { ...s, ...data } : s
+                    String(s.id) === String(sessionId) ? { ...s, ...data } : s
                 );
                 updateCandidate(candidateData.id, { interviewSessions: updatedSessions });
             }
@@ -411,6 +411,20 @@ export default function LiveInterviewPage() {
         } finally {
             setCoachGenerating(false);
         }
+    };
+
+    // Dedicated leave handler for CANDIDATE — no dependency on isRecruiter, no confirmation dialog
+    const handleCandidateLeave = async () => {
+        if (stream) stream.getTracks().forEach(t => t.stop());
+        setStream(null);
+        setIsMicOn(false);
+        setIsVideoOn(false);
+        setIsRecording(false);
+        setPhase('finished');
+        try {
+            await persistSessionData({ candidateStatus: 'finished' });
+        } catch(e) { console.error('[CandidateLeave]', e); }
+        navigate('/exit');
     };
 
     const handleFinishInterview = async () => {
@@ -479,6 +493,8 @@ export default function LiveInterviewPage() {
                 interviewSessions: updatedSessions,
                 status: 'Evaluation'
             });
+            // Also mark the public Firestore interview doc as completed so candidates get notified
+            await setDoc(doc(db, 'interviews', sessionId), { status: 'completed' }, { merge: true });
             console.log("[LiveInterview] Session saved successfully.");
             navigate(`/interview-report/${sessionId}`);
         } catch (err) {
@@ -1192,7 +1208,7 @@ export default function LiveInterviewPage() {
                         </div>
                         <div className="flex items-center gap-3">
                             <button
-                                onClick={handleFinishInterview}
+                                onClick={handleCandidateLeave}
                                 className="px-4 py-1.5 rounded-lg bg-white text-red-600 border border-red-100 text-[9px] font-black uppercase tracking-wider hover:bg-red-600 hover:text-white transition-all shadow-sm cursor-pointer"
                             >
                                 Ayrıl
