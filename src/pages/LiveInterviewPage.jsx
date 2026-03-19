@@ -21,7 +21,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 export default function LiveInterviewPage() {
     const { sessionId } = useParams();
     const navigate = useNavigate();
-    const { user, isAuthenticated, userProfile, role } = useAuth();
+    const { user, isAuthenticated, userProfile, role, logout } = useAuth();
     const { candidates, updateCandidate, loading: candidatesLoading, error: candidatesError } = useCandidates();
 
     const [phase, setPhase] = useState('lobby'); // lobby, active, finished
@@ -319,8 +319,10 @@ export default function LiveInterviewPage() {
                 setApiSession(prev => ({ ...(prev || {}), ...data }));
                 if (data.candidateId) setApiCandidateId(prev => prev || data.candidateId);
                 if (Array.isArray(data.questions)) {
-                    console.log(`[Candidate Listener] ${data.questions.length} visible question(s)`);
-                    setQuestions(data.questions);
+                    // Candidate only sees questions the recruiter explicitly reveals
+                    const visible = data.questions.filter(q => q.visibleToCandidate);
+                    console.log(`[Candidate Listener] ${visible.length} visible / ${data.questions.length} total question(s)`);
+                    setQuestions(visible);
                 }
             } else {
                 console.warn('[Candidate Listener] Session doc not found yet, waiting...');
