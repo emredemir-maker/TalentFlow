@@ -1010,7 +1010,7 @@ export default function InterviewManagementPage() {
                                                                 <div className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
                                                                 <span className="text-[10px] font-black tracking-tight text-rose-600 uppercase">CANLI YAYIN</span>
                                                             </>
-                                                        ) : int.status === 'completed' ? (
+                                                        ) : isCompleted ? (
                                                             <>
                                                                 <div className="w-2 h-2 rounded-full bg-emerald-500" />
                                                                 <span className="text-[10px] font-black tracking-tight text-emerald-600 uppercase">TAMAMLANDI</span>
@@ -1024,7 +1024,7 @@ export default function InterviewManagementPage() {
                                                             <>
                                                                 <div className="w-2 h-2 rounded-full bg-amber-400" />
                                                                 <span className="text-[10px] font-black tracking-tight text-[#0F172A] uppercase">
-                                                                    {int.status === 'postponed' ? 'ERTELENDİ / BEKLEMEDE' : 'HAZIRDA BEKLİYOR'}
+                                                                    {int.status === 'postponed' ? 'ERTELENDİ / BEKLEMEDE' : 'PLANLANDI'}
                                                                 </span>
                                                             </>
                                                         )}

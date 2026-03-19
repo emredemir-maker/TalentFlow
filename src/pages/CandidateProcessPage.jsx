@@ -27,6 +27,11 @@ export default function CandidateProcessPage() {
     const candidates = enrichedCandidates || [];
     const [searchQuery, setSearchQuery]   = useState('');
     const [activeTab, setActiveTab]       = useState('ai_analysis');
+    const [showFilters, setShowFilters]   = useState(false);
+    const [filterSource, setFilterSource] = useState('');
+    const [filterStatus, setFilterStatus] = useState('');
+    const [filterPosition, setFilterPosition] = useState('');
+    const [filterMinScore, setFilterMinScore] = useState(0);
 
     // ── Modal states ──────────────────────────────────────────────────────────
     const [commentModal, setCommentModal] = useState(false);
@@ -101,11 +106,26 @@ export default function CandidateProcessPage() {
         return candidates.find(c => c.id === viewCandidateId) || (candidates.length > 0 ? candidates[0] : null);
     }, [candidates, viewCandidateId]);
 
-    const filtered = useMemo(() =>
-        candidates.filter(c =>
-            c.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            c.position?.toLowerCase().includes(searchQuery.toLowerCase())
-        ), [candidates, searchQuery]);
+    const filterOptions = useMemo(() => {
+        const sources = [...new Set(candidates.map(c => c.source).filter(Boolean))];
+        const positions = [...new Set(candidates.map(c => c.position || c.bestTitle).filter(Boolean))];
+        const statuses = [...new Set(candidates.map(c => c.status).filter(Boolean))];
+        return { sources, positions, statuses };
+    }, [candidates]);
+
+    const activeFilterCount = [filterSource, filterStatus, filterPosition, filterMinScore > 0].filter(Boolean).length;
+
+    const filtered = useMemo(() => {
+        const q = searchQuery.toLowerCase();
+        return candidates.filter(c => {
+            if (q && !c.name?.toLowerCase().includes(q) && !(c.position || c.bestTitle)?.toLowerCase().includes(q)) return false;
+            if (filterSource && c.source !== filterSource) return false;
+            if (filterStatus && c.status !== filterStatus) return false;
+            if (filterPosition && (c.position || c.bestTitle) !== filterPosition) return false;
+            if (filterMinScore > 0 && (c.bestScore || 0) < filterMinScore) return false;
+            return true;
+        });
+    }, [candidates, searchQuery, filterSource, filterStatus, filterPosition, filterMinScore]);
 
     const parseFeedback = (text) => {
         if (!text) return { pos: '', neg: '' };
@@ -175,8 +195,17 @@ export default function CandidateProcessPage() {
                     </div>
 
                     {/* Search */}
-                    <div className="px-4 pt-4 pb-3">
-                        <div className="text-[9px] font-black text-slate-400 tracking-widest uppercase mb-3">ADAYLAR</div>
+                    <div className="px-4 pt-4 pb-2">
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="text-[9px] font-black text-slate-400 tracking-widest uppercase">ADAYLAR <span className="text-slate-300">({filtered.length})</span></div>
+                            <button
+                                onClick={() => setShowFilters(f => !f)}
+                                className={`flex items-center gap-1 text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-lg transition-all ${showFilters || activeFilterCount > 0 ? 'bg-cyan-50 text-cyan-600 border border-cyan-200' : 'text-slate-400 hover:text-slate-600'}`}
+                            >
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" /></svg>
+                                FİLTRE{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+                            </button>
+                        </div>
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                             <input
@@ -188,6 +217,73 @@ export default function CandidateProcessPage() {
                             />
                         </div>
                     </div>
+
+                    {/* Filter Panel */}
+                    {showFilters && (
+                        <div className="px-4 pb-3 space-y-2 border-b border-slate-100">
+                            {/* Source */}
+                            <div>
+                                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest block mb-1">Kaynak</label>
+                                <select
+                                    value={filterSource}
+                                    onChange={e => setFilterSource(e.target.value)}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg py-1.5 px-2 text-[10px] text-slate-700 outline-none focus:border-cyan-400 transition-all"
+                                >
+                                    <option value="">Tümü</option>
+                                    {filterOptions.sources.map(s => <option key={s} value={s}>{s}</option>)}
+                                </select>
+                            </div>
+                            {/* Stage */}
+                            <div>
+                                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest block mb-1">Aşama</label>
+                                <select
+                                    value={filterStatus}
+                                    onChange={e => setFilterStatus(e.target.value)}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg py-1.5 px-2 text-[10px] text-slate-700 outline-none focus:border-cyan-400 transition-all"
+                                >
+                                    <option value="">Tümü</option>
+                                    {filterOptions.statuses.map(s => <option key={s} value={s}>{s}</option>)}
+                                </select>
+                            </div>
+                            {/* Position */}
+                            <div>
+                                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest block mb-1">Pozisyon</label>
+                                <select
+                                    value={filterPosition}
+                                    onChange={e => setFilterPosition(e.target.value)}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg py-1.5 px-2 text-[10px] text-slate-700 outline-none focus:border-cyan-400 transition-all"
+                                >
+                                    <option value="">Tümü</option>
+                                    {filterOptions.positions.map(p => <option key={p} value={p}>{p}</option>)}
+                                </select>
+                            </div>
+                            {/* Min Score */}
+                            <div>
+                                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest block mb-1">Min. Uyum Skoru: <span className="text-cyan-600">%{filterMinScore}</span></label>
+                                <input
+                                    type="range"
+                                    min={0}
+                                    max={100}
+                                    step={5}
+                                    value={filterMinScore}
+                                    onChange={e => setFilterMinScore(Number(e.target.value))}
+                                    className="w-full accent-cyan-500"
+                                />
+                                <div className="flex justify-between text-[7px] text-slate-300 font-bold mt-0.5">
+                                    <span>0%</span><span>50%</span><span>100%</span>
+                                </div>
+                            </div>
+                            {/* Clear */}
+                            {activeFilterCount > 0 && (
+                                <button
+                                    onClick={() => { setFilterSource(''); setFilterStatus(''); setFilterPosition(''); setFilterMinScore(0); }}
+                                    className="w-full text-[8px] font-black uppercase tracking-widest text-rose-500 hover:text-rose-700 py-1 transition-all"
+                                >
+                                    Filtreleri Temizle
+                                </button>
+                            )}
+                        </div>
+                    )}
 
                     {/* List */}
                     <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-0.5 custom-scrollbar">
