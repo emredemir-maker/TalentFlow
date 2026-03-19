@@ -57,8 +57,15 @@ export default function LiveInterviewPage() {
         [candidateData, sessionId]);
 
     // effectiveSession: for anonymous candidates who can't read Firestore candidates collection,
-    // fall back to apiSession (Firestore /interviews/{sessionId} listener)
-    const effectiveSession = useMemo(() => session || apiSession, [session, apiSession]);
+    // fall back to apiSession (Firestore /interviews/{sessionId} listener).
+    // IMPORTANT: If the public Firestore doc says 'completed', always trust it over the candidate array
+    // (candidate array status can be stale due to race conditions on finishSession cleanup).
+    const effectiveSession = useMemo(() => {
+        const base = session || apiSession;
+        if (!base) return null;
+        if (apiSession?.status === 'completed') return { ...base, status: 'completed' };
+        return base;
+    }, [session, apiSession]);
 
     // Media States
     const [isMicOn, setIsMicOn] = useState(true);
@@ -252,6 +259,18 @@ export default function LiveInterviewPage() {
     }, [transcript]);
 
     const simulationInsights = [];
+
+    // Self-healing: if public Firestore doc says 'completed' but candidate array is stale, fix it once
+    useEffect(() => {
+        if (!isRecruiter || !candidateData?.id || !sessionId) return;
+        if (apiSession?.status === 'completed' && session && session.status !== 'completed') {
+            console.log("[LiveInterview] Self-healing stale session status in candidate array...");
+            const healed = (candidateData.interviewSessions || []).map(s =>
+                String(s.id) === String(sessionId) ? { ...s, status: 'completed' } : s
+            );
+            updateCandidate(candidateData.id, { interviewSessions: healed });
+        }
+    }, [apiSession?.status, session?.status, candidateData?.id, sessionId, isRecruiter]);
 
     // Handle side effects (redirects, phase transitions)
     useEffect(() => {

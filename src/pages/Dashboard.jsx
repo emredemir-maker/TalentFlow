@@ -70,7 +70,7 @@ export default function Dashboard() {
         candidates.forEach(c => {
             if (c.interviewSessions && Array.isArray(c.interviewSessions)) {
                 c.interviewSessions.forEach(s => {
-                    if (s.status === 'cancelled') return; // Skip cancelled sessions in weekly plan
+                    if (s.status === 'cancelled' || s.status === 'completed') return; // Skip cancelled/completed sessions in weekly plan
 
                     const sessionDatePart = s.date ? s.date.split('T')[0] : '';
                     const sessionDate = new Date(sessionDatePart);
