@@ -467,6 +467,18 @@ export default function PositionsPage() {
         return unsub;
     }, []);
 
+    // Open a specific position detail when navigated from another page
+    useEffect(() => {
+        const handleOpenPosition = (e) => {
+            const posId = e.detail?.positionId;
+            if (!posId) return;
+            const found = positions.find(p => p.id === posId);
+            if (found) setDetailPos(found);
+        };
+        window.addEventListener('openPosition', handleOpenPosition);
+        return () => window.removeEventListener('openPosition', handleOpenPosition);
+    }, [positions]);
+
     const handleExtract = async (formData, setFormData) => {
         if (!jdText || jdText.length < 50) return;
         setIsExtracting(true);

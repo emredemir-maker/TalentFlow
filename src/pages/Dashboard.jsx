@@ -257,7 +257,16 @@ export default function Dashboard() {
                         </div>
                         <div className="space-y-2">
                             {activePositions.map(pos => (
-                                <div key={pos.id} className="p-3 bg-[#F8FAFC] border border-[#F1F5F9] rounded-xl hover:bg-white hover:border-blue-200 transition-all cursor-pointer group flex items-center justify-between">
+                                <div
+                                    key={pos.id}
+                                    onClick={() => {
+                                        window.dispatchEvent(new CustomEvent('changeView', { detail: 'positions' }));
+                                        setTimeout(() => {
+                                            window.dispatchEvent(new CustomEvent('openPosition', { detail: { positionId: pos.id } }));
+                                        }, 80);
+                                    }}
+                                    className="p-3 bg-[#F8FAFC] border border-[#F1F5F9] rounded-xl hover:bg-white hover:border-blue-200 transition-all cursor-pointer group flex items-center justify-between"
+                                >
                                     <div className="min-w-0 flex-1">
                                         <h4 className="text-[11px] font-bold text-[#0F172A] group-hover:text-blue-600 truncate uppercase">{pos.title}</h4>
                                         <div className="flex items-center gap-2 mt-0.5 text-[9px] text-[#94A3B8] font-bold">
