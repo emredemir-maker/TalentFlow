@@ -270,21 +270,21 @@ export default function LiveInterviewPage() {
         // 3. Sync session metadata in real-time
         if (effectiveSession.status === 'live') {
             if (isRecruiter) {
-                // Recruiter gets full session data from Firestore
+                // Only sync strategy/index/transcript — NOT questions or selectedPathId.
+                // handleSelectPath is the single source of truth for those;
+                // syncing them here would revert every path change the recruiter makes.
                 if (session?.activeStrategy) setActiveStrategy(session.activeStrategy);
-                if (session?.questions) setQuestions(session.questions);
-                if (session?.selectedPathId) setSelectedPathId(session.selectedPathId);
                 if (session?.currentQuestionIndex !== undefined) setCurrentQuestionIndex(session.currentQuestionIndex);
                 if (session?.transcript) setTranscript(session.transcript);
+                // Sync questions ONLY when local state is empty (e.g. recruiter reconnects)
+                if (questions.length === 0 && session?.questions?.length > 0) {
+                    setQuestions(session.questions);
+                    if (session.selectedPathId) setSelectedPathId(session.selectedPathId);
+                }
             }
-            // Candidate question sync is handled by the polling effect below (only visibleToCandidate questions)
-        } else if (phase === 'lobby') {
-            // Force questions to be hidden to candidate in lobby
-            if (questions.some(q => q.visibleToCandidate)) {
-                setQuestions(prev => prev.map(q => ({ ...q, visibleToCandidate: false })));
-            }
+            // Candidate question sync is handled by the Firestore onSnapshot listener
         }
-    }, [candidateData, session, apiSession, phase, navigate, sessionId, isRecruiter, questions]);
+    }, [candidateData, session, apiSession, phase, navigate, sessionId, isRecruiter]);
 
     // Recruiter Role Detection
     useEffect(() => {
@@ -2083,14 +2083,7 @@ export default function LiveInterviewPage() {
                                     {isVideoOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
                                 </button>
                                 <button
-                                    onClick={() => {
-                                        if (window.confirm("Görüşmeden ayrılmak istediğinize emin misiniz?")) {
-                                            if (user?.isAnonymous) {
-                                                logout();
-                                            }
-                                            navigate('/exit');
-                                        }
-                                    }}
+                                    onClick={handleCandidateLeave}
                                     className="px-8 h-12 bg-white/10 hover:bg-white/20 text-white rounded-xl font-black text-[11px] uppercase tracking-widest transition-all border border-white/5 flex items-center gap-2 active:scale-95"
                                     title="Mülakatı Kapat ve Ayrıl"
                                 >
