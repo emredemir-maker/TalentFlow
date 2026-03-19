@@ -248,27 +248,29 @@ export default function CandidateProcessPage() {
                 {/* ── RIGHT: DETAIL PANEL ───────────────────────────────────── */}
                 <main className="flex-1 overflow-hidden flex flex-col bg-slate-50">
                     {candidate ? (
-                        <div className="flex-1 overflow-hidden flex flex-col bg-white m-4 rounded-2xl border border-slate-200 shadow-sm">
+                        <div className="flex-1 overflow-hidden flex flex-col bg-white m-3 rounded-2xl border border-slate-200 shadow-sm">
 
                             {/* Candidate header */}
-                            <div className="px-6 py-4 border-b border-slate-100 flex items-start justify-between">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-xl border-2 border-white shadow-md overflow-hidden shrink-0 ring-2 ring-cyan-100">
+                            <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl border-2 border-white shadow-md overflow-hidden shrink-0 ring-2 ring-cyan-100">
                                         <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${candidate.name}`} className="w-full h-full object-cover" alt="" />
                                     </div>
                                     <div>
-                                        <h2 className="text-[18px] font-black text-slate-900 tracking-tight leading-none">{candidate.name}</h2>
-                                        <p className="text-[10px] text-slate-500 font-bold mt-0.5">{candidate.position || candidate.bestTitle || '—'}</p>
-                                        <div className="flex items-center gap-2 mt-1.5">
+                                        <div className="flex items-center gap-2">
+                                            <h2 className="text-[15px] font-black text-slate-900 tracking-tight leading-none">{candidate.name}</h2>
                                             <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 flex items-center gap-1">
                                                 <Target className="w-2.5 h-2.5" /> İlk %2
                                             </span>
                                             <span className="text-[9px] font-black text-cyan-600 bg-cyan-50 px-2 py-0.5 rounded-full border border-cyan-100 flex items-center gap-1">
                                                 <Zap className="w-2.5 h-2.5 fill-cyan-500" /> %{score} Uyum
                                             </span>
+                                        </div>
+                                        <div className="flex items-center gap-3 mt-0.5">
+                                            <p className="text-[11px] text-slate-500 font-medium">{candidate.position || candidate.bestTitle || '—'}</p>
                                             {candidate.email && (
-                                                <span className="text-[9px] font-medium text-slate-500 flex items-center gap-1">
-                                                    <Mail className="w-2.5 h-2.5" /> {candidate.email}
+                                                <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                                                    <Mail className="w-3 h-3" /> {candidate.email}
                                                 </span>
                                             )}
                                         </div>
@@ -277,13 +279,13 @@ export default function CandidateProcessPage() {
 
                                 {/* Stat pills */}
                                 <div className="flex items-center gap-2">
-                                    <div className="flex flex-col items-center bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 min-w-[72px]">
-                                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">STAR Güveni</span>
-                                        <span className="text-[18px] font-black text-slate-800 leading-tight">{candidate.bestScore ? `${Math.round(candidate.bestScore * 0.98)}%` : '—'}</span>
+                                    <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">
+                                        <span className="text-[9px] font-bold text-slate-400 uppercase">STAR</span>
+                                        <span className="text-[13px] font-black text-slate-800">{candidate.bestScore ? `${Math.round(candidate.bestScore * 0.98)}%` : '—'}</span>
                                     </div>
-                                    <div className="flex flex-col items-center bg-cyan-500 rounded-xl px-4 py-2.5 min-w-[72px] shadow-sm shadow-cyan-200">
-                                        <span className="text-[8px] font-black text-cyan-100 uppercase tracking-widest">Uyum</span>
-                                        <span className="text-[18px] font-black text-white leading-tight">
+                                    <div className="flex items-center gap-1.5 bg-cyan-500 rounded-lg px-3 py-1.5 shadow-sm shadow-cyan-200">
+                                        <span className="text-[9px] font-bold text-cyan-100 uppercase">Uyum</span>
+                                        <span className="text-[13px] font-black text-white">
                                             {score > 80 ? 'GÜÇLÜ' : score > 60 ? 'ORTA' : 'ZAYIF'}
                                         </span>
                                     </div>
@@ -291,12 +293,12 @@ export default function CandidateProcessPage() {
                             </div>
 
                             {/* Tabs */}
-                            <div className="flex border-b border-slate-100 px-6 bg-white">
+                            <div className="flex border-b border-slate-100 px-5 bg-white">
                                 {TABS.map(tab => (
                                     <button
                                         key={tab.id}
                                         onClick={() => setActiveTab(tab.id)}
-                                        className={`flex items-center gap-1.5 py-3 px-1 mr-6 text-[9px] font-black uppercase tracking-widest relative whitespace-nowrap transition-colors ${
+                                        className={`flex items-center gap-1.5 py-2.5 px-1 mr-5 text-[9px] font-black uppercase tracking-widest relative whitespace-nowrap transition-colors ${
                                             activeTab === tab.id ? 'text-cyan-600' : 'text-slate-400 hover:text-slate-600'
                                         }`}
                                     >
@@ -309,42 +311,43 @@ export default function CandidateProcessPage() {
                             </div>
 
                             {/* Tab content */}
-                            <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
+                            <div className="flex-1 overflow-y-auto custom-scrollbar p-4">
 
                                 {/* ── STAR ANALİZİ ── */}
                                 {activeTab === 'ai_analysis' && (
-                                    <div className="space-y-5 animate-in fade-in duration-300">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <div className="w-1 h-4 rounded-full bg-cyan-500" />
-                                            <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-widest">Detaylı STAR Değerlendirmesi</h3>
+                                    <div className="space-y-3 animate-in fade-in duration-300">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-1 h-3.5 rounded-full bg-cyan-500" />
+                                            <h3 className="text-[10px] font-black text-slate-700 uppercase tracking-widest">STAR Değerlendirmesi</h3>
                                         </div>
 
-                                        <div className="space-y-4">
+                                        <div className="space-y-2">
                                             {[
-                                                { k: 'S', l: 'DURUM (SITUATION)', bg: 'bg-blue-50',   border: 'border-blue-100',   tc: 'text-blue-700',   r: starAnalysis.Situation.reason },
-                                                { k: 'T', l: 'GÖREV (TASK)',      bg: 'bg-teal-50',   border: 'border-teal-100',   tc: 'text-teal-700',   r: starAnalysis.Task.reason },
-                                                { k: 'A', l: 'EYLEM (ACTION)',    bg: 'bg-violet-50', border: 'border-violet-100', tc: 'text-violet-700', r: starAnalysis.Action.reason },
-                                                { k: 'R', l: 'SONUÇ (RESULT)',   bg: 'bg-emerald-50',border: 'border-emerald-100',tc: 'text-emerald-700',r: starAnalysis.Result.reason },
+                                                { k: 'S', l: 'DURUM', sub: 'Situation', bg: 'bg-blue-50',   border: 'border-blue-100',   tc: 'text-blue-700',   r: starAnalysis.Situation.reason },
+                                                { k: 'T', l: 'GÖREV', sub: 'Task',      bg: 'bg-teal-50',   border: 'border-teal-100',   tc: 'text-teal-700',   r: starAnalysis.Task.reason },
+                                                { k: 'A', l: 'EYLEM', sub: 'Action',    bg: 'bg-violet-50', border: 'border-violet-100', tc: 'text-violet-700', r: starAnalysis.Action.reason },
+                                                { k: 'R', l: 'SONUÇ', sub: 'Result',    bg: 'bg-emerald-50',border: 'border-emerald-100',tc: 'text-emerald-700',r: starAnalysis.Result.reason },
                                             ].map((step, idx) => {
                                                 const { pos, neg } = parseFeedback(step.r);
                                                 return (
-                                                    <div key={idx} className={`rounded-xl border ${step.border} ${step.bg} p-4`}>
-                                                        <div className="flex items-center gap-2 mb-3">
-                                                            <div className={`w-7 h-7 rounded-lg bg-white border ${step.border} flex items-center justify-center text-[13px] font-black ${step.tc} shadow-sm`}>{step.k}</div>
+                                                    <div key={idx} className={`rounded-xl border ${step.border} ${step.bg} p-3`}>
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            <div className={`w-6 h-6 rounded-md bg-white border ${step.border} flex items-center justify-center text-[11px] font-black ${step.tc} shadow-sm shrink-0`}>{step.k}</div>
                                                             <h4 className={`text-[10px] font-black uppercase tracking-wider ${step.tc}`}>{step.l}</h4>
+                                                            <span className={`text-[9px] font-medium opacity-60 ${step.tc}`}>({step.sub})</span>
                                                         </div>
-                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                                                             {pos && (
-                                                                <div className="bg-white border border-emerald-100 p-3 rounded-lg">
-                                                                    <div className="flex items-center gap-1 text-[8px] font-black text-emerald-600 uppercase mb-1.5">
+                                                                <div className="bg-white border border-emerald-100 px-3 py-2 rounded-lg">
+                                                                    <div className="flex items-center gap-1 text-[8px] font-black text-emerald-600 uppercase mb-1">
                                                                         <ShieldCheck className="w-3 h-3" /> Pozitif
                                                                     </div>
                                                                     <p className="text-[11px] text-slate-600 leading-relaxed">{pos}</p>
                                                                 </div>
                                                             )}
                                                             {neg && (
-                                                                <div className="bg-white border border-red-100 p-3 rounded-lg">
-                                                                    <div className="flex items-center gap-1 text-[8px] font-black text-red-500 uppercase mb-1.5">
+                                                                <div className="bg-white border border-red-100 px-3 py-2 rounded-lg">
+                                                                    <div className="flex items-center gap-1 text-[8px] font-black text-red-500 uppercase mb-1">
                                                                         <AlertCircle className="w-3 h-3" /> Negatif
                                                                     </div>
                                                                     <p className="text-[11px] text-slate-600 leading-relaxed">{neg}</p>
@@ -703,7 +706,7 @@ export default function CandidateProcessPage() {
                             </div>
 
                             {/* Footer actions */}
-                            <div className="border-t border-slate-100 px-6 py-3 flex items-center justify-between bg-white shrink-0">
+                            <div className="border-t border-slate-100 px-5 py-2.5 flex items-center justify-between bg-white shrink-0">
                                 {/* Success toast */}
                                 {actionSuccess && (
                                     <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 bg-slate-900 text-white text-[10px] font-black rounded-xl shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-300">
