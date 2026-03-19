@@ -8,7 +8,8 @@ import {
     Target, ShieldCheck, ArrowRight, FileText, Clock,
     AlertCircle, Trophy, Calendar, Edit3,
     CheckCircle2, Link2, ExternalLink, Video, Play, Award, User, Mail,
-    ChevronRight, BarChart2, MessageSquare, XCircle, Send, Loader2
+    ChevronRight, BarChart2, MessageSquare, XCircle, Send, Loader2,
+    Sparkles
 } from 'lucide-react';
 
 const STATUS_CONFIG = {
@@ -146,40 +147,50 @@ export default function CandidateProcessPage() {
     return (
         <div className="h-screen bg-slate-50 flex flex-col font-sans overflow-hidden">
             {/* PAGE HEADER */}
-            <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between shrink-0">
+            <div className="bg-white border-b border-slate-200 px-8 py-5 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-3">
-                    <div className="w-7 h-7 rounded-lg bg-cyan-50 border border-cyan-100 flex items-center justify-center">
-                        <User className="w-4 h-4 text-cyan-600" />
-                    </div>
-                    <div>
-                        <h1 className="text-[13px] font-black text-slate-900 tracking-tight">Aday Yönetimi</h1>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{candidates.length} ADAY • AKTİF SÜREÇ</p>
+                    <h1 className="text-[20px] font-black text-slate-900 tracking-tight">Aday Yönetimi</h1>
+                    <div className="rounded-full bg-slate-100 text-slate-400 text-[11px] px-2.5 py-0.5 font-medium">
+                        {candidates.length}
                     </div>
                 </div>
-                <button className="h-8 px-4 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all shadow-sm shadow-cyan-200">
+                <button className="bg-cyan-500 hover:bg-cyan-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-colors shadow-sm shadow-cyan-200 flex items-center gap-1.5">
                     <Plus className="w-3.5 h-3.5" /> Yeni Aday
                 </button>
             </div>
 
             <div className="flex-1 flex overflow-hidden">
                 {/* ── LEFT: CANDIDATE LIST ─────────────────────────────────── */}
-                <aside className="w-[280px] shrink-0 flex flex-col bg-white border-r border-slate-200">
+                <aside className="w-[260px] shrink-0 flex flex-col bg-white border-r border-slate-200">
+
+                    {/* Logo + Branding */}
+                    <div className="flex items-center gap-3 px-4 pt-5 pb-4 border-b border-slate-100">
+                        <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-gradient-to-br from-teal-400 to-cyan-600 shadow-md shadow-cyan-500/20 shrink-0">
+                            <span className="font-black text-white text-sm tracking-tighter">TI</span>
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                            <span className="text-sm font-bold text-slate-800 leading-tight">Talent-Inn</span>
+                            <span className="text-[10px] text-slate-400 font-medium">HR Platform</span>
+                        </div>
+                    </div>
+
                     {/* Search */}
-                    <div className="p-3 border-b border-slate-100">
+                    <div className="px-4 pt-4 pb-3">
+                        <div className="text-[9px] font-black text-slate-400 tracking-widest uppercase mb-3">ADAYLAR</div>
                         <div className="relative">
-                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                             <input
                                 type="text"
-                                placeholder="Aday veya rol ara..."
+                                placeholder="Ad veya pozisyon ara..."
                                 value={searchQuery}
                                 onChange={e => setSearchQuery(e.target.value)}
-                                className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2 pl-8 pr-3 text-[11px] font-medium text-slate-700 placeholder-slate-400 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-50 transition-all"
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 pl-9 pr-3 text-[12px] text-slate-700 placeholder-slate-400 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition-all"
                             />
                         </div>
                     </div>
 
                     {/* List */}
-                    <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
+                    <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-0.5 custom-scrollbar">
                         {filtered.length === 0 && (
                             <div className="py-10 flex flex-col items-center text-slate-400">
                                 <Search className="w-8 h-8 mb-2 opacity-30" />
@@ -194,31 +205,43 @@ export default function CandidateProcessPage() {
                                 <button
                                     key={c.id}
                                     onClick={() => setViewCandidateId(c.id)}
-                                    className={`w-full text-left rounded-xl border px-3 py-2.5 flex items-center gap-3 transition-all ${
+                                    className={`w-full text-left rounded-xl px-3 py-2.5 flex items-center gap-2.5 transition-colors border ${
                                         isActive
-                                            ? 'bg-cyan-50 border-cyan-300 shadow-sm'
-                                            : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                                            ? 'bg-cyan-50 border-cyan-200'
+                                            : 'bg-transparent border-transparent hover:bg-slate-50'
                                     }`}
                                 >
+                                    {isActive && <div className="w-[6px] h-[6px] rounded-full bg-cyan-500 shrink-0" />}
                                     <div className="w-8 h-8 rounded-lg bg-slate-100 overflow-hidden shrink-0 border border-black/5">
                                         <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${c.name}`} className="w-full h-full object-cover" alt="" />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-[12px] font-black text-slate-900 truncate leading-tight">{c.name}</p>
+                                        <p className={`text-[12px] font-bold truncate leading-tight ${isActive ? 'text-cyan-700' : 'text-slate-700'}`}>{c.name}</p>
                                         <span
-                                            className="text-[7px] font-black px-1.5 py-0.5 rounded mt-0.5 inline-flex items-center gap-0.5 uppercase"
-                                            style={{ color: srcColor, backgroundColor: `${srcColor}18` }}
+                                            className="text-[8px] font-bold px-1.5 py-0.5 rounded-md mt-0.5 inline-flex items-center gap-0.5 uppercase"
+                                            style={{ color: srcColor, backgroundColor: `${srcColor}15` }}
                                         >
-                                            <Link2 className="w-2 h-2" /> {getSourceLabel(c)}
+                                            {getSourceLabel(c)}
                                         </span>
                                     </div>
-                                    <div className="shrink-0 text-right">
-                                        <span className={`text-[11px] font-black ${isActive ? 'text-cyan-600' : 'text-slate-600'}`}>%{sc}</span>
-                                        <Zap className="w-2.5 h-2.5 inline ml-0.5 fill-amber-400 text-amber-400" />
+                                    <div className="shrink-0">
+                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                                            isActive ? 'bg-cyan-100 text-cyan-700' : 'bg-slate-100 text-slate-500'
+                                        }`}>%{sc}</span>
                                     </div>
                                 </button>
                             );
                         })}
+                    </div>
+
+                    {/* Bottom AI card */}
+                    <div className="px-4 py-4 border-t border-slate-100">
+                        <div className="rounded-xl bg-cyan-50 border border-cyan-100 p-3 flex items-start gap-2">
+                            <Sparkles className="w-3.5 h-3.5 text-cyan-500 shrink-0 mt-0.5" />
+                            <span className="text-[11px] text-slate-500 leading-snug">
+                                {candidates.length} aday AI analiz sürecinde
+                            </span>
+                        </div>
                     </div>
                 </aside>
 
