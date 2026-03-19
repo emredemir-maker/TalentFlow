@@ -32,6 +32,7 @@ import {
     MessageSquare,
     Play,
     AlertCircle,
+    AlertTriangle,
     Check,
     Loader2,
     Link as LinkIcon,
@@ -39,7 +40,8 @@ import {
     ArrowLeft,
     Activity,
     Trash2,
-    RefreshCw
+    RefreshCw,
+    CheckCircle
 } from 'lucide-react';
 
 const USERS_PATH = 'artifacts/talent-flow/public/data/users';
@@ -72,6 +74,12 @@ export default function InterviewManagementPage() {
     const [manualDate, setManualDate] = useState('');
     const [manualTime, setManualTime] = useState('09:00');
 
+    // Conflict & day-slot States
+    const [conflictWarning, setConflictWarning] = useState(null); // null | { type, message, existing }
+    const [dayFreeSlots, setDayFreeSlots] = useState([]);          // free slots for selected day
+    const [isCheckingDay, setIsCheckingDay] = useState(false);     // loading indicator for day check
+    const [dayCalendarBusy, setDayCalendarBusy] = useState([]);    // fetched calendar events for selected day
+
     // Email Preview Modal States
     const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
     const [emailSubject, setEmailSubject] = useState('');
@@ -90,6 +98,155 @@ export default function InterviewManagementPage() {
 
     const isGoogleConnected = userProfile?.integrations?.google?.connected;
     const googleToken = userProfile?.integrations?.google?.accessToken;
+
+    // ─── CONFLICT DETECTION HELPERS ───────────────────────────────────────────
+
+    // Check existing interview sessions across ALL candidates for time overlap.
+    // Returns the first conflicting session info or null.
+    const checkLocalConflict = (date, time) => {
+        if (!date || !time) return null;
+        const slotStart = new Date(`${date}T${time}:00`);
+        const slotEnd = new Date(slotStart.getTime() + 60 * 60 * 1000);
+
+        for (const candidate of enrichedCandidates) {
+            for (const session of (candidate.interviewSessions || [])) {
+                if (!session.date || !session.time) continue;
+                if (session.status === 'completed' || session.status === 'cancelled') continue;
+                const sesStart = new Date(`${session.date}T${session.time}:00`);
+                const sesEnd = new Date(sesStart.getTime() + 60 * 60 * 1000);
+                if (slotStart < sesEnd && slotEnd > sesStart) {
+                    return { candidateName: candidate.name, session };
+                }
+            }
+        }
+        return null;
+    };
+
+    // Given a date and list of busy calendar event objects ({ start, end }),
+    // return up to 5 free 1-hour slots within business hours (08:00–18:00)
+    // excluding times that are already busy or in the past.
+    const computeDayFreeSlots = (date, busyEvents = []) => {
+        const candidateHours = [
+            '08:00','09:00','10:00','11:00','13:00',
+            '14:00','15:00','16:00','17:00','18:00'
+        ];
+        const now = new Date();
+        const free = [];
+
+        for (const time of candidateHours) {
+            const slotStart = new Date(`${date}T${time}:00`);
+            const slotEnd = new Date(slotStart.getTime() + 60 * 60 * 1000);
+
+            if (slotStart <= now) continue; // skip past slots
+
+            const localConflict = checkLocalConflict(date, time);
+            if (localConflict) continue;
+
+            const calConflict = busyEvents.some(ev => slotStart < ev.end && slotEnd > ev.start);
+            if (calConflict) continue;
+
+            free.push({ date, time });
+            if (free.length >= 5) break;
+        }
+        return free;
+    };
+
+    // Evaluate the currently selected date+time and update conflictWarning.
+    const evaluateConflict = (date, time, busyCalEvents) => {
+        if (!date || !time) { setConflictWarning(null); return; }
+
+        // 1. Check system interviews
+        const localHit = checkLocalConflict(date, time);
+        if (localHit) {
+            setConflictWarning({
+                type: 'system',
+                message: `Bu saat zaten ${localHit.candidateName} adayı ile planlanmış (${localHit.session.title}).`,
+                existing: localHit
+            });
+            return;
+        }
+
+        // 2. Check Google Calendar
+        if (busyCalEvents.length > 0) {
+            const slotStart = new Date(`${date}T${time}:00`);
+            const slotEnd = new Date(slotStart.getTime() + 60 * 60 * 1000);
+            const calHit = busyCalEvents.find(ev => slotStart < ev.end && slotEnd > ev.start);
+            if (calHit) {
+                setConflictWarning({
+                    type: 'calendar',
+                    message: `Takvimde bu saate çakışan bir etkinlik mevcut: "${calHit.summary || 'Meşgul'}"`,
+                    existing: calHit
+                });
+                return;
+            }
+        }
+
+        setConflictWarning(null);
+    };
+
+    // ─── EFFECTS ──────────────────────────────────────────────────────────────
+
+    // When the selected date changes: fetch Google Calendar events for that day,
+    // compute free slots, and re-evaluate the current time conflict.
+    useEffect(() => {
+        if (!manualDate) {
+            setDayCalendarBusy([]);
+            setDayFreeSlots([]);
+            setConflictWarning(null);
+            return;
+        }
+
+        let cancelled = false;
+        const run = async () => {
+            setIsCheckingDay(true);
+            let busyEvents = [];
+
+            if (isGoogleConnected) {
+                try {
+                    const token = await ensureValidGoogleToken(userId, userProfile);
+                    if (token) {
+                        const dayStart = new Date(`${manualDate}T00:00:00`).toISOString();
+                        const dayEnd = new Date(`${manualDate}T23:59:59`).toISOString();
+                        const result = await getCalendarEvents(token, dayStart, dayEnd);
+                        if (result.success) {
+                            busyEvents = result.events.map(e => ({
+                                start: new Date(e.start.dateTime || e.start.date),
+                                end: new Date(e.end.dateTime || e.end.date),
+                                summary: e.summary
+                            }));
+                        }
+                    }
+                } catch (err) {
+                    console.warn('[ConflictCheck] Calendar fetch failed:', err.message);
+                }
+            }
+
+            if (cancelled) return;
+            setDayCalendarBusy(busyEvents);
+            setDayFreeSlots(computeDayFreeSlots(manualDate, busyEvents));
+            evaluateConflict(manualDate, manualTime, busyEvents);
+            setIsCheckingDay(false);
+        };
+
+        run();
+        return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [manualDate, isGoogleConnected]);
+
+    // Re-evaluate conflict when only the time changes (date and busy list stay the same).
+    useEffect(() => {
+        evaluateConflict(manualDate, manualTime, dayCalendarBusy);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [manualTime]);
+
+    // Reset conflict / day-slot state when the candidate changes (or form closes → null candidate).
+    useEffect(() => {
+        setConflictWarning(null);
+        setDayFreeSlots([]);
+        setDayCalendarBusy([]);
+        setManualDate('');
+        setManualTime('09:00');
+    }, [selectedCandidate]);
 
     // Fetch system users
     useEffect(() => {
@@ -494,27 +651,104 @@ export default function InterviewManagementPage() {
                                     </div>
 
                                     <div className="space-y-1">
-                                        <label className="text-[10px] font-black text-[#64748B] uppercase tracking-widest text-emerald-600">Manuel Tarih</label>
+                                        <label className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-1.5">
+                                            Manuel Tarih
+                                            {isCheckingDay && <Loader2 className="w-3 h-3 animate-spin text-slate-400" />}
+                                        </label>
                                         <input 
                                             type="date" 
                                             value={manualDate}
+                                            min={new Date().toISOString().split('T')[0]}
                                             onChange={(e) => setManualDate(e.target.value)}
                                             className="w-full bg-emerald-50/30 border border-emerald-100 rounded-xl px-4 py-2 text-[11px] font-bold text-[#0F172A] outline-none focus:border-emerald-500" 
                                         />
                                     </div>
 
                                     <div className="space-y-1">
-                                        <label className="text-[10px] font-black text-[#64748B] uppercase tracking-widest text-[#10B981]">Saat Seçimi</label>
+                                        <label className="text-[10px] font-black text-[#10B981] uppercase tracking-widest flex items-center gap-1.5">
+                                            Saat Seçimi
+                                            {conflictWarning && <span className="text-red-500 text-[9px] font-black">⚠ ÇAKIŞMA</span>}
+                                            {!conflictWarning && manualDate && manualTime && !isCheckingDay && <span className="text-emerald-500 text-[9px] font-black">✓ UYGUN</span>}
+                                        </label>
                                         <select 
                                             value={manualTime}
                                             onChange={(e) => setManualTime(e.target.value)}
-                                            className="w-full bg-emerald-50/30 border border-emerald-100 rounded-xl px-4 py-2 text-[11px] font-bold text-[#0F172A] outline-none focus:border-emerald-500 appearance-none pointer-events-auto"
+                                            className={`w-full rounded-xl px-4 py-2 text-[11px] font-bold text-[#0F172A] outline-none appearance-none pointer-events-auto transition-all ${
+                                                conflictWarning 
+                                                    ? 'bg-red-50 border border-red-300 focus:border-red-500' 
+                                                    : 'bg-emerald-50/30 border border-emerald-100 focus:border-emerald-500'
+                                            }`}
                                         >
                                             {timeSlots.map(t => (
                                                 <option key={t} value={t}>{t}</option>
                                             ))}
                                         </select>
                                     </div>
+
+                                    {/* CONFLICT WARNING + DAY FREE SLOTS */}
+                                    {manualDate && (
+                                        <div className="col-span-2 space-y-2 animate-in fade-in duration-200">
+                                            {conflictWarning ? (
+                                                <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-2.5">
+                                                    <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-[11px] font-black text-red-700">
+                                                            {conflictWarning.type === 'system' ? 'Sistem Çakışması' : 'Takvim Çakışması'}
+                                                        </p>
+                                                        <p className="text-[10px] text-red-600 mt-0.5 leading-relaxed">{conflictWarning.message}</p>
+                                                        {dayFreeSlots.length > 0 && (
+                                                            <div className="mt-2.5">
+                                                                <p className="text-[9px] font-black text-red-500 uppercase tracking-widest mb-1.5">Bu gün uygun saatler:</p>
+                                                                <div className="flex flex-wrap gap-1.5">
+                                                                    {dayFreeSlots.map((slot, i) => (
+                                                                        <button
+                                                                            key={i}
+                                                                            type="button"
+                                                                            onClick={() => setManualTime(slot.time)}
+                                                                            className="px-3 py-1 bg-white border border-emerald-300 rounded-lg text-[10px] font-black text-emerald-700 hover:bg-emerald-50 transition-all"
+                                                                        >
+                                                                            {slot.time}
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                        {dayFreeSlots.length === 0 && !isCheckingDay && (
+                                                            <p className="text-[9px] text-red-500 mt-1.5 font-bold">Bu gün için uygun saat bulunamadı.</p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ) : dayFreeSlots.length > 0 ? (
+                                                <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-3 flex items-start gap-2.5">
+                                                    <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-[10px] font-black text-emerald-700">Bu gün müsait saatler</p>
+                                                        <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                                            {dayFreeSlots.map((slot, i) => (
+                                                                <button
+                                                                    key={i}
+                                                                    type="button"
+                                                                    onClick={() => setManualTime(slot.time)}
+                                                                    className={`px-3 py-1 rounded-lg text-[10px] font-black transition-all border ${
+                                                                        manualTime === slot.time
+                                                                            ? 'bg-emerald-500 text-white border-emerald-500'
+                                                                            : 'bg-white border-emerald-200 text-emerald-700 hover:bg-emerald-100'
+                                                                    }`}
+                                                                >
+                                                                    {slot.time}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ) : isCheckingDay ? (
+                                                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 flex items-center gap-2">
+                                                    <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
+                                                    <span className="text-[10px] text-slate-500 font-bold">Takvim kontrol ediliyor...</span>
+                                                </div>
+                                            ) : null}
+                                        </div>
+                                    )}
 
                                     <div className="space-y-1 col-span-2">
                                         <label className="text-[10px] font-black text-[#64748B] uppercase tracking-widest">Mülakat Tipi</label>
@@ -580,11 +814,26 @@ export default function InterviewManagementPage() {
                                         </button>
                                         {manualDate && manualTime ? (
                                             <button 
-                                                onClick={() => createInterviewRecord({ date: manualDate, time: manualTime }, false)}
-                                                disabled={!selectedCandidate}
-                                                className="flex-1 bg-[#10B981] text-white py-3 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-emerald-600 transition-all shadow-xl shadow-emerald-500/10"
+                                                onClick={() => {
+                                                    if (conflictWarning) {
+                                                        const confirmed = window.confirm(
+                                                            `⚠️ Çakışma Uyarısı\n\n${conflictWarning.message}\n\nYine de bu saatte planlamak istiyor musunuz?`
+                                                        );
+                                                        if (!confirmed) return;
+                                                    }
+                                                    createInterviewRecord({ date: manualDate, time: manualTime }, false);
+                                                }}
+                                                disabled={!selectedCandidate || isCheckingDay}
+                                                className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-xl ${
+                                                    conflictWarning
+                                                        ? 'bg-orange-500 hover:bg-orange-600 text-white shadow-orange-500/10'
+                                                        : 'bg-[#10B981] hover:bg-emerald-600 text-white shadow-emerald-500/10'
+                                                }`}
                                             >
-                                                <Calendar className="w-3.5 h-3.5" /> MÜLAKATI PLANLA
+                                                {conflictWarning 
+                                                    ? <><AlertTriangle className="w-3.5 h-3.5" /> YINE DE PLANLA</>
+                                                    : <><Calendar className="w-3.5 h-3.5" /> MÜLAKATI PLANLA</>
+                                                }
                                             </button>
                                         ) : (
                                             <button 
