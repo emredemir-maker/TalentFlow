@@ -107,13 +107,23 @@ export default function InterviewManagementPage() {
         if (!date || !time) return null;
         const slotStart = new Date(`${date}T${time}:00`);
         const slotEnd = new Date(slotStart.getTime() + 60 * 60 * 1000);
+        if (isNaN(slotStart.getTime())) return null;
 
         for (const candidate of enrichedCandidates) {
             for (const session of (candidate.interviewSessions || [])) {
                 if (!session.date || !session.time) continue;
                 if (session.status === 'completed' || session.status === 'cancelled') continue;
-                const sesStart = new Date(`${session.date}T${session.time}:00`);
+
+                // Normalize date: session.date may be "2026-03-19" or "2026-03-19T10:00:00.000Z"
+                const sessionDateStr = (session.date || '').split('T')[0];
+                if (sessionDateStr !== date) continue; // only check sessions on the same date
+
+                // Normalize time: trim whitespace, accept "HH:MM" or "H:MM"
+                const sessionTime = (session.time || '').trim();
+                const sesStart = new Date(`${date}T${sessionTime}:00`);
+                if (isNaN(sesStart.getTime())) continue; // skip sessions with unparseable times
                 const sesEnd = new Date(sesStart.getTime() + 60 * 60 * 1000);
+
                 if (slotStart < sesEnd && slotEnd > sesStart) {
                     return { candidateName: candidate.name, session };
                 }
@@ -209,11 +219,13 @@ export default function InterviewManagementPage() {
                         const dayEnd = new Date(`${manualDate}T23:59:59`).toISOString();
                         const result = await getCalendarEvents(token, dayStart, dayEnd);
                         if (result.success) {
-                            busyEvents = result.events.map(e => ({
-                                start: new Date(e.start.dateTime || e.start.date),
-                                end: new Date(e.end.dateTime || e.end.date),
-                                summary: e.summary
-                            }));
+                            busyEvents = result.events
+                                .filter(e => e.start.dateTime) // skip all-day events (no specific times)
+                                .map(e => ({
+                                    start: new Date(e.start.dateTime),
+                                    end: new Date(e.end.dateTime),
+                                    summary: e.summary
+                                }));
                         }
                     }
                 } catch (err) {
