@@ -1,73 +1,52 @@
-import React, { useState } from 'react';
+// src/pages/GuidePage.jsx
+// Platform Guide — Light theme, semantic search, all features documented
+
+import { useState, useMemo } from 'react';
 import {
-    Zap, Rocket, Target, Users, Search,
-    Sparkles, ShieldCheck, Mail, Calendar,
-    BookOpen, ChevronRight, LayoutDashboard,
-    GitBranch, ArrowRight, Star, Globe,
-    BarChart3, Settings, Briefcase, Award,
-    X, CheckCircle2, AlertCircle, MousePointer2, Activity,
-    Database, Clock, Heart, MessageSquare,
-    Upload, Brain, Layers, FileText,
-    Building2, Unlock, Send, Eye, UserCog, Link2
+    Search, BookOpen, ChevronDown, ChevronRight,
+    LayoutDashboard, Users, Briefcase, Calendar,
+    BarChart3, MessageSquare, Share2, Building2,
+    Shield, Settings, Video, Upload, Brain, Star,
+    Zap, Globe, Mail, Bell, Mic, Activity, UserPlus,
+    CheckCircle, ArrowRight, Lightbulb, Play,
+    FileText, Filter, RefreshCw, Plus, Eye,
+    Clock, Target, Layers, AlertCircle
 } from 'lucide-react';
 
-const FEATURES_DETAIL = [
+// ─── FEATURE DATA ──────────────────────────────────────────────────────────────
+const FEATURES = [
+    // ── ANA EKRANLAR ──
     {
-        id: 'cv-upload',
-        icon: Upload,
-        title: "Nöral CV Ayrıştırma (OCR+NLP)",
-        desc: "Ham dosyaları saniyeler içinde yapılandırılmış stratejik veriye dönüştürün. AI, adayın tüm kariyer yolculuğunu otomatik olarak kronolojik bir başarı akışına çevirir.",
-        color: "text-blue-400",
-        bgColor: "bg-blue-400/10",
-        howItWorks: [
-            "Aday Görünümü sayfasındaki 'Aday Ekle' butonuna tıklayın.",
-            "PDF veya Word formatındaki CV dosyasını sürükleyip bırakın.",
-            "AI, gelişmiş NLP teknikleriyle metni ayrıştırı ve yetkinlikleri etiketler.",
-            "Saniyeler içinde adayın tüm kariyer geçmişi 'Aday Kartı' olarak sistemde yerini alır."
+        id: 'dashboard',
+        category: 'genel',
+        icon: LayoutDashboard,
+        color: '#3b82f6',
+        title: 'Kontrol Paneli',
+        subtitle: 'Ana ekran & genel bakış',
+        description: 'Tüm işe alım süreçlerinizin tek bakışta görüldüğü merkez ekrandır. Açık ilanlar, bekleyen mülakatlar, günlük aktivite özeti ve son aday hareketlerini buradan takip edebilirsiniz.',
+        steps: [
+            'Sol menüden "Kontrol Paneli" seçeneğine tıklayın.',
+            'Üstteki KPI kartlarında toplam aday, açık pozisyon ve yaklaşan mülakat sayılarını görün.',
+            'Aktivite akışından son eklenen adayları ve güncellemeleri takip edin.',
+            'Hızlı erişim butonlarıyla doğrudan yeni aday ekleyebilir veya mülakat planlayabilirsiniz.',
         ],
-        preview: (
-            <div className="space-y-4">
-                <div className="border-2 border-dashed border-text-primary/10 rounded-2xl p-6 text-center bg-text-primary/[0.02]">
-                    <Upload className="w-8 h-8 text-blue-400 mx-auto mb-2 animate-bounce" />
-                    <div className="text-[10px] text-navy-400 font-bold uppercase tracking-widest">Ayrıştırma Motoru Hazır</div>
-                </div>
-                <div className="flex items-center gap-3 bg-text-primary/5 p-2 rounded-xl border border-text-primary/10 animate-pulse">
-                    <FileText className="w-4 h-4 text-navy-400" />
-                    <div className="h-2 w-24 bg-text-primary/10 rounded-full" />
-                    <div className="ml-auto text-[8px] text-emerald-400 font-bold">ANALİZ TAMAMLANDI</div>
-                </div>
-            </div>
-        )
-    },
-    {
-        id: 'candidate-mgmt',
-        icon: Layers,
-        title: "Aday Pipeline Yönetimi",
-        desc: "Adayları süreçlerine göre kategorize edin. Dinamik filtreleme ve durum takibi ile tüm işe alım hunisini tek bir kontrol merkezinden yönetin.",
-        color: "text-emerald-400",
-        bgColor: "bg-emerald-400/10",
-        howItWorks: [
-            "Candidate Process sayfasından tüm aktif aday listesine erişin.",
-            "Pozisyon bazlı veya tecrübe yılına göre gelişmiş filtreler uygulayın.",
-            "Adayların durumunu (Mülakat, Değerlendirme, Red) anlık olarak güncelleyin.",
-            "Pipeline üzerinden aday etkileşimlerini merkezi olarak izleyin."
-        ],
-        preview: (
+        tip: 'Kontrol Paneli anlık güncellenir — sayfayı yenilemeden her değişiklik otomatik yansır.',
+        tags: ['dashboard', 'ana ekran', 'özet', 'kpi', 'istatistik', 'hızlı erişim'],
+        mockup: (
             <div className="space-y-3">
                 <div className="grid grid-cols-3 gap-2">
-                    <div className="h-1 rounded-full bg-emerald-500" />
-                    <div className="h-1 rounded-full bg-navy-800" />
-                    <div className="h-1 rounded-full bg-navy-800" />
+                    {[{ l: 'Açık İlan', v: '12', c: '#3b82f6' }, { l: 'Aday', v: '48', c: '#10b981' }, { l: 'Bu Hafta', v: '5', c: '#f59e0b' }].map(k => (
+                        <div key={k.l} className="bg-white border border-slate-100 rounded-xl p-2.5 text-center">
+                            <div className="text-lg font-bold" style={{ color: k.c }}>{k.v}</div>
+                            <div className="text-[9px] text-slate-400 font-medium">{k.l}</div>
+                        </div>
+                    ))}
                 </div>
-                <div className="space-y-2">
-                    {[1, 2].map(i => (
-                        <div key={i} className="bg-text-primary/5 border border-text-primary/10 p-2 rounded-lg flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-navy-700 to-navy-600" />
-                            <div className="flex-1 space-y-1">
-                                <div className="h-1.5 w-12 bg-text-primary/10 rounded" />
-                                <div className="h-1 w-20 bg-text-primary/5 rounded" />
-                            </div>
-                            <div className="text-[8px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded">Aktif Süreç</div>
+                <div className="space-y-1.5">
+                    {['Ahmet Yılmaz eklenid • 2dk', 'Yazılım Müh. mülakatı planlandı • 1s'].map((t, i) => (
+                        <div key={i} className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-lg p-2">
+                            <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                            <span className="text-[10px] text-slate-500">{t}</span>
                         </div>
                     ))}
                 </div>
@@ -75,216 +54,386 @@ const FEATURES_DETAIL = [
         )
     },
     {
-        id: 'ai-principles',
-        icon: Brain,
-        title: "Kanıta Dayalı Analiz Motoru",
-        desc: "AI, ham veriler yerine 'somut kanıtlar' üzerinden skorlama yapar. STAR metodolojisini temel alan objektif değerlendirme algoritmasıyla tanışın.",
-        color: "text-purple-400",
-        bgColor: "bg-purple-400/10",
-        howItWorks: [
-            "Objektif Analiz: AI, özgeçmişteki iddiaları somut başarı cümleleriyle doğrular.",
-            "STAR Puanlaması: Deneyimler (Situation, Task, Action, Result) çerçevesinde skorlanır.",
-            "Gap Analysis: İş tanımı ile aday arasındaki kritik farklar otomatik raporlanır.",
-            "Önyargısız Seçim: Sadece profesyonel yetkinliklere odaklanan 'Bias-Free' yaklaşım."
+        id: 'candidates',
+        category: 'aday',
+        icon: Users,
+        color: '#10b981',
+        title: 'Aday Pipeline Yönetimi',
+        subtitle: 'Adaylar sayfası',
+        description: 'Tüm adaylarınızı tek ekranda yönetin. Aday durumlarını güncelleyin, filtreler uygulayın ve her adayın detaylı AI analiz kartına ulaşın. CV yüklemeden mülakat raporuna kadar tüm süreç burada yönetilir.',
+        steps: [
+            '"Adaylar" menüsünden aday listesine erişin.',
+            '"Aday Ekle" butonuna tıklayın ve PDF/Word CV yükleyin — AI otomatik ayrıştırır.',
+            'Aday kartına tıklayarak AI tarafından çıkarılan beceriler, deneyim ve skorları inceleyin.',
+            'Durum açılır menüsünden adayı "Mülakata Davet", "Değerlendirme" veya "Red" aşamasına taşıyın.',
+            'Filtreler ile pozisyon, deneyim yılı veya uyum skoruna göre listeleyin.',
         ],
-        preview: (
-            <div className="space-y-4">
-                <div className="flex justify-between items-center px-2">
-                    <span className="text-[10px] font-black text-text-primary uppercase tracking-tighter">AI Reasoner V2</span>
-                    <Sparkles className="w-3 h-3 text-purple-400" />
-                </div>
-                <div className="bg-purple-500/5 border border-purple-500/20 p-3 rounded-xl space-y-2">
-                    <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                        <span className="text-[9px] text-navy-300">Kanıt: AWS migrasyonunda %40 maliyet tasarrufu sağlandı</span>
+        tip: "AI, CV'yi yükler yüklemez STAR metodolojisiyle otomatik puan üretir. Manuel veri girişi gerekmez.",
+        tags: ['aday', 'cv', 'upload', 'pipeline', 'durum', 'filtre', 'skor', 'ai analiz', 'özgeçmiş'],
+        mockup: (
+            <div className="space-y-2">
+                {[
+                    { name: 'Zeynep K.', pos: 'Frontend Dev', score: 91, status: 'Mülakat', sc: '#10b981' },
+                    { name: 'Mert A.', pos: 'Backend Dev', score: 78, status: 'Değerlendirme', sc: '#f59e0b' },
+                    { name: 'Selin Y.', pos: 'UX Designer', score: 85, status: 'Yeni', sc: '#3b82f6' },
+                ].map((c, i) => (
+                    <div key={i} className="flex items-center gap-3 bg-white border border-slate-100 rounded-xl p-2.5">
+                        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-600">
+                            {c.name[0]}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <div className="text-xs font-semibold text-slate-700">{c.name}</div>
+                            <div className="text-[9px] text-slate-400">{c.pos}</div>
+                        </div>
+                        <div className="text-xs font-bold" style={{ color: c.sc }}>{c.score}%</div>
+                        <div className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: c.sc + '20', color: c.sc }}>{c.status}</div>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <Star className="w-2.5 h-2.5 text-amber-400 fill-amber-400" />
-                        <span className="text-[9px] text-text-primary font-bold tracking-tight">STAR SKORU: 4.9/5</span>
-                    </div>
-                </div>
+                ))}
             </div>
         )
     },
     {
         id: 'positions',
+        category: 'aday',
         icon: Briefcase,
-        title: "Hedef Pozisyon & JD Analizi",
-        desc: "İş tanımlarınızı (JD) sisteme tanıtın. AI, bu tanımları analiz ederek adayları spesifik pozisyon gereksinimlerinize göre hassas bir şekilde eşleştirir.",
-        color: "text-amber-400",
-        bgColor: "bg-amber-400/10",
-        howItWorks: [
-            "Pozisyonlar sayfasından detaylı iş tanımlarını sisteme girin.",
-            "AI, metindeki kritik yetkinlikleri ve tecrübe beklentilerini ayıklar.",
-            "Her yeni pozisyon, aday havuzunuz için otomatik bir 'karşılaştırma hedefi' olur.",
-            "Dinamik skorlama sayesinde adayın her farklı role olan uygunluğunu ayrı görün."
+        color: '#8b5cf6',
+        title: 'Açık İlanlar & Pozisyon Yönetimi',
+        subtitle: 'Pozisyonlar sayfası',
+        description: 'İşe alım yapacağınız pozisyonları tanımlayın. Her pozisyon için iş tanımı, departman, yetenek gereksinimleri ve beklentileri girin. AI bu bilgileri analiz ederek aday havuzunuzdan en uygun eşleşmeleri otomatik bulur.',
+        steps: [
+            '"Açık İlanlar" menüsünden "Yeni Pozisyon" butonuna tıklayın.',
+            'Pozisyon adı, departman ve iş tanımı alanlarını doldurun.',
+            'İsteğe bağlı olarak AI ile otomatik iş tanımı oluşturabilirsiniz — pozisyon başlığını yazıp AI\'a bırakın.',
+            'Kaydet butonuna tıklayın — pozisyon aktif olur ve aday eşleştirmesi başlar.',
+            'Pozisyon satırına tıklayarak eşleşen adayları, istatistikleri ve detayları görün.',
         ],
-        preview: (
-            <div className="space-y-3">
-                <div className="flex items-center justify-between bg-text-primary/5 p-3 rounded-xl border border-text-primary/10">
-                    <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-amber-400/20 flex items-center justify-center text-amber-400"><Briefcase className="w-4 h-4" /></div>
-                        <div>
-                            <div className="text-xs font-bold text-text-primary">Cloud Architecture Specialist</div>
-                            <div className="text-[10px] text-navy-500">Stratejik Rol • 8 Aday</div>
+        tip: 'Detaylı iş tanımı yazdıkça AI eşleştirme skorları daha isabetli olur. En az 3-4 cümle girin.',
+        tags: ['pozisyon', 'ilan', 'iş tanımı', 'jd', 'eşleştirme', 'departman', 'ai', 'yetenek'],
+        mockup: (
+            <div className="space-y-2">
+                {[
+                    { title: 'Yazılım Müh.', dept: 'Mühendislik', count: 8, status: 'Aktif' },
+                    { title: 'UX Designer', dept: 'Ürün', count: 5, status: 'Aktif' },
+                    { title: 'Data Analyst', dept: 'Analitik', count: 3, status: 'Pasif' },
+                ].map((p, i) => (
+                    <div key={i} className="flex items-center gap-3 bg-white border border-slate-100 rounded-xl p-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-violet-50 border border-violet-100 flex items-center justify-center">
+                            <Briefcase className="w-4 h-4 text-violet-500" />
                         </div>
+                        <div className="flex-1 min-w-0">
+                            <div className="text-xs font-semibold text-slate-700">{p.title}</div>
+                            <div className="text-[9px] text-slate-400">{p.dept} · {p.count} aday</div>
+                        </div>
+                        <div className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${p.status === 'Aktif' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>{p.status}</div>
                     </div>
-                    <div className="text-[10px] text-emerald-400 border border-emerald-400/20 px-2 py-0.5 rounded-full">Optimize Edildi</div>
+                ))}
+            </div>
+        )
+    },
+    // ── MÜLAKAT ──
+    {
+        id: 'interview-mgmt',
+        category: 'mulakat',
+        icon: Calendar,
+        color: '#f59e0b',
+        title: 'Mülakat Planlama & Davetler',
+        subtitle: 'Mülakatlar sayfası',
+        description: 'Mülakatları planlayın, adaylara otomatik davet e-postaları gönderin ve Google Calendar entegrasyonu ile takviminize ekleyin. Her mülakat için benzersiz bir katılım bağlantısı otomatik oluşturulur.',
+        steps: [
+            '"Mülakatlar" menüsünden "Yeni Mülakat Planla" butonuna tıklayın.',
+            'Aday, pozisyon, tarih ve saat seçin. Mülakat türünü belirleyin (Teknik / İK / Ürün).',
+            '"E-posta Gönder" seçeneği ile adaya otomatik davetiye ve mülakat bağlantısı gönderilir.',
+            'Google Calendar bağlantısı varsa etkinlik otomatik takviminize eklenir.',
+            'Mülakat günü, "Mülakatı Başlat" butonuyla Canlı Mülakat ekranına geçin.',
+        ],
+        tip: 'Google Workspace entegrasyonu aktifken takvim görünürlüğünüzü kontrol edebilir, adayın kendi zamanını seçmesini sağlayabilirsiniz.',
+        tags: ['mülakat', 'planlama', 'takvim', 'google calendar', 'davet', 'email', 'link', 'zamanlama'],
+        mockup: (
+            <div className="space-y-2.5">
+                <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-semibold text-amber-700">Bugün — 14:00</span>
+                        <span className="text-[9px] bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded-full">Bekliyor</span>
+                    </div>
+                    <div className="text-[11px] text-slate-700 font-medium">Ahmet Yılmaz — Teknik Mülakat</div>
+                    <div className="text-[9px] text-slate-400 mt-0.5">Yazılım Müh. • meet.google.com/···</div>
                 </div>
-                <div className="bg-text-primary/[0.02] border border-text-primary/5 rounded-xl p-4 space-y-2">
-                    <div className="h-2 w-1/3 bg-text-primary/10 rounded-full" />
-                    <div className="h-1.5 w-full bg-text-primary/5 rounded-full" />
-                    <div className="h-1.5 w-5/6 bg-text-primary/5 rounded-full" />
+                <div className="flex gap-2">
+                    <div className="flex-1 bg-emerald-50 border border-emerald-100 rounded-lg px-2 py-1.5 text-center">
+                        <div className="text-[9px] text-emerald-600 font-semibold">Başlat →</div>
+                    </div>
+                    <div className="flex-1 bg-slate-50 border border-slate-100 rounded-lg px-2 py-1.5 text-center">
+                        <div className="text-[9px] text-slate-500 font-semibold">E-posta Gönder</div>
+                    </div>
                 </div>
             </div>
         )
     },
     {
-        id: 'shadow-observer',
-        icon: Eye,
-        title: "Shadow Observer: Canlı Y.Z. Gözlemcisi",
-        desc: "Mülakatın her saniyesini dinleyen 'Gölge Gözlemci' ile tanışın. Gemini 2.0 Multimodal Audio altyapısıyla çalışır; hem sizin hem de adayın sesini dijital olarak analiz eder.",
-        color: "text-emerald-400",
-        bgColor: "bg-emerald-400/10",
-        howItWorks: [
-            "Interview Bridge: 'Botu Toplantıya Sok' diyerek Meet/Zoom sekmesini ve 'SİSTEM SESİNİ' paylaşın.",
-            "Hibrit Miksaj: Sistem, mikrofonunuzu ve toplantı sesini AudioContext üzerinden birleştirerek kusursuz analiz yapar.",
-            "Canlı STAR Denetimi: Adayın cevapları konuşma anında S-T-A-R kriterlerine ve mantık bütünlüğüne göre skorlanır.",
-            "Taktiksel Rehberlik: AI asistanı mülakat sırasında yan panelden 'Derinleş' veya 'Soru Grubu Değiştir' gibi taktikler fısıldar."
+        id: 'live-interview',
+        category: 'mulakat',
+        icon: Video,
+        color: '#06b6d4',
+        title: 'Canlı AI Mülakat Oturumu',
+        subtitle: 'Canlı Mülakat ekranı',
+        description: 'WebRTC altyapısıyla adayla bağlantı kurun ve Gemini yapay zekasının gerçek zamanlı sesli analiz gücünden yararlanın. AI her konuşmayı dinler, STAR kriterlerine göre değerlendirir ve size anlık sorular önerir.',
+        steps: [
+            'Mülakatlar sayfasından "Mülakatı Başlat" butonuna tıklayın — recruiter ekranı açılır.',
+            'Aday, size iletilen benzersiz bağlantıya girerek kendi cihazından katılır.',
+            'WebRTC sayesinde video ve ses bağlantısı kurulur (kamera & mikrofon izni gerekir).',
+            'Gemini STT motoru konuşmaları gerçek zamanlı dinler ve yazıya dönüştürür.',
+            '"AI Soru Üret" butonuna tıklayarak seçtiğiniz yetkinlik moduna göre anlık soru alın.',
+            'Mülakat bittiğinde "Sonlandır" butonuna basın — otomatik rapor oluşturulur.',
         ],
-        preview: (
-            <div className="space-y-4">
-                <div className="flex items-center justify-between px-1">
-                    <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                        <span className="text-[10px] font-black text-text-primary uppercase tracking-tighter">MÜLAKAT KÖPRÜSÜ AKTİF</span>
+        tip: 'Mülakat sırasında "Derinleştir" modunu kullanın: adayın yüzeysel kalan cevabını derinlemesine sorgulayan çapraz sorular üretir.',
+        tags: ['canlı mülakat', 'webrtc', 'video', 'ses', 'gemini', 'stt', 'ai soru', 'star', 'gerçek zamanlı', 'sesli analiz'],
+        mockup: (
+            <div className="space-y-2.5">
+                <div className="bg-slate-800 rounded-xl p-3 flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-slate-700 flex items-center justify-center">
+                        <Video className="w-5 h-5 text-white/60" />
                     </div>
-                    <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                    <div>
+                        <div className="text-[10px] text-white font-semibold">Aday Bağlı</div>
+                        <div className="flex items-center gap-1 mt-0.5">
+                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                            <span className="text-[9px] text-emerald-400">Canlı · 00:14:32</span>
+                        </div>
+                    </div>
                 </div>
-                <div className="grid grid-cols-4 gap-1.5">
-                    {['S', 'T', 'A', 'R'].map(s => (
-                        <div key={s} className="bg-text-primary/5 border border-text-primary/10 p-2 rounded-lg text-center">
-                            <div className="text-[8px] text-navy-500 font-bold mb-1">{s}</div>
-                            <div className="h-1 w-full bg-navy-800 rounded-full overflow-hidden">
-                                <div className="h-full bg-emerald-500 w-3/4" />
+                <div className="bg-cyan-50 border border-cyan-100 rounded-xl p-2.5">
+                    <div className="text-[9px] text-cyan-600 font-semibold mb-1 flex items-center gap-1">
+                        <Brain className="w-3 h-3" /> AI Soru Önerisi
+                    </div>
+                    <div className="text-[10px] text-slate-700">"Bu projede karşılaştığınız en büyük teknik engel neydi?"</div>
+                </div>
+                <div className="grid grid-cols-4 gap-1">
+                    {['S', 'T', 'A', 'R'].map((s, i) => (
+                        <div key={s} className="bg-white border border-slate-100 rounded-lg p-1.5 text-center">
+                            <div className="text-[8px] font-bold text-slate-500">{s}</div>
+                            <div className="mt-1 h-1 bg-slate-100 rounded-full overflow-hidden">
+                                <div className="h-full rounded-full bg-cyan-400" style={{ width: `${[80, 60, 90, 70][i]}%` }} />
                             </div>
                         </div>
                     ))}
                 </div>
-                <div className="bg-emerald-500/5 border border-emerald-500/20 p-2.5 rounded-xl">
-                    <div className="flex items-center gap-2 mb-1">
-                        <Activity className="w-3 h-3 text-emerald-400" />
-                        <span className="text-[9px] text-emerald-400 font-bold uppercase">Intel Stream</span>
+            </div>
+        )
+    },
+    {
+        id: 'interview-report',
+        category: 'mulakat',
+        icon: FileText,
+        color: '#8b5cf6',
+        title: 'Mülakat Raporu & STAR Analizi',
+        subtitle: 'Otomatik mülakat raporlama',
+        description: 'Mülakat tamamlandıktan sonra AI tüm konuşmayı analiz ederek STAR metodolojisine göre detaylı bir değerlendirme raporu üretir. Adayın güçlü ve zayıf yönleri, teknik yeterlilik ve kültürel uyum skorları raporlanır.',
+        steps: [
+            'Mülakat sona erdiğinde "Sonlandır" butonuna basın.',
+            'AI, kaydedilen konuşmayı saniyeler içinde analiz eder.',
+            'Rapor sayfasında STAR skorları, yetkinlik değerlendirmeleri ve önerilen takip soruları gösterilir.',
+            'Raporu PDF olarak indirebilir veya adayın dosyasına ekleyebilirsiniz.',
+        ],
+        tip: 'Rapordaki "Önerilen Takip Soruları" bölümü bir sonraki mülakat turu için hazır sorular sunar.',
+        tags: ['rapor', 'star', 'değerlendirme', 'analiz', 'skor', 'pdf', 'sonuç', 'yetkinlik'],
+        mockup: (
+            <div className="space-y-2">
+                <div className="bg-violet-50 border border-violet-100 rounded-xl p-3">
+                    <div className="text-[10px] font-semibold text-violet-700 mb-2">STAR Skoru — Zeynep K.</div>
+                    {[['Durum Analizi', 85], ['Görev Yönetimi', 72], ['Aksiyon Gücü', 91], ['Sonuç Odaklılık', 88]].map(([l, v]) => (
+                        <div key={l} className="flex items-center gap-2 mb-1">
+                            <span className="text-[9px] text-slate-500 w-28">{l}</span>
+                            <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                <div className="h-full bg-violet-400 rounded-full" style={{ width: v + '%' }} />
+                            </div>
+                            <span className="text-[9px] font-bold text-violet-600">{v}</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        )
+    },
+    // ── ANALİTİK ──
+    {
+        id: 'analytics',
+        category: 'analitik',
+        icon: BarChart3,
+        color: '#06b6d4',
+        title: 'Analitik Raporlar',
+        subtitle: '3 sekmeli analitik panel',
+        description: "İşe alım performansınızı üç farklı perspektiften analiz edin. Genel Bakış'ta KPI'lar ve dönüşüm hunisi, Edinme'de kaynak verimliliği, Yanıt Takibi'nde ise aday iletişim durumlarını takip edin.",
+        steps: [
+            '"Analitik Raporlar" menüsünden ana panele erişin.',
+            '"Genel Bakış" sekmesinde toplam aday, açık pozisyon, tamamlanan mülakat ve ortalama uyum skoru kartlarını inceleyin.',
+            '"Edinme & Kaynak" sekmesinde hangi kanalın en iyi adayı getirdiğini görün.',
+            '"Yanıt Takibi" sekmesinde gönderilen davetlerin açılma ve yanıtlanma oranlarını izleyin.',
+            'Sağ üstteki zaman aralığı seçici ile haftalık/aylık/yıllık görünümler arasında geçiş yapın.',
+        ],
+        tip: "Edinme sekmesindeki \"Kanal/Detay\" toggle'ı kaynak bazlı ve alt kaynak bazlı görünümler arasında geçiş sağlar.",
+        tags: ['analitik', 'rapor', 'kpi', 'grafik', 'kaynak', 'dönüşüm', 'huni', 'istatistik', 'performans'],
+        mockup: (
+            <div className="space-y-2">
+                <div className="flex gap-1 mb-2">
+                    {['Genel Bakış', 'Edinme', 'Yanıtlar'].map((t, i) => (
+                        <div key={t} className={`px-2 py-1 rounded-lg text-[9px] font-medium ${i === 0 ? 'bg-cyan-500 text-white' : 'bg-slate-100 text-slate-500'}`}>{t}</div>
+                    ))}
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
+                    {[{ l: 'Toplam Aday', v: '124', c: '#3b82f6' }, { l: 'Ort. Skor', v: '%82', c: '#10b981' }, { l: 'Mülakatlar', v: '31', c: '#8b5cf6' }, { l: 'İşe Alım', v: '8', c: '#f59e0b' }].map(k => (
+                        <div key={k.l} className="bg-white border border-slate-100 rounded-lg p-2 text-center">
+                            <div className="text-sm font-bold" style={{ color: k.c }}>{k.v}</div>
+                            <div className="text-[9px] text-slate-400">{k.l}</div>
+                        </div>
+                    ))}
+                </div>
+                <div className="flex items-end gap-1 h-12 px-1">
+                    {[40, 65, 55, 80, 70, 90, 75].map((h, i) => (
+                        <div key={i} className="flex-1 bg-cyan-100 rounded-sm" style={{ height: h + '%' }} />
+                    ))}
+                </div>
+            </div>
+        )
+    },
+    // ── İLETİŞİM ──
+    {
+        id: 'messages',
+        category: 'iletisim',
+        icon: MessageSquare,
+        color: '#ec4899',
+        title: 'Mesajlaşma',
+        subtitle: 'Ekip içi iletişim',
+        description: 'Takım üyelerinizle anlık mesajlaşın. Aday bilgilerini, mülakat notlarını ve önemli güncellemeleri ekibinizle paylaşın. Tüm konuşmalar organize kanallar halinde saklanır.',
+        steps: [
+            '"Mesajlaşma" menüsüne tıklayın.',
+            'Sol panelde mevcut sohbet kanallarını görün veya yeni kanal oluşturun.',
+            'Mesaj kutusuna yazın ve gönderin.',
+            'Aday kartını mesaja eklemek için ek seçeneğini kullanın.',
+        ],
+        tip: 'Önemli konuşmaları sabitleyin (pin) — kritik mülakat notlarına hızlıca ulaşın.',
+        tags: ['mesaj', 'iletişim', 'sohbet', 'ekip', 'kanal', 'bildirim'],
+        mockup: (
+            <div className="space-y-2">
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-2 flex gap-2">
+                    <div className="w-6 h-6 rounded-full bg-pink-100 flex items-center justify-center text-[9px] font-bold text-pink-600">A</div>
+                    <div className="flex-1">
+                        <div className="text-[10px] font-semibold text-slate-700">Ahmet B.</div>
+                        <div className="text-[9px] text-slate-500 mt-0.5">Zeynep K. mülakatı nasıl geçti?</div>
                     </div>
-                    <div className="h-1.5 w-full bg-text-primary/5 rounded-full overflow-hidden">
-                        <div className="h-full bg-emerald-500 w-2/3 animate-[shimmer_2s_infinite]" />
+                </div>
+                <div className="bg-cyan-50 border border-cyan-100 rounded-xl p-2 flex gap-2">
+                    <div className="w-6 h-6 rounded-full bg-cyan-100 flex items-center justify-center text-[9px] font-bold text-cyan-600">S</div>
+                    <div className="flex-1">
+                        <div className="text-[10px] font-semibold text-slate-700">Siz</div>
+                        <div className="text-[9px] text-slate-500 mt-0.5">Çok iyi! STAR skoru 91 çıktı 🎯</div>
                     </div>
                 </div>
             </div>
         )
     },
     {
-        id: 'calendar',
-        icon: Calendar,
-        title: "Google Workspace Entegrasyonu",
-        desc: "İletişimi tek bir noktadan yönetin. Takvimde mülakat planlayın, otomatik Meet bağlantıları oluşturun ve adaya profesyonel davetler gönderin.",
-        color: "text-rose-400",
-        bgColor: "bg-rose-400/10",
-        howItWorks: [
-            "Ayarlar üzerinden Google/Gmail hesabınızı tek tıkla bağlayın.",
-            "Mülakat planlarken takviminizdeki müsaitlik durumunu görün.",
-            "Meet bağlantısı sisteme otomatik tanımlanır ve aday e-postasına eklenir.",
-            "Tüm süreç sonunda takvim etkinliği ve aday dosyası senkronize edilir."
+        id: 'google-workspace',
+        category: 'iletisim',
+        icon: Mail,
+        color: '#ef4444',
+        title: 'Google Workspace Entegrasyonu',
+        subtitle: 'Gmail & Google Calendar bağlantısı',
+        description: 'Gmail hesabınızı bağlayarak adaylara doğrudan sistem üzerinden e-posta gönderin. Google Calendar entegrasyonu sayesinde mülakatlar takviminize otomatik eklenir ve Meet bağlantısı oluşturulur.',
+        steps: [
+            'Genel Ayarlar → "Entegrasyonlar" bölümüne gidin.',
+            '"Google Workspace" kartındaki "Bağlan" butonuna tıklayın.',
+            'Google hesabınızla oturum açın ve izinleri onaylayın.',
+            'Bağlantı tamamlandıktan sonra e-posta ve takvim özellikleri otomatik aktif olur.',
+            'Mülakat planlarken "E-posta Gönder" seçeneği artık Gmail üzerinden çalışır.',
         ],
-        preview: (
-            <div className="bg-text-primary/[0.03] border border-text-primary/10 rounded-2xl p-4 flex flex-col gap-3">
-                <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-lg p-1.5"><svg viewBox="0 0 24 24" className="w-full h-full"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" /><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" /><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" /><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" /></svg></div>
-                    <div className="text-[11px] font-bold text-text-primary uppercase tracking-wider">Sync Active</div>
-                </div>
-                <div className="bg-emerald-500/10 border border-emerald-500/20 p-2 rounded-lg flex items-center justify-center gap-2">
-                    <Globe className="w-3 h-3 text-emerald-400" />
-                    <span className="text-[9px] font-mono text-emerald-400">meet.google.com/talentflow-room</span>
-                </div>
-            </div>
-        )
-    },
-    {
-        id: 'gdpr',
-        icon: ShieldCheck,
-        title: "KVKK & Tasfiye Politikası",
-        desc: "Yasal uyumlulukta tam güvenlik. Ham CV verilerini analizden sonra belirlediğiniz takvimde otomatik imha ederek verinizi koruyun.",
-        color: "text-cyan-400",
-        bgColor: "bg-cyan-400/10",
-        howItWorks: [
-            "Dosya sisteme girdiği andan itibaren tasfiye saati işlemeye başlar.",
-            "Analiz tamamlanıp dijital veri oluştuktan sonra dilediğiniz gün sayısını seçin.",
-            "Sistem, ham PDF/Word dosyalarını kalıcı olarak sunucudan siler.",
-            "Anonimize edilmiş analiz verileri uzun süreli raporlama için güvenle saklanır."
-        ],
-        preview: (
-            <div className="p-4 bg-navy-900/40 rounded-2xl border border-cyan-500/20 flex flex-col items-center gap-2 text-center">
-                <ShieldCheck className="w-8 h-8 text-cyan-400" />
-                <div className="text-[10px] font-bold text-text-primary uppercase tracking-widest">Veri Koruma Kalkanı</div>
-                <div className="flex gap-1 mt-1">
-                    <div className="w-24 h-1.5 bg-text-primary/5 rounded-full overflow-hidden">
-                        <div className="h-full w-4/5 bg-cyan-500" />
+        tip: 'Bağlantıyı kestikten sonra daha önce gönderilen e-postalar korunur, yalnızca yeni işlemler etkilenir.',
+        tags: ['google', 'gmail', 'takvim', 'calendar', 'entegrasyon', 'meet', 'email', 'bağlantı'],
+        mockup: (
+            <div className="space-y-2.5">
+                <div className="flex items-center gap-3 bg-white border border-slate-100 rounded-xl p-3">
+                    <div className="w-10 h-10 rounded-full bg-white border border-slate-100 shadow-sm flex items-center justify-center p-2">
+                        <svg viewBox="0 0 24 24" className="w-full h-full"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" /><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" /><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" /><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" /></svg>
                     </div>
-                </div>
-            </div>
-        )
-    },
-    {
-        id: 'department-user',
-        icon: Building2,
-        title: "Departman İzolasyon Mimarisi",
-        desc: "Çoklu ekip yönetiminde veri güvenliğini sağlayın. Her departmanın sadece kendine ait aday ve pozisyon havuzuna erişimini garanti edin.",
-        color: "text-amber-400",
-        bgColor: "bg-amber-400/10",
-        howItWorks: [
-            "Kullanıcı rollerini Departman bazlı olarak yapılandırın.",
-            "Atanan kullanıcılar dışındaki verilerin tamamen gizlenmesini sağlayın.",
-            "Ekibinizle sadece ilgili aday kayıtlarını paylaşarak odaklanmayı artırın.",
-            "Global Recruiter yetkisiyle tüm operasyonu kuş bakışı koordine edin."
-        ],
-        preview: (
-            <div className="space-y-3">
-                <div className="flex items-center justify-between bg-text-primary/5 p-3 rounded-xl border border-text-primary/10">
-                    <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-lg bg-amber-400/20 flex items-center justify-center"><UserCog className="w-3.5 h-3.5 text-amber-400" /></div>
-                        <div>
-                            <div className="text-[10px] font-bold text-text-primary">Departman Yetkilisi</div>
-                            <div className="text-[8px] text-navy-500 uppercase">Yazılım Direktörlüğü</div>
+                    <div className="flex-1">
+                        <div className="text-xs font-semibold text-slate-700">Google Workspace</div>
+                        <div className="text-[9px] text-emerald-500 flex items-center gap-1">
+                            <CheckCircle className="w-2.5 h-2.5" /> Bağlı
                         </div>
                     </div>
                 </div>
-                <div className="bg-amber-500/5 border border-amber-500/20 p-2 rounded-lg text-center">
-                    <Eye className="w-3 h-3 text-amber-400 mx-auto mb-1" />
-                    <div className="text-[8px] text-amber-300 font-bold uppercase tracking-widest">Sadece Atanmış Veriler Görünür</div>
+                <div className="bg-emerald-50 border border-emerald-100 rounded-lg p-2 text-center text-[9px] text-emerald-600 font-medium">
+                    meet.google.com/abc-def-ghi — Hazır
                 </div>
             </div>
         )
     },
+    // ── SİSTEM ──
     {
-        id: 'source-mgmt',
-        icon: Globe,
-        title: "Kanal & Kaynak Analitiği",
-        desc: "Birden fazla kanaldan gelen aday akışını merkezi olarak takip edin. Hangi kaynağın daha 'kaliteli' aday ürettiğini verilerle kanıtlayın.",
-        color: "text-indigo-400",
-        bgColor: "bg-indigo-400/10",
-        howItWorks: [
-            "Dinamik kaynak ve alt-kaynak kırılımlarını özelleştirin.",
-            "İş ortakları veya sosyal mecralar için özel etiketler oluşturun.",
-            "Analiz panelinden kaynak verimliliğini gerçek zamanlı izleyin.",
-            "En verimli kanallara odaklanarak işe alım maliyetlerini optimize edin."
+        id: 'sources',
+        category: 'sistem',
+        icon: Share2,
+        color: '#06b6d4',
+        title: 'Kaynak Yönetimi',
+        subtitle: 'İşe alım kanalları',
+        description: 'Adaylarınızın geldiği kaynakları (LinkedIn, Kariyer.net, Referans vb.) sisteme tanımlayın. Her kaynak için alt detaylar oluşturun. Analitik panelinde hangi kanalın en kaliteli adayı ürettiğini takip edin.',
+        steps: [
+            'Genel Ayarlar → "Kaynak Yönetimi" sekmesine gidin.',
+            '"Ana Kaynak Ekle" ile yeni bir kanal (ör: Sosyal Medya) oluşturun. İkon ve renk seçin.',
+            '"Alt Detay" ekleyerek kanalı detaylandırın (ör: LinkedIn, Instagram).',
+            'Aday eklerken kaynak seçimi yaparak veri takibini başlatın.',
+            'Analitik → Edinme sekmesinde kaynak performansını izleyin.',
         ],
-        preview: (
+        tip: 'Kaynakları sistematik tanımlamak, hangi kanalın en az maliyetle en iyi adayı getirdiğini ileride görmenizi sağlar.',
+        tags: ['kaynak', 'kanal', 'linkedin', 'kariyer', 'referans', 'sosyal medya', 'analitik', 'performans'],
+        mockup: (
             <div className="space-y-2">
-                {['LinkedIn', 'Referans', 'Headhunter'].map((s, i) => (
-                    <div key={i} className="flex items-center justify-between bg-text-primary/5 p-2 rounded-lg border border-text-primary/5">
-                        <span className="text-[9px] text-navy-300 font-bold uppercase">{s}</span>
-                        <div className="flex items-center gap-1">
-                            <div className="h-1.5 rounded-full bg-teal-500" style={{ width: `${60 - i * 15}px` }} />
+                {[
+                    { name: 'LinkedIn', subs: 3, color: '#3b82f6' },
+                    { name: 'Kariyer Portalları', subs: 3, color: '#ec4899' },
+                    { name: 'Referral / Öneri', subs: 3, color: '#10b981' },
+                ].map((s, i) => (
+                    <div key={i} className="flex items-center gap-3 bg-white border border-slate-100 rounded-xl p-2.5">
+                        <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: s.color + '20' }}>
+                            <Share2 className="w-3.5 h-3.5" style={{ color: s.color }} />
+                        </div>
+                        <div className="flex-1 text-xs font-medium text-slate-700">{s.name}</div>
+                        <div className="text-[9px] text-slate-400">{s.subs} alt detay</div>
+                    </div>
+                ))}
+            </div>
+        )
+    },
+    {
+        id: 'departments',
+        category: 'sistem',
+        icon: Building2,
+        color: '#f59e0b',
+        title: 'Departman Yönetimi',
+        subtitle: 'Çoklu ekip & izolasyon',
+        description: 'Şirketinizdeki departmanları sisteme tanımlayın ve kullanıcıları departmanlarına atayın. Her departman kullanıcısı yalnızca kendi departmanına ait adayları ve pozisyonları görebilir — veri güvenliği otomatik sağlanır.',
+        steps: [
+            'Genel Ayarlar → "Departmanlar" sekmesine gidin.',
+            '"Yeni Departman" butonuyla departman adı, açıklama ve renk belirleyin.',
+            'Oluşturulan departman kartını genişleterek "Kullanıcı Ekle" ile üye atayın.',
+            'Sistem Yönetimi\'nden kullanıcı rollerini "Departman Kullanıcısı" olarak ayarlayın.',
+            'Departman kullanıcıları sisteme giriş yaptığında yalnızca kendi verilerini görür.',
+        ],
+        tip: 'Büyük ekiplerde her departmanın kendi işe alım sürecini bağımsız yönetmesi için Departman İzolasyonu mutlaka yapılandırılmalıdır.',
+        tags: ['departman', 'izolasyon', 'yetki', 'ekip', 'rol', 'güvenlik', 'erişim', 'kullanıcı'],
+        mockup: (
+            <div className="space-y-2">
+                {[
+                    { name: 'Mühendislik', users: 4, open: 3, color: '#3b82f6' },
+                    { name: 'Ürün', users: 2, open: 1, color: '#8b5cf6' },
+                    { name: 'Satış', users: 3, open: 2, color: '#f59e0b' },
+                ].map((d, i) => (
+                    <div key={i} className="flex items-center gap-3 bg-white border border-slate-100 rounded-xl p-2.5">
+                        <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: d.color + '18', border: `1px solid ${d.color}30` }}>
+                            <Building2 className="w-4 h-4" style={{ color: d.color }} />
+                        </div>
+                        <div className="flex-1 text-xs font-medium text-slate-700">{d.name}</div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[9px] text-slate-400">{d.users} kullanıcı</span>
+                            <span className="text-[9px] bg-emerald-50 text-emerald-600 px-1 rounded">{d.open} açık</span>
                         </div>
                     </div>
                 ))}
@@ -292,425 +441,397 @@ const FEATURES_DETAIL = [
         )
     },
     {
-        id: 'position-request',
-        icon: Send,
-        title: "Dinamik Talep & Onay Akışı",
-        desc: "Departmanlardan gelen yetenek taleplerini yönetin. Onay akışlarını dijitalleştirerek talepten ilana geçiş süresini minimize edin.",
-        color: "text-indigo-400",
-        bgColor: "bg-indigo-400/10",
-        howItWorks: [
-            "Departmanlar direkt olarak sistemden ihtiyaç bildiriminde bulunur.",
-            "Recruiter ekranına düşen talepler tek tıkla onaylanır veya revize edilir.",
-            "Onaylanan talepler otomatik olarak birer 'Hedef Pozisyon'a dönüşür.",
-            "Operasyonel hızı artırmak için tüm süreç loglanır ve takibi kolaylaşır."
+        id: 'super-admin',
+        category: 'sistem',
+        icon: Shield,
+        color: '#ef4444',
+        title: 'Sistem Yönetimi',
+        subtitle: 'Kullanıcı davet & rol yönetimi',
+        description: 'Süper Admin yetkisiyle sisteme yeni kullanıcılar davet edin, rollerini belirleyin ve gerektiğinde hesapları yönetin. Recruiter, Departman Kullanıcısı ve Süper Admin olmak üzere 3 farklı yetki seviyesi mevcuttur.',
+        steps: [
+            'Genel Ayarlar → "Sistem Yönetimi" sekmesine gidin (Süper Admin yetkisi gerekir).',
+            '"Kullanıcı Davet Et" butonuyla e-posta adresi ve rol belirleyin.',
+            'Davetiye linki sisteme kayıt işlemi için gönderilir.',
+            'Mevcut kullanıcıların rolünü düzenlemek için kullanıcı satırındaki Düzenle butonunu kullanın.',
+            'İhtiyaç duyulduğunda kullanıcı hesabını devre dışı bırakabilir veya silebilirsiniz.',
         ],
-        preview: (
-            <div className="space-y-3">
-                <div className="bg-amber-500/10 border border-amber-500/20 p-2 rounded-lg flex items-center gap-2">
-                    <AlertCircle className="w-3 h-3 text-amber-400" />
-                    <span className="text-[9px] text-amber-400 font-black uppercase">Talep Onayı Bekleniyor</span>
+        tip: 'Recruiter rolü tüm pozisyonları ve adayları görebilirken Departman Kullanıcısı yalnızca atandığı departmanı görür.',
+        tags: ['süper admin', 'yetki', 'rol', 'kullanıcı', 'davet', 'sistem', 'güvenlik', 'izin'],
+        mockup: (
+            <div className="space-y-2">
+                <div className="flex items-center justify-between bg-red-50 border border-red-100 rounded-xl p-2.5">
+                    <div className="flex items-center gap-2">
+                        <Shield className="w-4 h-4 text-red-500" />
+                        <span className="text-xs font-medium text-slate-700">Süper Admin</span>
+                    </div>
+                    <span className="text-[9px] bg-red-100 text-red-500 px-1.5 py-0.5 rounded-full">Tam Yetki</span>
                 </div>
-                <div className="flex gap-2">
-                    <div className="flex-1 py-1.5 rounded-lg bg-emerald-500/20 text-center text-[8px] text-emerald-400 font-black">ONAYLA</div>
-                    <div className="flex-1 py-1.5 rounded-lg bg-red-500/20 text-center text-[8px] text-red-400 font-black">REDDET</div>
-                </div>
+                {[{ role: 'Recruiter', color: '#3b82f6' }, { role: 'Dept. Kullanıcısı', color: '#f59e0b' }].map((r, i) => (
+                    <div key={i} className="flex items-center justify-between bg-white border border-slate-100 rounded-xl p-2.5">
+                        <span className="text-xs font-medium text-slate-600">{r.role}</span>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: r.color + '15', color: r.color }}>Kısıtlı</span>
+                    </div>
+                ))}
             </div>
         )
     },
     {
-        id: 'opportunity-hub',
-        icon: Sparkles,
-        title: "Yapay Zeka Fırsat Havuzu",
-        desc: "Gizli yetenekleri keşfedin. Sistem, havuzunuzdaki yüksek potansiyelli adayları analiz ederek onları en uygun oldukları 'fırsatlara' otomatik yerleştirir.",
-        color: "text-pink-400",
-        bgColor: "bg-pink-400/10",
-        howItWorks: [
-            "Sistem, %80 ve üzeri skor alan adayları merkezi bir havuzda toplar.",
-            "Bir adayın birden fazla pozisyonla olan gizli korelasyonları listelenir.",
-            "Recruiter için 'İdeal Aday'lar tek bir ekranda önceliklendirilmiş olarak sunulur.",
-            "Yüksek uyumluluk skorlarıyla mülakat başarı oranlarını garantileyin."
+        id: 'settings',
+        category: 'sistem',
+        icon: Settings,
+        color: '#6366f1',
+        title: 'Genel Ayarlar',
+        subtitle: 'Kişisel tercihler & entegrasyonlar',
+        description: 'Tema (koyu/açık), dil, bildirimler ve dashboard düzenini ayarlayın. Ses tanıma motorunu test edin ve Google Workspace entegrasyonunu yönetin. Tüm ayarlar hesabınıza bağlı olarak saklanır.',
+        steps: [
+            'Sol menü altındaki "Genel Ayarlar"a tıklayın.',
+            '"Tercihler" bölümünden tema, dil ve bildirim ayarlarınızı yapın.',
+            '"Ses Tanıma Motoru Testi" bölümünde mikrofon butonuna basarak STT motorunu test edin.',
+            '"Entegrasyonlar" bölümünden Google Workspace bağlantısını yönetin.',
         ],
-        preview: (
+        tip: 'Ses tanıma testi başarısızsa mülakat sırasında AI sesli analiz çalışmayabilir. Ayarlar → STT testi ile doğrulayın.',
+        tags: ['ayarlar', 'tema', 'dil', 'bildirim', 'ses tanıma', 'stt', 'entegrasyon', 'kişiselleştirme'],
+        mockup: (
             <div className="space-y-2">
-                <div className="bg-text-primary/5 p-2 rounded-xl border border-text-primary/10 flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center text-[7px] font-bold text-text-primary">Y.Z</div>
-                    <div className="flex-1">
-                        <div className="text-[10px] font-black text-text-primary">POTANSİYEL EŞLEŞME</div>
-                        <div className="flex gap-1 mt-0.5">
-                            <span className="text-[7px] bg-emerald-500/20 text-emerald-400 px-1 rounded font-bold">MATCH %95</span>
-                        </div>
+                {[['Tema', '🌙 Koyu'], ['Dil', '🇹🇷 Türkçe'], ['Bildirimler', '✅ Açık']].map(([l, v]) => (
+                    <div key={l} className="flex items-center justify-between bg-white border border-slate-100 rounded-lg px-3 py-2">
+                        <span className="text-xs text-slate-600">{l}</span>
+                        <span className="text-[10px] font-medium text-slate-700">{v}</span>
                     </div>
+                ))}
+                <div className="bg-cyan-50 border border-cyan-100 rounded-lg px-3 py-2 flex items-center gap-2">
+                    <Mic className="w-3.5 h-3.5 text-cyan-500" />
+                    <span className="text-[10px] text-cyan-600 font-medium">STT Motoru — Hazır</span>
                 </div>
             </div>
         )
-    }
+    },
 ];
 
+const CATEGORIES = [
+    { id: 'all', label: 'Tümü', icon: Layers },
+    { id: 'genel', label: 'Genel', icon: LayoutDashboard },
+    { id: 'aday', label: 'Aday & İlan', icon: Users },
+    { id: 'mulakat', label: 'Mülakat', icon: Video },
+    { id: 'analitik', label: 'Analitik', icon: BarChart3 },
+    { id: 'iletisim', label: 'İletişim', icon: MessageSquare },
+    { id: 'sistem', label: 'Sistem', icon: Shield },
+];
+
+const QUICK_STEPS = [
+    { num: '01', icon: Briefcase, color: '#8b5cf6', title: 'Pozisyon Oluşturun', desc: 'Açık İlanlar sayfasından işe almak istediğiniz pozisyonu ekleyin. İş tanımı ne kadar detaylı olursa AI eşleştirmesi o kadar isabetli olur.' },
+    { num: '02', icon: Upload, color: '#3b82f6', title: 'Aday CV\'lerini Yükleyin', desc: 'Adaylar sayfasından PDF/Word CV dosyalarını yükleyin. AI anında ayrıştırır — isim, deneyim, beceriler otomatik çıkarılır.' },
+    { num: '03', icon: Star, color: '#f59e0b', title: 'AI Eşleştirme Skorlarını İnceleyin', desc: 'Her aday için AI otomatik uyum skoru üretir. Skoru yüksek adayları mülakata davet edin.' },
+    { num: '04', icon: Calendar, color: '#10b981', title: 'Mülakat Planlayın', desc: 'Mülakatlar sayfasından tarih ve saat belirleyin. Adaya otomatik davetiye gönderilir, Google Calendar\'a eklenir.' },
+    { num: '05', icon: Video, color: '#06b6d4', title: 'Canlı AI Mülakatı Başlatın', desc: 'Mülakat günü "Başlat" butonuna basın. AI konuşmayı dinler, STAR skorlaması yapar ve anlık sorular önerir.' },
+    { num: '06', icon: FileText, color: '#6366f1', title: 'Raporu İnceleyin', desc: 'Mülakat bitince otomatik STAR raporu hazırlanır. Adayı değerlendirerek süreci sonlandırın.' },
+];
+
+// ─── SEMANTIC SEARCH HELPER ────────────────────────────────────────────────────
+function searchScore(feature, query) {
+    if (!query.trim()) return 1;
+    const q = query.toLowerCase().trim();
+    const words = q.split(/\s+/);
+    const searchableText = [
+        feature.title, feature.subtitle, feature.description,
+        ...feature.steps, feature.tip, ...feature.tags,
+    ].join(' ').toLowerCase();
+
+    let score = 0;
+    for (const word of words) {
+        if (searchableText.includes(word)) score += 1;
+        if (feature.title.toLowerCase().includes(word)) score += 2;
+        if (feature.tags.some(t => t.includes(word))) score += 1.5;
+    }
+    return score;
+}
+
+// ─── MAIN COMPONENT ────────────────────────────────────────────────────────────
 export default function GuidePage() {
-    const [selectedFeature, setSelectedFeature] = useState(null);
+    const [query, setQuery] = useState('');
+    const [category, setCategory] = useState('all');
+    const [expanded, setExpanded] = useState(null);
+    const [showQuickStart, setShowQuickStart] = useState(true);
+
+    const filtered = useMemo(() => {
+        let list = FEATURES;
+        if (category !== 'all') list = list.filter(f => f.category === category);
+        if (!query.trim()) return list;
+        return list
+            .map(f => ({ ...f, _score: searchScore(f, query) }))
+            .filter(f => f._score > 0)
+            .sort((a, b) => b._score - a._score);
+    }, [query, category]);
+
+    const toggle = (id) => setExpanded(prev => prev === id ? null : id);
 
     return (
-        <div className="flex flex-col min-h-screen bg-navy-950/20 relative isolate">
-
-
-            {/* Header / Hero Section */}
-            <header className="relative pt-24 pb-16 px-6 lg:px-12 overflow-hidden bg-navy-950/20 backdrop-blur-sm">
-                <div className="absolute top-0 left-0 w-full h-full opacity-20 pointer-events-none">
-                    <div className="absolute top-0 right-[-10%] w-[50%] h-[50%] bg-electric/20 blur-[150px] rounded-full" />
-                    <div className="absolute bottom-0 left-[-10%] w-[40%] h-[40%] bg-purple-600/10 blur-[120px] rounded-full" />
-                </div>
-
-                <div className="relative max-w-5xl mx-auto text-center space-y-8 animate-fade-in">
-                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-electric/5 border border-electric/10 text-electric-light text-[11px] font-black uppercase tracking-[0.3em] backdrop-blur-md">
-                        <Sparkles className="w-3.5 h-3.5" /> Gelişmiş Yetenek Kontrol Merkezi
+        <div className="min-h-screen bg-slate-50">
+            {/* ── HERO ── */}
+            <div className="bg-white border-b border-slate-200 px-6 lg:px-10 py-10">
+                <div className="max-w-3xl mx-auto text-center space-y-4">
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-cyan-50 border border-cyan-100 text-cyan-600 text-xs font-semibold">
+                        <BookOpen className="w-3.5 h-3.5" /> Platform Kılavuzu
                     </div>
-
-                    <div className="space-y-4">
-                        <h1 className="text-5xl md:text-7xl font-black tracking-tight text-text-primary leading-[1.05]">
-                            İşe Alımın <br />
-                            <span className="bg-gradient-to-r from-electric via-cyan-400 to-emerald-400 bg-clip-text text-transparent">Yapay Zeka Mimarı</span>
-                        </h1>
-                        <p className="text-text-muted text-lg md:text-xl max-w-3xl mx-auto leading-relaxed font-medium">
-                            TalentFlow, sıradan bir aday takip sisteminden çok daha fazlasıdır. Veriyi stratejiye,
-                            adayları ise yetkinlik kanıtlarına dönüştüren uçtan uca bir <span className="text-text-primary font-bold">Yapay Zeka Ekosistemidir.</span>
-                        </p>
+                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
+                        Talent-Inn'i Nasıl Kullanırsınız?
+                    </h1>
+                    <p className="text-slate-500 text-sm leading-relaxed max-w-xl mx-auto">
+                        Aday yönetiminden canlı AI mülakatına, analitik raporlardan ekip izolasyonuna — tüm özellikleri adım adım öğrenin.
+                    </p>
+                    {/* Search Bar */}
+                    <div className="relative max-w-lg mx-auto pt-2">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <input
+                            type="text"
+                            value={query}
+                            onChange={e => setQuery(e.target.value)}
+                            placeholder="Özellik, kavram veya adım ara... (ör: 'mülakat planla', 'cv yükle', 'kaynak')"
+                            className="w-full pl-11 pr-10 py-3 text-sm border border-slate-200 rounded-xl bg-white outline-none focus:border-cyan-400 focus:ring-3 focus:ring-cyan-50 transition-all shadow-sm"
+                        />
+                        {query && (
+                            <button onClick={() => setQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 hover:bg-slate-200 transition-all">
+                                <span className="text-xs">×</span>
+                            </button>
+                        )}
                     </div>
-
-                    <div className="flex items-center justify-center gap-6 pt-4">
-                        <div className="flex flex-col items-center gap-2">
-                            <div className="text-2xl font-black text-text-primary">3s</div>
-                            <div className="text-[9px] text-text-muted font-bold uppercase tracking-widest">CV Analizi</div>
-                        </div>
-                        <div className="w-px h-10 bg-text-primary/10" />
-                        <div className="flex flex-col items-center gap-2">
-                            <div className="text-2xl font-black text-text-primary">%90</div>
-                            <div className="text-[9px] text-text-muted font-bold uppercase tracking-widest">Tahmin Skoru</div>
-                        </div>
-                        <div className="w-px h-10 bg-text-primary/10" />
-                        <div className="flex flex-col items-center gap-2">
-                            <div className="text-2xl font-black text-text-primary">24/7</div>
-                            <div className="text-[9px] text-text-muted font-bold uppercase tracking-widest">Akıllı Asistan</div>
-                        </div>
+                    {/* Stats */}
+                    <div className="flex items-center justify-center gap-8 pt-2">
+                        {[['11', 'Özellik'], ['6', 'Kategori'], ['60+', 'Adım']].map(([v, l]) => (
+                            <div key={l} className="text-center">
+                                <div className="text-xl font-bold text-slate-800">{v}</div>
+                                <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">{l}</div>
+                            </div>
+                        ))}
                     </div>
                 </div>
-            </header>
+            </div>
 
-            <main className="flex-1 px-6 lg:px-12 py-8 max-w-6xl mx-auto w-full space-y-24">
+            <div className="max-w-5xl mx-auto px-6 lg:px-10 py-8 space-y-8">
 
-                {/* Agentic Interview (Previously at bottom) */}
-                <section className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center bg-navy-900/40 p-12 rounded-[3.5rem] border border-white/[0.05] relative overflow-hidden backdrop-blur-xl group">
-                    <div className="absolute top-0 right-0 p-32 opacity-10 blur-[100px] bg-electric rounded-full -translate-y-1/2 translate-x-1/2 group-hover:opacity-20 transition-opacity" />
-
-                    <div className="space-y-8 relative">
-                        <div className="w-16 h-16 rounded-[1.5rem] bg-electric/10 flex items-center justify-center border border-electric/20 shadow-lg shadow-electric/5">
-                            <Zap className="w-8 h-8 text-electric" />
-                        </div>
-                        <div className="space-y-4">
-                            <h2 className="text-4xl font-black text-text-primary tracking-tight leading-tight">Agentic Mülakat:<br /><span className="text-electric">Yanınızdaki Uzman</span></h2>
-                            <p className="text-text-muted leading-relaxed text-base font-medium">
-                                Mülakat sırasında not tutma stresiyle vedalaşın. TalentFlow AI asistanı mülakatın her aşamasında size rehberlik eder, adaydan gelen ham cevapları teknik derinlik ve kültürel uyum testlerine tabi tutar.
-                            </p>
-                        </div>
-                        <ul className="space-y-4">
-                            <li className="flex gap-4">
-                                <div className="w-6 h-6 rounded-lg bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 mt-1 shrink-0"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /></div>
-                                <div className="text-sm text-text-secondary leading-relaxed"><b className="text-text-primary">Yetkinlik Modları:</b> Stres yönetimi, ekip uyumu, aidiyet gibi can alıcı yetkinlikler için asistanınızdan anlık olarak derinleşme soruları talep edin.</div>
-                            </li>
-                            <li className="flex gap-4">
-                                <div className="w-6 h-6 rounded-lg bg-blue-500/10 flex items-center justify-center border border-blue-500/20 mt-1 shrink-0"><Target className="w-3.5 h-3.5 text-blue-400" /></div>
-                                <div className="text-sm text-text-secondary leading-relaxed"><b className="text-text-primary">Derinleşme (Deepen):</b> Adayın cevabı yüzeysel mi kaldı? AI, teknik boşlukları yakalamak için çapraz sorgu soruları üretir.</div>
-                            </li>
-                            <li className="flex gap-4">
-                                <div className="w-6 h-6 rounded-lg bg-amber-500/10 flex items-center justify-center border border-amber-500/20 mt-1 shrink-0"><Star className="w-3.5 h-3.5 text-amber-400" /></div>
-                                <div className="text-sm text-text-secondary leading-relaxed"><b className="text-text-primary">AI Skorlama Matrixi:</b> Mülakat sonunda her bir cevap STAR metodolojisine göre puanlanır ve mülakatçı notlarıyla konsolide edilir.</div>
-                            </li>
-                        </ul>
-                    </div>
-
-                    <div className="relative">
-                        <div className="absolute -inset-10 bg-electric/10 blur-[100px] rounded-full" />
-                        <div className="relative border border-text-primary/10 rounded-[2.5rem] overflow-hidden shadow-2xl bg-navy-950/80 p-1 backdrop-blur-2xl">
-                            <div className="p-6 border-b border-text-primary/5 bg-text-primary/[0.02] flex items-center justify-between">
-                                <div className="flex gap-1.5 pt-1">
-                                    <div className="w-2.5 h-2.5 rounded-full bg-red-500/40" />
-                                    <div className="w-2.5 h-2.5 rounded-full bg-amber-500/40" />
-                                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/40" />
+                {/* ── QUICK START ── */}
+                {!query && (
+                    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                        <button
+                            onClick={() => setShowQuickStart(p => !p)}
+                            className="w-full flex items-center justify-between px-6 py-4 hover:bg-slate-50 transition-all"
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-cyan-50 border border-cyan-100 flex items-center justify-center">
+                                    <Play className="w-4 h-4 text-cyan-600" />
                                 </div>
-                                <div className="text-[10px] text-text-muted font-black uppercase tracking-widest pl-10 flex items-center gap-2">
-                                    <LayoutDashboard className="w-3 h-3" /> Mülakat Kontrol Paneli
-                                </div>
-                                <div className="w-10" />
-                            </div>
-                            <div className="p-8 space-y-6">
-                                <div className="space-y-3">
-                                    <div className="h-4 w-3/4 bg-text-primary/10 rounded-full animate-pulse" />
-                                    <div className="h-4 w-1/2 bg-text-primary/5 rounded-full" />
-                                </div>
-                                <div className="grid grid-cols-2 gap-4 pt-4">
-                                    <div className="h-12 rounded-2xl bg-electric/20 border border-electric/30 flex items-center justify-center gap-2">
-                                        <div className="w-2 h-2 rounded-full bg-electric animate-ping" />
-                                        <div className="w-12 h-2 bg-white/20 rounded-full" />
-                                    </div>
-                                    <div className="h-12 rounded-2xl bg-text-primary/5 border border-text-primary/10" />
-                                </div>
-                                <div className="pt-6 space-y-3">
-                                    <div className="h-2 w-full bg-text-primary/[0.04] rounded-full" />
-                                    <div className="h-2 w-full bg-text-primary/[0.04] rounded-full" />
-                                    <div className="h-2 w-2/3 bg-text-primary/[0.04] rounded-full" />
+                                <div className="text-left">
+                                    <h2 className="text-sm font-bold text-slate-800">Hızlı Başlangıç</h2>
+                                    <p className="text-xs text-slate-400">İlk işe alımınızı 6 adımda tamamlayın</p>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                </section>
+                            <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform duration-300 ${showQuickStart ? 'rotate-180' : ''}`} />
+                        </button>
 
-                {/* Interactive Features Explorer */}
-                <section className="space-y-12">
-                    <div className="flex flex-col md:flex-row items-end justify-between gap-6 px-4">
-                        <div className="space-y-2">
-                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-electric/10 border border-electric/20 text-electric text-[10px] font-black uppercase tracking-widest">
-                                <Layers className="w-3 h-3" /> Özellik Kaşifi
-                            </div>
-                            <h2 className="text-3xl font-black text-text-primary tracking-tight">Platform Yetenekleri</h2>
-                        </div>
-                        <p className="text-navy-400 text-sm max-w-sm text-right hidden md:block">
-                            TalentFlow'un sunduğu otonom özellikleri keşfetmek için soldaki menüden seçim yapın.
-                        </p>
-                    </div>
-
-                    <div className="flex flex-col lg:flex-row gap-8 min-h-[600px]">
-                        {/* Left Sidebar List */}
-                        <div className="w-full lg:w-80 flex flex-col gap-3 shrink-0">
-                            {FEATURES_DETAIL.map((f) => (
-                                <button
-                                    key={f.id}
-                                    onClick={() => setSelectedFeature(f)}
-                                    className={`flex items-center gap-4 p-4 rounded-2xl border transition-all duration-300 text-left relative group overflow-hidden
-                                        ${selectedFeature?.id === f.id
-                                            ? 'bg-gradient-to-r from-navy-800 to-navy-900 border-white/20 shadow-xl shadow-black/20'
-                                            : 'bg-text-primary/[0.02] border-white/[0.05] hover:bg-text-primary/[0.04] hover:border-text-primary/10'}`}
-                                >
-                                    {selectedFeature?.id === f.id && (
-                                        <div className={`absolute left-0 top-0 bottom-0 w-1 ${f.bgColor.replace('/10', '')}`} />
-                                    )}
-                                    <div className={`w-10 h-10 rounded-xl ${f.bgColor} flex items-center justify-center transition-transform group-hover:scale-110`}>
-                                        <f.icon className={`w-5 h-5 ${f.color}`} />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className={`text-xs font-bold truncate transition-colors ${selectedFeature?.id === f.id ? 'text-text-primary' : 'text-navy-300 group-hover:text-text-primary'}`}>
-                                            {f.title}
-                                        </div>
-                                        <div className="text-[10px] text-navy-500 font-medium truncate">Detayları incele</div>
-                                    </div>
-                                    <ChevronRight className={`w-4 h-4 text-navy-600 transition-all ${selectedFeature?.id === f.id ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2'}`} />
-                                </button>
-                            ))}
-                        </div>
-
-                        {/* Right Detail Panel */}
-                        <div className="flex-1 relative">
-                            {!selectedFeature ? (
-                                <div className="h-full rounded-[3rem] border-2 border-dashed border-text-primary/5 flex flex-col items-center justify-center text-center p-12 space-y-6 animate-pulse">
-                                    <div className="w-20 h-20 rounded-full bg-text-primary/[0.02] flex items-center justify-center">
-                                        <MousePointer2 className="w-8 h-8 text-navy-600" />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <h3 className="text-xl font-bold text-navy-400">Bir Özellik Seçin</h3>
-                                        <p className="text-sm text-navy-600 max-w-xs">
-                                            Detaylı çalışma prensibi ve önizlemeleri görmek için soldaki menüyü kullanın.
-                                        </p>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="animate-fade-in-up h-full">
-                                    <div className="glass h-full rounded-[3rem] p-1 shadow-2xl overflow-hidden group relative">
-                                        <div className={`absolute top-0 right-0 p-32 opacity-10 blur-3xl ${selectedFeature.bgColor.replace('/10', '')} rounded-full -translate-y-1/2 translate-x-1/2`} />
-
-                                        <div className="bg-navy-950/60 rounded-[2.9rem] p-8 md:p-12 h-full flex flex-col">
-                                            <div className="flex items-start justify-between mb-10">
-                                                <div className="flex items-center gap-5">
-                                                    <div className={`w-14 h-14 rounded-2xl ${selectedFeature.bgColor} flex items-center justify-center border border-text-primary/5 shadow-lg`}>
-                                                        <selectedFeature.icon className={`w-7 h-7 ${selectedFeature.color}`} />
+                        {showQuickStart && (
+                            <div className="px-6 pb-6">
+                                <div className="relative">
+                                    <div className="absolute left-5 top-6 bottom-6 w-px bg-slate-100 hidden sm:block" />
+                                    <div className="space-y-4">
+                                        {QUICK_STEPS.map((step, i) => {
+                                            const Icon = step.icon;
+                                            return (
+                                                <div key={i} className="flex gap-4 relative">
+                                                    <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 relative z-10 border" style={{ background: step.color + '15', borderColor: step.color + '30' }}>
+                                                        <Icon className="w-4.5 h-4.5" style={{ color: step.color }} />
                                                     </div>
-                                                    <div>
-                                                        <h3 className="text-2xl md:text-3xl font-black text-text-primary tracking-tight leading-none">{selectedFeature.title}</h3>
-                                                        <div className="flex items-center gap-2 mt-3">
-                                                            <div className={`h-1.5 w-1.5 rounded-full ${selectedFeature.bgColor.replace('/10', '')} animate-pulse`} />
-                                                            <span className="text-[10px] text-navy-400 font-black uppercase tracking-[0.2em]">Stratejik Modül Analizi</span>
+                                                    <div className="flex-1 pt-1.5">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[10px] font-bold text-slate-300">ADIM {step.num}</span>
+                                                            <h3 className="text-sm font-bold text-slate-800">{step.title}</h3>
                                                         </div>
+                                                        <p className="text-xs text-slate-500 mt-1 leading-relaxed">{step.desc}</p>
                                                     </div>
                                                 </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* ── CATEGORY FILTERS ── */}
+                {!query && (
+                    <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                        {CATEGORIES.map(cat => {
+                            const Icon = cat.icon;
+                            return (
+                                <button
+                                    key={cat.id}
+                                    onClick={() => setCategory(cat.id)}
+                                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all border ${
+                                        category === cat.id
+                                            ? 'bg-cyan-500 text-white border-cyan-500 shadow-sm'
+                                            : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300 hover:text-slate-700'
+                                    }`}
+                                >
+                                    <Icon className="w-3.5 h-3.5" />
+                                    {cat.label}
+                                </button>
+                            );
+                        })}
+                    </div>
+                )}
+
+                {/* ── SEARCH STATUS ── */}
+                {query && (
+                    <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 text-sm text-slate-500">
+                            <Search className="w-4 h-4 text-slate-400" />
+                            <span>"{query}" için <span className="font-semibold text-slate-700">{filtered.length}</span> sonuç</span>
+                        </div>
+                        <button onClick={() => setQuery('')} className="text-xs text-cyan-600 hover:text-cyan-700 font-medium">Temizle</button>
+                    </div>
+                )}
+
+                {/* ── FEATURES LIST ── */}
+                {filtered.length === 0 ? (
+                    <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-200">
+                        <Search className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+                        <h3 className="text-base font-semibold text-slate-600">Sonuç bulunamadı</h3>
+                        <p className="text-sm text-slate-400 mt-1 max-w-xs mx-auto">Farklı anahtar kelimeler deneyin: "mülakat", "aday", "rapor", "google"</p>
+                    </div>
+                ) : (
+                    <div className="space-y-3">
+                        {filtered.map(feature => {
+                            const Icon = feature.icon;
+                            const isOpen = expanded === feature.id;
+
+                            return (
+                                <div key={feature.id} className={`bg-white rounded-2xl border overflow-hidden transition-all duration-300 ${isOpen ? 'border-cyan-200 shadow-sm' : 'border-slate-200 hover:border-slate-300'}`}>
+                                    {/* Card Header */}
+                                    <button
+                                        onClick={() => toggle(feature.id)}
+                                        className="w-full flex items-center gap-4 px-5 py-4 text-left"
+                                    >
+                                        <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border" style={{ background: feature.color + '15', borderColor: feature.color + '25' }}>
+                                            <Icon className="w-5 h-5" style={{ color: feature.color }} />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2">
+                                                <h3 className="text-sm font-bold text-slate-800">{feature.title}</h3>
+                                                <span className="hidden sm:block text-[10px] text-slate-400 font-medium">{feature.subtitle}</span>
                                             </div>
+                                            <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">{feature.description}</p>
+                                        </div>
+                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all shrink-0 ${isOpen ? 'bg-cyan-50 text-cyan-500' : 'bg-slate-50 text-slate-300'}`}>
+                                            <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
+                                        </div>
+                                    </button>
 
-                                            <div className="grid grid-cols-1 xl:grid-cols-2 gap-12 flex-1">
-                                                <div className="space-y-10">
-                                                    <div className="space-y-4">
-                                                        <p className="text-lg text-navy-200 leading-relaxed font-medium">
-                                                            {selectedFeature.desc}
-                                                        </p>
-                                                    </div>
+                                    {/* Expanded Content */}
+                                    {isOpen && (
+                                        <div className="border-t border-slate-100 px-5 py-5">
+                                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                                {/* LEFT: Description + Steps + Tip */}
+                                                <div className="space-y-5">
+                                                    <p className="text-sm text-slate-600 leading-relaxed">{feature.description}</p>
 
-                                                    <div className="space-y-6">
-                                                        <h4 className="text-xs font-black text-electric/60 uppercase tracking-widest flex items-center gap-3">
-                                                            <Rocket className="w-4 h-4" /> Çalışma Prensibi
-                                                        </h4>
-                                                        <div className="space-y-4">
-                                                            {selectedFeature.howItWorks.map((step, i) => (
-                                                                <div key={i} className="flex gap-5 group/step">
-                                                                    <div className="w-6 h-6 rounded-lg bg-navy-800 border border-text-primary/10 flex items-center justify-center text-[10px] font-black text-navy-400 group-hover/step:text-electric transition-colors shrink-0">
+                                                    {/* Steps */}
+                                                    <div>
+                                                        <div className="flex items-center gap-2 mb-3">
+                                                            <ArrowRight className="w-3.5 h-3.5 text-cyan-500" />
+                                                            <span className="text-xs font-bold text-slate-600 uppercase tracking-wide">Nasıl Kullanılır?</span>
+                                                        </div>
+                                                        <div className="space-y-2.5">
+                                                            {feature.steps.map((step, i) => (
+                                                                <div key={i} className="flex gap-3">
+                                                                    <div className="w-5 h-5 rounded-lg text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5 border" style={{ background: feature.color + '15', borderColor: feature.color + '25', color: feature.color }}>
                                                                         {i + 1}
                                                                     </div>
-                                                                    <p className="text-sm text-navy-300 leading-relaxed font-medium">{step}</p>
+                                                                    <p className="text-sm text-slate-600 leading-relaxed flex-1">{step}</p>
                                                                 </div>
                                                             ))}
                                                         </div>
                                                     </div>
 
-                                                    <div className="p-6 rounded-3xl bg-text-primary/[0.02] border border-white/[0.04] flex gap-4 items-start">
-                                                        <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
-                                                        <div className="space-y-1">
-                                                            <div className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Profesyonel İpucu</div>
-                                                            <p className="text-xs text-navy-400 italic leading-relaxed">
-                                                                Bu özellik, standart işleyişe kıyasla zamandan %60 tasarruf sağlar.
-                                                            </p>
+                                                    {/* Tip */}
+                                                    <div className="flex gap-3 p-3 bg-amber-50 border border-amber-100 rounded-xl">
+                                                        <Lightbulb className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                                                        <div>
+                                                            <div className="text-[10px] font-bold text-amber-600 uppercase tracking-wide mb-1">Profesyonel İpucu</div>
+                                                            <p className="text-xs text-amber-700 leading-relaxed">{feature.tip}</p>
                                                         </div>
                                                     </div>
                                                 </div>
 
-                                                <div className="space-y-6">
-                                                    <div className="flex items-center justify-between">
-                                                        <h4 className="text-xs font-black text-navy-500 uppercase tracking-widest flex items-center gap-3">
-                                                            <Eye className="w-4 h-4" /> Arayüz Simülasyonu
-                                                        </h4>
-                                                        <div className="flex gap-1">
-                                                            <div className="h-1 w-8 rounded-full bg-electric-light/20" />
-                                                            <div className="h-1 w-4 rounded-full bg-text-primary/10" />
-                                                        </div>
+                                                {/* RIGHT: Visual Mockup */}
+                                                <div>
+                                                    <div className="flex items-center gap-2 mb-3">
+                                                        <Eye className="w-3.5 h-3.5 text-slate-400" />
+                                                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">Arayüz Önizlemesi</span>
                                                     </div>
-                                                    <div className="relative group/preview mt-4">
-                                                        <div className={`absolute -inset-4 bg-gradient-to-br from-white/5 to-transparent rounded-[2.5rem] blur-2xl opacity-0 group-hover/preview:opacity-100 transition-opacity duration-700`} />
-                                                        <div className="relative border border-text-primary/10 rounded-[2.5rem] bg-navy-900/60 p-10 shadow-3xl backdrop-blur-md">
-                                                            <div className="absolute top-6 right-8 flex gap-2">
-                                                                <div className="w-2 h-2 rounded-full bg-text-primary/[0.05]" />
-                                                                <div className="w-2 h-2 rounded-full bg-text-primary/[0.05]" />
-                                                                <div className="w-2 h-2 rounded-full bg-text-primary/[0.05]" />
-                                                            </div>
-                                                            <div className="animate-in fade-in zoom-in-95 duration-500">
-                                                                {selectedFeature.preview}
-                                                            </div>
+                                                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                                                        {/* Window chrome */}
+                                                        <div className="flex items-center gap-1.5 mb-3">
+                                                            <div className="w-2 h-2 rounded-full bg-red-300" />
+                                                            <div className="w-2 h-2 rounded-full bg-amber-300" />
+                                                            <div className="w-2 h-2 rounded-full bg-emerald-300" />
+                                                            <div className="flex-1 mx-2 h-4 bg-white border border-slate-100 rounded-md" />
                                                         </div>
+                                                        {feature.mockup}
                                                     </div>
+
+                                                    {/* Navigate button */}
+                                                    <button
+                                                        onClick={() => {
+                                                            const navMap = {
+                                                                'dashboard': 'dashboard',
+                                                                'candidates': 'candidate-process',
+                                                                'positions': 'positions',
+                                                                'interview-mgmt': 'interviews',
+                                                                'live-interview': 'interviews',
+                                                                'interview-report': 'interviews',
+                                                                'analytics': 'analytics',
+                                                                'messages': 'messages',
+                                                                'google-workspace': 'settings',
+                                                                'sources': 'settings',
+                                                                'departments': 'settings',
+                                                                'super-admin': 'settings',
+                                                                'settings': 'settings',
+                                                            };
+                                                            const view = navMap[feature.id] || 'dashboard';
+                                                            window.dispatchEvent(new CustomEvent('changeView', { detail: view }));
+                                                        }}
+                                                        className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 text-xs font-semibold rounded-xl border transition-all hover:border-cyan-300 hover:text-cyan-600 hover:bg-cyan-50 text-slate-500 border-slate-200"
+                                                    >
+                                                        Sayfaya Git <ChevronRight className="w-3.5 h-3.5" />
+                                                    </button>
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
+                                    )}
                                 </div>
-                            )}
+                            );
+                        })}
+                    </div>
+                )}
+
+                {/* ── FOOTER CTA ── */}
+                {!query && (
+                    <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center space-y-4">
+                        <div className="w-12 h-12 rounded-2xl bg-cyan-50 border border-cyan-100 flex items-center justify-center mx-auto">
+                            <Zap className="w-6 h-6 text-cyan-600" />
                         </div>
-                    </div>
-                </section>
-
-                {/* 2. Step by Step Guide (Workflow) */}
-                <section className="space-y-12 bg-text-primary/[0.02] border border-white/[0.06] rounded-[3rem] p-12 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none"><Rocket className="w-48 h-48 text-text-primary" /></div>
-
-                    <div className="max-w-3xl">
-                        <h2 className="text-3xl font-black text-text-primary mb-4 italic uppercase tracking-tighter">İş Akışı: İlk Adayınızı Nasıl Alırsınız?</h2>
-                        <p className="text-navy-400 text-sm mb-12 italic">TalentFlow üzerinde uçtan uca bir kiralama süreci başlatmak oldukça basittir.</p>
-                    </div>
-
-                    <div className="space-y-8 relative">
-                        <div className="absolute left-6 top-6 bottom-6 w-px bg-gradient-to-b from-electric via-white/10 to-transparent hidden md:block" />
-
-                        <StepItem
-                            num="01"
-                            title="Pozisyon Oluşturun"
-                            desc="Pozisyonlar sayfasından bir iş tanımı girin. Bu metin, AI'ın adaylarda ne arayacağını bilmesini sağlar."
-                        />
-                        <StepItem
-                            num="02"
-                            title="Adayları Ekleyin"
-                            desc="Aday CV'lerini sisteme yükleyin. Sistem, adayın profesyonel geçmişini otomatik olarak ayrıştıracak ve saklayacaktır."
-                        />
-                        <StepItem
-                            num="03"
-                            title="Aday Analizini İnceleyin"
-                            desc="Aday kartına girerek AI tarafından ayrıştırılmış verileri ve öz geçmiş özetini inceleyin."
-                        />
-                        <StepItem
-                            num="04"
-                            title="Gölge Gözlemci & Mülakat Köprüsü"
-                            desc="İçerideki 'Botu Toplantıya Sok' butonunu kullanarak mülakat sekmesini paylaşın. AI, adayı ve sizi eş zamanlı dinleyerek STAR denetimi yapmaya başlar."
-                        />
-                        <StepItem
-                            num="05"
-                            title="Veda ve Raporlama"
-                            desc="Mülakat bittiğinde dinleme anında durur. AI, konuşulanları saniyeler içinde analiz eder ve STAR metodolojisine göre puanlanmış raporu önünüze sürer."
-                        />
-                    </div>
-                </section>
-
-                {/* Final Help / System Support */}
-                <div className="p-10 rounded-[3rem] bg-navy-900 border border-white/[0.05] text-center space-y-6 shadow-2xl">
-                    <div className="w-16 h-16 rounded-full bg-electric/10 border border-electric/20 flex items-center justify-center mx-auto mb-4">
-                        <Globe className="w-8 h-8 text-electric" />
-                    </div>
-                    <h3 className="text-2xl font-black text-text-primary tracking-tight">Kurumsal Entegrasyona Başlayın</h3>
-                    <p className="text-text-muted text-sm max-w-lg mx-auto leading-relaxed">
-                        TalentFlow, işe alım süreçlerinizi bir angaryadan ziyade stratejik bir kazanıma dönüştürür.
-                        Tüm modülleri test etmek için <span className="text-text-primary font-bold">Dashboard</span> ekranından başlayabilirsiniz.
-                    </p>
-                    <div className="flex items-center justify-center gap-4 pt-4">
+                        <div>
+                            <h3 className="text-base font-bold text-slate-800">Kullanmaya Hazır mısınız?</h3>
+                            <p className="text-sm text-slate-400 mt-1 max-w-md mx-auto">Hızlı başlangıç kılavuzunu tamamladınız. Kontrol Paneli'nden ilk pozisyonunuzu oluşturmaya başlayın.</p>
+                        </div>
                         <button
                             onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'dashboard' }))}
-                            className="px-10 py-4 rounded-2xl bg-electric text-text-primary font-black text-xs uppercase tracking-[0.2em] shadow-lg shadow-electric/20 hover:scale-105 active:scale-95 transition-all inline-flex items-center gap-2 group cursor-pointer"
+                            className="inline-flex items-center gap-2 px-6 py-2.5 bg-cyan-500 hover:bg-cyan-600 text-white text-sm font-semibold rounded-xl transition-all"
                         >
-                            Sisteme Giriş Yap <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                            Kontrol Paneline Git <ArrowRight className="w-4 h-4" />
                         </button>
                     </div>
-                </div>
-            </main>
-
-            {/* Footer Padding for Mobile */}
-            <div className="h-24 md:hidden" />
-        </div>
-    );
-}
-
-function FeatureCard({ icon: Icon, title, desc, color, bgColor, onClick, isActive }) {
-    return (
-        <div
-            onClick={onClick}
-            className={`group p-8 rounded-3xl border transition-all duration-300 cursor-pointer relative overflow-hidden
-                ${isActive
-                    ? 'bg-text-primary/10 border-white/20 scale-[1.02] shadow-[0_0_40px_rgba(255,255,255,0.05)]'
-                    : 'bg-text-primary/[0.03] border-white/[0.06] hover:bg-text-primary/[0.05] hover:border-text-primary/10'}`}
-        >
-            <div className={`w-14 h-14 rounded-2xl ${bgColor} flex items-center justify-center mb-6 ring-8 ring-transparent group-hover:ring-white/5 transition-all`}>
-                <Icon className={`w-7 h-7 ${color}`} />
-            </div>
-            <h3 className="text-lg font-bold text-text-primary mb-3 flex items-center gap-2">
-                {title}
-                <ChevronRight className={`w-4 h-4 text-navy-600 transition-all ${isActive ? 'opacity-100 translate-x-1 text-text-primary' : 'opacity-0 group-hover:opacity-100 group-hover:translate-x-1'}`} />
-            </h3>
-            <p className="text-sm text-navy-400 leading-relaxed">{desc}</p>
-            {isActive && (
-                <div className="absolute top-4 right-4 animate-pulse">
-                    <div className="w-2 h-2 rounded-full bg-electric" />
-                </div>
-            )}
-        </div>
-    );
-}
-
-function StepItem({ num, title, desc }) {
-    return (
-        <div className="relative pl-12 md:pl-16 group">
-            <div className="absolute left-0 top-0 w-12 h-12 rounded-2xl bg-text-primary/5 border border-text-primary/10 flex items-center justify-center text-xs font-black text-navy-400 group-hover:bg-electric group-hover:text-text-primary group-hover:border-electric transition-all shadow-xl">
-                {num}
-            </div>
-            <div className="space-y-1">
-                <h4 className="text-base font-bold text-text-primary group-hover:text-electric-light transition-colors">{title}</h4>
-                <p className="text-sm text-navy-400 leading-relaxed max-w-2xl">{desc}</p>
+                )}
             </div>
         </div>
     );
