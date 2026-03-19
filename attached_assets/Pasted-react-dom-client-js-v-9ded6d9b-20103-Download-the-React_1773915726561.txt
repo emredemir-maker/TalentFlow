@@ -1,0 +1,71 @@
+react-dom_client.js?v=9ded6d9b:20103 Download the React DevTools for a better development experience: https://react.dev/link/react-devtools
+LiveInterviewPage.jsx:313 [Candidate Listener] Starting Firestore listener on /interviews/ iv-crLNdOcLJGsFAHQZ1FmL-1773745857019
+CandidatesContext.jsx:114 [TalentFlow] Public access detected. Waiting for anonymous auth before starting listener...
+(anonymous) @ CandidatesContext.jsx:114
+CandidatesContext.jsx:118 [TalentFlow] Public route & unauthenticated. Triggering anonymous sign-in from CandidatesContext...
+AuthContext.jsx:172 [TalentFlow] Public route & unauthenticated. Triggering anonymous sign-in...
+LiveInterviewPage.jsx:318 [Candidate Listener] Snapshot received: Array(12)
+LiveInterviewPage.jsx:322 [Candidate Listener] 3 visible question(s)
+CandidatesContext.jsx:144 [TalentFlow] Public route detected. Starting TARGETED listener for candidate: crLNdOcLJGsFAHQZ1FmL
+CandidatesContext.jsx:120 [TalentFlow] Anonymous sign-in success: vjGnBDJV8uSgQSioegJiOPfg6wU2
+CandidatesContext.jsx:144 [TalentFlow] Public route detected. Starting TARGETED listener for candidate: crLNdOcLJGsFAHQZ1FmL
+CandidatesContext.jsx:151 [TalentFlow] Targeted candidate data loaded.
+LiveInterviewPage.jsx:318 [Candidate Listener] Snapshot received: Array(12)
+LiveInterviewPage.jsx:322 [Candidate Listener] 3 visible question(s)
+CandidatesContext.jsx:151 [TalentFlow] Targeted candidate data loaded.
+LiveInterviewPage.jsx:318 [Candidate Listener] Snapshot received: Array(12)
+LiveInterviewPage.jsx:322 [Candidate Listener] 3 visible question(s)
+LiveInterviewPage.jsx:318 [Candidate Listener] Snapshot received: Array(12)
+LiveInterviewPage.jsx:322 [Candidate Listener] 3 visible question(s)
+CandidatesContext.jsx:151 [TalentFlow] Targeted candidate data loaded.
+LiveInterviewPage.jsx:318 [Candidate Listener] Snapshot received: Array(12)
+LiveInterviewPage.jsx:322 [Candidate Listener] 3 visible question(s)
+CandidatesContext.jsx:151 [TalentFlow] Targeted candidate data loaded.
+LiveInterviewPage.jsx:266 [LiveInterview] Recruiter admitted candidate. Transitioning to active...
+CandidatesContext.jsx:151 [TalentFlow] Targeted candidate data loaded.
+LiveInterviewPage.jsx:318 [Candidate Listener] Snapshot received: Array(12)
+LiveInterviewPage.jsx:322 [Candidate Listener] 3 visible question(s)
+CandidatesContext.jsx:151 [TalentFlow] Targeted candidate data loaded.
+LiveInterviewPage.jsx:318 [Candidate Listener] Snapshot received: Array(12)
+LiveInterviewPage.jsx:322 [Candidate Listener] 3 visible question(s)
+CandidatesContext.jsx:151 [TalentFlow] Targeted candidate data loaded.
+LiveInterviewPage.jsx:318 [Candidate Listener] Snapshot received: Array(12)
+LiveInterviewPage.jsx:322 [Candidate Listener] 3 visible question(s)
+CandidatesContext.jsx:151 [TalentFlow] Targeted candidate data loaded.
+LiveInterviewPage.jsx:318 [Candidate Listener] Snapshot received: Array(12)
+LiveInterviewPage.jsx:322 [Candidate Listener] 3 visible question(s)
+LiveInterviewPage.jsx:318 [Candidate Listener] Snapshot received: Array(12)
+LiveInterviewPage.jsx:322 [Candidate Listener] 3 visible question(s)
+CandidatesContext.jsx:151 [TalentFlow] Targeted candidate data loaded.
+LiveInterviewPage.jsx:318 [Candidate Listener] Snapshot received: Array(12)
+LiveInterviewPage.jsx:322 [Candidate Listener] 3 visible question(s)
+LiveInterviewPage.jsx:318 [Candidate Listener] Snapshot received: Array(12)
+LiveInterviewPage.jsx:322 [Candidate Listener] 3 visible question(s)
+CandidatesContext.jsx:151 [TalentFlow] Targeted candidate data loaded.
+LiveInterviewPage.jsx:318 [Candidate Listener] Snapshot received: Array(12)
+LiveInterviewPage.jsx:322 [Candidate Listener] 3 visible question(s)
+CandidatesContext.jsx:151 [TalentFlow] Targeted candidate data loaded.
+LiveInterviewPage.jsx:318 [Candidate Listener] Snapshot received: Array(12)
+LiveInterviewPage.jsx:322 [Candidate Listener] 3 visible question(s)
+CandidatesContext.jsx:151 [TalentFlow] Targeted candidate data loaded.
+CandidatesContext.jsx:151 [TalentFlow] Targeted candidate data loaded.
+LiveInterviewPage.jsx:318 [Candidate Listener] Snapshot received: Array(12)
+LiveInterviewPage.jsx:322 [Candidate Listener] 3 visible question(s)
+CandidatesContext.jsx:151 [TalentFlow] Targeted candidate data loaded.
+CandidatesContext.jsx:151 [TalentFlow] Targeted candidate data loaded.
+LiveInterviewPage.jsx:318 [Candidate Listener] Snapshot received: Array(12)
+LiveInterviewPage.jsx:322 [Candidate Listener] 3 visible question(s)
+CandidatesContext.jsx:151 [TalentFlow] Targeted candidate data loaded.
+LiveInterviewPage.jsx:2087 Uncaught ReferenceError: logout is not defined
+    at onClick (LiveInterviewPage.jsx:2087:49)
+    at executeDispatch (react-dom_client.js?v=9ded6d9b:13622:11)
+    at runWithFiberInDEV (react-dom_client.js?v=9ded6d9b:997:72)
+    at processDispatchQueue (react-dom_client.js?v=9ded6d9b:13658:37)
+    at react-dom_client.js?v=9ded6d9b:14071:11
+    at batchedUpdates$1 (react-dom_client.js?v=9ded6d9b:2626:42)
+    at dispatchEventForPluginEventSystem (react-dom_client.js?v=9ded6d9b:13763:9)
+    at dispatchEvent (react-dom_client.js?v=9ded6d9b:16784:13)
+    at dispatchDiscreteEvent (react-dom_client.js?v=9ded6d9b:16765:62)
+LiveInterviewPage.jsx:318 [Candidate Listener] Snapshot received: (12) ['questions', 'lastActive', 'status', 'candidateId', 'activeStrategy', 'transcript', 'recruiterPresence', 'selectedPathId', 'sessionId', 'currentQuestionIndex', 'startedAt', 'candidateStatus']
+LiveInterviewPage.jsx:322 [Candidate Listener] 3 visible question(s)
+CandidatesContext.jsx:151 [TalentFlow] Targeted candidate data loaded.
