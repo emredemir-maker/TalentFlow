@@ -99,40 +99,31 @@ const upload = multer({
 });
 
 const app = express();
-const allowedOrigins = [
-    'http://localhost:5173',
-    'http://localhost:5174',
-    'http://127.0.0.1:5173',
-    'http://127.0.0.1:5174',
-    'http://localhost:3000',
-    process.env.VITE_APP_URL,
-    process.env.APP_URL
-].filter(Boolean);
 
 // --- Security Middlewares ---
-app.use(helmet({
-    contentSecurityPolicy: false,
-}));
-// app.use(xss());
+app.use(helmet({ contentSecurityPolicy: false }));
 app.use(hpp());
 
-// Strict CORS setup
+// Open CORS for Firebase Hosting + Replit + localhost
 app.use(cors({
     origin: (origin, callback) => {
-        // Allow requests with no origin (like mobile apps or curl) 
-        // OR if origin is in allowed list
-        if (!origin || allowedOrigins.includes(origin)) {
-            callback(null, true);
-        } else {
-            console.warn(`🛑 Blocked CORS request from: ${origin}`);
-            callback(new Error('CORS Policy: Not allowed origin'));
-        }
+        if (!origin) return callback(null, true); // server-to-server / curl
+        const allowed =
+            /^https:\/\/.*\.replit\.dev$/.test(origin) ||
+            /^https:\/\/.*\.replit\.app$/.test(origin) ||
+            /^https:\/\/.*\.pike\.replit\.dev$/.test(origin) ||
+            /^https:\/\/.*\.web\.app$/.test(origin) ||
+            /^https:\/\/.*\.firebaseapp\.com$/.test(origin) ||
+            /^http:\/\/localhost(:\d+)?$/.test(origin) ||
+            /^http:\/\/127\.0\.0\.1(:\d+)?$/.test(origin);
+        if (allowed) return callback(null, true);
+        console.warn(`🛑 Blocked CORS: ${origin}`);
+        callback(new Error('CORS: Not allowed'));
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     credentials: true
 }));
-// app.use(xss()); // Protect against XSS in body
-app.use(express.json({ limit: '50kb' })); // Body size limiting
+app.use(express.json({ limit: '10mb' })); // 10MB for base64 audio payloads
 
 // Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(uploadBaseDir, 'uploads')));
@@ -832,6 +823,55 @@ app.post('/api/google/create-calendar-event', async (req, res) => {
         res.status(response.status).json({ success: false, error: data.error?.message || 'Calendar Create Error' });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Gemini STT Endpoint (Audio to Text)
+// Accepts both multipart/form-data (LiveInterviewPage) and base64 JSON (SettingsPage)
+const audioUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
+app.post('/api/gemini-stt', (req, res, next) => {
+    const ct = req.headers['content-type'] || '';
+    if (ct.includes('multipart/form-data')) {
+        audioUpload.single('audio')(req, res, next);
+    } else {
+        next();
+    }
+}, async (req, res) => {
+    try {
+        let audioBase64, mimeType;
+
+        if (req.file) {
+            // Path 1: multipart upload (LiveInterviewPage)
+            audioBase64 = req.file.buffer.toString('base64');
+            mimeType = (req.file.mimetype || 'audio/webm').split(';')[0];
+            console.log(`🎙️ STT (multipart) ${mimeType} ${(req.file.buffer.length / 1024).toFixed(1)}KB`);
+        } else if (req.body?.audio) {
+            // Path 2: base64 JSON (SettingsPage)
+            audioBase64 = req.body.audio;
+            mimeType = (req.body.mimeType || 'audio/webm').split(';')[0];
+            const sizeKB = (audioBase64.length * 0.75 / 1024).toFixed(1);
+            console.log(`🎙️ STT (base64) ${mimeType} ~${sizeKB}KB`);
+        } else {
+            return res.status(400).json({ error: 'Ses dosyası bulunamadı' });
+        }
+
+        const apiKey = await getApiKey();
+        if (!apiKey) return res.status(500).json({ error: 'Gemini API Key eksik' });
+
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+
+        const result = await model.generateContent([
+            { inlineData: { data: audioBase64, mimeType } },
+            "Bu ses dosyasındaki Türkçe konuşmaları metne dök. ÖNEMLİ: Sadece konuşulan sözcükleri yaz. Konuşma yoksa sadece boş bir dize döndür. 'Sessizlik', 'Ses yok', 'Boş' gibi ifadeler KULLANMA. Eğer konuşmacı mülakat yapıyorsa o bağlamda kelimeleri doğru seç."
+        ]);
+
+        const text = result.response.text().trim();
+        console.log(`✅ STT Result: "${text.substring(0, 80)}"`);
+        res.json({ success: true, text });
+    } catch (err) {
+        console.error('💥 Gemini STT Error:', err.message);
+        res.status(500).json({ error: err.message });
     }
 });
 
