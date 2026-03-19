@@ -7,6 +7,8 @@ import Header from '../components/Header';
 import CandidateDrawer from '../components/CandidateDrawer';
 import AddCandidateModal from '../components/AddCandidateModal';
 import OpportunityHub from '../components/OpportunityHub';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../config/firebase';
 import {
     Users,
     MessageSquare,
@@ -70,7 +72,8 @@ export default function Dashboard() {
         candidates.forEach(c => {
             if (c.interviewSessions && Array.isArray(c.interviewSessions)) {
                 c.interviewSessions.forEach(s => {
-                    if (s.status === 'cancelled' || s.status === 'completed') return; // Skip cancelled/completed sessions in weekly plan
+                    const effectivelyCompleted = s.status === 'completed' || (s.aiOverallScore > 0 && s.status !== 'live');
+                    if (s.status === 'cancelled' || effectivelyCompleted) return; // Skip cancelled/completed sessions in weekly plan
 
                     const sessionDatePart = s.date ? s.date.split('T')[0] : '';
                     const sessionDate = new Date(sessionDatePart);
@@ -86,6 +89,7 @@ export default function Dashboard() {
                             time: s.time || '10:00',
                             date: sessionDatePart,
                             status: s.status,
+                            aiOverallScore: s.aiOverallScore || 0,
                             score: c.combinedScore || c.bestScore || 0,
                             skills: c.skills?.slice(0, 2) || []
                         };
@@ -269,15 +273,18 @@ export default function Dashboard() {
                                                     <h4 className="text-[12px] font-bold text-[#0F172A] group-hover:text-blue-600 transition-colors truncate">{int.name}</h4>
                                                     <span className="text-[9px] font-black text-emerald-500 bg-emerald-50 px-1 rounded">%{int.score}</span>
                                                     {/* Status Badge */}
-                                                    {int.status === 'live' ? (
-                                                        <span className="text-[7px] font-black bg-rose-50 text-rose-600 px-1.5 py-0.5 rounded border border-rose-100 animate-pulse">CANLI</span>
-                                                    ) : int.status === 'completed' ? (
-                                                        <span className="text-[7px] font-black bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded border border-emerald-100">TAMAMLANDI</span>
-                                                    ) : int.status === 'cancelled' ? (
-                                                        <span className="text-[7px] font-black bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200">İPTAL</span>
-                                                    ) : (
-                                                        <span className="text-[7px] font-black bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100">PLANLANDI</span>
-                                                    )}
+                                                    {(() => {
+                                                        const effComp = int.status === 'completed' || (int.aiOverallScore > 0 && int.status !== 'live');
+                                                        return int.status === 'live' ? (
+                                                            <span className="text-[7px] font-black bg-rose-50 text-rose-600 px-1.5 py-0.5 rounded border border-rose-100 animate-pulse">CANLI</span>
+                                                        ) : effComp ? (
+                                                            <span className="text-[7px] font-black bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded border border-emerald-100">TAMAMLANDI</span>
+                                                        ) : int.status === 'cancelled' ? (
+                                                            <span className="text-[7px] font-black bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200">İPTAL</span>
+                                                        ) : (
+                                                            <span className="text-[7px] font-black bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100">PLANLANDI</span>
+                                                        );
+                                                    })()}
                                                 </div>
                                                 <p className="text-[9px] text-[#64748B] font-bold uppercase tracking-tight truncate mb-1">{int.role}</p>
                                                 <div className="flex gap-1">
@@ -287,19 +294,29 @@ export default function Dashboard() {
                                                 </div>
                                             </div>
                                             <button 
-                                                onClick={(e) => {
+                                                onClick={async (e) => {
                                                     e.stopPropagation();
-                                                    if (int.status === 'completed') {
+                                                    const effComp = int.status === 'completed' || (int.aiOverallScore > 0 && int.status !== 'live');
+                                                    if (effComp) {
                                                         navigate(`/interview-report/${int.id}`);
-                                                    } else {
+                                                        return;
+                                                    }
+                                                    try {
+                                                        const snap = await getDoc(doc(db, 'interviews', int.id));
+                                                        if (snap.exists() && snap.data()?.status === 'completed') {
+                                                            navigate(`/interview-report/${int.id}`);
+                                                        } else {
+                                                            navigate(`/live-interview/${int.id}`);
+                                                        }
+                                                    } catch {
                                                         navigate(`/live-interview/${int.id}`);
                                                     }
                                                 }}
                                                 className={`h-7 px-3 text-[8px] font-black rounded-lg transition-all uppercase tracking-widest flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95 ${
-                                                    int.status === 'completed' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-[#1E3A8A] hover:bg-blue-800 text-white'
+                                                    (int.status === 'completed' || (int.aiOverallScore > 0 && int.status !== 'live')) ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-[#1E3A8A] hover:bg-blue-800 text-white'
                                                 }`}
                                             >
-                                                {int.status === 'completed' ? 'RAPOR' : 'GÖRÜNTÜLE'}
+                                                {(int.status === 'completed' || (int.aiOverallScore > 0 && int.status !== 'live')) ? 'RAPOR' : 'GÖRÜNTÜLE'}
                                             </button>
                                         </div>
                                     </div>

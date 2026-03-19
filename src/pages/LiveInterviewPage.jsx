@@ -63,7 +63,10 @@ export default function LiveInterviewPage() {
     const effectiveSession = useMemo(() => {
         const base = session || apiSession;
         if (!base) return null;
+        // Trust public Firestore doc if it says 'completed'
         if (apiSession?.status === 'completed') return { ...base, status: 'completed' };
+        // If the session has an AI score, it was completed even if status field is stale
+        if (session?.aiOverallScore > 0 && base.status !== 'live') return { ...base, status: 'completed' };
         return base;
     }, [session, apiSession]);
 

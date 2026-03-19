@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import { useCandidates } from '../context/CandidatesContext';
 import { useAuth } from '../context/AuthContext';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { getCalendarEvents, connectGoogleWorkspace, sendDirectEmail, createDirectCalendarEvent, ensureValidGoogleToken } from '../services/integrationService';
 import { 
@@ -311,9 +311,8 @@ export default function InterviewManagementPage() {
                     const isIsoDate = /^\d{4}-\d{2}-\d{2}$/.test(sessionDatePart);
                     
                     const isLive = session.status === 'live';
-                    const isCompleted = session.status === 'completed';
+                    const isCompleted = session.status === 'completed' || (session.aiOverallScore > 0 && !isLive);
                     const isCancelled = session.status === 'cancelled';
-                    const isPostponed = session.status === 'postponed' || session.status === 'scheduled';
                     const isFutureOrToday = isIsoDate && sessionDatePart >= todayStr;
 
                     const sessionData = {
@@ -323,6 +322,7 @@ export default function InterviewManagementPage() {
                         candidateName: c.name,
                         role: c.position || c.bestTitle || 'Pozisyon',
                         matchScore: c.bestScore || 0,
+                        _effectiveCompleted: isCompleted,
                     };
 
                     // Filtering logic: Live or Pending/Future goes to Active. Completed/Cancelled/Past goes to History.
@@ -978,7 +978,7 @@ export default function InterviewManagementPage() {
                                 <tbody className="divide-y divide-[#F1F5F9]">
                                     {(viewTab === 'active' ? activeInterviews : pastInterviews).map((int, idx) => {
                                         const isToday = int.date === new Date().toISOString().split('T')[0];
-                                        const isCompleted = int.status === 'completed';
+                                        const isCompleted = int._effectiveCompleted || int.status === 'completed';
                                         return (
                                             <tr key={idx} className={`hover:bg-blue-50/20 transition-all ${isToday && !isCompleted ? 'bg-blue-50/10' : ''}`}>
                                                 <td className="px-6 py-4">
@@ -1059,7 +1059,7 @@ export default function InterviewManagementPage() {
                                                             >
                                                                 KATIL
                                                             </button>
-                                                        ) : int.status === 'completed' ? (
+                                                        ) : isCompleted ? (
                                                             <button 
                                                                 onClick={() => navigate(`/interview-report/${int.id}`)}
                                                                 className="bg-[#1E3A8A] text-white px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-sm active:scale-95"
@@ -1068,7 +1068,18 @@ export default function InterviewManagementPage() {
                                                             </button>
                                                         ) : (
                                                             <button 
-                                                                onClick={() => navigate(`/live-interview/${int.id}`)}
+                                                                onClick={async () => {
+                                                                    try {
+                                                                        const snap = await getDoc(doc(db, 'interviews', int.id));
+                                                                        if (snap.exists() && snap.data()?.status === 'completed') {
+                                                                            navigate(`/interview-report/${int.id}`);
+                                                                        } else {
+                                                                            navigate(`/live-interview/${int.id}`);
+                                                                        }
+                                                                    } catch {
+                                                                        navigate(`/live-interview/${int.id}`);
+                                                                    }
+                                                                }}
                                                                 className="bg-[#1E3A8A] text-white px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-blue-800 transition-all shadow-sm active:scale-95"
                                                             >
                                                                 BAŞLAT

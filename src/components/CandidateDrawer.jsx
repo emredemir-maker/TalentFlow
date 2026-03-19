@@ -14,7 +14,7 @@ import { analyzeCandidateMatch } from '../services/geminiService';
 import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
 import { calculateMatchScore } from '../services/matchService';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, doc, getDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
 import { useNavigate } from 'react-router-dom';
@@ -667,8 +667,22 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                             {/* Interview History */}
                             <InterviewHistory
                                 sessions={candidate.interviewSessions}
-                                onStartSession={(session) => {
-                                    navigate(`/live-interview/${session.id}`);
+                                onStartSession={async (session) => {
+                                    const effComp = session.status === 'completed' || (session.aiOverallScore > 0 && session.status !== 'live');
+                                    if (effComp) {
+                                        navigate(`/interview-report/${session.id}`);
+                                        return;
+                                    }
+                                    try {
+                                        const snap = await getDoc(doc(db, 'interviews', session.id));
+                                        if (snap.exists() && snap.data()?.status === 'completed') {
+                                            navigate(`/interview-report/${session.id}`);
+                                        } else {
+                                            navigate(`/live-interview/${session.id}`);
+                                        }
+                                    } catch {
+                                        navigate(`/live-interview/${session.id}`);
+                                    }
                                 }}
                             />
 
