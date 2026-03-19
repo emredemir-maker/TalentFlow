@@ -294,6 +294,12 @@ export default function InterviewManagementPage() {
         }
     };
 
+    // Helper: build a local-time ISO string (no trailing Z) from date + "HH:MM"
+    const toLocalISOString = (date) => {
+        const pad = n => String(n).padStart(2, '0');
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:00`;
+    };
+
     const createInterviewRecord = async (slot = null, startNow = false) => {
         if (!selectedCandidate) return;
         setSaveStatus('saving');
@@ -303,7 +309,8 @@ export default function InterviewManagementPage() {
             
             // Using full ID for better lookup reliability in public pages
             const sessionId = `iv-${selectedCandidate.id}-${Date.now()}`;
-            const meetLink = `${window.location.origin}/join/${sessionId}`;
+            let meetLink = `${window.location.origin}/join/${sessionId}`;
+            let calendarEventLink = null;
 
             const newSession = {
                 id: sessionId,
@@ -313,21 +320,56 @@ export default function InterviewManagementPage() {
                 type: interviewType,
                 interviewer: interviewerName,
                 status: startNow ? 'live' : 'scheduled',
-                meetLink: meetLink
+                meetLink
             };
 
-            // If we have a slot and it's scheduled, optionally create a real calendar event
+            // Create Google Calendar event when a date/time is specified and Google is connected
             if (slot && !startNow && isGoogleConnected) {
+                // Build LOCAL time strings — no UTC conversion — Google Calendar needs local + timezone
                 const startDT = new Date(`${slot.date}T${slot.time}:00`);
                 const endDT = new Date(startDT.getTime() + 60 * 60 * 1000);
-                
-                await createDirectCalendarEvent(userId, googleToken, {
-                    summary: `${selectedCandidate.name} - ${newSession.title}`,
-                    description: `TalentFlow üzerinden planlanan mülakat seansı.\nAday Score: %${Math.round(selectedCandidate.bestScore || 0)}`,
-                    startDateTime: startDT.toISOString(),
-                    endDateTime: endDT.toISOString(),
-                    guestEmail: selectedCandidate.email
+                const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+                const calResult = await createDirectCalendarEvent(userId, googleToken, {
+                    summary: `${selectedCandidate.name} — ${newSession.title}`,
+                    description: `Talent-Inn üzerinden planlanan mülakat.\nAday: ${selectedCandidate.name}\nPozisyon: ${selectedCandidate.position || '—'}\nDeğerlendirici: ${interviewerName}\nMülakat linki: ${meetLink}`,
+                    startDateTime: toLocalISOString(startDT),
+                    endDateTime: toLocalISOString(endDT),
+                    guestEmail: selectedCandidate.email,
+                    timeZone: userTimeZone
                 });
+
+                if (calResult.success) {
+                    // Prefer the real Google Meet link over the internal join link
+                    if (calResult.meetLink) {
+                        meetLink = calResult.meetLink;
+                        newSession.meetLink = calResult.meetLink;
+                    }
+                    if (calResult.htmlLink) {
+                        calendarEventLink = calResult.htmlLink;
+                        newSession.calendarEventLink = calResult.htmlLink;
+                    }
+                } else {
+                    // Token expired → prompt reconnect and abort
+                    if (calResult.error?.includes('TOKEN_EXPIRED') || calResult.error?.includes('süresi dolmuş')) {
+                        setSaveStatus('idle');
+                        const shouldReconnect = window.confirm(
+                            'Google bağlantı tokenı süresi dolmuş.\n\nTakvim etkinliği oluşturmak için Google hesabınızı yeniden bağlamanız gerekiyor.\n\nŞimdi yeniden bağlanmak ister misiniz?'
+                        );
+                        if (shouldReconnect) {
+                            const reconnResult = await connectGoogleWorkspace(userId);
+                            if (reconnResult.success) {
+                                alert('Google yeniden bağlandı! Lütfen mülakatı tekrar kaydedin.');
+                            } else {
+                                alert('Yeniden bağlantı başarısız: ' + reconnResult.error);
+                            }
+                        }
+                        return;
+                    }
+                    // Any other error → warn but still save the interview record
+                    console.warn('[Calendar] Event creation failed, saving interview without calendar:', calResult.error);
+                    alert(`⚠️ Takvim etkinliği oluşturulamadı: ${calResult.error}\n\nMülakat yine de sisteme kaydedilecek.`);
+                }
             }
 
             await updateCandidate(selectedCandidate.id, {

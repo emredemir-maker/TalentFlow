@@ -118,45 +118,70 @@ export const sendDirectEmail = async (userId, token, emailData) => {
 
 export const createDirectCalendarEvent = async (userId, token, eventData) => {
     try {
-        const { summary, description, startDateTime, endDateTime, guestEmail } = eventData;
+        const { summary, description, startDateTime, endDateTime, guestEmail, timeZone } = eventData;
+
+        // Use the user's local timezone so the event appears at the correct local time.
+        // startDateTime / endDateTime must be LOCAL time strings (no trailing Z) when timeZone is supplied.
+        const tz = timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
         const event = {
             summary,
             description,
-            start: { dateTime: startDateTime },
-            end: { dateTime: endDateTime },
+            start: { dateTime: startDateTime, timeZone: tz },
+            end:   { dateTime: endDateTime,   timeZone: tz },
             conferenceData: {
                 createRequest: {
                     requestId: `tf-${Date.now()}`,
                     conferenceSolutionKey: { type: 'hangoutsMeet' }
                 }
+            },
+            reminders: {
+                useDefault: false,
+                overrides: [
+                    { method: 'email',  minutes: 60 },
+                    { method: 'popup',  minutes: 10 }
+                ]
             }
         };
 
         if (guestEmail) {
             event.attendees = [{ email: guestEmail }];
+            event.guestsCanModify = false;
         }
 
-        const response = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(event)
-        });
+        const response = await fetch(
+            'https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1&sendUpdates=all',
+            {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(event)
+            }
+        );
 
         const data = await response.json();
+
         if (!response.ok) {
-            if (response.status === 401) throw new Error("Oturum süresi dolmuş veya yetki kaldırılmış. Lütfen Google bağlantısını yenileyin.");
-            if (response.status === 403) throw new Error("Takvime erişim yetkisi yetersiz (403). Lütfen Google hesabınızı tekrar bağlayıp tüm izinleri onaylayın.");
+            if (response.status === 401) {
+                throw new Error("TOKEN_EXPIRED: Oturum süresi dolmuş veya yetki kaldırılmış. Lütfen Google bağlantısını yenileyin.");
+            }
+            if (response.status === 403) {
+                throw new Error("AUTH_SCOPE: Takvime erişim yetkisi yetersiz (403). Lütfen Google hesabınızı tekrar bağlayıp tüm izinleri onaylayın.");
+            }
             throw new Error(data.error?.message || `Takvim etkinliği oluşturulamadı (${response.status})`);
         }
+
+        const meetLink = data.conferenceData?.entryPoints?.find(ep => ep.entryPointType === 'video')?.uri
+            || data.conferenceData?.entryPoints?.[0]?.uri
+            || null;
 
         return {
             success: true,
             htmlLink: data.htmlLink,
-            meetLink: data.conferenceData?.entryPoints?.[0]?.uri || data.htmlLink
+            meetLink,
+            eventId: data.id
         };
     } catch (error) {
         console.error("Direct Calendar Event Error:", error);
