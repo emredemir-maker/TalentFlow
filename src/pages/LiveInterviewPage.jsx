@@ -15,7 +15,7 @@ import { generateInterviewPaths, generateFollowUpQuestion, analyzeSTARRealTime, 
 import LoadingScreen from '../components/LoadingScreen';
 import CandidateExitPage from './CandidateExitPage';
 import { db } from '../config/firebase';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export default function LiveInterviewPage() {
@@ -62,6 +62,12 @@ export default function LiveInterviewPage() {
     const videoRef = useRef(null);
     const pipVideoRef = useRef(null);
     const streamRef = useRef(null);
+
+    // WebRTC peer connection
+    const [remoteStream, setRemoteStream] = useState(null);
+    const peerConnectionRef = useRef(null);
+    const appliedRecruiterIceRef = useRef(0);
+    const appliedCandidateIceRef = useRef(0);
     const [copied, setCopied] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
 
@@ -373,13 +379,93 @@ export default function LiveInterviewPage() {
         if (stream) {
             streamRef.current = stream;
         }
-        if (stream && videoRef.current && isVideoOn) {
-            videoRef.current.srcObject = stream;
+        // Main video: show remote (peer) stream if connected, otherwise local fallback
+        if (videoRef.current) {
+            const mainSrc = remoteStream || (isVideoOn ? stream : null);
+            videoRef.current.srcObject = mainSrc || null;
         }
+        // PiP: always local stream
         if (stream && pipVideoRef.current) {
             pipVideoRef.current.srcObject = stream;
         }
-    }, [stream, phase, isVideoOn]);
+    }, [stream, remoteStream, phase, isVideoOn]);
+
+    // WebRTC peer connection — established when interview goes active
+    useEffect(() => {
+        if (phase !== 'active' || !stream || !sessionId) return;
+
+        const STUN = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] };
+        const pc = new RTCPeerConnection(STUN);
+        peerConnectionRef.current = pc;
+        appliedRecruiterIceRef.current = 0;
+        appliedCandidateIceRef.current = 0;
+
+        stream.getTracks().forEach(track => pc.addTrack(track, stream));
+
+        pc.ontrack = (event) => {
+            const [remote] = event.streams;
+            if (remote) setRemoteStream(remote);
+        };
+
+        const sessionRef = doc(db, 'interviews', sessionId);
+
+        if (isRecruiter) {
+            pc.onicecandidate = async ({ candidate }) => {
+                if (candidate) {
+                    try { await updateDoc(sessionRef, { recruiterIce: arrayUnion(JSON.stringify(candidate.toJSON())) }); } catch(e) {}
+                }
+            };
+
+            (async () => {
+                try {
+                    const offer = await pc.createOffer();
+                    await pc.setLocalDescription(offer);
+                    await setDoc(sessionRef, { webrtcOffer: { sdp: offer.sdp, type: offer.type }, webrtcAnswer: null, recruiterIce: [], candidateIce: [] }, { merge: true });
+                } catch(e) { console.error('[WebRTC recruiter offer]', e); }
+            })();
+
+            const unsub = onSnapshot(sessionRef, async (snap) => {
+                if (!snap.exists()) return;
+                const data = snap.data();
+                if (data.webrtcAnswer && !pc.remoteDescription) {
+                    try { await pc.setRemoteDescription(new RTCSessionDescription(data.webrtcAnswer)); } catch(e) {}
+                }
+                const ice = data.candidateIce || [];
+                for (let i = appliedCandidateIceRef.current; i < ice.length; i++) {
+                    try { await pc.addIceCandidate(new RTCIceCandidate(JSON.parse(ice[i]))); } catch(e) {}
+                }
+                appliedCandidateIceRef.current = ice.length;
+            });
+
+            return () => { unsub(); pc.close(); peerConnectionRef.current = null; };
+        } else {
+            pc.onicecandidate = async ({ candidate }) => {
+                if (candidate) {
+                    try { await updateDoc(sessionRef, { candidateIce: arrayUnion(JSON.stringify(candidate.toJSON())) }); } catch(e) {}
+                }
+            };
+
+            const unsub = onSnapshot(sessionRef, async (snap) => {
+                if (!snap.exists()) return;
+                const data = snap.data();
+                if (data.webrtcOffer && !pc.remoteDescription) {
+                    try {
+                        await pc.setRemoteDescription(new RTCSessionDescription(data.webrtcOffer));
+                        const answer = await pc.createAnswer();
+                        await pc.setLocalDescription(answer);
+                        await updateDoc(sessionRef, { webrtcAnswer: { sdp: answer.sdp, type: answer.type } });
+                    } catch(e) { console.error('[WebRTC candidate answer]', e); }
+                }
+                const ice = data.recruiterIce || [];
+                for (let i = appliedRecruiterIceRef.current; i < ice.length; i++) {
+                    try { await pc.addIceCandidate(new RTCIceCandidate(JSON.parse(ice[i]))); } catch(e) {}
+                }
+                appliedRecruiterIceRef.current = ice.length;
+            });
+
+            return () => { unsub(); pc.close(); peerConnectionRef.current = null; };
+        }
+    }, [phase, sessionId, isRecruiter]); // stream intentionally omitted to avoid reconnects on track toggle
 
     const handleGenerateAIQuestion = async (mode, category = null) => {
         if (!candidateData || coachGenerating) return;
@@ -687,7 +773,11 @@ export default function LiveInterviewPage() {
             } catch { /* fallback */ }
 
             const cleanText = text.trim();
-            if (cleanText.length > 2 && !cleanText.toLowerCase().includes('sessizlik') && !cleanText.toLowerCase().includes('boş_ses')) {
+            // Filter out Gemini prompt echoes and silence markers
+            const BLOCKED_PHRASES = ['bu ses dosyasını analiz et', 'json formatında', 'sessizlik', 'boş_ses', 'ses yok', 'inlinedata'];
+            const textLower = cleanText.toLowerCase();
+            const isPromptEcho = BLOCKED_PHRASES.some(p => textLower.includes(p));
+            if (cleanText.length > 2 && !isPromptEcho) {
                 const roleLabel = isRecruiter ? 'YÖNETİCİ' : 'ADAY';
                 const newEntry = {
                     role: roleLabel,
