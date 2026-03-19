@@ -12,6 +12,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useCandidates } from '../context/CandidatesContext';
 import { generateInterviewPaths, generateFollowUpQuestion, analyzeSTARRealTime, stripPII } from '../services/geminiService';
+import { getGlobalGeminiKey } from '../services/ai/config.js';
 import LoadingScreen from '../components/LoadingScreen';
 import CandidateExitPage from './CandidateExitPage';
 import { db } from '../config/firebase';
@@ -54,6 +55,10 @@ export default function LiveInterviewPage() {
     const session = useMemo(() =>
         candidateData?.interviewSessions?.find(s => s.id === sessionId),
         [candidateData, sessionId]);
+
+    // effectiveSession: for anonymous candidates who can't read Firestore candidates collection,
+    // fall back to apiSession (Firestore /interviews/{sessionId} listener)
+    const effectiveSession = useMemo(() => session || apiSession, [session, apiSession]);
 
     // Media States
     const [isMicOn, setIsMicOn] = useState(true);
@@ -156,14 +161,15 @@ export default function LiveInterviewPage() {
     // Recruiter Presence Check (for Candidates)
     const isRecruiterActive = useMemo(() => {
         if (isRecruiter) return true; // You are the recruiter
-        if (!session?.lastActive) return false;
+        const es = effectiveSession;
+        if (!es?.lastActive) return false;
 
-        const lastActiveDate = new Date(session.lastActive);
+        const lastActiveDate = new Date(es.lastActive);
         const now = new Date();
         const diffSeconds = (now - lastActiveDate) / 1000;
 
-        return session.recruiterPresence && diffSeconds < 45; // 45 seconds buffer
-    }, [session?.lastActive, session?.recruiterPresence, isRecruiter]);
+        return es.recruiterPresence && diffSeconds < 45; // 45 seconds buffer
+    }, [effectiveSession, isRecruiter]);
 
     // Generate AI Paths based on strategy
     useEffect(() => {
@@ -247,9 +253,7 @@ export default function LiveInterviewPage() {
     const simulationInsights = [];
 
     // Handle side effects (redirects, phase transitions)
-    // effectiveSession: falls back to API-polled session data for anonymous candidates who can't read Firestore
     useEffect(() => {
-        const effectiveSession = session || apiSession;
         if (!effectiveSession) return;
         // For recruiter: also require candidateData to be present
         if (isRecruiter && !candidateData) return;
@@ -291,7 +295,7 @@ export default function LiveInterviewPage() {
             }
             // Candidate question sync is handled by the Firestore onSnapshot listener
         }
-    }, [candidateData, session, apiSession, phase, navigate, sessionId, isRecruiter]);
+    }, [candidateData, effectiveSession, phase, navigate, sessionId, isRecruiter, session, questions]);
 
     // Recruiter Role Detection
     useEffect(() => {
@@ -751,7 +755,8 @@ export default function LiveInterviewPage() {
             const base64Audio = btoa(binary);
             const mimeType = blob.type.split(';')[0] || 'audio/webm';
 
-            const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+            const apiKey = await getGlobalGeminiKey();
+            if (!apiKey) { console.warn('[STT] No Gemini API key found.'); return; }
             const genAI = new GoogleGenerativeAI(apiKey);
             const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
             const result = await model.generateContent([
@@ -1428,20 +1433,20 @@ export default function LiveInterviewPage() {
                                                     )}
 
                                                     <div className="relative">
-                                                        <div className={`w-3 h-3 rounded-full shadow-lg ${!isRecruiterActive ? 'bg-amber-500' : session?.status !== 'live' ? 'bg-blue-500' : 'bg-emerald-500'}`} />
-                                                        <div className={`absolute -inset-1.5 rounded-full animate-ping ${!isRecruiterActive ? 'bg-amber-500/20' : session?.status !== 'live' ? 'bg-blue-500/20' : 'bg-emerald-500/20'}`} />
+                                                        <div className={`w-3 h-3 rounded-full shadow-lg ${!isRecruiterActive ? 'bg-amber-500' : effectiveSession?.status !== 'live' ? 'bg-blue-500' : 'bg-emerald-500'}`} />
+                                                        <div className={`absolute -inset-1.5 rounded-full animate-ping ${!isRecruiterActive ? 'bg-amber-500/20' : effectiveSession?.status !== 'live' ? 'bg-blue-500/20' : 'bg-emerald-500/20'}`} />
                                                     </div>
 
                                                     <div className="flex-1 min-w-0">
-                                                        <p className={`text-[10px] font-black uppercase tracking-[0.15em] italic ${!isRecruiterActive ? 'text-amber-600' : session?.status !== 'live' ? 'text-blue-500' : 'text-emerald-600'}`}>
-                                                            {!isRecruiterActive ? 'Mülakatçı Bekleniyor' : session?.status !== 'live' ? 'Mülakatçı Hazırlanıyor' : 'Mülakatçı Hazır'}
+                                                        <p className={`text-[10px] font-black uppercase tracking-[0.15em] italic ${!isRecruiterActive ? 'text-amber-600' : effectiveSession?.status !== 'live' ? 'text-blue-500' : 'text-emerald-600'}`}>
+                                                            {!isRecruiterActive ? 'Mülakatçı Bekleniyor' : effectiveSession?.status !== 'live' ? 'Mülakatçı Hazırlanıyor' : 'Mülakatçı Hazır'}
                                                         </p>
                                                         <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5 truncate">
-                                                            {!isRecruiterActive ? 'Lütfen oturumun açılmasını bekleyin...' : session?.status !== 'live' ? 'Mülakatçı soruları ve salonu hazırlıyor...' : 'Hemen katılarak görüşmeyi başlatabilirsiniz'}
+                                                            {!isRecruiterActive ? 'Lütfen oturumun açılmasını bekleyin...' : effectiveSession?.status !== 'live' ? 'Mülakatçı soruları ve salonu hazırlıyor...' : 'Hemen katılarak görüşmeyi başlatabilirsiniz'}
                                                         </p>
                                                     </div>
 
-                                                    {isRecruiterActive && session?.status === 'live' && (
+                                                    {isRecruiterActive && effectiveSession?.status === 'live' && (
                                                         <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 animate-in zoom-in duration-300">
                                                             <Check className="w-4 h-4 text-emerald-600" />
                                                         </div>
@@ -1455,7 +1460,7 @@ export default function LiveInterviewPage() {
                                                                 alert("Mülakatçı henüz odaya katılmadı. Lütfen odaya girmesini bekleyin.");
                                                                 return;
                                                             }
-                                                            if (session?.status !== 'live') {
+                                                            if (effectiveSession?.status !== 'live') {
                                                                 alert("Mülakatçı henüz oturumu (Live) başlatmadı. Lütfen hazırlıkların bitmesini bekleyin.");
                                                                 return;
                                                             }
@@ -1467,8 +1472,8 @@ export default function LiveInterviewPage() {
                                                             alert("Lütfen KVKK onayını kabul edin.");
                                                         }
                                                     }}
-                                                    className={`w-full h-16 rounded-2xl text-white font-black text-[12px] uppercase tracking-[0.2em] shadow-2xl flex items-center justify-center gap-3 transition-all hover:scale-[1.02] active:scale-95 group italic ${isRecruiterActive && session?.status === 'live' ? 'bg-[#0F172A] shadow-blue-900/40' : 'bg-slate-800 opacity-50 cursor-not-allowed'}`}
-                                                    disabled={!hasConsent || !isRecruiterActive || session?.status !== 'live'}
+                                                    className={`w-full h-16 rounded-2xl text-white font-black text-[12px] uppercase tracking-[0.2em] shadow-2xl flex items-center justify-center gap-3 transition-all hover:scale-[1.02] active:scale-95 group italic ${isRecruiterActive && effectiveSession?.status === 'live' ? 'bg-[#0F172A] shadow-blue-900/40' : 'bg-slate-800 opacity-50 cursor-not-allowed'}`}
+                                                    disabled={!hasConsent || !isRecruiterActive || effectiveSession?.status !== 'live'}
                                                 >
                                                     KATILMAYA HAZIRIM <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                                                 </button>

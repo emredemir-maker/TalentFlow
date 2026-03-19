@@ -9,10 +9,17 @@ let currentApiKey = null;
 
 export async function getGlobalGeminiKey() {
     try {
-        const docRef = doc(db, 'artifacts/talent-flow/public/data/settings', 'system');
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists() && docSnap.data().geminiApiKey) {
-            return docSnap.data().geminiApiKey;
+        // Primary: SuperAdmin saves to settings/api_keys → gemini field
+        const apiKeysRef = doc(db, 'artifacts/talent-flow/public/data/settings', 'api_keys');
+        const apiKeysSnap = await getDoc(apiKeysRef);
+        if (apiKeysSnap.exists() && apiKeysSnap.data().gemini) {
+            return apiKeysSnap.data().gemini;
+        }
+        // Legacy fallback: settings/system → geminiApiKey
+        const systemRef = doc(db, 'artifacts/talent-flow/public/data/settings', 'system');
+        const systemSnap = await getDoc(systemRef);
+        if (systemSnap.exists() && systemSnap.data().geminiApiKey) {
+            return systemSnap.data().geminiApiKey;
         }
     } catch (e) {
         console.warn("Global API Key fetching error:", e);
