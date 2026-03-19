@@ -311,7 +311,12 @@ export default function InterviewManagementPage() {
                     const isIsoDate = /^\d{4}-\d{2}-\d{2}$/.test(sessionDatePart);
                     
                     const isLive = session.status === 'live';
-                    const isCompleted = session.status === 'completed' || (session.aiOverallScore > 0 && !isLive);
+                    const isCompleted = session.status === 'completed' ||
+                        (!isLive && (
+                            (session.aiOverallScore > 0) ||
+                            Boolean(session.aiSummary) ||
+                            (session.finalScore > 0)
+                        ));
                     const isCancelled = session.status === 'cancelled';
                     const isFutureOrToday = isIsoDate && sessionDatePart >= todayStr;
 

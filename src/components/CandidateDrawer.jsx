@@ -668,7 +668,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                             <InterviewHistory
                                 sessions={candidate.interviewSessions}
                                 onStartSession={async (session) => {
-                                    const effComp = session.status === 'completed' || (session.aiOverallScore > 0 && session.status !== 'live');
+                                    const effComp = session.status === 'completed' || (session.status !== 'live' && (session.aiOverallScore > 0 || Boolean(session.aiSummary) || session.finalScore > 0));
                                     if (effComp) {
                                         navigate(`/interview-report/${session.id}`);
                                         return;

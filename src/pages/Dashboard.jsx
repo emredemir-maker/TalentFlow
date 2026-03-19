@@ -72,7 +72,8 @@ export default function Dashboard() {
         candidates.forEach(c => {
             if (c.interviewSessions && Array.isArray(c.interviewSessions)) {
                 c.interviewSessions.forEach(s => {
-                    const effectivelyCompleted = s.status === 'completed' || (s.aiOverallScore > 0 && s.status !== 'live');
+                    const effectivelyCompleted = s.status === 'completed' ||
+                        (s.status !== 'live' && (s.aiOverallScore > 0 || Boolean(s.aiSummary) || s.finalScore > 0));
                     if (s.status === 'cancelled' || effectivelyCompleted) return; // Skip cancelled/completed sessions in weekly plan
 
                     const sessionDatePart = s.date ? s.date.split('T')[0] : '';
@@ -274,7 +275,7 @@ export default function Dashboard() {
                                                     <span className="text-[9px] font-black text-emerald-500 bg-emerald-50 px-1 rounded">%{int.score}</span>
                                                     {/* Status Badge */}
                                                     {(() => {
-                                                        const effComp = int.status === 'completed' || (int.aiOverallScore > 0 && int.status !== 'live');
+                                                        const effComp = int.status === 'completed' || (int.status !== 'live' && (int.aiOverallScore > 0 || Boolean(int.aiSummary) || int.finalScore > 0));
                                                         return int.status === 'live' ? (
                                                             <span className="text-[7px] font-black bg-rose-50 text-rose-600 px-1.5 py-0.5 rounded border border-rose-100 animate-pulse">CANLI</span>
                                                         ) : effComp ? (
@@ -296,7 +297,7 @@ export default function Dashboard() {
                                             <button 
                                                 onClick={async (e) => {
                                                     e.stopPropagation();
-                                                    const effComp = int.status === 'completed' || (int.aiOverallScore > 0 && int.status !== 'live');
+                                                    const effComp = int.status === 'completed' || (int.status !== 'live' && (int.aiOverallScore > 0 || Boolean(int.aiSummary) || int.finalScore > 0));
                                                     if (effComp) {
                                                         navigate(`/interview-report/${int.id}`);
                                                         return;
@@ -313,10 +314,10 @@ export default function Dashboard() {
                                                     }
                                                 }}
                                                 className={`h-7 px-3 text-[8px] font-black rounded-lg transition-all uppercase tracking-widest flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95 ${
-                                                    (int.status === 'completed' || (int.aiOverallScore > 0 && int.status !== 'live')) ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-[#1E3A8A] hover:bg-blue-800 text-white'
+                                                    (int.status === 'completed' || (int.status !== 'live' && (int.aiOverallScore > 0 || Boolean(int.aiSummary) || int.finalScore > 0))) ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-[#1E3A8A] hover:bg-blue-800 text-white'
                                                 }`}
                                             >
-                                                {(int.status === 'completed' || (int.aiOverallScore > 0 && int.status !== 'live')) ? 'RAPOR' : 'GÖRÜNTÜLE'}
+                                                {(int.status === 'completed' || (int.status !== 'live' && (int.aiOverallScore > 0 || Boolean(int.aiSummary) || int.finalScore > 0))) ? 'RAPOR' : 'GÖRÜNTÜLE'}
                                             </button>
                                         </div>
                                     </div>
