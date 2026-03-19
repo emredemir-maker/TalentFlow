@@ -7,10 +7,6 @@ import {
     Calendar,
     BarChart3,
     MessageSquare,
-    Share2,
-    Building2,
-    BookOpen,
-    Shield,
     Settings,
     LogOut,
     ChevronLeft,
@@ -29,33 +25,34 @@ export default function Sidebar({ activeView, onNavigate, collapsed, onToggleCol
         { id: 'positions', label: 'Açık İlanlar', icon: Briefcase },
         { id: 'analytics', label: 'Analitik Raporlar', icon: BarChart3 },
         { id: 'messages', label: 'Mesajlaşma', icon: MessageSquare },
-        { id: 'sources', label: 'Kaynak Yönetimi', icon: Share2 },
-        { id: 'departments', label: 'Departmanlar', icon: Building2 },
-        { id: 'guide', label: 'Platform Kılavuzu', icon: BookOpen },
     ];
 
     const adminItems = [
-        { id: 'super-admin', label: 'Sistem Yönetimi', icon: Shield },
         { id: 'settings', label: 'Genel Ayarlar', icon: Settings },
     ];
 
-    const MenuItem = ({ item }) => (
-        <button
-            onClick={() => onNavigate(item.id)}
-            className={`w-full flex items-center gap-4 px-6 py-3.5 transition-all duration-200 group relative
-                ${activeView === item.id
-                    ? 'bg-[#1E293B] text-white'
-                    : 'text-[#94A3B8] hover:text-white hover:bg-[#1E293B]/50'
-                }`}
-        >
-            <item.icon className={`w-4.5 h-4.5 shrink-0 ${activeView === item.id ? 'text-white' : 'text-[#64748B] group-hover:text-white'}`} />
-            {!collapsed && <span className="text-[13px] font-medium tracking-tight truncate">{item.label}</span>}
-            
-            {activeView === item.id && (
-                <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#2563EB]" />
-            )}
-        </button>
-    );
+    const isSettingsGroup = ['settings', 'sources', 'departments', 'guide', 'super-admin'].includes(activeView);
+
+    const MenuItem = ({ item }) => {
+        const isActive = item.id === 'settings' ? isSettingsGroup : activeView === item.id;
+        return (
+            <button
+                onClick={() => onNavigate(item.id)}
+                className={`w-full flex items-center gap-4 px-6 py-3.5 transition-all duration-200 group relative
+                    ${isActive
+                        ? 'bg-[#1E293B] text-white'
+                        : 'text-[#94A3B8] hover:text-white hover:bg-[#1E293B]/50'
+                    }`}
+            >
+                <item.icon className={`w-4.5 h-4.5 shrink-0 ${isActive ? 'text-white' : 'text-[#64748B] group-hover:text-white'}`} />
+                {!collapsed && <span className="text-[13px] font-medium tracking-tight truncate">{item.label}</span>}
+
+                {isActive && (
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#2563EB]" />
+                )}
+            </button>
+        );
+    };
 
     return (
         <aside className={`fixed left-0 top-0 h-screen transition-all duration-300 z-50 bg-[#0A1629]
@@ -69,7 +66,7 @@ export default function Sidebar({ activeView, onNavigate, collapsed, onToggleCol
                     </div>
                     {!collapsed && (
                         <div className="flex flex-col">
-                            <span className="text-white text-[16px] font-bold tracking-tight leading-none">TalentFlow</span>
+                            <span className="text-white text-[16px] font-bold tracking-tight leading-none">Talent-Inn</span>
                             <span className="text-[#64748B] text-[9px] font-medium mt-1">AI Recruitment</span>
                         </div>
                     )}
@@ -117,7 +114,7 @@ export default function Sidebar({ activeView, onNavigate, collapsed, onToggleCol
                     )}
                 </div>
                 {!collapsed && (
-                    <button 
+                    <button
                         onClick={logout}
                         className="w-full flex items-center gap-3 px-2 py-2 text-[#64748B] hover:text-white transition-colors mt-1"
                     >

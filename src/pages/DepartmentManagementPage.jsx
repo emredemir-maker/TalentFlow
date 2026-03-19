@@ -14,7 +14,6 @@ import {
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 import { usePositions } from '../context/PositionsContext';
-import Header from '../components/Header';
 
 const DEPARTMENTS_PATH = 'artifacts/talent-flow/public/data/departments';
 const USERS_PATH = 'artifacts/talent-flow/public/data/users';
@@ -164,20 +163,18 @@ export default function DepartmentManagementPage() {
 
     if (!isSuperAdmin) {
         return (
-            <div className="min-h-screen flex items-center justify-center">
-                <div className="text-center space-y-4">
-                    <Shield className="w-12 h-12 text-navy-600 mx-auto" />
-                    <p className="text-navy-400 font-bold">Bu sayfaya erişim yetkiniz bulunmuyor.</p>
+            <div className="flex items-center justify-center py-24 text-center">
+                <div className="space-y-3">
+                    <Shield className="w-10 h-10 text-slate-300 mx-auto" />
+                    <p className="text-slate-500 font-medium text-sm">Bu bölüme erişim yetkiniz bulunmuyor.</p>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen pb-20">
-            <Header title="Departman Yönetimi" />
-
-            <div className="max-w-6xl mx-auto px-6 lg:px-8 py-10 space-y-10">
+        <div className="pb-10">
+            <div className="space-y-8">
 
                 {/* Hero */}
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
