@@ -2,8 +2,8 @@
 type ModuleMap = Record<string, () => Promise<Record<string, unknown>>>;
 export const modules: ModuleMap = {
   "./components/mockups/login-layouts/CommandDeck.tsx": () => import("../components/mockups/login-layouts/CommandDeck.tsx"),
-  "./components/mockups/login-layouts/ElevatedDepth.tsx": () => import("../components/mockups/login-layouts/ElevatedDepth.tsx"),
-  "./components/mockups/login-layouts/PrecisionForm.tsx": () => import("../components/mockups/login-layouts/PrecisionForm.tsx"),
   "./components/mockups/login-layouts/SplitScreen.tsx": () => import("../components/mockups/login-layouts/SplitScreen.tsx"),
-  "./components/mockups/login-layouts/StackedBlocks.tsx": () => import("../components/mockups/login-layouts/StackedBlocks.tsx")
+  "./components/mockups/login-layouts/StackedBlocks.tsx": () => import("../components/mockups/login-layouts/StackedBlocks.tsx"),
+  "./components/mockups/positions-layouts/CommandTable.tsx": () => import("../components/mockups/positions-layouts/CommandTable.tsx"),
+  "./components/mockups/positions-layouts/NeuralGrid.tsx": () => import("../components/mockups/positions-layouts/NeuralGrid.tsx")
 };
