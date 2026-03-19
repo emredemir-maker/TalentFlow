@@ -74,7 +74,7 @@ function AuthenticatedApp() {
   if (loading) {
     return (
       <LoadingScreen
-        message="TalentFlow Başlatılıyor..."
+        message="Talent-Inn Başlatılıyor..."
         subtext="Firebase kimlik doğrulaması bekleniyor"
       />
     );

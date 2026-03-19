@@ -1,117 +1,150 @@
 // src/pages/CandidateProcessPage.jsx
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Header from '../components/Header';
 import { useCandidates } from '../context/CandidatesContext';
-import { usePositions } from '../context/PositionsContext';
 import {
-    Plus, Search, ChevronRight, Zap, Star, Brain, X,
-    Mail, Phone, Target, MessageSquare, Briefcase, TrendingUp, Users, ShieldCheck, Heart, ArrowRight, FileText, Clock, Sparkles, Filter, AlertCircle, Trophy, Globe, Code, Layers, Calendar, Edit3, Trash2, ChevronDown, CheckCircle2, Link2, ExternalLink, Video, Play, Award
+    Plus, Search, Zap, Star, Brain, X,
+    Target, Briefcase, TrendingUp, ShieldCheck, ArrowRight, FileText, Clock,
+    Sparkles, AlertCircle, Trophy, Calendar, Edit3, Trash2,
+    CheckCircle2, Link2, ExternalLink, Video, Play, Award, User, Mail,
+    ChevronRight, BarChart2, MessageSquare
 } from 'lucide-react';
+
+const STATUS_CONFIG = {
+    live:       { label: 'CANLI',      bg: 'bg-rose-50',    text: 'text-rose-600',    border: 'border-rose-100',    pulse: true },
+    completed:  { label: 'TAMAMLANDI', bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-100', pulse: false },
+    cancelled:  { label: 'İPTAL',      bg: 'bg-slate-100',  text: 'text-slate-500',   border: 'border-slate-200',   pulse: false },
+    scheduled:  { label: 'PLANLANDI',  bg: 'bg-amber-50',   text: 'text-amber-600',   border: 'border-amber-100',   pulse: false },
+};
+const getStatusCfg = (s) => STATUS_CONFIG[s] || STATUS_CONFIG.scheduled;
 
 export default function CandidateProcessPage() {
     const navigate = useNavigate();
     const { enrichedCandidates, viewCandidateId, setViewCandidateId, sourceColors, setPreselectedInterviewData } = useCandidates();
     const candidates = enrichedCandidates || [];
-    const [searchQuery, setSearchQuery] = useState('');
-    const [activeDetailTab, setActiveDetailTab] = useState('ai_analysis');
-    const [expandedInterviewId, setExpandedInterviewId] = useState(null);
+    const [searchQuery, setSearchQuery]   = useState('');
+    const [activeTab, setActiveTab]       = useState('ai_analysis');
 
     const candidate = useMemo(() => {
         if (!viewCandidateId && candidates.length > 0) return candidates[0];
         return candidates.find(c => c.id === viewCandidateId) || (candidates.length > 0 ? candidates[0] : null);
     }, [candidates, viewCandidateId]);
 
-    const filteredCandidates = useMemo(() => {
-        return candidates.filter(c => 
+    const filtered = useMemo(() =>
+        candidates.filter(c =>
             c.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
             c.position?.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-    }, [candidates, searchQuery]);
+        ), [candidates, searchQuery]);
 
     const parseFeedback = (text) => {
-        if (!text) return { pos: "", neg: "" };
-        const posSplit = text.split("Negatif (-):");
-        const pos = posSplit[0].replace("Pozitif (+):", "").trim();
-        const neg = posSplit[1] ? posSplit[1].trim() : "";
-        return { pos, neg };
+        if (!text) return { pos: '', neg: '' };
+        const parts = text.split('Negatif (-):');
+        return {
+            pos: parts[0].replace('Pozitif (+):', '').trim(),
+            neg: parts[1]?.trim() || ''
+        };
     };
 
     const starAnalysis = candidate?.aiAnalysis?.starAnalysis || {
-        Situation: { reason: "Mülakat verisi bekleniyor.", score: 0 },
-        Task: { reason: "Mülakat verisi bekleniyor.", score: 0 },
-        Action: { reason: "Mülakat verisi bekleniyor.", score: 0 },
-        Result: { reason: "Mülakat verisi bekleniyor.", score: 0 }
+        Situation: { reason: 'Mülakat verisi bekleniyor.', score: 0 },
+        Task:      { reason: 'Mülakat verisi bekleniyor.', score: 0 },
+        Action:    { reason: 'Mülakat verisi bekleniyor.', score: 0 },
+        Result:    { reason: 'Mülakat verisi bekleniyor.', score: 0 },
     };
 
     const careerHistory = candidate?.experiences || candidate?.careerHistory || [];
 
-    // Mock data removed - using candidate.interviewSessions from context
-
     const getSourceLabel = (c) => {
         if (!c?.source) return 'Manuel / PDF';
-        if (c.sourceDetail) return `${c.source} (${c.sourceDetail})`;
-        return c.source;
+        return c.sourceDetail ? `${c.source} (${c.sourceDetail})` : c.source;
+    };
+    const getSourceColor = (src) => {
+        if (!src) return '#64748B';
+        return sourceColors?.[src.toLowerCase()] || '#64748B';
     };
 
-    const getSourceColor = (src) => {
-        if (!src) return '#64748B'; // Default slate
-        const key = src.toLowerCase();
-        return sourceColors?.[key] || '#64748B';
-    };
+    const score = Math.round(candidate?.bestScore || 0);
+
+    // ── TABS ──────────────────────────────────────────────────────────────────
+    const TABS = [
+        { id: 'ai_analysis', label: 'STAR Analizi',      icon: <Brain className="w-3.5 h-3.5" /> },
+        { id: 'cv_match',    label: 'CV & Uyum',          icon: <FileText className="w-3.5 h-3.5" /> },
+        { id: 'sessions',    label: 'Mülakatlar',         icon: <Video className="w-3.5 h-3.5" /> },
+        { id: 'history',     label: 'Süreç Geçmişi',      icon: <BarChart2 className="w-3.5 h-3.5" /> },
+    ];
 
     return (
-        <div className="h-screen bg-[#F1F5F9] flex flex-col font-sans overflow-hidden">
-            <Header />
+        <div className="h-screen bg-slate-50 flex flex-col font-sans overflow-hidden">
+            {/* PAGE HEADER */}
+            <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-3">
+                    <div className="w-7 h-7 rounded-lg bg-cyan-50 border border-cyan-100 flex items-center justify-center">
+                        <User className="w-4 h-4 text-cyan-600" />
+                    </div>
+                    <div>
+                        <h1 className="text-[13px] font-black text-slate-900 tracking-tight">Aday Yönetimi</h1>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{candidates.length} ADAY • AKTİF SÜREÇ</p>
+                    </div>
+                </div>
+                <button className="h-8 px-4 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all shadow-sm shadow-cyan-200">
+                    <Plus className="w-3.5 h-3.5" /> Yeni Aday
+                </button>
+            </div>
 
             <div className="flex-1 flex overflow-hidden">
-                {/* LEFT: CANDIDATE LIST */}
-                <aside className="w-[30%] flex flex-col bg-white border-r border-[#E2E8F0]">
-                    <div className="p-4 pb-2 space-y-3">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h1 className="text-[16px] font-black text-[#0F172A] tracking-tighter">Aktif Süreç</h1>
-                                <p className="text-[9px] text-[#64748B] font-bold uppercase tracking-tight opacity-50">{candidates.length} ADAY • GENEL LİSTE</p>
-                            </div>
-                            <div className="flex gap-1.5">
-                                <button className="h-7 px-2.5 bg-[#F8FAFC] text-[#64748B] rounded-lg border border-[#E2E8F0] flex items-center gap-1 text-[8.5px] font-black hover:bg-white transition-all uppercase">Filtrele</button>
-                                <button className="h-7 px-2.5 bg-[#1E3A8A] text-white rounded-lg flex items-center gap-1 text-[8.5px] font-black hover:bg-[#162A62] transition-all uppercase">Yeni Aday</button>
-                            </div>
-                        </div>
+                {/* ── LEFT: CANDIDATE LIST ─────────────────────────────────── */}
+                <aside className="w-[280px] shrink-0 flex flex-col bg-white border-r border-slate-200">
+                    {/* Search */}
+                    <div className="p-3 border-b border-slate-100">
                         <div className="relative">
-                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-[#94A3B8]" />
-                            <input type="text" placeholder="Aday veya rol ara..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-[#F1F5F9] border-transparent focus:bg-white rounded-lg py-1.5 pl-8 pr-3 text-[11px] outline-none font-medium" />
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                            <input
+                                type="text"
+                                placeholder="Aday veya rol ara..."
+                                value={searchQuery}
+                                onChange={e => setSearchQuery(e.target.value)}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2 pl-8 pr-3 text-[11px] font-medium text-slate-700 placeholder-slate-400 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-50 transition-all"
+                            />
                         </div>
                     </div>
-                    <div className="flex-1 overflow-y-auto p-3 pt-1 space-y-1.5 custom-scrollbar bg-slate-50/10">
-                        {filteredCandidates.map(c => {
-                            const sourceLabel = getSourceLabel(c);
-                            const sourceColor = getSourceColor(c.source);
-                            const score = Math.round(c.bestScore || 0);
-                            
+
+                    {/* List */}
+                    <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
+                        {filtered.length === 0 && (
+                            <div className="py-10 flex flex-col items-center text-slate-400">
+                                <Search className="w-8 h-8 mb-2 opacity-30" />
+                                <p className="text-[10px] font-bold uppercase">Aday bulunamadı</p>
+                            </div>
+                        )}
+                        {filtered.map(c => {
+                            const sc = Math.round(c.bestScore || 0);
+                            const srcColor = getSourceColor(c.source);
+                            const isActive = c.id === candidate?.id;
                             return (
-                                <button key={c.id} onClick={() => setViewCandidateId(c.id)} className={`w-full group rounded-lg border transition-all flex items-center p-2.5 gap-3 relative ${c.id === candidate?.id ? 'bg-white border-[#1E3A8A] shadow-md border-[1.5px]' : 'bg-white border-[#E2E8F0] hover:border-blue-100'}`}>
+                                <button
+                                    key={c.id}
+                                    onClick={() => setViewCandidateId(c.id)}
+                                    className={`w-full text-left rounded-xl border px-3 py-2.5 flex items-center gap-3 transition-all ${
+                                        isActive
+                                            ? 'bg-cyan-50 border-cyan-300 shadow-sm'
+                                            : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                                    }`}
+                                >
                                     <div className="w-8 h-8 rounded-lg bg-slate-100 overflow-hidden shrink-0 border border-black/5">
-                                        <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${c.name}`} className="w-full h-full object-cover" />
+                                        <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${c.name}`} className="w-full h-full object-cover" alt="" />
                                     </div>
-                                    <div className="flex-1 min-w-0 flex items-center justify-between">
-                                        <div className="space-y-0 text-left">
-                                            <h4 className="text-[12px] font-black text-[#0F172A] truncate leading-tight">{c.name}</h4>
-                                            <div className="flex items-center gap-1 mt-0.5">
-                                                <span 
-                                                    className="text-[7px] font-black px-1.5 py-0 rounded uppercase flex items-center gap-0.5 whitespace-nowrap"
-                                                    style={{ color: sourceColor, backgroundColor: `${sourceColor}15` }}
-                                                >
-                                                    <Link2 className="w-2.5 h-2.5" /> {sourceLabel}
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-3 shrink-0">
-                                            <div className="text-center">
-                                                <span className="text-[7px] font-black text-[#94A3B8] uppercase block leading-none">Eşleşme</span>
-                                                <span className="text-[11px] font-black text-[#1E3A8A]">%{score} <Zap className="w-2 h-2 inline fill-amber-400 text-amber-400" /></span>
-                                            </div>
-                                        </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-[12px] font-black text-slate-900 truncate leading-tight">{c.name}</p>
+                                        <span
+                                            className="text-[7px] font-black px-1.5 py-0.5 rounded mt-0.5 inline-flex items-center gap-0.5 uppercase"
+                                            style={{ color: srcColor, backgroundColor: `${srcColor}18` }}
+                                        >
+                                            <Link2 className="w-2 h-2" /> {getSourceLabel(c)}
+                                        </span>
+                                    </div>
+                                    <div className="shrink-0 text-right">
+                                        <span className={`text-[11px] font-black ${isActive ? 'text-cyan-600' : 'text-slate-600'}`}>%{sc}</span>
+                                        <Zap className="w-2.5 h-2.5 inline ml-0.5 fill-amber-400 text-amber-400" />
                                     </div>
                                 </button>
                             );
@@ -119,173 +152,201 @@ export default function CandidateProcessPage() {
                     </div>
                 </aside>
 
-                {/* RIGHT: ANALYTICAL PANEL */}
-                <main className="flex-1 bg-[#F8FAFC] overflow-y-auto custom-scrollbar p-5">
+                {/* ── RIGHT: DETAIL PANEL ───────────────────────────────────── */}
+                <main className="flex-1 overflow-hidden flex flex-col bg-slate-50">
                     {candidate ? (
-                        <div className="bg-white rounded-[20px] border border-[#E2E8F0] shadow-lg flex flex-col h-full overflow-hidden">
-                            <div className="bg-white sticky top-0 z-20 border-b border-[#F1F5F9]">
-                                <div className="px-6 py-4 flex items-center justify-between">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 rounded-xl border-[2.5px] border-white shadow-xl overflow-hidden shrink-0">
-                                            <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${candidate.name}`} className="w-full h-full object-cover" />
-                                        </div>
-                                        <div className="space-y-0.5">
-                                            <h2 className="text-[20px] font-black text-[#1E3A8A] tracking-tighter uppercase italic leading-none">{candidate.name}</h2>
-                                            <div className="flex items-center gap-1.5 text-[9px] font-black text-[#10B981] bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100/50 w-fit">
-                                                <Target className="w-2.5 h-2.5" /> İlk %2 Aday
-                                            </div>
-                                        </div>
+                        <div className="flex-1 overflow-hidden flex flex-col bg-white m-4 rounded-2xl border border-slate-200 shadow-sm">
+
+                            {/* Candidate header */}
+                            <div className="px-6 py-4 border-b border-slate-100 flex items-start justify-between">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-xl border-2 border-white shadow-md overflow-hidden shrink-0 ring-2 ring-cyan-100">
+                                        <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${candidate.name}`} className="w-full h-full object-cover" alt="" />
                                     </div>
-                                    <div className="flex flex-col items-end gap-2">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-[8.5px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-1.5"><Brain className="w-3 h-3 fill-blue-600" /> YZ Analiz Modu</span>
-                                            <button className="p-1 hover:bg-slate-50 rounded-lg text-slate-300"><X className="w-4 h-4" /></button>
+                                    <div>
+                                        <h2 className="text-[18px] font-black text-slate-900 tracking-tight leading-none">{candidate.name}</h2>
+                                        <p className="text-[10px] text-slate-500 font-bold mt-0.5">{candidate.position || candidate.bestTitle || '—'}</p>
+                                        <div className="flex items-center gap-2 mt-1.5">
+                                            <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 flex items-center gap-1">
+                                                <Target className="w-2.5 h-2.5" /> İlk %2
+                                            </span>
+                                            <span className="text-[9px] font-black text-cyan-600 bg-cyan-50 px-2 py-0.5 rounded-full border border-cyan-100 flex items-center gap-1">
+                                                <Zap className="w-2.5 h-2.5 fill-cyan-500" /> %{score} Uyum
+                                            </span>
+                                            {candidate.email && (
+                                                <span className="text-[9px] font-medium text-slate-500 flex items-center gap-1">
+                                                    <Mail className="w-2.5 h-2.5" /> {candidate.email}
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="flex px-6 gap-6">
-                                    {[
-                                        { id: 'ai_analysis', label: 'STAR Analizi', icon: <Brain className="w-3 h-3" /> },
-                                        { id: 'cv_match', label: 'CV & Uyum Çıkarımı', icon: <FileText className="w-3 h-3" /> },
-                                        { id: 'sessions', label: 'Mülakatlar', icon: <Video className="w-3 h-3 text-red-500" /> },
-                                        { id: 'interviews', label: 'Süreç Geçmişi', icon: <Clock className="w-3 h-3" /> }
-                                    ].map(tab => (
-                                        <button key={tab.id} onClick={() => setActiveDetailTab(tab.id)} className={`flex items-center gap-1.5 py-2.5 text-[9px] font-black uppercase tracking-widest relative ${activeDetailTab === tab.id ? 'text-blue-600' : 'text-[#94A3B8] hover:text-[#475569]'}`}>
-                                            {tab.icon} {tab.label}
-                                            {activeDetailTab === tab.id && <div className="absolute bottom-[-1px] left-0 right-0 h-0.5 bg-blue-600 shadow-[0_0_8px_blue]" />}
-                                        </button>
-                                    ))}
+                                {/* Stat pills */}
+                                <div className="flex items-center gap-2">
+                                    <div className="flex flex-col items-center bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 min-w-[72px]">
+                                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">STAR Güveni</span>
+                                        <span className="text-[18px] font-black text-slate-800 leading-tight">{candidate.bestScore ? `${Math.round(candidate.bestScore * 0.98)}%` : '—'}</span>
+                                    </div>
+                                    <div className="flex flex-col items-center bg-cyan-500 rounded-xl px-4 py-2.5 min-w-[72px] shadow-sm shadow-cyan-200">
+                                        <span className="text-[8px] font-black text-cyan-100 uppercase tracking-widest">Uyum</span>
+                                        <span className="text-[18px] font-black text-white leading-tight">
+                                            {score > 80 ? 'GÜÇLÜ' : score > 60 ? 'ORTA' : 'ZAYIF'}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
 
-                            <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
-                                {activeDetailTab === 'ai_analysis' && (
-                                    <div className="space-y-6 animate-in fade-in duration-300">
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="bg-[#EFF6FF] rounded-xl p-4 border border-blue-100 flex flex-col justify-between h-24">
-                                                <span className="text-[9px] font-black text-[#3B82F6] uppercase tracking-widest">STAR GÜVENİ</span>
-                                                <div className="text-[24px] font-black text-[#1E3A8A] italic uppercase">{candidate.bestScore ? `${Math.round(candidate.bestScore * 0.98)}%` : '-%'}</div>
-                                            </div>
-                                            <div className="bg-[#1E3A8A] rounded-xl p-4 shadow-lg flex flex-col justify-between h-24 text-white">
-                                                <span className="text-[9px] font-black text-blue-200/50 uppercase tracking-widest">UYUM DURUMU</span>
-                                                <div className="text-[24px] font-black italic uppercase">
-                                                    {candidate.bestScore > 80 ? 'GÜÇLÜ' : candidate.bestScore > 60 ? 'ORTA' : 'ZAYIF'}
-                                                </div>
-                                            </div>
+                            {/* Tabs */}
+                            <div className="flex border-b border-slate-100 px-6 bg-white">
+                                {TABS.map(tab => (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setActiveTab(tab.id)}
+                                        className={`flex items-center gap-1.5 py-3 px-1 mr-6 text-[9px] font-black uppercase tracking-widest relative whitespace-nowrap transition-colors ${
+                                            activeTab === tab.id ? 'text-cyan-600' : 'text-slate-400 hover:text-slate-600'
+                                        }`}
+                                    >
+                                        {tab.icon} {tab.label}
+                                        {activeTab === tab.id && (
+                                            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-500 rounded-full" />
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Tab content */}
+                            <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
+
+                                {/* ── STAR ANALİZİ ── */}
+                                {activeTab === 'ai_analysis' && (
+                                    <div className="space-y-5 animate-in fade-in duration-300">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <div className="w-1 h-4 rounded-full bg-cyan-500" />
+                                            <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-widest">Detaylı STAR Değerlendirmesi</h3>
                                         </div>
-                                        <div className="space-y-5">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <div className="w-1.5 h-1.5 rounded-full bg-blue-600" />
-                                                <h3 className="text-[11px] font-black text-[#0F172A] uppercase tracking-[0.2em]">Detaylı STAR Değerlendirmesi</h3>
-                                            </div>
-                                            <div className="space-y-5">
-                                                {[
-                                                    { k: 'S', l: 'DURUM (SITUATION)', c: '#EFF6FF', tc: '#2563EB', r: starAnalysis.Situation.reason },
-                                                    { k: 'T', l: 'GÖREV (TASK)', c: '#F0FDFA', tc: '#0D9488', r: starAnalysis.Task.reason },
-                                                    { k: 'A', l: 'EYLEM (ACTION)', c: '#F5F3FF', tc: '#7C3AED', r: starAnalysis.Action.reason },
-                                                    { k: 'R', l: 'SONUÇ (RESULT)', c: '#F0FDF4', tc: '#16A34A', r: starAnalysis.Result.reason }
-                                                ].map((step, idx) => {
-                                                    const { pos, neg } = parseFeedback(step.r);
-                                                    return (
-                                                        <div key={idx} className="flex gap-4 group">
-                                                            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-[14px] font-black shadow-sm shrink-0" style={{ backgroundColor: step.c, color: step.tc }}>{step.k}</div>
-                                                            <div className="flex-1 space-y-2 pb-2">
-                                                                <h4 className="text-[10px] font-black text-[#0F172A] uppercase tracking-wider">{step.l}</h4>
-                                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                                    {pos && <div className="bg-emerald-50/40 border border-emerald-100/50 p-2.5 rounded-lg">
-                                                                        <div className="flex items-center gap-1 text-[8.5px] font-black text-emerald-600 uppercase mb-1"><ShieldCheck className="w-2.5 h-2.5" /> Pozitif</div>
-                                                                        <p className="text-[11px] text-[#475569] leading-relaxed">{pos}</p>
-                                                                    </div>}
-                                                                    {neg && <div className="bg-red-50/40 border border-red-100/50 p-2.5 rounded-lg">
-                                                                        <div className="flex items-center gap-1 text-[8.5px] font-black text-red-600 uppercase mb-1"><AlertCircle className="w-2.5 h-2.5" /> Negatif</div>
-                                                                        <p className="text-[11px] text-[#475569] leading-relaxed">{neg}</p>
-                                                                    </div>}
-                                                                </div>
-                                                            </div>
+
+                                        <div className="space-y-4">
+                                            {[
+                                                { k: 'S', l: 'DURUM (SITUATION)', bg: 'bg-blue-50',   border: 'border-blue-100',   tc: 'text-blue-700',   r: starAnalysis.Situation.reason },
+                                                { k: 'T', l: 'GÖREV (TASK)',      bg: 'bg-teal-50',   border: 'border-teal-100',   tc: 'text-teal-700',   r: starAnalysis.Task.reason },
+                                                { k: 'A', l: 'EYLEM (ACTION)',    bg: 'bg-violet-50', border: 'border-violet-100', tc: 'text-violet-700', r: starAnalysis.Action.reason },
+                                                { k: 'R', l: 'SONUÇ (RESULT)',   bg: 'bg-emerald-50',border: 'border-emerald-100',tc: 'text-emerald-700',r: starAnalysis.Result.reason },
+                                            ].map((step, idx) => {
+                                                const { pos, neg } = parseFeedback(step.r);
+                                                return (
+                                                    <div key={idx} className={`rounded-xl border ${step.border} ${step.bg} p-4`}>
+                                                        <div className="flex items-center gap-2 mb-3">
+                                                            <div className={`w-7 h-7 rounded-lg bg-white border ${step.border} flex items-center justify-center text-[13px] font-black ${step.tc} shadow-sm`}>{step.k}</div>
+                                                            <h4 className={`text-[10px] font-black uppercase tracking-wider ${step.tc}`}>{step.l}</h4>
                                                         </div>
-                                                    );
-                                                })}
-                                            </div>
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                            {pos && (
+                                                                <div className="bg-white border border-emerald-100 p-3 rounded-lg">
+                                                                    <div className="flex items-center gap-1 text-[8px] font-black text-emerald-600 uppercase mb-1.5">
+                                                                        <ShieldCheck className="w-3 h-3" /> Pozitif
+                                                                    </div>
+                                                                    <p className="text-[11px] text-slate-600 leading-relaxed">{pos}</p>
+                                                                </div>
+                                                            )}
+                                                            {neg && (
+                                                                <div className="bg-white border border-red-100 p-3 rounded-lg">
+                                                                    <div className="flex items-center gap-1 text-[8px] font-black text-red-500 uppercase mb-1.5">
+                                                                        <AlertCircle className="w-3 h-3" /> Negatif
+                                                                    </div>
+                                                                    <p className="text-[11px] text-slate-600 leading-relaxed">{neg}</p>
+                                                                </div>
+                                                            )}
+                                                            {!pos && !neg && (
+                                                                <p className="text-[11px] text-slate-400 italic col-span-2">{step.r || 'Mülakat verisi bekleniyor.'}</p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                 )}
 
-                                {activeDetailTab === 'cv_match' && (
+                                {/* ── CV & UYUM ── */}
+                                {activeTab === 'cv_match' && (
                                     <div className="space-y-6 animate-in fade-in duration-300">
-                                        {/* ENHANCED CV SUMMARY BOX */}
-                                        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 relative overflow-visible group">
-                                            <div className="absolute right-6 top-6 flex items-center gap-2">
-                                                <span 
-                                                    className="text-[9px] font-black px-3 py-1 rounded-lg border flex items-center gap-1.5 shadow-sm"
-                                                    style={{ color: getSourceColor(candidate.source), backgroundColor: 'white', borderColor: `${getSourceColor(candidate.source)}40` }}
+                                        {/* Summary */}
+                                        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 relative overflow-hidden">
+                                            <Brain className="absolute -right-6 -top-6 w-24 h-24 text-slate-200" />
+                                            <div className="flex items-start justify-between mb-3">
+                                                <div className="flex items-center gap-2">
+                                                    <Target className="w-4 h-4 text-cyan-500" />
+                                                    <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-widest">Pozisyon Uyum Analizi</h3>
+                                                </div>
+                                                <span
+                                                    className="text-[8px] font-black px-2.5 py-1 rounded-lg border flex items-center gap-1 bg-white shadow-sm"
+                                                    style={{ color: getSourceColor(candidate.source), borderColor: `${getSourceColor(candidate.source)}40` }}
                                                 >
-                                                    <Link2 className="w-2.5 h-2.5" /> {getSourceLabel(candidate)} Kaynağı
+                                                    <Link2 className="w-2 h-2" /> {getSourceLabel(candidate)}
                                                 </span>
                                             </div>
-                                            <Brain className="absolute -right-8 -top-8 w-32 h-32 text-[#1E3A8A]/5 group-hover:scale-110 transition-transform" />
-                                            <div className="flex items-center gap-2 mb-3">
-                                                <Target className="w-4 h-4 text-emerald-500" />
-                                                <h3 className="text-[12px] font-black text-[#1E3A8A] uppercase tracking-[0.2em]">Kapsamlı Pozisyon Uyum Analizi</h3>
-                                            </div>
-                                            <div className="pr-40">
-                                                <p className="text-[13px] text-[#475569] leading-relaxed font-medium italic">
-                                                    "{candidate.aiAnalysis?.summary || `${candidate.name} teknik profili, ${candidate.position || 'Hedef Pozisyon'} pozisyonu ile %${Math.round(candidate.bestScore || 0)} uyum göstermektedir. Adayın tecrübesi ve yetkinlikleri analiz edilerek puanlanmıştır.`}"
-                                                </p>
-                                            </div>
-                                            <div className="mt-4 flex gap-3">
-                                                <div className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-[10px] font-black text-blue-600 flex items-center gap-1.5 shadow-sm italic">
-                                                    <Zap className="w-3 h-3 text-amber-500 fill-amber-500" /> %{Math.round(candidate.bestScore || 0)} Uyum Skoru Doğrulandı
-                                                </div>
+                                            <p className="text-[12px] text-slate-600 leading-relaxed italic font-medium pr-16">
+                                                "{candidate.aiAnalysis?.summary || `${candidate.name} teknik profili, ${candidate.position || 'Hedef Pozisyon'} pozisyonu ile %${score} uyum göstermektedir.`}"
+                                            </p>
+                                            <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 bg-white border border-slate-200 rounded-lg text-[10px] font-black text-cyan-600 shadow-sm">
+                                                <Zap className="w-3 h-3 text-amber-400 fill-amber-400" /> %{score} Uyum Skoru Doğrulandı
                                             </div>
                                         </div>
 
                                         <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-                                            <div className="md:col-span-8 space-y-5">
-                                                <div className="flex items-center justify-between border-b border-[#F1F5F9] pb-2">
-                                                    <h3 className="text-[11px] font-black text-[#0F172A] uppercase tracking-[0.2em] flex items-center gap-2"><Clock className="w-4 h-4 text-blue-500" /> Kariyer Kronolojisi & Milestonelar</h3>
+                                            {/* Career timeline */}
+                                            <div className="md:col-span-8 space-y-4">
+                                                <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                                                    <Clock className="w-4 h-4 text-cyan-500" />
+                                                    <h3 className="text-[10px] font-black text-slate-700 uppercase tracking-widest">Kariyer Kronolojisi</h3>
                                                 </div>
-                                                <div className="space-y-6 pl-2">
-                                                    {careerHistory.map((exp, i) => (
-                                                        <div key={i} className="relative pl-6 border-l-2 border-blue-50 pb-4 group">
-                                                            <div className="absolute -left-[5.5px] top-0 w-2.5 h-2.5 rounded-full bg-white border-2 border-blue-600 shadow-sm" />
-                                                            <div className="space-y-2">
-                                                                <div className="flex justify-between items-start">
-                                                                    <div>
-                                                                        <h4 className="text-[14px] font-black text-[#1E3A8A] uppercase tracking-tight">{exp.role}</h4>
-                                                                        <p className="text-[10px] font-bold text-[#64748B] uppercase">{exp.company}</p>
-                                                                    </div>
-                                                                    <span className="text-[10px] font-black text-[#94A3B8] bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100">{exp.duration}</span>
+                                                <div className="space-y-5 pl-2">
+                                                    {careerHistory.length > 0 ? careerHistory.map((exp, i) => (
+                                                        <div key={i} className="relative pl-5 border-l-2 border-cyan-100 pb-4">
+                                                            <div className="absolute -left-[5px] top-1 w-2.5 h-2.5 rounded-full bg-white border-2 border-cyan-400 shadow-sm" />
+                                                            <div className="flex justify-between items-start mb-1.5">
+                                                                <div>
+                                                                    <h4 className="text-[13px] font-black text-slate-800">{exp.role}</h4>
+                                                                    <p className="text-[10px] font-bold text-slate-500 uppercase">{exp.company}</p>
                                                                 </div>
-                                                                <p className="text-[12px] text-[#475569] leading-relaxed font-medium bg-slate-50/50 p-2 rounded-lg border border-slate-100/50">{exp.desc}</p>
-                                                                <div className="flex flex-wrap gap-2 mt-2">
-                                                                    {exp.milestones?.map((m, idx) => (
-                                                                        <span key={idx} className="flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-700 text-[9px] font-black rounded-lg border border-emerald-100 shadow-sm"><Trophy className="w-2.5 h-2.5" /> {m}</span>
+                                                                <span className="text-[9px] font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200 shrink-0 ml-2">{exp.duration}</span>
+                                                            </div>
+                                                            <p className="text-[11px] text-slate-500 leading-relaxed bg-slate-50 p-2 rounded-lg border border-slate-100">{exp.desc}</p>
+                                                            {exp.milestones?.length > 0 && (
+                                                                <div className="flex flex-wrap gap-1.5 mt-2">
+                                                                    {exp.milestones.map((m, idx) => (
+                                                                        <span key={idx} className="flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[8.5px] font-black rounded-lg border border-emerald-100">
+                                                                            <Trophy className="w-2 h-2" /> {m}
+                                                                        </span>
                                                                     ))}
                                                                 </div>
-                                                            </div>
+                                                            )}
                                                         </div>
-                                                    ))}
+                                                    )) : (
+                                                        <p className="text-[12px] text-slate-400 italic">Kariyer bilgisi bulunamadı.</p>
+                                                    )}
                                                 </div>
                                             </div>
-                                            <div className="md:col-span-4 space-y-6">
-                                                <div className="space-y-4">
-                                                    <div className="flex items-center justify-between border-b pb-2">
-                                                        <h3 className="text-[10px] font-black text-[#94A3B8] uppercase tracking-[0.3em]">Teknik Ekosistem</h3>
+
+                                            {/* Skills + Education */}
+                                            <div className="md:col-span-4 space-y-5">
+                                                <div>
+                                                    <div className="flex items-center gap-2 pb-2 border-b border-slate-100 mb-3">
+                                                        <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Teknik Ekosistem</h3>
                                                     </div>
                                                     <div className="flex flex-wrap gap-1.5">
-                                                        {(candidate.skills || ['Kubernetes', 'GoLang', 'React', 'Node.js', 'Redis', 'AWS']).map((s, i) => (
-                                                            <span key={i} className="px-2.5 py-1 bg-white border border-[#E2E8F0] rounded-lg text-[9px] font-black text-[#475569] shadow-sm uppercase">{s}</span>
+                                                        {(candidate.skills || ['React', 'Node.js', 'AWS', 'Redis']).map((s, i) => (
+                                                            <span key={i} className="px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[9px] font-black text-slate-600 shadow-sm uppercase">{s}</span>
                                                         ))}
                                                     </div>
                                                 </div>
-
-                                                <div className="space-y-4 pt-4 border-t border-slate-100">
-                                                    <div className="flex items-center justify-between border-b pb-2">
-                                                        <h3 className="text-[10px] font-black text-[#94A3B8] uppercase tracking-[0.3em]">Eğitim & Sertifika</h3>
+                                                <div className="pt-4 border-t border-slate-100">
+                                                    <div className="flex items-center gap-2 pb-2 border-b border-slate-100 mb-3">
+                                                        <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Eğitim & Sertifika</h3>
                                                     </div>
-                                                    <p className="text-[11px] font-bold text-[#475569] italic leading-relaxed">
-                                                        {candidate.education || candidate.educationDetail || 'Yalova University – Computer Engineering'}
+                                                    <p className="text-[11px] font-medium text-slate-600 italic leading-relaxed">
+                                                        {candidate.education || candidate.educationDetail || 'Eğitim bilgisi bulunamadı.'}
                                                     </p>
                                                 </div>
                                             </div>
@@ -293,199 +354,211 @@ export default function CandidateProcessPage() {
                                     </div>
                                 )}
 
-                                {activeDetailTab === 'sessions' && (
-                                    <div className="space-y-5 animate-in fade-in duration-300">
-                                        <div className="flex items-center justify-between border-b pb-2">
-                                            <h3 className="text-[11px] font-black uppercase text-[#0F172A] tracking-widest">Planlanmış ve Gerçekleşen Görüşmeler</h3>
-                                            <button 
+                                {/* ── MÜLAKATLAr ── */}
+                                {activeTab === 'sessions' && (
+                                    <div className="space-y-4 animate-in fade-in duration-300">
+                                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-1 h-4 rounded-full bg-cyan-500" />
+                                                <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-widest">Planlanmış ve Gerçekleşen Görüşmeler</h3>
+                                            </div>
+                                            <button
                                                 onClick={() => {
                                                     setPreselectedInterviewData({ candidateId: candidate.id });
                                                     window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }));
                                                 }}
-                                                className="text-[9px] font-black text-blue-600 uppercase flex items-center gap-1 hover:underline hover:scale-105 transition-all"
+                                                className="text-[9px] font-black text-cyan-600 uppercase flex items-center gap-1 hover:underline transition-all"
                                             >
                                                 <Plus className="w-3 h-3" /> MÜLAKAT PLANLA
                                             </button>
                                         </div>
-                                        
-                                        <div className="grid grid-cols-1 gap-3">
-                                            {(candidate.interviewSessions || []).length > 0 ? (
-                                                candidate.interviewSessions.map((session, sidx) => (
-                                                    <div key={sidx} className="bg-white border border-[#E2E8F0] rounded-2xl p-4 shadow-sm hover:border-blue-300 transition-all flex items-center justify-between group">
-                                                        <div className="flex items-center gap-4">
-                                                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center border ${session.status === 'live' ? 'bg-rose-50 border-rose-100 text-rose-600 animate-pulse' : 'bg-blue-50 border-blue-100 text-[#1E3A8A]'}`}>
-                                                                <Video className="w-6 h-6" />
-                                                            </div>
-                                                            <div className="space-y-0.5">
-                                                                <h4 className="text-[14px] font-black text-[#0F172A] uppercase tracking-tight">{session.title}</h4>
-                                                                <div className="flex items-center gap-3">
-                                                                    <span className="text-[10px] font-bold text-[#64748B] flex items-center gap-1"><Calendar className="w-3 h-3" /> {session.date}</span>
-                                                                    <span className="text-[10px] font-bold text-[#64748B] flex items-center gap-1"><Clock className="w-3 h-3" /> {session.time}</span>
-                                                                    <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-100/50">{session.interviewer}</span>
-                                                                    {/* Status Badge */}
-                                                                    {session.status === 'live' ? (
-                                                                        <span className="text-[8px] font-black bg-rose-50 text-rose-600 px-2 py-0.5 rounded-lg border border-rose-100 animate-pulse">CANLI</span>
-                                                                    ) : session.status === 'completed' ? (
-                                                                        <span className="text-[8px] font-black bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-lg border border-emerald-100">TAMAMLANDI</span>
-                                                                    ) : session.status === 'cancelled' ? (
-                                                                        <span className="text-[8px] font-black bg-slate-100 text-slate-500 px-2 py-0.5 rounded-lg border border-slate-200">İPTAL</span>
-                                                                    ) : (
-                                                                        <span className="text-[8px] font-black bg-amber-50 text-amber-600 px-2 py-0.5 rounded-lg border border-amber-100">PLANLANDI</span>
-                                                                    )}
+
+                                        {(candidate.interviewSessions || []).length > 0 ? (
+                                            <div className="space-y-3">
+                                                {candidate.interviewSessions.map((session, sidx) => {
+                                                    const cfg = getStatusCfg(session.status);
+                                                    return (
+                                                        <div key={sidx} className="bg-white border border-slate-200 rounded-xl p-4 hover:border-slate-300 hover:shadow-sm transition-all flex items-center justify-between gap-4">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center border ${cfg.bg} ${cfg.border} ${cfg.pulse ? 'animate-pulse' : ''}`}>
+                                                                    <Video className={`w-5 h-5 ${cfg.text}`} />
+                                                                </div>
+                                                                <div>
+                                                                    <h4 className="text-[12px] font-black text-slate-800">{session.title || 'Mülakat Seansı'}</h4>
+                                                                    <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                                                                        {session.date && (
+                                                                            <span className="text-[9px] font-bold text-slate-500 flex items-center gap-0.5">
+                                                                                <Calendar className="w-2.5 h-2.5" />
+                                                                                {(session.date || '').split('T')[0]}
+                                                                            </span>
+                                                                        )}
+                                                                        {session.time && (
+                                                                            <span className="text-[9px] font-bold text-slate-500 flex items-center gap-0.5">
+                                                                                <Clock className="w-2.5 h-2.5" /> {session.time}
+                                                                            </span>
+                                                                        )}
+                                                                        {session.interviewer && (
+                                                                            <span className="text-[8.5px] font-black text-cyan-700 bg-cyan-50 px-2 py-0.5 rounded-lg border border-cyan-100">
+                                                                                {session.interviewer}
+                                                                            </span>
+                                                                        )}
+                                                                        <span className={`text-[8px] font-black px-2 py-0.5 rounded-lg border ${cfg.bg} ${cfg.text} ${cfg.border} ${cfg.pulse ? 'animate-pulse' : ''}`}>
+                                                                            {cfg.label}
+                                                                        </span>
+                                                                    </div>
                                                                 </div>
                                                             </div>
-                                                        </div>
-                                                        <div className="flex items-center gap-3">
-                                                            {session.status === 'live' ? (
-                                                                <button 
-                                                                    onClick={() => navigate(`/live-interview/${session.id}`)}
-                                                                    className="bg-rose-600 text-white px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-700 shadow-lg shadow-rose-600/20"
+
+                                                            <div className="flex items-center gap-2 shrink-0">
+                                                                {session.status === 'live' && (
+                                                                    <button
+                                                                        onClick={() => navigate(`/live-interview/${session.id}`)}
+                                                                        className="bg-rose-500 text-white px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-rose-600 transition-all shadow-sm"
+                                                                    >
+                                                                        SEANSA KATIL
+                                                                    </button>
+                                                                )}
+                                                                {session.status === 'completed' && (
+                                                                    <button
+                                                                        onClick={() => navigate(`/interview-report/${session.id}`)}
+                                                                        className="bg-slate-800 text-white px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-slate-900 transition-all shadow-sm flex items-center gap-1.5"
+                                                                    >
+                                                                        <Award className="w-3 h-3" /> RAPORU AÇ
+                                                                    </button>
+                                                                )}
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setPreselectedInterviewData({ candidateId: candidate.id, session });
+                                                                        window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }));
+                                                                    }}
+                                                                    className="p-1.5 text-slate-300 hover:text-cyan-500 transition-colors"
+                                                                    title="Düzenle"
                                                                 >
-                                                                    SEANSA KATIL
+                                                                    <Edit3 className="w-3.5 h-3.5" />
                                                                 </button>
-                                                            ) : session.status === 'completed' ? (
-                                                                <button 
-                                                                    onClick={() => navigate(`/interview-report/${session.id}`)}
-                                                                    className="bg-[#1E3A8A] text-white px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black shadow-lg shadow-blue-900/10 flex items-center gap-2"
-                                                                >
-                                                                    <Award className="w-3.5 h-3.5" /> RAPORU AÇ
-                                                                </button>
-                                                            ) : (
-                                                                <div className="flex flex-col items-end">
-                                                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">DURUM</span>
-                                                                    <span className="text-[11px] font-black text-amber-500 uppercase italic">PLANLANDI</span>
-                                                                </div>
-                                                            )}
-                                                            <button 
-                                                                onClick={() => {
-                                                                    if (session.status === 'live') {
-                                                                        navigate(`/live-interview/${session.id}`);
-                                                                    } else {
+                                                                <button
+                                                                    onClick={() => {
                                                                         setPreselectedInterviewData({ candidateId: candidate.id, sessionId: session.id });
                                                                         window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }));
-                                                                    }
+                                                                    }}
+                                                                    className="p-1.5 text-slate-300 hover:text-slate-600 transition-colors"
+                                                                    title="Mülakat sayfasına git"
+                                                                >
+                                                                    <ExternalLink className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <div className="py-16 flex flex-col items-center border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
+                                                <div className="w-14 h-14 rounded-2xl bg-cyan-50 border border-cyan-100 flex items-center justify-center mb-3">
+                                                    <Video className="w-7 h-7 text-cyan-300" />
+                                                </div>
+                                                <p className="text-[12px] text-slate-400 font-bold italic mb-4">Henüz mülakat planlanmamış</p>
+                                                <button
+                                                    onClick={() => {
+                                                        setPreselectedInterviewData({ candidateId: candidate.id });
+                                                        window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }));
+                                                    }}
+                                                    className="px-5 py-2 bg-cyan-500 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-cyan-600 transition-all shadow-sm"
+                                                >
+                                                    Mülakat Planla
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* ── SÜREÇ GEÇMİŞİ ── */}
+                                {activeTab === 'history' && (
+                                    <div className="space-y-4 animate-in fade-in duration-300">
+                                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-1 h-4 rounded-full bg-cyan-500" />
+                                                <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-widest">Süreç Yol Haritası</h3>
+                                            </div>
+                                            <button
+                                                onClick={() => {
+                                                    setPreselectedInterviewData({ candidateId: candidate.id });
+                                                    window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }));
+                                                }}
+                                                className="text-[9px] font-black text-cyan-600 uppercase flex items-center gap-1 hover:underline"
+                                            >
+                                                <Plus className="w-3 h-3" /> MÜLAKAT EKLE
+                                            </button>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            {/* Static: AI Analysis milestone */}
+                                            <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between shadow-sm">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center">
+                                                        <Brain className="w-4.5 h-4.5 text-blue-500" />
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="text-[12px] font-black text-slate-800">AI Detaylı CV Analizi</h4>
+                                                        <span className="text-[9px] font-bold text-slate-400 flex items-center gap-1">
+                                                            <CheckCircle2 className="w-2.5 h-2.5 text-emerald-500" /> Tamamlandı
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <span className="text-[18px] font-black text-emerald-500">%{score}</span>
+                                            </div>
+
+                                            {/* Dynamic: session milestones */}
+                                            {(candidate.interviewSessions || []).map((session, sidx) => {
+                                                const cfg = getStatusCfg(session.status);
+                                                return (
+                                                    <div key={sidx} className="bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between hover:border-slate-300 transition-all group shadow-sm">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={`w-9 h-9 rounded-xl border flex items-center justify-center ${cfg.bg} ${cfg.border}`}>
+                                                                <Play className={`w-4 h-4 ${cfg.text}`} />
+                                                            </div>
+                                                            <div>
+                                                                <h4 className="text-[12px] font-black text-slate-800">{session.title || 'Mülakat'}</h4>
+                                                                <span className="text-[9px] font-bold text-slate-400 flex items-center gap-1">
+                                                                    <Calendar className="w-2.5 h-2.5" />
+                                                                    {(session.date || '').split('T')[0] || '—'}
+                                                                    {' • '}
+                                                                    <span className={cfg.text}>{cfg.label}</span>
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                                                            <button
+                                                                onClick={() => {
+                                                                    setPreselectedInterviewData({ candidateId: candidate.id, sessionId: session.id });
+                                                                    window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }));
                                                                 }}
-                                                                className="p-2 text-slate-200 hover:text-blue-500 transition-colors"
-                                                                title="Mülakat Sayfasına Git"
+                                                                className="px-3 py-1 bg-slate-800 text-white rounded-lg text-[8px] font-black uppercase tracking-widest hover:bg-cyan-600 transition-all"
                                                             >
-                                                                <ExternalLink className="w-4 h-4" />
+                                                                YÖNET
                                                             </button>
-                                                            <button 
+                                                            <button
                                                                 onClick={() => {
                                                                     setPreselectedInterviewData({ candidateId: candidate.id, session });
                                                                     window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }));
                                                                 }}
-                                                                className="p-2 text-slate-200 hover:text-blue-600 transition-colors"
+                                                                className="p-1.5 text-slate-300 hover:text-cyan-500 transition-colors"
                                                             >
-                                                                <Edit3 className="w-4 h-4" />
+                                                                <Edit3 className="w-3.5 h-3.5" />
                                                             </button>
                                                         </div>
                                                     </div>
-                                                ))
-                                            ) : (
-                                                <div className="py-16 flex flex-col items-center justify-center border-2 border-dashed border-slate-100 rounded-[32px] bg-slate-50/20">
-                                                    <div className="w-16 h-16 rounded-3xl bg-blue-50 flex items-center justify-center mb-4">
-                                                        <Video className="w-8 h-8 text-blue-200" />
-                                                    </div>
-                                                    <p className="text-[13px] text-slate-400 font-bold italic uppercase tracking-wider">Aktif bir mülakat bulunamadı</p>
-                                                    <button 
-                                                        onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }))}
-                                                        className="mt-4 px-6 py-2 bg-[#1E3A8A] text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-lg shadow-blue-900/10"
-                                                    >
-                                                        Sıradaki Mülakatı Planla
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
+                                                );
+                                            })}
 
-                                {activeDetailTab === 'interviews' && (
-                                    <div className="space-y-5 animate-in fade-in duration-300">
-                                        <div className="flex items-center justify-between border-b pb-2">
-                                            <h3 className="text-[11px] font-black uppercase text-[#0F172A] tracking-widest">Süreç Yol Haritası</h3>
-                                            <button 
-                                                onClick={() => {
-                                                    setPreselectedInterviewData({ candidateId: candidate.id });
-                                                    window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }));
-                                                }}
-                                                className="text-[9px] font-black text-blue-600 uppercase flex items-center gap-1 hover:underline"
-                                            >
-                                                <Plus className="w-3 h-3" /> MÜLAKAT PLANLA
-                                            </button>
-                                        </div>
-                                        <div className="space-y-3">
-                                            {/* Static Initial Analysis Milestone */}
-                                            <div className="bg-white border border-[#E2E8F0] rounded-xl overflow-hidden shadow-sm">
-                                                <div className="p-4 flex items-center justify-between">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center border border-blue-100"><Brain className="w-5 h-5 text-blue-600" /></div>
-                                                        <div>
-                                                            <h4 className="text-[12px] font-black text-[#1E3A8A] uppercase tracking-tight">AI Detaylı CV Analizi</h4>
-                                                            <span className="text-[9px] font-bold text-[#64748B] flex items-center gap-1"><CheckCircle2 className="w-2.5 h-2.5 text-emerald-500" /> Tamamlandı</span>
-                                                        </div>
+                                            {/* Static: future milestone */}
+                                            <div className="bg-white border border-dashed border-slate-200 rounded-xl p-4 flex items-center justify-between opacity-40">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-9 h-9 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center">
+                                                        <Trophy className="w-4 h-4 text-slate-400" />
                                                     </div>
-                                                    <div className="text-right">
-                                                        <span className="text-[8px] font-black text-[#94A3B8] block uppercase">ANALİZ SKORU</span>
-                                                        <span className="text-[14px] font-black text-emerald-600">%{Math.round(candidate.bestScore || 0)}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* Dynamic Sessions Milestone */}
-                                            {(candidate.interviewSessions || []).map((session, sidx) => (
-                                                <div key={sidx} className="bg-white border border-[#E2E8F0] rounded-xl overflow-hidden shadow-sm hover:border-blue-200 transition-all group">
-                                                    <div className="p-4 flex items-center justify-between">
-                                                        <div className="flex items-center gap-4">
-                                                            <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center border border-emerald-100"><Play className="w-4 h-4 text-emerald-600" /></div>
-                                                            <div>
-                                                                <h4 className="text-[12px] font-black text-[#1E3A8A] uppercase tracking-tight">{session.title}</h4>
-                                                                <span className="text-[9px] font-bold text-[#64748B] flex items-center gap-1">
-                                                                    <Calendar className="w-2.5 h-2.5" /> {session.date} • {session.status === 'live' ? 'Canlı Yayında' : 'Planlandı'}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                            <div className="flex items-center gap-3">
-                                                                <button 
-                                                                    onClick={() => {
-                                                                        setPreselectedInterviewData({ candidateId: candidate.id, sessionId: session.id });
-                                                                        window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }))
-                                                                    }}
-                                                                    className="opacity-0 group-hover:opacity-100 px-3 py-1 bg-black text-white rounded-lg text-[8px] font-black uppercase tracking-widest transition-all hover:bg-blue-600"
-                                                                >
-                                                                    YÖNET
-                                                                </button>
-                                                                <span className={`text-[8px] font-black px-2 py-0.5 rounded uppercase ${session.status === 'live' ? 'bg-rose-500 text-white animate-pulse shadow-sm' : 'bg-slate-100 text-slate-500'}`}>
-                                                                    {session.status === 'live' ? 'CANLI' : 'HAZIRDA'}
-                                                                </span>
-                                                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                                                                    <button 
-                                                                        onClick={() => {
-                                                                            setPreselectedInterviewData({ candidateId: candidate.id, session });
-                                                                            window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }));
-                                                                        }}
-                                                                        className="p-1.5 text-slate-400 hover:text-blue-600"
-                                                                    >
-                                                                        <Edit3 className="w-3.5 h-3.5" />
-                                                                    </button>
-                                                                    <button className="p-1.5 text-slate-400 hover:text-red-600">
-                                                                        <Trash2 className="w-3.5 h-3.5" />
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                    </div>
-                                                </div>
-                                            ))}
-
-                                            {/* Static Future Milestone Example */}
-                                            <div className="bg-white border border-[#E2E8F0] rounded-xl overflow-hidden shadow-sm opacity-50 grayscale">
-                                                <div className="p-4 flex items-center justify-between">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center border border-slate-100"><Trophy className="w-4 h-4 text-slate-400" /></div>
-                                                        <div>
-                                                            <h4 className="text-[12px] font-black text-slate-400 uppercase tracking-tight">Final Kararı ve Teklif</h4>
-                                                            <span className="text-[9px] font-bold text-slate-400 flex items-center gap-1">Hedeflenen Aşama</span>
-                                                        </div>
+                                                    <div>
+                                                        <h4 className="text-[12px] font-black text-slate-500">Final Kararı ve Teklif</h4>
+                                                        <span className="text-[9px] font-bold text-slate-400">Hedeflenen Aşama</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -494,17 +567,26 @@ export default function CandidateProcessPage() {
                                 )}
                             </div>
 
-                            {/* COMPACT FOOTER */}
-                            <div className="bg-white border-t border-[#F1F5F9] px-6 py-4 flex items-center justify-between sticky bottom-0">
+                            {/* Footer actions */}
+                            <div className="border-t border-slate-100 px-6 py-3 flex items-center justify-between bg-white shrink-0">
                                 <div className="flex gap-2">
-                                    <button className="h-8 px-4 bg-[#F8FAFC] text-[#64748B] rounded-lg text-[9px] font-black uppercase border border-[#E2E8F0]">Yorum</button>
-                                    <button className="h-8 px-4 text-[#EF4444] rounded-lg text-[9px] font-black uppercase border border-[#FEE2E2]">Ret</button>
+                                    <button className="h-8 px-4 bg-slate-50 text-slate-600 rounded-lg text-[9px] font-black uppercase border border-slate-200 hover:bg-slate-100 transition-all flex items-center gap-1.5">
+                                        <MessageSquare className="w-3 h-3" /> Yorum
+                                    </button>
+                                    <button className="h-8 px-4 text-red-500 rounded-lg text-[9px] font-black uppercase border border-red-100 hover:bg-red-50 transition-all">
+                                        Ret
+                                    </button>
                                 </div>
-                                <button className="h-9 px-6 bg-[#1E3A8A] text-white rounded-lg text-[10px] font-black uppercase tracking-widest shadow-md flex items-center gap-2">Final Turuna Taşı <ArrowRight className="w-3.5 h-3.5" /></button>
+                                <button className="h-8 px-5 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg text-[9px] font-black uppercase tracking-widest shadow-sm flex items-center gap-2 transition-all">
+                                    Final Turuna Taşı <ArrowRight className="w-3 h-3" />
+                                </button>
                             </div>
                         </div>
                     ) : (
-                        <div className="h-full flex flex-col items-center justify-center opacity-20"><Brain className="w-16 h-16 text-blue-900 mb-3 animate-pulse" /><h2 className="text-[11px] font-black uppercase tracking-[0.4em] text-blue-900">Yükleniyor</h2></div>
+                        <div className="flex-1 flex flex-col items-center justify-center text-slate-300">
+                            <Brain className="w-14 h-14 mb-3 animate-pulse" />
+                            <h2 className="text-[11px] font-black uppercase tracking-widest">Yükleniyor…</h2>
+                        </div>
                     )}
                 </main>
             </div>
