@@ -1,0 +1,35 @@
+index-B01vzoF6.js:55 [TalentFlow] Starting global candidates listener (isAuthenticated: true, isPublicAccessRoute: false)
+index-B01vzoF6.js:516 [Presence] Recruiter session active. Starting heartbeat...
+index-B01vzoF6.js:55 [Firestore] Updating candidate VzEfj7ThL62Kl46rUkJm... Object
+index-B01vzoF6.js:55 [Firestore] Candidate VzEfj7ThL62Kl46rUkJm updated successfully.
+index-B01vzoF6.js:516 [LiveInterview] Fetching paths for strategy: culture
+index-B01vzoF6.js:55 [Firestore] Updating candidate VzEfj7ThL62Kl46rUkJm... Object
+index-B01vzoF6.js:55 [Firestore] Candidate VzEfj7ThL62Kl46rUkJm updated successfully.
+index-B01vzoF6.js:55 [Firestore] Updating candidate VzEfj7ThL62Kl46rUkJm... Object
+index-B01vzoF6.js:55 [Firestore] Candidate VzEfj7ThL62Kl46rUkJm updated successfully.
+index-B01vzoF6.js:55 [Firestore] Updating candidate VzEfj7ThL62Kl46rUkJm... Object
+index-B01vzoF6.js:55 [Firestore] Candidate VzEfj7ThL62Kl46rUkJm updated successfully.
+index-B01vzoF6.js:55 [Firestore] Updating candidate VzEfj7ThL62Kl46rUkJm... Object
+index-B01vzoF6.js:516 [LiveInterview] Fetching paths for strategy: culture
+index-B01vzoF6.js:55 [Firestore] Candidate VzEfj7ThL62Kl46rUkJm updated successfully.
+index-B01vzoF6.js:55 [Firestore] Updating candidate VzEfj7ThL62Kl46rUkJm... Object
+index-B01vzoF6.js:55 [Firestore] Candidate VzEfj7ThL62Kl46rUkJm updated successfully.
+index-B01vzoF6.js:55 [Firestore] Updating candidate VzEfj7ThL62Kl46rUkJm... Object
+index-B01vzoF6.js:55 [Firestore] Candidate VzEfj7ThL62Kl46rUkJm updated successfully.
+index-B01vzoF6.js:55 [Firestore] Updating candidate VzEfj7ThL62Kl46rUkJm... Object
+index-B01vzoF6.js:55 [Firestore] Candidate VzEfj7ThL62Kl46rUkJm updated successfully.
+index-B01vzoF6.js:55 [Firestore] Updating candidate VzEfj7ThL62Kl46rUkJm... Object
+index-B01vzoF6.js:55 [Firestore] Candidate VzEfj7ThL62Kl46rUkJm updated successfully.
+index-B01vzoF6.js:55 [Firestore] Updating candidate VzEfj7ThL62Kl46rUkJm... Object
+index-B01vzoF6.js:55 [Firestore] Candidate VzEfj7ThL62Kl46rUkJm updated successfully.
+index-B01vzoF6.js:55 [Firestore] Updating candidate VzEfj7ThL62Kl46rUkJm... Object
+index-B01vzoF6.js:55 [Firestore] Candidate VzEfj7ThL62Kl46rUkJm updated successfully.
+index-B01vzoF6.js:55 [Firestore] Updating candidate VzEfj7ThL62Kl46rUkJm... {interviewSessions: Array(12)}
+index-B01vzoF6.js:516 [LiveInterview] Fetching paths for strategy: culture
+index-B01vzoF6.js:55 [Firestore] Candidate VzEfj7ThL62Kl46rUkJm updated successfully.
+index-B01vzoF6.js:516 [LiveInterview] Finishing session for recruiter: VzEfj7ThL62Kl46rUkJm iv-VzEfj7ThL62Kl46rUkJm-1773938244849
+index-B01vzoF6.js:55 [Firestore] Updating candidate VzEfj7ThL62Kl46rUkJm... {interviewSessions: Array(12), status: 'Evaluation'}
+index-B01vzoF6.js:55 [Firestore] Candidate VzEfj7ThL62Kl46rUkJm updated successfully.
+index-B01vzoF6.js:516 [LiveInterview] Session saved successfully.
+index-B01vzoF6.js:55 [Firestore] Updating candidate VzEfj7ThL62Kl46rUkJm... {interviewSessions: Array(12)}
+index-B01vzoF6.js:55 [Firestore] Candidate VzEfj7ThL62Kl46rUkJm updated successfully.
