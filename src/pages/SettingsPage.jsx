@@ -1,16 +1,19 @@
 // src/pages/SettingsPage.jsx
 // Tabbed settings page: Genel Ayarlar | Kaynak Yönetimi | Departmanlar | Platform Kılavuzu | Sistem Yönetimi
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useUserSettings } from '../context/UserSettingsContext';
 import { useAuth } from '../context/AuthContext';
 import {
     Settings, Palette, Globe, Bell, LayoutGrid, Hash, Mail,
     CheckCircle, Loader2, Mic, MicOff, Zap, Activity,
-    Share2, Building2, BookOpen, Shield
+    Share2, Building2, BookOpen, Shield, Key, Eye, EyeOff, ShieldCheck
 } from 'lucide-react';
 import { connectGoogleWorkspace, disconnectGoogleWorkspace } from '../services/integrationService';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getGlobalGeminiKey } from '../services/ai/config.js';
+import { db } from '../config/firebase';
+import { doc, setDoc } from 'firebase/firestore';
 
 import SourceManagementPage from './SourceManagementPage';
 import DepartmentManagementPage from './DepartmentManagementPage';
@@ -39,6 +42,27 @@ export default function SettingsPage({ initialTab }) {
     const sttIntervalRef = useRef(null);
     const audioChunksRef = useRef([]);
     const sttActiveRef = useRef(false);
+
+    // Gemini API Key
+    const [geminiKey, setGeminiKey] = useState('');
+    const [showGeminiKey, setShowGeminiKey] = useState(false);
+    const [savingGeminiKey, setSavingGeminiKey] = useState(false);
+    const [geminiKeySaved, setGeminiKeySaved] = useState(false);
+
+    useEffect(() => {
+        getGlobalGeminiKey().then(k => { if (k) setGeminiKey(k); });
+    }, []);
+
+    const handleSaveGeminiKey = async () => {
+        if (!geminiKey.trim()) return;
+        setSavingGeminiKey(true);
+        try {
+            await setDoc(doc(db, 'artifacts/talent-flow/public/data/settings', 'api_keys'), { gemini: geminiKey.trim() }, { merge: true });
+            setGeminiKeySaved(true);
+            setTimeout(() => setGeminiKeySaved(false), 3000);
+        } catch (err) { alert('Kayıt hatası: ' + err.message); }
+        finally { setSavingGeminiKey(false); }
+    };
 
     const stopSttTest = () => {
         sttActiveRef.current = false;
@@ -85,7 +109,8 @@ export default function SettingsPage({ initialTab }) {
                             let binary = '';
                             for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
                             const base64Audio = btoa(binary);
-                            const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+                            const apiKey = await getGlobalGeminiKey();
+                            if (!apiKey) { setSttStatus('error'); return; }
                             const genAI = new GoogleGenerativeAI(apiKey);
                             const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
                             const result = await model.generateContent([
@@ -352,6 +377,57 @@ export default function SettingsPage({ initialTab }) {
                             <p className="text-[11px] text-slate-400 mt-3">
                                 Bu test, mülakatlarda kullanılan Gemini tabanlı ses tanıma motorunun cihazınızda düzgün çalışıp çalışmadığını doğrular.
                             </p>
+                        </div>
+
+                        {/* Gemini API Key Card */}
+                        <div className="bg-white rounded-2xl border border-slate-200 p-6">
+                            <div className="flex items-center gap-3 mb-5 pb-4 border-b border-slate-100">
+                                <div className="w-9 h-9 rounded-xl bg-violet-50 border border-violet-100 flex items-center justify-center">
+                                    <Key className="w-4 h-4 text-violet-500" />
+                                </div>
+                                <div>
+                                    <h2 className="text-sm font-bold text-slate-800">Gemini API Anahtarı</h2>
+                                    <p className="text-xs text-slate-400">CV analizi, mülakat soruları ve ses tanıma için gereklidir</p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-3">
+                                <div className="relative">
+                                    <input
+                                        type={showGeminiKey ? 'text' : 'password'}
+                                        value={geminiKey}
+                                        onChange={e => setGeminiKey(e.target.value)}
+                                        placeholder="AIzaSy..."
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 pr-10 text-sm text-slate-700 font-mono outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition-all"
+                                    />
+                                    <button
+                                        onClick={() => setShowGeminiKey(v => !v)}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                    >
+                                        {showGeminiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                    </button>
+                                </div>
+                                <p className="text-xs text-slate-400">
+                                    Google AI Studio'dan ücretsiz alabilirsiniz.{' '}
+                                    <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-cyan-600 hover:underline">Ücretsiz al →</a>
+                                </p>
+                                <button
+                                    onClick={handleSaveGeminiKey}
+                                    disabled={savingGeminiKey || !geminiKey.trim()}
+                                    className={`w-full py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50 ${
+                                        geminiKeySaved
+                                            ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-200'
+                                            : 'bg-cyan-500 hover:bg-cyan-600 text-white shadow-sm shadow-cyan-200'
+                                    }`}
+                                >
+                                    {savingGeminiKey
+                                        ? <><Loader2 className="w-4 h-4 animate-spin" /> Kaydediliyor...</>
+                                        : geminiKeySaved
+                                            ? <><CheckCircle className="w-4 h-4" /> Kaydedildi!</>
+                                            : <><ShieldCheck className="w-4 h-4" /> Anahtarı Kaydet</>
+                                    }
+                                </button>
+                            </div>
                         </div>
 
                         {/* Integrations Card */}
