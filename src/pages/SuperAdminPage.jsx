@@ -1,45 +1,17 @@
 // src/pages/SuperAdminPage.jsx
 import { useState, useEffect, useMemo } from 'react';
 import {
-    Users,
-    UserPlus,
-    Mail,
-    Shield,
-    Clock,
-    CheckCircle,
-    XCircle,
-    Loader2,
-    Search,
-    RefreshCw,
-    X,
-    ShieldCheck,
-    Copy,
-    Trash2,
-    UserX,
-    UserCheck,
-    Edit2,
-    Settings,
-    Key,
-    Eye,
-    EyeOff
+    Users, UserPlus, Mail, Shield, CheckCircle, XCircle,
+    Loader2, ShieldCheck, Copy, Trash2, UserX, UserCheck,
+    Edit2, Settings, Key, Eye, EyeOff, X
 } from 'lucide-react';
 import {
-    collection,
-    query,
-    onSnapshot,
-    addDoc,
-    serverTimestamp,
-    where,
-    deleteDoc,
-    getDocs,
-    doc,
-    updateDoc,
-    setDoc
+    collection, query, onSnapshot, addDoc, serverTimestamp,
+    where, deleteDoc, getDocs, doc, updateDoc, setDoc
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 import { usePositions } from '../context/PositionsContext';
-
 
 const USERS_PATH = 'artifacts/talent-flow/public/data/users';
 const INVITATIONS_PATH = 'artifacts/talent-flow/public/data/invitations';
@@ -51,7 +23,6 @@ export default function SuperAdminPage() {
     const [loading, setLoading] = useState(true);
     const [copiedId, setCopiedId] = useState(null);
 
-    // Invite Form State
     const [showInviteModal, setShowInviteModal] = useState(false);
     const [inviteEmail, setInviteEmail] = useState('');
     const [inviteRole, setInviteRole] = useState('recruiter');
@@ -60,18 +31,15 @@ export default function SuperAdminPage() {
     const [error, setError] = useState(null);
     const [departments, setDepartments] = useState([]);
 
-    // System Settings State
     const [geminiKey, setGeminiKey] = useState('');
     const [showKey, setShowKey] = useState(false);
     const [savingSettings, setSavingSettings] = useState(false);
-    const [activeTab, setActiveTab] = useState('users'); // 'users' or 'settings'
+    const [activeTab, setActiveTab] = useState('users');
 
-    // Edit User State
     const [showEditModal, setShowEditModal] = useState(false);
-    const [editingUser, setEditingUser] = useState(null); // { id, role, departments[] }
+    const [editingUser, setEditingUser] = useState(null);
     const { positions } = usePositions();
 
-    // Fetch departments from dedicated collection
     useEffect(() => {
         const unsub = onSnapshot(collection(db, 'artifacts/talent-flow/public/data/departments'), (snap) => {
             setDepartments(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -79,7 +47,6 @@ export default function SuperAdminPage() {
         return unsub;
     }, []);
 
-    // Extract unique department names
     const departmentOptions = useMemo(() => {
         const fromDepts = departments.map(d => d.name);
         const fromPositions = positions.filter(p => p.department).map(p => p.department);
@@ -88,108 +55,61 @@ export default function SuperAdminPage() {
 
     useEffect(() => {
         if (!isSuperAdmin) return;
-
-        // Listen to Users
         const unsubUsers = onSnapshot(collection(db, USERS_PATH), (snap) => {
             setUsers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         });
-
-        // Listen to Invitations
         const unsubInvites = onSnapshot(collection(db, INVITATIONS_PATH), (snap) => {
             setInvitations(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
             setLoading(false);
         });
-
-        // Fetch Gemini Key (Only for Super Admin)
         const fetchGeminiKey = async () => {
             try {
                 const docSnap = await getDocs(query(collection(db, 'artifacts/talent-flow/public/data/settings')));
                 const apiKeysDoc = docSnap.docs.find(d => d.id === 'api_keys');
-                if (apiKeysDoc && apiKeysDoc.data().gemini) {
-                    setGeminiKey(apiKeysDoc.data().gemini);
-                }
-            } catch (err) {
-                console.warn("Could not fetch API keys:", err);
-            }
+                if (apiKeysDoc?.data().gemini) setGeminiKey(apiKeysDoc.data().gemini);
+            } catch (err) { console.warn("Could not fetch API keys:", err); }
         };
-
         fetchGeminiKey();
-
-        return () => {
-            unsubUsers();
-            unsubInvites();
-        };
+        return () => { unsubUsers(); unsubInvites(); };
     }, [isSuperAdmin]);
 
     const handleCopyInviteLink = (email, id) => {
-        const baseUrl = window.location.origin;
-        const link = `${baseUrl}?invite=${encodeURIComponent(email)}`;
-        navigator.clipboard.writeText(link);
+        navigator.clipboard.writeText(`${window.location.origin}?invite=${encodeURIComponent(email)}`);
         setCopiedId(id);
         setTimeout(() => setCopiedId(null), 2000);
     };
 
     const handleDeleteInvite = async (id) => {
         if (!window.confirm("Bu davetiyeyi silmek istediğinize emin misiniz?")) return;
-        try {
-            await deleteDoc(doc(db, INVITATIONS_PATH, id));
-        } catch (err) {
-            console.error(err);
-        }
+        await deleteDoc(doc(db, INVITATIONS_PATH, id));
     };
 
     const handleDeleteUser = async (userToDelete) => {
         if (userToDelete.id === user.uid) return alert("Kendi hesabınızı silemezsiniz.");
-        if (!window.confirm(`${userToDelete.displayName} kullanıcısını tamamen silmek istediğinize emin misiniz? \n\nNot: Kullanıcı Firebase Auth üzerinde kalmaya devam edecektir, ancak tekrar davet edilirse erişim sağlayabilir.`)) return;
-
+        if (!window.confirm(`${userToDelete.displayName} kullanıcısını silmek istediğinize emin misiniz?`)) return;
         try {
-            // 1. Delete user profile
             await deleteDoc(doc(db, USERS_PATH, userToDelete.id));
-
-            // 2. Clear invitations for this email so they can be re-invited
             const q = query(collection(db, INVITATIONS_PATH), where("email", "==", userToDelete.email.toLowerCase()));
             const inviteSnap = await getDocs(q);
-            for (const d of inviteSnap.docs) {
-                await deleteDoc(doc(db, INVITATIONS_PATH, d.id));
-            }
-
-            alert("Kullanıcı ve davet geçmişi temizlendi.");
-        } catch (err) {
-            console.error("User delete error:", err);
-            alert("Kullanıcı silinirken bir hata oluştu.");
-        }
+            for (const d of inviteSnap.docs) await deleteDoc(doc(db, INVITATIONS_PATH, d.id));
+        } catch (err) { alert("Kullanıcı silinirken bir hata oluştu."); }
     };
 
     const handleToggleUserStatus = async (userId, currentStatus) => {
         if (userId === user.uid) return alert("Kendi durumunuzu değiştiremezsiniz.");
         const newStatus = currentStatus === 'disabled' ? 'active' : 'disabled';
-        const actionText = newStatus === 'disabled' ? 'dondurmak' : 'aktifleştimek';
-
-        if (!window.confirm(`Bu kullanıcıyı ${actionText} istediğinize emin misiniz?`)) return;
-
-        try {
-            await updateDoc(doc(db, USERS_PATH, userId), {
-                status: newStatus
-            });
-        } catch (err) {
-            console.error("User status toggle error:", err);
-            alert("Kullanıcı durumu güncellenirken bir hata oluştu.");
-        }
+        if (!window.confirm(`Kullanıcıyı ${newStatus === 'disabled' ? 'dondurmak' : 'aktifleştirmek'} istediğinize emin misiniz?`)) return;
+        await updateDoc(doc(db, USERS_PATH, userId), { status: newStatus });
     };
 
     const handleSendInvite = async (e) => {
         e.preventDefault();
         if (!inviteEmail.trim()) return;
-
         setSending(true);
         setError(null);
         try {
-            const existingUser = users.find(u => u.email === inviteEmail);
-            const existingInvite = invitations.find(i => i.email === inviteEmail && i.status === 'pending');
-
-            if (existingUser) throw new Error("Bu e-posta adresi zaten kayıtlı.");
-            if (existingInvite) throw new Error("Bu e-posta bekleyen bir davete sahip.");
-
+            if (users.find(u => u.email === inviteEmail)) throw new Error("Bu e-posta adresi zaten kayıtlı.");
+            if (invitations.find(i => i.email === inviteEmail && i.status === 'pending')) throw new Error("Bu e-posta bekleyen bir davete sahip.");
             await addDoc(collection(db, INVITATIONS_PATH), {
                 email: inviteEmail.trim().toLowerCase(),
                 role: inviteRole,
@@ -198,49 +118,21 @@ export default function SuperAdminPage() {
                 invitedBy: user.uid,
                 createdAt: serverTimestamp()
             });
-
-            const baseUrl = window.location.origin;
-            const inviteLink = `${baseUrl}?invite=${encodeURIComponent(inviteEmail.trim().toLowerCase())}`;
-
-            // Send email via backend
+            const inviteLink = `${window.location.origin}?invite=${encodeURIComponent(inviteEmail.trim().toLowerCase())}`;
             try {
-                // Use relative path to leverage Vite Proxy in dev or same-origin in prod
-                const emailResponse = await fetch('/api/send-invite', {
+                const res = await fetch('/api/send-invite', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        email: inviteEmail.trim().toLowerCase(),
-                        role: inviteRole,
-                        inviteLink: inviteLink
-                    })
+                    body: JSON.stringify({ email: inviteEmail.trim().toLowerCase(), role: inviteRole, inviteLink })
                 });
-
-                if (!emailResponse.ok) {
-                    const emailError = await emailResponse.json().catch(() => ({ error: 'Bilinmeyen sunucu hatası.' }));
-                    console.warn('Backend email send error:', emailError);
-                    alert(`⚠️ Davet oluşturuldu ancak e-posta gönderilemedi: ${emailError.error || 'Bilinmeyen hata'}`);
-                } else {
-                    alert(`✅ Davet oluşturuldu ve e-posta başarıyla gönderildi!`);
-                }
-            } catch (emailErr) {
-                console.error('Failed to call email API:', emailErr);
-                alert(`❌ Sunucu bağlantı hatası: E-posta gönderilemedi. (Sunucu portu 3001 açık mı?)`);
-            }
-
-            try {
-                await navigator.clipboard.writeText(inviteLink);
-                alert(`✅ Davet oluşturuldu ve mail gönderildi!\n\nDavet linki panoya kopyalandı.`);
-            } catch (clipErr) {
-                prompt('Davet linki:', inviteLink);
-            }
-
+                if (!res.ok) console.warn('Email send error');
+            } catch { }
+            try { await navigator.clipboard.writeText(inviteLink); } catch { prompt('Davet linki:', inviteLink); }
+            alert('✅ Davet oluşturuldu ve link panoya kopyalandı!');
             setInviteEmail('');
             setShowInviteModal(false);
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setSending(false);
-        }
+        } catch (err) { setError(err.message); }
+        finally { setSending(false); }
     };
 
     const handleOpenEdit = (userToEdit) => {
@@ -258,451 +150,359 @@ export default function SuperAdminPage() {
         if (!geminiKey.trim()) return alert("Lütfen bir anahtar girin.");
         setSavingSettings(true);
         try {
-            const settingsRef = doc(db, 'artifacts/talent-flow/public/data/settings', 'api_keys');
-            await setDoc(settingsRef, { gemini: geminiKey.trim() }, { merge: true });
+            await setDoc(doc(db, 'artifacts/talent-flow/public/data/settings', 'api_keys'), { gemini: geminiKey.trim() }, { merge: true });
             alert("✅ Gemini API Key başarıyla kaydedildi.");
-        } catch (err) {
-            console.error(err);
-            alert("❌ Ayarlar kaydedilirken bir hata oluştu: " + err.message);
-        } finally {
-            setSavingSettings(false);
-        }
+        } catch (err) { alert("❌ Hata: " + err.message); }
+        finally { setSavingSettings(false); }
     };
 
     const handleUpdateUser = async (e) => {
         e.preventDefault();
         if (!editingUser) return;
-
         setSending(true);
         setError(null);
         try {
-            const userRef = doc(db, USERS_PATH, editingUser.id);
-            await updateDoc(userRef, {
+            await updateDoc(doc(db, USERS_PATH, editingUser.id), {
                 role: editingUser.role,
                 departments: editingUser.role === 'department_user' ? editingUser.departments : [],
                 updatedAt: serverTimestamp()
             });
-
             setShowEditModal(false);
             setEditingUser(null);
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setSending(false);
-        }
+        } catch (err) { setError(err.message); }
+        finally { setSending(false); }
     };
 
     if (!isSuperAdmin) {
         return (
-            <div className="p-8 flex flex-col items-center justify-center h-full text-center space-y-4 relative isolate min-h-screen">
-
-                <Shield className="w-12 h-12 text-red-500 opacity-50" />
-                <h1 className="text-xl font-bold text-text-primary">Erişim Reddedildi</h1>
-                <p className="text-navy-400 max-w-sm">Bu sayfa sadece Süper Admin yetkisine sahip kullanıcılar tarafından görüntülenebilir.</p>
+            <div className="flex flex-col items-center justify-center h-64 text-center">
+                <Shield className="w-10 h-10 text-red-400 mb-3" />
+                <h2 className="text-sm font-bold text-slate-700">Erişim Reddedildi</h2>
+                <p className="text-xs text-slate-400 mt-1">Bu sayfa yalnızca Süper Admin yetkisiyle görüntülenebilir.</p>
             </div>
         );
     }
 
-    return (
-        <div className="p-6 space-y-8 animate-in fade-in duration-500 relative isolate min-h-screen">
+    const pendingInvites = invitations.filter(i => i.status === 'pending');
+    const superAdmins = users.filter(u => u.role === 'super_admin').length;
 
+    return (
+        <div className="p-6 max-w-5xl mx-auto space-y-5">
 
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-black text-text-primary flex items-center gap-3">
-                        <Users className="w-8 h-8 text-electric" /> Kullanıcı & Yetki Yönetimi
-                    </h1>
-                    <p className="text-navy-400 mt-1">Ekibinizi yönetin ve yeni kullanıcılar davet edin.</p>
-                </div>
-                <div className="flex items-center gap-2 bg-white/5 p-1 rounded-2xl border border-white/5">
-                    <button
-                        onClick={() => setActiveTab('users')}
-                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === 'users' ? 'bg-electric text-text-primary' : 'text-navy-400 hover:text-text-primary'}`}
-                    >
-                        Kullanıcılar
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('settings')}
-                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === 'settings' ? 'bg-electric text-text-primary' : 'text-navy-400 hover:text-text-primary'}`}
-                    >
-                        Sistem Ayarları
-                    </button>
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-violet-50 border border-violet-100 flex items-center justify-center">
+                        <Shield className="w-4 h-4 text-violet-600" />
+                    </div>
+                    <div>
+                        <h1 className="text-[15px] font-black text-slate-900 tracking-tight">Sistem Yönetimi</h1>
+                        <p className="text-[10px] text-slate-400 font-medium">Kullanıcı ve yetki yönetimi</p>
+                    </div>
                 </div>
                 <button
                     onClick={() => setShowInviteModal(true)}
-                    className="flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-electric text-text-primary font-bold hover:bg-electric-light transition-all shadow-lg shadow-electric/20 active:scale-95"
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-white text-xs font-bold transition-colors shadow-sm shadow-cyan-200"
                 >
-                    <UserPlus className="w-5 h-5" /> Yeni Kullanıcı Davet Et
+                    <UserPlus className="w-3.5 h-3.5" /> Kullanıcı Davet Et
                 </button>
             </div>
 
-            {/* Main Content Tabs */}
+            {/* Stats Row */}
+            <div className="grid grid-cols-3 gap-3">
+                {[
+                    { label: 'Aktif Kullanıcı', value: users.length, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100', icon: ShieldCheck },
+                    { label: 'Bekleyen Davet', value: pendingInvites.length, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100', icon: Mail },
+                    { label: 'Süper Admin', value: superAdmins, color: 'text-violet-600', bg: 'bg-violet-50', border: 'border-violet-100', icon: Shield },
+                ].map((s, i) => (
+                    <div key={i} className={`bg-white rounded-xl border border-slate-200 px-4 py-3 flex items-center justify-between`}>
+                        <div>
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{s.label}</p>
+                            <p className={`text-[22px] font-black ${s.color} leading-tight`}>{s.value}</p>
+                        </div>
+                        <div className={`w-9 h-9 rounded-lg ${s.bg} border ${s.border} flex items-center justify-center`}>
+                            <s.icon className={`w-4 h-4 ${s.color}`} />
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* Sub-tabs */}
+            <div className="flex gap-1 border-b border-slate-200">
+                {[{ id: 'users', label: 'Kullanıcılar' }, { id: 'settings', label: 'Sistem Ayarları' }].map(t => (
+                    <button
+                        key={t.id}
+                        onClick={() => setActiveTab(t.id)}
+                        className={`px-4 py-2 text-xs font-bold border-b-2 transition-all whitespace-nowrap -mb-px ${
+                            activeTab === t.id ? 'border-cyan-500 text-cyan-600' : 'border-transparent text-slate-500 hover:text-slate-700'
+                        }`}
+                    >
+                        {t.label}
+                    </button>
+                ))}
+            </div>
+
             {activeTab === 'users' ? (
-                <>
-                    {/* Stats */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {[
-                            { label: 'Aktif Kullanıcılar', value: users.length, icon: ShieldCheck, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
-                            { label: 'Bekleyen Davetler', value: invitations.filter(i => i.status === 'pending').length, icon: Mail, color: 'text-amber-400', bg: 'bg-amber-500/10' },
-                            { label: 'Süper Adminler', value: users.filter(u => u.role === 'super_admin').length, icon: Shield, color: 'text-violet-400', bg: 'bg-violet-500/10' },
-                        ].map((stat, i) => (
-                            <div key={i} className="glass p-6 rounded-3xl border border-white/5 flex items-center justify-between">
-                                <div>
-                                    <p className="text-navy-400 text-xs font-bold uppercase tracking-widest mb-1">{stat.label}</p>
-                                    <h3 className="text-3xl font-black text-text-primary">{stat.value}</h3>
-                                </div>
-                                <div className={`w-12 h-12 rounded-2xl ${stat.bg} ${stat.color} flex items-center justify-center`}>
-                                    <stat.icon className="w-6 h-6" />
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-
-                    {/* Tables Section */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        {/* Users Table */}
-                        <div className="glass rounded-[32px] border border-white/5 overflow-hidden">
-                            <div className="p-6 border-b border-white/5 flex items-center justify-between">
-                                <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
-                                    <ShieldCheck className="w-5 h-5 text-emerald-400" /> Aktif Kullanıcılar
-                                </h2>
-                            </div>
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left">
-                                    <thead className="bg-bg-primary text-[10px] text-text-muted uppercase font-black tracking-widest">
-                                        <tr>
-                                            <th className="px-6 py-4">Kullanıcı</th>
-                                            <th className="px-6 py-4">Rol</th>
-                                            <th className="px-6 py-4">Durum</th>
-                                            <th className="px-6 py-4">İşlemler</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-white/[0.04]">
-                                        {users.map(u => (
-                                            <tr key={u.id} className="group hover:bg-white/[0.02] transition-colors">
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-xs font-bold text-text-primary">
-                                                            {u.displayName?.substring(0, 2).toUpperCase() || 'U'}
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-sm font-semibold text-navy-100">{u.displayName}</p>
-                                                            <p className="text-[11px] text-navy-500 font-mono">{u.email}</p>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4 text-[11px] font-bold text-navy-300">
-                                                    {u.role === 'super_admin' ? (
-                                                        <span className="px-2 py-1 rounded bg-violet-500/10 text-violet-400">Süper Admin</span>
-                                                    ) : u.role === 'department_user' ? (
-                                                        <div className="flex flex-wrap gap-1">
-                                                            {(u.departments || (u.department ? [u.department] : [])).map((dept, idx) => (
-                                                                <span key={idx} className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-400">
-                                                                    {dept}
-                                                                </span>
-                                                            ))}
-                                                            {!(u.departments?.length > 0 || u.department) && (
-                                                                <span className="px-2 py-0.5 rounded bg-bg-primary text-text-muted">Atanmamış</span>
-                                                            )}
-                                                        </div>
-                                                    ) : (
-                                                        <span className="px-2 py-1 rounded bg-blue-500/10 text-blue-400">Recruiter</span>
-                                                    )}
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className={`flex items-center gap-1.5 text-[11px] font-bold ${u.status === 'disabled' ? 'text-red-400' : 'text-emerald-400'}`}>
-                                                        {u.status === 'disabled' ? (
-                                                            <><XCircle className="w-3.5 h-3.5" /> Devre Dışı</>
-                                                        ) : (
-                                                            <><CheckCircle className="w-3.5 h-3.5" /> Aktif</>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4">
-
-                                                    <div className="flex items-center gap-2">
-                                                        {u.id !== user.uid && (
-                                                            <>
-                                                                <button
-                                                                    onClick={() => handleOpenEdit(u)}
-                                                                    className="p-2 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-all"
-                                                                    title="Düzenle"
-                                                                >
-                                                                    <Edit2 className="w-3.5 h-3.5" />
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleDeleteUser(u)}
-                                                                    className="p-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all"
-                                                                    title="Kullanıcıyı Sil"
-                                                                >
-                                                                    <Trash2 className="w-3.5 h-3.5" />
-                                                                </button>
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {/* Users Table */}
+                    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                        <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
+                            <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                            <h2 className="text-[12px] font-black text-slate-800">Aktif Kullanıcılar</h2>
+                            <span className="ml-auto text-[10px] font-bold bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">{users.length}</span>
                         </div>
-
-                        {/* Invitations Table */}
-                        <div className="glass rounded-[32px] border border-white/5 overflow-hidden">
-                            <div className="p-6 border-b border-white/5 flex items-center justify-between">
-                                <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
-                                    <Mail className="w-5 h-5 text-amber-400" /> Bekleyen Davetler
-                                </h2>
-                            </div>
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left">
-                                    <thead className="bg-bg-primary text-[10px] text-text-muted uppercase font-black tracking-widest">
-                                        <tr>
-                                            <th className="px-6 py-4">E-posta</th>
-                                            <th className="px-6 py-4">Rol</th>
-                                            <th className="px-6 py-4">İşlemler</th>
-                                            <th className="px-6 py-4">Durum</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-white/[0.04]">
-                                        {invitations.filter(i => i.status === 'pending').map(i => (
-                                            <tr key={i.id} className="group hover:bg-white/[0.02] transition-colors">
-                                                <td className="px-6 py-4 text-sm font-medium text-navy-100">{i.email}</td>
-                                                <td className="px-6 py-4 text-[11px] font-bold text-navy-300 capitalize">{i.role}</td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center gap-2">
-                                                        <button
-                                                            onClick={() => handleCopyInviteLink(i.email, i.id)}
-                                                            className={`p-2 rounded-lg transition-all flex items-center gap-1.5 ${copiedId === i.id ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-navy-400 hover:text-text-primary hover:bg-white/10'}`}
-                                                            title="Davet Linkini Kopyala"
-                                                        >
-                                                            {copiedId === i.id ? <CheckCircle className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                                                            <span className="text-[10px] font-bold">{copiedId === i.id ? 'Kopyalandı' : 'Linki Kopyala'}</span>
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleDeleteInvite(i.id)}
-                                                            className="p-2 rounded-lg bg-red-500/5 text-navy-500 hover:text-red-400 hover:bg-red-500/10 transition-all"
-                                                            title="İptal Et"
-                                                        >
-                                                            <Trash2 className="w-3.5 h-3.5" />
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <span className="px-2 py-1 rounded bg-amber-500/10 text-amber-400 text-[10px] font-black uppercase">Bekliyor</span>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                        {invitations.filter(i => i.status === 'pending').length === 0 && (
-                                            <tr>
-                                                <td colSpan="4" className="px-6 py-12 text-center text-navy-500 italic text-sm">
-                                                    Bekleyen davet bulunmuyor.
-                                                </td>
-                                            </tr>
+                        <div className="divide-y divide-slate-100">
+                            {loading ? (
+                                <div className="py-8 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-slate-300" /></div>
+                            ) : users.length === 0 ? (
+                                <p className="py-8 text-center text-xs text-slate-400 italic">Henüz kullanıcı yok.</p>
+                            ) : users.map(u => (
+                                <div key={u.id} className="px-4 py-3 flex items-center gap-3 group hover:bg-slate-50 transition-colors">
+                                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-400 to-violet-500 flex items-center justify-center text-[10px] font-black text-white shrink-0">
+                                        {u.displayName?.substring(0, 2).toUpperCase() || 'U'}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-[12px] font-bold text-slate-800 truncate">{u.displayName}</p>
+                                        <p className="text-[10px] text-slate-400 font-mono truncate">{u.email}</p>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                        <RolePill role={u.role} />
+                                        {u.status === 'disabled' && (
+                                            <span className="text-[9px] font-black text-red-500 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded">Donduruldu</span>
                                         )}
-                                    </tbody>
-                                </table>
-                            </div>
+                                    </div>
+                                    {u.id !== user.uid && (
+                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                            <button
+                                                onClick={() => handleOpenEdit(u)}
+                                                className="p-1.5 rounded-lg bg-slate-100 hover:bg-cyan-50 hover:text-cyan-600 text-slate-400 transition-colors"
+                                                title="Düzenle"
+                                            >
+                                                <Edit2 className="w-3.5 h-3.5" />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDeleteUser(u)}
+                                                className="p-1.5 rounded-lg bg-slate-100 hover:bg-red-50 hover:text-red-500 text-slate-400 transition-colors"
+                                                title="Sil"
+                                            >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
                         </div>
                     </div>
-                </>
-            ) : (
-                <div className="max-w-2xl mx-auto space-y-8 animate-in slide-in-from-bottom-4 duration-500">
-                    <div className="glass rounded-[40px] border border-white/10 p-10 space-y-8">
-                        <div className="flex items-center gap-4">
-                            <div className="w-14 h-14 rounded-2xl bg-electric/10 text-electric flex items-center justify-center">
-                                <Settings className="w-8 h-8" />
-                            </div>
-                            <div>
-                                <h2 className="text-xl font-black text-text-primary">Sistem Ayarları</h2>
-                                <p className="text-navy-400 text-sm">Uygulama genelindeki API anahtarlarını ve konfigürasyonları yönetin.</p>
-                            </div>
+
+                    {/* Invitations Table */}
+                    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                        <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
+                            <Mail className="w-4 h-4 text-amber-500" />
+                            <h2 className="text-[12px] font-black text-slate-800">Bekleyen Davetler</h2>
+                            <span className="ml-auto text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-100 px-2 py-0.5 rounded-full">{pendingInvites.length}</span>
                         </div>
-
-                        <div className="space-y-6">
-                            <div className="space-y-3">
-                                <label className="flex items-center gap-2 text-[10px] text-navy-400 font-black uppercase tracking-widest ml-1">
-                                    <Key className="w-3 h-3 text-electric" /> Gemini API Key
-                                </label>
-                                <div className="relative group">
-                                    <input
-                                        type={showKey ? "text" : "password"}
-                                        value={geminiKey}
-                                        onChange={(e) => setGeminiKey(e.target.value)}
-                                        placeholder="AI özellikleri için Gemini API anahtarını buraya yapıştırın..."
-                                        className="w-full px-6 py-5 bg-navy-900/50 border border-white/10 rounded-[20px] text-text-primary outline-none focus:border-electric focus:ring-4 focus:ring-electric/5 transition-all font-mono text-sm pr-14"
-                                    />
-                                    <button
-                                        onClick={() => setShowKey(!showKey)}
-                                        className="absolute right-4 top-1/2 -translate-y-1/2 p-2 hover:bg-white/5 rounded-xl text-navy-500 hover:text-text-primary transition-all"
-                                    >
-                                        {showKey ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                                    </button>
+                        <div className="divide-y divide-slate-100">
+                            {pendingInvites.length === 0 ? (
+                                <p className="py-8 text-center text-xs text-slate-400 italic">Bekleyen davet bulunmuyor.</p>
+                            ) : pendingInvites.map(i => (
+                                <div key={i.id} className="px-4 py-3 flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center shrink-0">
+                                        <Mail className="w-3.5 h-3.5 text-amber-500" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-[12px] font-medium text-slate-700 truncate">{i.email}</p>
+                                        <RolePill role={i.role} small />
+                                    </div>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                        <button
+                                            onClick={() => handleCopyInviteLink(i.email, i.id)}
+                                            className={`p-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${
+                                                copiedId === i.id
+                                                    ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                                                    : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                                            }`}
+                                        >
+                                            {copiedId === i.id ? <CheckCircle className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteInvite(i.id)}
+                                            className="p-1.5 rounded-lg bg-slate-100 hover:bg-red-50 hover:text-red-500 text-slate-400 transition-colors"
+                                        >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
                                 </div>
-                                <p className="text-[11px] text-navy-500 italic ml-1">
-                                    * Bu anahtar CV ayrıştırma ve otomatik soru oluşturma özellikleri için kullanılır.
-                                    <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-electric hover:underline ml-1">Buradan ücretsiz alabilirsiniz.</a>
-                                </p>
-                            </div>
-
-                            <button
-                                onClick={handleSaveGeminiKey}
-                                disabled={savingSettings}
-                                className="w-full py-5 bg-electric text-text-primary font-black rounded-[20px] hover:bg-electric-light transition-all shadow-xl shadow-electric/20 active:scale-[0.98] flex items-center justify-center gap-3 disabled:opacity-50"
-                            >
-                                {savingSettings ? (
-                                    <Loader2 className="w-6 h-6 animate-spin" />
-                                ) : (
-                                    <><ShieldCheck className="w-6 h-6" /> Ayarları Güvenli Şekilde Kaydet</>
-                                )}
-                            </button>
+                            ))}
                         </div>
                     </div>
                 </div>
-            )}
+            ) : (
+                <div className="max-w-lg bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
+                    <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
+                        <div className="w-8 h-8 rounded-lg bg-cyan-50 border border-cyan-100 flex items-center justify-center">
+                            <Key className="w-4 h-4 text-cyan-600" />
+                        </div>
+                        <div>
+                            <h2 className="text-[13px] font-black text-slate-800">API Anahtarları</h2>
+                            <p className="text-[10px] text-slate-400">Uygulama genelinde kullanılan servis anahtarları</p>
+                        </div>
+                    </div>
 
-            {/* Modals - Outside tabs for cleaner state */}
-            {showInviteModal && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-navy-950/80 backdrop-blur-md" onClick={() => setShowInviteModal(false)} />
-                    <div className="relative w-full max-w-md glass rounded-[40px] border border-white/10 p-8 space-y-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-                        <div className="flex items-center justify-between">
-                            <h3 className="text-xl font-bold text-text-primary flex items-center gap-3">
-                                <UserPlus className="w-6 h-6 text-electric" /> Ekibe Kat
-                            </h3>
-                            <button onClick={() => setShowInviteModal(false)} className="p-2 hover:bg-white/5 rounded-2xl text-navy-500">
-                                <X className="w-5 h-5" />
+                    <div className="space-y-2">
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                            <Key className="w-2.5 h-2.5" /> Gemini API Key
+                        </label>
+                        <div className="relative">
+                            <input
+                                type={showKey ? 'text' : 'password'}
+                                value={geminiKey}
+                                onChange={(e) => setGeminiKey(e.target.value)}
+                                placeholder="AI özellikleri için Gemini API anahtarı..."
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 pr-10 text-[12px] text-slate-700 font-mono outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition-all"
+                            />
+                            <button
+                                onClick={() => setShowKey(!showKey)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                            >
+                                {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                             </button>
                         </div>
+                        <p className="text-[10px] text-slate-400">
+                            CV ayrıştırma ve otomatik soru oluşturma için kullanılır.
+                            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-cyan-600 hover:underline ml-1">Ücretsiz al →</a>
+                        </p>
+                    </div>
 
-                        <form onSubmit={handleSendInvite} className="space-y-4">
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] text-navy-500 uppercase font-black tracking-widest ml-1">E-posta Adresi</label>
+                    <button
+                        onClick={handleSaveGeminiKey}
+                        disabled={savingSettings}
+                        className="w-full py-2.5 bg-cyan-500 hover:bg-cyan-600 text-white font-bold text-sm rounded-xl transition-colors shadow-sm shadow-cyan-200 flex items-center justify-center gap-2 disabled:opacity-60"
+                    >
+                        {savingSettings ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                        Kaydet
+                    </button>
+                </div>
+            )}
+
+            {/* Invite Modal */}
+            {showInviteModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm animate-in zoom-in-95 duration-200">
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+                            <div className="flex items-center gap-2">
+                                <UserPlus className="w-4 h-4 text-cyan-500" />
+                                <h3 className="text-[13px] font-black text-slate-800">Yeni Kullanıcı Davet Et</h3>
+                            </div>
+                            <button onClick={() => setShowInviteModal(false)} className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-50">
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+                        <form onSubmit={handleSendInvite} className="px-5 py-4 space-y-3">
+                            <div>
+                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">E-posta Adresi</label>
                                 <input
-                                    type="email"
-                                    required
-                                    value={inviteEmail}
+                                    type="email" required value={inviteEmail}
                                     onChange={(e) => setInviteEmail(e.target.value)}
                                     placeholder="ornek@sirket.com"
-                                    className="w-full px-5 py-4 bg-navy-900 border border-white/10 rounded-2xl text-text-primary outline-none focus:border-electric transition-all"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-700 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition-all"
                                 />
                             </div>
-
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] text-navy-500 uppercase font-black tracking-widest ml-1">Kullanıcı Rolü</label>
+                            <div>
+                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Kullanıcı Rolü</label>
                                 <select
                                     value={inviteRole}
                                     onChange={(e) => setInviteRole(e.target.value)}
-                                    className="w-full px-5 py-4 bg-navy-900 border border-white/10 rounded-2xl text-text-primary outline-none focus:border-electric transition-all appearance-none"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-700 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition-all"
                                 >
                                     <option value="recruiter">Recruiter (İK Uzmanı)</option>
                                     <option value="department_user">Departman Kullanıcısı</option>
                                     <option value="super_admin">Süper Admin (Yönetici)</option>
                                 </select>
                             </div>
-
                             {inviteRole === 'department_user' && (
-                                <div className="space-y-3 pt-2">
-                                    <label className="text-[10px] text-navy-500 uppercase font-black tracking-widest ml-1">Departmanlar (Birden Fazla Seçilebilir)</label>
-                                    <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                                <div>
+                                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Departmanlar</label>
+                                    <div className="grid grid-cols-2 gap-1.5 max-h-32 overflow-y-auto">
                                         {departmentOptions.map(dept => (
                                             <button
-                                                key={dept}
-                                                type="button"
-                                                onClick={() => {
-                                                    if (inviteDepartments.includes(dept)) {
-                                                        setInviteDepartments(inviteDepartments.filter(d => d !== dept));
-                                                    } else {
-                                                        setInviteDepartments([...inviteDepartments, dept]);
-                                                    }
-                                                }}
-                                                className={`px-3 py-3 rounded-xl text-[10px] font-bold text-left transition-all border ${inviteDepartments.includes(dept)
-                                                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-400 font-black ring-1 ring-amber-500/50'
-                                                    : 'bg-navy-900 border-white/5 text-navy-400 hover:border-white/10'
-                                                    }`}
+                                                key={dept} type="button"
+                                                onClick={() => setInviteDepartments(prev =>
+                                                    prev.includes(dept) ? prev.filter(d => d !== dept) : [...prev, dept]
+                                                )}
+                                                className={`px-2.5 py-2 rounded-lg text-[10px] font-bold text-left transition-all border ${
+                                                    inviteDepartments.includes(dept)
+                                                        ? 'bg-cyan-50 border-cyan-200 text-cyan-700'
+                                                        : 'bg-slate-50 border-slate-200 text-slate-500 hover:border-slate-300'
+                                                }`}
                                             >
                                                 {dept}
                                             </button>
                                         ))}
                                     </div>
-                                    {inviteDepartments.length === 0 && (
-                                        <p className="text-[9px] text-amber-500/60 italic">* En az bir departman seçmelisiniz.</p>
-                                    )}
                                 </div>
                             )}
-
-                            {error && (
-                                <div className="text-red-400 text-xs font-bold text-center p-3 rounded-xl bg-red-500/5 border border-red-500/10">
-                                    {error}
-                                </div>
-                            )}
-
-                            <button
-                                type="submit"
-                                disabled={sending || !inviteEmail}
-                                className="w-full py-4 bg-electric text-text-primary font-bold rounded-2xl hover:bg-electric-light transition-all flex items-center justify-center gap-2 shadow-lg shadow-electric/20 active:scale-95 disabled:opacity-50"
-                            >
-                                {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Mail className="w-5 h-5" />} Davet Gönder
-                            </button>
+                            {error && <p className="text-[11px] text-red-500 bg-red-50 border border-red-100 rounded-xl px-3 py-2">{error}</p>}
+                            <div className="flex gap-2 pt-1">
+                                <button type="button" onClick={() => setShowInviteModal(false)} className="flex-1 h-9 rounded-xl text-[11px] font-bold text-slate-500 border border-slate-200 hover:bg-slate-50 transition-all">İptal</button>
+                                <button
+                                    type="submit" disabled={sending || !inviteEmail}
+                                    className="flex-[2] h-9 rounded-xl text-[11px] font-bold bg-cyan-500 hover:bg-cyan-600 text-white flex items-center justify-center gap-1.5 transition-all disabled:opacity-60 shadow-sm"
+                                >
+                                    {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
+                                    Davet Gönder
+                                </button>
+                            </div>
                         </form>
                     </div>
                 </div>
             )}
 
+            {/* Edit User Modal */}
             {showEditModal && editingUser && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-navy-950/80 backdrop-blur-md" onClick={() => setShowEditModal(false)} />
-                    <div className="relative w-full max-w-md glass rounded-[40px] border border-white/10 p-8 space-y-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-                        <div className="flex items-center justify-between">
-                            <h3 className="text-xl font-bold text-text-primary flex items-center gap-3">
-                                <Edit2 className="w-6 h-6 text-electric" /> Kullanıcıyı Düzenle
-                            </h3>
-                            <button onClick={() => setShowEditModal(false)} className="p-2 hover:bg-white/5 rounded-2xl text-navy-500">
-                                <X className="w-5 h-5" />
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm animate-in zoom-in-95 duration-200">
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+                            <div className="flex items-center gap-2">
+                                <Edit2 className="w-4 h-4 text-cyan-500" />
+                                <h3 className="text-[13px] font-black text-slate-800">Kullanıcıyı Düzenle</h3>
+                            </div>
+                            <button onClick={() => setShowEditModal(false)} className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-50">
+                                <X className="w-4 h-4" />
                             </button>
                         </div>
-
-                        <div className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-1">
-                            <p className="text-sm font-bold text-text-primary">{editingUser.displayName}</p>
-                            <p className="text-xs text-navy-500">{editingUser.email}</p>
-                        </div>
-
-                        <form onSubmit={handleUpdateUser} className="space-y-4">
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] text-navy-500 uppercase font-black tracking-widest ml-1">Kullanıcı Rolü</label>
+                        <form onSubmit={handleUpdateUser} className="px-5 py-4 space-y-3">
+                            <div className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5">
+                                <p className="text-[12px] font-bold text-slate-700">{editingUser.displayName}</p>
+                                <p className="text-[10px] text-slate-400 font-mono">{editingUser.email}</p>
+                            </div>
+                            <div>
+                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Rol</label>
                                 <select
                                     value={editingUser.role}
                                     onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value })}
-                                    className="w-full px-5 py-4 bg-navy-900 border border-white/10 rounded-2xl text-text-primary outline-none focus:border-electric transition-all appearance-none"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-700 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition-all"
                                 >
                                     <option value="recruiter">Recruiter (İK Uzmanı)</option>
                                     <option value="department_user">Departman Kullanıcısı</option>
-                                    <option value="super_admin">Süper Admin (Yönetici)</option>
+                                    <option value="super_admin">Süper Admin</option>
                                 </select>
                             </div>
-
                             {editingUser.role === 'department_user' && (
-                                <div className="space-y-3 pt-2">
-                                    <label className="text-[10px] text-navy-500 uppercase font-black tracking-widest ml-1">Departmanlar</label>
-                                    <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                                <div>
+                                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Departmanlar</label>
+                                    <div className="grid grid-cols-2 gap-1.5 max-h-32 overflow-y-auto">
                                         {departmentOptions.map(dept => (
                                             <button
-                                                key={dept}
-                                                type="button"
+                                                key={dept} type="button"
                                                 onClick={() => {
                                                     const current = editingUser.departments || [];
-                                                    if (current.includes(dept)) {
-                                                        setEditingUser({ ...editingUser, departments: current.filter(d => d !== dept) });
-                                                    } else {
-                                                        setEditingUser({ ...editingUser, departments: [...current, dept] });
-                                                    }
+                                                    setEditingUser({ ...editingUser, departments: current.includes(dept) ? current.filter(d => d !== dept) : [...current, dept] });
                                                 }}
-                                                className={`px-3 py-3 rounded-xl text-[10px] font-bold text-left transition-all border ${editingUser.departments?.includes(dept)
-                                                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-400 font-black ring-1 ring-amber-500/50'
-                                                    : 'bg-bg-primary border border-border-subtle text-text-muted hover:border-text-muted/10'
-                                                    }`}
+                                                className={`px-2.5 py-2 rounded-lg text-[10px] font-bold text-left transition-all border ${
+                                                    editingUser.departments?.includes(dept)
+                                                        ? 'bg-cyan-50 border-cyan-200 text-cyan-700'
+                                                        : 'bg-slate-50 border-slate-200 text-slate-500 hover:border-slate-300'
+                                                }`}
                                             >
                                                 {dept}
                                             </button>
@@ -710,31 +510,26 @@ export default function SuperAdminPage() {
                                     </div>
                                 </div>
                             )}
-
-                            {error && (
-                                <div className="text-red-400 text-xs font-bold text-center p-3 rounded-xl bg-red-500/5 border border-red-500/10">
-                                    {error}
-                                </div>
-                            )}
-
-                            <div className="flex gap-3 pt-2">
+                            {error && <p className="text-[11px] text-red-500 bg-red-50 border border-red-100 rounded-xl px-3 py-2">{error}</p>}
+                            <div className="flex gap-2 pt-1">
                                 <button
                                     type="button"
                                     onClick={() => handleToggleUserStatus(editingUser.id, users.find(u => u.id === editingUser.id)?.status)}
-                                    className={`flex-1 py-4 rounded-2xl font-bold text-xs transition-all flex items-center justify-center gap-2 border ${users.find(u => u.id === editingUser.id)?.status === 'disabled'
-                                        ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20'
-                                        : 'bg-amber-500/10 border-amber-500/20 text-amber-400 hover:bg-amber-500/20'
-                                        }`}
+                                    className={`flex-1 h-9 rounded-xl text-[10px] font-bold flex items-center justify-center gap-1.5 border transition-all ${
+                                        users.find(u => u.id === editingUser.id)?.status === 'disabled'
+                                            ? 'bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-100'
+                                            : 'bg-amber-50 border-amber-200 text-amber-600 hover:bg-amber-100'
+                                    }`}
                                 >
-                                    {users.find(u => u.id === editingUser.id)?.status === 'disabled' ? <UserCheck className="w-4 h-4" /> : <UserX className="w-4 h-4" />}
-                                    {users.find(u => u.id === editingUser.id)?.status === 'disabled' ? 'Hesabı Aç' : 'Hesabı Dondur'}
+                                    {users.find(u => u.id === editingUser.id)?.status === 'disabled' ? <UserCheck className="w-3.5 h-3.5" /> : <UserX className="w-3.5 h-3.5" />}
+                                    {users.find(u => u.id === editingUser.id)?.status === 'disabled' ? 'Hesabı Aç' : 'Dondur'}
                                 </button>
                                 <button
-                                    type="submit"
-                                    disabled={sending}
-                                    className="flex-[2] py-4 bg-electric text-text-primary font-bold rounded-2xl hover:bg-electric-light transition-all flex items-center justify-center gap-2 shadow-lg shadow-electric/20 active:scale-95 disabled:opacity-50"
+                                    type="submit" disabled={sending}
+                                    className="flex-[2] h-9 rounded-xl text-[11px] font-bold bg-cyan-500 hover:bg-cyan-600 text-white flex items-center justify-center gap-1.5 transition-all disabled:opacity-60 shadow-sm"
                                 >
-                                    {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <ShieldCheck className="w-5 h-5" />} Güncelle
+                                    {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                                    Güncelle
                                 </button>
                             </div>
                         </form>
@@ -742,5 +537,18 @@ export default function SuperAdminPage() {
                 </div>
             )}
         </div>
+    );
+}
+
+function RolePill({ role, small }) {
+    const cfg = {
+        super_admin: { label: 'Süper Admin', cls: 'bg-violet-50 text-violet-600 border-violet-100' },
+        department_user: { label: 'Departman', cls: 'bg-amber-50 text-amber-600 border-amber-100' },
+        recruiter: { label: 'Recruiter', cls: 'bg-blue-50 text-blue-600 border-blue-100' },
+    }[role] || { label: role, cls: 'bg-slate-100 text-slate-500 border-slate-200' };
+    return (
+        <span className={`inline-flex text-[9px] font-black px-1.5 py-0.5 rounded border ${cfg.cls}`}>
+            {cfg.label}
+        </span>
     );
 }

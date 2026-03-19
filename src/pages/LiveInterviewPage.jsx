@@ -1300,7 +1300,7 @@ export default function LiveInterviewPage() {
                             <div className="w-9 h-9 rounded-xl bg-[#0F172A] flex items-center justify-center">
                                 <Video className="w-4.5 h-4.5 text-white" />
                             </div>
-                            <h2 className="text-[15px] font-black text-[#0F172A] tracking-tighter uppercase italic leading-none">TalentFlow <span className="text-slate-400">Live</span></h2>
+                            <h2 className="text-[15px] font-black text-[#0F172A] tracking-tighter uppercase italic leading-none">Talent-Inn <span className="text-slate-400">Live</span></h2>
                         </div>
                         <div className="flex items-center gap-3">
                             <button

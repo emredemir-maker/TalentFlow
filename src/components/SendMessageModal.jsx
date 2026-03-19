@@ -116,7 +116,7 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
 
                 const eventResult = await createDirectCalendarEvent(userId, googleToken, {
                     summary: `Mülakat: ${candidate.name} - ${candidate.matchedPositionTitle || 'Pozisyon'}`,
-                    description: `TalentFlow üzerinden planlanan görüşme.\nTakip ID: ${trackingId}`,
+                    description: `Talent-Inn üzerinden planlanan görüşme.\nTakip ID: ${trackingId}`,
                     startDateTime,
                     endDateTime,
                     guestEmail: sendCandidateEmail ? candidate.email : null // Only add guest if we notify them

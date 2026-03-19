@@ -90,7 +90,7 @@ export default function InterviewHistory({ sessions = [], onStartSession, onDele
             .footer-text { font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.3em; color: #1e3a8a; }
         </style></head><body>
             <h1>MÜLAKAT ANALİZ RAPORU</h1>
-            <div class="subtitle">TalentFlow Core Architecture v2.4</div>
+            <div class="subtitle">Talent-Inn Core Architecture v2.4</div>
             
             <div class="meta-grid">
                 <div class="meta-item"><div class="meta-label">OTURUM TÜRÜ</div><div class="meta-value">${session.typeLabel}</div></div>
@@ -111,7 +111,7 @@ export default function InterviewHistory({ sessions = [], onStartSession, onDele
             ${qaHtml}
 
             <div class="footer">
-                <div class="footer-text">TalentFlow AI Verification Platform</div>
+                <div class="footer-text">Talent-Inn AI Verification Platform</div>
             </div>
         </body></html>`);
         win.document.close();
@@ -208,7 +208,7 @@ export default function InterviewHistory({ sessions = [], onStartSession, onDele
                                                     </div>
                                                     <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
                                                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Platform</span>
-                                                        <span className="text-sm font-black text-slate-800">TalentFlow Live</span>
+                                                        <span className="text-sm font-black text-slate-800">Talent-Inn Live</span>
                                                     </div>
                                                 </div>
                                                 <button 
@@ -315,7 +315,7 @@ export default function InterviewHistory({ sessions = [], onStartSession, onDele
                                                  <button onClick={(e) => { e.stopPropagation(); onDeleteSession?.(session); }} className="text-[10px] font-black text-red-400 hover:text-red-600 transition-colors uppercase tracking-[0.2em] flex items-center gap-2">
                                                      <Trash2 className="w-4 h-4" /> Oturumu Kayıtlarını Sil
                                                  </button>
-                                                 <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">TalentFlow Analytics Verified</span>
+                                                 <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Talent-Inn Analytics Verified</span>
                                             </div>
                                         </div>
                                     )}

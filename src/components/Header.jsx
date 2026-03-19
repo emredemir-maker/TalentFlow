@@ -18,7 +18,7 @@ export default function Header({ title }) {
                         <Video className="w-5 h-5 text-white" />
                     </div>
                     <div className="hidden md:block">
-                        <h2 className="text-[18px] font-black text-[#0F172A] tracking-tighter uppercase italic leading-none">TalentFlow <span className="text-blue-600">Pro</span></h2>
+                        <h2 className="text-[18px] font-black text-[#0F172A] tracking-tighter uppercase italic leading-none">Talent-Inn <span className="text-blue-600">Pro</span></h2>
                         {title && <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1 italic">{title}</p>}
                     </div>
                 </div>

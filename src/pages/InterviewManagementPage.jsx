@@ -443,7 +443,7 @@ export default function InterviewManagementPage() {
         const joinLink = `${window.location.origin}/join/iv-${selectedCandidate.id.substring(0, 4)}-${Date.now()}`; // Mocking ID for preview
         
         setEmailSubject(`Mülakat Daveti: ${typeLabel} Değerlendirmesi - ${selectedCandidate.name}`);
-        setEmailBody(`Merhaba ${selectedCandidate.name},\n\nTalentFlow ekibi olarak sizinle ${typeLabel} mülakatı gerçekleştirmek istiyoruz.\n\nMülakat Detayları:\n- Tarih: ${manualDate || 'Henüz Belirlenmedi'}\n- Saat: ${manualTime}\n- Platform: TalentFlow Workspace\n\nMülakat linkiniz: ${joinLink}\n\nHerhangi bir sorunuz olursa bu mail üzerinden bizimle iletişime geçebilirsiniz.\n\nİyi çalışmalar dileriz.`);
+        setEmailBody(`Merhaba ${selectedCandidate.name},\n\nTalent-Inn ekibi olarak sizinle ${typeLabel} mülakatı gerçekleştirmek istiyoruz.\n\nMülakat Detayları:\n- Tarih: ${manualDate || 'Henüz Belirlenmedi'}\n- Saat: ${manualTime}\n- Platform: Talent-Inn Workspace\n\nMülakat linkiniz: ${joinLink}\n\nHerhangi bir sorunuz olursa bu mail üzerinden bizimle iletişime geçebilirsiniz.\n\nİyi çalışmalar dileriz.`);
         setIsEmailModalOpen(true);
     };
 

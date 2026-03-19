@@ -650,14 +650,14 @@ app.post('/api/send-invite', async (req, res) => {
         // await transporter.verify();
 
         const mailOptions = {
-            from: `"TalentFlow" <${process.env.EMAIL_USER}>`,
+            from: `"Talent-Inn" <${process.env.EMAIL_USER}>`,
             to: email,
-            subject: 'TalentFlow\'a Davet Edildiniz',
+            subject: 'Talent-Inn\'a Davet Edildiniz',
             html: `
                 <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px; background-color: #ffffff;">
-                    <h2 style="color: #4f46e5; border-bottom: 2px solid #f3f4f6; padding-bottom: 10px;">TalentFlow'a Hoş Geldiniz!</h2>
+                    <h2 style="color: #4f46e5; border-bottom: 2px solid #f3f4f6; padding-bottom: 10px;">Talent-Inn'a Hoş Geldiniz!</h2>
                     <p style="color: #374151; font-size: 16px;">Merhaba,</p>
-                    <p style="color: #374151; font-size: 15px; line-height: 1.5;">TalentFlow platformuna <strong>${role === 'super_admin' ? 'Süper Admin' : 'Recruiter'}</strong> olarak davet edildiniz.</p>
+                    <p style="color: #374151; font-size: 15px; line-height: 1.5;">Talent-Inn platformuna <strong>${role === 'super_admin' ? 'Süper Admin' : 'Recruiter'}</strong> olarak davet edildiniz.</p>
                     <p style="color: #374151; font-size: 15px;">Aşağıdaki butona tıklayarak hesabınızı oluşturabilir ve ekibe katılabilirsiniz:</p>
                     <div style="text-align: center; margin: 35px 0;">
                         <a href="${inviteLink}" style="background-color: #4f46e5; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 16px;">Daveti Kabul Et</a>
