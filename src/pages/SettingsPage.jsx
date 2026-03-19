@@ -13,68 +13,23 @@ export default function SettingsPage() {
     // STT Test States
     const [sttStatus, setSttStatus] = useState('idle'); // idle | listening | success | error
     const [sttResult, setSttResult] = useState('');
-    const streamRef = useRef(null);
+    const mediaRecorderRef = useRef(null);
+    const sttIntervalRef = useRef(null);
+    const audioChunksRef = useRef([]);
     const sttActiveRef = useRef(false);
 
     const stopSttTest = () => {
         sttActiveRef.current = false;
-        if (streamRef.current) {
-            streamRef.current.getTracks().forEach(t => t.stop());
-            streamRef.current = null;
+        if (sttIntervalRef.current) clearInterval(sttIntervalRef.current);
+        if (mediaRecorderRef.current) {
+            mediaRecorderRef.current.onstop = null; // prevent restart on forced stop
+            if (mediaRecorderRef.current.state === 'recording') mediaRecorderRef.current.stop();
+            mediaRecorderRef.current.stream?.getTracks().forEach(t => t.stop());
+            mediaRecorderRef.current = null;
         }
+        audioChunksRef.current = [];
         setSttStatus('idle');
         setSttResult('');
-    };
-
-    // Recursive recording cycle: each cycle records ~4s, sends to API, then starts the next cycle.
-    // This avoids the stop()->start() race condition by only calling start() inside onstop.
-    const runCycle = (stream) => {
-        if (!sttActiveRef.current) return;
-
-        const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-            ? 'audio/webm;codecs=opus'
-            : 'audio/webm';
-
-        const recorder = new MediaRecorder(stream, { mimeType });
-        const chunks = [];
-
-        recorder.ondataavailable = (e) => {
-            if (e.data && e.data.size > 0) chunks.push(e.data);
-        };
-
-        recorder.onstop = async () => {
-            if (!sttActiveRef.current) return;
-
-            const blob = new Blob(chunks, { type: mimeType });
-            if (blob.size >= 2000) {
-                try {
-                    const formData = new FormData();
-                    formData.append('audio', blob, 'stt-test.webm');
-                    const res = await fetch('/api/gemini-stt', { method: 'POST', body: formData });
-                    const data = await res.json();
-                    const text = data.text?.trim();
-                    if (text && sttActiveRef.current) {
-                        setSttResult(text);
-                        setSttStatus('success');
-                        sttActiveRef.current = false;
-                        stream.getTracks().forEach(t => t.stop());
-                        streamRef.current = null;
-                        return;
-                    }
-                } catch (e) {
-                    console.error('[STT Test]', e);
-                }
-            }
-
-            // Start the next 4-second cycle
-            setTimeout(() => runCycle(stream), 100);
-        };
-
-        recorder.start();
-        // Stop after 4 seconds to trigger onstop → API call → next cycle
-        setTimeout(() => {
-            if (recorder.state === 'recording') recorder.stop();
-        }, 4000);
     };
 
     const toggleSttTest = async () => {
@@ -85,10 +40,67 @@ export default function SettingsPage() {
         setSttResult('');
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            streamRef.current = stream;
+
+            // Pick best supported mimeType (same logic as LiveInterviewPage)
+            let mimeType = 'audio/webm';
+            for (const t of ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus']) {
+                if (MediaRecorder.isTypeSupported(t)) { mimeType = t; break; }
+            }
+
+            const recorder = new MediaRecorder(stream, { mimeType });
+            mediaRecorderRef.current = recorder;
+            audioChunksRef.current = [];
             sttActiveRef.current = true;
+
+            recorder.ondataavailable = (e) => {
+                if (e.data && e.data.size > 0) audioChunksRef.current.push(e.data);
+            };
+
+            recorder.onstop = async () => {
+                const chunks = audioChunksRef.current;
+                audioChunksRef.current = [];
+
+                if (chunks.length > 0) {
+                    const blob = new Blob(chunks, { type: mimeType });
+                    if (blob.size >= 1000) {
+                        try {
+                            const formData = new FormData();
+                            formData.append('audio', blob, 'chunk.webm');
+                            const res = await fetch('/api/gemini-stt', { method: 'POST', body: formData });
+                            const data = await res.json();
+                            const text = data.text?.trim() || '';
+                            const isJunk = text.length <= 2
+                                || text.toLowerCase().includes('sessizlik')
+                                || text.toLowerCase().includes('boş_ses');
+
+                            if (!isJunk && sttActiveRef.current) {
+                                setSttResult(text);
+                                setSttStatus('success');
+                                sttActiveRef.current = false;
+                                clearInterval(sttIntervalRef.current);
+                                stream.getTracks().forEach(t => t.stop());
+                                return;
+                            }
+                        } catch (err) {
+                            console.error('[STT Test]', err);
+                        }
+                    }
+                }
+
+                // Restart the same recorder for next chunk (only if still active)
+                if (sttActiveRef.current && recorder.state === 'inactive') {
+                    try { recorder.start(); } catch { /* stream ended */ }
+                }
+            };
+
+            // Start recording; interval calls stop() every 5s → onstop restarts
+            recorder.start();
             setSttStatus('listening');
-            runCycle(stream);
+            sttIntervalRef.current = setInterval(() => {
+                if (mediaRecorderRef.current?.state === 'recording') {
+                    mediaRecorderRef.current.stop();
+                }
+            }, 5000);
         } catch {
             setSttStatus('error');
         }
