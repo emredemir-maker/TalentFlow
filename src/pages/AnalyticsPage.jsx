@@ -413,7 +413,6 @@ export default function AnalyticsPage() {
     const { userProfile } = useAuth();
     const [activeTab, setActiveTab]     = useState('overview');
     const [timeRange, setTimeRange]     = useState('7d');
-    const [activeSourceTab, setActiveSourceTab] = useState('source');
     const [processingResponse, setProcessingResponse] = useState(null);
 
     const openResponseModal = (msg) => setProcessingResponse({ message: msg, emailText: '', loading: false, result: null, checkingMail: false });

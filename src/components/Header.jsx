@@ -3,12 +3,10 @@ import React from 'react';
 import { Search, Bell, Settings, Home, Video } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../context/NotificationContext';
-import { useAuth } from '../context/AuthContext';
 
 export default function Header({ title }) {
     const navigate = useNavigate();
     const { unreadCount } = useNotifications();
-    const { userProfile } = useAuth();
 
     return (
         <header className="h-[88px] flex items-center justify-between px-8 bg-white/80 backdrop-blur-md border-b border-[#F1F5F9] sticky top-0 z-40">

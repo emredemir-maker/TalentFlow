@@ -75,7 +75,7 @@ export default function InterviewHistory({ sessions = [], onStartSession, onDele
             body { font-family: 'Inter', sans-serif; padding: 60px; color: #010409; max-width: 800px; margin: 0 auto; background: #fff; line-height: 1.5; }
             h1 { font-size: 32px; font-weight: 900; letter-spacing: -0.04em; margin-bottom: 4px; font-style: italic; text-transform: uppercase; }
             .subtitle { font-size: 10px; color: #64748b; font-weight: 900; text-transform: uppercase; letter-spacing: 0.3em; margin-bottom: 40px; }
-            .meta-grid { display: grid; grid-cols: repeat(4, 1fr); gap: 15px; margin-bottom: 40px; }
+            .meta-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 40px; }
             .meta-item { padding: 20px; background: #f8fbff; border-radius: 20px; border: 1px solid #e2e8f0; }
             .meta-label { font-size: 8px; font-weight: 900; color: #64748b; text-transform: uppercase; letter-spacing: 0.2em; margin-bottom: 6px; }
             .meta-value { font-size: 14px; font-weight: 700; color: #1e3a8a; }
