@@ -29,16 +29,17 @@ function TabPill({ id, label, active, onClick }) {
 }
 
 // ─── Overview tab ────────────────────────────────────────────
-function OverviewTab({ candidates, funnelData, trendsData, positionStatusData, avgMatchScore, pendingCount }) {
+function OverviewTab({ candidates, funnelData, trendsData, positionStatusData, avgMatchScore, pendingCount, timeRange }) {
     const hiredCount   = candidates.filter(c => c.status === 'hired').length;
     const hiringRate   = Math.round((hiredCount / (candidates.length || 1)) * 100);
     const pendingReply = pendingCount;
 
     // Bar chart heights: normalise trendsData to max
     const maxApps = Math.max(...trendsData.map(d => d.applications), 1);
-    const DAY_LABELS = ['P', 'S', 'Ç', 'P', 'C', 'C', 'P'];
-    const thisWeek   = trendsData.reduce((a, d) => a + d.applications, 0);
-    const lastWeek   = Math.round(thisWeek * 0.75); // approximation without historical data
+    const is30d    = timeRange === '30d';
+    const periodLabel = is30d ? 'Son 30 Gün' : 'Son 7 Gün';
+    const totalApps  = trendsData.reduce((a, d) => a + d.applications, 0);
+    const prevPeriod = Math.round(totalApps * 0.75); // approximation without historical data
 
     return (
         <div className="space-y-4">
@@ -74,26 +75,31 @@ function OverviewTab({ candidates, funnelData, trendsData, positionStatusData, a
                             <TrendingUp className="text-cyan-500" size={16} />
                             <span className="text-[14px] font-bold text-slate-900">Başvuru Trendi</span>
                         </div>
-                        <span className="text-[10px] bg-slate-100 text-slate-500 px-2.5 py-1 rounded-xl font-semibold">Son 7 Gün</span>
+                        <span className="text-[10px] bg-slate-100 text-slate-500 px-2.5 py-1 rounded-xl font-semibold">{periodLabel}</span>
                     </div>
-                    <div className="h-44 flex items-end justify-between gap-1 px-2 pt-2 border-b border-slate-100 pb-2">
+                    <div className="h-44 flex items-end justify-between gap-0.5 px-1 pt-2 border-b border-slate-100 pb-2">
                         {trendsData.map((d, i) => {
                             const pct = Math.max(4, Math.round((d.applications / maxApps) * 100));
                             const isLast = i === trendsData.length - 1;
+                            const showLabel = is30d ? i % 5 === 0 : true;
                             return (
-                                <div key={i} className="flex flex-col items-center w-full gap-2">
+                                <div key={i} className="flex flex-col items-center w-full gap-1">
                                     <div className="w-full h-36 flex items-end justify-center">
-                                        <div className={`w-full rounded-t-md transition-colors ${isLast ? 'bg-cyan-500' : 'bg-cyan-300 hover:bg-cyan-400'}`} style={{ height: `${pct}%` }} />
+                                        <div
+                                            className={`w-full rounded-t-sm transition-colors ${isLast ? 'bg-cyan-500' : 'bg-cyan-300 hover:bg-cyan-400'}`}
+                                            style={{ height: `${pct}%` }}
+                                            title={`${d.date}: ${d.applications}`}
+                                        />
                                     </div>
-                                    <span className="text-[9px] text-slate-400 font-medium">{DAY_LABELS[i]}</span>
+                                    {showLabel && <span className="text-[8px] text-slate-400 font-medium">{is30d ? d.date.split(' ')[0] : d.date.split(' ')[0]}</span>}
                                 </div>
                             );
                         })}
                     </div>
                     <div className="pt-3 flex items-center gap-6">
-                        <div className="flex items-center gap-1.5"><span className="text-[11px] text-slate-400">Bu hafta:</span><span className="font-bold text-slate-700 text-sm">{thisWeek}</span></div>
-                        <div className="flex items-center gap-1.5"><span className="text-[11px] text-slate-400">Geçen hafta:</span><span className="font-bold text-slate-700 text-sm">{lastWeek}</span></div>
-                        <div className="flex items-center gap-1.5"><span className="text-[11px] text-slate-400">Değişim:</span><span className="font-bold text-emerald-600 text-sm">▲ {lastWeek ? Math.round(((thisWeek - lastWeek) / lastWeek) * 100) : 0}%</span></div>
+                        <div className="flex items-center gap-1.5"><span className="text-[11px] text-slate-400">{periodLabel}:</span><span className="font-bold text-slate-700 text-sm">{totalApps}</span></div>
+                        <div className="flex items-center gap-1.5"><span className="text-[11px] text-slate-400">Önceki dönem:</span><span className="font-bold text-slate-700 text-sm">{prevPeriod}</span></div>
+                        <div className="flex items-center gap-1.5"><span className="text-[11px] text-slate-400">Değişim:</span><span className="font-bold text-emerald-600 text-sm">▲ {prevPeriod ? Math.round(((totalApps - prevPeriod) / prevPeriod) * 100) : 0}%</span></div>
                     </div>
                 </div>
 
@@ -446,18 +452,33 @@ export default function AnalyticsPage() {
         }
     };
 
+    // ── Date-filtered candidates ──
+    const timeCutoff = useMemo(() => {
+        const d = new Date();
+        d.setDate(d.getDate() - (timeRange === '30d' ? 30 : 7));
+        return d;
+    }, [timeRange]);
+
+    const timeFilteredCandidates = useMemo(() => {
+        return candidates.filter(c => {
+            if (!c.appliedDate) return true; // keep candidates with no date
+            return new Date(c.appliedDate) >= timeCutoff;
+        });
+    }, [candidates, timeCutoff]);
+
     // ── Data ──
     const trendsData = useMemo(() => {
-        const last7 = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - i); return d.toISOString().split('T')[0]; }).reverse();
+        const days = timeRange === '30d' ? 30 : 7;
+        const dateList = [...Array(days)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - i); return d.toISOString().split('T')[0]; }).reverse();
         const counts = {};
         candidates.forEach(c => { if (c.appliedDate) counts[c.appliedDate.split('T')[0]] = (counts[c.appliedDate.split('T')[0]] || 0) + 1; });
-        return last7.map(date => ({ date: new Date(date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' }), applications: counts[date] || 0 }));
-    }, [candidates]);
+        return dateList.map(date => ({ date: new Date(date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' }), applications: counts[date] || 0 }));
+    }, [candidates, timeRange]);
 
     const positionStatusData = useMemo(() => {
         const matrix = {};
         positions.forEach(p => { if (p.status === 'open') matrix[p.title] = { name: p.title, total: 0, review: 0, interview: 0, hired: 0, rejected: 0, avgScore: 0, scoredCandidates: 0 }; });
-        candidates.forEach(c => {
+        timeFilteredCandidates.forEach(c => {
             const pos = c.matchedPositionTitle || c.position || 'Genel Başvuru';
             if (!matrix[pos]) matrix[pos] = { name: pos, total: 0, review: 0, interview: 0, hired: 0, rejected: 0, avgScore: 0, scoredCandidates: 0 };
             matrix[pos].total += 1;
@@ -468,18 +489,18 @@ export default function AnalyticsPage() {
             if (c.status === 'rejected') matrix[pos].rejected += 1;
         });
         return Object.values(matrix).map(p => ({ ...p, avgScore: p.scoredCandidates > 0 ? Math.round(p.avgScore / p.scoredCandidates) : 0 })).sort((a, b) => b.total - a.total);
-    }, [candidates, positions]);
+    }, [timeFilteredCandidates, positions]);
 
     const funnelData = useMemo(() => ([
-        { name: 'Başvuru',  color: '#6366f1', count: candidates.length },
-        { name: 'İnceleme', color: '#f59e0b', count: candidates.filter(c => ['review', 'interview', 'offer', 'hired'].includes(c.status)).length },
-        { name: 'Mülakat',  color: '#3b82f6', count: candidates.filter(c => ['interview', 'offer', 'hired'].includes(c.status)).length },
-        { name: 'İşe Alım', color: '#10b981', count: candidates.filter(c => c.status === 'hired').length },
-    ]), [candidates]);
+        { name: 'Başvuru',  color: '#6366f1', count: timeFilteredCandidates.length },
+        { name: 'İnceleme', color: '#f59e0b', count: timeFilteredCandidates.filter(c => ['review', 'interview', 'offer', 'hired'].includes(c.status)).length },
+        { name: 'Mülakat',  color: '#3b82f6', count: timeFilteredCandidates.filter(c => ['interview', 'offer', 'hired'].includes(c.status)).length },
+        { name: 'İşe Alım', color: '#10b981', count: timeFilteredCandidates.filter(c => c.status === 'hired').length },
+    ]), [timeFilteredCandidates]);
 
     const { sourceList, subSourceList } = useMemo(() => {
         const sources = {}, subSources = {};
-        candidates.forEach(c => {
+        timeFilteredCandidates.forEach(c => {
             const s = c.source?.includes('Visual') ? 'LinkedIn / Scraper' : c.source?.includes('Browser') ? 'Eklenti' : c.source?.includes('CV') ? 'CV Yükleme' : (c.source || 'Diğer');
             if (!sources[s]) sources[s] = { count: 0, totalScore: 0, successCount: 0 };
             sources[s].count += 1; sources[s].totalScore += (c.matchScore || 0);
@@ -490,18 +511,18 @@ export default function AnalyticsPage() {
         });
         const fmt = obj => Object.entries(obj).map(([name, d]) => ({ name, value: d.count, percentage: d.count > 0 ? Math.round(d.totalScore / d.count) : 0, successRate: d.count > 0 ? Math.round((d.successCount / d.count) * 100) : 0 })).sort((a, b) => b.value - a.value);
         return { sourceList: fmt(sources), subSourceList: fmt(subSources) };
-    }, [candidates]);
+    }, [timeFilteredCandidates]);
 
     const topSkills = useMemo(() => {
         const skills = {};
-        candidates.forEach(c => (c.skills || []).forEach(s => { skills[s] = (skills[s] || 0) + 1; }));
+        timeFilteredCandidates.forEach(c => (c.skills || []).forEach(s => { skills[s] = (skills[s] || 0) + 1; }));
         return Object.entries(skills).sort((a, b) => b[1] - a[1]).slice(0, 8);
-    }, [candidates]);
+    }, [timeFilteredCandidates]);
 
     const avgMatchScore = useMemo(() => {
-        if (!candidates.length) return 0;
-        return Math.round(candidates.reduce((a, c) => a + (c.matchScore || 0), 0) / candidates.length);
-    }, [candidates]);
+        if (!timeFilteredCandidates.length) return 0;
+        return Math.round(timeFilteredCandidates.reduce((a, c) => a + (c.matchScore || 0), 0) / timeFilteredCandidates.length);
+    }, [timeFilteredCandidates]);
 
     const pendingApprovals = useMemo(() => messages.filter(m => m.status === 'draft' || m.status === 'ready_to_send'), [messages]);
     const sentMessages     = useMemo(() => messages.filter(m => m.status === 'sent' || m.status === 'email_opened' || m.status === 'replied'), [messages]);
@@ -556,14 +577,15 @@ export default function AnalyticsPage() {
                 <div className="max-w-[1600px] mx-auto">
                     {activeTab === 'overview' && (
                         <OverviewTab
-                            candidates={candidates} funnelData={funnelData} trendsData={trendsData}
+                            candidates={timeFilteredCandidates} funnelData={funnelData} trendsData={trendsData}
                             positionStatusData={positionStatusData} avgMatchScore={avgMatchScore} pendingCount={pendingCount}
+                            timeRange={timeRange}
                         />
                     )}
                     {activeTab === 'acquisition' && (
                         <AcquisitionTab
                             sourceList={sourceList} subSourceList={subSourceList}
-                            topSkills={topSkills} avgMatchScore={avgMatchScore} candidates={candidates}
+                            topSkills={topSkills} avgMatchScore={avgMatchScore} candidates={timeFilteredCandidates}
                         />
                     )}
                     {activeTab === 'responses' && (
