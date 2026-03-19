@@ -13,52 +13,82 @@ export default function SettingsPage() {
     // STT Test States
     const [sttStatus, setSttStatus] = useState('idle'); // idle | listening | success | error
     const [sttResult, setSttResult] = useState('');
-    const mediaRecorderRef = useRef(null);
-    const sttIntervalRef = useRef(null);
+    const streamRef = useRef(null);
+    const sttActiveRef = useRef(false);
+
+    const stopSttTest = () => {
+        sttActiveRef.current = false;
+        if (streamRef.current) {
+            streamRef.current.getTracks().forEach(t => t.stop());
+            streamRef.current = null;
+        }
+        setSttStatus('idle');
+        setSttResult('');
+    };
+
+    // Recursive recording cycle: each cycle records ~4s, sends to API, then starts the next cycle.
+    // This avoids the stop()->start() race condition by only calling start() inside onstop.
+    const runCycle = (stream) => {
+        if (!sttActiveRef.current) return;
+
+        const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+            ? 'audio/webm;codecs=opus'
+            : 'audio/webm';
+
+        const recorder = new MediaRecorder(stream, { mimeType });
+        const chunks = [];
+
+        recorder.ondataavailable = (e) => {
+            if (e.data && e.data.size > 0) chunks.push(e.data);
+        };
+
+        recorder.onstop = async () => {
+            if (!sttActiveRef.current) return;
+
+            const blob = new Blob(chunks, { type: mimeType });
+            if (blob.size >= 2000) {
+                try {
+                    const formData = new FormData();
+                    formData.append('audio', blob, 'stt-test.webm');
+                    const res = await fetch('/api/gemini-stt', { method: 'POST', body: formData });
+                    const data = await res.json();
+                    const text = data.text?.trim();
+                    if (text && sttActiveRef.current) {
+                        setSttResult(text);
+                        setSttStatus('success');
+                        sttActiveRef.current = false;
+                        stream.getTracks().forEach(t => t.stop());
+                        streamRef.current = null;
+                        return;
+                    }
+                } catch (e) {
+                    console.error('[STT Test]', e);
+                }
+            }
+
+            // Start the next 4-second cycle
+            setTimeout(() => runCycle(stream), 100);
+        };
+
+        recorder.start();
+        // Stop after 4 seconds to trigger onstop → API call → next cycle
+        setTimeout(() => {
+            if (recorder.state === 'recording') recorder.stop();
+        }, 4000);
+    };
 
     const toggleSttTest = async () => {
         if (sttStatus === 'listening') {
-            if (sttIntervalRef.current) clearInterval(sttIntervalRef.current);
-            if (mediaRecorderRef.current?.state !== 'inactive') mediaRecorderRef.current?.stop();
-            setSttStatus('idle');
-            setSttResult('');
+            stopSttTest();
             return;
         }
         setSttResult('');
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const mediaRecorder = new MediaRecorder(stream);
-            mediaRecorderRef.current = mediaRecorder;
-            mediaRecorder.audioChunks = [];
-
-            mediaRecorder.ondataavailable = (e) => { mediaRecorder.audioChunks.push(e.data); };
-            mediaRecorder.onstop = async () => {
-                const chunks = mediaRecorder.audioChunks || [];
-                if (chunks.length === 0) return;
-                const blob = new Blob(chunks, { type: 'audio/webm' });
-                mediaRecorder.audioChunks = [];
-                if (blob.size < 2000) return;
-                const formData = new FormData();
-                formData.append('audio', blob, 'stt-test.webm');
-                try {
-                    const res = await fetch('/api/gemini-stt', { method: 'POST', body: formData });
-                    const data = await res.json();
-                    if (data.text && data.text.trim()) {
-                        setSttResult(data.text.trim());
-                        setSttStatus('success');
-                        if (sttIntervalRef.current) clearInterval(sttIntervalRef.current);
-                    }
-                } catch (e) { console.error('STT error', e); }
-            };
-
-            mediaRecorder.start();
+            streamRef.current = stream;
+            sttActiveRef.current = true;
             setSttStatus('listening');
-            sttIntervalRef.current = setInterval(() => {
-                if (mediaRecorderRef.current?.state === 'recording') {
-                    mediaRecorderRef.current.stop();
-                    mediaRecorderRef.current.start();
-                }
-            }, 4000);
+            runCycle(stream);
         } catch {
             setSttStatus('error');
         }
