@@ -647,35 +647,47 @@ app.post('/api/process-cv', aiLimiter, upload.array('cvs', 20), async (req, res)
 });
 
 // Gemini STT Endpoint (Audio to Text)
+// Accepts both multipart/form-data (LiveInterviewPage) and base64 JSON (SettingsPage)
 const audioUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
-app.post('/api/gemini-stt', aiLimiter, audioUpload.single('audio'), async (req, res) => {
+app.post('/api/gemini-stt', aiLimiter, (req, res, next) => {
+    const ct = req.headers['content-type'] || '';
+    if (ct.includes('multipart/form-data')) {
+        audioUpload.single('audio')(req, res, next);
+    } else {
+        next();
+    }
+}, async (req, res) => {
     try {
-        if (!req.file) return res.status(400).json({ error: 'Ses dosyası bulunamadı' });
-        
+        let audioBase64, mimeType;
+
+        if (req.file) {
+            // Path 1: multipart/form-data upload (LiveInterviewPage)
+            audioBase64 = req.file.buffer.toString('base64');
+            mimeType = (req.file.mimetype || 'audio/webm').split(';')[0];
+            console.log(`🎙️ STT (multipart) ${mimeType} ${(req.file.buffer.length / 1024).toFixed(1)}KB`);
+        } else if (req.body?.audio) {
+            // Path 2: base64 JSON body (SettingsPage — avoids proxy/xss-clean issues with binary)
+            audioBase64 = req.body.audio;
+            mimeType = (req.body.mimeType || 'audio/webm').split(';')[0];
+            const sizeKB = (audioBase64.length * 0.75 / 1024).toFixed(1);
+            console.log(`🎙️ STT (base64) ${mimeType} ~${sizeKB}KB`);
+        } else {
+            return res.status(400).json({ error: 'Ses dosyası bulunamadı' });
+        }
+
         const apiKey = await getApiKey();
         if (!apiKey) return res.status(500).json({ error: 'Gemini API Key eksik' });
 
         const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
-        const mimeType = (req.file.mimetype || "audio/webm").split(';')[0];
-        const audioData = {
-            inlineData: {
-                data: req.file.buffer.toString("base64"),
-                mimeType: mimeType
-            }
-        };
-
-        console.log(`🎙️ Processing STT Audio Chunk (${mimeType}, ${(req.file.buffer.length / 1024).toFixed(1)}KB)`);
-
         const result = await model.generateContent([
-            audioData,
+            { inlineData: { data: audioBase64, mimeType } },
             "Bu ses dosyasındaki Türkçe konuşmaları metne dök. ÖNEMLİ: Sadece konuşulan sözcükleri yaz. Konuşma yoksa sadece boş bir dize döndür. 'Sessizlik', 'Ses yok', 'Boş' gibi ifadeler KULLANMA. Eğer konuşmacı mülakat yapıyorsa o bağlamda kelimeleri doğru seç."
         ]);
 
         const text = result.response.text().trim();
-        console.log(`✅ STT Result [${req.file.buffer.length}b]: "${text.substring(0, 80)}..."`);
-        
+        console.log(`✅ STT Result: "${text.substring(0, 80)}"`);
         res.json({ success: true, text });
     } catch (err) {
         console.error('💥 Gemini STT Error:', err.message);

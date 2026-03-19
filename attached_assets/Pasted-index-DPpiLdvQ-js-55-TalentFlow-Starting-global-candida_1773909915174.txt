@@ -1,0 +1,52 @@
+index-DPpiLdvQ.js:55 [TalentFlow] Starting global candidates listener (isAuthenticated: true, isPublicAccessRoute: false)
+/api/gemini-stt:1  Failed to load resource: the server responded with a status of 403 ()
+index-DPpiLdvQ.js:484 [STT Test] SyntaxError: Unexpected token '<', "
+<html><hea"... is not valid JSON
+T.onstop @ index-DPpiLdvQ.js:484
+/api/gemini-stt:1  Failed to load resource: the server responded with a status of 403 ()
+index-DPpiLdvQ.js:484 [STT Test] SyntaxError: Unexpected token '<', "
+<html><hea"... is not valid JSON
+T.onstop @ index-DPpiLdvQ.js:484
+/api/gemini-stt:1  Failed to load resource: the server responded with a status of 403 ()
+index-DPpiLdvQ.js:484 [STT Test] SyntaxError: Unexpected token '<', "
+<html><hea"... is not valid JSON
+T.onstop @ index-DPpiLdvQ.js:484
+/api/gemini-stt:1  Failed to load resource: the server responded with a status of 403 ()
+index-DPpiLdvQ.js:484 [STT Test] SyntaxError: Unexpected token '<', "
+<html><hea"... is not valid JSON
+T.onstop @ index-DPpiLdvQ.js:484
+/api/gemini-stt:1  Failed to load resource: the server responded with a status of 403 ()
+index-DPpiLdvQ.js:484 [STT Test] SyntaxError: Unexpected token '<', "
+<html><hea"... is not valid JSON
+T.onstop @ index-DPpiLdvQ.js:484
+www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1:1  Failed to load resource: the server responded with a status of 401 ()
+index-DPpiLdvQ.js:484 Direct Calendar Event Error: Error: Oturum süresi dolmuş veya yetki kaldırılmış. Lütfen Google bağlantısını yenileyin.
+    at cae (index-DPpiLdvQ.js:484:1316)
+    at async De (index-DPpiLdvQ.js:535:849)
+cae @ index-DPpiLdvQ.js:484
+index-DPpiLdvQ.js:55 [Firestore] Updating candidate m33uYFANKmRjAi1OiXNB... Object
+index-DPpiLdvQ.js:55 [Firestore] Candidate m33uYFANKmRjAi1OiXNB updated successfully.
+(index):1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+(index):1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+(index):1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+(index):1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+(index):1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+(index):1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+(index):1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+(index):1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+(index):1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+(index):1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+(index):1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+(index):1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+(index):1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+(index):1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+(index):1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+(index):1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+(index):1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+(index):1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+(index):1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+(index):1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+(index):1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+(index):1 Unchecked runtime.lastError: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+(index):1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received
+(index):1 Uncaught (in promise) Error: A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received

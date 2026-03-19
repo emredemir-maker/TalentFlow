@@ -64,9 +64,17 @@ export default function SettingsPage() {
                     const blob = new Blob(chunks, { type: mimeType });
                     if (blob.size >= 1000) {
                         try {
-                            const formData = new FormData();
-                            formData.append('audio', blob, 'chunk.webm');
-                            const res = await fetch('/api/gemini-stt', { method: 'POST', body: formData });
+                            // Send as base64 JSON to avoid multipart/proxy 403 issues
+                            const arrayBuffer = await blob.arrayBuffer();
+                            const bytes = new Uint8Array(arrayBuffer);
+                            let binary = '';
+                            for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+                            const base64Audio = btoa(binary);
+                            const res = await fetch('/api/gemini-stt', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ audio: base64Audio, mimeType })
+                            });
                             const data = await res.json();
                             const text = data.text?.trim() || '';
                             const isJunk = text.length <= 2
