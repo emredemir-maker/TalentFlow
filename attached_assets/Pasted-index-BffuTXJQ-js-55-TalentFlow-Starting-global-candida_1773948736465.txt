@@ -1,0 +1,81 @@
+index-BffuTXJQ.js:55 [TalentFlow] Starting global candidates listener (isAuthenticated: true, isPublicAccessRoute: false)
+index-BffuTXJQ.js:516 [Presence] Recruiter session active. Starting heartbeat...
+index-BffuTXJQ.js:55 [Firestore] Updating candidate m33uYFANKmRjAi1OiXNB... Object
+index-BffuTXJQ.js:55 [Firestore] Candidate m33uYFANKmRjAi1OiXNB updated successfully.
+index-BffuTXJQ.js:55 [Firestore] Updating candidate m33uYFANKmRjAi1OiXNB... Object
+index-BffuTXJQ.js:55 [Firestore] Candidate m33uYFANKmRjAi1OiXNB updated successfully.
+index-BffuTXJQ.js:516 [LiveInterview] Fetching paths for strategy: product
+index-BffuTXJQ.js:55 [Firestore] Updating candidate m33uYFANKmRjAi1OiXNB... Object
+index-BffuTXJQ.js:55 [Firestore] Candidate m33uYFANKmRjAi1OiXNB updated successfully.
+index-BffuTXJQ.js:55 [Firestore] Updating candidate m33uYFANKmRjAi1OiXNB... Object
+index-BffuTXJQ.js:55 [Firestore] Candidate m33uYFANKmRjAi1OiXNB updated successfully.
+index-BffuTXJQ.js:55 [Firestore] Updating candidate m33uYFANKmRjAi1OiXNB... Object
+index-BffuTXJQ.js:55 [Firestore] Candidate m33uYFANKmRjAi1OiXNB updated successfully.
+index-BffuTXJQ.js:55 [Firestore] Updating candidate m33uYFANKmRjAi1OiXNB... Object
+index-BffuTXJQ.js:516 [LiveInterview] Fetching paths for strategy: product
+index-BffuTXJQ.js:55 [Firestore] Candidate m33uYFANKmRjAi1OiXNB updated successfully.
+gemini-2.0-flash:generateContent:1  Failed to load resource: the server responded with a status of 400 ()
+index-BffuTXJQ.js:525 💥 Gemini STT Error: cS: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent: [400 ] API key not valid. Please pass a valid API key. [{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"API_KEY_INVALID","domain":"googleapis.com","metadata":{"service":"generativelanguage.googleapis.com"}},{"@type":"type.googleapis.com/google.rpc.LocalizedMessage","locale":"en-US","message":"API key not valid. Please pass a valid API key."}]
+    at WP (index-BffuTXJQ.js:57:24704)
+    at async zP (index-BffuTXJQ.js:57:24259)
+    at async hS (index-BffuTXJQ.js:58:3938)
+    at async Bn (index-BffuTXJQ.js:516:33952)
+Bn @ index-BffuTXJQ.js:525
+index-BffuTXJQ.js:55 [Firestore] Updating candidate m33uYFANKmRjAi1OiXNB... Object
+index-BffuTXJQ.js:55 [Firestore] Candidate m33uYFANKmRjAi1OiXNB updated successfully.
+gemini-2.0-flash:generateContent:1  Failed to load resource: the server responded with a status of 400 ()
+index-BffuTXJQ.js:525 💥 Gemini STT Error: cS: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent: [400 ] API key not valid. Please pass a valid API key. [{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"API_KEY_INVALID","domain":"googleapis.com","metadata":{"service":"generativelanguage.googleapis.com"}},{"@type":"type.googleapis.com/google.rpc.LocalizedMessage","locale":"en-US","message":"API key not valid. Please pass a valid API key."}]
+    at WP (index-BffuTXJQ.js:57:24704)
+    at async zP (index-BffuTXJQ.js:57:24259)
+    at async hS (index-BffuTXJQ.js:58:3938)
+    at async Bn (index-BffuTXJQ.js:516:33952)
+Bn @ index-BffuTXJQ.js:525
+index-BffuTXJQ.js:55 [Firestore] Updating candidate m33uYFANKmRjAi1OiXNB... Object
+index-BffuTXJQ.js:55 [Firestore] Candidate m33uYFANKmRjAi1OiXNB updated successfully.
+gemini-2.0-flash:generateContent:1  Failed to load resource: the server responded with a status of 400 ()
+index-BffuTXJQ.js:525 💥 Gemini STT Error: cS: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent: [400 ] API key not valid. Please pass a valid API key. [{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"API_KEY_INVALID","domain":"googleapis.com","metadata":{"service":"generativelanguage.googleapis.com"}},{"@type":"type.googleapis.com/google.rpc.LocalizedMessage","locale":"en-US","message":"API key not valid. Please pass a valid API key."}]
+    at WP (index-BffuTXJQ.js:57:24704)
+    at async zP (index-BffuTXJQ.js:57:24259)
+    at async hS (index-BffuTXJQ.js:58:3938)
+    at async Bn (index-BffuTXJQ.js:516:33952)
+Bn @ index-BffuTXJQ.js:525
+index-BffuTXJQ.js:55 [Firestore] Updating candidate m33uYFANKmRjAi1OiXNB... Object
+index-BffuTXJQ.js:516 [LiveInterview] Fetching paths for strategy: product
+index-BffuTXJQ.js:55 [Firestore] Candidate m33uYFANKmRjAi1OiXNB updated successfully.
+index-BffuTXJQ.js:55 [Firestore] Updating candidate m33uYFANKmRjAi1OiXNB... Object
+index-BffuTXJQ.js:55 [Firestore] Candidate m33uYFANKmRjAi1OiXNB updated successfully.
+gemini-2.0-flash:generateContent:1  Failed to load resource: the server responded with a status of 400 ()
+index-BffuTXJQ.js:525 💥 Gemini STT Error: cS: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent: [400 ] API key not valid. Please pass a valid API key. [{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"API_KEY_INVALID","domain":"googleapis.com","metadata":{"service":"generativelanguage.googleapis.com"}},{"@type":"type.googleapis.com/google.rpc.LocalizedMessage","locale":"en-US","message":"API key not valid. Please pass a valid API key."}]
+    at WP (index-BffuTXJQ.js:57:24704)
+    at async zP (index-BffuTXJQ.js:57:24259)
+    at async hS (index-BffuTXJQ.js:58:3938)
+    at async Bn (index-BffuTXJQ.js:516:33952)
+Bn @ index-BffuTXJQ.js:525
+index-BffuTXJQ.js:55 [Firestore] Updating candidate m33uYFANKmRjAi1OiXNB... {interviewSessions: Array(3)}
+index-BffuTXJQ.js:55 [Firestore] Candidate m33uYFANKmRjAi1OiXNB updated successfully.
+index-BffuTXJQ.js:57  POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent 400 (Bad Request)
+zP @ index-BffuTXJQ.js:57
+If @ index-BffuTXJQ.js:57
+await in If
+hS @ index-BffuTXJQ.js:58
+generateContent @ index-BffuTXJQ.js:58
+Bn @ index-BffuTXJQ.js:516
+await in Bn
+Dt.onstop @ index-BffuTXJQ.js:525
+index-BffuTXJQ.js:525 💥 Gemini STT Error: cS: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent: [400 ] API key not valid. Please pass a valid API key. [{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"API_KEY_INVALID","domain":"googleapis.com","metadata":{"service":"generativelanguage.googleapis.com"}},{"@type":"type.googleapis.com/google.rpc.LocalizedMessage","locale":"en-US","message":"API key not valid. Please pass a valid API key."}]
+    at WP (index-BffuTXJQ.js:57:24704)
+    at async zP (index-BffuTXJQ.js:57:24259)
+    at async hS (index-BffuTXJQ.js:58:3938)
+    at async Bn (index-BffuTXJQ.js:516:33952)
+Bn @ index-BffuTXJQ.js:525
+await in Bn
+Dt.onstop @ index-BffuTXJQ.js:525
+index-BffuTXJQ.js:516 [LiveInterview] Finishing session for recruiter: m33uYFANKmRjAi1OiXNB iv-m33uYFANKmRjAi1OiXNB-1773938194426
+index-BffuTXJQ.js:55 [Firestore] Updating candidate m33uYFANKmRjAi1OiXNB... {interviewSessions: Array(3), status: 'Evaluation'}
+index-BffuTXJQ.js:55 [Firestore] Candidate m33uYFANKmRjAi1OiXNB updated successfully.
+index-BffuTXJQ.js:55 [Firestore] Updating candidate m33uYFANKmRjAi1OiXNB... {interviewSessions: Array(3)}
+index-BffuTXJQ.js:516 [LiveInterview] Fetching paths for strategy: product
+index-BffuTXJQ.js:516 [LiveInterview] Session saved successfully.
+index-BffuTXJQ.js:55 [Firestore] Candidate m33uYFANKmRjAi1OiXNB updated successfully.
+index-BffuTXJQ.js:55 [Firestore] Updating candidate m33uYFANKmRjAi1OiXNB... {interviewSessions: Array(3)}
+index-BffuTXJQ.js:55 [Firestore] Candidate m33uYFANKmRjAi1OiXNB updated successfully.
