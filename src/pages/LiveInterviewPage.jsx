@@ -14,6 +14,9 @@ import { useCandidates } from '../context/CandidatesContext';
 import { generateInterviewPaths, generateFollowUpQuestion, analyzeSTARRealTime, stripPII } from '../services/geminiService';
 import LoadingScreen from '../components/LoadingScreen';
 import CandidateExitPage from './CandidateExitPage';
+import { db } from '../config/firebase';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export default function LiveInterviewPage() {
     const { sessionId } = useParams();
@@ -300,41 +303,33 @@ export default function LiveInterviewPage() {
         }
     }, [isAuthenticated, role, userProfile, user]);
 
-    // Polling effect for candidates (anonymous users can't read Firestore directly)
-    // Polls /api/session/:sessionId every 2 seconds to get live session status and visible questions
+    // Real-time listener for candidates — reads from public /interviews/{sessionId} Firestore collection
+    // (replaces the old /api/session polling that returned 403 on Firebase)
     useEffect(() => {
         const isJoinRoute = window.location.pathname.startsWith('/join/');
         if (!isJoinRoute || isRecruiter) return;
         if (!sessionId) return;
 
-        const poll = async () => {
-            try {
-                const res = await fetch(`/api/session/${sessionId}`);
-                if (!res.ok) {
-                    console.warn(`[Candidate Polling] Server responded ${res.status} for session ${sessionId}`);
-                    return;
+        console.log('[Candidate Listener] Starting Firestore listener on /interviews/', sessionId);
+        const sessionRef = doc(db, 'interviews', sessionId);
+        const unsub = onSnapshot(sessionRef, (snap) => {
+            if (snap.exists()) {
+                const data = snap.data();
+                console.log('[Candidate Listener] Snapshot received:', Object.keys(data));
+                setApiSession(prev => ({ ...(prev || {}), ...data }));
+                if (data.candidateId) setApiCandidateId(prev => prev || data.candidateId);
+                if (Array.isArray(data.questions)) {
+                    console.log(`[Candidate Listener] ${data.questions.length} visible question(s)`);
+                    setQuestions(data.questions);
                 }
-                const data = await res.json();
-                if (data.found !== false) {
-                    setApiSession(prev => ({ ...(prev || {}), ...data }));
-                    // Use functional update to avoid stale closure on apiCandidateId
-                    if (data.candidateId) setApiCandidateId(prev => prev || data.candidateId);
-                    // Only sync candidate-visible questions (server already filters visibleToCandidate)
-                    if (Array.isArray(data.questions)) {
-                        console.log(`[Candidate Polling] ${data.questions.length} visible question(s) received`);
-                        setQuestions(data.questions);
-                    }
-                } else {
-                    console.warn('[Candidate Polling] Session not found yet, retrying...');
-                }
-            } catch (e) {
-                console.warn('[Candidate Polling]', e.message);
+            } else {
+                console.warn('[Candidate Listener] Session doc not found yet, waiting...');
             }
-        };
+        }, (err) => {
+            console.error('[Candidate Listener] Firestore error:', err.message);
+        });
 
-        poll();
-        const interval = setInterval(poll, 2000);
-        return () => clearInterval(interval);
+        return () => unsub();
     }, [sessionId, isRecruiter]);
 
     // Elapsed time counter — starts when recruiter enters active phase
@@ -351,29 +346,15 @@ export default function LiveInterviewPage() {
 
     const persistSessionData = async (data) => {
         if (!sessionId) return;
-        
-        // Use candidateId from data if provided, otherwise fallback to candidateData or apiCandidateId (for anonymous users)
-        const candidateId = data.candidateId || candidateData?.id || apiCandidateId;
-        if (!candidateId && !isRecruiter) return; // Anonymous joiner needs candidateId for proxy
 
         try {
-            const sUrl = import.meta.env.VITE_SERVER_URL || '';
-            const payload = { 
-                sessionId, 
-                candidateId: candidateId || 'internal', 
-                updates: data 
-            };
-            
-            console.log('[persistSessionData] Sending to server:', { sessionId, candidateId, updates: Object.keys(data) });
-            fetch(`${sUrl}/api/update-candidate-status`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            }).then(r => {
-                if (!r.ok) console.error('[persistSessionData] Server error:', r.status);
-            }).catch(e => console.warn('[persistSessionData] Network error:', e.message));
+            // Always write real-time state to the public /interviews/{sessionId} Firestore path
+            // This is readable by anonymous candidates (firestore rules: allow read, write: if true)
+            const sessionRef = doc(db, 'interviews', sessionId);
+            const candidateId = data.candidateId || candidateData?.id || apiCandidateId;
+            await setDoc(sessionRef, { ...data, sessionId, ...(candidateId ? { candidateId } : {}) }, { merge: true });
 
-            // For recruiter: always do a localized sync to ensure UI sees the change instantly
+            // For recruiter: also sync to candidates collection so the app's data stays consistent
             if (isRecruiter && candidateData?.id) {
                 const updatedSessions = (candidateData.interviewSessions || []).map(s =>
                     s.id === sessionId ? { ...s, ...data } : s
@@ -381,7 +362,7 @@ export default function LiveInterviewPage() {
                 updateCandidate(candidateData.id, { interviewSessions: updatedSessions });
             }
         } catch (err) {
-            console.error("Session update failed", err);
+            console.error('[persistSessionData] Firestore write failed:', err.message);
         }
     };
 
@@ -651,37 +632,57 @@ export default function LiveInterviewPage() {
     }, [transcript]);
 
     const sendAudioToGemini = async (blob) => {
-        if (blob.size < 1000) return; // ignore empty/very short audio
-        
+        if (blob.size < 1000) return;
+
         try {
-            const formData = new FormData();
-            formData.append('audio', blob, 'chunk.webm');
+            // Call Gemini API directly from frontend — bypasses Firebase Cloud Function routing entirely
+            const arrayBuffer = await blob.arrayBuffer();
+            const bytes = new Uint8Array(arrayBuffer);
+            let binary = '';
+            for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+            const base64Audio = btoa(binary);
+            const mimeType = blob.type.split(';')[0] || 'audio/webm';
 
-            const serverUrl = import.meta.env.VITE_SERVER_URL || '';
-            
-            const req = await fetch(`${serverUrl}/api/gemini-stt`, {
-                method: 'POST',
-                body: formData
-            });
-            const res = await req.json();
+            const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+            const genAI = new GoogleGenerativeAI(apiKey);
+            const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+            const result = await model.generateContent([
+                { inlineData: { data: base64Audio, mimeType } },
+                `Bu ses dosyasını analiz et. YALNIZCA aşağıdaki JSON formatında yanıt döndür, başka hiçbir şey yazma:\n{"text":"türkçe transkript metni","stress":30,"excitement":70,"confidence":60,"hesitation":20}\nKurallar:\n- text: konuşulan Türkçe sözcükler. Konuşma yoksa boş string.\n- stress: stres/gerginlik seviyesi 0-100\n- excitement: heyecan/coşku seviyesi 0-100\n- confidence: özgüven/kararlılık seviyesi 0-100\n- hesitation: tereddüt/dolgu sesi seviyesi 0-100\n- Skorlar 0-100 arası tam sayı olmalı.\n- 'Sessizlik', 'Ses yok', 'Boş' gibi ifadeler text alanına YAZMA.`
+            ]);
 
-            if (res.success && res.text) {
-                const cleanText = res.text.trim();
-                if (cleanText.length > 2 && !cleanText.toLowerCase().includes("sessizlik") && !cleanText.toLowerCase().includes("boş_ses")) {
-                     const roleLabel = isRecruiter ? 'YÖNETİCİ' : 'ADAY';
-                     const newEntry = {
-                         role: roleLabel,
-                         text: cleanText,
-                         confidence: 100,
-                         time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-                     };
-                     setTranscript(prev => [...prev, newEntry]);
-                     persistSessionData({ transcript: [...liveTranscriptRef.current, newEntry] });
+            const raw = result.response.text().trim();
+            let text = raw;
+            let emotion = null;
+            try {
+                const m = raw.match(/\{[\s\S]*\}/);
+                if (m) {
+                    const parsed = JSON.parse(m[0]);
+                    text = typeof parsed.text === 'string' ? parsed.text : '';
+                    emotion = {
+                        stress: Math.min(100, Math.max(0, parseInt(parsed.stress) || 0)),
+                        excitement: Math.min(100, Math.max(0, parseInt(parsed.excitement) || 0)),
+                        confidence: Math.min(100, Math.max(0, parseInt(parsed.confidence) || 0)),
+                        hesitation: Math.min(100, Math.max(0, parseInt(parsed.hesitation) || 0)),
+                    };
                 }
-                if (res.emotion) setEmotionData(res.emotion);
+            } catch { /* fallback */ }
+
+            const cleanText = text.trim();
+            if (cleanText.length > 2 && !cleanText.toLowerCase().includes('sessizlik') && !cleanText.toLowerCase().includes('boş_ses')) {
+                const roleLabel = isRecruiter ? 'YÖNETİCİ' : 'ADAY';
+                const newEntry = {
+                    role: roleLabel,
+                    text: cleanText,
+                    confidence: 100,
+                    time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                };
+                setTranscript(prev => [...prev, newEntry]);
+                persistSessionData({ transcript: [...liveTranscriptRef.current, newEntry] });
             }
+            if (emotion) setEmotionData(emotion);
         } catch (err) {
-            console.error("💥 Gemini Audio STT Error:", err);
+            console.error('💥 Gemini STT Error:', err);
         }
     };
 
@@ -1516,14 +1517,6 @@ export default function LiveInterviewPage() {
                                     {(!session?.candidateStatus || session.candidateStatus !== 'admitted') && (
                                         <button
                                             onClick={async () => {
-                                                try {
-                                                    const sUrl = import.meta.env.VITE_SERVER_URL || '';
-                                                    await fetch(`${sUrl}/api/update-candidate-status`, {
-                                                        method: 'POST',
-                                                        headers: { 'Content-Type': 'application/json' },
-                                                        body: JSON.stringify({ sessionId, candidateId: candidateData.id, updates: { candidateStatus: 'admitted' } })
-                                                    });
-                                                } catch(e) {}
                                                 await persistSessionData({ candidateStatus: 'admitted' });
                                             }}
                                             className={`h-8 px-4 rounded-lg text-white font-black text-[9px] tracking-widest uppercase transition-all shadow-lg flex items-center gap-2 border mr-2 ${session?.candidateStatus === 'waiting_room' ? 'bg-amber-500 hover:bg-amber-600 border-amber-400 shadow-amber-500/20 animate-pulse' : 'bg-slate-700 hover:bg-slate-600 border-slate-600 shadow-slate-900/50 opacity-80 hover:opacity-100'}`}
