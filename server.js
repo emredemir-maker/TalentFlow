@@ -683,12 +683,37 @@ app.post('/api/gemini-stt', aiLimiter, (req, res, next) => {
 
         const result = await model.generateContent([
             { inlineData: { data: audioBase64, mimeType } },
-            "Bu ses dosyasındaki Türkçe konuşmaları metne dök. ÖNEMLİ: Sadece konuşulan sözcükleri yaz. Konuşma yoksa sadece boş bir dize döndür. 'Sessizlik', 'Ses yok', 'Boş' gibi ifadeler KULLANMA. Eğer konuşmacı mülakat yapıyorsa o bağlamda kelimeleri doğru seç."
+            `Bu ses dosyasını analiz et. YALNIZCA aşağıdaki JSON formatında yanıt döndür, başka hiçbir şey yazma:
+{"text":"türkçe transkript metni","stress":30,"excitement":70,"confidence":60,"hesitation":20}
+Kurallar:
+- text: konuşulan Türkçe sözcükler. Konuşma yoksa boş string.
+- stress: stres/gerginlik seviyesi 0-100
+- excitement: heyecan/coşku seviyesi 0-100
+- confidence: özgüven/kararlılık seviyesi 0-100
+- hesitation: tereddüt/dolgu sesi seviyesi 0-100
+- Skorlar 0-100 arası tam sayı olmalı.
+- 'Sessizlik', 'Ses yok', 'Boş' gibi ifadeler text alanına YAZMA.`
         ]);
 
-        const text = result.response.text().trim();
-        console.log(`✅ STT Result: "${text.substring(0, 80)}"`);
-        res.json({ success: true, text });
+        const raw = result.response.text().trim();
+        let text = raw;
+        let emotion = null;
+        try {
+            const m = raw.match(/\{[\s\S]*\}/);
+            if (m) {
+                const parsed = JSON.parse(m[0]);
+                text = typeof parsed.text === 'string' ? parsed.text : '';
+                emotion = {
+                    stress: Math.min(100, Math.max(0, parseInt(parsed.stress) || 0)),
+                    excitement: Math.min(100, Math.max(0, parseInt(parsed.excitement) || 0)),
+                    confidence: Math.min(100, Math.max(0, parseInt(parsed.confidence) || 0)),
+                    hesitation: Math.min(100, Math.max(0, parseInt(parsed.hesitation) || 0)),
+                };
+            }
+        } catch { /* fallback: use raw as text */ }
+
+        console.log(`✅ STT: "${text.substring(0, 60)}" | emotion: ${JSON.stringify(emotion)}`);
+        res.json({ success: true, text, emotion });
     } catch (err) {
         console.error('💥 Gemini STT Error:', err.message);
         res.status(500).json({ error: err.message });

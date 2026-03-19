@@ -92,6 +92,7 @@ export default function LiveInterviewPage() {
     const [suggestedQuestion, setSuggestedQuestion] = useState(null);
     const [starAnalyzing, setStarAnalyzing] = useState(false);
     const [biasWarning, setBiasWarning] = useState(null);
+    const [emotionData, setEmotionData] = useState(null);
 
     const [questions, setQuestions] = useState([]);
     const [isDataInitialized, setIsDataInitialized] = useState(false);
@@ -671,13 +672,13 @@ export default function LiveInterviewPage() {
                      const newEntry = {
                          role: roleLabel,
                          text: cleanText,
-                         confidence: 100, // Gemini provides literal text
+                         confidence: 100,
                          time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
                      };
-
                      setTranscript(prev => [...prev, newEntry]);
                      persistSessionData({ transcript: [...liveTranscriptRef.current, newEntry] });
                 }
+                if (res.emotion) setEmotionData(res.emotion);
             }
         } catch (err) {
             console.error("💥 Gemini Audio STT Error:", err);
@@ -1941,6 +1942,37 @@ export default function LiveInterviewPage() {
                                     </div>
                                 </div>
                             </section>
+
+                            {/* VOCAL EMOTION ANALYSIS */}
+                            {emotionData && (
+                                <section className="bg-[#0F172A] rounded-2xl border border-white/5 p-3 flex flex-col gap-2 shadow-xl">
+                                    <div className="flex items-center gap-1.5 mb-0.5">
+                                        <Activity className="w-3 h-3 text-purple-400" />
+                                        <span className="text-[8px] font-black text-white/30 uppercase tracking-widest italic">Ses Duygu Analizi</span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                                        {[
+                                            { label: 'Stres', value: emotionData.stress, color: '#EF4444' },
+                                            { label: 'Heyecan', value: emotionData.excitement, color: '#F59E0B' },
+                                            { label: 'Özgüven', value: emotionData.confidence, color: '#10B981' },
+                                            { label: 'Tereddüt', value: emotionData.hesitation, color: '#8B5CF6' },
+                                        ].map(({ label, value, color }) => (
+                                            <div key={label}>
+                                                <div className="flex justify-between mb-1">
+                                                    <span className="text-[9px] text-white/40">{label}</span>
+                                                    <span className="text-[9px] font-bold" style={{ color }}>{value}%</span>
+                                                </div>
+                                                <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+                                                    <div
+                                                        className="h-full rounded-full transition-all duration-700"
+                                                        style={{ width: `${value}%`, backgroundColor: color }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </section>
+                            )}
 
                             {/* AI LIVE INSIGHTS FEED */}
                             {aiInsights.length > 0 && (

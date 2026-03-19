@@ -14,6 +14,7 @@ export default function SettingsPage() {
     // STT Test States
     const [sttStatus, setSttStatus] = useState('idle'); // idle | listening | success | error
     const [sttResult, setSttResult] = useState('');
+    const [sttEmotion, setSttEmotion] = useState(null);
     const mediaRecorderRef = useRef(null);
     const sttIntervalRef = useRef(null);
     const audioChunksRef = useRef([]);
@@ -31,6 +32,7 @@ export default function SettingsPage() {
         audioChunksRef.current = [];
         setSttStatus('idle');
         setSttResult('');
+        setSttEmotion(null);
     };
 
     const toggleSttTest = async () => {
@@ -77,15 +79,31 @@ export default function SettingsPage() {
                             const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
                             const result = await model.generateContent([
                                 { inlineData: { data: base64Audio, mimeType: mimeType.split(';')[0] } },
-                                "Bu ses dosyasındaki Türkçe konuşmaları metne dök. ÖNEMLİ: Sadece konuşulan sözcükleri yaz. Konuşma yoksa sadece boş bir dize döndür. 'Sessizlik', 'Ses yok', 'Boş' gibi ifadeler KULLANMA."
+                                `Bu ses dosyasını analiz et. YALNIZCA aşağıdaki JSON formatında yanıt döndür, başka hiçbir şey yazma:\n{"text":"türkçe transkript metni","stress":30,"excitement":70,"confidence":60,"hesitation":20}\nKurallar:\n- text: konuşulan Türkçe sözcükler. Konuşma yoksa boş string.\n- stress: stres/gerginlik seviyesi 0-100\n- excitement: heyecan/coşku seviyesi 0-100\n- confidence: özgüven/kararlılık seviyesi 0-100\n- hesitation: tereddüt/dolgu sesi seviyesi 0-100\n- Skorlar 0-100 arası tam sayı olmalı.\n- 'Sessizlik', 'Ses yok', 'Boş' gibi ifadeler text alanına YAZMA.`
                             ]);
-                            const text = result.response.text().trim();
+                            const raw = result.response.text().trim();
+                            let text = raw;
+                            let parsedEmotion = null;
+                            try {
+                                const m = raw.match(/\{[\s\S]*\}/);
+                                if (m) {
+                                    const parsed = JSON.parse(m[0]);
+                                    text = typeof parsed.text === 'string' ? parsed.text : '';
+                                    parsedEmotion = {
+                                        stress: Math.min(100, Math.max(0, parseInt(parsed.stress) || 0)),
+                                        excitement: Math.min(100, Math.max(0, parseInt(parsed.excitement) || 0)),
+                                        confidence: Math.min(100, Math.max(0, parseInt(parsed.confidence) || 0)),
+                                        hesitation: Math.min(100, Math.max(0, parseInt(parsed.hesitation) || 0)),
+                                    };
+                                }
+                            } catch { /* fallback */ }
                             const isJunk = text.length <= 2
                                 || text.toLowerCase().includes('sessizlik')
                                 || text.toLowerCase().includes('boş_ses');
 
                             if (!isJunk && sttActiveRef.current) {
                                 setSttResult(text);
+                                setSttEmotion(parsedEmotion);
                                 setSttStatus('success');
                                 sttActiveRef.current = false;
                                 clearInterval(sttIntervalRef.current);
@@ -348,6 +366,37 @@ export default function SettingsPage() {
                                         />
                                     ))}
                                 </div>
+
+                                {/* Emotion Analysis — shown after successful STT */}
+                                {sttStatus === 'success' && sttEmotion && (
+                                    <div className="mt-4 border-t border-white/5 pt-4">
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-text-muted mb-3 flex items-center gap-1.5">
+                                            <Activity size={10} className="text-electric-light" />
+                                            Ses Duygu Analizi
+                                        </p>
+                                        <div className="grid grid-cols-2 gap-x-6 gap-y-2.5">
+                                            {[
+                                                { label: 'Stres', value: sttEmotion.stress, color: '#EF4444' },
+                                                { label: 'Heyecan', value: sttEmotion.excitement, color: '#F59E0B' },
+                                                { label: 'Özgüven', value: sttEmotion.confidence, color: '#10B981' },
+                                                { label: 'Tereddüt', value: sttEmotion.hesitation, color: '#8B5CF6' },
+                                            ].map(({ label, value, color }) => (
+                                                <div key={label}>
+                                                    <div className="flex justify-between mb-1">
+                                                        <span className="text-[10px] text-text-muted">{label}</span>
+                                                        <span className="text-[10px] font-bold" style={{ color }}>{value}%</span>
+                                                    </div>
+                                                    <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                                        <div
+                                                            className="h-full rounded-full transition-all duration-700"
+                                                            style={{ width: `${value}%`, backgroundColor: color }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             <p className="text-[11px] text-text-muted mt-3 relative z-10">
