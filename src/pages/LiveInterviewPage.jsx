@@ -68,6 +68,7 @@ export default function LiveInterviewPage() {
     const peerConnectionRef = useRef(null);
     const appliedRecruiterIceRef = useRef(0);
     const appliedCandidateIceRef = useRef(0);
+    const remoteVideoRef = useRef(null); // NOT muted — plays remote audio+video
     const [copied, setCopied] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
 
@@ -379,14 +380,17 @@ export default function LiveInterviewPage() {
         if (stream) {
             streamRef.current = stream;
         }
-        // Main video: show remote (peer) stream if connected, otherwise local fallback
+        // Local self-view: videoRef (always muted) — used as fallback when no remote stream
         if (videoRef.current) {
-            const mainSrc = remoteStream || (isVideoOn ? stream : null);
-            videoRef.current.srcObject = mainSrc || null;
+            videoRef.current.srcObject = (isVideoOn && stream) ? stream : null;
         }
-        // PiP: always local stream
-        if (stream && pipVideoRef.current) {
-            pipVideoRef.current.srcObject = stream;
+        // Remote peer: remoteVideoRef (NOT muted, so audio plays) — shown in main area
+        if (remoteVideoRef.current && remoteStream) {
+            remoteVideoRef.current.srcObject = remoteStream;
+        }
+        // PiP: local self-view (always muted)
+        if (pipVideoRef.current) {
+            pipVideoRef.current.srcObject = (stream) ? stream : null;
         }
     }, [stream, remoteStream, phase, isVideoOn]);
 
@@ -1891,8 +1895,12 @@ export default function LiveInterviewPage() {
                         {/* CENTER: MAIN VIDEO AREA */}
                         <div className="flex-1 bg-[#0F172A] rounded-3xl relative overflow-hidden shadow-2xl border border-white/10 group/video">
                             <div className="absolute inset-0 bg-[#07090F] flex items-center justify-center">
-                                {(stream || !isRecruiter) ? (
-                                    <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover scale-x-[-1] opacity-60" />
+                                {/* Remote peer video — NOT muted so audio plays */}
+                                {remoteStream ? (
+                                    <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
+                                ) : stream ? (
+                                    // Fallback: own local feed (muted) while waiting for peer
+                                    <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover scale-x-[-1] opacity-40" />
                                 ) : (
                                     <div className="w-32 h-32 rounded-full bg-white/5 flex items-center justify-center border border-white/10 animate-pulse">
                                         <User className="w-12 h-12 text-white/10" />
@@ -2117,17 +2125,16 @@ export default function LiveInterviewPage() {
                 ) : (
                     // CANDIDATE VIEW (Clean and focused)
                     <div className="flex-1 flex gap-4 overflow-hidden animate-in fade-in duration-700">
-                        {/* Main Stage: Recruiter View (Mock) */}
+                        {/* Main Stage: Recruiter View */}
                         <div className="flex-1 bg-[#0F172A] rounded-[2.5rem] relative overflow-hidden shadow-2xl border border-white/10 group/stage">
-                            {/* Recruiter Feed Placeholder */}
+                            {/* Recruiter Feed — remote stream (NOT muted so audio plays) */}
                             <div className="absolute inset-0 bg-slate-950 flex items-center justify-center">
-                                {isVideoOn && stream ? (
+                                {remoteStream ? (
                                     <video
-                                        ref={videoRef}
+                                        ref={remoteVideoRef}
                                         autoPlay
-                                        muted
                                         playsInline
-                                        className="w-full h-full object-cover opacity-80"
+                                        className="w-full h-full object-cover opacity-90"
                                     />
                                 ) : (
                                     <div className="flex flex-col items-center gap-6 z-10 animate-in fade-in zoom-in duration-700">
