@@ -6,7 +6,7 @@ import { useCandidates } from '../context/CandidatesContext';
 import { useAuth } from '../context/AuthContext';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { getCalendarEvents, connectGoogleWorkspace, sendDirectEmail, createDirectCalendarEvent } from '../services/integrationService';
+import { getCalendarEvents, connectGoogleWorkspace, sendDirectEmail, createDirectCalendarEvent, ensureValidGoogleToken } from '../services/integrationService';
 import { 
     Plus, 
     Video, 
@@ -211,8 +211,15 @@ export default function InterviewManagementPage() {
             const timeMin = new Date().toISOString();
             const timeMax = new Date();
             timeMax.setDate(timeMax.getDate() + 7);
+
+            // Always get a valid (auto-refreshed if needed) token before calling the API
+            const freshToken = await ensureValidGoogleToken(userId, userProfile);
+            if (!freshToken) {
+                alert("Google bağlantısı kurulamadı. Lütfen Ayarlar → Sistem bölümünden yeniden bağlanın.");
+                return;
+            }
             
-            const result = await getCalendarEvents(googleToken, timeMin, timeMax.toISOString());
+            const result = await getCalendarEvents(freshToken, timeMin, timeMax.toISOString());
             
             if (result.success) {
                 const busyEvents = result.events.map(e => ({
@@ -274,7 +281,12 @@ export default function InterviewManagementPage() {
     const handleSendEmail = async () => {
         setIsSendingEmail(true);
         try {
-            const result = await sendDirectEmail(userId, googleToken, {
+            const freshToken = await ensureValidGoogleToken(userId, userProfile);
+            if (!freshToken) {
+                throw new Error("Google bağlantısı kurulamadı. Lütfen Ayarlar → Sistem bölümünden yeniden bağlanın.");
+            }
+
+            const result = await sendDirectEmail(userId, freshToken, {
                 to: selectedCandidate.email,
                 subject: emailSubject,
                 body: emailBody
@@ -330,45 +342,37 @@ export default function InterviewManagementPage() {
                 const endDT = new Date(startDT.getTime() + 60 * 60 * 1000);
                 const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-                const calResult = await createDirectCalendarEvent(userId, googleToken, {
-                    summary: `${selectedCandidate.name} — ${newSession.title}`,
-                    description: `Talent-Inn üzerinden planlanan mülakat.\nAday: ${selectedCandidate.name}\nPozisyon: ${selectedCandidate.position || '—'}\nDeğerlendirici: ${interviewerName}\nMülakat linki: ${meetLink}`,
-                    startDateTime: toLocalISOString(startDT),
-                    endDateTime: toLocalISOString(endDT),
-                    guestEmail: selectedCandidate.email,
-                    timeZone: userTimeZone
-                });
+                // ensureValidGoogleToken silently refreshes if the stored token is expired.
+                // This avoids any manual reconnection prompts for the user.
+                const freshCalToken = await ensureValidGoogleToken(userId, userProfile);
 
-                if (calResult.success) {
-                    // Prefer the real Google Meet link over the internal join link
-                    if (calResult.meetLink) {
-                        meetLink = calResult.meetLink;
-                        newSession.meetLink = calResult.meetLink;
-                    }
-                    if (calResult.htmlLink) {
-                        calendarEventLink = calResult.htmlLink;
-                        newSession.calendarEventLink = calResult.htmlLink;
-                    }
+                if (!freshCalToken) {
+                    console.warn('[Calendar] Could not obtain valid token — skipping calendar event.');
+                    alert('⚠️ Google token alınamadı. Mülakat sisteme kaydedilecek ama takvime eklenemeyecek.');
                 } else {
-                    // Token expired → prompt reconnect and abort
-                    if (calResult.error?.includes('TOKEN_EXPIRED') || calResult.error?.includes('süresi dolmuş')) {
-                        setSaveStatus('idle');
-                        const shouldReconnect = window.confirm(
-                            'Google bağlantı tokenı süresi dolmuş.\n\nTakvim etkinliği oluşturmak için Google hesabınızı yeniden bağlamanız gerekiyor.\n\nŞimdi yeniden bağlanmak ister misiniz?'
-                        );
-                        if (shouldReconnect) {
-                            const reconnResult = await connectGoogleWorkspace(userId);
-                            if (reconnResult.success) {
-                                alert('Google yeniden bağlandı! Lütfen mülakatı tekrar kaydedin.');
-                            } else {
-                                alert('Yeniden bağlantı başarısız: ' + reconnResult.error);
-                            }
+                    const calResult = await createDirectCalendarEvent(userId, freshCalToken, {
+                        summary: `${selectedCandidate.name} — ${newSession.title}`,
+                        description: `Talent-Inn üzerinden planlanan mülakat.\nAday: ${selectedCandidate.name}\nPozisyon: ${selectedCandidate.position || '—'}\nDeğerlendirici: ${interviewerName}\nMülakat linki: ${meetLink}`,
+                        startDateTime: toLocalISOString(startDT),
+                        endDateTime: toLocalISOString(endDT),
+                        guestEmail: selectedCandidate.email,
+                        timeZone: userTimeZone
+                    });
+
+                    if (calResult.success) {
+                        if (calResult.meetLink) {
+                            meetLink = calResult.meetLink;
+                            newSession.meetLink = calResult.meetLink;
                         }
-                        return;
+                        if (calResult.htmlLink) {
+                            calendarEventLink = calResult.htmlLink;
+                            newSession.calendarEventLink = calResult.htmlLink;
+                        }
+                    } else {
+                        // Warn but don't block — interview record is still saved
+                        console.warn('[Calendar] Event creation failed:', calResult.error);
+                        alert(`⚠️ Takvim etkinliği oluşturulamadı: ${calResult.error}\n\nMülakat yine de sisteme kaydedilecek.`);
                     }
-                    // Any other error → warn but still save the interview record
-                    console.warn('[Calendar] Event creation failed, saving interview without calendar:', calResult.error);
-                    alert(`⚠️ Takvim etkinliği oluşturulamadı: ${calResult.error}\n\nMülakat yine de sisteme kaydedilecek.`);
                 }
             }
 
