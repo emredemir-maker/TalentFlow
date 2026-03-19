@@ -377,77 +377,119 @@ export default function CandidateProcessPage() {
                                             <div className="space-y-3">
                                                 {candidate.interviewSessions.map((session, sidx) => {
                                                     const cfg = getStatusCfg(session.status);
+                                                    const isCompleted = session.status === 'completed';
+                                                    const isLive = session.status === 'live';
+
+                                                    const CardWrapper = isCompleted
+                                                        ? ({ children, ...props }) => (
+                                                            <button
+                                                                {...props}
+                                                                onClick={() => navigate(`/interview-report/${session.id}`)}
+                                                                className="w-full text-left group cursor-pointer"
+                                                            >
+                                                                {children}
+                                                            </button>
+                                                        )
+                                                        : ({ children, ...props }) => <div {...props}>{children}</div>;
+
                                                     return (
-                                                        <div key={sidx} className="bg-white border border-slate-200 rounded-xl p-4 hover:border-slate-300 hover:shadow-sm transition-all flex items-center justify-between gap-4">
-                                                            <div className="flex items-center gap-3">
-                                                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center border ${cfg.bg} ${cfg.border} ${cfg.pulse ? 'animate-pulse' : ''}`}>
-                                                                    <Video className={`w-5 h-5 ${cfg.text}`} />
-                                                                </div>
-                                                                <div>
-                                                                    <h4 className="text-[12px] font-black text-slate-800">{session.title || 'Mülakat Seansı'}</h4>
-                                                                    <div className="flex flex-wrap items-center gap-2 mt-0.5">
-                                                                        {session.date && (
-                                                                            <span className="text-[9px] font-bold text-slate-500 flex items-center gap-0.5">
-                                                                                <Calendar className="w-2.5 h-2.5" />
-                                                                                {(session.date || '').split('T')[0]}
+                                                        <CardWrapper key={sidx}>
+                                                            <div className={`rounded-xl border p-4 transition-all flex items-center justify-between gap-4 ${
+                                                                isCompleted
+                                                                    ? 'bg-emerald-50 border-emerald-200 hover:border-emerald-400 hover:shadow-md hover:shadow-emerald-100'
+                                                                    : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm'
+                                                            }`}>
+                                                                <div className="flex items-center gap-3">
+                                                                    {/* Icon */}
+                                                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center border shrink-0 ${
+                                                                        isCompleted
+                                                                            ? 'bg-emerald-100 border-emerald-200'
+                                                                            : `${cfg.bg} ${cfg.border} ${cfg.pulse ? 'animate-pulse' : ''}`
+                                                                    }`}>
+                                                                        {isCompleted
+                                                                            ? <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                                                                            : <Video className={`w-5 h-5 ${cfg.text}`} />
+                                                                        }
+                                                                    </div>
+
+                                                                    {/* Info */}
+                                                                    <div>
+                                                                        <div className="flex items-center gap-2">
+                                                                            <h4 className={`text-[12px] font-black ${isCompleted ? 'text-emerald-900' : 'text-slate-800'}`}>
+                                                                                {session.title || 'Mülakat Seansı'}
+                                                                            </h4>
+                                                                            <span className={`text-[8px] font-black px-2 py-0.5 rounded-lg border ${cfg.bg} ${cfg.text} ${cfg.border} ${cfg.pulse ? 'animate-pulse' : ''}`}>
+                                                                                {cfg.label}
                                                                             </span>
-                                                                        )}
-                                                                        {session.time && (
-                                                                            <span className="text-[9px] font-bold text-slate-500 flex items-center gap-0.5">
-                                                                                <Clock className="w-2.5 h-2.5" /> {session.time}
-                                                                            </span>
-                                                                        )}
-                                                                        {session.interviewer && (
-                                                                            <span className="text-[8.5px] font-black text-cyan-700 bg-cyan-50 px-2 py-0.5 rounded-lg border border-cyan-100">
-                                                                                {session.interviewer}
-                                                                            </span>
-                                                                        )}
-                                                                        <span className={`text-[8px] font-black px-2 py-0.5 rounded-lg border ${cfg.bg} ${cfg.text} ${cfg.border} ${cfg.pulse ? 'animate-pulse' : ''}`}>
-                                                                            {cfg.label}
-                                                                        </span>
+                                                                        </div>
+                                                                        <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                                                                            {session.date && (
+                                                                                <span className="text-[9px] font-bold text-slate-500 flex items-center gap-0.5">
+                                                                                    <Calendar className="w-2.5 h-2.5" />
+                                                                                    {(session.date || '').split('T')[0]}
+                                                                                </span>
+                                                                            )}
+                                                                            {session.time && (
+                                                                                <span className="text-[9px] font-bold text-slate-500 flex items-center gap-0.5">
+                                                                                    <Clock className="w-2.5 h-2.5" /> {session.time}
+                                                                                </span>
+                                                                            )}
+                                                                            {session.interviewer && (
+                                                                                <span className="text-[8.5px] font-black text-cyan-700 bg-cyan-50 px-2 py-0.5 rounded-lg border border-cyan-100">
+                                                                                    {session.interviewer}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
                                                                     </div>
                                                                 </div>
-                                                            </div>
 
-                                                            <div className="flex items-center gap-2 shrink-0">
-                                                                {session.status === 'live' && (
-                                                                    <button
-                                                                        onClick={() => navigate(`/live-interview/${session.id}`)}
-                                                                        className="bg-rose-500 text-white px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-rose-600 transition-all shadow-sm"
-                                                                    >
-                                                                        SEANSA KATIL
-                                                                    </button>
-                                                                )}
-                                                                {session.status === 'completed' && (
-                                                                    <button
-                                                                        onClick={() => navigate(`/interview-report/${session.id}`)}
-                                                                        className="bg-slate-800 text-white px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-slate-900 transition-all shadow-sm flex items-center gap-1.5"
-                                                                    >
-                                                                        <Award className="w-3 h-3" /> RAPORU AÇ
-                                                                    </button>
-                                                                )}
-                                                                <button
-                                                                    onClick={() => {
-                                                                        setPreselectedInterviewData({ candidateId: candidate.id, session });
-                                                                        window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }));
-                                                                    }}
-                                                                    className="p-1.5 text-slate-300 hover:text-cyan-500 transition-colors"
-                                                                    title="Düzenle"
-                                                                >
-                                                                    <Edit3 className="w-3.5 h-3.5" />
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => {
-                                                                        setPreselectedInterviewData({ candidateId: candidate.id, sessionId: session.id });
-                                                                        window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }));
-                                                                    }}
-                                                                    className="p-1.5 text-slate-300 hover:text-slate-600 transition-colors"
-                                                                    title="Mülakat sayfasına git"
-                                                                >
-                                                                    <ExternalLink className="w-3.5 h-3.5" />
-                                                                </button>
+                                                                {/* Right actions */}
+                                                                <div className="flex items-center gap-2 shrink-0">
+                                                                    {isLive && (
+                                                                        <button
+                                                                            onClick={e => { e.stopPropagation(); navigate(`/live-interview/${session.id}`); }}
+                                                                            className="bg-rose-500 text-white px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-rose-600 transition-all shadow-sm animate-pulse"
+                                                                        >
+                                                                            SEANSA KATIL
+                                                                        </button>
+                                                                    )}
+
+                                                                    {isCompleted && (
+                                                                        <span className="flex items-center gap-1.5 text-[9px] font-black text-emerald-700 bg-white border border-emerald-200 px-3 py-1.5 rounded-lg shadow-sm group-hover:bg-emerald-600 group-hover:text-white group-hover:border-emerald-600 transition-all">
+                                                                            <Award className="w-3 h-3" /> Raporu Gör
+                                                                            <ChevronRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+                                                                        </span>
+                                                                    )}
+
+                                                                    {!isCompleted && !isLive && (
+                                                                        <>
+                                                                            <button
+                                                                                onClick={e => {
+                                                                                    e.stopPropagation();
+                                                                                    setPreselectedInterviewData({ candidateId: candidate.id, session });
+                                                                                    window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }));
+                                                                                }}
+                                                                                className="p-1.5 text-slate-300 hover:text-cyan-500 transition-colors"
+                                                                                title="Düzenle"
+                                                                            >
+                                                                                <Edit3 className="w-3.5 h-3.5" />
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={e => {
+                                                                                    e.stopPropagation();
+                                                                                    setPreselectedInterviewData({ candidateId: candidate.id, sessionId: session.id });
+                                                                                    window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }));
+                                                                                }}
+                                                                                className="p-1.5 text-slate-300 hover:text-slate-600 transition-colors"
+                                                                                title="Mülakat sayfasına git"
+                                                                            >
+                                                                                <ExternalLink className="w-3.5 h-3.5" />
+                                                                            </button>
+                                                                        </>
+                                                                    )}
+                                                                </div>
                                                             </div>
-                                                        </div>
+                                                        </CardWrapper>
                                                     );
                                                 })}
                                             </div>
