@@ -67,6 +67,7 @@ export default function LiveInterviewPage() {
     const videoRef = useRef(null);
     const pipVideoRef = useRef(null);
     const streamRef = useRef(null);
+    const isFinishedRef = useRef(false); // prevents ghost writes after session is completed
 
     // WebRTC peer connection
     const [remoteStream, setRemoteStream] = useState(null);
@@ -359,6 +360,8 @@ export default function LiveInterviewPage() {
 
     const persistSessionData = async (data) => {
         if (!sessionId) return;
+        // After finishSession, block any ghost writes to candidates collection
+        if (isFinishedRef.current) return;
 
         try {
             // Always write real-time state to the public /interviews/{sessionId} Firestore path
@@ -539,6 +542,7 @@ export default function LiveInterviewPage() {
 
         if (!isRecruiter) {
             // Candidate finishing: Mark as finished in local state, persist, then logout and exit
+            isFinishedRef.current = true;
             setPhase('finished');
             await persistSessionData({
                 status: 'completed',
@@ -557,6 +561,7 @@ export default function LiveInterviewPage() {
             return;
         }
 
+        isFinishedRef.current = true; // block ghost writes from heartbeat/cleanup
         setPhase('finished');
 
         // Detailed save for recruiter

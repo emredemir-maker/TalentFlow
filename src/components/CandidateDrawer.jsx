@@ -297,7 +297,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                             </button>
                             <button
                                 onClick={async () => {
-                                    const sessId = `iv-${candidate.id.substring(0, 4)}-${Date.now().toString().slice(-4)}`;
+                                    const sessId = `iv-${candidate.id}-${Date.now()}`;
                                     const newSession = {
                                         id: sessId,
                                         status: 'planned',
@@ -312,10 +312,10 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                             interviewSessions: [...(candidate.interviewSessions || []), newSession],
                                             status: 'interview'
                                         });
-                                        navigate(`/interview/${sessId}`);
+                                        navigate(`/live-interview/${sessId}`);
                                     } catch (err) {
                                         console.error("Failed to create live session:", err);
-                                        navigate(`/interview/${sessId}`);
+                                        navigate(`/live-interview/${sessId}`);
                                     }
                                 }}
                                 className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/20 transition-all shadow-sm" title="Yeni Canlı Mülakat">
@@ -638,7 +638,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                             {/* Start New Interview */}
                             <button
                                 onClick={async () => {
-                                    const sessId = `iv-${candidate.id.substring(0, 4)}-${Date.now().toString().slice(-4)}`;
+                                    const sessId = `iv-${candidate.id}-${Date.now()}`;
                                     const newSession = {
                                         id: sessId,
                                         status: 'planned',
@@ -653,10 +653,10 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                             interviewSessions: [...(candidate.interviewSessions || []), newSession],
                                             status: 'interview'
                                         });
-                                        navigate(`/interview/${sessId}`);
+                                        navigate(`/live-interview/${sessId}`);
                                     } catch (err) {
                                         console.error("Failed to create live session:", err);
-                                        navigate(`/interview/${sessId}`);
+                                        navigate(`/live-interview/${sessId}`);
                                     }
                                 }}
                                 className="w-full py-4 rounded-3xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-cyan-500/20 transition-all active:scale-[0.98] flex items-center justify-center gap-3"
@@ -668,7 +668,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                             <InterviewHistory
                                 sessions={candidate.interviewSessions}
                                 onStartSession={(session) => {
-                                    navigate(`/interview/${session.id}`);
+                                    navigate(`/live-interview/${session.id}`);
                                 }}
                             />
 

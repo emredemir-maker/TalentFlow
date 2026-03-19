@@ -127,7 +127,8 @@ export default function InterviewHistory({ sessions = [], onStartSession, onDele
             <div className="space-y-4">
                 {sorted.map(session => {
                     const isExpanded = expandedId === session.id;
-                    const isPlanned = session.status === 'planned';
+                    const isCompleted = session.status === 'completed';
+                    const isPlanned = !isCompleted && session.status !== 'cancelled';
                     const TypeIcon = TYPE_ICONS[session.type] || MessageSquare;
 
                     return (
