@@ -96,6 +96,27 @@ export default function InterviewManagementPage() {
         return slots;
     }, []);
 
+    // ─── PUBLIC INTERVIEW STATUS MAP ──────────────────────────────────────────
+    // `interviews/{sessionId}` is the authoritative source for completion status.
+    // The candidate-array copy can be ghost-written by a race condition in the
+    // heartbeat, so we always overlay the public doc status on top.
+    const [sessionStatuses, setSessionStatuses] = useState({});
+
+    useEffect(() => {
+        const unsubscribe = onSnapshot(
+            collection(db, 'interviews'),
+            (snap) => {
+                const map = {};
+                snap.forEach(docSnap => {
+                    map[docSnap.id] = docSnap.data().status;
+                });
+                setSessionStatuses(map);
+            },
+            (err) => console.warn('[InterviewMgmt] session status listener error:', err)
+        );
+        return () => unsubscribe();
+    }, []);
+
     const isGoogleConnected = userProfile?.integrations?.google?.connected;
     const googleToken = userProfile?.integrations?.google?.accessToken;
 
@@ -309,15 +330,20 @@ export default function InterviewManagementPage() {
                 c.interviewSessions.forEach(session => {
                     const sessionDatePart = session.date ? session.date.split('T')[0] : '';
                     const isIsoDate = /^\d{4}-\d{2}-\d{2}$/.test(sessionDatePart);
-                    
-                    const isLive = session.status === 'live';
-                    const isCompleted = session.status === 'completed' ||
+
+                    // Overlay the authoritative public Firestore doc status (if available)
+                    // to fix ghost-write race conditions in the candidate array.
+                    const publicStatus = sessionStatuses[session.id];
+                    const effectiveStatus = publicStatus || session.status;
+
+                    const isLive = effectiveStatus === 'live';
+                    const isCompleted = effectiveStatus === 'completed' ||
                         (!isLive && (
                             (session.aiOverallScore > 0) ||
                             Boolean(session.aiSummary) ||
                             (session.finalScore > 0)
                         ));
-                    const isCancelled = session.status === 'cancelled';
+                    const isCancelled = effectiveStatus === 'cancelled';
                     const isFutureOrToday = isIsoDate && sessionDatePart >= todayStr;
 
                     const sessionData = {
@@ -328,6 +354,7 @@ export default function InterviewManagementPage() {
                         role: c.position || c.bestTitle || 'Pozisyon',
                         matchScore: c.bestScore || 0,
                         _effectiveCompleted: isCompleted,
+                        _effectiveStatus: effectiveStatus, // authoritative status for badge
                     };
 
                     // Filtering logic: Live or Pending/Future goes to Active. Completed/Cancelled/Past goes to History.
@@ -361,13 +388,13 @@ export default function InterviewManagementPage() {
             activeInterviews: sortedActive,
             pastInterviews: sortedPast,
             stats: {
-                live: active.filter(i => i.status === 'live').length,
+                live: active.filter(i => i._effectiveStatus === 'live').length,
                 today: active.filter(i => (i.date?.split('T')[0] === todayStr)).length,
-                pending: active.filter(i => i.status !== 'live').length,
+                pending: active.filter(i => i._effectiveStatus !== 'live').length,
                 total: active.length + past.length
             }
         };
-    }, [enrichedCandidates]);
+    }, [enrichedCandidates, sessionStatuses]);
 
     const [viewTab, setViewTab] = useState('active'); // active, past
 
@@ -1010,7 +1037,7 @@ export default function InterviewManagementPage() {
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center gap-2">
-                                                        {int.status === 'live' ? (
+                                                        {int._effectiveStatus === 'live' ? (
                                                             <>
                                                                 <div className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
                                                                 <span className="text-[10px] font-black tracking-tight text-rose-600 uppercase">CANLI YAYIN</span>
@@ -1020,7 +1047,7 @@ export default function InterviewManagementPage() {
                                                                 <div className="w-2 h-2 rounded-full bg-emerald-500" />
                                                                 <span className="text-[10px] font-black tracking-tight text-emerald-600 uppercase">TAMAMLANDI</span>
                                                             </>
-                                                        ) : int.status === 'cancelled' ? (
+                                                        ) : int._effectiveStatus === 'cancelled' ? (
                                                             <>
                                                                 <div className="w-2 h-2 rounded-full bg-slate-400" />
                                                                 <span className="text-[10px] font-black tracking-tight text-slate-400 uppercase">İPTAL EDİLDİ</span>
@@ -1029,7 +1056,7 @@ export default function InterviewManagementPage() {
                                                             <>
                                                                 <div className="w-2 h-2 rounded-full bg-amber-400" />
                                                                 <span className="text-[10px] font-black tracking-tight text-[#0F172A] uppercase">
-                                                                    {int.status === 'postponed' ? 'ERTELENDİ / BEKLEMEDE' : 'PLANLANDI'}
+                                                                    {int._effectiveStatus === 'postponed' ? 'ERTELENDİ / BEKLEMEDE' : 'PLANLANDI'}
                                                                 </span>
                                                             </>
                                                         )}
@@ -1057,7 +1084,7 @@ export default function InterviewManagementPage() {
                                                             <Copy className="w-3 h-3 group-hover/copy:scale-110 transition-transform" /> BAĞLANTIYI KOPYALA
                                                         </button>
                                                         {/* Status dependent primary actions */}
-                                                        {int.status === 'live' ? (
+                                                        {int._effectiveStatus === 'live' ? (
                                                             <button 
                                                                 onClick={() => navigate(`/live-interview/${int.id}`)}
                                                                 className="bg-rose-600 text-white px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-rose-700 transition-all shadow-lg shadow-rose-600/20 active:scale-95"

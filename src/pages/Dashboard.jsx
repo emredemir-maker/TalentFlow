@@ -1,5 +1,5 @@
 // src/pages/Dashboard.jsx
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
@@ -7,7 +7,7 @@ import Header from '../components/Header';
 import CandidateDrawer from '../components/CandidateDrawer';
 import AddCandidateModal from '../components/AddCandidateModal';
 import OpportunityHub from '../components/OpportunityHub';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import {
     Users,
@@ -33,6 +33,21 @@ export default function Dashboard() {
     const candidates = enrichedCandidates || [];
     const [selectedCandidate, setSelectedCandidate] = useState(null);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
+    // Listen to public interview docs — authoritative source for completion status
+    const [sessionStatuses, setSessionStatuses] = useState({});
+    useEffect(() => {
+        const unsubscribe = onSnapshot(
+            collection(db, 'interviews'),
+            (snap) => {
+                const map = {};
+                snap.forEach(docSnap => { map[docSnap.id] = docSnap.data().status; });
+                setSessionStatuses(map);
+            },
+            (err) => console.warn('[Dashboard] session status listener error:', err)
+        );
+        return () => unsubscribe();
+    }, []);
     const { positions } = usePositions();
 
     const activePositions = useMemo(() => positions.filter(p => p.status === 'open').slice(0, 4), [positions]);
@@ -72,13 +87,15 @@ export default function Dashboard() {
         candidates.forEach(c => {
             if (c.interviewSessions && Array.isArray(c.interviewSessions)) {
                 c.interviewSessions.forEach(s => {
-                    const effectivelyCompleted = s.status === 'completed' ||
-                        (s.status !== 'live' && (s.aiOverallScore > 0 || Boolean(s.aiSummary) || s.finalScore > 0));
-                    if (s.status === 'cancelled' || effectivelyCompleted) return; // Skip cancelled/completed sessions in weekly plan
+                    // Overlay authoritative public doc status to beat ghost-write race conditions
+                    const effectiveStatus = sessionStatuses[s.id] || s.status;
+                    const effectivelyCompleted = effectiveStatus === 'completed' ||
+                        (effectiveStatus !== 'live' && (s.aiOverallScore > 0 || Boolean(s.aiSummary) || s.finalScore > 0));
+                    if (effectiveStatus === 'cancelled' || effectivelyCompleted) return; // Skip cancelled/completed
 
                     const sessionDatePart = s.date ? s.date.split('T')[0] : '';
                     const sessionDate = new Date(sessionDatePart);
-                    const isLive = s.status === 'live';
+                    const isLive = effectiveStatus === 'live';
                     
                     if (isLive || (sessionDate >= startOfToday && sessionDate <= endOfWeek)) {
                         const key = `${c.id}-${sessionDatePart}-${s.time}`;
@@ -89,14 +106,16 @@ export default function Dashboard() {
                             role: c.position || c.bestTitle || 'Aday',
                             time: s.time || '10:00',
                             date: sessionDatePart,
-                            status: s.status,
+                            status: effectiveStatus,
                             aiOverallScore: s.aiOverallScore || 0,
+                            aiSummary: s.aiSummary,
+                            finalScore: s.finalScore || 0,
                             score: c.combinedScore || c.bestScore || 0,
                             skills: c.skills?.slice(0, 2) || []
                         };
 
                         // If already exists, prefer live/completed over scheduled
-                        if (!sessionsMap.has(key) || s.status === 'live' || s.status === 'completed') {
+                        if (!sessionsMap.has(key) || effectiveStatus === 'live' || effectiveStatus === 'completed') {
                             sessionsMap.set(key, sessionData);
                         }
                     }
@@ -112,7 +131,7 @@ export default function Dashboard() {
             if (a.date !== b.date) return a.date.localeCompare(b.date);
             return a.time.localeCompare(b.time);
         }).slice(0, 5);
-    }, [candidates]);
+    }, [candidates, sessionStatuses]);
 
     const navigate = useNavigate();
 
