@@ -3,6 +3,7 @@ import { useUserSettings } from '../context/UserSettingsContext';
 import { useAuth } from '../context/AuthContext';
 import { Settings, Palette, Globe, Bell, LayoutGrid, Hash, Mail, CheckCircle, Loader2, Mic, MicOff, Zap, Activity } from 'lucide-react';
 import { connectGoogleWorkspace, disconnectGoogleWorkspace } from '../services/integrationService';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 
 export default function SettingsPage() {
@@ -64,19 +65,21 @@ export default function SettingsPage() {
                     const blob = new Blob(chunks, { type: mimeType });
                     if (blob.size >= 1000) {
                         try {
-                            // Send as base64 JSON to avoid multipart/proxy 403 issues
+                            // Call Gemini directly from frontend — bypasses backend/Firebase routing entirely
                             const arrayBuffer = await blob.arrayBuffer();
                             const bytes = new Uint8Array(arrayBuffer);
                             let binary = '';
                             for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
                             const base64Audio = btoa(binary);
-                            const res = await fetch('/api/gemini-stt', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ audio: base64Audio, mimeType })
-                            });
-                            const data = await res.json();
-                            const text = data.text?.trim() || '';
+
+                            const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+                            const genAI = new GoogleGenerativeAI(apiKey);
+                            const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+                            const result = await model.generateContent([
+                                { inlineData: { data: base64Audio, mimeType: mimeType.split(';')[0] } },
+                                "Bu ses dosyasındaki Türkçe konuşmaları metne dök. ÖNEMLİ: Sadece konuşulan sözcükleri yaz. Konuşma yoksa sadece boş bir dize döndür. 'Sessizlik', 'Ses yok', 'Boş' gibi ifadeler KULLANMA."
+                            ]);
+                            const text = result.response.text().trim();
                             const isJunk = text.length <= 2
                                 || text.toLowerCase().includes('sessizlik')
                                 || text.toLowerCase().includes('boş_ses');
