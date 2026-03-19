@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useUserSettings } from '../context/UserSettingsContext';
 import { useAuth } from '../context/AuthContext';
-import { Settings, Palette, Globe, Bell, LayoutGrid, Hash, Mail, Calendar, CheckCircle, Loader2 } from 'lucide-react';
+import { Settings, Palette, Globe, Bell, LayoutGrid, Hash, Mail, CheckCircle, Loader2, Mic, MicOff, Zap, Activity } from 'lucide-react';
 import { connectGoogleWorkspace, disconnectGoogleWorkspace } from '../services/integrationService';
 
 
@@ -9,6 +9,60 @@ export default function SettingsPage() {
     const { settings, loading, updateSettings } = useUserSettings();
     const { userProfile, userId } = useAuth();
     const [isConnectingGoogle, setIsConnectingGoogle] = useState(false);
+
+    // STT Test States
+    const [sttStatus, setSttStatus] = useState('idle'); // idle | listening | success | error
+    const [sttResult, setSttResult] = useState('');
+    const mediaRecorderRef = useRef(null);
+    const sttIntervalRef = useRef(null);
+
+    const toggleSttTest = async () => {
+        if (sttStatus === 'listening') {
+            if (sttIntervalRef.current) clearInterval(sttIntervalRef.current);
+            if (mediaRecorderRef.current?.state !== 'inactive') mediaRecorderRef.current?.stop();
+            setSttStatus('idle');
+            setSttResult('');
+            return;
+        }
+        setSttResult('');
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mediaRecorder = new MediaRecorder(stream);
+            mediaRecorderRef.current = mediaRecorder;
+            mediaRecorder.audioChunks = [];
+
+            mediaRecorder.ondataavailable = (e) => { mediaRecorder.audioChunks.push(e.data); };
+            mediaRecorder.onstop = async () => {
+                const chunks = mediaRecorder.audioChunks || [];
+                if (chunks.length === 0) return;
+                const blob = new Blob(chunks, { type: 'audio/webm' });
+                mediaRecorder.audioChunks = [];
+                if (blob.size < 2000) return;
+                const formData = new FormData();
+                formData.append('audio', blob, 'stt-test.webm');
+                try {
+                    const res = await fetch('/api/gemini-stt', { method: 'POST', body: formData });
+                    const data = await res.json();
+                    if (data.text && data.text.trim()) {
+                        setSttResult(data.text.trim());
+                        setSttStatus('success');
+                        if (sttIntervalRef.current) clearInterval(sttIntervalRef.current);
+                    }
+                } catch (e) { console.error('STT error', e); }
+            };
+
+            mediaRecorder.start();
+            setSttStatus('listening');
+            sttIntervalRef.current = setInterval(() => {
+                if (mediaRecorderRef.current?.state === 'recording') {
+                    mediaRecorderRef.current.stop();
+                    mediaRecorderRef.current.start();
+                }
+            }, 4000);
+        } catch {
+            setSttStatus('error');
+        }
+    };
 
     if (loading || !userProfile) {
         return (
@@ -141,6 +195,111 @@ export default function SettingsPage() {
                                     ]}
                                 />
                             </SettingRow>
+                        </div>
+
+                        {/* STT Diagnostics Section */}
+                        <div className="glass rounded-2xl p-6 animate-fade-in-up space-y-0 relative overflow-hidden group border border-border-subtle">
+                            <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+                            <div className="flex items-center gap-3 mb-6 pb-4 border-b border-border-subtle relative z-10">
+                                <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center">
+                                    <Activity className="w-5 h-5 text-cyan-400" />
+                                </div>
+                                <div>
+                                    <h2 className="text-base font-bold text-text-primary">Ses Tanıma Motoru Testi</h2>
+                                    <p className="text-[12px] text-text-muted">STT (Speech-to-Text) motorunun çalışırlığını test edin</p>
+                                </div>
+                            </div>
+
+                            <div className="relative z-10 rounded-xl border border-border-subtle p-4 bg-navy-950/30">
+                                <div className="flex items-center gap-4">
+                                    {/* Mic Button */}
+                                    <button
+                                        onClick={toggleSttTest}
+                                        className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 transition-all duration-300 ${
+                                            sttStatus === 'listening'
+                                                ? 'bg-red-500/20 border-2 border-red-400/40 text-red-400 scale-110'
+                                                : sttStatus === 'success'
+                                                ? 'bg-emerald-500/20 border-2 border-emerald-400/40 text-emerald-400'
+                                                : 'bg-navy-800/40 border border-border-subtle text-text-muted hover:border-cyan-500/40 hover:text-cyan-400'
+                                        }`}
+                                    >
+                                        {sttStatus === 'listening' ? (
+                                            <MicOff size={18} className="animate-pulse" />
+                                        ) : (
+                                            <Mic size={18} />
+                                        )}
+                                    </button>
+
+                                    {/* Status Info */}
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <Zap size={12} className={sttStatus === 'listening' ? 'text-cyan-400' : 'text-text-muted'} />
+                                            <span className="text-[11px] font-bold uppercase tracking-wider text-text-muted">STT Nöral Motor</span>
+                                            <span className={`ml-auto text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${
+                                                sttStatus === 'listening' ? 'bg-red-500/15 text-red-400' :
+                                                sttStatus === 'success' ? 'bg-emerald-500/15 text-emerald-400' :
+                                                sttStatus === 'error' ? 'bg-red-500/15 text-red-400' :
+                                                'bg-navy-800/40 text-text-muted'
+                                            }`}>
+                                                {sttStatus === 'idle' && 'Hazır'}
+                                                {sttStatus === 'listening' && 'Dinleniyor'}
+                                                {sttStatus === 'success' && 'Başarılı'}
+                                                {sttStatus === 'error' && 'Hata'}
+                                            </span>
+                                        </div>
+                                        <div className="text-[12px] text-text-muted min-h-[18px]">
+                                            {sttStatus === 'idle' && 'Mikrofon butonuna basarak testi başlatın.'}
+                                            {sttStatus === 'listening' && (
+                                                <span className="flex items-center gap-1 text-cyan-400">
+                                                    Konuşun, dinliyorum
+                                                    <span className="animate-bounce inline-block" style={{ animationDelay: '0ms' }}>.</span>
+                                                    <span className="animate-bounce inline-block" style={{ animationDelay: '150ms' }}>.</span>
+                                                    <span className="animate-bounce inline-block" style={{ animationDelay: '300ms' }}>.</span>
+                                                </span>
+                                            )}
+                                            {sttStatus === 'success' && sttResult && (
+                                                <span className="text-emerald-400 italic">"{sttResult}"</span>
+                                            )}
+                                            {sttStatus === 'error' && (
+                                                <span className="text-red-400">Mikrofon erişimi sağlanamadı. İzin ayarlarını kontrol edin.</span>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Action Button */}
+                                    <button
+                                        onClick={toggleSttTest}
+                                        className={`px-4 py-2 rounded-lg text-xs font-bold transition-all shrink-0 ${
+                                            sttStatus === 'listening'
+                                                ? 'bg-red-500/15 text-red-400 hover:bg-red-500/25 border border-red-500/20'
+                                                : 'bg-electric/10 text-electric-light hover:bg-electric/20 border border-electric/20'
+                                        }`}
+                                    >
+                                        {sttStatus === 'listening' ? 'Durdur' : sttStatus === 'success' ? 'Tekrar Test Et' : 'Testi Başlat'}
+                                    </button>
+                                </div>
+
+                                {/* Audio visualizer bars */}
+                                <div className="flex items-end gap-0.5 mt-4 h-8 px-1">
+                                    {[...Array(24)].map((_, i) => (
+                                        <div
+                                            key={i}
+                                            className="flex-1 rounded-full transition-all duration-150"
+                                            style={{
+                                                backgroundColor: sttStatus === 'listening' ? '#06B6D4' : sttStatus === 'success' ? '#10B981' : 'rgba(255,255,255,0.06)',
+                                                height: sttStatus === 'listening'
+                                                    ? `${20 + Math.abs(Math.sin(i * 0.7 + Date.now() * 0.001)) * 80}%`
+                                                    : sttStatus === 'success' ? '60%' : '15%',
+                                                opacity: sttStatus === 'listening' ? 0.5 + (i % 3) * 0.2 : 0.4,
+                                            }}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+
+                            <p className="text-[11px] text-text-muted mt-3 relative z-10">
+                                Bu test, mülakatlarda kullanılan Gemini tabanlı ses tanıma motorunun cihazınızda düzgün çalışıp çalışmadığını doğrular.
+                            </p>
                         </div>
 
                         {/* Integrations Section */}

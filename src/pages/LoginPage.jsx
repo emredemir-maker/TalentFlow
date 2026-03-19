@@ -1,8 +1,7 @@
 // src/pages/LoginPage.jsx
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { LogIn, AlertCircle, CheckCircle, Loader2, User, Mail, Lock, Zap, Mic, Terminal, Activity, ArrowRight } from 'lucide-react';
-import Logo from '../components/Logo';
+import { LogIn, AlertCircle, CheckCircle, Loader2, User, Mail, Lock, Sparkles, ArrowRight, Zap, Brain, BarChart3, Clock } from 'lucide-react';
 
 export default function LoginPage() {
     const { loginWithGoogle, loginWithEmail, registerWithEmail, loading, error } = useAuth();
@@ -12,71 +11,6 @@ export default function LoginPage() {
     const [password, setPassword] = useState('');
     const [name, setName] = useState('');
     const [success, setSuccess] = useState(null);
-
-    // STT Diagnostic States
-    const [isMicActive, setIsMicActive] = useState(false);
-    const [sttResult, setSttResult] = useState('');
-    const mediaRecorderRef = useRef(null);
-    const sttIntervalRef = useRef(null);
-
-    const toggleSttTest = async () => {
-        if (isMicActive) {
-            if (sttIntervalRef.current) clearInterval(sttIntervalRef.current);
-            if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-                mediaRecorderRef.current.stop();
-            }
-            setIsMicActive(false);
-            setSttResult('');
-            return;
-        }
-
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const mediaRecorder = new MediaRecorder(stream);
-            mediaRecorderRef.current = mediaRecorder;
-
-            mediaRecorder.onstop = async () => {
-                const chunks = mediaRecorder.audioChunks || [];
-                if (chunks.length === 0) return;
-                const blob = new Blob(chunks, { type: 'audio/webm' });
-                mediaRecorder.audioChunks = [];
-                if (blob.size < 2000) return;
-                const formData = new FormData();
-                formData.append('audio', blob, 'test.webm');
-                try {
-                    const serverUrl = import.meta.env.VITE_SERVER_URL || '';
-                    const res = await fetch(`${serverUrl}/api/gemini-stt`, { method: 'POST', body: formData });
-                    const data = await res.json();
-                    if (data.text) setSttResult(data.text);
-                } catch (e) {
-                    console.error("STT Test failed", e);
-                }
-            };
-
-            mediaRecorder.ondataavailable = (e) => {
-                if (!mediaRecorder.audioChunks) mediaRecorder.audioChunks = [];
-                mediaRecorder.audioChunks.push(e.data);
-            };
-
-            mediaRecorder.start();
-            setIsMicActive(true);
-
-            sttIntervalRef.current = setInterval(() => {
-                if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-                    mediaRecorderRef.current.stop();
-                    mediaRecorderRef.current.start();
-                }
-            }, 4000);
-        } catch (err) {
-            alert("Mikrofon erişimi engellendi veya cihaz bulunamadı.");
-        }
-    };
-
-    useEffect(() => {
-        return () => {
-            if (sttIntervalRef.current) clearInterval(sttIntervalRef.current);
-        };
-    }, []);
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
@@ -94,131 +28,300 @@ export default function LoginPage() {
                 await loginWithEmail(email, password);
             } else {
                 await registerWithEmail(email, password, name);
-                setSuccess("Kayıt başarılı! Sisteme erişim sağlanıyor...");
+                setSuccess('Kayıt başarılı! Sisteme erişim sağlanıyor...');
             }
         } catch {}
     };
 
+    const inputStyle = {
+        backgroundColor: '#FFFFFF',
+        border: '1.5px solid #E2E8F0',
+        color: '#1E293B',
+        borderRadius: '10px',
+        width: '100%',
+        height: '48px',
+        paddingLeft: '44px',
+        paddingRight: '16px',
+        fontSize: '14px',
+        outline: 'none',
+        transition: 'border-color 0.2s, box-shadow 0.2s',
+    };
+
+    const handleFocus = (e) => {
+        e.target.style.borderColor = '#06B6D4';
+        e.target.style.boxShadow = '0 0 0 3px rgba(6,182,212,0.12)';
+    };
+    const handleBlur = (e) => {
+        e.target.style.borderColor = '#E2E8F0';
+        e.target.style.boxShadow = 'none';
+    };
+
+    const stats = [
+        { value: '3s', label: 'CV Analizi', icon: BarChart3 },
+        { value: '%90', label: 'Tahmin Skoru', icon: Brain },
+        { value: '24/7', label: 'Akıllı Asistan', icon: Clock },
+    ];
+
+    const features = [
+        'Nöral CV Ayrıştırma ve Eşleştirme',
+        'Gerçek Zamanlı STAR Mülakat Analizi',
+        'Bias Korumalı AI Değerlendirme',
+        'Agentic İşe Alım İş Akışları',
+    ];
+
     return (
         <div
-            className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
             style={{
-                backgroundColor: '#0A0F1E',
-                backgroundImage: 'linear-gradient(rgba(6, 182, 212, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(6, 182, 212, 0.03) 1px, transparent 1px)',
-                backgroundSize: '24px 24px',
-                fontFamily: "'Inter', ui-sans-serif, system-ui, sans-serif"
+                minHeight: '100vh',
+                width: '100%',
+                display: 'flex',
+                fontFamily: "'Inter', ui-sans-serif, system-ui, sans-serif",
+                overflow: 'hidden',
             }}
         >
-            {/* Scanline overlay */}
+            {/* ── LEFT PANEL ── */}
             <div
-                className="absolute inset-0 pointer-events-none opacity-[0.06]"
-                style={{ background: 'repeating-linear-gradient(0deg, transparent, transparent 2px, #000 2px, #000 4px)' }}
-            />
-
-            {/* Ambient glow */}
-            <div className="fixed top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(6,182,212,0.06) 0%, transparent 70%)'}} />
-            <div className="fixed bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(59,130,246,0.06) 0%, transparent 70%)' }} />
-
-            {/* Central Panel */}
-            <div
-                className="w-full max-w-[480px] rounded-sm relative z-10 flex flex-col"
                 style={{
-                    backgroundColor: '#111827',
-                    borderLeft: '4px solid #06B6D4',
-                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 20px rgba(6, 182, 212, 0.1)'
+                    width: '45%',
+                    minHeight: '100vh',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    padding: '56px 48px',
+                    background: 'linear-gradient(155deg, #0F172A 0%, #1E1B4B 55%, #0F172A 100%)',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    flexShrink: 0,
                 }}
             >
-                {/* Header / Logo */}
-                <div className="flex items-center gap-3 px-6 py-5 border-b border-gray-800/60">
-                    <Logo size={32} showText={false} />
-                    <div className="flex flex-col leading-none tracking-widest" style={{ color: '#06B6D4' }}>
-                        <span className="text-xs font-black uppercase">TALENT</span>
-                        <span className="text-xs font-black uppercase opacity-80">FLOW</span>
-                    </div>
-                    <div className="ml-auto flex items-center gap-2 text-xs text-gray-500">
-                        <Activity size={14} className="text-cyan-500 opacity-50" />
-                        <span className="uppercase tracking-wider text-[10px]">SECURE.LINK</span>
+                {/* Decorative glows */}
+                <div style={{
+                    position: 'absolute', top: '-10%', right: '-10%',
+                    width: '55%', height: '55%', borderRadius: '50%',
+                    background: 'radial-gradient(circle, rgba(6,182,212,0.18) 0%, transparent 70%)',
+                    pointerEvents: 'none'
+                }} />
+                <div style={{
+                    position: 'absolute', bottom: '-10%', left: '-10%',
+                    width: '55%', height: '55%', borderRadius: '50%',
+                    background: 'radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%)',
+                    pointerEvents: 'none'
+                }} />
+
+                {/* Logo */}
+                <div style={{ position: 'relative', zIndex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '0' }}>
+                        <div style={{
+                            width: '44px', height: '44px', borderRadius: '12px',
+                            background: 'linear-gradient(135deg, #06B6D4 0%, #3B82F6 100%)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            boxShadow: '0 8px 24px rgba(6,182,212,0.3)',
+                            flexShrink: 0,
+                        }}>
+                            <span style={{ color: '#fff', fontWeight: 900, fontSize: '16px', letterSpacing: '-1px' }}>TI</span>
+                        </div>
+                        <div>
+                            <div style={{ color: '#F8FAFC', fontWeight: 900, fontSize: '18px', letterSpacing: '-0.5px', lineHeight: 1 }}>Talent-Inn</div>
+                            <div style={{ color: '#94A3B8', fontSize: '10px', letterSpacing: '2px', textTransform: 'uppercase', marginTop: '2px' }}>AI-Powered HR Platform</div>
+                        </div>
                     </div>
                 </div>
 
-                {/* Alerts */}
-                {error && (
-                    <div className="mx-6 mt-4 flex items-start gap-2 p-3 rounded-sm text-xs" style={{ backgroundColor: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#F87171' }}>
-                        <AlertCircle size={14} className="shrink-0 mt-0.5" />
-                        <span>{error}</span>
+                {/* Hero Text */}
+                <div style={{ position: 'relative', zIndex: 1, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', paddingTop: '48px', paddingBottom: '48px' }}>
+                    {/* Badge */}
+                    <div style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '8px',
+                        padding: '6px 14px', borderRadius: '999px',
+                        backgroundColor: 'rgba(6,182,212,0.08)',
+                        border: '1px solid rgba(6,182,212,0.15)',
+                        color: '#67E8F9',
+                        fontSize: '10px', fontWeight: 800,
+                        letterSpacing: '3px', textTransform: 'uppercase',
+                        marginBottom: '28px',
+                        width: 'fit-content',
+                    }}>
+                        <Sparkles size={12} />
+                        Gelişmiş Yetenek Kontrol Merkezi
                     </div>
-                )}
-                {success && (
-                    <div className="mx-6 mt-4 flex items-start gap-2 p-3 rounded-sm text-xs" style={{ backgroundColor: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', color: '#34D399' }}>
-                        <CheckCircle size={14} className="shrink-0 mt-0.5" />
-                        <span>{success}</span>
+
+                    {/* Main heading */}
+                    <h1 style={{
+                        fontSize: 'clamp(36px, 3.5vw, 52px)',
+                        fontWeight: 900,
+                        lineHeight: 1.05,
+                        letterSpacing: '-1.5px',
+                        color: '#F8FAFC',
+                        marginBottom: '20px',
+                    }}>
+                        İşe Alımın <br />
+                        <span style={{
+                            background: 'linear-gradient(90deg, #06B6D4, #67E8F9, #34D399)',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            backgroundClip: 'text',
+                        }}>
+                            Yapay Zeka Mimarı
+                        </span>
+                    </h1>
+
+                    {/* Description */}
+                    <p style={{
+                        color: '#94A3B8',
+                        fontSize: '15px',
+                        lineHeight: '1.7',
+                        maxWidth: '400px',
+                        marginBottom: '36px',
+                        fontWeight: 500,
+                    }}>
+                        Talent-Inn, sıradan bir aday takip sisteminden çok daha fazlasıdır. Veriyi stratejiye, adayları ise yetkinlik kanıtlarına dönüştüren uçtan uca bir{' '}
+                        <span style={{ color: '#F8FAFC', fontWeight: 700 }}>Yapay Zeka Ekosistemidir.</span>
+                    </p>
+
+                    {/* Feature list */}
+                    <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 40px 0', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        {features.map((f) => (
+                            <li key={f} style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#CBD5E1', fontSize: '13px', fontWeight: 500 }}>
+                                <div style={{
+                                    width: '20px', height: '20px', borderRadius: '50%',
+                                    background: 'rgba(6,182,212,0.12)',
+                                    border: '1px solid rgba(6,182,212,0.25)',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    flexShrink: 0,
+                                }}>
+                                    <Zap size={10} color="#06B6D4" />
+                                </div>
+                                {f}
+                            </li>
+                        ))}
+                    </ul>
+
+                    {/* Stats */}
+                    <div style={{ display: 'flex', gap: '0', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '28px' }}>
+                        {stats.map((s, i) => (
+                            <div key={s.label} style={{
+                                flex: 1,
+                                display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
+                                paddingRight: i < stats.length - 1 ? '24px' : '0',
+                                borderRight: i < stats.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+                                paddingLeft: i > 0 ? '24px' : '0',
+                            }}>
+                                <s.icon size={16} color="#06B6D4" style={{ marginBottom: '8px', opacity: 0.8 }} />
+                                <div style={{ fontSize: '22px', fontWeight: 900, color: '#F8FAFC', lineHeight: 1 }}>{s.value}</div>
+                                <div style={{ fontSize: '9px', color: '#64748B', fontWeight: 700, letterSpacing: '2px', textTransform: 'uppercase', marginTop: '4px' }}>{s.label}</div>
+                            </div>
+                        ))}
                     </div>
-                )}
+                </div>
 
-                {/* Form Area */}
-                <div className="px-6 py-5 flex flex-col gap-4">
-                    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+                {/* Footer note */}
+                <div style={{ position: 'relative', zIndex: 1, color: '#475569', fontSize: '11px', letterSpacing: '1px' }}>
+                    © 2025 Talent-Inn · AI-Powered Talent Intelligence
+                </div>
+            </div>
 
-                        {/* Name field — only for register */}
+            {/* ── RIGHT PANEL ── */}
+            <div style={{
+                flex: 1,
+                backgroundColor: '#F8FAFC',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '48px 40px',
+                overflowY: 'auto',
+            }}>
+                <div style={{ width: '100%', maxWidth: '420px' }}>
+                    {/* Header */}
+                    <div style={{ marginBottom: '36px' }}>
+                        <h2 style={{ fontSize: '26px', fontWeight: 800, color: '#0F172A', marginBottom: '8px', letterSpacing: '-0.5px' }}>
+                            {mode === 'login' ? 'Hoş Geldiniz' : 'Hesap Oluşturun'}
+                        </h2>
+                        <p style={{ color: '#64748B', fontSize: '14px', lineHeight: '1.5' }}>
+                            {mode === 'login'
+                                ? 'Platforma erişmek için bilgilerinizi girin.'
+                                : 'Davetiyenizle yeni hesabınızı oluşturun.'}
+                        </p>
+                    </div>
+
+                    {/* Error Alert */}
+                    {error && (
+                        <div style={{
+                            display: 'flex', alignItems: 'flex-start', gap: '10px',
+                            padding: '12px 14px', borderRadius: '10px', marginBottom: '20px',
+                            backgroundColor: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
+                            color: '#EF4444', fontSize: '13px'
+                        }}>
+                            <AlertCircle size={15} style={{ flexShrink: 0, marginTop: '1px' }} />
+                            <span>{error}</span>
+                        </div>
+                    )}
+
+                    {/* Success Alert */}
+                    {success && (
+                        <div style={{
+                            display: 'flex', alignItems: 'flex-start', gap: '10px',
+                            padding: '12px 14px', borderRadius: '10px', marginBottom: '20px',
+                            backgroundColor: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)',
+                            color: '#10B981', fontSize: '13px'
+                        }}>
+                            <CheckCircle size={15} style={{ flexShrink: 0, marginTop: '1px' }} />
+                            <span>{success}</span>
+                        </div>
+                    )}
+
+                    {/* Form */}
+                    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        {/* Name — register only */}
                         {mode === 'register' && (
-                            <div className="flex flex-col gap-1">
-                                <label className="text-[10px] uppercase tracking-wider font-semibold flex items-center justify-between" style={{ color: '#9CA3AF' }}>
-                                    <span>Görünen Ad</span>
-                                    <span className="text-gray-600">REQ</span>
+                            <div>
+                                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#1E293B', marginBottom: '6px' }}>
+                                    Görünen Ad
                                 </label>
-                                <div className="relative">
-                                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-500">
-                                        <User size={14} />
-                                    </div>
+                                <div style={{ position: 'relative' }}>
+                                    <User size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
                                     <input
                                         type="text"
                                         required
                                         value={name}
                                         onChange={(e) => setName(e.target.value)}
                                         placeholder="Ad Soyad"
-                                        className="w-full pl-9 pr-3 h-10 text-sm rounded-sm focus:outline-none transition-all placeholder-gray-600"
-                                        style={{ backgroundColor: '#1F2937', border: '1px solid #374151', color: '#E5E7EB' }}
-                                        onFocus={e => { e.target.style.borderColor = '#06B6D4'; e.target.style.boxShadow = '0 0 0 1px #06B6D4'; }}
-                                        onBlur={e => { e.target.style.borderColor = '#374151'; e.target.style.boxShadow = 'none'; }}
+                                        style={inputStyle}
+                                        onFocus={handleFocus}
+                                        onBlur={handleBlur}
+                                        autoComplete="name"
                                     />
                                 </div>
                             </div>
                         )}
 
-                        {/* Email Field */}
-                        <div className="flex flex-col gap-1">
-                            <label className="text-[10px] uppercase tracking-wider font-semibold flex items-center justify-between" style={{ color: '#9CA3AF' }}>
-                                <span>Erişim Sinyali (E-posta)</span>
-                                <span className="text-gray-600">REQ</span>
+                        {/* Email */}
+                        <div>
+                            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#1E293B', marginBottom: '6px' }}>
+                                E-posta Adresi
                             </label>
-                            <div className="relative">
-                                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-500">
-                                    <Mail size={14} />
-                                </div>
+                            <div style={{ position: 'relative' }}>
+                                <Mail size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
                                 <input
                                     type="email"
                                     required
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    placeholder="isim@sistem.com"
-                                    className="w-full pl-9 pr-3 h-10 text-sm rounded-sm focus:outline-none transition-all placeholder-gray-600"
-                                    style={{ backgroundColor: '#1F2937', border: '1px solid #374151', color: '#E5E7EB' }}
-                                    onFocus={e => { e.target.style.borderColor = '#06B6D4'; e.target.style.boxShadow = '0 0 0 1px #06B6D4'; }}
-                                    onBlur={e => { e.target.style.borderColor = '#374151'; e.target.style.boxShadow = 'none'; }}
+                                    placeholder="ornek@sirket.com"
+                                    style={inputStyle}
+                                    onFocus={handleFocus}
+                                    onBlur={handleBlur}
+                                    autoComplete="email"
                                 />
                             </div>
                         </div>
 
-                        {/* Password Field */}
-                        <div className="flex flex-col gap-1">
-                            <label className="text-[10px] uppercase tracking-wider font-semibold flex items-center justify-between" style={{ color: '#9CA3AF' }}>
-                                <span>Güvenlik Anahtarı (Şifre)</span>
-                                <span className="text-gray-600">REQ</span>
+                        {/* Password */}
+                        <div>
+                            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#1E293B', marginBottom: '6px' }}>
+                                Şifre
                             </label>
-                            <div className="relative">
-                                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-500">
-                                    <Lock size={14} />
-                                </div>
+                            <div style={{ position: 'relative' }}>
+                                <Lock size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
                                 <input
                                     type="password"
                                     required
@@ -226,123 +329,89 @@ export default function LoginPage() {
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     placeholder="••••••••"
-                                    className="w-full pl-9 pr-3 h-10 text-sm rounded-sm focus:outline-none transition-all placeholder-gray-600"
-                                    style={{ backgroundColor: '#1F2937', border: '1px solid #374151', color: '#E5E7EB' }}
-                                    onFocus={e => { e.target.style.borderColor = '#06B6D4'; e.target.style.boxShadow = '0 0 0 1px #06B6D4'; }}
-                                    onBlur={e => { e.target.style.borderColor = '#374151'; e.target.style.boxShadow = 'none'; }}
+                                    style={inputStyle}
+                                    onFocus={handleFocus}
+                                    onBlur={handleBlur}
+                                    autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                                 />
                             </div>
                         </div>
 
-                        {/* Submit Button */}
+                        {/* Submit */}
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full h-10 mt-2 flex items-center justify-center gap-2 rounded-sm text-sm font-black uppercase tracking-wider transition-colors relative overflow-hidden group"
-                            style={{ backgroundColor: '#06B6D4', color: '#0A0F1E' }}
-                            onMouseEnter={e => e.currentTarget.style.backgroundColor = '#22D3EE'}
-                            onMouseLeave={e => e.currentTarget.style.backgroundColor = '#06B6D4'}
+                            style={{
+                                width: '100%', height: '50px', borderRadius: '10px',
+                                background: loading ? '#94A3B8' : 'linear-gradient(135deg, #06B6D4 0%, #3B82F6 100%)',
+                                color: '#fff', fontWeight: 700, fontSize: '14px',
+                                letterSpacing: '0.3px', border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                                marginTop: '4px',
+                                boxShadow: loading ? 'none' : '0 8px 24px rgba(6,182,212,0.25)',
+                                transition: 'opacity 0.2s',
+                            }}
+                            onMouseEnter={e => { if (!loading) e.currentTarget.style.opacity = '0.9'; }}
+                            onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}
                         >
                             {loading ? (
-                                <Loader2 size={16} className="animate-spin" />
+                                <Loader2 size={18} className="animate-spin" />
                             ) : (
                                 <>
-                                    <span>{mode === 'login' ? 'SİSTEME GİRİŞ YAP ✦' : 'HESAP OLUŞTUR ✦'}</span>
-                                    <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
+                                    <LogIn size={16} />
+                                    {mode === 'login' ? 'Sisteme Giriş Yap' : 'Hesap Oluştur'}
                                 </>
                             )}
                         </button>
                     </form>
 
                     {/* Divider */}
-                    <div className="flex items-center gap-3 my-1 opacity-50">
-                        <div className="h-px flex-1 bg-gray-700" />
-                        <span className="text-[10px] uppercase tracking-wider whitespace-nowrap" style={{ color: '#9CA3AF' }}>Güvenli Kimlik Doğrulama</span>
-                        <div className="h-px flex-1 bg-gray-700" />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '24px 0' }}>
+                        <div style={{ flex: 1, height: '1px', backgroundColor: '#E2E8F0' }} />
+                        <span style={{ color: '#94A3B8', fontSize: '11px', fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+                            Güvenli Kimlik Doğrulama
+                        </span>
+                        <div style={{ flex: 1, height: '1px', backgroundColor: '#E2E8F0' }} />
                     </div>
 
                     {/* Google SSO */}
                     <button
                         type="button"
                         onClick={loginWithGoogle}
-                        className="w-full h-10 flex items-center justify-center gap-2 rounded-sm text-xs tracking-wide uppercase transition-colors"
-                        style={{ backgroundColor: '#1F2937', border: '1px solid #374151', color: '#D1D5DB' }}
-                        onMouseEnter={e => e.currentTarget.style.backgroundColor = '#374151'}
-                        onMouseLeave={e => e.currentTarget.style.backgroundColor = '#1F2937'}
+                        style={{
+                            width: '100%', height: '48px', borderRadius: '10px',
+                            backgroundColor: '#FFFFFF', border: '1.5px solid #E2E8F0',
+                            color: '#1E293B', fontWeight: 600, fontSize: '14px',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+                            cursor: 'pointer', transition: 'background-color 0.15s, border-color 0.15s',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#F1F5F9'; e.currentTarget.style.borderColor = '#CBD5E1'; }}
+                        onMouseLeave={e => { e.currentTarget.style.backgroundColor = '#FFFFFF'; e.currentTarget.style.borderColor = '#E2E8F0'; }}
                     >
-                        <img src="https://www.google.com/favicon.ico" alt="Google" className="w-3.5 h-3.5 opacity-80" />
-                        Google Nexus ile Doğrula
+                        <svg viewBox="0 0 24 24" style={{ width: '18px', height: '18px' }} xmlns="http://www.w3.org/2000/svg">
+                            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+                            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+                        </svg>
+                        Google ile Devam Et
                     </button>
 
-                    {/* Mode toggle */}
-                    <div className="flex justify-end">
+                    {/* Toggle mode */}
+                    <div style={{ marginTop: '28px', textAlign: 'center' }}>
                         <button
                             type="button"
                             onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setSuccess(null); }}
-                            className="text-[10px] uppercase tracking-wider flex items-center gap-1 transition-colors"
-                            style={{ color: '#6B7280' }}
-                            onMouseEnter={e => e.currentTarget.style.color = '#06B6D4'}
-                            onMouseLeave={e => e.currentTarget.style.color = '#6B7280'}
-                        >
-                            {mode === 'login' ? 'Kayıtlı Değil Misiniz? Hesap Oluşturun' : 'Zaten Kayıtlı Mısınız? Giriş Yapın'}
-                            <ArrowRight size={10} />
-                        </button>
-                    </div>
-                </div>
-
-                {/* STT Diagnostics Panel */}
-                <div className="border-t border-gray-800/60 p-4 mt-auto" style={{ backgroundColor: 'rgba(10,15,30,0.8)' }}>
-                    <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2" style={{ color: '#06B6D4' }}>
-                            <Terminal size={12} />
-                            <span className="text-[10px] uppercase font-black tracking-wider">Sistem Tanılama</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                            <span className="text-[9px] text-green-500 uppercase tracking-widest">ÇALIŞIYOR</span>
-                        </div>
-                    </div>
-
-                    <div className="flex items-start gap-3 p-3 rounded-sm" style={{ backgroundColor: '#050810', border: '1px solid #1F2937' }}>
-                        <button
-                            type="button"
-                            onClick={toggleSttTest}
-                            className="w-8 h-8 rounded flex items-center justify-center shrink-0 transition-all"
                             style={{
-                                backgroundColor: isMicActive ? '#06B6D4' : '#1F2937',
-                                color: isMicActive ? '#0A0F1E' : '#9CA3AF'
+                                background: 'none', border: 'none', cursor: 'pointer',
+                                fontSize: '13px', color: '#64748B', display: 'inline-flex', alignItems: 'center', gap: '4px',
                             }}
+                            onMouseEnter={e => e.currentTarget.style.color = '#06B6D4'}
+                            onMouseLeave={e => e.currentTarget.style.color = '#64748B'}
                         >
-                            <Mic size={14} />
+                            {mode === 'login' ? 'Hesabınız yok mu? Kayıt olun' : 'Zaten üye misiniz? Giriş yapın'}
+                            <ArrowRight size={13} />
                         </button>
-                        <div className="flex-1 min-w-0">
-                            <div className="text-[10px] mb-1 flex items-center gap-1" style={{ color: '#6B7280' }}>
-                                <Zap size={10} style={{ color: isMicActive ? '#06B6D4' : undefined }} />
-                                <span className="uppercase tracking-wide">STT Nöral Motor Testi</span>
-                                <span className="ml-auto px-2 py-0.5 rounded-sm text-[8px] uppercase tracking-widest" style={{ backgroundColor: '#1F2937', color: isMicActive ? '#EF4444' : '#06B6D4' }}>
-                                    {isMicActive ? 'MOTORU DURDUR' : 'MOTORU BAŞLAT'}
-                                </span>
-                            </div>
-                            <div className="h-4 text-xs overflow-hidden" style={{ color: '#E5E7EB' }}>
-                                {sttResult ? (
-                                    <span className="text-cyan-400 italic text-[10px]">"{sttResult}"</span>
-                                ) : isMicActive ? (
-                                    <span className="flex items-center gap-0.5 text-gray-500 text-[10px]">
-                                        Dinleniyor
-                                        <span className="animate-bounce inline-block" style={{ animationDelay: '0ms' }}>.</span>
-                                        <span className="animate-bounce inline-block" style={{ animationDelay: '100ms' }}>.</span>
-                                        <span className="animate-bounce inline-block" style={{ animationDelay: '200ms' }}>.</span>
-                                    </span>
-                                ) : (
-                                    <span className="text-gray-600 text-[10px] font-mono">Beklemede_</span>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="mt-3 flex items-center justify-between text-[8px] uppercase tracking-widest" style={{ color: '#374151' }}>
-                        <span>Nöral Motor Dağıtımı: Kararlı v2.4.0</span>
-                        <span>OK</span>
                     </div>
                 </div>
             </div>
