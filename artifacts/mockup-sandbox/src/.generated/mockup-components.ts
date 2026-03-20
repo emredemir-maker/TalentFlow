@@ -7,12 +7,12 @@ export const modules: ModuleMap = {
   "./components/mockups/candidates-layouts/Clinic.tsx": () => import("../components/mockups/candidates-layouts/Clinic.tsx"),
   "./components/mockups/candidates-layouts/ObsidianIntelligence.tsx": () => import("../components/mockups/candidates-layouts/ObsidianIntelligence.tsx"),
   "./components/mockups/candidates-layouts/Papyrus.tsx": () => import("../components/mockups/candidates-layouts/Papyrus.tsx"),
-  "./components/mockups/login-layouts/CommandDeck.tsx": () => import("../components/mockups/login-layouts/CommandDeck.tsx"),
-  "./components/mockups/login-layouts/SplitScreen.tsx": () => import("../components/mockups/login-layouts/SplitScreen.tsx"),
-  "./components/mockups/login-layouts/StackedBlocks.tsx": () => import("../components/mockups/login-layouts/StackedBlocks.tsx"),
   "./components/mockups/positions-layouts/CommandTable.tsx": () => import("../components/mockups/positions-layouts/CommandTable.tsx"),
   "./components/mockups/positions-layouts/NeuralGrid.tsx": () => import("../components/mockups/positions-layouts/NeuralGrid.tsx"),
   "./components/mockups/positions-layouts/PositionCreate.tsx": () => import("../components/mockups/positions-layouts/PositionCreate.tsx"),
   "./components/mockups/positions-layouts/PositionDetail.tsx": () => import("../components/mockups/positions-layouts/PositionDetail.tsx"),
-  "./components/mockups/positions-layouts/PositionEdit.tsx": () => import("../components/mockups/positions-layouts/PositionEdit.tsx")
+  "./components/mockups/positions-layouts/PositionEdit.tsx": () => import("../components/mockups/positions-layouts/PositionEdit.tsx"),
+  "./components/mockups/login-layouts/CommandDeck.tsx": () => import("../components/mockups/login-layouts/CommandDeck.tsx"),
+  "./components/mockups/login-layouts/SplitScreen.tsx": () => import("../components/mockups/login-layouts/SplitScreen.tsx"),
+  "./components/mockups/login-layouts/StackedBlocks.tsx": () => import("../components/mockups/login-layouts/StackedBlocks.tsx")
 };
