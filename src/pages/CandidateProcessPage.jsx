@@ -515,7 +515,14 @@ export default function CandidateProcessPage() {
                                                                 </div>
                                                             )}
                                                         </div>
-                                                    )) : (
+                                                    )) : (candidate?.cvData || candidate?.cvText) ? (
+                                                        <div className="relative pl-5 border-l-2 border-cyan-100">
+                                                            <div className="absolute -left-[5px] top-1 w-2.5 h-2.5 rounded-full bg-white border-2 border-cyan-400 shadow-sm" />
+                                                            <pre className="text-[11px] text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100 whitespace-pre-wrap font-sans">
+                                                                {(candidate?.cvData || candidate?.cvText || '').slice(0, 4000)}
+                                                            </pre>
+                                                        </div>
+                                                    ) : (
                                                         <p className="text-[12px] text-slate-400 italic">Kariyer bilgisi bulunamadı.</p>
                                                     )}
                                                 </div>

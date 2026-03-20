@@ -235,6 +235,7 @@ export default function ApplyPage() {
                 experience: parsedCandidate?.experience || 0,
                 education: parsedCandidate?.education || '',
                 summary: parsedCandidate?.summary || '',
+                cvData: parsedCandidate?.cvData || '',
                 cvText: cvText ? cvText.slice(0, 6000) : '',
                 cvFileName: cvFile.name,
                 source,
