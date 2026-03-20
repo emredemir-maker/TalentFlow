@@ -1,7 +1,7 @@
 // src/pages/ApplyPage.jsx — Public job application page (no auth required)
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { doc, getDoc, collection, addDoc, getDocs, query, where, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, collection, addDoc, getDocs, query, where, updateDoc, serverTimestamp, onSnapshot, orderBy } from 'firebase/firestore';
 import { signInAnonymously } from 'firebase/auth';
 import { db, auth } from '../config/firebase';
 import { extractTextFromFile } from '../services/cvParser';
@@ -11,8 +11,15 @@ import { detectSource } from '../services/applicationService';
 import {
     Briefcase, Upload, CheckCircle2, Loader2, AlertCircle,
     User, Mail, Phone, Linkedin, FileText, Building2, X,
-    ChevronRight, Shield
+    ChevronRight, Shield, Globe, Layers, Link2, Share2, Users, Zap, Search as SearchIcon,
+    ChevronDown
 } from 'lucide-react';
+
+const SOURCES_PATH = 'artifacts/talent-flow/public/data/sources';
+
+const SOURCE_ICONS = {
+    Globe, Layers, Link2, Share2, Users, Zap, Search: SearchIcon,
+};
 
 const POSITIONS_COLLECTION = 'artifacts/talent-flow/public/data/positions';
 const APPLICATIONS_COLLECTION = 'artifacts/talent-flow/public/data/applications';
@@ -56,7 +63,7 @@ export default function ApplyPage() {
     const { positionId } = useParams();
     const [searchParams] = useSearchParams();
     const refParam = searchParams.get('ref') || searchParams.get('utm_source') || '';
-    const source = detectSource(refParam);
+    const detectedSource = detectSource(refParam);
 
     const [position, setPosition] = useState(null);
     const [posLoading, setPosLoading] = useState(true);
@@ -74,6 +81,11 @@ export default function ApplyPage() {
     const [progress, setProgress] = useState('');
     const [aiScore, setAiScore] = useState(null);
     const [submitError, setSubmitError] = useState(null);
+
+    // ── Source selection ──────────────────────────────────────────────────
+    const [sources, setSources]                     = useState([]);
+    const [selectedMainSource, setSelectedMainSource] = useState(null); // full source object
+    const [selectedSubSource, setSelectedSubSource]   = useState('');   // sub-source string
 
     const fileInputRef = useRef(null);
 
@@ -99,6 +111,47 @@ export default function ApplyPage() {
             }
         })();
     }, [positionId]);
+
+    // ── Load sources from Firestore (same anon auth) ─────────────────────
+    useEffect(() => {
+        const q = query(collection(db, SOURCES_PATH), orderBy('createdAt', 'asc'));
+        const unsub = onSnapshot(q, (snap) => {
+            const loaded = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            setSources(loaded);
+
+            // Auto-select based on URL-detected source
+            if (loaded.length > 0 && detectedSource && detectedSource !== 'Direkt') {
+                const normalised = detectedSource.toLowerCase();
+                for (const main of loaded) {
+                    const matchedSub = (main.subSources || []).find(
+                        s => s.toLowerCase() === normalised || normalised.includes(s.toLowerCase())
+                    );
+                    if (matchedSub) {
+                        setSelectedMainSource(main);
+                        setSelectedSubSource(matchedSub);
+                        break;
+                    }
+                    if (main.name.toLowerCase() === normalised || normalised.includes(main.name.toLowerCase())) {
+                        setSelectedMainSource(main);
+                        break;
+                    }
+                }
+            }
+        }, (err) => {
+            console.warn('Sources fetch error (non-blocking):', err.message);
+        });
+        return unsub;
+    }, []);
+
+    // ── Derived: effective source values saved to Firestore ───────────────
+    const effectiveSubSource  = selectedSubSource  || (selectedMainSource ? '' : detectedSource);
+    const effectiveSource     = selectedSubSource  || selectedMainSource?.name || detectedSource;
+    const effectiveCategory   = selectedMainSource?.name || null;
+
+    function handleMainSourceSelect(src) {
+        setSelectedMainSource(prev => prev?.id === src.id ? null : src);
+        setSelectedSubSource('');
+    }
 
     function handleField(e) {
         const { name, value } = e.target;
@@ -230,7 +283,8 @@ export default function ApplyPage() {
                 linkedin: form.linkedin?.trim() || '',
                 cvFileName: cvFile.name,
                 cvText: cvText ? cvText.slice(0, 6000) : '',
-                source,
+                source: effectiveSource,
+                sourceCategory: effectiveCategory,
                 aiScore: score,
                 aiSummary: parsedCandidate?.summary || '',
                 status: 'new',
@@ -277,6 +331,8 @@ export default function ApplyPage() {
                         matchScore: score,
                         combinedScore: score,
                         status: 'new',
+                        source: effectiveSource,
+                        sourceCategory: effectiveCategory,
                         ...(starAiAnalysis ? { aiAnalysis: starAiAnalysis } : {}),
                         updatedAt: serverTimestamp(),
                     });
@@ -302,7 +358,8 @@ export default function ApplyPage() {
                     cvData: parsedCandidate?.cvData || '',
                     cvText: cvText ? cvText.slice(0, 6000) : '',
                     cvFileName: cvFile.name,
-                    source,
+                    source: effectiveSource,
+                    sourceCategory: effectiveCategory,
                     status: 'new',
                     matchScore: score,
                     combinedScore: score,
@@ -392,7 +449,7 @@ export default function ApplyPage() {
                             <div className="flex gap-2"><span className="text-slate-300 w-16 shrink-0">Ad</span><span className="font-bold text-slate-700 truncate">{form.name}</span></div>
                             <div className="flex gap-2"><span className="text-slate-300 w-16 shrink-0">E-posta</span><span className="font-bold text-slate-700 truncate">{form.email}</span></div>
                             <div className="flex gap-2"><span className="text-slate-300 w-16 shrink-0">CV</span><span className="font-bold text-slate-700 truncate">{cvFile?.name}</span></div>
-                            <div className="flex gap-2"><span className="text-slate-300 w-16 shrink-0">Kaynak</span><span className="font-bold text-slate-700">{source}</span></div>
+                            <div className="flex gap-2"><span className="text-slate-300 w-16 shrink-0">Kaynak</span><span className="font-bold text-slate-700">{effectiveCategory ? `${effectiveCategory} · ${effectiveSource}` : effectiveSource}</span></div>
                         </div>
                     </div>
                 </div>
@@ -456,9 +513,9 @@ export default function ApplyPage() {
                         <span className="text-white text-[11px] font-black tracking-tight">TI</span>
                     </div>
                     <span className="text-slate-800 font-black text-sm">Talent-Inn</span>
-                    {source !== 'Direkt' && (
+                    {effectiveSource !== 'Direkt' && (
                         <span className="ml-auto text-[9px] font-black uppercase tracking-widest text-slate-400 border border-slate-200 rounded-full px-2.5 py-1">
-                            {source}
+                            {effectiveCategory ? `${effectiveCategory} · ${effectiveSource}` : effectiveSource}
                         </span>
                     )}
                 </div>
@@ -564,6 +621,97 @@ export default function ApplyPage() {
                             value={form.linkedin} onChange={handleField}
                             placeholder="linkedin.com/in/kullanici (isteğe bağlı)" />
                     </div>
+
+                    {/* Source selector — only shown when sources loaded from Firestore */}
+                    {sources.length > 0 && (
+                        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-4">
+                            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                Bize Nasıl Ulaştınız? <span className="text-slate-300 font-normal normal-case">(isteğe bağlı)</span>
+                            </div>
+
+                            {/* Main sources */}
+                            <div className="flex flex-wrap gap-2">
+                                {sources.map(src => {
+                                    const Icon    = SOURCE_ICONS[src.icon] || Globe;
+                                    const color   = src.color || '#06b6d4';
+                                    const active  = selectedMainSource?.id === src.id;
+                                    return (
+                                        <button
+                                            key={src.id}
+                                            type="button"
+                                            onClick={() => handleMainSourceSelect(src)}
+                                            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-semibold transition-all ${
+                                                active
+                                                    ? 'border-transparent shadow-sm'
+                                                    : 'border-slate-200 text-slate-500 hover:border-slate-300 bg-slate-50'
+                                            }`}
+                                            style={active
+                                                ? { background: `${color}15`, borderColor: `${color}40`, color }
+                                                : {}
+                                            }
+                                        >
+                                            <Icon size={14} />
+                                            {src.name}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Sub-sources — shown when a main source is selected */}
+                            {selectedMainSource && (selectedMainSource.subSources || []).length > 0 && (
+                                <div className="pl-1 space-y-2">
+                                    <div className="flex items-center gap-2">
+                                        <ChevronDown size={12} className="text-slate-300" style={{ color: selectedMainSource.color || '#06b6d4' }} />
+                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                            {selectedMainSource.name} Alt Kanalı
+                                        </span>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {(selectedMainSource.subSources || []).map(sub => {
+                                            const active = selectedSubSource === sub;
+                                            const color  = selectedMainSource.color || '#06b6d4';
+                                            return (
+                                                <button
+                                                    key={sub}
+                                                    type="button"
+                                                    onClick={() => setSelectedSubSource(prev => prev === sub ? '' : sub)}
+                                                    className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-all ${
+                                                        active
+                                                            ? 'border-transparent shadow-sm'
+                                                            : 'border-slate-200 text-slate-500 hover:border-slate-300 bg-slate-50'
+                                                    }`}
+                                                    style={active ? { background: `${color}15`, borderColor: `${color}40`, color } : {}}
+                                                >
+                                                    {sub}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Selection summary */}
+                            {selectedMainSource && (
+                                <div className="flex items-center gap-2 text-[11px] text-slate-400 bg-slate-50 rounded-lg px-3 py-2">
+                                    <CheckCircle2 size={12} className="text-emerald-500 shrink-0" />
+                                    <span>
+                                        <span className="font-semibold text-slate-600">{selectedMainSource.name}</span>
+                                        {selectedSubSource && (
+                                            <> › <span className="font-semibold text-slate-600">{selectedSubSource}</span></>
+                                        )}
+                                        {' '}olarak kaydedilecek
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setSelectedMainSource(null); setSelectedSubSource(''); }}
+                                        className="ml-auto text-slate-300 hover:text-slate-500 transition-colors"
+                                    >
+                                        <X size={12} />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* KVKK */}
                     <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
