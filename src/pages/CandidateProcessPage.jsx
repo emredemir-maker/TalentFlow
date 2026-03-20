@@ -6,6 +6,7 @@ import { usePositions } from '../context/PositionsContext';
 import { useAuth } from '../context/AuthContext';
 import { analyzeCandidateMatch } from '../services/geminiService';
 import SystemScanner from '../components/SystemScanner';
+import AddCandidateModal from '../components/AddCandidateModal';
 import {
     Plus, Search, Zap, Brain, X,
     Target, ShieldCheck, ArrowRight, FileText, Clock,
@@ -48,6 +49,7 @@ export default function CandidateProcessPage() {
     const [actionSuccess, setActionSuccess] = useState(null); // 'comment' | 'reject' | 'final'
     const [analyzingIds, setAnalyzingIds]       = useState(new Set());
     const [analysisError, setAnalysisError]     = useState(null);
+    const [isAddModalOpen, setIsAddModalOpen]   = useState(false);
 
     const showSuccess = (type) => {
         setActionSuccess(type);
@@ -254,7 +256,10 @@ export default function CandidateProcessPage() {
                 </div>
                 <div className="flex items-center gap-2">
                     <SystemScanner />
-                    <button className="bg-cyan-500 hover:bg-cyan-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-colors shadow-sm shadow-cyan-200 flex items-center gap-1.5">
+                    <button
+                        onClick={() => setIsAddModalOpen(true)}
+                        className="bg-cyan-500 hover:bg-cyan-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-colors shadow-sm shadow-cyan-200 flex items-center gap-1.5"
+                    >
                         <Plus className="w-3.5 h-3.5" /> Yeni Aday
                     </button>
                 </div>
@@ -1204,6 +1209,8 @@ export default function CandidateProcessPage() {
                     </div>
                 </div>
             )}
+
+            <AddCandidateModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
         </div>
     );
 }
