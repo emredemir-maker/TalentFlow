@@ -3,11 +3,11 @@ import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useCandidates } from '../context/CandidatesContext';
 import { 
-    ChevronLeft, Share2, Download, Edit3, Brain, 
+    ChevronLeft, Share2, Download, Brain, 
     Target, Star, MessageSquare, Clock, Zap, 
     ShieldCheck, AlertCircle, FileText, DownloadCloud,
     ExternalLink, Search, MoreHorizontal, Printer, Mail,
-    Users, Activity, TrendingUp, Award, CheckCircle2,
+    Users, Activity, TrendingUp, Award,
     Sparkles, Briefcase, ArrowRight, Video
 } from 'lucide-react';
 
@@ -16,7 +16,6 @@ export default function InterviewReportPage() {
     const navigate = useNavigate();
     const { enrichedCandidates, updateCandidate } = useCandidates();
     const [activeTab, setActiveTab] = useState('overview'); // overview, transcript
-    const [isEditing, setIsEditing] = useState(false);
     const [toast, setToast] = useState(null);
 
     // Find candidate and session - moved up to avoid TDZ for recruiterNotes
@@ -31,12 +30,13 @@ export default function InterviewReportPage() {
     }, [enrichedCandidates, sessionId]);
 
     const [recruiterNotes, setRecruiterNotes] = useState('');
+    const [finalDecision, setFinalDecision] = useState('');
+    const [isSavingNotes, setIsSavingNotes] = useState(false);
+    const [isSavingDecision, setIsSavingDecision] = useState(false);
 
-    // Update recruiter notes when session is loaded
     React.useEffect(() => {
-        if (session?.recruiterNotes) {
-            setRecruiterNotes(session.recruiterNotes);
-        }
+        if (session?.recruiterNotes) setRecruiterNotes(session.recruiterNotes);
+        if (session?.finalDecision) setFinalDecision(session.finalDecision);
     }, [session]);
 
     const showToast = (message, type = 'success') => {
@@ -55,18 +55,34 @@ export default function InterviewReportPage() {
 
     const handleSaveNotes = async () => {
         if (!candidate || !session) return;
-        
+        setIsSavingNotes(true);
         try {
             const updatedSessions = (candidate.interviewSessions || []).map(s => 
-                String(s.id) === String(sessionId) ? { ...s, recruiterNotes: recruiterNotes } : s
+                String(s.id) === String(sessionId) ? { ...s, recruiterNotes } : s
             );
-            
             await updateCandidate(candidate.id, { interviewSessions: updatedSessions });
-            setIsEditing(false);
             showToast("Değerlendirme notları kaydedildi.");
         } catch (err) {
-            console.error("Not kaydetme hatası:", err);
             showToast("Notlar kaydedilirken bir hata oluştu.", "error");
+        } finally {
+            setIsSavingNotes(false);
+        }
+    };
+
+    const handleSaveDecision = async (decision) => {
+        if (!candidate || !session) return;
+        setFinalDecision(decision);
+        setIsSavingDecision(true);
+        try {
+            const updatedSessions = (candidate.interviewSessions || []).map(s =>
+                String(s.id) === String(sessionId) ? { ...s, finalDecision: decision } : s
+            );
+            await updateCandidate(candidate.id, { interviewSessions: updatedSessions });
+            showToast(`Karar kaydedildi: ${decision}`);
+        } catch (err) {
+            showToast("Karar kaydedilirken bir hata oluştu.", "error");
+        } finally {
+            setIsSavingDecision(false);
         }
     };
 
@@ -142,12 +158,6 @@ export default function InterviewReportPage() {
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
-                             <button 
-                                onClick={() => setIsEditing(!isEditing)}
-                                className={`h-10 px-4 rounded-xl border text-[11px] font-black uppercase flex items-center gap-2 transition-all cursor-pointer ${isEditing ? 'bg-amber-50 text-amber-600 border-amber-200 shadow-sm' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
-                             >
-                                 <Edit3 className="w-4 h-4" /> {isEditing ? 'Düzenlemeyi Bitir' : 'Düzenle'}
-                             </button>
                              <button 
                                 onClick={handleShare}
                                 className="h-10 px-4 bg-slate-50 text-slate-600 rounded-xl border border-slate-200 text-[11px] font-black uppercase flex items-center gap-2 hover:bg-slate-100 transition-all cursor-pointer"
@@ -358,49 +368,58 @@ export default function InterviewReportPage() {
                                         </div>
                                     )}
                                     </div>
-                                    <button className="w-full py-2.5 text-[9px] font-black text-[#1E3A8A] uppercase hover:bg-slate-50 rounded-xl border border-slate-100 transition-all">Tüm Transkripti Görüntüle</button>
+                                    <button onClick={() => setActiveTab('transcript')} className="w-full py-2.5 text-[9px] font-black text-[#1E3A8A] uppercase hover:bg-slate-50 rounded-xl border border-slate-100 transition-all">Tüm Transkripti Görüntüle →</button>
                                 </section>
 
                                 {/* DECISION CARD */}
-                                <section className="bg-[#0F172A] rounded-[24px] p-8 shadow-xl space-y-6 text-white border border-white/5 relative overflow-hidden group">
+                                <section className="bg-[#0F172A] rounded-[24px] p-8 shadow-xl space-y-6 text-white border border-white/5 relative overflow-hidden">
                                      <div className="absolute -right-12 -bottom-12 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl" />
                                      <h3 className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] italic">DEĞERLENDİRME VE KARAR</h3>
-                                     <div className="space-y-4">
-                                         <div className="space-y-1">
-                                             <label className="text-[8px] font-black text-white/20 uppercase">MÜLAKATÇI NOTU</label>
-                                             {isEditing ? (
-                                                 <div className="space-y-3">
-                                                     <textarea 
-                                                        value={recruiterNotes}
-                                                        onChange={(e) => setRecruiterNotes(e.target.value)}
-                                                        className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-[12px] font-medium text-slate-200 focus:border-blue-500 outline-none min-h-[100px]"
-                                                        placeholder="Notlarınızı buraya yazın..."
-                                                     />
-                                                     <button 
-                                                        onClick={handleSaveNotes}
-                                                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all"
-                                                     >
-                                                         Notları Kaydet
-                                                     </button>
-                                                 </div>
-                                             ) : (
-                                                 <p className="text-[12px] font-medium text-slate-400 leading-relaxed italic border-l-2 border-white/5 pl-4 py-1">
-                                                     {recruiterNotes || "Aday hakkındaki mülakatçı notları burada görünecektir."}
-                                                 </p>
-                                             )}
+
+                                     {/* Recruiter notes — always editable */}
+                                     <div className="space-y-2">
+                                         <label className="text-[8px] font-black text-white/30 uppercase tracking-widest">MÜLAKATÇI NOTU</label>
+                                         <p className="text-[10px] text-white/20 font-medium">Mülakat sırasında veya sonrasında notlarınızı buraya ekleyebilirsiniz.</p>
+                                         <textarea
+                                             value={recruiterNotes}
+                                             onChange={(e) => setRecruiterNotes(e.target.value)}
+                                             rows={4}
+                                             className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-[12px] font-medium text-slate-200 focus:border-blue-500/60 focus:outline-none resize-none placeholder:text-white/20"
+                                             placeholder="Adayın güçlü/zayıf yönleri, genel izlenim, önerileriniz..."
+                                         />
+                                         <button
+                                             onClick={handleSaveNotes}
+                                             disabled={isSavingNotes}
+                                             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-all"
+                                         >
+                                             {isSavingNotes ? 'Kaydediliyor...' : 'Notu Kaydet'}
+                                         </button>
+                                     </div>
+
+                                     {/* Final decision buttons */}
+                                     <div className="space-y-3 pt-2">
+                                         <label className="text-[8px] font-black text-white/30 uppercase tracking-widest">FİNAL KARARI</label>
+                                         <div className="grid grid-cols-3 gap-2">
+                                             {[
+                                                 { label: 'İşe Al', value: 'İşe Al', active: 'bg-emerald-500 border-emerald-400', inactive: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20' },
+                                                 { label: 'Beklemede', value: 'Beklemede', active: 'bg-amber-500 border-amber-400', inactive: 'bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20' },
+                                                 { label: 'Uygun Değil', value: 'Uygun Değil', active: 'bg-rose-500 border-rose-400', inactive: 'bg-rose-500/10 border-rose-500/30 text-rose-400 hover:bg-rose-500/20' },
+                                             ].map(opt => (
+                                                 <button
+                                                     key={opt.value}
+                                                     onClick={() => handleSaveDecision(opt.value)}
+                                                     disabled={isSavingDecision}
+                                                     className={`py-3 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50 ${finalDecision === opt.value ? opt.active + ' text-white shadow-lg' : opt.inactive}`}
+                                                 >
+                                                     {opt.label}
+                                                 </button>
+                                             ))}
                                          </div>
-                                         <div className="pt-4 space-y-3">
-                                             <label className="text-[8px] font-black text-white/20 uppercase">FİNAL KARARI</label>
-                                             <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 flex items-center gap-4 group-hover:scale-[1.02] transition-transform cursor-pointer">
-                                                 <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-900/40 shrink-0">
-                                                     <CheckCircle2 className="w-6 h-6 text-white" />
-                                                 </div>
-                                                 <div>
-                                                     <p className="text-[14px] font-black text-emerald-400 italic">{session.finalDecision || "Puanlama Bekleniyor"}</p>
-                                                     <p className="text-[8px] font-black text-emerald-500/60 uppercase mt-0.5">MÜLAKAT SONUCU</p>
-                                                 </div>
-                                             </div>
-                                         </div>
+                                         {finalDecision && (
+                                             <p className="text-[9px] font-black text-white/30 uppercase tracking-widest text-center">
+                                                 Mevcut Karar: <span className="text-white/60">{finalDecision}</span>
+                                             </p>
+                                         )}
                                      </div>
                                 </section>
 

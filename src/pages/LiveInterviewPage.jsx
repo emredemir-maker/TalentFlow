@@ -591,6 +591,29 @@ export default function LiveInterviewPage() {
         try {
             console.log("[LiveInterview] Finishing session for recruiter:", candidateData.id, sessionId);
 
+            // Build critical moments from longest ADAY responses
+            const adayLines = transcript.filter(t => t.role === 'ADAY' && t.text.length > 30);
+            const recruiterLines = transcript.filter(t => t.role === 'YÖNETİCİ');
+            const criticalMoments = adayLines
+                .sort((a, b) => b.text.length - a.text.length)
+                .slice(0, 4)
+                .map(t => ({
+                    time: t.time || '—',
+                    text: t.text.length > 140 ? t.text.slice(0, 137) + '…' : t.text,
+                    type: t.text.toLowerCase().match(/başardım|tamamladım|çözdüm|geliştirdim|uyguladım/) ? 'BAŞARI' : 'YANIT',
+                    color: t.text.toLowerCase().match(/başardım|tamamladım|çözdüm|geliştirdim|uyguladım/) ? 'bg-emerald-500' : 'bg-blue-500'
+                }));
+
+            // Build a meaningful aiSummary from the transcript content
+            const totalLines     = transcript.length;
+            const candidateWords = adayLines.reduce((sum, t) => sum + t.text.split(' ').length, 0);
+            const avgStarScore   = Math.round((starScores.S + starScores.T + starScores.A + starScores.R) / 4);
+            const aiSummary = totalLines > 4
+                ? `Mülakat ${totalLines} konuşma turunu kapsadı. Aday toplamda yaklaşık ${candidateWords} kelime ile yanıt verdi. ` +
+                  `STAR analizi ortalaması %${avgStarScore}. ` +
+                  (adayLines[0] ? `En kapsamlı yanıt: "${adayLines[0].text.slice(0, 80)}…"` : '')
+                : 'Mülakat tamamlandı. Ses algılaması kısa sürdü; transkript sınırlı kaldı.';
+
             const finalSessionData = {
                 id: sessionId,
                 status: 'completed',
@@ -599,11 +622,11 @@ export default function LiveInterviewPage() {
                 starScores: starScores,
                 logicIntegrity: logicIntegrity,
                 transcript: transcript,
-                aiSummary: "Mülakat başarıyla tamamlandı. Adayın teknik yetkinliği ve STAR uyumu analiz edildi. " +
-                    (transcript.length > 5 ? "Aday ile gerçekleştirilen detaylı diyaloglar üzerinden yetkinlik ölçümü yapıldı." : "Kısa süreli bir görüşme gerçekleştirildi."),
+                criticalMoments,
+                aiSummary,
                 questions: questions.map((q, idx) => ({
                     ...q,
-                    answer: transcript.filter(t => t.role === 'ADAY')[idx]?.text || (transcript.length > idx ? "İlgili diyalog kaydedildi." : "Cevap kaydedilmedi."),
+                    answer: adayLines[idx]?.text || recruiterLines[idx]?.text || 'Cevap kaydedilmedi.',
                     aiScore: Math.floor(Math.random() * 40) + 60
                 })),
                 date: new Date().toISOString()
@@ -832,89 +855,145 @@ export default function LiveInterviewPage() {
     };
 
     useEffect(() => {
-        // Only run STT when interview is active, mic is on, and we have a stream
+        // ── STT Engine ────────────────────────────────────────────────────
+        // Primary: Web Speech API (browser-native, ~0 latency, tr-TR)
+        // Fallback: Gemini audio chunks (3 s) when Web Speech API unavailable
         if (phase !== 'active' || !isMicOn || !stream) {
-             if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-                 mediaRecorderRef.current.onstop = null; // prevent looping
-                 mediaRecorderRef.current.stop();
-             }
-             if (sttIntervalRef.current) clearInterval(sttIntervalRef.current);
-             setIsRecording(false);
-             return;
+            // Stop Web Speech API
+            if (recognitionRef.current) {
+                recognitionRef.current.onend = null;
+                try { recognitionRef.current.abort(); } catch (e) { /* ignore */ }
+                recognitionRef.current = null;
+            }
+            // Stop legacy MediaRecorder
+            if (mediaRecorderRef.current?.state === 'recording') {
+                mediaRecorderRef.current.onstop = null;
+                mediaRecorderRef.current.stop();
+            }
+            if (sttIntervalRef.current) clearInterval(sttIntervalRef.current);
+            setIsRecording(false);
+            return;
         }
 
-        const audioTrack = stream.getAudioTracks()[0];
-        if (!audioTrack) {
-             console.warn("[STT] No audio track available.");
-             return;
+        const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+        if (SpeechRecognitionAPI) {
+            // ── Web Speech API path ──────────────────────────────────────
+            const recognition = new SpeechRecognitionAPI();
+            recognition.continuous     = true;
+            recognition.interimResults = false; // only committed results
+            recognition.lang           = 'tr-TR';
+            recognition.maxAlternatives = 1;
+            recognitionRef.current = recognition;
+
+            let restartTimer = null;
+
+            recognition.onresult = (event) => {
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const res = event.results[i];
+                    if (!res.isFinal) continue;
+                    const text = res[0].transcript.trim();
+                    if (text.length < 3) continue;
+                    const BLOCKED = ['bu ses dosyasını', 'json formatında', 'sessizlik', 'ses yok'];
+                    if (BLOCKED.some(b => text.toLowerCase().includes(b))) continue;
+
+                    const roleLabel = isRecruiter ? 'YÖNETİCİ' : 'ADAY';
+                    const newEntry = {
+                        role: roleLabel,
+                        text,
+                        confidence: Math.round((res[0].confidence || 0.9) * 100),
+                        time: new Date().toLocaleTimeString('tr-TR', {
+                            hour: '2-digit', minute: '2-digit', second: '2-digit'
+                        })
+                    };
+                    setTranscript(prev => [...prev, newEntry]);
+                    persistSessionData({ transcript: [...liveTranscriptRef.current, newEntry] });
+                }
+            };
+
+            recognition.onerror = (event) => {
+                // no-speech and aborted are non-fatal
+                if (event.error === 'no-speech' || event.error === 'aborted') return;
+                console.warn('[STT] Web Speech error:', event.error);
+            };
+
+            recognition.onend = () => {
+                if (phaseRef.current === 'active' && isMicOnRef.current) {
+                    // Restart with a brief delay to avoid tight loops
+                    restartTimer = setTimeout(() => {
+                        try { recognition.start(); } catch (e) { /* ignore if already started */ }
+                    }, 300);
+                } else {
+                    setIsRecording(false);
+                }
+            };
+
+            try {
+                recognition.start();
+                setIsRecording(true);
+            } catch (err) {
+                console.error('[STT] Web Speech API start failed:', err);
+            }
+
+            return () => {
+                if (restartTimer) clearTimeout(restartTimer);
+                recognition.onend = null;
+                try { recognition.abort(); } catch (e) { /* ignore */ }
+                recognitionRef.current = null;
+                setIsRecording(false);
+            };
+
+        } else {
+            // ── Gemini audio-chunk fallback (3-second chunks) ────────────
+            const audioTrack = stream.getAudioTracks()[0];
+            if (!audioTrack) {
+                console.warn('[STT] No audio track for fallback recorder.');
+                return;
+            }
+
+            let options = { mimeType: 'audio/webm' };
+            for (const type of ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus']) {
+                if (window.MediaRecorder?.isTypeSupported(type)) { options.mimeType = type; break; }
+            }
+
+            const audioStream = new MediaStream([audioTrack]);
+            const recorder = new window.MediaRecorder(audioStream, options);
+            mediaRecorderRef.current = recorder;
+
+            recorder.ondataavailable = (e) => {
+                if (e.data.size > 0) audioChunksRef.current.push(e.data);
+            };
+            recorder.onstop = () => {
+                if (audioChunksRef.current.length > 0) {
+                    const blob = new Blob(audioChunksRef.current, { type: options.mimeType });
+                    audioChunksRef.current = [];
+                    sendAudioToGemini(blob);
+                }
+                if (phaseRef.current === 'active' && isMicOnRef.current) {
+                    try { recorder.start(); setIsRecording(true); } catch (e) { /* ignore */ }
+                } else {
+                    setIsRecording(false);
+                }
+            };
+
+            recorder.start();
+            setIsRecording(true);
+            // Flush every 3 s (reduced from 5 s to lower latency)
+            sttIntervalRef.current = setInterval(() => {
+                if (mediaRecorderRef.current?.state === 'recording') {
+                    mediaRecorderRef.current.stop();
+                }
+            }, 3000);
+
+            return () => {
+                if (sttIntervalRef.current) clearInterval(sttIntervalRef.current);
+                if (mediaRecorderRef.current?.state === 'recording') {
+                    mediaRecorderRef.current.onstop = null;
+                    mediaRecorderRef.current.stop();
+                }
+                setIsRecording(false);
+            };
         }
-
-        const MediaRecorder = window.MediaRecorder;
-        if (!MediaRecorder) return;
-
-        let options = { mimeType: "audio/webm" };
-        const supportedTypes = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus"];
-        for (const type of supportedTypes) {
-             if (MediaRecorder.isTypeSupported(type)) {
-                  options.mimeType = type;
-                  break;
-             }
-        }
-
-        try {
-             // We use a strictly audio-only stream for recording chunks
-             const audioStream = new MediaStream([audioTrack]);
-             const recorder = new MediaRecorder(audioStream, options);
-             mediaRecorderRef.current = recorder;
-
-             recorder.ondataavailable = (e) => {
-                 if (e.data.size > 0) {
-                     audioChunksRef.current.push(e.data);
-                 }
-             };
-
-             recorder.onstop = () => {
-                 if (audioChunksRef.current.length > 0) {
-                     const blob = new Blob(audioChunksRef.current, { type: options.mimeType });
-                     audioChunksRef.current = [];
-                     sendAudioToGemini(blob);
-                 }
-                 // Restart if still active
-                 if (phaseRef.current === 'active' && isMicOnRef.current && streamRef.current?.getAudioTracks().length > 0) {
-                      try {
-                          recorder.start();
-                          setIsRecording(true);
-                      } catch (err) {
-                          console.error("STT restart err:", err);
-                      }
-                 } else {
-                      setIsRecording(false);
-                 }
-             };
-
-             // Initial start
-             recorder.start();
-             setIsRecording(true);
-
-             // Chunk logic: stop and thus flush & restart every 5 seconds
-             sttIntervalRef.current = setInterval(() => {
-                  if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-                       mediaRecorderRef.current.stop();
-                  }
-             }, 5000);
-
-        } catch (err) {
-             console.error("[STT] Init failed:", err);
-        }
-
-        return () => {
-             if (sttIntervalRef.current) clearInterval(sttIntervalRef.current);
-             if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-                 mediaRecorderRef.current.onstop = null;
-                 mediaRecorderRef.current.stop();
-             }
-             setIsRecording(false);
-        };
     }, [phase, isMicOn, stream, isRecruiter]);
 
     useEffect(() => {
