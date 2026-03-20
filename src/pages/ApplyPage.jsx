@@ -20,19 +20,28 @@ const APPLICATIONS_COLLECTION = 'artifacts/talent-flow/public/data/applications'
 // ──────────────────────────────────────────────
 // Helpers
 // ──────────────────────────────────────────────
-function InputField({ label, icon: Icon, required, ...props }) {
+function InputField({ label, icon: Icon, required, autoFilled, ...props }) {
     return (
         <div>
-            <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1.5">
+            <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
                 {label} {required && <span className="text-indigo-500">*</span>}
+                {autoFilled && (
+                    <span className="ml-1 inline-flex items-center gap-0.5 text-[9px] font-black uppercase tracking-wide text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-full px-1.5 py-0.5">
+                        <CheckCircle2 size={8} /> CV'den
+                    </span>
+                )}
             </label>
             <div className="relative">
-                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300">
+                <div className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${autoFilled ? 'text-emerald-400' : 'text-slate-300'}`}>
                     <Icon size={15} />
                 </div>
                 <input
                     {...props}
-                    className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 text-slate-800 text-sm font-semibold placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-400/30 focus:border-indigo-400 transition-all bg-white"
+                    className={`w-full pl-10 pr-4 py-3 rounded-xl border text-slate-800 text-sm font-semibold placeholder-slate-300 focus:outline-none focus:ring-2 transition-all bg-white
+                        ${autoFilled
+                            ? 'border-emerald-200 focus:ring-emerald-400/30 focus:border-emerald-400 bg-emerald-50/30'
+                            : 'border-slate-200 focus:ring-indigo-400/30 focus:border-indigo-400'
+                        }`}
                 />
             </div>
         </div>
@@ -74,6 +83,9 @@ export default function ApplyPage() {
     const [form, setForm] = useState({ name: '', email: '', phone: '', linkedin: '' });
     const [cvFile, setCvFile] = useState(null);
     const [kvkk, setKvkk] = useState(false);
+    const [cvParsing, setCvParsing] = useState(false);
+    const [autoFilled, setAutoFilled] = useState({ name: false, email: false, phone: false, linkedin: false });
+    const [cvParseError, setCvParseError] = useState(false);
 
     const [step, setStep] = useState('form');   // form | processing | success | error
     const [progress, setProgress] = useState('');
@@ -106,10 +118,13 @@ export default function ApplyPage() {
     }, [positionId]);
 
     function handleField(e) {
-        setForm(f => ({ ...f, [e.target.name]: e.target.value }));
+        const { name, value } = e.target;
+        setForm(f => ({ ...f, [name]: value }));
+        // Clear auto-fill badge when user manually edits
+        if (autoFilled[name]) setAutoFilled(af => ({ ...af, [name]: false }));
     }
 
-    function handleFileDrop(e) {
+    async function handleFileDrop(e) {
         e.preventDefault();
         const file = e.dataTransfer?.files[0] || e.target.files?.[0];
         if (!file) return;
@@ -119,6 +134,39 @@ export default function ApplyPage() {
         if (!ok) { alert('Lütfen PDF veya DOCX formatında CV yükleyin.'); return; }
         if (file.size > 10 * 1024 * 1024) { alert('Dosya 10 MB\'dan küçük olmalı.'); return; }
         setCvFile(file);
+        setCvParsing(true);
+        setCvParseError(false);
+        try {
+            const text = await extractTextFromFile(file);
+            if (text && text.length >= 40) {
+                const parsed = await parseCandidateFromText(text);
+                if (parsed) {
+                    const newForm = {};
+                    const filled = {};
+                    const fields = [
+                        { key: 'name', val: parsed.name },
+                        { key: 'email', val: parsed.email },
+                        { key: 'phone', val: parsed.phone },
+                        { key: 'linkedin', val: parsed.linkedinUrl },
+                    ];
+                    for (const { key, val } of fields) {
+                        if (val && String(val).trim() && String(val).trim() !== '-') {
+                            newForm[key] = String(val).trim();
+                            filled[key] = true;
+                        }
+                    }
+                    if (Object.keys(newForm).length > 0) {
+                        setForm(f => ({ ...f, ...newForm }));
+                        setAutoFilled(af => ({ ...af, ...filled }));
+                    }
+                }
+            }
+        } catch (err) {
+            console.warn('CV auto-parse error:', err);
+            setCvParseError(true);
+        } finally {
+            setCvParsing(false);
+        }
     }
 
     async function handleSubmit(e) {
@@ -337,24 +385,7 @@ export default function ApplyPage() {
             <div className="max-w-lg mx-auto px-6 pb-12">
                 <form onSubmit={handleSubmit} className="space-y-3">
 
-                    {/* Personal info */}
-                    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-4">
-                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Kişisel Bilgiler</div>
-                        <InputField label="Ad Soyad" icon={User} name="name" required
-                            value={form.name} onChange={handleField}
-                            placeholder="Adınız ve soyadınız" />
-                        <InputField label="E-posta" icon={Mail} name="email" type="email" required
-                            value={form.email} onChange={handleField}
-                            placeholder="ornek@email.com" />
-                        <InputField label="Telefon" icon={Phone} name="phone" type="tel" required
-                            value={form.phone} onChange={handleField}
-                            placeholder="+90 5XX XXX XX XX" />
-                        <InputField label="LinkedIn Profili" icon={Linkedin} name="linkedin" type="url"
-                            value={form.linkedin} onChange={handleField}
-                            placeholder="linkedin.com/in/kullanici (isteğe bağlı)" />
-                    </div>
-
-                    {/* CV Upload */}
+                    {/* CV Upload — first so auto-fill can populate fields below */}
                     <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
                         <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">
                             CV / Özgeçmiş <span className="text-red-400">*</span>
@@ -362,16 +393,25 @@ export default function ApplyPage() {
                         <div
                             onDragOver={e => e.preventDefault()}
                             onDrop={handleFileDrop}
-                            onClick={() => fileInputRef.current?.click()}
-                            className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${cvFile ? 'border-indigo-300 bg-indigo-50/40' : 'border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/20'}`}
+                            onClick={() => !cvParsing && fileInputRef.current?.click()}
+                            className={`border-2 border-dashed rounded-xl p-8 text-center transition-all ${cvParsing ? 'cursor-wait border-indigo-200 bg-indigo-50/20' : cvFile ? 'cursor-pointer border-indigo-300 bg-indigo-50/40' : 'cursor-pointer border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/20'}`}
                         >
                             <input ref={fileInputRef} type="file" accept=".pdf,.docx" className="hidden" onChange={handleFileDrop} />
-                            {cvFile ? (
+                            {cvParsing ? (
+                                <div className="flex flex-col items-center gap-2">
+                                    <Loader2 className="w-8 h-8 text-indigo-400 animate-spin" />
+                                    <div className="font-bold text-slate-500 text-sm">CV okunuyor ve analiz ediliyor...</div>
+                                    <div className="text-[11px] text-slate-400">Bilgileriniz otomatik doldurulacak</div>
+                                </div>
+                            ) : cvFile ? (
                                 <div className="flex flex-col items-center gap-2">
                                     <FileText className="w-8 h-8 text-indigo-500" />
                                     <div className="font-bold text-slate-700 text-sm">{cvFile.name}</div>
                                     <div className="text-[11px] text-slate-400">{(cvFile.size / 1024).toFixed(0)} KB</div>
-                                    <button type="button" onClick={e => { e.stopPropagation(); setCvFile(null); }}
+                                    {cvParseError && (
+                                        <div className="text-[11px] text-amber-500 font-semibold">Otomatik doldurma başarısız — lütfen manuel doldurun</div>
+                                    )}
+                                    <button type="button" onClick={e => { e.stopPropagation(); setCvFile(null); setAutoFilled({ name: false, email: false, phone: false, linkedin: false }); }}
                                         className="flex items-center gap-1 text-red-400 text-[11px] font-bold hover:text-red-500 mt-1">
                                         <X size={12} /> Kaldır
                                     </button>
@@ -381,9 +421,38 @@ export default function ApplyPage() {
                                     <Upload className="w-8 h-8 text-slate-300" />
                                     <div className="font-bold text-slate-500 text-sm">CV'nizi sürükleyin veya tıklayın</div>
                                     <div className="text-[11px] text-slate-400">PDF veya DOCX • Maks. 10 MB</div>
+                                    <div className="text-[11px] text-indigo-400 font-semibold mt-1">Bilgiler otomatik doldurulacak</div>
                                 </div>
                             )}
                         </div>
+                    </div>
+
+                    {/* Personal info */}
+                    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-4">
+                        <div className="flex items-center justify-between">
+                            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Kişisel Bilgiler</div>
+                            {(autoFilled.name || autoFilled.email || autoFilled.phone || autoFilled.linkedin) && (
+                                <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5 flex items-center gap-1">
+                                    <CheckCircle2 size={9} /> CV'den otomatik dolduruldu
+                                </span>
+                            )}
+                        </div>
+                        <InputField label="Ad Soyad" icon={User} name="name" required
+                            autoFilled={autoFilled.name}
+                            value={form.name} onChange={handleField}
+                            placeholder="Adınız ve soyadınız" />
+                        <InputField label="E-posta" icon={Mail} name="email" type="email" required
+                            autoFilled={autoFilled.email}
+                            value={form.email} onChange={handleField}
+                            placeholder="ornek@email.com" />
+                        <InputField label="Telefon" icon={Phone} name="phone" type="tel" required
+                            autoFilled={autoFilled.phone}
+                            value={form.phone} onChange={handleField}
+                            placeholder="+90 5XX XXX XX XX" />
+                        <InputField label="LinkedIn Profili" icon={Linkedin} name="linkedin" type="url"
+                            autoFilled={autoFilled.linkedin}
+                            value={form.linkedin} onChange={handleField}
+                            placeholder="linkedin.com/in/kullanici (isteğe bağlı)" />
                     </div>
 
                     {/* KVKK */}
