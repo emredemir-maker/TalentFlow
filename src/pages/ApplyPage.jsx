@@ -188,10 +188,12 @@ export default function ApplyPage() {
         }
     }
 
+    const pageBg = 'min-h-screen bg-[#f6f5ff]';
+
     // ── Loading ──
     if (posLoading) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-slate-50 to-violet-50 flex items-center justify-center">
+            <div className={`${pageBg} flex items-center justify-center`}>
                 <Loader2 className="w-8 h-8 text-violet-500 animate-spin" />
             </div>
         );
@@ -200,9 +202,11 @@ export default function ApplyPage() {
     // ── Error ──
     if (posError) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-slate-50 to-violet-50 flex items-center justify-center p-6">
-                <div className="bg-white rounded-3xl shadow-xl p-10 max-w-sm w-full text-center border border-red-100">
-                    <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+            <div className={`${pageBg} flex items-center justify-center p-6`}>
+                <div className="bg-white rounded-3xl shadow-xl p-10 max-w-sm w-full text-center">
+                    <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
+                        <AlertCircle className="w-7 h-7 text-red-400" />
+                    </div>
                     <h2 className="text-xl font-black text-slate-800 mb-2">Hata</h2>
                     <p className="text-slate-500 text-sm">{posError}</p>
                 </div>
@@ -213,15 +217,15 @@ export default function ApplyPage() {
     // ── Processing ──
     if (step === 'processing') {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-slate-50 to-violet-50 flex items-center justify-center p-6">
+            <div className={`${pageBg} flex items-center justify-center p-6`}>
                 <div className="bg-white rounded-3xl shadow-xl p-10 max-w-sm w-full text-center">
-                    <div className="w-16 h-16 rounded-full bg-violet-100 flex items-center justify-center mx-auto mb-5">
-                        <Loader2 className="w-8 h-8 text-violet-500 animate-spin" />
+                    <div className="w-16 h-16 rounded-full bg-violet-50 flex items-center justify-center mx-auto mb-5">
+                        <Loader2 className="w-8 h-8 text-violet-600 animate-spin" />
                     </div>
                     <h2 className="text-xl font-black text-slate-800 mb-2">Başvuru İşleniyor</h2>
                     <p className="text-slate-400 text-sm">{progress}</p>
                     <div className="mt-6 bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                        <div className="h-full bg-violet-500 rounded-full animate-pulse" style={{ width: '70%' }} />
+                        <div className="h-full bg-gradient-to-r from-violet-500 to-purple-500 rounded-full animate-pulse" style={{ width: '70%' }} />
                     </div>
                 </div>
             </div>
@@ -231,12 +235,12 @@ export default function ApplyPage() {
     // ── Success ──
     if (step === 'success') {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-slate-50 to-violet-50 flex items-center justify-center p-6">
+            <div className={`${pageBg} flex items-center justify-center p-6`}>
                 <div className="bg-white rounded-3xl shadow-xl p-10 max-w-sm w-full text-center">
-                    <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-5">
+                    <div className="w-16 h-16 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-5">
                         <CheckCircle2 className="w-8 h-8 text-emerald-500" />
                     </div>
-                    <div className="text-[10px] font-black text-slate-400 tracking-widest uppercase mb-1">Başvurunuz Alındı</div>
+                    <div className="text-[10px] font-black text-violet-400 tracking-widest uppercase mb-1">Başvurunuz Alındı</div>
                     <h2 className="text-2xl font-black text-slate-800 mb-1">{position?.title}</h2>
                     <p className="text-slate-400 text-sm mb-6">{position?.department}</p>
 
@@ -273,13 +277,15 @@ export default function ApplyPage() {
     // ── Submit Error ──
     if (step === 'error') {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-slate-50 to-violet-50 flex items-center justify-center p-6">
+            <div className={`${pageBg} flex items-center justify-center p-6`}>
                 <div className="bg-white rounded-3xl shadow-xl p-10 max-w-sm w-full text-center">
-                    <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+                    <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
+                        <AlertCircle className="w-7 h-7 text-red-400" />
+                    </div>
                     <h2 className="text-xl font-black text-slate-800 mb-2">Başvuru Gönderilemedi</h2>
                     <p className="text-slate-500 text-sm mb-6">{submitError}</p>
                     <button onClick={() => setStep('form')}
-                        className="w-full py-3 rounded-xl bg-violet-500 text-white font-bold text-sm hover:bg-violet-600 transition-colors">
+                        className="w-full py-3 rounded-xl bg-violet-600 text-white font-bold text-sm hover:bg-violet-700 transition-colors">
                         Tekrar Dene
                     </button>
                 </div>
@@ -289,16 +295,16 @@ export default function ApplyPage() {
 
     // ── Form ──
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-violet-50">
+        <div className={pageBg}>
             {/* Top bar */}
-            <div className="bg-white border-b border-slate-100 px-6 py-4">
+            <div className="bg-white/80 backdrop-blur-sm border-b border-violet-100/60 px-6 py-3.5 sticky top-0 z-10">
                 <div className="max-w-lg mx-auto flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-600 to-violet-800 flex items-center justify-center shrink-0">
-                        <span className="text-white text-[11px] font-black">TI</span>
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-purple-700 flex items-center justify-center shrink-0 shadow-sm shadow-violet-300">
+                        <span className="text-white text-[11px] font-black tracking-tight">TI</span>
                     </div>
-                    <span className="text-slate-800 font-black text-sm">Talent-Inn</span>
+                    <span className="text-slate-700 font-black text-sm tracking-tight">Talent-Inn</span>
                     {source !== 'Direkt' && (
-                        <span className="ml-auto text-[9px] font-black uppercase tracking-widest text-slate-300 border border-slate-200 rounded-full px-2.5 py-1">
+                        <span className="ml-auto text-[9px] font-black uppercase tracking-widest text-violet-400 border border-violet-200 bg-violet-50 rounded-full px-2.5 py-1">
                             {source}
                         </span>
                     )}
@@ -306,25 +312,29 @@ export default function ApplyPage() {
             </div>
 
             {/* Hero */}
-            <div className="max-w-lg mx-auto px-6 pt-8 pb-4">
-                <div className="bg-gradient-to-br from-violet-600 to-violet-800 rounded-3xl p-6 text-white shadow-xl shadow-violet-200">
-                    <div className="flex items-start gap-4">
-                        <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
+            <div className="max-w-lg mx-auto px-6 pt-7 pb-4">
+                <div className="relative overflow-hidden bg-gradient-to-br from-violet-600 via-violet-700 to-purple-800 rounded-3xl p-6 text-white shadow-2xl shadow-violet-400/30">
+                    {/* Decorative blobs */}
+                    <div className="absolute -top-6 -right-6 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+                    <div className="absolute -bottom-8 -left-4 w-24 h-24 bg-purple-500/30 rounded-full blur-xl pointer-events-none" />
+
+                    <div className="relative flex items-start gap-4">
+                        <div className="w-12 h-12 rounded-2xl bg-white/15 border border-white/20 flex items-center justify-center shrink-0 backdrop-blur-sm">
                             <Briefcase className="w-6 h-6 text-white" />
                         </div>
                         <div className="flex-1 min-w-0">
-                            <div className="text-[10px] font-black uppercase tracking-widest opacity-70 mb-1">Açık Pozisyon</div>
+                            <div className="text-[10px] font-black uppercase tracking-widest text-violet-200 mb-1">Açık Pozisyon</div>
                             <h1 className="text-[22px] font-black leading-tight">{position?.title}</h1>
-                            <div className="flex items-center gap-1.5 mt-1 opacity-80">
+                            <div className="flex items-center gap-1.5 mt-1.5 text-violet-200">
                                 <Building2 size={12} />
                                 <span className="text-[12px] font-semibold">{position?.department}</span>
                             </div>
                         </div>
                     </div>
                     {position?.requirements?.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 mt-4">
+                        <div className="relative flex flex-wrap gap-1.5 mt-4">
                             {position.requirements.slice(0, 5).map(r => (
-                                <span key={r} className="px-2.5 py-1 bg-white/20 rounded-xl text-[10px] font-bold">{r}</span>
+                                <span key={r} className="px-2.5 py-1 bg-white/15 border border-white/20 rounded-xl text-[10px] font-bold backdrop-blur-sm">{r}</span>
                             ))}
                         </div>
                     )}
@@ -333,11 +343,11 @@ export default function ApplyPage() {
 
             {/* Form */}
             <div className="max-w-lg mx-auto px-6 pb-12">
-                <form onSubmit={handleSubmit} className="space-y-5">
+                <form onSubmit={handleSubmit} className="space-y-4">
 
                     {/* Personal info */}
-                    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-4">
-                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Kişisel Bilgiler</div>
+                    <div className="bg-white rounded-3xl border border-violet-100/80 shadow-sm shadow-violet-100 p-6 space-y-4">
+                        <div className="text-[10px] font-black text-violet-400 uppercase tracking-widest">Kişisel Bilgiler</div>
                         <InputField label="Ad Soyad" icon={User} name="name" required
                             value={form.name} onChange={handleField}
                             placeholder="Adınız ve soyadınız" />
@@ -353,15 +363,15 @@ export default function ApplyPage() {
                     </div>
 
                     {/* CV Upload */}
-                    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6">
-                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">
+                    <div className="bg-white rounded-3xl border border-violet-100/80 shadow-sm shadow-violet-100 p-6">
+                        <div className="text-[10px] font-black text-violet-400 uppercase tracking-widest mb-4">
                             CV / Özgeçmiş <span className="text-violet-500">*</span>
                         </div>
                         <div
                             onDragOver={e => e.preventDefault()}
                             onDrop={handleFileDrop}
                             onClick={() => fileInputRef.current?.click()}
-                            className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all ${cvFile ? 'border-violet-300 bg-violet-50' : 'border-slate-200 hover:border-violet-300 hover:bg-violet-50/50'}`}
+                            className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all ${cvFile ? 'border-violet-400 bg-violet-50/60' : 'border-violet-200 hover:border-violet-400 hover:bg-violet-50/40'}`}
                         >
                             <input ref={fileInputRef} type="file" accept=".pdf,.docx" className="hidden" onChange={handleFileDrop} />
                             {cvFile ? (
@@ -376,20 +386,20 @@ export default function ApplyPage() {
                                 </div>
                             ) : (
                                 <div className="flex flex-col items-center gap-2">
-                                    <Upload className="w-8 h-8 text-slate-300" />
+                                    <Upload className="w-8 h-8 text-violet-300" />
                                     <div className="font-bold text-slate-500 text-sm">CV'nizi sürükleyin veya tıklayın</div>
-                                    <div className="text-[11px] text-slate-300">PDF veya DOCX • Maks. 10 MB</div>
+                                    <div className="text-[11px] text-slate-400">PDF veya DOCX • Maks. 10 MB</div>
                                 </div>
                             )}
                         </div>
                     </div>
 
                     {/* KVKK */}
-                    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6">
+                    <div className="bg-white rounded-3xl border border-violet-100/80 shadow-sm shadow-violet-100 p-6">
                         <label className="flex gap-3 cursor-pointer select-none">
                             <div className="relative mt-0.5 shrink-0">
                                 <input type="checkbox" className="sr-only" checked={kvkk} onChange={e => setKvkk(e.target.checked)} />
-                                <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${kvkk ? 'bg-violet-500 border-violet-500' : 'border-slate-300 bg-white'}`}>
+                                <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${kvkk ? 'bg-violet-600 border-violet-600' : 'border-slate-200 bg-white'}`}>
                                     {kvkk && <CheckCircle2 size={12} className="text-white" />}
                                 </div>
                             </div>
@@ -409,12 +419,12 @@ export default function ApplyPage() {
                     <button
                         type="submit"
                         disabled={!form.name || !form.email || !form.phone || !cvFile || !kvkk}
-                        className="w-full py-4 rounded-2xl bg-violet-600 hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-[15px] shadow-lg shadow-violet-200 flex items-center justify-center gap-2 transition-all"
+                        className="w-full py-4 rounded-2xl bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-[15px] shadow-lg shadow-violet-300/50 flex items-center justify-center gap-2 transition-all"
                     >
                         Başvuruyu Gönder <ChevronRight className="w-5 h-5" />
                     </button>
 
-                    <p className="text-center text-[10px] text-slate-300 pb-4">
+                    <p className="text-center text-[10px] text-slate-400 pb-4">
                         Başvurunuz AI destekli değerlendirmeye alınacak ve ekibimiz en kısa sürede sizinle iletişime geçecektir.
                     </p>
                 </form>
