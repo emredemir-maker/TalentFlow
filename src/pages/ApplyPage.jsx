@@ -379,11 +379,11 @@ export default function ApplyPage() {
                     <div className="absolute top-0 right-0 w-40 h-40 opacity-20 pointer-events-none" style={{ background: 'radial-gradient(circle, #818cf8 0%, transparent 70%)' }} />
 
                     <div className="relative">
-                        <span className="inline-block text-[10px] font-black uppercase tracking-widest text-indigo-300 mb-3">Açık Pozisyon</span>
-                        <h1 className="text-[24px] font-black text-white leading-tight mb-1">{position?.title}</h1>
-                        <div className="flex items-center gap-1.5 text-indigo-300 mb-4">
-                            <Building2 size={12} className="text-indigo-300" />
-                            <span className="text-[12px] font-semibold text-indigo-300">{position?.department}</span>
+                        <span className="inline-block text-[10px] font-black uppercase tracking-widest mb-3" style={{ color: '#a5b4fc' }}>Açık Pozisyon</span>
+                        <h1 className="text-[24px] font-black leading-tight mb-1" style={{ color: '#ffffff' }}>{position?.title}</h1>
+                        <div className="flex items-center gap-1.5 mb-4">
+                            <Building2 size={12} style={{ color: '#a5b4fc' }} />
+                            <span className="text-[12px] font-semibold" style={{ color: '#a5b4fc' }}>{position?.department}</span>
                         </div>
                         {position?.requirements?.length > 0 && (
                             <div className="flex flex-wrap gap-1.5">
