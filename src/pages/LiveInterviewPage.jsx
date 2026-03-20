@@ -56,8 +56,8 @@ export default function LiveInterviewPage() {
         candidateData?.interviewSessions?.find(s => s.id === sessionId),
         [candidateData, sessionId]);
 
-    // effectiveSession: for anonymous candidates who can't read Firestore candidates collection,
-    // fall back to apiSession (Firestore /interviews/{sessionId} listener).
+    // effectiveSession: merges candidates-collection data (authoritative for recruiter)
+    // with the public /interviews/{sessionId} doc (authoritative for real-time candidate signals).
     // IMPORTANT: If the public Firestore doc says 'completed', always trust it over the candidate array
     // (candidate array status can be stale due to race conditions on finishSession cleanup).
     const effectiveSession = useMemo(() => {
@@ -68,7 +68,10 @@ export default function LiveInterviewPage() {
         // If the session has completion markers, treat as completed even if status field is stale
         if (base.status !== 'live' && (session?.aiOverallScore > 0 || Boolean(session?.aiSummary) || session?.finalScore > 0))
             return { ...base, status: 'completed' };
-        return base;
+        // Always prefer apiSession.candidateStatus: the candidate writes their lobby state
+        // to the public interviews doc — the recruiter-side candidates collection won't have it.
+        const candidateStatus = apiSession?.candidateStatus || session?.candidateStatus || base.candidateStatus;
+        return { ...base, ...(candidateStatus ? { candidateStatus } : {}) };
     }, [session, apiSession]);
 
     // Media States
@@ -338,6 +341,29 @@ export default function LiveInterviewPage() {
         }
     }, [isAuthenticated, role, userProfile, user]);
 
+    // Real-time listener for RECRUITER — reads candidateStatus + transcript from /interviews/{sessionId}
+    // The candidate writes lobby state here; the candidates collection never gets those updates.
+    useEffect(() => {
+        if (!isRecruiter || !sessionId) return;
+        const sessionRef = doc(db, 'interviews', sessionId);
+        const unsub = onSnapshot(sessionRef, (snap) => {
+            if (snap.exists()) {
+                const data = snap.data();
+                setApiSession(prev => ({ ...(prev || {}), ...data }));
+                // Merge Firestore transcript (which accumulates both sides via arrayUnion) with
+                // any local entries not yet persisted, to prevent briefly losing just-spoken text.
+                if (Array.isArray(data.transcript) && data.transcript.length > 0) {
+                    setTranscript(prev => {
+                        const fsSet = new Set(data.transcript.map(e => `${e.time}|${e.text}`));
+                        const localOnly = (prev || []).filter(e => !fsSet.has(`${e.time}|${e.text}`));
+                        return [...data.transcript, ...localOnly];
+                    });
+                }
+            }
+        });
+        return () => unsub();
+    }, [isRecruiter, sessionId]);
+
     // Real-time listener for candidates — reads from public /interviews/{sessionId} Firestore collection
     // (replaces the old /api/session polling that returned 403 on Firebase)
     useEffect(() => {
@@ -358,6 +384,14 @@ export default function LiveInterviewPage() {
                     const visible = data.questions.filter(q => q.visibleToCandidate);
                     console.log(`[Candidate Listener] ${visible.length} visible / ${data.questions.length} total question(s)`);
                     setQuestions(visible);
+                }
+                // Sync the full transcript (both YÖNETİCİ + ADAY entries via arrayUnion)
+                if (Array.isArray(data.transcript) && data.transcript.length > 0) {
+                    setTranscript(prev => {
+                        const fsSet = new Set(data.transcript.map(e => `${e.time}|${e.text}`));
+                        const localOnly = (prev || []).filter(e => !fsSet.has(`${e.time}|${e.text}`));
+                        return [...data.transcript, ...localOnly];
+                    });
                 }
             } else {
                 console.warn('[Candidate Listener] Session doc not found yet, waiting...');
@@ -846,7 +880,14 @@ export default function LiveInterviewPage() {
                     time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
                 };
                 setTranscript(prev => [...prev, newEntry]);
-                persistSessionData({ transcript: [...liveTranscriptRef.current, newEntry] });
+                // Use arrayUnion so neither side overwrites the other's transcript entries
+                updateDoc(doc(db, 'interviews', sessionId), {
+                    transcript: arrayUnion(newEntry), sessionId
+                }).catch(() => {
+                    setDoc(doc(db, 'interviews', sessionId), {
+                        transcript: [newEntry], sessionId
+                    }, { merge: true });
+                });
             }
             if (emotion) setEmotionData(emotion);
         } catch (err) {
@@ -906,8 +947,19 @@ export default function LiveInterviewPage() {
                             hour: '2-digit', minute: '2-digit', second: '2-digit'
                         })
                     };
+                    // Update local state immediately for the UI
                     setTranscript(prev => [...prev, newEntry]);
-                    persistSessionData({ transcript: [...liveTranscriptRef.current, newEntry] });
+                    // Push only this new entry to Firestore via arrayUnion — prevents one side
+                    // from overwriting the other side's transcript entries.
+                    updateDoc(doc(db, 'interviews', sessionId), {
+                        transcript: arrayUnion(newEntry),
+                        sessionId
+                    }).catch(() => {
+                        // Doc might not exist yet — fall back to setDoc
+                        setDoc(doc(db, 'interviews', sessionId), {
+                            transcript: [newEntry], sessionId
+                        }, { merge: true });
+                    });
                 }
             };
 
@@ -1721,34 +1773,38 @@ export default function LiveInterviewPage() {
                                         <span className="text-[9px] font-black text-emerald-500 tracking-widest tabular-nums italic">LIVE: {Math.floor(elapsedTime / 60).toString().padStart(2, '0')}:{String(elapsedTime % 60).padStart(2, '0')}</span>
                                     </div>
 
-                                    {/* Aday Durum Göstergesi */}
-                                    {(!session?.candidateStatus || session.candidateStatus !== 'admitted') ? (
-                                        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${session?.candidateStatus === 'waiting_room' ? 'bg-amber-500/10 border-amber-500/20' : 'bg-rose-500/10 border-rose-500/20'}`}>
-                                            <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${session?.candidateStatus === 'waiting_room' ? 'bg-amber-500' : 'bg-rose-500'}`} />
-                                            <span className={`text-[9px] font-black tracking-widest uppercase ${session?.candidateStatus === 'waiting_room' ? 'text-amber-500' : 'text-rose-500'}`}>
-                                                {session?.candidateStatus === 'waiting_room' ? 'Aday Lobide Bekliyor' : 'Aday Henüz Girmedİ'}
-                                            </span>
-                                        </div>
-                                    ) : (
-                                        <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                            <span className="text-[9px] font-black text-emerald-500 tracking-widest uppercase">
-                                                Aday Oturumda
-                                            </span>
-                                        </div>
-                                    )}
-
-                                    {(!session?.candidateStatus || session.candidateStatus !== 'admitted') && (
-                                        <button
-                                            onClick={async () => {
-                                                await persistSessionData({ candidateStatus: 'admitted' });
-                                            }}
-                                            className={`h-8 px-4 rounded-lg text-white font-black text-[9px] tracking-widest uppercase transition-all shadow-lg flex items-center gap-2 border mr-2 ${session?.candidateStatus === 'waiting_room' ? 'bg-amber-500 hover:bg-amber-600 border-amber-400 shadow-amber-500/20 animate-pulse' : 'bg-slate-700 hover:bg-slate-600 border-slate-600 shadow-slate-900/50 opacity-80 hover:opacity-100'}`}
-                                            title={session?.candidateStatus === 'waiting_room' ? 'Adayı İçeri Al' : 'Aday Henüz Lobide Değil. Yine de Odaya Zorla Al'}
-                                        >
-                                            <Users className="w-3 h-3" /> {session?.candidateStatus === 'waiting_room' ? 'Adayı İçeri Al' : 'İçeri Al (Fallback)'}
-                                        </button>
-                                    )}
+                                    {/* Aday Durum Göstergesi — reads from effectiveSession which merges apiSession (Firestore) */}
+                                    {(() => {
+                                        const cs = effectiveSession?.candidateStatus;
+                                        if (cs === 'admitted') {
+                                            return (
+                                                <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                                    <span className="text-[9px] font-black text-emerald-500 tracking-widest uppercase">Aday Oturumda</span>
+                                                </div>
+                                            );
+                                        }
+                                        const inLobby = cs === 'waiting_room';
+                                        return (
+                                            <>
+                                                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${inLobby ? 'bg-amber-500/10 border-amber-500/20' : 'bg-rose-500/10 border-rose-500/20'}`}>
+                                                    <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${inLobby ? 'bg-amber-500' : 'bg-rose-500'}`} />
+                                                    <span className={`text-[9px] font-black tracking-widest uppercase ${inLobby ? 'text-amber-500' : 'text-rose-500'}`}>
+                                                        {inLobby ? 'Aday Lobide Bekliyor' : 'Aday Henüz Girmedi'}
+                                                    </span>
+                                                </div>
+                                                <button
+                                                    onClick={async () => {
+                                                        await persistSessionData({ candidateStatus: 'admitted' });
+                                                    }}
+                                                    className={`h-8 px-4 rounded-lg text-white font-black text-[9px] tracking-widest uppercase transition-all shadow-lg flex items-center gap-2 border mr-2 ${inLobby ? 'bg-amber-500 hover:bg-amber-600 border-amber-400 shadow-amber-500/20 animate-pulse' : 'bg-slate-700 hover:bg-slate-600 border-slate-600 shadow-slate-900/50 opacity-80 hover:opacity-100'}`}
+                                                    title={inLobby ? 'Adayı İçeri Al' : 'Aday Henüz Lobide Değil — Yine de Zorla Al'}
+                                                >
+                                                    <Users className="w-3 h-3" /> {inLobby ? 'Adayı İçeri Al' : 'İçeri Al (Fallback)'}
+                                                </button>
+                                            </>
+                                        );
+                                    })()}
                                 </>
                             )}
 
