@@ -463,7 +463,7 @@ export default function ApplyPage() {
                             autoFilled={autoFilled.phone}
                             value={form.phone} onChange={handleField}
                             placeholder="+90 5XX XXX XX XX" />
-                        <InputField label="LinkedIn Profili" icon={Linkedin} name="linkedin" type="url"
+                        <InputField label="LinkedIn / Portfolyo" icon={Linkedin} name="linkedin" type="text"
                             autoFilled={autoFilled.linkedin}
                             value={form.linkedin} onChange={handleField}
                             placeholder="linkedin.com/in/kullanici (isteğe bağlı)" />
