@@ -5,6 +5,7 @@ import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
 import { useAuth } from '../context/AuthContext';
 import { analyzeCandidateMatch } from '../services/geminiService';
+import { calculateMatchScore, filterPositionsByDomain, detectJobDomain, domainLabel } from '../services/matchService';
 import SystemScanner from '../components/SystemScanner';
 import AddCandidateModal from '../components/AddCandidateModal';
 import {
@@ -13,7 +14,7 @@ import {
     AlertCircle, Trophy, Calendar, Edit3,
     CheckCircle2, Link2, ExternalLink, Video, Play, Award, User, Mail,
     ChevronRight, BarChart2, MessageSquare, XCircle, Send, Loader2,
-    Sparkles, Trash2, RefreshCw
+    Sparkles, Trash2, RefreshCw, Layers, TrendingUp
 } from 'lucide-react';
 
 const STATUS_CONFIG = {
@@ -236,12 +237,43 @@ export default function CandidateProcessPage() {
 
     const score = Math.round(candidate?.bestScore || 0);
 
+    // ── POSITION MATCHES (domain-filtered) ─────────────────────────────────────
+    const positionMatches = useMemo(() => {
+        if (!candidate || !positions) return { candidateDomain: 'general', compatible: [], incompatible: [] };
+        const candidateText = [
+            candidate.position || '', candidate.title || '',
+            (candidate.skills || []).join(' '), candidate.about || '',
+            candidate.description || '', candidate.cvData || '',
+        ].join(' ');
+        const cDomain = detectJobDomain(candidateText);
+        const openPositions = positions.filter(p => p.status === 'open');
+        const compatible = [];
+        const incompatible = [];
+        openPositions.forEach(pos => {
+            const posText = [pos.title || '', (pos.requirements || []).join(' '), pos.description || ''].join(' ');
+            const pDomain = detectJobDomain(posText);
+            const isCompat = cDomain === 'general' || pDomain === 'general' || pDomain === 'management' || cDomain === 'management' || cDomain === pDomain;
+            const savedAnalysis = candidate.positionAnalyses?.[pos.title];
+            const staticMatch = calculateMatchScore(candidate, pos);
+            const matchData = savedAnalysis
+                ? { score: savedAnalysis.score, summary: savedAnalysis.summary, isAi: true, reasons: savedAnalysis.reasons || [] }
+                : { score: staticMatch.score, summary: null, isAi: false, reasons: staticMatch.reasons || [] };
+            const entry = { position: pos, match: matchData, positionDomain: pDomain };
+            if (isCompat) compatible.push(entry);
+            else incompatible.push(entry);
+        });
+        compatible.sort((a, b) => b.match.score - a.match.score);
+        incompatible.sort((a, b) => b.match.score - a.match.score);
+        return { candidateDomain: cDomain, compatible, incompatible };
+    }, [candidate, positions]);
+
     // ── TABS ──────────────────────────────────────────────────────────────────
     const TABS = [
-        { id: 'ai_analysis', label: 'STAR Analizi',      icon: <Brain className="w-3.5 h-3.5" /> },
-        { id: 'cv_match',    label: 'CV & Uyum',          icon: <FileText className="w-3.5 h-3.5" /> },
-        { id: 'sessions',    label: 'Mülakatlar',         icon: <Video className="w-3.5 h-3.5" /> },
-        { id: 'history',     label: 'Süreç Geçmişi',      icon: <BarChart2 className="w-3.5 h-3.5" /> },
+        { id: 'ai_analysis',      label: 'STAR Analizi',        icon: <Brain className="w-3.5 h-3.5" /> },
+        { id: 'cv_match',         label: 'CV & Uyum',           icon: <FileText className="w-3.5 h-3.5" /> },
+        { id: 'pos_matches',      label: 'Pozisyon Eşleşmeleri', icon: <Layers className="w-3.5 h-3.5" /> },
+        { id: 'sessions',         label: 'Mülakatlar',          icon: <Video className="w-3.5 h-3.5" /> },
+        { id: 'history',          label: 'Süreç Geçmişi',       icon: <BarChart2 className="w-3.5 h-3.5" /> },
     ];
 
     return (
@@ -700,6 +732,123 @@ export default function CandidateProcessPage() {
                                         </div>
                                     </div>
                                 )}
+
+                                {/* ── POZİSYON EŞLEŞMELERİ ── */}
+                                {activeTab === 'pos_matches' && (() => {
+                                    const { candidateDomain, compatible, incompatible } = positionMatches;
+                                    const scoreColor = (s) => s >= 70 ? '#10B981' : s >= 50 ? '#3B82F6' : s >= 30 ? '#F59E0B' : '#94A3B8';
+                                    return (
+                                        <div className="space-y-5 animate-in fade-in duration-300">
+                                            {/* Domain header */}
+                                            <div className="flex items-center gap-3 p-4 bg-slate-50 border border-slate-100 rounded-2xl">
+                                                <div className="w-9 h-9 rounded-xl bg-[#1E3A8A]/10 flex items-center justify-center shrink-0">
+                                                    <Layers className="w-4.5 h-4.5 text-[#1E3A8A]" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-[11px] font-black text-slate-800">
+                                                        Aday Meslek Alanı:
+                                                        <span className="ml-1.5 px-2 py-0.5 bg-[#1E3A8A]/10 text-[#1E3A8A] rounded-md">{domainLabel(candidateDomain)}</span>
+                                                    </p>
+                                                    <p className="text-[9px] text-slate-400 mt-0.5">Yalnızca uyumlu meslek alanındaki açık pozisyonlar eşleştirilir.</p>
+                                                </div>
+                                                <div className="ml-auto flex items-center gap-3 text-center shrink-0">
+                                                    <div>
+                                                        <p className="text-[13px] font-black text-emerald-600">{compatible.length}</p>
+                                                        <p className="text-[8px] text-slate-400 font-medium">Uyumlu</p>
+                                                    </div>
+                                                    <div className="w-px h-8 bg-slate-200" />
+                                                    <div>
+                                                        <p className="text-[13px] font-black text-slate-400">{incompatible.length}</p>
+                                                        <p className="text-[8px] text-slate-400 font-medium">Ayrı Alan</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Compatible positions */}
+                                            {compatible.length === 0 ? (
+                                                <div className="text-center py-10">
+                                                    <Layers className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+                                                    <p className="text-[12px] text-slate-400 font-medium">Uyumlu açık pozisyon bulunamadı.</p>
+                                                    <p className="text-[10px] text-slate-300 mt-1">Yeni pozisyon eklendikten sonra burası güncellenecek.</p>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-2.5">
+                                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.15em]">Eşleşen Pozisyonlar ({compatible.length})</p>
+                                                    {compatible.map(({ position: pos, match, positionDomain }) => (
+                                                        <div key={pos.id} className="bg-white border border-slate-100 hover:border-slate-200 rounded-2xl p-4 transition-all">
+                                                            <div className="flex items-center gap-3">
+                                                                {/* Score ring */}
+                                                                <div className="relative w-11 h-11 flex items-center justify-center shrink-0">
+                                                                    <svg className="absolute inset-0 -rotate-90" viewBox="0 0 44 44">
+                                                                        <circle cx="22" cy="22" r="18" fill="none" stroke="#F1F5F9" strokeWidth="4" />
+                                                                        <circle cx="22" cy="22" r="18" fill="none"
+                                                                            stroke={scoreColor(match.score)} strokeWidth="4"
+                                                                            strokeDasharray={`${(match.score / 100) * 113.1} 113.1`}
+                                                                            strokeLinecap="round" />
+                                                                    </svg>
+                                                                    <span className="text-[10px] font-black" style={{ color: scoreColor(match.score) }}>%{match.score}</span>
+                                                                </div>
+                                                                {/* Info */}
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="flex items-center gap-2 mb-0.5">
+                                                                        <p className="text-[13px] font-black text-slate-800 truncate">{pos.title}</p>
+                                                                        {match.isAi && (
+                                                                            <span className="shrink-0 inline-flex items-center gap-1 text-[7px] font-black px-1.5 py-0.5 bg-violet-50 text-violet-600 border border-violet-100 rounded-full">
+                                                                                <Sparkles className="w-2 h-2" /> AI
+                                                                            </span>
+                                                                        )}
+                                                                        {match.score >= 70 && (
+                                                                            <span className="shrink-0 inline-flex items-center gap-1 text-[7px] font-black px-1.5 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-full">
+                                                                                <TrendingUp className="w-2 h-2" /> Yüksek
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="flex items-center gap-2 text-[9px] text-slate-400">
+                                                                        <span>{pos.department || '—'}</span>
+                                                                        <span>·</span>
+                                                                        <span>{pos.minExperience ? `min ${pos.minExperience} yıl` : 'Deneyim belirtilmemiş'}</span>
+                                                                        <span>·</span>
+                                                                        <span className="text-blue-500 font-bold">{domainLabel(positionDomain)}</span>
+                                                                    </div>
+                                                                    {match.summary && (
+                                                                        <p className="text-[9px] text-slate-400 mt-1 leading-relaxed line-clamp-2 italic">{match.summary}</p>
+                                                                    )}
+                                                                    {match.reasons.length > 0 && !match.summary && (
+                                                                        <div className="flex flex-wrap gap-1 mt-1.5">
+                                                                            {match.reasons.slice(0, 3).map((r, ri) => (
+                                                                                <span key={ri} className="text-[8px] font-medium px-1.5 py-0.5 bg-slate-50 border border-slate-100 rounded-md text-slate-500">{r}</span>
+                                                                            ))}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            {/* Incompatible — collapsed notice */}
+                                            {incompatible.length > 0 && (
+                                                <div className="border border-dashed border-slate-200 rounded-2xl p-4">
+                                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.1em] mb-1">
+                                                        Farklı Meslek Alanı ({incompatible.length} pozisyon)
+                                                    </p>
+                                                    <p className="text-[10px] text-slate-400">
+                                                        Bu pozisyonlar aday profiliyle uyumlu meslek alanında değil; eşleştirme dışı tutuldu.
+                                                    </p>
+                                                    <div className="flex flex-wrap gap-1.5 mt-2">
+                                                        {incompatible.slice(0, 6).map(({ position: pos }) => (
+                                                            <span key={pos.id} className="text-[8px] font-medium px-2 py-0.5 bg-slate-50 border border-slate-100 rounded-full text-slate-400">{pos.title}</span>
+                                                        ))}
+                                                        {incompatible.length > 6 && (
+                                                            <span className="text-[8px] font-medium px-2 py-0.5 bg-slate-50 border border-slate-100 rounded-full text-slate-400">+{incompatible.length - 6} daha</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })()}
 
                                 {/* ── MÜLAKATLAr ── */}
                                 {activeTab === 'sessions' && (

@@ -21,7 +21,7 @@ import PotentialCandidatesTab from '../components/PotentialCandidatesTab';
 import CandidateDrawer from '../components/CandidateDrawer';
 import { useCandidates } from '../context/CandidatesContext';
 import { extractPositionFromJD } from '../services/geminiService';
-import { calculateMatchScore } from '../services/matchService';
+import { calculateMatchScore, filterCandidatesByDomain } from '../services/matchService';
 
 const STATUS_CONFIG = {
     open:             { label: 'Aktif',        pill: 'bg-emerald-50 text-emerald-600 border-emerald-200', dot: 'bg-emerald-500' },
@@ -713,8 +713,11 @@ export default function PositionsPage() {
     const handleCreate = async (formData) => {
         if (!formData.title || !formData.department) return;
         const reqs = formData.requirements.split(',').map(r => r.trim()).filter(Boolean);
-        const matchedCandidates = candidates
-            .map(c => ({ ...c, match: calculateMatchScore(c, { ...formData, requirements: reqs }) }))
+        const positionObj = { ...formData, requirements: reqs };
+        // Domain-filter first: only score candidates in the same job domain
+        const domainCandidates = filterCandidatesByDomain(positionObj, candidates);
+        const matchedCandidates = domainCandidates
+            .map(c => ({ ...c, match: calculateMatchScore(c, positionObj) }))
             .filter(c => c.match.score >= 50)
             .sort((a, b) => b.match.score - a.match.score)
             .slice(0, 10)

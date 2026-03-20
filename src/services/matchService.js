@@ -14,6 +14,116 @@ const TECH_GROUPS = {
     general: ['software', 'yazılım', 'development', 'geliştirme', 'bilişim', 'mühendislik', 'engineering', 'teknoloji', 'agile', 'scrum']
 };
 
+/**
+ * HIGH-LEVEL JOB DOMAIN MAP
+ * Used to prevent cross-domain false matches (e.g. Sales CV vs Dev Position).
+ * Keywords are intentionally broader to avoid missing edge cases.
+ * Order matters: first match wins.
+ */
+const JOB_DOMAINS = [
+    { id: 'sales',       label: 'Satış',           keywords: ['satış', 'sales', 'account manager', 'business development', 'iş geliştirme', 'ticari', 'commercial', 'müşteri temsilci', 'satış müdür', 'satış uzman', 'revenue', 'quota', 'crm', 'müşteri yönetimi', 'channel'] },
+    { id: 'marketing',   label: 'Pazarlama',        keywords: ['pazarlama', 'marketing', 'marka', 'brand', 'dijital pazarlama', 'digital marketing', 'seo', 'sem', 'kampanya', 'campaign', 'growth', 'acquisition', 'retention'] },
+    { id: 'design',      label: 'Tasarım',          keywords: ['tasarımcı', 'designer', 'ui/ux', 'ux designer', 'ui designer', 'product design', 'grafik', 'graphic', 'motion', 'figma', 'sketch', 'adobe xd', 'creative director'] },
+    { id: 'data',        label: 'Veri / Analitik',  keywords: ['data scientist', 'data engineer', 'data analyst', 'makine öğrenmesi', 'machine learning', 'yapay zeka uzman', 'bi analyst', 'business intelligence', 'nlp', 'deep learning', 'model training'] },
+    { id: 'engineering', label: 'Yazılım',          keywords: ['yazılım geliştirici', 'developer', 'software engineer', 'backend', 'frontend', 'full stack', 'fullstack', 'devops', 'cloud engineer', 'mühendis', 'programcı', 'geliştirici', 'sre', 'platform engineer', 'mobile developer', 'ios developer', 'android developer', 'yazılım mühendisi'] },
+    { id: 'hr',          label: 'İnsan Kaynakları', keywords: ['insan kaynakları', 'hr', 'recruitment', 'recruiter', 'işe alım', 'organizasyon gelişim', 'human resources', 'ik uzman', 'ik müdür', 'talent acquisition', 'performans yönetimi'] },
+    { id: 'finance',     label: 'Finans / Muhasebe',keywords: ['finans', 'finance', 'muhasebe', 'accountant', 'accounting', 'mali', 'treasury', 'bütçe', 'budget', 'cfo', 'controller', 'denetim', 'audit'] },
+    { id: 'operations',  label: 'Operasyon',        keywords: ['operasyon', 'operations', 'supply chain', 'lojistik', 'logistics', 'tedarik zinciri', 'procurement', 'satın alma', 'depo', 'warehouse', 'fulfillment'] },
+    { id: 'support',     label: 'Müşteri Hizmetleri',keywords: ['müşteri hizmet', 'customer service', 'destek', 'support specialist', 'help desk', 'teknik destek', 'technical support', 'call center', 'çağrı merkezi'] },
+    { id: 'legal',       label: 'Hukuk',            keywords: ['hukuk', 'legal', 'avukat', 'lawyer', 'counsel', 'compliance', 'uyum', 'sözleşme', 'contract'] },
+    { id: 'management',  label: 'Yönetim',          keywords: ['genel müdür', 'ceo', 'coo', 'cto', 'direktör', 'director', 'vp', 'vice president', 'country manager', 'general manager', 'c-level'] },
+];
+
+/**
+ * Detect the primary job domain from any freeform text.
+ * Returns a domain id string, or 'general' if nothing matches.
+ */
+export function detectJobDomain(text) {
+    if (!text) return 'general';
+    const lower = text.toLowerCase();
+    for (const domain of JOB_DOMAINS) {
+        if (domain.keywords.some(kw => lower.includes(kw))) return domain.id;
+    }
+    return 'general';
+}
+
+/**
+ * Returns the human-readable label for a domain id.
+ */
+export function domainLabel(domainId) {
+    return JOB_DOMAINS.find(d => d.id === domainId)?.label || 'Genel';
+}
+
+/**
+ * Are two detected domains compatible?
+ * - 'general' and 'management' are wildcards — compatible with everything.
+ * - Otherwise domains must match exactly.
+ */
+export function areDomainsCompatible(d1, d2) {
+    if (!d1 || !d2) return true;
+    if (d1 === 'general' || d2 === 'general') return true;
+    if (d1 === 'management' || d2 === 'management') return true;
+    return d1 === d2;
+}
+
+/**
+ * Build a single text blob for domain detection from a candidate object.
+ */
+function candidateDomainText(candidate) {
+    return [
+        candidate.position || '',
+        candidate.title || '',
+        candidate.about || '',
+        candidate.description || '',
+        (candidate.skills || []).join(' '),
+        Array.isArray(candidate.experiences)
+            ? candidate.experiences.map(e => `${e.title || ''} ${e.company || ''}`).join(' ')
+            : '',
+        candidate.cvData || '',
+    ].join(' ');
+}
+
+/**
+ * Build a single text blob for domain detection from a position object.
+ */
+function positionDomainText(position) {
+    return [
+        position.title || '',
+        position.department || '',
+        (position.requirements || []).join(' '),
+        position.description || '',
+        position.jobDescription || '',
+    ].join(' ');
+}
+
+/**
+ * Filter a list of positions to only those domain-compatible with a candidate.
+ * If the candidate domain cannot be determined ('general'), all positions are returned.
+ */
+export function filterPositionsByDomain(candidate, positions) {
+    if (!positions || positions.length === 0) return [];
+    const candidateDomain = detectJobDomain(candidateDomainText(candidate));
+    if (candidateDomain === 'general') return positions;
+    return positions.filter(pos => {
+        const posDomain = detectJobDomain(positionDomainText(pos));
+        return areDomainsCompatible(candidateDomain, posDomain);
+    });
+}
+
+/**
+ * Filter a list of candidates to only those domain-compatible with a position.
+ * If the position domain cannot be determined ('general'), all candidates are returned.
+ */
+export function filterCandidatesByDomain(position, candidates) {
+    if (!candidates || candidates.length === 0) return [];
+    const posDomain = detectJobDomain(positionDomainText(position));
+    if (posDomain === 'general') return candidates;
+    return candidates.filter(c => {
+        const cDomain = detectJobDomain(candidateDomainText(c));
+        return areDomainsCompatible(cDomain, posDomain);
+    });
+}
+
 
 /**
  * Unified Otonom Matching Algorithm

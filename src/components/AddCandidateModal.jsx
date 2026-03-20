@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
-import { calculateMatchScore } from '../services/matchService';
+import { calculateMatchScore, filterPositionsByDomain, detectJobDomain } from '../services/matchService';
 import { analyzeCandidateMatch, parseCandidateFromText } from '../services/geminiService';
 import { extractTextFromFile } from '../services/cvParser';
 import { storage } from '../config/firebase';
@@ -163,7 +163,9 @@ export default function AddCandidateModal({ isOpen, onClose }) {
 
             const processedResults = await Promise.all(resultsData.map(async (res) => {
                 if (!res.success || res.isDuplicate) return res;
-                const candidates = openPositions.map(pos => ({
+                // Filter positions to only those compatible with the candidate's domain
+                const compatiblePositions = filterPositionsByDomain(res.candidate, openPositions);
+                const candidates = compatiblePositions.map(pos => ({
                     pos,
                     static: calculateMatchScore(res.candidate, pos),
                 })).sort((a, b) => b.static.score - a.static.score);

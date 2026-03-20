@@ -13,7 +13,7 @@ import AIAnalysisPanel from './AIAnalysisPanel';
 import { analyzeCandidateMatch } from '../services/geminiService';
 import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
-import { calculateMatchScore } from '../services/matchService';
+import { calculateMatchScore, filterPositionsByDomain, detectJobDomain, domainLabel } from '../services/matchService';
 import { collection, onSnapshot, query, orderBy, doc, getDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
@@ -102,33 +102,44 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
 
 
 
-    // Calculate smart matches for open positions (Point 1 & 2)
+    // Detect candidate domain once for display and filtering
+    const candidateDomain = useMemo(() => {
+        if (!candidate) return 'general';
+        const text = [
+            candidate.position || '', candidate.title || '',
+            (candidate.skills || []).join(' '), candidate.about || '',
+            candidate.description || '', candidate.cvData || '',
+        ].join(' ');
+        return detectJobDomain(text);
+    }, [candidate]);
+
+    // Calculate smart matches for open positions — domain-filtered
     const smartMatches = useMemo(() => {
         if (!positions || !candidate) return [];
-        return positions
-            .filter(p => p.status === 'open')
+        const openPositions = positions.filter(p => p.status === 'open');
+        // Apply domain filter: only show positions compatible with candidate's domain
+        const compatible = filterPositionsByDomain(candidate, openPositions);
+        return compatible
             .map(p => {
                 // Check if we have a stored AI analysis for this specific position
                 const savedAnalysis = candidate.positionAnalyses?.[p.title];
-
                 if (savedAnalysis) {
                     return {
                         position: p,
                         match: {
                             score: savedAnalysis.score,
                             reasons: savedAnalysis.reasons || (savedAnalysis.summary ? [savedAnalysis.summary] : ['AI Analizi Mevcut']),
-                            isAi: true // Flag to show AI indicator
+                            isAi: true
                         }
                     };
                 }
-
                 return {
                     position: p,
                     match: calculateMatchScore(candidate, p)
                 };
             })
             .sort((a, b) => b.match.score - a.match.score);
-    }, [positions, candidate]);
+    }, [positions, candidate, candidateDomain]);
 
 
 
