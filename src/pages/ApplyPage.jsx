@@ -86,6 +86,7 @@ export default function ApplyPage() {
     const [cvParsing, setCvParsing] = useState(false);
     const [autoFilled, setAutoFilled] = useState({ name: false, email: false, phone: false, linkedin: false });
     const [cvParseError, setCvParseError] = useState(false);
+    const [cvParseNoData, setCvParseNoData] = useState(false);
 
     const [step, setStep] = useState('form');   // form | processing | success | error
     const [progress, setProgress] = useState('');
@@ -136,10 +137,13 @@ export default function ApplyPage() {
         setCvFile(file);
         setCvParsing(true);
         setCvParseError(false);
+        setCvParseNoData(false);
         try {
             const text = await extractTextFromFile(file);
+            console.log('[CV auto-fill] extracted text length:', text?.length);
             if (text && text.length >= 40) {
                 const parsed = await parseCandidateFromText(text);
+                console.log('[CV auto-fill] parsed result:', parsed);
                 if (parsed) {
                     const newForm = {};
                     const filled = {};
@@ -150,19 +154,26 @@ export default function ApplyPage() {
                         { key: 'linkedin', val: parsed.linkedinUrl },
                     ];
                     for (const { key, val } of fields) {
-                        if (val && String(val).trim() && String(val).trim() !== '-') {
-                            newForm[key] = String(val).trim();
+                        const v = String(val || '').trim();
+                        if (v && v !== '-' && v !== 'null' && v !== 'undefined' && v.length > 1) {
+                            newForm[key] = v;
                             filled[key] = true;
                         }
                     }
                     if (Object.keys(newForm).length > 0) {
                         setForm(f => ({ ...f, ...newForm }));
                         setAutoFilled(af => ({ ...af, ...filled }));
+                    } else {
+                        setCvParseNoData(true);
                     }
+                } else {
+                    setCvParseNoData(true);
                 }
+            } else {
+                setCvParseNoData(true);
             }
         } catch (err) {
-            console.warn('CV auto-parse error:', err);
+            console.warn('[CV auto-fill] error:', err);
             setCvParseError(true);
         } finally {
             setCvParsing(false);
@@ -409,9 +420,12 @@ export default function ApplyPage() {
                                     <div className="font-bold text-slate-700 text-sm">{cvFile.name}</div>
                                     <div className="text-[11px] text-slate-400">{(cvFile.size / 1024).toFixed(0)} KB</div>
                                     {cvParseError && (
-                                        <div className="text-[11px] text-amber-500 font-semibold">Otomatik doldurma başarısız — lütfen manuel doldurun</div>
+                                        <div className="text-[11px] text-amber-500 font-semibold mt-1">⚠ Belge okunamadı — lütfen bilgilerinizi manuel doldurun</div>
                                     )}
-                                    <button type="button" onClick={e => { e.stopPropagation(); setCvFile(null); setAutoFilled({ name: false, email: false, phone: false, linkedin: false }); }}
+                                    {cvParseNoData && !cvParseError && (
+                                        <div className="text-[11px] text-amber-500 font-semibold mt-1">Bu belgede kişisel bilgi bulunamadı — lütfen bilgilerinizi manuel doldurun</div>
+                                    )}
+                                    <button type="button" onClick={e => { e.stopPropagation(); setCvFile(null); setAutoFilled({ name: false, email: false, phone: false, linkedin: false }); setCvParseNoData(false); setCvParseError(false); }}
                                         className="flex items-center gap-1 text-red-400 text-[11px] font-bold hover:text-red-500 mt-1">
                                         <X size={12} /> Kaldır
                                     </button>
