@@ -44,6 +44,13 @@ service cloud.firestore {
       allow read, update, delete: if isRecruiter();
     }
 
+    // Candidates: authenticated users (incl. anonymous) can create
+    // so public form submissions auto-appear in the HR dashboard
+    match /artifacts/talent-flow/public/data/candidates/{candidateId} {
+      allow create: if isAuthenticated();
+      allow read, update, delete: if isRecruiter();
+    }
+
     // --- Users & Settings ---
     match /artifacts/talent-flow/public/data/users/{userId} {
       allow read, create: if isAuthenticated();

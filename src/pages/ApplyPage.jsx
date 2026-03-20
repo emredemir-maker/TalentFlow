@@ -16,6 +16,7 @@ import {
 
 const POSITIONS_COLLECTION = 'artifacts/talent-flow/public/data/positions';
 const APPLICATIONS_COLLECTION = 'artifacts/talent-flow/public/data/applications';
+const CANDIDATES_COLLECTION = 'artifacts/talent-flow/public/data/candidates';
 
 // ──────────────────────────────────────────────
 // Helpers
@@ -45,25 +46,6 @@ function InputField({ label, icon: Icon, required, autoFilled, ...props }) {
                 />
             </div>
         </div>
-    );
-}
-
-// ──────────────────────────────────────────────
-// Score ring
-// ──────────────────────────────────────────────
-function ScoreRing({ score }) {
-    const r = 40, c = 2 * Math.PI * r;
-    const dash = (score / 100) * c;
-    const color = score >= 75 ? '#10b981' : score >= 50 ? '#f59e0b' : '#ef4444';
-    return (
-        <svg width="96" height="96" viewBox="0 0 96 96" className="drop-shadow-lg">
-            <circle cx="48" cy="48" r={r} fill="none" stroke="#f1f5f9" strokeWidth="10" />
-            <circle cx="48" cy="48" r={r} fill="none" stroke={color} strokeWidth="10"
-                strokeDasharray={`${dash} ${c}`} strokeLinecap="round"
-                transform="rotate(-90 48 48)" style={{ transition: 'stroke-dasharray 1s ease' }} />
-            <text x="48" y="53" textAnchor="middle" fill={color}
-                fontSize="20" fontWeight="900" fontFamily="sans-serif">{score}%</text>
-        </svg>
     );
 }
 
@@ -216,7 +198,7 @@ export default function ApplyPage() {
                 }
             }
 
-            // Step 4 — Save directly to Firestore (anonymous auth satisfies isAuthenticated() rule)
+            // Step 4 — Save to applications + candidates
             setProgress('Başvuru kaydediliyor...');
             const appData = {
                 positionId: position.id,
@@ -236,7 +218,43 @@ export default function ApplyPage() {
             };
             if (parsedCandidate) appData.parsedCandidate = parsedCandidate;
             if (scoreBreakdown) appData.aiScoreBreakdown = scoreBreakdown;
-            await addDoc(collection(db, APPLICATIONS_COLLECTION), appData);
+
+            // Save application
+            const appRef = await addDoc(collection(db, APPLICATIONS_COLLECTION), appData);
+
+            // Also create a candidate entry so it appears in the HR dashboard
+            const candidateData = {
+                name: form.name.trim(),
+                email: form.email.trim().toLowerCase(),
+                phone: form.phone.trim(),
+                linkedinUrl: form.linkedin?.trim() || '',
+                position: position.title || '',
+                company: parsedCandidate?.company || '',
+                location: parsedCandidate?.location || '',
+                skills: parsedCandidate?.skills || [],
+                experience: parsedCandidate?.experience || 0,
+                education: parsedCandidate?.education || '',
+                summary: parsedCandidate?.summary || '',
+                cvText: cvText ? cvText.slice(0, 6000) : '',
+                cvFileName: cvFile.name,
+                source,
+                status: 'new',
+                matchScore: score,
+                combinedScore: score,
+                aiAnalysis: score > 0 ? { score, summary: parsedCandidate?.summary || '' } : null,
+                applicationId: appRef.id,
+                positionId: position.id,
+                appliedDate: new Date().toISOString().split('T')[0],
+                interviewSessions: [],
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+            };
+            try {
+                await addDoc(collection(db, CANDIDATES_COLLECTION), candidateData);
+            } catch (candErr) {
+                // Candidate save failing shouldn't block the application confirmation
+                console.warn('Candidate creation failed (rules not deployed?):', candErr.message);
+            }
 
             setAiScore(score);
             setStep('success');
@@ -301,21 +319,7 @@ export default function ApplyPage() {
                     <h2 className="text-2xl font-black text-slate-800 mb-1">{position?.title}</h2>
                     <p className="text-slate-400 text-sm mb-6">{position?.department}</p>
 
-                    {aiScore !== null && (
-                        <div className="mb-6">
-                            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">AI Uyum Skoru</div>
-                            <div className="flex justify-center">
-                                <ScoreRing score={aiScore} />
-                            </div>
-                            <p className="text-[11px] text-slate-400 mt-3 leading-relaxed">
-                                {aiScore >= 75
-                                    ? 'Profiliniz bu pozisyonla yüksek uyum gösteriyor. Ekibimiz kısa sürede sizinle iletişime geçecek.'
-                                    : aiScore >= 50
-                                        ? 'Profiliniz değerlendirmeye alındı. Ekibimiz inceleyerek size dönüş yapacak.'
-                                        : 'Başvurunuz kaydedildi. Ekibimiz inceleyerek size dönüş yapacak.'}
-                            </p>
-                        </div>
-                    )}
+                    <p className="text-slate-400 text-sm mb-6">Profiliniz değerlendirmeye alındı. Ekibimiz inceleyerek size dönüş yapacak.</p>
 
                     <div className="bg-slate-50 rounded-xl p-4 text-left border border-slate-100 text-[11px]">
                         <div className="font-black uppercase tracking-widest text-slate-400 mb-2">Başvuru Özeti</div>
