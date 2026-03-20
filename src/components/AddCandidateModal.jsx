@@ -41,8 +41,24 @@ function ScoreRing({ score }) {
     );
 }
 
+// Normalise contact fields the same way ApplyPage does
+function norm(str) { return (str || '').trim().toLowerCase().replace(/\s+/g, ''); }
+
+// Find an existing candidate by email OR phone in the already-loaded pool
+function findDuplicate(parsedCandidate, allCandidates) {
+    if (!parsedCandidate) return null;
+    const email = norm(parsedCandidate.email);
+    const phone = norm(parsedCandidate.phone);
+    if (!email && !phone) return null;
+    return allCandidates.find(c => {
+        if (email && norm(c.email) === email) return true;
+        if (phone && norm(c.phone) === phone) return true;
+        return false;
+    }) || null;
+}
+
 export default function AddCandidateModal({ isOpen, onClose }) {
-    const { addCandidate } = useCandidates();
+    const { addCandidate, updateCandidate, enrichedCandidates } = useCandidates();
     const { addNotification } = useNotifications();
     const { positions } = usePositions();
     const openPositions = positions.filter(p => p.status === 'open');
@@ -110,6 +126,25 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                         resultsData.push({ fileName: file.name, error: 'AI ayrıştırma hatası', success: false });
                         continue;
                     }
+
+                    // --- DUPLICATE CHECK (email / phone) ---
+                    const duplicate = findDuplicate(candidate, enrichedCandidates);
+                    if (duplicate) {
+                        resultsData.push({
+                            fileName: file.name,
+                            candidate,
+                            success: true,
+                            isDuplicate: true,
+                            existingCandidate: duplicate,
+                            match: {
+                                title: duplicate.matchedPositionTitle || duplicate.position || '—',
+                                score: duplicate.matchScore || 0,
+                                aiInsight: duplicate.aiAnalysis?.summary || 'Bu aday sistemde zaten kayıtlı.',
+                            },
+                        });
+                        continue;
+                    }
+
                     try {
                         const fileExtension = file.name.split('.').pop();
                         const uniqueName = `cvs/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExtension}`;
@@ -119,7 +154,7 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                     } catch (uploadError) {
                         console.error('Firebase Storage Upload Error:', uploadError);
                     }
-                    resultsData.push({ fileName: file.name, candidate, success: true });
+                    resultsData.push({ fileName: file.name, candidate, success: true, isDuplicate: false });
                 } catch (err) {
                     console.error(`Error processing ${file.name}:`, err);
                     resultsData.push({ fileName: file.name, error: err.message, success: false });
@@ -127,7 +162,7 @@ export default function AddCandidateModal({ isOpen, onClose }) {
             }
 
             const processedResults = await Promise.all(resultsData.map(async (res) => {
-                if (!res.success) return res;
+                if (!res.success || res.isDuplicate) return res;
                 const candidates = openPositions.map(pos => ({
                     pos,
                     static: calculateMatchScore(res.candidate, pos),
@@ -161,8 +196,9 @@ export default function AddCandidateModal({ isOpen, onClose }) {
         if (!results) return;
         setLoading(true);
         try {
-            const successfulOnes = results.filter(r => r.success && r.candidate);
-            await Promise.all(successfulOnes.map(async (r, idx) => {
+            // Only save NEW, non-duplicate, successfully parsed candidates
+            const toSave = results.filter(r => r.success && r.candidate && !r.isDuplicate);
+            await Promise.all(toSave.map(async (r, idx) => {
                 try {
                     const candidateData = {
                         ...r.candidate,
@@ -211,7 +247,16 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                             </h2>
                             <p className="text-[10px] text-slate-400 font-medium mt-0.5">
                                 {results
-                                    ? `${results.filter(r => r.success).length} başarılı · ${results.filter(r => !r.success).length} hatalı`
+                                    ? (() => {
+                                        const newOnes = results.filter(r => r.success && !r.isDuplicate).length;
+                                        const dups = results.filter(r => r.isDuplicate).length;
+                                        const fails = results.filter(r => !r.success).length;
+                                        return [
+                                            newOnes > 0 && `${newOnes} yeni`,
+                                            dups > 0 && `${dups} mükerrer`,
+                                            fails > 0 && `${fails} hatalı`,
+                                        ].filter(Boolean).join(' · ');
+                                    })()
                                     : `Adım ${step} / ${STEPS.length}`}
                             </p>
                         </div>
@@ -248,26 +293,39 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                     )}
 
                     {/* RESULTS SUMMARY BAR */}
-                    {results && (
-                        <div className="grid grid-cols-3 gap-3 pb-5 border-b border-slate-100">
-                            {[
-                                {
-                                    label: 'Ort. Uyum Skoru',
-                                    value: results.filter(r => r.success).length > 0
-                                        ? `%${Math.round(results.filter(r => r.success).reduce((a, r) => a + (r.match?.score || 0), 0) / results.filter(r => r.success).length)}`
-                                        : '—',
-                                    color: 'text-blue-700',
-                                },
-                                { label: 'AI Tarama', value: 'Tamamlandı', color: 'text-emerald-600' },
-                                { label: 'Kaydedilecek', value: `${results.filter(r => r.success).length} Aday`, color: 'text-violet-700' },
-                            ].map((s, i) => (
-                                <div key={i} className="bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-center">
-                                    <div className={`text-[12px] font-black ${s.color}`}>{s.value}</div>
-                                    <div className="text-[8px] text-slate-400 font-medium mt-0.5">{s.label}</div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                    {results && (() => {
+                        const newOnes = results.filter(r => r.success && !r.isDuplicate);
+                        const dups = results.filter(r => r.isDuplicate);
+                        const avgScore = newOnes.length > 0
+                            ? Math.round(newOnes.reduce((a, r) => a + (r.match?.score || 0), 0) / newOnes.length)
+                            : 0;
+                        return (
+                            <div className="grid grid-cols-3 gap-3 pb-5 border-b border-slate-100">
+                                {[
+                                    {
+                                        label: 'Ort. Uyum Skoru',
+                                        value: newOnes.length > 0 ? `%${avgScore}` : '—',
+                                        color: 'text-blue-700',
+                                    },
+                                    {
+                                        label: 'Mükerrer Tespit',
+                                        value: dups.length > 0 ? `${dups.length} Engellendi` : 'Yok',
+                                        color: dups.length > 0 ? 'text-amber-600' : 'text-emerald-600',
+                                    },
+                                    {
+                                        label: 'Kaydedilecek',
+                                        value: `${newOnes.length} Aday`,
+                                        color: 'text-violet-700',
+                                    },
+                                ].map((s, i) => (
+                                    <div key={i} className="bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-center">
+                                        <div className={`text-[12px] font-black ${s.color}`}>{s.value}</div>
+                                        <div className="text-[8px] text-slate-400 font-medium mt-0.5">{s.label}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        );
+                    })()}
                 </div>
 
                 {/* BODY */}
@@ -278,8 +336,38 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                         <div className="space-y-3">
                             <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.15em]">Sonuçlar</p>
                             {results.map((res, i) => (
-                                <div key={i} className={`rounded-2xl border p-4 ${res.success ? 'bg-white border-slate-100 hover:border-slate-200' : 'bg-red-50/50 border-red-100'} transition-all`}>
-                                    {res.success ? (
+                                <div key={i} className={`rounded-2xl border p-4 transition-all ${
+                                    res.isDuplicate
+                                        ? 'bg-amber-50/60 border-amber-200'
+                                        : res.success
+                                            ? 'bg-white border-slate-100 hover:border-slate-200'
+                                            : 'bg-red-50/50 border-red-100'
+                                }`}>
+                                    {res.isDuplicate ? (
+                                        <div className="flex items-start gap-4">
+                                            <ScoreRing score={res.match?.score || 0} />
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-start justify-between gap-2 mb-1">
+                                                    <div>
+                                                        <p className="text-[13px] font-bold text-[#0F172A]">{res.candidate?.name || res.fileName}</p>
+                                                        <p className="text-[10px] text-slate-500 font-medium">{res.candidate?.position}</p>
+                                                    </div>
+                                                    <span className="inline-flex items-center gap-1 text-[8px] font-black px-2 py-0.5 bg-amber-100 text-amber-700 border border-amber-200 rounded-full shrink-0">
+                                                        ⚠ Mevcut Aday
+                                                    </span>
+                                                </div>
+                                                <p className="text-[10px] text-amber-700/80 leading-relaxed mb-2">
+                                                    Bu aday sistemde zaten kayıtlı — yeni kayıt oluşturulmadı. Mevcut skoru korundu.
+                                                </p>
+                                                {res.match?.title && (
+                                                    <div className="flex items-center gap-1 text-[9px] font-bold text-amber-600">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
+                                                        {res.match.title} eşleşmesi (mevcut)
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ) : res.success ? (
                                         <div className="flex items-start gap-4">
                                             <ScoreRing score={res.match?.score || 0} />
                                             <div className="flex-1 min-w-0">
