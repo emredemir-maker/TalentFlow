@@ -4,7 +4,7 @@ import { RefreshCw, Play, Loader2, CheckCircle, Brain, Search, Database, UserChe
 import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
 import { findBestPositionMatch } from '../services/matchService';
-import { analyzeCandidateMatch, quickCandidateScreening } from '../services/geminiService';
+import { analyzeCandidateMatch } from '../services/geminiService';
 import { useNotifications } from '../context/NotificationContext';
 
 export default function SystemScanner() {
@@ -104,54 +104,55 @@ export default function SystemScanner() {
                 const hasManualOverride = candidate.manualScore && candidate.scoringStage !== 'initial';
 
                 // Condition for AI Analysis:
-                const openPosTitles = openPositions.map(p => p.title);
-                const missingAnalyses = openPosTitles.filter(t => !candidate.positionAnalyses?.[t]);
-                const shouldAnalyze = effectiveForce || (!hasManualOverride && (!candidate.preAssessment));
+                // Normal mode: only analyze candidates that have NO detailed STAR analysis yet
+                // Force mode (Detaylı Deterministik): re-analyze ALL candidates
+                const hasStarAnalysis = !!candidate.aiAnalysis?.starAnalysis;
+                const shouldAnalyze = effectiveForce || (!hasManualOverride && !hasStarAnalysis);
 
                 if (shouldAnalyze) {
                     setActiveStage('analyst');
 
                     try {
-                        if (effectiveForce) {
-                            const updatedAnalyses = { ...(candidate.positionAnalyses || {}) };
-                            let highestScore = -1;
-                            let bestResult = null;
-                            let bestTitle = candidate.matchedPositionTitle;
+                        // Both normal mode (first-time analysis) and force mode run full analyzeCandidateMatch.
+                        // Force mode processes ALL open positions; normal mode uses best-match position only.
+                        const updatedAnalyses = { ...(candidate.positionAnalyses || {}) };
+                        let highestScore = -1;
+                        let bestResult = null;
+                        let bestTitle = candidate.matchedPositionTitle;
 
-                            // Process all open positions
-                            for (const pos of openPositions) {
-                                const jobDesc = `${pos.title}\n${(pos.requirements || []).join(', ')}\n${pos.description || ''}`;
-                                try {
-                                    const result = await analyzeCandidateMatch(jobDesc, candidate, 'gemini-2.0-flash');
-                                    updatedAnalyses[pos.title] = result;
-                                    setAiCount(prev => prev + 1);
+                        const positionsToAnalyze = effectiveForce
+                            ? openPositions  // Force: re-analyze against ALL open positions
+                            : [bestMatch || openPositions[0]].filter(Boolean); // Normal: use best-match position only
 
-                                    if (result.score > highestScore) {
-                                        highestScore = result.score;
-                                        bestResult = result;
-                                        bestTitle = pos.title;
-                                    }
-                                } catch (e) {
-                                    console.error("AI Error for pos", pos.title, e);
+                        for (const pos of positionsToAnalyze) {
+                            if (!pos) continue;
+                            const jobDesc = `${pos.title}\n${(pos.requirements || []).join(', ')}\n${pos.description || ''}`;
+                            try {
+                                const result = await analyzeCandidateMatch(jobDesc, candidate, 'gemini-2.0-flash');
+                                updatedAnalyses[pos.title] = result;
+                                setAiCount(prev => prev + 1);
+
+                                if (result.score > highestScore) {
+                                    highestScore = result.score;
+                                    bestResult = result;
+                                    bestTitle = pos.title;
                                 }
+                            } catch (e) {
+                                console.error("AI Error for pos", pos.title, e);
                             }
+                        }
 
-                            if (bestResult) {
-                                updates.aiAnalysis = bestResult; // keeping for backward compat
-                                updates.summary = bestResult.summary;
-                                updates.matchScore = bestResult.score;
-                                updates.aiScore = bestResult.score;
-                                updates.matchedPositionTitle = bestTitle;
-                                updates.positionAnalyses = updatedAnalyses;
-                            }
-                        } else {
-                            const screeningResult = await quickCandidateScreening(candidate, openPositions);
-
-                            updates.preAssessment = screeningResult;
-                            // Reset active score since it's just a general assessment
-                            updates.matchedPositionTitle = screeningResult.suggestedOpenPosition || screeningResult.potentialPosition;
-
-                            setAiCount(prev => prev + 1);
+                        if (bestResult) {
+                            updates.aiAnalysis = {
+                                ...bestResult,
+                                lastAnalyzedAt: new Date().toISOString(),
+                                analyzedForPosition: bestTitle,
+                            };
+                            updates.summary = bestResult.summary;
+                            updates.matchScore = bestResult.score;
+                            updates.aiScore = bestResult.score;
+                            updates.matchedPositionTitle = bestTitle;
+                            updates.positionAnalyses = updatedAnalyses;
                         }
 
                         // Force update timestamp to trigger re-renders

@@ -45,7 +45,7 @@ export default function CandidateProcessPage() {
     const [deleteModal, setDeleteModal]   = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
     const [actionSuccess, setActionSuccess] = useState(null); // 'comment' | 'reject' | 'final'
-    const [analysisLoading, setAnalysisLoading] = useState(false);
+    const [analyzingIds, setAnalyzingIds]       = useState(new Set());
     const [analysisError, setAnalysisError]     = useState(null);
 
     const showSuccess = (type) => {
@@ -125,36 +125,56 @@ export default function CandidateProcessPage() {
         }
     };
 
-    const handleRunStarAnalysis = async () => {
-        if (!candidate || analysisLoading) return;
-        setAnalysisLoading(true);
+    const handleRunStarAnalysis = async (targetCandidate) => {
+        const c = targetCandidate || candidate;
+        if (!c || analyzingIds.has(c.id)) return;
+
+        // Skip if already has a complete STAR analysis (use forceRescan via SystemScanner for re-analysis)
+        if (c.aiAnalysis?.starAnalysis) return;
+
+        setAnalyzingIds(prev => new Set(prev).add(c.id));
         setAnalysisError(null);
         try {
-            // Build job description from matched position or candidate's own position field
-            const matchedPosition = positions?.find(p => p.id === candidate.positionId);
-            const jobText = matchedPosition
-                ? `${matchedPosition.title}\n${(matchedPosition.requirements || []).join(', ')}\n${matchedPosition.description || ''}`
-                : (candidate.position || candidate.bestTitle || 'Açık Pozisyon');
+            // ── Stage 1: Scout — find best position match ──────────────────────
+            const openPositions = positions?.filter(p => p.status === 'open') || [];
+            const matchedPosition = openPositions.find(p => p.id === c.positionId)
+                || openPositions[0];
 
-            const result = await analyzeCandidateMatch(jobText, candidate);
+            if (!matchedPosition) throw new Error('Açık pozisyon bulunamadı.');
 
-            // Merge into existing aiAnalysis
+            // ── Stage 2: Analyst — deep AI STAR analysis (otonom agent) ────────
+            const jobText = `${matchedPosition.title}\n${(matchedPosition.requirements || []).join(', ')}\n${matchedPosition.description || ''}`;
+            const result = await analyzeCandidateMatch(jobText, c);
+
+            // ── Stage 3: Recruiter — persist to Firestore ───────────────────────
             const updatedAnalysis = {
-                ...(candidate.aiAnalysis || {}),
+                ...(c.aiAnalysis || {}),
                 score: result.score,
                 summary: result.summary,
                 starAnalysis: result.starAnalysis,
                 reasons: result.reasons,
+                scoreData: result.scoreData,
                 lastAnalyzedAt: new Date().toISOString(),
+                analyzedForPosition: matchedPosition.title,
             };
 
-            await updateCandidate(candidate.id, { aiAnalysis: updatedAnalysis });
-            showSuccess('comment'); // re-use success flash
+            await updateCandidate(c.id, {
+                aiAnalysis: updatedAnalysis,
+                matchScore: result.score,
+                matchedPositionTitle: matchedPosition.title,
+                lastScannedAt: new Date().toISOString(),
+            });
+
+            showSuccess('comment');
         } catch (err) {
             console.error('STAR Analysis error:', err);
             setAnalysisError('Analiz sırasında bir hata oluştu. Tekrar deneyin.');
         } finally {
-            setAnalysisLoading(false);
+            setAnalyzingIds(prev => {
+                const next = new Set(prev);
+                next.delete(c.id);
+                return next;
+            });
         }
     };
 
@@ -469,7 +489,7 @@ export default function CandidateProcessPage() {
                                 {/* ── STAR ANALİZİ ── */}
                                 {activeTab === 'ai_analysis' && (
                                     <div className="space-y-3 animate-in fade-in duration-300">
-                                        {/* Header row with refresh button */}
+                                        {/* Header row */}
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-2">
                                                 <div className="w-1 h-3.5 rounded-full bg-cyan-500" />
@@ -480,16 +500,11 @@ export default function CandidateProcessPage() {
                                                     </span>
                                                 )}
                                             </div>
+                                            {/* Already analyzed: point to SystemScanner for re-analysis */}
                                             {candidate.aiAnalysis?.starAnalysis && (
-                                                <button
-                                                    onClick={handleRunStarAnalysis}
-                                                    disabled={analysisLoading}
-                                                    className="flex items-center gap-1.5 h-7 px-3 rounded-lg text-[9px] font-black uppercase border border-slate-200 text-slate-400 hover:text-cyan-600 hover:border-cyan-200 hover:bg-cyan-50 transition-all disabled:opacity-50"
-                                                    title="Analizi Yenile"
-                                                >
-                                                    <RefreshCw className={`w-3 h-3 ${analysisLoading ? 'animate-spin' : ''}`} />
-                                                    Yenile
-                                                </button>
+                                                <span className="text-[9px] text-slate-400 italic">
+                                                    Toplu yenileme için Sistem Taraması kullanın
+                                                </span>
                                             )}
                                         </div>
 
@@ -500,19 +515,23 @@ export default function CandidateProcessPage() {
                                             </div>
                                         )}
 
-                                        {/* Loading state */}
-                                        {analysisLoading && (
+                                        {/* Per-candidate loading state */}
+                                        {analyzingIds.has(candidate.id) && (
                                             <div className="flex flex-col items-center justify-center py-12 gap-3">
                                                 <div className="w-12 h-12 rounded-2xl bg-cyan-50 border border-cyan-100 flex items-center justify-center">
                                                     <Sparkles className="w-6 h-6 text-cyan-500 animate-pulse" />
                                                 </div>
-                                                <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Yapay Zeka Analiz Ediyor…</p>
-                                                <p className="text-[10px] text-slate-400">CV ve pozisyon verileri işleniyor</p>
+                                                <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Otonom Ajan Analiz Ediyor…</p>
+                                                <div className="flex items-center gap-3 text-[10px] text-slate-400">
+                                                    <span className="flex items-center gap-1"><Brain className="w-3 h-3 text-violet-400" /> Analyst</span>
+                                                    <span className="text-slate-200">→</span>
+                                                    <span className="flex items-center gap-1"><ShieldCheck className="w-3 h-3 text-emerald-400" /> Recruiter</span>
+                                                </div>
                                             </div>
                                         )}
 
                                         {/* Empty state — no STAR analysis yet */}
-                                        {!analysisLoading && !candidate.aiAnalysis?.starAnalysis && (
+                                        {!analyzingIds.has(candidate.id) && !candidate.aiAnalysis?.starAnalysis && (
                                             <div className="flex flex-col items-center justify-center py-12 gap-4 text-center">
                                                 <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center">
                                                     <Brain className="w-7 h-7 text-slate-300" />
@@ -520,22 +539,22 @@ export default function CandidateProcessPage() {
                                                 <div>
                                                     <p className="text-[12px] font-black text-slate-700 mb-1">STAR Analizi Henüz Yapılmadı</p>
                                                     <p className="text-[11px] text-slate-400 max-w-xs leading-relaxed">
-                                                        Adayın CV'sini ve pozisyon gereksinimlerini STAR metodolojisiyle derinlemesine analiz etmek için yapay zekayı başlatın.
+                                                        Adayın CV'si ve pozisyon gereksinimleri STAR metodolojisiyle otonom ajan sistemi üzerinden analiz edilecektir.
                                                     </p>
                                                 </div>
                                                 <button
-                                                    onClick={handleRunStarAnalysis}
-                                                    disabled={analysisLoading}
+                                                    onClick={() => handleRunStarAnalysis(candidate)}
+                                                    disabled={analyzingIds.has(candidate.id)}
                                                     className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-white font-black text-sm shadow-xl shadow-cyan-500/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:scale-100"
                                                 >
                                                     <Sparkles className="w-4 h-4" />
-                                                    Yapay Zekayı Başlat
+                                                    Otonom Analizi Başlat
                                                 </button>
                                             </div>
                                         )}
 
-                                        {/* STAR cards — shown only when analysis data exists */}
-                                        {!analysisLoading && candidate.aiAnalysis?.starAnalysis && (
+                                        {/* STAR cards — shown only when analysis data exists and not currently re-analyzing */}
+                                        {!analyzingIds.has(candidate.id) && candidate.aiAnalysis?.starAnalysis && (
                                             <div className="space-y-2">
                                                 {[
                                                     { k: 'S', l: 'DURUM', sub: 'Situation', bg: 'bg-blue-50',   border: 'border-blue-100',   tc: 'text-blue-700',   r: starAnalysis.Situation.reason },
