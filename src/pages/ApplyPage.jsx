@@ -5,7 +5,7 @@ import { doc, getDoc, collection, addDoc, getDocs, query, where, updateDoc, serv
 import { signInAnonymously } from 'firebase/auth';
 import { db, auth } from '../config/firebase';
 import { extractTextFromFile } from '../services/cvParser';
-import { parseCandidateFromText } from '../services/geminiService';
+import { parseCandidateFromText, analyzeCandidateMatch } from '../services/geminiService';
 import { calculateMatchScore } from '../services/matchService';
 import { detectSource } from '../services/applicationService';
 import {
@@ -184,7 +184,7 @@ export default function ApplyPage() {
                 parsedCandidate = null;
             }
 
-            // Step 3 — Score against position
+            // Step 3 — Score against position (Phase 1: fast deterministic)
             setProgress('Pozisyona uygunluk hesaplanıyor...');
             let score = 0;
             let scoreBreakdown = null;
@@ -195,6 +195,27 @@ export default function ApplyPage() {
                     scoreBreakdown = result.breakdown ?? null;
                 } catch {
                     score = 0;
+                }
+            }
+
+            // Step 3b — STAR Analysis (Phase 2: AI-powered deep CV evaluation)
+            setProgress('CV STAR analizi yapılıyor...');
+            let starAiAnalysis = null;
+            if (parsedCandidate && position) {
+                try {
+                    const jobText = `${position.title}\n${(position.requirements || []).join(', ')}\n${position.description || ''}`;
+                    const aiResult = await analyzeCandidateMatch(jobText, parsedCandidate);
+                    starAiAnalysis = {
+                        score: aiResult.score,
+                        summary: aiResult.summary,
+                        starAnalysis: aiResult.starAnalysis,
+                        reasons: aiResult.reasons,
+                        lastAnalyzedAt: new Date().toISOString(),
+                    };
+                    // Use the AI score as the primary score if available
+                    if (aiResult.score > 0) score = aiResult.score;
+                } catch (starErr) {
+                    console.warn('Phase 2 STAR analysis failed (non-blocking):', starErr.message);
                 }
             }
 
@@ -256,6 +277,7 @@ export default function ApplyPage() {
                         matchScore: score,
                         combinedScore: score,
                         status: 'new',
+                        ...(starAiAnalysis ? { aiAnalysis: starAiAnalysis } : {}),
                         updatedAt: serverTimestamp(),
                     });
                 } catch (updErr) {
@@ -284,7 +306,7 @@ export default function ApplyPage() {
                     status: 'new',
                     matchScore: score,
                     combinedScore: score,
-                    aiAnalysis: score > 0 ? { score, summary: parsedCandidate?.summary || '' } : null,
+                    aiAnalysis: starAiAnalysis || (score > 0 ? { score, summary: parsedCandidate?.summary || '' } : null),
                     applicationId: appRef.id,
                     positionId: position.id,
                     appliedDate: new Date().toISOString().split('T')[0],

@@ -2,14 +2,16 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCandidates } from '../context/CandidatesContext';
+import { usePositions } from '../context/PositionsContext';
 import { useAuth } from '../context/AuthContext';
+import { analyzeCandidateMatch } from '../services/geminiService';
 import {
     Plus, Search, Zap, Brain, X,
     Target, ShieldCheck, ArrowRight, FileText, Clock,
     AlertCircle, Trophy, Calendar, Edit3,
     CheckCircle2, Link2, ExternalLink, Video, Play, Award, User, Mail,
     ChevronRight, BarChart2, MessageSquare, XCircle, Send, Loader2,
-    Sparkles, Trash2
+    Sparkles, Trash2, RefreshCw
 } from 'lucide-react';
 
 const STATUS_CONFIG = {
@@ -23,6 +25,7 @@ const getStatusCfg = (s) => STATUS_CONFIG[s] || STATUS_CONFIG.scheduled;
 export default function CandidateProcessPage() {
     const navigate = useNavigate();
     const { enrichedCandidates, viewCandidateId, setViewCandidateId, sourceColors, setPreselectedInterviewData, updateCandidate, deleteCandidate } = useCandidates();
+    const { positions } = usePositions();
     const { user } = useAuth();
     const candidates = enrichedCandidates || [];
     const [searchQuery, setSearchQuery]   = useState('');
@@ -42,6 +45,8 @@ export default function CandidateProcessPage() {
     const [deleteModal, setDeleteModal]   = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
     const [actionSuccess, setActionSuccess] = useState(null); // 'comment' | 'reject' | 'final'
+    const [analysisLoading, setAnalysisLoading] = useState(false);
+    const [analysisError, setAnalysisError]     = useState(null);
 
     const showSuccess = (type) => {
         setActionSuccess(type);
@@ -117,6 +122,39 @@ export default function CandidateProcessPage() {
             }
         } finally {
             setActionLoading(false);
+        }
+    };
+
+    const handleRunStarAnalysis = async () => {
+        if (!candidate || analysisLoading) return;
+        setAnalysisLoading(true);
+        setAnalysisError(null);
+        try {
+            // Build job description from matched position or candidate's own position field
+            const matchedPosition = positions?.find(p => p.id === candidate.positionId);
+            const jobText = matchedPosition
+                ? `${matchedPosition.title}\n${(matchedPosition.requirements || []).join(', ')}\n${matchedPosition.description || ''}`
+                : (candidate.position || candidate.bestTitle || 'Açık Pozisyon');
+
+            const result = await analyzeCandidateMatch(jobText, candidate);
+
+            // Merge into existing aiAnalysis
+            const updatedAnalysis = {
+                ...(candidate.aiAnalysis || {}),
+                score: result.score,
+                summary: result.summary,
+                starAnalysis: result.starAnalysis,
+                reasons: result.reasons,
+                lastAnalyzedAt: new Date().toISOString(),
+            };
+
+            await updateCandidate(candidate.id, { aiAnalysis: updatedAnalysis });
+            showSuccess('comment'); // re-use success flash
+        } catch (err) {
+            console.error('STAR Analysis error:', err);
+            setAnalysisError('Analiz sırasında bir hata oluştu. Tekrar deneyin.');
+        } finally {
+            setAnalysisLoading(false);
         }
     };
 
@@ -431,51 +469,114 @@ export default function CandidateProcessPage() {
                                 {/* ── STAR ANALİZİ ── */}
                                 {activeTab === 'ai_analysis' && (
                                     <div className="space-y-3 animate-in fade-in duration-300">
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-1 h-3.5 rounded-full bg-cyan-500" />
-                                            <h3 className="text-[10px] font-black text-slate-700 uppercase tracking-widest">STAR Değerlendirmesi</h3>
+                                        {/* Header row with refresh button */}
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-1 h-3.5 rounded-full bg-cyan-500" />
+                                                <h3 className="text-[10px] font-black text-slate-700 uppercase tracking-widest">STAR Değerlendirmesi</h3>
+                                                {candidate.aiAnalysis?.lastAnalyzedAt && (
+                                                    <span className="text-[9px] text-slate-400">
+                                                        · {new Date(candidate.aiAnalysis.lastAnalyzedAt).toLocaleDateString('tr-TR')}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            {candidate.aiAnalysis?.starAnalysis && (
+                                                <button
+                                                    onClick={handleRunStarAnalysis}
+                                                    disabled={analysisLoading}
+                                                    className="flex items-center gap-1.5 h-7 px-3 rounded-lg text-[9px] font-black uppercase border border-slate-200 text-slate-400 hover:text-cyan-600 hover:border-cyan-200 hover:bg-cyan-50 transition-all disabled:opacity-50"
+                                                    title="Analizi Yenile"
+                                                >
+                                                    <RefreshCw className={`w-3 h-3 ${analysisLoading ? 'animate-spin' : ''}`} />
+                                                    Yenile
+                                                </button>
+                                            )}
                                         </div>
 
-                                        <div className="space-y-2">
-                                            {[
-                                                { k: 'S', l: 'DURUM', sub: 'Situation', bg: 'bg-blue-50',   border: 'border-blue-100',   tc: 'text-blue-700',   r: starAnalysis.Situation.reason },
-                                                { k: 'T', l: 'GÖREV', sub: 'Task',      bg: 'bg-teal-50',   border: 'border-teal-100',   tc: 'text-teal-700',   r: starAnalysis.Task.reason },
-                                                { k: 'A', l: 'EYLEM', sub: 'Action',    bg: 'bg-violet-50', border: 'border-violet-100', tc: 'text-violet-700', r: starAnalysis.Action.reason },
-                                                { k: 'R', l: 'SONUÇ', sub: 'Result',    bg: 'bg-emerald-50',border: 'border-emerald-100',tc: 'text-emerald-700',r: starAnalysis.Result.reason },
-                                            ].map((step, idx) => {
-                                                const { pos, neg } = parseFeedback(step.r);
-                                                return (
-                                                    <div key={idx} className={`rounded-xl border ${step.border} ${step.bg} p-3`}>
-                                                        <div className="flex items-center gap-2 mb-2">
-                                                            <div className={`w-6 h-6 rounded-md bg-white border ${step.border} flex items-center justify-center text-[11px] font-black ${step.tc} shadow-sm shrink-0`}>{step.k}</div>
-                                                            <h4 className={`text-[10px] font-black uppercase tracking-wider ${step.tc}`}>{step.l}</h4>
-                                                            <span className={`text-[9px] font-medium opacity-60 ${step.tc}`}>({step.sub})</span>
-                                                        </div>
-                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                                            {pos && (
-                                                                <div className="bg-white border border-emerald-100 px-3 py-2 rounded-lg">
-                                                                    <div className="flex items-center gap-1 text-[8px] font-black text-emerald-600 uppercase mb-1">
-                                                                        <ShieldCheck className="w-3 h-3" /> Pozitif
+                                        {/* Error banner */}
+                                        {analysisError && (
+                                            <div className="flex items-center gap-2 bg-red-50 border border-red-100 rounded-lg px-3 py-2 text-[11px] text-red-600">
+                                                <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {analysisError}
+                                            </div>
+                                        )}
+
+                                        {/* Loading state */}
+                                        {analysisLoading && (
+                                            <div className="flex flex-col items-center justify-center py-12 gap-3">
+                                                <div className="w-12 h-12 rounded-2xl bg-cyan-50 border border-cyan-100 flex items-center justify-center">
+                                                    <Sparkles className="w-6 h-6 text-cyan-500 animate-pulse" />
+                                                </div>
+                                                <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Yapay Zeka Analiz Ediyor…</p>
+                                                <p className="text-[10px] text-slate-400">CV ve pozisyon verileri işleniyor</p>
+                                            </div>
+                                        )}
+
+                                        {/* Empty state — no STAR analysis yet */}
+                                        {!analysisLoading && !candidate.aiAnalysis?.starAnalysis && (
+                                            <div className="flex flex-col items-center justify-center py-12 gap-4 text-center">
+                                                <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center">
+                                                    <Brain className="w-7 h-7 text-slate-300" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-[12px] font-black text-slate-700 mb-1">STAR Analizi Henüz Yapılmadı</p>
+                                                    <p className="text-[11px] text-slate-400 max-w-xs leading-relaxed">
+                                                        Adayın CV'sini ve pozisyon gereksinimlerini STAR metodolojisiyle derinlemesine analiz etmek için yapay zekayı başlatın.
+                                                    </p>
+                                                </div>
+                                                <button
+                                                    onClick={handleRunStarAnalysis}
+                                                    disabled={analysisLoading}
+                                                    className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-white font-black text-sm shadow-xl shadow-cyan-500/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:scale-100"
+                                                >
+                                                    <Sparkles className="w-4 h-4" />
+                                                    Yapay Zekayı Başlat
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        {/* STAR cards — shown only when analysis data exists */}
+                                        {!analysisLoading && candidate.aiAnalysis?.starAnalysis && (
+                                            <div className="space-y-2">
+                                                {[
+                                                    { k: 'S', l: 'DURUM', sub: 'Situation', bg: 'bg-blue-50',   border: 'border-blue-100',   tc: 'text-blue-700',   r: starAnalysis.Situation.reason },
+                                                    { k: 'T', l: 'GÖREV', sub: 'Task',      bg: 'bg-teal-50',   border: 'border-teal-100',   tc: 'text-teal-700',   r: starAnalysis.Task.reason },
+                                                    { k: 'A', l: 'EYLEM', sub: 'Action',    bg: 'bg-violet-50', border: 'border-violet-100', tc: 'text-violet-700', r: starAnalysis.Action.reason },
+                                                    { k: 'R', l: 'SONUÇ', sub: 'Result',    bg: 'bg-emerald-50',border: 'border-emerald-100',tc: 'text-emerald-700',r: starAnalysis.Result.reason },
+                                                ].map((step, idx) => {
+                                                    const { pos, neg } = parseFeedback(step.r);
+                                                    return (
+                                                        <div key={idx} className={`rounded-xl border ${step.border} ${step.bg} p-3`}>
+                                                            <div className="flex items-center gap-2 mb-2">
+                                                                <div className={`w-6 h-6 rounded-md bg-white border ${step.border} flex items-center justify-center text-[11px] font-black ${step.tc} shadow-sm shrink-0`}>{step.k}</div>
+                                                                <h4 className={`text-[10px] font-black uppercase tracking-wider ${step.tc}`}>{step.l}</h4>
+                                                                <span className={`text-[9px] font-medium opacity-60 ${step.tc}`}>({step.sub})</span>
+                                                            </div>
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                                                {pos && (
+                                                                    <div className="bg-white border border-emerald-100 px-3 py-2 rounded-lg">
+                                                                        <div className="flex items-center gap-1 text-[8px] font-black text-emerald-600 uppercase mb-1">
+                                                                            <ShieldCheck className="w-3 h-3" /> Pozitif
+                                                                        </div>
+                                                                        <p className="text-[11px] text-slate-600 leading-relaxed">{pos}</p>
                                                                     </div>
-                                                                    <p className="text-[11px] text-slate-600 leading-relaxed">{pos}</p>
-                                                                </div>
-                                                            )}
-                                                            {neg && (
-                                                                <div className="bg-white border border-red-100 px-3 py-2 rounded-lg">
-                                                                    <div className="flex items-center gap-1 text-[8px] font-black text-red-500 uppercase mb-1">
-                                                                        <AlertCircle className="w-3 h-3" /> Negatif
+                                                                )}
+                                                                {neg && (
+                                                                    <div className="bg-white border border-red-100 px-3 py-2 rounded-lg">
+                                                                        <div className="flex items-center gap-1 text-[8px] font-black text-red-500 uppercase mb-1">
+                                                                            <AlertCircle className="w-3 h-3" /> Negatif
+                                                                        </div>
+                                                                        <p className="text-[11px] text-slate-600 leading-relaxed">{neg}</p>
                                                                     </div>
-                                                                    <p className="text-[11px] text-slate-600 leading-relaxed">{neg}</p>
-                                                                </div>
-                                                            )}
-                                                            {!pos && !neg && (
-                                                                <p className="text-[11px] text-slate-400 italic col-span-2">{step.r || 'Mülakat verisi bekleniyor.'}</p>
-                                                            )}
+                                                                )}
+                                                                {!pos && !neg && (
+                                                                    <p className="text-[11px] text-slate-400 italic col-span-2">{step.r || '—'}</p>
+                                                                )}
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
                                     </div>
                                 )}
 
