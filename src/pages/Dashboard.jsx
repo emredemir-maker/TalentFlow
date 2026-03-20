@@ -6,20 +6,32 @@ import { usePositions } from '../context/PositionsContext';
 import Header from '../components/Header';
 import CandidateDrawer from '../components/CandidateDrawer';
 import AddCandidateModal from '../components/AddCandidateModal';
-import OpportunityHub from '../components/OpportunityHub';
 import { doc, getDoc, collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import {
     Users,
-    MessageSquare,
-    Plus,
-    Zap,
+    Target,
+    Clock,
     Star,
+    Zap,
+    BarChart2,
+    Calendar,
     ChevronRight,
-    Search,
-    MapPin,
-    Target
+    ArrowUpRight,
+    ArrowDownRight,
+    CheckCircle2,
+    Circle,
+    TrendingUp,
 } from 'lucide-react';
+
+function Trend({ up, val }) {
+    return (
+        <span className={`inline-flex items-center gap-0.5 text-[10px] font-black ${up ? 'text-emerald-600' : 'text-red-500'}`}>
+            {up ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+            {val}
+        </span>
+    );
+}
 
 export default function Dashboard() {
     const {
@@ -34,7 +46,6 @@ export default function Dashboard() {
     const [selectedCandidate, setSelectedCandidate] = useState(null);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
-    // Listen to public interview docs — authoritative source for completion status
     const [sessionStatuses, setSessionStatuses] = useState({});
     useEffect(() => {
         const unsubscribe = onSnapshot(
@@ -48,32 +59,34 @@ export default function Dashboard() {
         );
         return () => unsubscribe();
     }, []);
+
     const { positions } = usePositions();
+    const navigate = useNavigate();
 
     const activePositions = useMemo(() => positions.filter(p => p.status === 'open').slice(0, 4), [positions]);
+    const allOpenCount = useMemo(() => positions.filter(p => p.status === 'open').length, [positions]);
 
     const funnelData = useMemo(() => {
         const byStatus = stats.byStatus || {};
-        
-        // Accurate counts based on candidate statuses
         const hiredCount = byStatus.hired || 0;
         const offerCount = (byStatus.offer || 0) + hiredCount;
-        const interviewCount = (byStatus.interview || 0) + 
-                               (byStatus.Interview || 0) + 
-                               (byStatus.mülakat || 0) + offerCount;
-        const reviewCount = (byStatus.review || 0) + 
-                            (byStatus.Review || 0) + 
-                            (byStatus.değerlendirme || 0) + interviewCount;
-        
+        const interviewCount = (byStatus.interview || 0) +
+            (byStatus.Interview || 0) +
+            (byStatus.mülakat || 0) + offerCount;
+        const reviewCount = (byStatus.review || 0) +
+            (byStatus.Review || 0) +
+            (byStatus.değerlendirme || 0) + interviewCount;
+
         const analyzedCount = candidates.filter(c => c.aiAnalysis || c.cvSummary || (c.bestScore || 0) > 0).length;
         const aiScreenedCount = Math.max(analyzedCount, reviewCount);
+        const total = candidates.length || 1;
 
         return [
-            { label: 'Başvurular', count: candidates.length, width: '100%', bg: 'bg-slate-50' },
-            { label: 'AI Tarama', count: aiScreenedCount, width: '85%', ml: 'ml-[7.5%]', bg: 'bg-slate-100' },
-            { label: 'İnceleme', count: reviewCount, width: '70%', ml: 'ml-[15%]', bg: 'bg-slate-200' },
-            { label: 'Mülakatlar', count: interviewCount, width: '55%', ml: 'ml-[22.5%]', bg: 'bg-slate-300' },
-            { label: 'Teklifler', count: offerCount, width: '40%', ml: 'ml-[30%]', bg: 'bg-emerald-500 text-white' },
+            { label: 'Başvurular', count: candidates.length, pct: 100, color: '#1E3A8A' },
+            { label: 'AI Tarama', count: aiScreenedCount, pct: Math.round((aiScreenedCount / total) * 100), color: '#2563EB' },
+            { label: 'İnceleme', count: reviewCount, pct: Math.round((reviewCount / total) * 100), color: '#3B82F6' },
+            { label: 'Mülakatlar', count: interviewCount, pct: Math.round((interviewCount / total) * 100), color: '#60A5FA' },
+            { label: 'Teklifler', count: offerCount, pct: Math.round((offerCount / total) * 100), color: '#10B981' },
         ];
     }, [stats, candidates]);
 
@@ -81,22 +94,20 @@ export default function Dashboard() {
         const now = new Date();
         const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const endOfWeek = new Date(startOfToday.getTime() + 7 * 24 * 60 * 60 * 1000);
-        
-        const sessionsMap = new Map(); // Use map to prevent duplicates for same candidate + time
-        
+        const sessionsMap = new Map();
+
         candidates.forEach(c => {
             if (c.interviewSessions && Array.isArray(c.interviewSessions)) {
                 c.interviewSessions.forEach(s => {
-                    // Overlay authoritative public doc status to beat ghost-write race conditions
                     const effectiveStatus = sessionStatuses[s.id] || s.status;
                     const effectivelyCompleted = effectiveStatus === 'completed' ||
                         (effectiveStatus !== 'live' && (s.aiOverallScore > 0 || Boolean(s.aiSummary) || s.finalScore > 0));
-                    if (effectiveStatus === 'cancelled' || effectivelyCompleted) return; // Skip cancelled/completed
+                    if (effectiveStatus === 'cancelled' || effectivelyCompleted) return;
 
                     const sessionDatePart = s.date ? s.date.split('T')[0] : '';
                     const sessionDate = new Date(sessionDatePart);
                     const isLive = effectiveStatus === 'live';
-                    
+
                     if (isLive || (sessionDate >= startOfToday && sessionDate <= endOfWeek)) {
                         const key = `${c.id}-${sessionDatePart}-${s.time}`;
                         const sessionData = {
@@ -111,10 +122,7 @@ export default function Dashboard() {
                             aiSummary: s.aiSummary,
                             finalScore: s.finalScore || 0,
                             score: c.combinedScore || c.bestScore || 0,
-                            skills: c.skills?.slice(0, 2) || []
                         };
-
-                        // If already exists, prefer live/completed over scheduled
                         if (!sessionsMap.has(key) || effectiveStatus === 'live' || effectiveStatus === 'completed') {
                             sessionsMap.set(key, sessionData);
                         }
@@ -122,275 +130,336 @@ export default function Dashboard() {
                 });
             }
         });
-        
-        const sessions = Array.from(sessionsMap.values());
-        
-        return sessions.sort((a, b) => {
+
+        return Array.from(sessionsMap.values()).sort((a, b) => {
             if (a.status === 'live' && b.status !== 'live') return -1;
             if (b.status === 'live' && a.status !== 'live') return 1;
             if (a.date !== b.date) return a.date.localeCompare(b.date);
             return a.time.localeCompare(b.time);
-        }).slice(0, 5);
+        }).slice(0, 4);
     }, [candidates, sessionStatuses]);
-
-    const navigate = useNavigate();
 
     const dynamicMetrics = useMemo(() => {
         const analyzedCount = candidates.filter(c => c.aiAnalysis || c.cvSummary || (Number(c.bestScore) || 0) > 0).length;
         const avgMatchArr = candidates.filter(c => (Number(c.bestScore) || 0) > 0);
-        const avgMatch = avgMatchArr.length > 0 
+        const avgMatch = avgMatchArr.length > 0
             ? Math.round(avgMatchArr.reduce((acc, curr) => acc + (Number(curr.bestScore) || 0), 0) / avgMatchArr.length)
             : 88;
 
-        const ivCount = (stats.byStatus?.interview || 0) + (stats.byStatus?.Interview || 0) + (stats.byStatus?.mülakat || 0) + (stats.byStatus?.Mülakat || 0);
+        const ivCount = (stats.byStatus?.interview || 0) + (stats.byStatus?.Interview || 0) +
+            (stats.byStatus?.mülakat || 0) + (stats.byStatus?.Mülakat || 0);
         const totalRoi = analyzedCount * 50 + ivCount * 150;
         const hoursSaved = Math.round((analyzedCount * 25 + ivCount * 60) / 60);
 
         return {
             avgMatch,
-            roi: (totalRoi || 42500).toLocaleString(),
+            roi: (totalRoi || 42500).toLocaleString('tr-TR'),
             timeSaved: hoursSaved || 120,
-            recruitSpeed: "12.4 Gün"
+            recruitSpeed: "12.4 Gün",
         };
     }, [stats, candidates]);
+
+    const kpis = useMemo(() => [
+        { label: "Toplam Aday", value: String(candidates.length), change: "+12", up: true, desc: "bu hafta yeni başvuru", icon: Users },
+        { label: "Aktif Pozisyon", value: String(allOpenCount), change: "+2", up: true, desc: "açık ilan", icon: Target },
+        { label: "AI Match Skoru", value: `${dynamicMetrics.avgMatch}%`, change: "+5%", up: true, desc: "ortalama uyum", icon: Star },
+        { label: "İşe Alım Hızı", value: dynamicMetrics.recruitSpeed, change: "-22%", up: true, desc: "ortalama süre", icon: Clock },
+    ], [candidates.length, allOpenCount, dynamicMetrics]);
 
     if (error) return <div className="p-10 text-[11px] font-black text-red-500 uppercase tracking-widest text-center">Sistem Hatası: Veri Senkronizasyonu Başarısız.</div>;
 
     return (
-        <div className="min-h-screen bg-[#F8FAFC]">
+        <div className="min-h-screen bg-[#F0F4F8]">
             <Header />
-            
-            <div className="max-w-[1600px] mx-auto px-8 py-6 space-y-6">
-                
-                {/* 1. COMPACT HEADER */}
+
+            <div className="max-w-[1500px] mx-auto px-8 py-6 space-y-6">
+
+                {/* PAGE TITLE */}
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-[24px] font-black text-[#0F172A] tracking-tighter uppercase italic leading-none">Stratejik Genel Bakış</h1>
-                        <p className="text-[11px] text-[#64748B] font-bold mt-1 uppercase tracking-[0.2em] opacity-60 italic">Real-Time Talent Intelligence Engine</p>
+                        <h1 className="text-[20px] font-black text-[#0F172A] tracking-tight">Stratejik Genel Bakış</h1>
+                        <p className="text-[10px] text-slate-400 font-medium mt-0.5">
+                            {new Date().toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} — Haftalık özet
+                        </p>
                     </div>
-
-                    <div className="flex gap-3">
-                        <div className="bg-white px-4 py-2.5 rounded-xl border border-[#E2E8F0] shadow-sm flex flex-col justify-center min-w-[140px]">
-                            <span className="text-[8px] font-black text-[#94A3B8] uppercase tracking-widest mb-0.5">İŞE ALIM HIZI</span>
-                            <div className="flex items-center gap-2">
-                                <span className="text-[16px] font-black text-[#0F172A]">{dynamicMetrics.recruitSpeed}</span>
-                                <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-1 rounded">-22%</span>
-                            </div>
+                    <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-500">
+                            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+                            Sistem Aktif
                         </div>
-                        <div className="bg-white px-4 py-2.5 rounded-xl border border-[#E2E8F0] shadow-sm flex flex-col justify-center min-w-[140px]">
-                            <span className="text-[8px] font-black text-[#94A3B8] uppercase tracking-widest mb-0.5">AI MATCH INDEX</span>
-                            <div className="flex items-center gap-2">
-                                <span className="text-[16px] font-black text-[#0F172A]">{dynamicMetrics.avgMatch}%</span>
-                                <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-1 rounded">+5%</span>
-                            </div>
-                        </div>
+                        <button
+                            onClick={() => setIsAddModalOpen(true)}
+                            className="text-[10px] font-bold text-white bg-[#1E3A8A] hover:bg-blue-800 px-4 py-2 rounded-xl transition-colors"
+                        >
+                            + Aday Ekle
+                        </button>
                     </div>
                 </div>
 
-                {/* 2. CORE ANALYTICS ROW (Compacted) */}
-                <div className="grid grid-cols-12 gap-5 items-stretch">
-                    {/* Compact Funnel */}
-                    <div className="col-span-12 lg:col-span-7 bg-white rounded-[20px] p-6 border border-[#E2E8F0] shadow-sm flex flex-col">
-                        <div className="flex items-center justify-between mb-6">
-                            <div className="flex items-center gap-2">
-                                <Target className="w-4 h-4 text-blue-600" />
-                                <h3 className="text-[13px] font-black text-[#0F172A] uppercase tracking-widest">Aday Akış Analizi</h3>
+                {/* KPI ROW */}
+                <div className="grid grid-cols-4 gap-4">
+                    {kpis.map((k, i) => (
+                        <div key={i} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-shadow">
+                            <div className="flex items-start justify-between mb-3">
+                                <span className="text-[11px] font-semibold text-slate-500">{k.label}</span>
+                                <Trend up={k.up} val={k.change} />
                             </div>
-                            <button className="text-[9px] font-black text-blue-600 uppercase tracking-widest hover:underline">Detay</button>
+                            <div className="text-[32px] font-black text-[#0F172A] leading-none mb-1">{k.value}</div>
+                            <div className="text-[10px] text-slate-400 font-medium">{k.desc}</div>
                         </div>
-
-                        <div className="space-y-2 flex-1 flex flex-col justify-center">
-                            {funnelData.map((phase, i) => (
-                                <div key={i} className="flex items-center justify-between gap-3 group">
-                                    <div className="flex-1 relative h-9 flex items-center pr-6">
-                                        <div 
-                                            className={`absolute left-0 top-0 bottom-0 ${phase.bg} rounded-lg transition-all duration-700 ease-out flex items-center px-4 border border-black/5 group-hover:brightness-95 shadow-sm`}
-                                            style={{ width: phase.width, marginLeft: phase.ml || '0' }}
-                                        >
-                                            <span className={`text-[9px] font-black uppercase tracking-tight truncate ${i === 4 ? 'text-white' : 'text-[#1E3A8A]'}`}>
-                                                {phase.label}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div className="w-10 text-right text-[13px] font-black text-[#0F172A] tabular-nums">{phase.count}</div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Compact Blue Card (Fixed Font Colors) */}
-                    <div className="col-span-12 lg:col-span-5 bg-[#1E3A8A] rounded-[20px] p-8 text-white relative overflow-hidden shadow-xl flex flex-col justify-between group">
-                        <div className="absolute -top-10 -right-10 w-48 h-48 bg-white/5 rounded-full blur-[50px] transition-transform group-hover:scale-125" />
-                        <Star className="absolute right-6 top-6 w-12 h-12 text-white/5 group-hover:opacity-10 transition-opacity" />
-                        
-                        <div className="relative z-10 space-y-4">
-                            <div className="flex items-center gap-2 text-[#6EE7B7]">
-                                <Zap className="w-3.5 h-3.5 fill-current" />
-                                <span className="text-[9px] font-black uppercase tracking-[0.2em]">Stratejik Görüntüleme</span>
-                            </div>
-                            <h2 className="text-[20px] font-black leading-tight italic uppercase !text-white shadow-sm">Operasyonel Verimlilik</h2>
-                            <p className="text-[12px] text-blue-100/80 leading-relaxed font-semibold italic">
-                                AI sistemimiz son periyotta <span className="text-white underline decoration-blue-400">{dynamicMetrics.timeSaved} saatlik</span> manuel yükü asiste ederek işe alım maliyetlerini minimize etti.
-                            </p>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3 mt-8 relative z-10">
-                            <div className="bg-white/10 backdrop-blur-md border border-white/5 rounded-xl p-4">
-                                <span className="text-[8px] font-black text-blue-200/60 uppercase tracking-widest block mb-1">ÜRETİLEN ROI</span>
-                                <div className="text-[18px] font-black text-white">${dynamicMetrics.roi}</div>
-                            </div>
-                            <div className="bg-white/10 backdrop-blur-md border border-white/5 rounded-xl p-4">
-                                <span className="text-[8px] font-black text-blue-200/60 uppercase tracking-widest block mb-1">ZAMAN TASARRUFU</span>
-                                <div className="text-[18px] font-black text-white">{dynamicMetrics.timeSaved}h</div>
-                            </div>
-                        </div>
-                    </div>
+                    ))}
                 </div>
 
-                {/* 3. TERTIARY ROW (Extreme Compact) */}
+                {/* MAIN CONTENT */}
                 <div className="grid grid-cols-12 gap-5">
-                    {/* Active Jobs List */}
-                    <div className="col-span-12 md:col-span-4 bg-white rounded-[20px] p-6 border border-[#E2E8F0] shadow-sm">
-                        <div className="flex items-center justify-between mb-5">
-                            <h3 className="text-[12px] font-black text-[#0F172A] uppercase tracking-widest italic">Açık Pozisyonlar</h3>
-                            <span className="text-[8px] font-black px-2 py-0.5 bg-blue-50 text-blue-600 rounded-md border border-blue-100">8 AKTİF</span>
-                        </div>
-                        <div className="space-y-2">
-                            {activePositions.map(pos => (
-                                <div
-                                    key={pos.id}
-                                    onClick={() => {
-                                        window.dispatchEvent(new CustomEvent('changeView', { detail: 'positions' }));
-                                        setTimeout(() => {
-                                            window.dispatchEvent(new CustomEvent('openPosition', { detail: { positionId: pos.id } }));
-                                        }, 80);
-                                    }}
-                                    className="p-3 bg-[#F8FAFC] border border-[#F1F5F9] rounded-xl hover:bg-white hover:border-blue-200 transition-all cursor-pointer group flex items-center justify-between"
-                                >
-                                    <div className="min-w-0 flex-1">
-                                        <h4 className="text-[11px] font-bold text-[#0F172A] group-hover:text-blue-600 truncate uppercase">{pos.title}</h4>
-                                        <div className="flex items-center gap-2 mt-0.5 text-[9px] text-[#94A3B8] font-bold">
-                                            <Users className="w-3 h-3" /> 24 Aday
-                                        </div>
-                                    </div>
-                                    <div className="text-[10px] font-black text-[#10B981] bg-emerald-50 px-1.5 py-0.5 rounded italic">92%</div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
 
-                    <div className="col-span-12 md:col-span-4 bg-white rounded-[20px] p-6 border border-[#E2E8F0] shadow-sm">
-                        <div className="flex items-center justify-between mb-5">
-                            <h3 className="text-[12px] font-black text-[#0F172A] uppercase tracking-widest italic">Haftanın Planı</h3>
-                            <button onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }))} className="text-[9px] font-black text-blue-600 uppercase tracking-widest hover:underline">TÜMÜNÜ GÖR</button>
-                        </div>
-                        <div className="space-y-4">
-                            {weeklyPlan.map((int, i) => {
-                                const todayStr = new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0') + '-' + String(new Date().getDate()).padStart(2, '0');
-                                const isToday = int.date === todayStr;
-                                return (
-                                    <div key={i} className="flex gap-4 items-center group relative">
-                                        <div className="text-center min-w-[54px] py-1 px-2 rounded-lg bg-slate-50 border border-slate-100">
-                                            <div className="text-[11px] font-black text-[#0F172A] leading-none mb-0.5">{int.time}</div>
-                                            <div className={`text-[7px] font-bold uppercase ${isToday ? 'text-emerald-500' : 'text-[#94A3B8]'}`}>
-                                                {isToday ? 'BUGÜN' : new Date(int.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
+                    {/* LEFT — Pipeline + Schedule */}
+                    <div className="col-span-8 space-y-5">
+
+                        {/* PIPELINE */}
+                        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+                            <div className="flex items-center justify-between mb-5">
+                                <div className="flex items-center gap-2">
+                                    <BarChart2 className="w-4 h-4 text-[#1E3A8A]" />
+                                    <span className="text-[13px] font-black text-[#0F172A]">Aday Pipeline</span>
+                                </div>
+                                <button
+                                    onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'candidates' }))}
+                                    className="flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:underline"
+                                >
+                                    Detaylı Görünüm <ChevronRight className="w-3 h-3" />
+                                </button>
+                            </div>
+                            <div className="space-y-3">
+                                {funnelData.map((p, i) => {
+                                    const prev = i === 0 ? candidates.length * 0.93 : funnelData[i - 1].count * 0.93;
+                                    const diff = p.count - Math.round(prev);
+                                    return (
+                                        <div key={i} className="flex items-center gap-4">
+                                            <div className="w-24 text-[11px] font-semibold text-slate-600 text-right shrink-0">{p.label}</div>
+                                            <div className="flex-1 h-10 bg-slate-50 rounded-xl overflow-hidden border border-slate-100 relative">
+                                                <div
+                                                    className="h-full rounded-xl flex items-center px-4 transition-all duration-700"
+                                                    style={{
+                                                        width: `${Math.max(p.pct, 8)}%`,
+                                                        backgroundColor: p.color + '18',
+                                                        borderRight: `3px solid ${p.color}`,
+                                                    }}
+                                                >
+                                                    <span className="text-[9px] font-black" style={{ color: p.color }}>{p.label.toUpperCase()}</span>
+                                                </div>
+                                            </div>
+                                            <div className="w-12 text-right text-[15px] font-black text-[#0F172A] tabular-nums shrink-0">{p.count}</div>
+                                            <div className="w-14 text-right shrink-0">
+                                                <span className={`text-[9px] font-bold ${diff >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                                                    {diff >= 0 ? '+' : ''}{diff}
+                                                </span>
                                             </div>
                                         </div>
-                                        <div className="flex-1 flex items-center justify-between gap-4 py-1 border-b border-[#F1F5F9] group-last:border-0 min-w-0">
-                                            <div className="min-w-0">
-                                                <div className="flex items-center gap-2">
-                                                    <h4 className="text-[12px] font-bold text-[#0F172A] group-hover:text-blue-600 transition-colors truncate">{int.name}</h4>
-                                                    <span className="text-[9px] font-black text-emerald-500 bg-emerald-50 px-1 rounded">%{int.score}</span>
-                                                    {/* Status Badge */}
-                                                    {(() => {
-                                                        const effComp = int.status === 'completed' || (int.status !== 'live' && (int.aiOverallScore > 0 || Boolean(int.aiSummary) || int.finalScore > 0));
-                                                        return int.status === 'live' ? (
-                                                            <span className="text-[7px] font-black bg-rose-50 text-rose-600 px-1.5 py-0.5 rounded border border-rose-100 animate-pulse">CANLI</span>
-                                                        ) : effComp ? (
-                                                            <span className="text-[7px] font-black bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded border border-emerald-100">TAMAMLANDI</span>
-                                                        ) : int.status === 'cancelled' ? (
-                                                            <span className="text-[7px] font-black bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200">İPTAL</span>
-                                                        ) : (
-                                                            <span className="text-[7px] font-black bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100">PLANLANDI</span>
-                                                        );
-                                                    })()}
-                                                </div>
-                                                <p className="text-[9px] text-[#64748B] font-bold uppercase tracking-tight truncate mb-1">{int.role}</p>
-                                                <div className="flex gap-1">
-                                                    {int.skills.map((s, idx) => (
-                                                        <span key={idx} className="text-[6px] font-black text-slate-400 bg-slate-100 px-1 py-0.5 rounded uppercase">{s}</span>
-                                                    ))}
+                                    );
+                                })}
+                            </div>
+                            <div className="mt-5 pt-4 border-t border-slate-100 flex items-center gap-6 flex-wrap">
+                                <div className="text-[10px] text-slate-500 font-medium">Başvurudan teklife dönüşüm:</div>
+                                <div className="font-black text-[13px] text-[#1E3A8A]">
+                                    %{candidates.length > 0 ? Math.round((funnelData[4].count / candidates.length) * 100) : 0}
+                                </div>
+                                <div className="flex items-center gap-1 text-[9px] font-bold text-emerald-600">
+                                    <TrendingUp className="w-3 h-3" />
+                                    İşe alım hızı -{dynamicMetrics.recruitSpeed} ortalama
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* SCHEDULE */}
+                        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+                            <div className="flex items-center justify-between mb-5">
+                                <div className="flex items-center gap-2">
+                                    <Calendar className="w-4 h-4 text-[#1E3A8A]" />
+                                    <span className="text-[13px] font-black text-[#0F172A]">Haftanın Planı</span>
+                                </div>
+                                <button
+                                    onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }))}
+                                    className="text-[10px] font-bold text-blue-600 hover:underline"
+                                >
+                                    Tümünü Gör
+                                </button>
+                            </div>
+                            <div className="divide-y divide-slate-50">
+                                {weeklyPlan.length === 0 ? (
+                                    <div className="py-10 text-center">
+                                        <p className="text-[11px] font-semibold text-slate-300">Planlı mülakat bulunmuyor.</p>
+                                    </div>
+                                ) : weeklyPlan.map((s, i) => {
+                                    const todayStr = new Date().toISOString().split('T')[0];
+                                    const isToday = s.date === todayStr;
+                                    const effComp = s.status === 'completed' || (s.status !== 'live' && (s.aiOverallScore > 0 || Boolean(s.aiSummary) || s.finalScore > 0));
+
+                                    return (
+                                        <div key={i} className="py-3 flex items-center gap-4 group">
+                                            <div className="w-16 shrink-0 text-center">
+                                                <div className="text-[13px] font-black text-[#0F172A]">{s.time}</div>
+                                                <div className={`text-[8px] font-bold uppercase ${isToday ? 'text-emerald-500' : 'text-slate-400'}`}>
+                                                    {isToday ? 'BUGÜN' : new Date(s.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
                                                 </div>
                                             </div>
-                                            <button 
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[12px] font-bold text-[#0F172A] group-hover:text-blue-700 transition-colors truncate">{s.name}</span>
+                                                    {s.status === 'live' ? (
+                                                        <span className="text-[7px] font-black px-1.5 py-0.5 bg-rose-50 text-rose-600 border border-rose-100 rounded animate-pulse">● CANLI</span>
+                                                    ) : effComp ? (
+                                                        <span className="text-[7px] font-black px-1.5 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded">TAMAMLANDI</span>
+                                                    ) : (
+                                                        <span className="text-[7px] font-black px-1.5 py-0.5 bg-slate-50 text-slate-400 border border-slate-100 rounded">PLANLI</span>
+                                                    )}
+                                                </div>
+                                                <div className="text-[10px] text-slate-400 font-medium mt-0.5 truncate">{s.role}</div>
+                                            </div>
+                                            <div className="shrink-0 text-right mr-2">
+                                                {s.score > 0 && (
+                                                    <>
+                                                        <div className="text-[14px] font-black text-[#0F172A]">%{s.score}</div>
+                                                        <div className="text-[8px] text-slate-400">Uyum</div>
+                                                    </>
+                                                )}
+                                            </div>
+                                            <button
                                                 onClick={async (e) => {
                                                     e.stopPropagation();
-                                                    const effComp = int.status === 'completed' || (int.status !== 'live' && (int.aiOverallScore > 0 || Boolean(int.aiSummary) || int.finalScore > 0));
-                                                    if (effComp) {
-                                                        navigate(`/interview-report/${int.id}`);
-                                                        return;
-                                                    }
+                                                    if (effComp) { navigate(`/interview-report/${s.id}`); return; }
                                                     try {
-                                                        const snap = await getDoc(doc(db, 'interviews', int.id));
+                                                        const snap = await getDoc(doc(db, 'interviews', s.id));
                                                         if (snap.exists() && snap.data()?.status === 'completed') {
-                                                            navigate(`/interview-report/${int.id}`);
+                                                            navigate(`/interview-report/${s.id}`);
                                                         } else {
-                                                            navigate(`/live-interview/${int.id}`);
+                                                            navigate(`/live-interview/${s.id}`);
                                                         }
                                                     } catch {
-                                                        navigate(`/live-interview/${int.id}`);
+                                                        navigate(`/live-interview/${s.id}`);
                                                     }
                                                 }}
-                                                className={`h-7 px-3 text-[8px] font-black rounded-lg transition-all uppercase tracking-widest flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95 ${
-                                                    (int.status === 'completed' || (int.status !== 'live' && (int.aiOverallScore > 0 || Boolean(int.aiSummary) || int.finalScore > 0))) ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-[#1E3A8A] hover:bg-blue-800 text-white'
-                                                }`}
+                                                className={`shrink-0 text-[9px] font-bold px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${effComp ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-[#1E3A8A] hover:bg-blue-800 text-white'}`}
                                             >
-                                                {(int.status === 'completed' || (int.status !== 'live' && (int.aiOverallScore > 0 || Boolean(int.aiSummary) || int.finalScore > 0))) ? 'RAPOR' : 'GÖRÜNTÜLE'}
+                                                {effComp ? 'Rapor' : s.status === 'live' ? 'Katıl' : 'Görüntüle'}
                                             </button>
                                         </div>
-                                    </div>
-                                );
-                            })}
-                            {weeklyPlan.length === 0 && (
-                                <div className="py-10 text-center">
-                                    <p className="text-[10px] font-bold text-slate-300 italic">Planlı mülakat bulunmuyor.</p>
-                                </div>
-                            )}
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div>
 
-                    {/* AI Engine Status (Compact) */}
-                    <div className="col-span-12 md:col-span-4 bg-white rounded-[20px] p-6 border border-[#E2E8F0] shadow-sm flex flex-col">
-                        <h3 className="text-[12px] font-black text-[#0F172A] uppercase tracking-widest italic mb-5">Motor Statüsü</h3>
-                        <div className="space-y-4 flex-1">
-                            {[
-                                { label: 'Scoring Engine', val: 98 },
-                                { label: 'Bias Guard', val: 100 },
-                                { label: 'Data Sync', val: 82 }
-                            ].map((stat, i) => (
-                                <div key={i} className="space-y-1.5">
-                                    <div className="flex justify-between text-[8px] font-black text-[#1E3A8A] uppercase tracking-[0.1em]">
-                                        <span>{stat.label}</span>
-                                        <span>{stat.val}%</span>
+                    {/* RIGHT PANEL */}
+                    <div className="col-span-4 space-y-5">
+
+                        {/* AI INSIGHT */}
+                        <div className="bg-[#1E3A8A] text-white rounded-2xl p-5 relative overflow-hidden">
+                            <div className="absolute -right-6 -top-6 w-28 h-28 bg-blue-500/20 rounded-full blur-xl" />
+                            <div className="relative z-10">
+                                <div className="flex items-center gap-1.5 mb-3">
+                                    <Zap className="w-3.5 h-3.5 text-blue-300 fill-blue-300" />
+                                    <span className="text-[8px] font-black text-blue-300 uppercase tracking-[0.2em]">AI Performans Özeti</span>
+                                </div>
+                                <p className="text-[12px] text-blue-100/80 leading-relaxed mb-5 font-medium">
+                                    AI sistemimiz bu periyotta{' '}
+                                    <span className="text-white font-black">{dynamicMetrics.timeSaved} saatlik</span>{' '}
+                                    manuel yükü asiste ederek işe alım maliyetlerini minimize etti.
+                                </p>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div className="bg-white/8 border border-white/10 rounded-xl p-3">
+                                        <div className="text-[7px] font-black text-blue-200/50 uppercase tracking-widest mb-1">ÜRETİLEN ROI</div>
+                                        <div className="text-[18px] font-black">${dynamicMetrics.roi}</div>
                                     </div>
-                                    <div className="h-1 bg-[#F1F5F9] rounded-full overflow-hidden">
-                                        <div className="h-full bg-blue-600 rounded-full transition-all duration-1000" style={{ width: `${stat.val}%` }} />
+                                    <div className="bg-white/8 border border-white/10 rounded-xl p-3">
+                                        <div className="text-[7px] font-black text-blue-200/50 uppercase tracking-widest mb-1">KAZANILAN</div>
+                                        <div className="text-[18px] font-black">{dynamicMetrics.timeSaved}h</div>
                                     </div>
                                 </div>
-                            ))}
+                            </div>
                         </div>
-                        <div className="mt-6 p-4 bg-slate-50 border-2 border-dashed border-[#E2E8F0] rounded-xl flex items-center justify-center text-center">
-                            <h2 className="text-[12px] font-black text-blue-200 uppercase tracking-[0.3em] italic">AI CORE ACTIVE</h2>
-                        </div>
-                    </div>
-                </div>
 
-                {/* 4. FOOTER (Minimal) */}
-                <div className="pt-4 border-t border-[#E2E8F0] flex items-center justify-between opacity-40">
-                    <div className="flex items-center gap-3 text-[8px] font-black uppercase tracking-[0.2em]">
-                        <PulseDot /> System Operational
+                        {/* OPEN POSITIONS */}
+                        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+                            <div className="flex items-center justify-between mb-4">
+                                <span className="text-[12px] font-black text-[#0F172A]">Açık Pozisyonlar</span>
+                                <span className="text-[8px] font-bold px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full border border-blue-100">
+                                    {allOpenCount} Aktif
+                                </span>
+                            </div>
+                            <div className="space-y-3">
+                                {activePositions.map((pos, i) => {
+                                    const posCount = candidates.filter(c => c.position === pos.title || c.bestTitle === pos.title).length;
+                                    const fillPct = Math.min(Math.round((posCount / Math.max(posCount + 5, 20)) * 100), 95);
+                                    const barColor = fillPct > 75 ? '#10B981' : fillPct > 50 ? '#3B82F6' : '#F59E0B';
+                                    return (
+                                        <div
+                                            key={pos.id}
+                                            className="group cursor-pointer"
+                                            onClick={() => {
+                                                window.dispatchEvent(new CustomEvent('changeView', { detail: 'positions' }));
+                                                setTimeout(() => {
+                                                    window.dispatchEvent(new CustomEvent('openPosition', { detail: { positionId: pos.id } }));
+                                                }, 80);
+                                            }}
+                                        >
+                                            <div className="flex items-start justify-between mb-1.5">
+                                                <div>
+                                                    <div className="text-[11px] font-bold text-[#0F172A] group-hover:text-blue-700 transition-colors leading-tight">{pos.title}</div>
+                                                    <div className="text-[9px] text-slate-400 font-medium mt-0.5">{posCount} aday</div>
+                                                </div>
+                                                <div className="text-[11px] font-black" style={{ color: barColor }}>{fillPct}%</div>
+                                            </div>
+                                            <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
+                                                <div className="h-full rounded-full transition-all duration-700" style={{ width: `${fillPct}%`, backgroundColor: barColor }} />
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            <button
+                                onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'positions' }))}
+                                className="mt-4 w-full text-center text-[9px] font-black text-blue-600 hover:text-blue-800 uppercase tracking-widest transition-colors"
+                            >
+                                Tüm Pozisyonları Gör →
+                            </button>
+                        </div>
+
+                        {/* ENGINE STATUS */}
+                        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+                            <span className="text-[12px] font-black text-[#0F172A] block mb-4">Sistem Durumu</span>
+                            <div className="space-y-3">
+                                {[
+                                    { label: 'Scoring Engine', val: 98, ok: true },
+                                    { label: 'Bias Guard', val: 100, ok: true },
+                                    { label: 'Data Sync', val: 82, ok: false },
+                                ].map((e, i) => (
+                                    <div key={i} className="flex items-center gap-3">
+                                        {e.ok
+                                            ? <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                                            : <Circle className="w-4 h-4 text-amber-400 shrink-0" />
+                                        }
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex justify-between text-[10px] mb-1">
+                                                <span className="font-semibold text-slate-700">{e.label}</span>
+                                                <span className={`font-black ${e.val > 90 ? 'text-emerald-600' : 'text-amber-500'}`}>{e.val}%</span>
+                                            </div>
+                                            <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
+                                                <div
+                                                    className="h-full rounded-full transition-all duration-1000"
+                                                    style={{ width: `${e.val}%`, backgroundColor: e.val > 90 ? '#10B981' : '#F59E0B' }}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="mt-4 p-3 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-center">
+                                <span className="text-[9px] font-black text-blue-200 uppercase tracking-[0.3em]">AI CORE ACTIVE</span>
+                            </div>
+                        </div>
+
                     </div>
-                    <span className="text-[8px] font-bold">TALENTFLOW FRAMEWORK v1.2</span>
                 </div>
             </div>
 
@@ -404,15 +473,6 @@ export default function Dashboard() {
                 />
             )}
             <AddCandidateModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
-        </div>
-    );
-}
-
-function PulseDot() {
-    return (
-        <div className="relative flex items-center justify-center w-2 h-2">
-            <div className="absolute w-full h-full bg-emerald-400 rounded-full opacity-75 animate-ping" />
-            <div className="relative w-1.5 h-1.5 bg-emerald-500 rounded-full" />
         </div>
     );
 }
