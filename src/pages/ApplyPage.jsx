@@ -1,19 +1,21 @@
 // src/pages/ApplyPage.jsx — Public job application page (no auth required)
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { doc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { signInAnonymously } from 'firebase/auth';
+import { db, auth } from '../config/firebase';
 import { extractTextFromFile } from '../services/cvParser';
 import { parseCandidateFromText } from '../services/geminiService';
 import { calculateMatchScore } from '../services/matchService';
-import { submitApplication, detectSource } from '../services/applicationService';
+import { detectSource } from '../services/applicationService';
 import {
     Briefcase, Upload, CheckCircle2, Loader2, AlertCircle,
     User, Mail, Phone, Linkedin, FileText, Building2, X,
-    ChevronRight, Shield, Star
+    ChevronRight, Shield
 } from 'lucide-react';
 
 const POSITIONS_COLLECTION = 'artifacts/talent-flow/public/data/positions';
+const APPLICATIONS_COLLECTION = 'artifacts/talent-flow/public/data/applications';
 
 // ──────────────────────────────────────────────
 // Helpers
@@ -80,18 +82,27 @@ export default function ApplyPage() {
 
     const fileInputRef = useRef(null);
 
-    // Fetch position
+    // Fetch position — sign in anonymously first so isAuthenticated() rule passes
     useEffect(() => {
         if (!positionId) { setPosError('Geçersiz başvuru linki.'); setPosLoading(false); return; }
-        getDoc(doc(db, POSITIONS_COLLECTION, positionId))
-            .then(snap => {
+        (async () => {
+            try {
+                // Anonymous sign-in satisfies isAuthenticated() Firestore rule
+                if (auth && !auth.currentUser) {
+                    await signInAnonymously(auth);
+                }
+                const snap = await getDoc(doc(db, POSITIONS_COLLECTION, positionId));
                 if (!snap.exists()) { setPosError('Pozisyon bulunamadı.'); return; }
                 const data = snap.data();
                 if (data.status !== 'open') { setPosError('Bu pozisyon şu an başvuruya kapalı.'); return; }
                 setPosition({ id: snap.id, ...data });
-            })
-            .catch(() => setPosError('Pozisyon yüklenirken hata oluştu.'))
-            .finally(() => setPosLoading(false));
+            } catch (err) {
+                console.error('Position fetch error:', err);
+                setPosError('Pozisyon yüklenirken hata oluştu.');
+            } finally {
+                setPosLoading(false);
+            }
+        })();
     }, [positionId]);
 
     function handleField(e) {
@@ -146,23 +157,27 @@ export default function ApplyPage() {
                 }
             }
 
-            // Step 4 — Save to Firestore
+            // Step 4 — Save directly to Firestore (anonymous auth satisfies isAuthenticated() rule)
             setProgress('Başvuru kaydediliyor...');
-            await submitApplication({
+            const appData = {
                 positionId: position.id,
-                positionTitle: position.title,
-                name: form.name,
-                email: form.email,
-                phone: form.phone,
-                linkedin: form.linkedin,
-                cvText,
+                positionTitle: position.title || '',
+                name: form.name.trim(),
+                email: form.email.trim().toLowerCase(),
+                phone: form.phone.trim(),
+                linkedin: form.linkedin?.trim() || '',
                 cvFileName: cvFile.name,
+                cvText: cvText ? cvText.slice(0, 6000) : '',
                 source,
-                parsedCandidate,
                 aiScore: score,
-                aiScoreBreakdown: scoreBreakdown,
                 aiSummary: parsedCandidate?.summary || '',
-            });
+                status: 'new',
+                kvkkConsent: true,
+                createdAt: serverTimestamp(),
+            };
+            if (parsedCandidate) appData.parsedCandidate = parsedCandidate;
+            if (scoreBreakdown) appData.aiScoreBreakdown = scoreBreakdown;
+            await addDoc(collection(db, APPLICATIONS_COLLECTION), appData);
 
             setAiScore(score);
             setStep('success');

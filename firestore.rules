@@ -30,6 +30,20 @@ service cloud.firestore {
       allow write: if isSuperAdmin();
     }
 
+    // --- Public Job Application System ---
+    // Positions: anyone can read (to display the apply form)
+    match /artifacts/talent-flow/public/data/positions/{positionId} {
+      allow read: if true;
+      allow write: if isRecruiter();
+    }
+
+    // Applications: anyone can create (public form submission)
+    // Only authenticated recruiters can read/update/delete
+    match /artifacts/talent-flow/public/data/applications/{applicationId} {
+      allow create: if true;
+      allow read, update, delete: if isRecruiter();
+    }
+
     // --- Users & Settings ---
     match /artifacts/talent-flow/public/data/users/{userId} {
       allow read, create: if isAuthenticated();
