@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
-import { findBestPositionMatch } from '../services/matchService';
+import { findBestPositionMatch, filterPositionsByDomain } from '../services/matchService';
 import { analyzeCandidateMatch } from '../services/geminiService';
 import { useNotifications } from '../context/NotificationContext';
 
@@ -160,7 +160,8 @@ export default function SystemScanner() {
                 // ── Stage 1: Scout ─────────────────────────────────────────
                 setActiveStage('scout');
                 await new Promise(r => setTimeout(r, 50));
-                const bestMatch = findBestPositionMatch(candidate, openPositions);
+                const compatiblePositions = filterPositionsByDomain(candidate, openPositions);
+                const bestMatch = findBestPositionMatch(candidate, compatiblePositions);
 
                 const updates = {};
                 let needsUpdate = false;
@@ -185,8 +186,8 @@ export default function SystemScanner() {
                         let bestTitle    = candidate.matchedPositionTitle;
 
                         const positionsToAnalyze = forceAnalyze
-                            ? openPositions
-                            : [bestMatch || openPositions[0]].filter(Boolean);
+                            ? compatiblePositions
+                            : [bestMatch || compatiblePositions[0]].filter(Boolean);
 
                         for (const pos of positionsToAnalyze) {
                             if (!pos) continue;
