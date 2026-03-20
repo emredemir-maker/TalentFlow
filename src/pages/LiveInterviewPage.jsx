@@ -127,6 +127,7 @@ export default function LiveInterviewPage() {
     const [questions, setQuestions] = useState([]);
     const [isDataInitialized, setIsDataInitialized] = useState(false);
     const [showActionsMenu, setShowActionsMenu] = useState(false);
+    const [showCustomInput, setShowCustomInput] = useState(false);
 
     // Initial Data Stabilization
     useEffect(() => {
@@ -2065,42 +2066,53 @@ export default function LiveInterviewPage() {
                                     )}
                                 </div>
 
-                                {/* Custom question input */}
+                                {/* Custom question input — isteğe bağlı, gizli by default */}
                                 {isTypeSelected && !pathLoading && (
                                     <div className="px-4 pb-3 pt-2 border-t border-white/5 shrink-0">
-                                        <form
-                                            onSubmit={(e) => {
-                                                e.preventDefault();
-                                                const val = e.target.customQ.value.trim();
-                                                if (!val) return;
-                                                const newQ = {
-                                                    id: questions.length + 1,
-                                                    text: val,
-                                                    category: 'Özel',
-                                                    status: 'pending',
-                                                    visibleToCandidate: false
-                                                };
-                                                const updated = [...questions, newQ];
-                                                setQuestions(updated);
-                                                persistSessionData({ questions: updated });
-                                                setCurrentQuestionIndex(updated.length - 1);
-                                                e.target.customQ.value = '';
-                                            }}
-                                            className="flex gap-2 items-center"
+                                        <button
+                                            onClick={() => setShowCustomInput(v => !v)}
+                                            className="w-full flex items-center justify-center gap-1.5 py-1 text-[7px] font-black text-white/20 uppercase tracking-widest hover:text-white/40 transition-colors"
                                         >
-                                            <input
-                                                name="customQ"
-                                                type="text"
-                                                placeholder="Özel soru yaz, Enter ile listeye ekle..."
-                                                className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-[10px] font-bold text-white placeholder-white/20 focus:outline-none focus:border-blue-500/50 transition-all"
-                                            />
-                                            <button
-                                                type="submit"
-                                                className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center hover:bg-blue-500 transition-all shrink-0"
+                                            <span className="text-[10px] leading-none">{showCustomInput ? '−' : '+'}</span>
+                                            {showCustomInput ? 'Gizle' : 'Listeye özel soru ekle'}
+                                        </button>
+                                        {showCustomInput && (
+                                            <form
+                                                onSubmit={(e) => {
+                                                    e.preventDefault();
+                                                    const val = e.target.customQ.value.trim();
+                                                    if (!val) return;
+                                                    const newQ = {
+                                                        id: questions.length + 1,
+                                                        text: val,
+                                                        category: 'Özel',
+                                                        status: 'pending',
+                                                        visibleToCandidate: false
+                                                    };
+                                                    const updated = [...questions, newQ];
+                                                    setQuestions(updated);
+                                                    persistSessionData({ questions: updated });
+                                                    setCurrentQuestionIndex(updated.length - 1);
+                                                    e.target.customQ.value = '';
+                                                    setShowCustomInput(false);
+                                                }}
+                                                className="flex gap-2 items-center mt-1.5"
                                             >
-                                                <ArrowRight className="w-3.5 h-3.5" />
-                                            </button>
-                                        </form>
+                                                <input
+                                                    name="customQ"
+                                                    type="text"
+                                                    autoFocus
+                                                    placeholder="Soruyu yaz, Enter ile listeye ekle..."
+                                                    className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-[10px] font-bold text-white placeholder-white/20 focus:outline-none focus:border-blue-500/50 transition-all"
+                                                />
+                                                <button
+                                                    type="submit"
+                                                    className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center hover:bg-blue-500 transition-all shrink-0"
+                                                >
+                                                    <ArrowRight className="w-3.5 h-3.5" />
+                                                </button>
+                                            </form>
+                                        )}
                                     </div>
                                 )}
                             </section>
@@ -2223,7 +2235,7 @@ export default function LiveInterviewPage() {
                                     {coachGenerating && <Loader2 className="w-2.5 h-2.5 text-blue-400 animate-spin" />}
                                 </div>
                                 <p className="text-[10px] font-bold text-white/80 leading-snug italic border-l-2 border-blue-500/40 pl-2">
-                                    {suggestedQuestion ? suggestedQuestion.question : "Transkripte göre AI öneri üretir. 'Derinleş' ile anlık soru talep edin."}
+                                    {suggestedQuestion ? suggestedQuestion.question : "Transkript otomatik takip ediyor — siz sesli sorun, sistem kaydeder. 'Derinleş' ile anlık öneri alın."}
                                 </p>
                                 {suggestedQuestion && (
                                     <div className="flex gap-1.5 mt-2">
