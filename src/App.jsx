@@ -21,6 +21,7 @@ import InterviewManagementPage from './pages/InterviewManagementPage';
 import LiveInterviewPage from './pages/LiveInterviewPage';
 import InterviewReportPage from './pages/InterviewReportPage';
 import CandidateExitPage from './pages/CandidateExitPage';
+import ApplyPage from './pages/ApplyPage';
 
 export default function App() {
   return (
@@ -34,6 +35,7 @@ export default function App() {
                 <Route path="/join/:sessionId" element={<LiveInterviewPage />} />
                 <Route path="/interview-report/:sessionId" element={<InterviewReportPage />} />
                 <Route path="/exit" element={<CandidateExitPage />} />
+                <Route path="/apply/:positionId" element={<ApplyPage />} />
                 <Route path="/*" element={<AuthenticatedApp />} />
               </Routes>
             </MessageQueueProvider>

@@ -1,7 +1,7 @@
 // src/pages/PositionsPage.jsx
 // Command Table layout — with redesigned Create / Detail / Edit screens
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import Header from '../components/Header';
 import { usePositions } from '../context/PositionsContext';
 import { useAuth } from '../context/AuthContext';
@@ -10,8 +10,12 @@ import { db } from '../config/firebase';
 import {
     Briefcase, Plus, Trash2, CheckCircle2, XCircle, Users, Clock,
     Search, Sparkles, Loader2, Cpu, ArrowUpRight, Building2,
-    AlertCircle, Unlock, Edit2, X, Send,
+    AlertCircle, Unlock, Edit2, X, Send, Link2, Copy, Check,
+    ExternalLink, FileText, ChevronRight, TrendingUp,
 } from 'lucide-react';
+import {
+    subscribeToApplications, getSourceColor, APP_STATUS_CONFIG, updateApplicationStatus
+} from '../services/applicationService';
 
 import PotentialCandidatesTab from '../components/PotentialCandidatesTab';
 import CandidateDrawer from '../components/CandidateDrawer';
@@ -29,12 +33,48 @@ const STATUS_CONFIG = {
 // ─────────────────────────────────────────────────────────────
 // DETAIL DRAWER
 // ─────────────────────────────────────────────────────────────
+const APPLY_SOURCES = ['LinkedIn', 'Kariyer.net', 'Instagram', 'Twitter/X', 'Facebook', 'E-posta', 'Web'];
+
 function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onToggleStatus, onDelete, isRecruiterOrAdmin, releaseLoading, releasingPosId, onCandidateClick }) {
     const sc = STATUS_CONFIG[pos.status] || STATUS_CONFIG.closed;
     const candidateCount = candidates.filter(c =>
         c.position === pos.title || c.matchedPositionTitle === pos.title || c.bestTitle === pos.title
     ).length;
     const openDays = pos.createdAt ? Math.floor((Date.now() - pos.createdAt.toDate?.()?.getTime?.()) / 86400000) : null;
+
+    const [activeTab, setActiveTab] = useState('detail');
+    const [applications, setApplications] = useState([]);
+    const [appsLoading, setAppsLoading] = useState(false);
+    const [linkSource, setLinkSource] = useState('LinkedIn');
+    const [copied, setCopied] = useState(false);
+
+    // Build the apply URL
+    const baseUrl = typeof window !== 'undefined' ? `${window.location.origin}/apply/${pos.id}` : `/apply/${pos.id}`;
+    const applyUrl = `${baseUrl}?ref=${encodeURIComponent(linkSource.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`;
+
+    // Load applications when tab opens
+    useEffect(() => {
+        if (activeTab !== 'applications') return;
+        setAppsLoading(true);
+        const unsub = subscribeToApplications(pos.id, (apps) => {
+            setApplications(apps);
+            setAppsLoading(false);
+        });
+        return () => unsub();
+    }, [activeTab, pos.id]);
+
+    function copyLink() {
+        navigator.clipboard.writeText(applyUrl).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        });
+    }
+
+    const TABS = [
+        { id: 'detail', label: 'Detay' },
+        { id: 'applications', label: 'Başvurular', badge: applications.length || null },
+        { id: 'link', label: 'Başvuru Linki' },
+    ];
 
     return (
         <>
@@ -77,86 +117,256 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                         <Building2 size={12} className="text-slate-400" />
                         <span className="text-[12px] text-slate-500">{pos.department}</span>
                     </div>
+
+                    {/* Tabs */}
+                    <div className="flex gap-1 mt-4 bg-slate-100 rounded-xl p-1">
+                        {TABS.map(t => (
+                            <button
+                                key={t.id}
+                                onClick={() => setActiveTab(t.id)}
+                                className={`flex-1 py-2 rounded-lg text-[11px] font-black transition-all flex items-center justify-center gap-1.5 ${activeTab === t.id ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                            >
+                                {t.label}
+                                {t.badge ? (
+                                    <span className="bg-violet-500 text-white text-[9px] font-black rounded-full px-1.5 py-0.5 leading-none">{t.badge}</span>
+                                ) : null}
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
-                {/* Body */}
-                <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
-
-                    {/* Stats */}
-                    <div className="grid grid-cols-3 gap-3">
-                        <div className="bg-slate-50 rounded-2xl border border-slate-100 p-4 text-center">
-                            <div className="text-[24px] font-black text-slate-900 leading-none">{candidateCount}</div>
-                            <div className="text-[10px] text-slate-400 uppercase tracking-widest mt-1">Aday</div>
-                        </div>
-                        <div className="bg-slate-50 rounded-2xl border border-slate-100 p-4 text-center">
-                            <div className="text-[24px] font-black text-slate-900 leading-none">{pos.minExperience || 0} yıl+</div>
-                            <div className="text-[10px] text-slate-400 uppercase tracking-widest mt-1">Min. Tecrübe</div>
-                        </div>
-                        <div className="bg-slate-50 rounded-2xl border border-slate-100 p-4 text-center">
-                            <div className="text-[24px] font-black text-cyan-500 leading-none">{openDays !== null ? `${openDays}g` : '—'}</div>
-                            <div className="text-[10px] text-slate-400 uppercase tracking-widest mt-1">Açık Süre</div>
-                        </div>
-                    </div>
-
-                    {/* Requirements */}
-                    {pos.requirements?.length > 0 && (
-                        <div>
-                            <h3 className="text-[9px] font-black text-slate-400 tracking-widest uppercase mb-2">GEREKSİNİMLER</h3>
-                            <div className="flex flex-wrap gap-2">
-                                {pos.requirements.map(req => (
-                                    <span key={req} className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 text-xs font-semibold border border-slate-200">{req}</span>
-                                ))}
+                {/* ── TAB: DETAIL ── */}
+                {activeTab === 'detail' && (
+                    <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+                        {/* Stats */}
+                        <div className="grid grid-cols-3 gap-3">
+                            <div className="bg-slate-50 rounded-2xl border border-slate-100 p-4 text-center">
+                                <div className="text-[24px] font-black text-slate-900 leading-none">{candidateCount}</div>
+                                <div className="text-[10px] text-slate-400 uppercase tracking-widest mt-1">Aday</div>
+                            </div>
+                            <div className="bg-slate-50 rounded-2xl border border-slate-100 p-4 text-center">
+                                <div className="text-[24px] font-black text-slate-900 leading-none">{pos.minExperience || 0} yıl+</div>
+                                <div className="text-[10px] text-slate-400 uppercase tracking-widest mt-1">Min. Tecrübe</div>
+                            </div>
+                            <div className="bg-slate-50 rounded-2xl border border-slate-100 p-4 text-center">
+                                <div className="text-[24px] font-black text-cyan-500 leading-none">{openDays !== null ? `${openDays}g` : '—'}</div>
+                                <div className="text-[10px] text-slate-400 uppercase tracking-widest mt-1">Açık Süre</div>
                             </div>
                         </div>
-                    )}
 
-                    {/* Description */}
-                    {pos.description && (
-                        <div>
-                            <h3 className="text-[9px] font-black text-slate-400 tracking-widest uppercase mb-2">AÇIKLAMA</h3>
-                            <p className="text-sm text-slate-600 leading-relaxed">{pos.description}</p>
-                        </div>
-                    )}
+                        {/* Requirements */}
+                        {pos.requirements?.length > 0 && (
+                            <div>
+                                <h3 className="text-[9px] font-black text-slate-400 tracking-widest uppercase mb-2">GEREKSİNİMLER</h3>
+                                <div className="flex flex-wrap gap-2">
+                                    {pos.requirements.map(req => (
+                                        <span key={req} className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 text-xs font-semibold border border-slate-200">{req}</span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
-                    {/* Matched Candidates */}
-                    {pos.status === 'open' && (
-                        <div>
-                            <h3 className="text-[9px] font-black text-slate-400 tracking-widest uppercase mb-2">EŞLEŞEN ADAYLAR</h3>
-                            {pos.matchedCandidates?.length > 0 ? (
-                                <div className="space-y-2">
-                                    {pos.matchedCandidates.slice(0, 5).map((mc, idx) => {
-                                        const fullCandidate = candidates.find(c => c.id === mc.id);
-                                        const initials = mc.name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() || '??';
-                                        return (
-                                            <div
-                                                key={idx}
-                                                onClick={() => fullCandidate && onCandidateClick(fullCandidate)}
-                                                className="bg-white border border-slate-200 rounded-2xl p-3.5 flex items-center gap-3 hover:border-cyan-200 transition-colors cursor-pointer group"
-                                            >
-                                                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center text-white text-xs font-black shrink-0 shadow-sm">
-                                                    {initials}
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="text-[13px] font-bold text-slate-800 truncate">{mc.name}</div>
-                                                    <div className="text-[11px] text-slate-400">{mc.reason || 'Eşleşme'}</div>
-                                                </div>
-                                                <div className="flex flex-col items-end shrink-0">
-                                                    <div className="text-[14px] font-black text-cyan-500">{mc.score}%</div>
-                                                    <div className="h-0.5 w-12 bg-slate-100 rounded-full mt-1 overflow-hidden">
-                                                        <div className="h-full bg-cyan-400 rounded-full" style={{ width: `${mc.score}%` }} />
+                        {/* Description */}
+                        {pos.description && (
+                            <div>
+                                <h3 className="text-[9px] font-black text-slate-400 tracking-widest uppercase mb-2">AÇIKLAMA</h3>
+                                <p className="text-sm text-slate-600 leading-relaxed">{pos.description}</p>
+                            </div>
+                        )}
+
+                        {/* Matched Candidates */}
+                        {pos.status === 'open' && (
+                            <div>
+                                <h3 className="text-[9px] font-black text-slate-400 tracking-widest uppercase mb-2">EŞLEŞEN ADAYLAR</h3>
+                                {pos.matchedCandidates?.length > 0 ? (
+                                    <div className="space-y-2">
+                                        {pos.matchedCandidates.slice(0, 5).map((mc, idx) => {
+                                            const fullCandidate = candidates.find(c => c.id === mc.id);
+                                            const initials = mc.name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() || '??';
+                                            return (
+                                                <div
+                                                    key={idx}
+                                                    onClick={() => fullCandidate && onCandidateClick(fullCandidate)}
+                                                    className="bg-white border border-slate-200 rounded-2xl p-3.5 flex items-center gap-3 hover:border-cyan-200 transition-colors cursor-pointer group"
+                                                >
+                                                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center text-white text-xs font-black shrink-0 shadow-sm">
+                                                        {initials}
                                                     </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="text-[13px] font-bold text-slate-800 truncate">{mc.name}</div>
+                                                        <div className="text-[11px] text-slate-400">{mc.reason || 'Eşleşme'}</div>
+                                                    </div>
+                                                    <div className="flex flex-col items-end shrink-0">
+                                                        <div className="text-[14px] font-black text-cyan-500">{mc.score}%</div>
+                                                        <div className="h-0.5 w-12 bg-slate-100 rounded-full mt-1 overflow-hidden">
+                                                            <div className="h-full bg-cyan-400 rounded-full" style={{ width: `${mc.score}%` }} />
+                                                        </div>
+                                                    </div>
+                                                    <ArrowUpRight size={14} className="text-slate-300 group-hover:text-cyan-500 transition-colors ml-1 shrink-0" />
                                                 </div>
-                                                <ArrowUpRight size={14} className="text-slate-300 group-hover:text-cyan-500 transition-colors ml-1 shrink-0" />
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-slate-400 italic">Henüz eşleşen aday yok.</p>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* ── TAB: APPLICATIONS ── */}
+                {activeTab === 'applications' && (
+                    <div className="flex-1 overflow-y-auto px-6 py-5">
+                        {appsLoading ? (
+                            <div className="flex items-center justify-center h-40">
+                                <Loader2 className="w-6 h-6 text-violet-400 animate-spin" />
+                            </div>
+                        ) : applications.length === 0 ? (
+                            <div className="text-center py-16">
+                                <FileText className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+                                <p className="text-slate-400 text-sm font-semibold">Henüz başvuru yok</p>
+                                <p className="text-slate-300 text-xs mt-1">Başvuru linkinizi paylaşın</p>
+                                <button
+                                    onClick={() => setActiveTab('link')}
+                                    className="mt-4 px-4 py-2 rounded-xl bg-violet-50 border border-violet-200 text-violet-600 text-xs font-bold hover:bg-violet-100 transition-colors inline-flex items-center gap-1.5"
+                                >
+                                    <Link2 size={12} /> Başvuru Linki Oluştur
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {/* Summary row */}
+                                <div className="grid grid-cols-3 gap-2 mb-4">
+                                    {['new','shortlisted','rejected'].map(st => {
+                                        const count = applications.filter(a => a.status === st).length;
+                                        const cfg = APP_STATUS_CONFIG[st];
+                                        return (
+                                            <div key={st} className={`rounded-2xl border p-3 text-center ${cfg.pill}`}>
+                                                <div className="text-[22px] font-black leading-none">{count}</div>
+                                                <div className="text-[9px] font-black uppercase tracking-widest mt-1 opacity-70">{cfg.label}</div>
                                             </div>
                                         );
                                     })}
                                 </div>
-                            ) : (
-                                <p className="text-sm text-slate-400 italic">Henüz eşleşen aday yok.</p>
-                            )}
+
+                                {applications.map(app => {
+                                    const sc = getSourceColor(app.source);
+                                    const stCfg = APP_STATUS_CONFIG[app.status] || APP_STATUS_CONFIG.new;
+                                    const scoreColor = app.aiScore >= 75 ? 'text-emerald-500' : app.aiScore >= 50 ? 'text-amber-500' : 'text-red-400';
+                                    return (
+                                        <div key={app.id} className="bg-white border border-slate-200 rounded-2xl p-4 hover:border-violet-200 transition-colors">
+                                            <div className="flex items-start gap-3">
+                                                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-400 to-violet-600 flex items-center justify-center text-white text-xs font-black shrink-0">
+                                                    {app.name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() || '??'}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className="text-[13px] font-black text-slate-800 truncate">{app.name}</span>
+                                                        <span className={`inline-flex px-2 py-0.5 rounded-full border text-[9px] font-black ${sc.bg} ${sc.text} ${sc.border}`}>{app.source}</span>
+                                                    </div>
+                                                    <div className="text-[11px] text-slate-400 truncate">{app.email}</div>
+                                                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                                        <span className={`inline-flex px-2.5 py-0.5 rounded-full border text-[9px] font-black ${stCfg.pill}`}>{stCfg.label}</span>
+                                                        {app.cvFileName && (
+                                                            <span className="inline-flex items-center gap-1 text-[10px] text-slate-400">
+                                                                <FileText size={10} />{app.cvFileName}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="shrink-0 text-right">
+                                                    <div className={`text-[18px] font-black leading-none ${scoreColor}`}>{app.aiScore || 0}%</div>
+                                                    <div className="text-[8px] text-slate-300 uppercase tracking-widest mt-0.5">AI Uyum</div>
+                                                    <div className="h-1 w-12 bg-slate-100 rounded-full mt-1 overflow-hidden">
+                                                        <div className={`h-full rounded-full ${app.aiScore >= 75 ? 'bg-emerald-400' : app.aiScore >= 50 ? 'bg-amber-400' : 'bg-red-400'}`} style={{ width: `${app.aiScore || 0}%` }} />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {/* Status changer */}
+                                            <div className="flex gap-1.5 mt-3 pt-3 border-t border-slate-100">
+                                                {Object.entries(APP_STATUS_CONFIG).map(([st, cfg]) => (
+                                                    <button
+                                                        key={st}
+                                                        onClick={() => updateApplicationStatus(app.id, st)}
+                                                        className={`flex-1 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wide border transition-all ${app.status === st ? cfg.pill : 'bg-slate-50 text-slate-300 border-slate-100 hover:border-slate-200'}`}
+                                                    >
+                                                        {cfg.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* ── TAB: APPLY LINK ── */}
+                {activeTab === 'link' && (
+                    <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+                        <div>
+                            <h3 className="text-[9px] font-black text-slate-400 tracking-widest uppercase mb-1">BAŞVURU LİNKİ</h3>
+                            <p className="text-[11px] text-slate-400 leading-relaxed">
+                                Aşağıdaki linki LinkedIn, e-posta veya istediğiniz platformda paylaşın. Kaynağı seçin — sistem hangi kanaldan geldiğini otomatik kaydeder.
+                            </p>
                         </div>
-                    )}
-                </div>
+
+                        {/* Source selector */}
+                        <div>
+                            <div className="text-[9px] font-black text-slate-400 tracking-widest uppercase mb-2">PAYLAŞIM KANALI</div>
+                            <div className="flex flex-wrap gap-2">
+                                {APPLY_SOURCES.map(s => (
+                                    <button
+                                        key={s}
+                                        onClick={() => setLinkSource(s)}
+                                        className={`px-3 py-1.5 rounded-xl border text-[11px] font-bold transition-all ${linkSource === s ? 'bg-violet-500 text-white border-violet-500' : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-violet-300'}`}
+                                    >
+                                        {s}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Link box */}
+                        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                            <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">OLUŞTURULAN LİNK</div>
+                            <div className="flex items-center gap-2">
+                                <div className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-[11px] font-mono text-slate-600 break-all leading-relaxed">
+                                    {applyUrl}
+                                </div>
+                                <button
+                                    onClick={copyLink}
+                                    className={`shrink-0 p-2.5 rounded-xl border transition-all ${copied ? 'bg-emerald-50 border-emerald-200 text-emerald-500' : 'bg-white border-slate-200 text-slate-400 hover:border-violet-300 hover:text-violet-500'}`}
+                                >
+                                    {copied ? <Check size={16} /> : <Copy size={16} />}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Preview button */}
+                        <a
+                            href={applyUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-center gap-2 w-full py-3 rounded-xl border border-violet-200 text-violet-600 font-bold text-xs hover:bg-violet-50 transition-colors"
+                        >
+                            <ExternalLink size={13} /> Başvuru Formunu Önizle
+                        </a>
+
+                        {/* Tip */}
+                        <div className="bg-violet-50 border border-violet-100 rounded-2xl p-4">
+                            <div className="text-[9px] font-black text-violet-500 uppercase tracking-widest mb-2">NASIL KULLANILIR?</div>
+                            <ul className="space-y-1.5 text-[11px] text-slate-500 leading-relaxed">
+                                <li className="flex items-start gap-2"><ChevronRight size={10} className="text-violet-400 mt-0.5 shrink-0" />LinkedIn iş ilanına "Başvur" butonu olarak ekleyin</li>
+                                <li className="flex items-start gap-2"><ChevronRight size={10} className="text-violet-400 mt-0.5 shrink-0" />E-posta imzanıza veya kampanyaya hyperlink ekleyin</li>
+                                <li className="flex items-start gap-2"><ChevronRight size={10} className="text-violet-400 mt-0.5 shrink-0" />Her platform için ayrı kaynak seçin — istatistikler ayrı tutulur</li>
+                                <li className="flex items-start gap-2"><ChevronRight size={10} className="text-violet-400 mt-0.5 shrink-0" />Gelen başvurular "Başvurular" sekmesinde AI skoru ile görünür</li>
+                            </ul>
+                        </div>
+                    </div>
+                )}
 
                 {/* Footer */}
                 <div className="px-6 py-4 border-t border-slate-100 shrink-0 bg-slate-50">
