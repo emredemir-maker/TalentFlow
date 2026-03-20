@@ -1,7 +1,7 @@
 // src/pages/ApplyPage.jsx — Public job application page (no auth required)
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { doc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, collection, addDoc, getDocs, query, where, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { signInAnonymously } from 'firebase/auth';
 import { db, auth } from '../config/firebase';
 import { extractTextFromFile } from '../services/cvParser';
@@ -223,42 +223,84 @@ export default function ApplyPage() {
             const appRef = await addDoc(collection(db, APPLICATIONS_COLLECTION), appData);
 
             // Also create a candidate entry so it appears in the HR dashboard
-            const candidateData = {
-                name: form.name.trim(),
-                email: form.email.trim().toLowerCase(),
-                phone: form.phone.trim(),
-                linkedinUrl: form.linkedin?.trim() || '',
-                position: position.title || '',
-                company: parsedCandidate?.company || '',
-                location: parsedCandidate?.location || '',
-                skills: parsedCandidate?.skills || [],
-                experience: parsedCandidate?.experience || 0,
-                education: parsedCandidate?.education || '',
-                summary: parsedCandidate?.summary || '',
-                cvData: parsedCandidate?.cvData || '',
-                cvText: cvText ? cvText.slice(0, 6000) : '',
-                cvFileName: cvFile.name,
-                source,
-                status: 'new',
-                matchScore: score,
-                combinedScore: score,
-                aiAnalysis: score > 0 ? { score, summary: parsedCandidate?.summary || '' } : null,
-                applicationId: appRef.id,
-                positionId: position.id,
-                appliedDate: new Date().toISOString().split('T')[0],
-                interviewSessions: [],
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp(),
-            };
+            // First: check for duplicates by email or phone
+            const emailNorm = form.email.trim().toLowerCase();
+            const phoneNorm = form.phone.trim();
+            let existingCandidateId = null;
             try {
-                await addDoc(collection(db, CANDIDATES_COLLECTION), candidateData);
-            } catch (candErr) {
-                // Candidate save failing shouldn't block the application confirmation
-                console.warn('Candidate creation failed (rules not deployed?):', candErr.message);
+                const emailQuery = await getDocs(
+                    query(collection(db, CANDIDATES_COLLECTION), where('email', '==', emailNorm))
+                );
+                if (!emailQuery.empty) {
+                    existingCandidateId = emailQuery.docs[0].id;
+                } else if (phoneNorm) {
+                    const phoneQuery = await getDocs(
+                        query(collection(db, CANDIDATES_COLLECTION), where('phone', '==', phoneNorm))
+                    );
+                    if (!phoneQuery.empty) {
+                        existingCandidateId = phoneQuery.docs[0].id;
+                    }
+                }
+            } catch (dupErr) {
+                console.warn('Duplicate check failed (non-blocking):', dupErr.message);
             }
 
-            setAiScore(score);
-            setStep('success');
+            if (existingCandidateId) {
+                // Duplicate found — link new application to existing candidate record
+                try {
+                    await updateDoc(doc(db, CANDIDATES_COLLECTION, existingCandidateId), {
+                        applicationId: appRef.id,
+                        positionId: position.id,
+                        position: position.title || '',
+                        appliedDate: new Date().toISOString().split('T')[0],
+                        matchScore: score,
+                        combinedScore: score,
+                        status: 'new',
+                        updatedAt: serverTimestamp(),
+                    });
+                } catch (updErr) {
+                    console.warn('Existing candidate update failed:', updErr.message);
+                }
+                setAiScore(score);
+                setStep('duplicate');
+            } else {
+                // Brand-new candidate
+                const candidateData = {
+                    name: form.name.trim(),
+                    email: emailNorm,
+                    phone: phoneNorm,
+                    linkedinUrl: form.linkedin?.trim() || '',
+                    position: position.title || '',
+                    company: parsedCandidate?.company || '',
+                    location: parsedCandidate?.location || '',
+                    skills: parsedCandidate?.skills || [],
+                    experience: parsedCandidate?.experience || 0,
+                    education: parsedCandidate?.education || '',
+                    summary: parsedCandidate?.summary || '',
+                    cvData: parsedCandidate?.cvData || '',
+                    cvText: cvText ? cvText.slice(0, 6000) : '',
+                    cvFileName: cvFile.name,
+                    source,
+                    status: 'new',
+                    matchScore: score,
+                    combinedScore: score,
+                    aiAnalysis: score > 0 ? { score, summary: parsedCandidate?.summary || '' } : null,
+                    applicationId: appRef.id,
+                    positionId: position.id,
+                    appliedDate: new Date().toISOString().split('T')[0],
+                    interviewSessions: [],
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp(),
+                };
+                try {
+                    await addDoc(collection(db, CANDIDATES_COLLECTION), candidateData);
+                } catch (candErr) {
+                    console.warn('Candidate creation failed (rules not deployed?):', candErr.message);
+                }
+                setAiScore(score);
+                setStep('success');
+            }
+            return; // avoid double setStep below
         } catch (err) {
             console.error('Application submit error:', err);
             setSubmitError(err.message || 'Bir hata oluştu.');
@@ -331,6 +373,33 @@ export default function ApplyPage() {
                             <div className="flex gap-2"><span className="text-slate-300 w-16 shrink-0">Kaynak</span><span className="font-bold text-slate-700">{source}</span></div>
                         </div>
                     </div>
+                </div>
+            </div>
+        );
+    }
+
+    // ── Duplicate Candidate ──
+    if (step === 'duplicate') {
+        return (
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+                <div className="bg-white rounded-2xl shadow-lg p-10 max-w-sm w-full text-center border border-slate-100">
+                    <div className="w-16 h-16 rounded-full bg-amber-50 flex items-center justify-center mx-auto mb-5">
+                        <User className="w-8 h-8 text-amber-500" />
+                    </div>
+                    <div className="text-[10px] font-black text-amber-500 tracking-widest uppercase mb-1">Zaten Kayıtlısınız</div>
+                    <h2 className="text-xl font-black text-slate-800 mb-2">Profil Güncellendi</h2>
+                    <p className="text-slate-400 text-sm mb-6">
+                        Bu e-posta veya telefon numarası sistemimizde kayıtlı. Başvurunuz mevcut profilinize bağlandı ve yeni pozisyon eklendi.
+                    </p>
+                    <div className="bg-amber-50 rounded-xl p-4 text-left border border-amber-100 text-[11px] mb-4">
+                        <div className="font-black uppercase tracking-widest text-amber-600 mb-2">Başvuru Bilgileri</div>
+                        <div className="space-y-1">
+                            <div className="flex gap-2"><span className="text-amber-400 w-20 shrink-0">Ad</span><span className="font-bold text-slate-700 truncate">{form.name}</span></div>
+                            <div className="flex gap-2"><span className="text-amber-400 w-20 shrink-0">E-posta</span><span className="font-bold text-slate-700 truncate">{form.email}</span></div>
+                            <div className="flex gap-2"><span className="text-amber-400 w-20 shrink-0">Pozisyon</span><span className="font-bold text-slate-700 truncate">{position?.title}</span></div>
+                        </div>
+                    </div>
+                    <p className="text-slate-400 text-xs">Ekibimiz başvurunuzu inceleyerek size dönüş yapacak.</p>
                 </div>
             </div>
         );

@@ -9,7 +9,7 @@ import {
     AlertCircle, Trophy, Calendar, Edit3,
     CheckCircle2, Link2, ExternalLink, Video, Play, Award, User, Mail,
     ChevronRight, BarChart2, MessageSquare, XCircle, Send, Loader2,
-    Sparkles
+    Sparkles, Trash2
 } from 'lucide-react';
 
 const STATUS_CONFIG = {
@@ -22,7 +22,7 @@ const getStatusCfg = (s) => STATUS_CONFIG[s] || STATUS_CONFIG.scheduled;
 
 export default function CandidateProcessPage() {
     const navigate = useNavigate();
-    const { enrichedCandidates, viewCandidateId, setViewCandidateId, sourceColors, setPreselectedInterviewData, updateCandidate } = useCandidates();
+    const { enrichedCandidates, viewCandidateId, setViewCandidateId, sourceColors, setPreselectedInterviewData, updateCandidate, deleteCandidate } = useCandidates();
     const { user } = useAuth();
     const candidates = enrichedCandidates || [];
     const [searchQuery, setSearchQuery]   = useState('');
@@ -39,6 +39,7 @@ export default function CandidateProcessPage() {
     const [rejectModal, setRejectModal]   = useState(false);
     const [rejectReason, setRejectReason] = useState('');
     const [finalModal, setFinalModal]     = useState(false);
+    const [deleteModal, setDeleteModal]   = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
     const [actionSuccess, setActionSuccess] = useState(null); // 'comment' | 'reject' | 'final'
 
@@ -96,6 +97,24 @@ export default function CandidateProcessPage() {
             });
             setFinalModal(false);
             showSuccess('final');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleDelete = async () => {
+        if (!candidate) return;
+        setActionLoading(true);
+        try {
+            await deleteCandidate(candidate.id);
+            setDeleteModal(false);
+            // Navigate to first remaining candidate or back to list
+            const remaining = candidates.filter(c => c.id !== candidate.id);
+            if (remaining.length > 0) {
+                setViewCandidateId(remaining[0].id);
+            } else {
+                navigate('/candidates');
+            }
         } finally {
             setActionLoading(false);
         }
@@ -843,6 +862,13 @@ export default function CandidateProcessPage() {
                                     >
                                         {candidate?.status === 'rejected' ? 'Reddedildi' : 'Ret'}
                                     </button>
+                                    <button
+                                        onClick={() => setDeleteModal(true)}
+                                        className="h-8 w-8 flex items-center justify-center rounded-lg text-slate-400 border border-slate-200 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-all"
+                                        title="Adayı Sil"
+                                    >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
                                 </div>
                                 <button
                                     onClick={() => setFinalModal(true)}
@@ -1009,6 +1035,45 @@ export default function CandidateProcessPage() {
                                 >
                                     {actionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArrowRight className="w-3.5 h-3.5" />}
                                     Onayla ve Taşı
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── SİL MODALI ───────────────────────────────────────────────── */}
+            {deleteModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm animate-in zoom-in-95 duration-200">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                            <div className="flex items-center gap-2">
+                                <Trash2 className="w-4 h-4 text-red-500" />
+                                <h3 className="text-[13px] font-black text-slate-800">Adayı Sil</h3>
+                            </div>
+                            <button onClick={() => setDeleteModal(false)} className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-50">
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+                        <div className="px-6 py-5 space-y-4">
+                            <div className="bg-red-50 border border-red-100 rounded-xl p-4 text-center">
+                                <div className="w-12 h-12 rounded-2xl bg-red-100 border border-red-200 flex items-center justify-center mx-auto mb-3">
+                                    <Trash2 className="w-6 h-6 text-red-500" />
+                                </div>
+                                <p className="text-[12px] font-black text-red-800 mb-1">{candidate?.name}</p>
+                                <p className="text-[11px] text-red-700 leading-relaxed">
+                                    Bu adayı kalıcı olarak silmek istediğinizi onaylıyor musunuz? Bu işlem geri alınamaz.
+                                </p>
+                            </div>
+                            <div className="flex gap-2 justify-end">
+                                <button onClick={() => setDeleteModal(false)} className="h-9 px-4 rounded-xl text-[10px] font-black text-slate-500 border border-slate-200 hover:bg-slate-50 transition-all">İptal</button>
+                                <button
+                                    onClick={handleDelete}
+                                    disabled={actionLoading}
+                                    className="h-9 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white shadow-sm transition-all disabled:opacity-60"
+                                >
+                                    {actionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                                    Evet, Sil
                                 </button>
                             </div>
                         </div>
