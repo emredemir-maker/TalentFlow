@@ -17,34 +17,154 @@ const TECH_GROUPS = {
 /**
  * HIGH-LEVEL JOB DOMAIN MAP
  * Used to prevent cross-domain false matches (e.g. Sales CV vs Dev Position).
- * Keywords are intentionally broader to avoid missing edge cases.
- * Order matters: first match wins.
+ * Detection uses COUNT-BASED scoring: the domain with the most keyword hits wins.
+ * This prevents a single generic word (e.g. "crm") from hijacking the result.
  */
 const JOB_DOMAINS = [
-    { id: 'sales',       label: 'Satış',           keywords: ['satış', 'sales', 'account manager', 'business development', 'iş geliştirme', 'ticari', 'commercial', 'müşteri temsilci', 'satış müdür', 'satış uzman', 'revenue', 'quota', 'crm', 'müşteri yönetimi', 'channel'] },
-    { id: 'marketing',   label: 'Pazarlama',        keywords: ['pazarlama', 'marketing', 'marka', 'brand', 'dijital pazarlama', 'digital marketing', 'seo', 'sem', 'kampanya', 'campaign', 'growth', 'acquisition', 'retention'] },
-    { id: 'design',      label: 'Tasarım',          keywords: ['tasarımcı', 'designer', 'ui/ux', 'ux designer', 'ui designer', 'product design', 'grafik', 'graphic', 'motion', 'figma', 'sketch', 'adobe xd', 'creative director'] },
-    { id: 'data',        label: 'Veri / Analitik',  keywords: ['data scientist', 'data engineer', 'data analyst', 'makine öğrenmesi', 'machine learning', 'yapay zeka uzman', 'bi analyst', 'business intelligence', 'nlp', 'deep learning', 'model training'] },
-    { id: 'engineering', label: 'Yazılım',          keywords: ['yazılım geliştirici', 'developer', 'software engineer', 'backend', 'frontend', 'full stack', 'fullstack', 'devops', 'cloud engineer', 'mühendis', 'programcı', 'geliştirici', 'sre', 'platform engineer', 'mobile developer', 'ios developer', 'android developer', 'yazılım mühendisi'] },
-    { id: 'hr',          label: 'İnsan Kaynakları', keywords: ['insan kaynakları', 'hr', 'recruitment', 'recruiter', 'işe alım', 'organizasyon gelişim', 'human resources', 'ik uzman', 'ik müdür', 'talent acquisition', 'performans yönetimi'] },
-    { id: 'finance',     label: 'Finans / Muhasebe',keywords: ['finans', 'finance', 'muhasebe', 'accountant', 'accounting', 'mali', 'treasury', 'bütçe', 'budget', 'cfo', 'controller', 'denetim', 'audit'] },
-    { id: 'operations',  label: 'Operasyon',        keywords: ['operasyon', 'operations', 'supply chain', 'lojistik', 'logistics', 'tedarik zinciri', 'procurement', 'satın alma', 'depo', 'warehouse', 'fulfillment'] },
-    { id: 'support',     label: 'Müşteri Hizmetleri',keywords: ['müşteri hizmet', 'customer service', 'destek', 'support specialist', 'help desk', 'teknik destek', 'technical support', 'call center', 'çağrı merkezi'] },
-    { id: 'legal',       label: 'Hukuk',            keywords: ['hukuk', 'legal', 'avukat', 'lawyer', 'counsel', 'compliance', 'uyum', 'sözleşme', 'contract'] },
-    { id: 'management',  label: 'Yönetim',          keywords: ['genel müdür', 'ceo', 'coo', 'cto', 'direktör', 'director', 'vp', 'vice president', 'country manager', 'general manager', 'c-level'] },
+    {
+        id: 'engineering', label: 'Yazılım',
+        // Role titles + strong tech signals — very unlikely in other domains
+        keywords: [
+            'software developer', 'software engineer', 'yazılım geliştirici', 'yazılım mühendisi',
+            'frontend developer', 'backend developer', 'full stack developer', 'fullstack developer',
+            'mobile developer', 'ios developer', 'android developer', 'flutter developer',
+            'devops engineer', 'platform engineer', 'cloud engineer', 'sre',
+            'react developer', 'node developer', 'java developer', 'python developer',
+            'developer', 'geliştirici', 'programcı',
+            'react', 'vue', 'angular', 'typescript', 'javascript', 'node.js', 'nodejs',
+            'python', 'java', 'kotlin', 'swift', 'go lang', 'golang', 'rust',
+            'spring boot', 'django', 'fastapi', 'express',
+            'docker', 'kubernetes', 'terraform', 'ci/cd', 'jenkins',
+            'postgresql', 'mongodb', 'redis', 'kafka', 'rabbitmq',
+            'rest api', 'graphql', 'microservices', 'api development',
+            'yazılım', 'software', 'coding', 'programming',
+        ],
+    },
+    {
+        id: 'data', label: 'Veri / Analitik',
+        keywords: [
+            'data scientist', 'data engineer', 'data analyst', 'veri bilimci', 'veri mühendisi',
+            'machine learning engineer', 'ml engineer', 'ai engineer',
+            'makine öğrenmesi', 'machine learning', 'deep learning', 'nlp',
+            'business intelligence', 'bi analyst', 'bi developer',
+            'model training', 'neural network', 'tensorflow', 'pytorch',
+            'pandas', 'numpy', 'spark', 'hadoop', 'airflow', 'dbt',
+            'tableau', 'power bi', 'looker', 'veri analizi', 'data analysis',
+        ],
+    },
+    {
+        id: 'design', label: 'Tasarım',
+        keywords: [
+            'ui designer', 'ux designer', 'product designer', 'ui/ux designer',
+            'graphic designer', 'motion designer', 'creative director', 'art director',
+            'tasarımcı', 'grafik tasarım', 'görsel tasarım',
+            'figma', 'sketch', 'adobe xd', 'invision', 'zeplin',
+            'illustrator', 'photoshop', 'after effects', 'indesign',
+            'branding', 'typography', 'visual identity',
+        ],
+    },
+    {
+        id: 'sales', label: 'Satış',
+        // Role-specific signals only — removed generic words like 'crm', 'channel', 'revenue'
+        keywords: [
+            'satış temsilcisi', 'satış uzmanı', 'satış müdürü', 'satış direktörü',
+            'sales representative', 'sales executive', 'sales manager', 'sales director',
+            'account manager', 'account executive', 'key account',
+            'business development manager', 'iş geliştirme müdürü',
+            'müşteri temsilcisi', 'ticari müdür',
+            'satış hedef', 'satış kotası', 'quota', 'satış bölge',
+            'b2b satış', 'b2c satış', 'kurumsal satış',
+        ],
+    },
+    {
+        id: 'marketing', label: 'Pazarlama',
+        keywords: [
+            'pazarlama uzmanı', 'pazarlama müdürü', 'dijital pazarlama uzmanı',
+            'marketing manager', 'digital marketing manager', 'marketing specialist',
+            'marka yöneticisi', 'brand manager',
+            'seo uzmanı', 'sem uzmanı', 'performance marketing',
+            'growth hacker', 'growth marketer', 'content marketing',
+            'sosyal medya uzmanı', 'social media manager',
+            'kampanya yönetimi', 'email marketing',
+        ],
+    },
+    {
+        id: 'hr', label: 'İnsan Kaynakları',
+        keywords: [
+            'insan kaynakları uzmanı', 'ik uzmanı', 'ik müdürü',
+            'human resources manager', 'hr manager', 'hr specialist', 'hr business partner',
+            'recruiter', 'talent acquisition', 'işe alım uzmanı', 'işe alım müdürü',
+            'organizasyon gelişim', 'od specialist', 'performans yönetimi',
+            'eğitim ve gelişim', 'learning & development',
+        ],
+    },
+    {
+        id: 'finance', label: 'Finans / Muhasebe',
+        keywords: [
+            'finansal analist', 'finans müdürü', 'mali müşavir',
+            'financial analyst', 'finance manager', 'cfo', 'controller',
+            'muhasebe uzmanı', 'muhasebe müdürü', 'accountant', 'accounting manager',
+            'denetçi', 'auditor', 'vergi uzmanı', 'tax specialist',
+            'bütçe planlama', 'budget planning', 'treasury manager', 'hazine',
+        ],
+    },
+    {
+        id: 'operations', label: 'Operasyon',
+        keywords: [
+            'operasyon müdürü', 'operasyon uzmanı', 'operations manager',
+            'supply chain manager', 'tedarik zinciri', 'lojistik müdürü', 'logistics manager',
+            'depo müdürü', 'warehouse manager', 'fulfillment',
+            'satın alma uzmanı', 'procurement specialist', 'purchasing manager',
+        ],
+    },
+    {
+        id: 'support', label: 'Müşteri Hizmetleri',
+        keywords: [
+            'müşteri hizmetleri uzmanı', 'customer service specialist', 'customer success',
+            'teknik destek uzmanı', 'technical support specialist', 'help desk',
+            'çağrı merkezi uzmanı', 'call center agent', 'support specialist',
+        ],
+    },
+    {
+        id: 'legal', label: 'Hukuk',
+        keywords: [
+            'avukat', 'hukuk müşaviri', 'lawyer', 'attorney', 'legal counsel',
+            'compliance officer', 'uyum uzmanı', 'hukuk uzmanı',
+            'sözleşme yönetimi', 'contract management', 'gdpr', 'kvkk',
+        ],
+    },
+    {
+        id: 'management', label: 'Yönetim',
+        keywords: [
+            'genel müdür', 'general manager', 'ceo', 'coo', 'cto',
+            'direktör', 'director', 'vp', 'vice president',
+            'country manager', 'c-level', 'board member', 'yönetim kurulu',
+        ],
+    },
 ];
 
 /**
  * Detect the primary job domain from any freeform text.
- * Returns a domain id string, or 'general' if nothing matches.
+ * Uses COUNT-BASED scoring: counts keyword hits per domain and returns
+ * the domain with the most matches. Falls back to 'general' if no hits.
+ * This prevents a single incidental keyword from misclassifying a profile.
  */
 export function detectJobDomain(text) {
     if (!text) return 'general';
     const lower = text.toLowerCase();
+
+    let bestDomain = 'general';
+    let bestCount = 0;
+
     for (const domain of JOB_DOMAINS) {
-        if (domain.keywords.some(kw => lower.includes(kw))) return domain.id;
+        const count = domain.keywords.reduce((acc, kw) => acc + (lower.includes(kw) ? 1 : 0), 0);
+        if (count > bestCount) {
+            bestCount = count;
+            bestDomain = domain.id;
+        }
     }
-    return 'general';
+
+    return bestDomain;
 }
 
 /**
