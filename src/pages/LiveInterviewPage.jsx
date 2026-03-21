@@ -2190,8 +2190,8 @@ export default function LiveInterviewPage() {
                         {/* RIGHT COLUMN: VIDEO + AI COACH + ANALYTICS (42%) */}
                         <div className="flex-[0_0_42%] min-w-0 flex flex-col gap-2 overflow-hidden h-full">
 
-                            {/* COMPACT VIDEO */}
-                            <div className="bg-[#07090F] rounded-2xl relative overflow-hidden border border-white/10 shadow-2xl shrink-0" style={{ height: '260px' }}>
+                            {/* COMPACT VIDEO — flex-1 so it expands to fill available vertical space */}
+                            <div className="bg-[#07090F] rounded-2xl relative overflow-hidden border border-white/10 shadow-2xl flex-1 min-h-[220px]">
                                 {remoteStream ? (
                                     <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
                                 ) : stream ? (
@@ -2288,7 +2288,7 @@ export default function LiveInterviewPage() {
                             </section>
 
                             {/* ANALYTICS */}
-                            <section className="bg-[#0F172A] rounded-2xl p-3 border border-white/5 shadow-xl flex-1 overflow-y-auto flex flex-col gap-2.5">
+                            <section className="bg-[#0F172A] rounded-2xl p-3 border border-white/5 shadow-xl shrink-0 overflow-y-auto flex flex-col gap-2.5">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-1.5">
                                         <Sparkles className="w-3 h-3 text-blue-400" />
