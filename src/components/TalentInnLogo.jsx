@@ -5,8 +5,8 @@
  *  iconSize   : number  — icon square size in px (default 40)
  *  showText   : bool    — show "Talent-Inn" wordmark (default true)
  *  showSub    : bool    — show subtitle text (default false)
- *  subtitle   : string  — subtitle text (default 'AI-Powered HR Platform')
- *  textSize   : string  — CSS font-size for wordmark (default '18px')
+ *  subtitle   : string  — subtitle text
+ *  textSize   : string  — CSS font-size for wordmark, e.g. '18px'
  *  horizontal : bool    — icon + text side by side (default true)
  *  className  : string  — wrapper class
  */
@@ -32,23 +32,33 @@ export default function TalentInnLogo({
             <TIIconMark size={iconSize} />
 
             {showText && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <div style={{ display: 'flex', alignItems: 'baseline', lineHeight: 1 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                    {/* Metallic wordmark — CSS gradient text */}
+                    <div style={{ display: 'flex', alignItems: 'baseline', lineHeight: 1, gap: 0 }}>
                         <span style={{
-                            fontWeight: 900,
+                            fontFamily: "'Inter', system-ui, sans-serif",
+                            fontWeight: 800,
                             fontSize: textSize,
                             letterSpacing: '-0.03em',
-                            color: '#38BDF8',
-                            fontFamily: "'Inter', system-ui, sans-serif",
+                            background: 'linear-gradient(180deg, #C8E8F8 0%, #5BB8E0 40%, #2B7BAA 100%)',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            backgroundClip: 'text',
+                            lineHeight: 1.1,
                         }}>Talent-</span>
                         <span style={{
-                            fontWeight: 900,
+                            fontFamily: "'Inter', system-ui, sans-serif",
+                            fontWeight: 800,
                             fontSize: textSize,
                             letterSpacing: '-0.03em',
-                            color: '#F59E0B',
-                            fontFamily: "'Inter', system-ui, sans-serif",
+                            background: 'linear-gradient(180deg, #F9E0A0 0%, #D4982A 40%, #8A5E10 100%)',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            backgroundClip: 'text',
+                            lineHeight: 1.1,
                         }}>Inn</span>
                     </div>
+
                     {showSub && (
                         <span style={{
                             fontSize: '9px',
@@ -57,6 +67,7 @@ export default function TalentInnLogo({
                             textTransform: 'uppercase',
                             color: '#64748B',
                             fontFamily: "'Inter', system-ui, sans-serif",
+                            marginTop: '2px',
                         }}>{subtitle}</span>
                     )}
                 </div>
@@ -66,10 +77,11 @@ export default function TalentInnLogo({
 }
 
 /**
- * Standalone icon mark — the triangular "inn tent" with person + spark
+ * Standalone icon mark — circular network hub with 4 glowing nodes + interlocking swirl + 3 stars
  */
 export function TIIconMark({ size = 40 }) {
-    const rx = size * 0.2;
+    const rx = Math.round(size * 0.18);
+
     return (
         <svg
             width={size}
@@ -80,112 +92,67 @@ export function TIIconMark({ size = 40 }) {
         >
             <defs>
                 <linearGradient id="ti-bg" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
-                    <stop offset="0%" stopColor="#061633" />
+                    <stop offset="0%"   stopColor="#061633" />
                     <stop offset="100%" stopColor="#0A1F4E" />
                 </linearGradient>
-                <linearGradient id="ti-cyan" x1="20" y1="10" x2="80" y2="90" gradientUnits="userSpaceOnUse">
-                    <stop offset="0%" stopColor="#67E8F9" />
-                    <stop offset="100%" stopColor="#0EA5E9" />
-                </linearGradient>
-                <filter id="ti-glow" x="-40%" y="-40%" width="180%" height="180%">
-                    <feGaussianBlur stdDeviation="2.5" result="blur" />
+                <filter id="ti-glow" x="-100%" y="-100%" width="300%" height="300%">
+                    <feGaussianBlur stdDeviation="3.5" result="blur" />
                     <feComposite in="SourceGraphic" in2="blur" operator="over" />
                 </filter>
-                <filter id="ti-glow-strong" x="-60%" y="-60%" width="220%" height="220%">
-                    <feGaussianBlur stdDeviation="4" result="blur" />
+                <filter id="ti-glow-soft" x="-50%" y="-50%" width="200%" height="200%">
+                    <feGaussianBlur stdDeviation="2" result="blur" />
                     <feComposite in="SourceGraphic" in2="blur" operator="over" />
                 </filter>
+                <clipPath id="ti-clip">
+                    <rect width="100" height="100" rx={rx} />
+                </clipPath>
             </defs>
 
-            {/* Badge background */}
+            {/* Badge */}
             <rect width="100" height="100" rx={rx} fill="url(#ti-bg)" />
 
-            {/* ── Triangular inn-tent outline ── */}
-            {/* Outer glow path */}
-            <path
-                d="M50 12 L82 76 L18 76 Z"
-                stroke="#06B6D4"
-                strokeWidth="3.5"
-                strokeLinejoin="round"
-                fill="none"
-                strokeOpacity="0.3"
-                filter="url(#ti-glow-strong)"
-            />
-            {/* Main triangle */}
-            <path
-                d="M50 12 L82 76 L18 76 Z"
-                stroke="url(#ti-cyan)"
-                strokeWidth="2.5"
-                strokeLinejoin="round"
-                fill="none"
-            />
+            <g clipPath="url(#ti-clip)">
+                {/* Soft overall glow centre */}
+                <circle cx="50" cy="45" r="30" fill="#06B6D4" fillOpacity="0.07" />
 
-            {/* Inner vertical spine of the triangle (the "i" / pillar) */}
-            <line
-                x1="50" y1="28"
-                x2="50" y2="76"
-                stroke="#38BDF8"
-                strokeWidth="1.5"
-                strokeOpacity="0.5"
-                strokeLinecap="round"
-            />
+                {/* ── Outer ring arcs (connecting adjacent nodes) ── */}
+                <path d="M 26,26 C 50,9  50,9  74,26" stroke="#38BDF8" strokeWidth="2"   strokeLinecap="round" fill="none" strokeOpacity="0.65" />
+                <path d="M 74,26 C 90,45 90,45 74,64" stroke="#38BDF8" strokeWidth="2"   strokeLinecap="round" fill="none" strokeOpacity="0.65" />
+                <path d="M 74,64 C 50,80 50,80 26,64" stroke="#38BDF8" strokeWidth="2"   strokeLinecap="round" fill="none" strokeOpacity="0.65" />
+                <path d="M 26,64 C 10,45 10,45 26,26" stroke="#38BDF8" strokeWidth="2"   strokeLinecap="round" fill="none" strokeOpacity="0.65" />
 
-            {/* ── Person silhouette (upward / ascending figure) ── */}
-            {/* Head */}
-            <circle cx="50" cy="42" r="5" fill="url(#ti-cyan)" />
-            {/* Body with upward arrow shape */}
-            <path
-                d="M46 48 L46 60 L54 60 L54 48"
-                fill="url(#ti-cyan)"
-                fillOpacity="0.85"
-            />
-            {/* Arms spread (star person pose) */}
-            <line x1="38" y1="53" x2="62" y2="53" stroke="#38BDF8" strokeWidth="2" strokeLinecap="round" strokeOpacity="0.8" />
+                {/* ── Inner swirl — S-curve A (NW→SE), back portion ── */}
+                <path d="M 26,26 C 62,26 38,45 50,45"   stroke="#67E8F9" strokeWidth="2.2" strokeLinecap="round" fill="none" />
+                {/* Knockout where B crosses A */}
+                <path d="M 74,26 C 38,26 62,45 50,45"   stroke="#061633" strokeWidth="5.5" strokeLinecap="round" fill="none" />
+                {/* S-curve B (NE→SW), full, on top */}
+                <path d="M 74,26 C 38,26 62,64 26,64"   stroke="#67E8F9" strokeWidth="2.2" strokeLinecap="round" fill="none" />
+                {/* S-curve A, front portion */}
+                <path d="M 50,45 C 62,45 38,64 74,64"   stroke="#67E8F9" strokeWidth="2.2" strokeLinecap="round" fill="none" />
 
-            {/* ── 4-point star / spark inside the triangle ── */}
-            {/* Glow */}
-            <path
-                d="M50 31 L52 37 L58 39 L52 41 L50 47 L48 41 L42 39 L48 37 Z"
-                fill="#06B6D4"
-                fillOpacity="0.3"
-                filter="url(#ti-glow-strong)"
-            />
-            {/* Star */}
-            <path
-                d="M50 31 L52 36 L57 38 L52 40 L50 45 L48 40 L43 38 L48 36 Z"
-                fill="url(#ti-cyan)"
-            />
-            <circle cx="50" cy="38" r="2" fill="white" fillOpacity="0.9" />
+                {/* ── Node glow halos ── */}
+                <g filter="url(#ti-glow)">
+                    <circle cx="26" cy="26" r="5" fill="#06B6D4" fillOpacity="0.6" />
+                    <circle cx="74" cy="26" r="5" fill="#06B6D4" fillOpacity="0.6" />
+                    <circle cx="74" cy="64" r="5" fill="#06B6D4" fillOpacity="0.6" />
+                    <circle cx="26" cy="64" r="5" fill="#06B6D4" fillOpacity="0.6" />
+                </g>
 
-            {/* ── 2×2 dot grid (upper right of triangle) ── */}
-            {[0, 1].map(r =>
-                [0, 1].map(c => (
-                    <circle
-                        key={`dot-${r}-${c}`}
-                        cx={68 + c * 6}
-                        cy={24 + r * 6}
-                        r="1.8"
-                        fill="#38BDF8"
-                        fillOpacity={0.5 + r * 0.2 + c * 0.1}
-                    />
-                ))
-            )}
+                {/* ── Node circles ── */}
+                <circle cx="26" cy="26" r="5.5" fill="#061633" stroke="#67E8F9" strokeWidth="2.2" />
+                <circle cx="26" cy="26" r="2.2" fill="#A5F3FC" />
+                <circle cx="74" cy="26" r="5.5" fill="#061633" stroke="#67E8F9" strokeWidth="2.2" />
+                <circle cx="74" cy="26" r="2.2" fill="#A5F3FC" />
+                <circle cx="74" cy="64" r="5.5" fill="#061633" stroke="#67E8F9" strokeWidth="2.2" />
+                <circle cx="74" cy="64" r="2.2" fill="#A5F3FC" />
+                <circle cx="26" cy="64" r="5.5" fill="#061633" stroke="#67E8F9" strokeWidth="2.2" />
+                <circle cx="26" cy="64" r="2.2" fill="#A5F3FC" />
 
-            {/* ── Small sparkles ── */}
-            <path d="M22 30 L23 33 L26 34 L23 35 L22 38 L21 35 L18 34 L21 33 Z" fill="#38BDF8" fillOpacity="0.6" transform="scale(0.7) translate(9, 5)" />
-            <circle cx="26" cy="82" r="1.5" fill="#67E8F9" fillOpacity="0.5" />
-            <circle cx="74" cy="82" r="1.2" fill="#67E8F9" fillOpacity="0.4" />
-            <circle cx="85" cy="50" r="1" fill="#38BDF8" fillOpacity="0.35" />
-
-            {/* ── Base line under triangle ── */}
-            <line
-                x1="18" y1="76"
-                x2="82" y2="76"
-                stroke="url(#ti-cyan)"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeOpacity="0.5"
-            />
+                {/* ── 3 stars below ── */}
+                <polygon points="37,77 38,80 41,80 39,82 40,85 37,83 34,85 35,82 33,80 36,80" fill="#38BDF8" fillOpacity="0.7" />
+                <polygon points="50,77 51,80 54,80 52,82 53,85 50,83 47,85 48,82 46,80 49,80" fill="#38BDF8" fillOpacity="0.7" />
+                <polygon points="63,77 64,80 67,80 65,82 66,85 63,83 60,85 61,82 59,80 62,80" fill="#38BDF8" fillOpacity="0.7" />
+            </g>
         </svg>
     );
 }
