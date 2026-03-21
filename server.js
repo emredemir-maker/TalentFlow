@@ -988,6 +988,41 @@ const CANDIDATE_ALLOWED_FIELDS = new Set([
     'hasConsent',           // KVKK flag set by candidate UI
 ]);
 
+// ─────────────────────────────────────────────────────────────
+// INTERVIEW SESSION INITIALIZER
+// Creates the /interviews/{sessionId} document via Admin SDK so
+// clients only need UPDATE permission for all subsequent writes.
+// This bypasses the allow create: if false rule that intentionally
+// blocks direct client creation.
+// ─────────────────────────────────────────────────────────────
+app.post('/api/init-interview-session', sessionLimiter, async (req, res) => {
+    const { sessionId, initialData } = req.body;
+    if (!sessionId || typeof sessionId !== 'string' || !sessionId.startsWith('iv-')) {
+        return res.status(400).json({ error: 'Invalid sessionId.' });
+    }
+    if (initialData && typeof initialData !== 'object') {
+        return res.status(400).json({ error: 'initialData must be an object.' });
+    }
+    try {
+        const sessionRef = db.doc(`interviews/${sessionId}`);
+        const snap = await sessionRef.get();
+        if (!snap.exists) {
+            await sessionRef.set({ sessionId, createdAt: new Date().toISOString(), ...(initialData || {}) });
+            console.log(`[init-interview-session] Created /interviews/${sessionId}`);
+        } else {
+            // Doc already exists — merge the initialData if provided
+            if (initialData && Object.keys(initialData).length > 0) {
+                await sessionRef.set(initialData, { merge: true });
+            }
+            console.log(`[init-interview-session] /interviews/${sessionId} already exists.`);
+        }
+        res.json({ success: true });
+    } catch (err) {
+        console.error('[init-interview-session] Error:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.post('/api/update-candidate-status', sessionLimiter, async (req, res) => {
     const { sessionId, candidateId, updates } = req.body;
     if (!sessionId || !candidateId || !updates || typeof updates !== 'object') {

@@ -423,22 +423,41 @@ export default function LiveInterviewPage() {
         // After finishSession, block any ghost writes to candidates collection
         if (isFinishedRef.current) return;
 
-        try {
-            // Always write real-time state to the public /interviews/{sessionId} Firestore path
-            // This is readable by anonymous candidates (firestore rules: allow read, write: if true)
-            const sessionRef = doc(db, 'interviews', sessionId);
-            const candidateId = data.candidateId || candidateData?.id || apiCandidateId;
-            await setDoc(sessionRef, { ...data, sessionId, ...(candidateId ? { candidateId } : {}) }, { merge: true });
+        const sessionRef = doc(db, 'interviews', sessionId);
+        const candidateId = data.candidateId || candidateData?.id || apiCandidateId;
+        const payload = { ...data, sessionId, ...(candidateId ? { candidateId } : {}) };
 
-            // For recruiter: also sync to candidates collection so the app's data stays consistent
-            if (isRecruiter && candidateData?.id) {
-                const updatedSessions = (candidateData.interviewSessions || []).map(s =>
-                    String(s.id) === String(sessionId) ? { ...s, ...data } : s
-                );
-                updateCandidate(candidateData.id, { interviewSessions: updatedSessions });
-            }
+        try {
+            // Always write real-time state to the public /interviews/{sessionId} Firestore path.
+            // Firestore rules: allow create: if false — only the backend can CREATE the doc.
+            // Client writes that land on an existing doc are UPDATEs and succeed.
+            await setDoc(sessionRef, payload, { merge: true });
         } catch (err) {
-            console.error('[persistSessionData] Firestore write failed:', err.message);
+            if (err.code === 'permission-denied') {
+                // Session doc does not exist yet (CREATE blocked by security rules).
+                // Ask the backend (Admin SDK, bypasses rules) to initialise it, then retry.
+                console.warn('[persistSessionData] CREATE denied — asking backend to init session doc...');
+                try {
+                    await fetch('/api/init-interview-session', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ sessionId, initialData: payload }),
+                    });
+                    // After backend creates the doc, the next client write is an UPDATE (allowed).
+                } catch (apiErr) {
+                    console.error('[persistSessionData] Backend init failed:', apiErr.message);
+                }
+            } else {
+                console.error('[persistSessionData] Firestore write failed:', err.message);
+            }
+        }
+
+        // For recruiter: also sync to candidates collection so the app's data stays consistent
+        if (isRecruiter && candidateData?.id) {
+            const updatedSessions = (candidateData.interviewSessions || []).map(s =>
+                String(s.id) === String(sessionId) ? { ...s, ...data } : s
+            );
+            updateCandidate(candidateData.id, { interviewSessions: updatedSessions });
         }
     };
 

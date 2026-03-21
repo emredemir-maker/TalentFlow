@@ -151,15 +151,14 @@ service cloud.firestore {
 
     // ── Live Interview Sessions ───────────────────────────────────────────────
     // • read:   open — sessionId (128-bit UUID) acts as capability token
-    // • create: denied — only backend Admin SDK creates sessions
-    // • update: requires ANY authenticated session (anon candidates included)
-    //           prevents random internet users from tampering with sessions
-    // • delete: denied — backend-only cleanup
+    // • create: recruiter initialises session; candidate may also create on
+    //           their first status write (setDoc merge:true on non-existing doc)
+    // • update: any authenticated user (recruiter or anon candidate)
+    // • delete: denied
     match /interviews/{sessionId} {
-      allow read:   if true;
-      allow create: if false;
-      allow update: if isAuthenticatedIncAnon();
-      allow delete: if false;
+      allow read:          if true;
+      allow create, update: if isAuthenticatedIncAnon();
+      allow delete:         if false;
     }
 
     // ── Default deny ──────────────────────────────────────────────────────────
