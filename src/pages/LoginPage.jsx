@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { LogIn, AlertCircle, CheckCircle, Loader2, User, Mail, Lock, Sparkles, ArrowRight, Zap, Brain, BarChart3, Clock } from 'lucide-react';
+import TalentInnLogo from '../components/TalentInnLogo';
 
 export default function LoginPage() {
     const { loginWithGoogle, loginWithEmail, registerWithEmail, loading, error } = useAuth();
@@ -110,21 +111,7 @@ export default function LoginPage() {
 
                 {/* Logo */}
                 <div style={{ position: 'relative', zIndex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '0' }}>
-                        <div style={{
-                            width: '44px', height: '44px', borderRadius: '12px',
-                            background: 'linear-gradient(135deg, #06B6D4 0%, #3B82F6 100%)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            boxShadow: '0 8px 24px rgba(6,182,212,0.3)',
-                            flexShrink: 0,
-                        }}>
-                            <span style={{ color: '#fff', fontWeight: 900, fontSize: '16px', letterSpacing: '-1px' }}>TI</span>
-                        </div>
-                        <div>
-                            <div style={{ color: '#F8FAFC', fontWeight: 900, fontSize: '18px', letterSpacing: '-0.5px', lineHeight: 1 }}>Talent-Inn</div>
-                            <div style={{ color: '#94A3B8', fontSize: '10px', letterSpacing: '2px', textTransform: 'uppercase', marginTop: '2px' }}>AI-Powered HR Platform</div>
-                        </div>
-                    </div>
+                    <TalentInnLogo iconSize={46} showText={true} showSub={true} textSize="20px" />
                 </div>
 
                 {/* Hero Text */}

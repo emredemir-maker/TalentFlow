@@ -11,9 +11,9 @@ import {
     LogOut,
     ChevronLeft,
     ChevronRight,
-    BrainCircuit
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import TalentInnLogo, { TIIconMark } from './TalentInnLogo';
 
 export default function Sidebar({ activeView, onNavigate, collapsed, onToggleCollapse }) {
     const { logout, userProfile } = useAuth();
@@ -59,18 +59,11 @@ export default function Sidebar({ activeView, onNavigate, collapsed, onToggleCol
             ${collapsed ? 'w-[80px]' : 'w-[240px]'} flex flex-col shadow-2xl`}>
 
             {/* Logo Section */}
-            <div className={`h-20 flex items-center ${collapsed ? 'justify-center' : 'px-8'}`}>
-                <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-blue-400 flex items-center justify-center shadow-lg shadow-blue-500/20">
-                        <BrainCircuit className="w-5 h-5 text-white" />
-                    </div>
-                    {!collapsed && (
-                        <div className="flex flex-col">
-                            <span className="text-white text-[16px] font-bold tracking-tight leading-none">Talent-Inn</span>
-                            <span className="text-[#64748B] text-[9px] font-medium mt-1">AI Recruitment</span>
-                        </div>
-                    )}
-                </div>
+            <div className={`h-20 flex items-center ${collapsed ? 'justify-center' : 'px-6'}`}>
+                {collapsed
+                    ? <TIIconMark size={38} />
+                    : <TalentInnLogo iconSize={38} showText={true} showSub={true} subtitle="AI Recruitment" textSize="16px" />
+                }
             </div>
 
             {/* Navigation Items */}
