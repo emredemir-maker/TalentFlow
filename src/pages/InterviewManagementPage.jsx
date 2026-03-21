@@ -54,6 +54,13 @@ export default function InterviewManagementPage() {
     // UI States
     const [isPlanningMode, setIsPlanningMode] = useState(false);
     const [wizardStep, setWizardStep] = useState(1); // 1 = aday seç, 2 = zaman belirle, 3 = onayla
+
+    // Calendar-first layout state
+    const todayStr = new Date().toISOString().split('T')[0];
+    const todayDate = new Date();
+    const [selectedCalDate, setSelectedCalDate] = useState(todayStr);
+    const [calYear, setCalYear] = useState(todayDate.getFullYear());
+    const [calMonth, setCalMonth] = useState(todayDate.getMonth()); // 0-indexed
     const [selectedCandidate, setSelectedCandidate] = useState(null);
     const [interviewType, setInterviewType] = useState('technical'); // technical, hr, product
     const [isAnalyzingSlots, setIsAnalyzingSlots] = useState(false);
@@ -625,40 +632,84 @@ export default function InterviewManagementPage() {
         }
     };
 
-    return (
-        <div className="flex flex-col h-screen bg-[#F8FAFC] font-inter">
-            <Header title="Mülakat Yönetimi" />
-            
-            <main className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
-                
-                {/* PAGE HEADER */}
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                        {isPlanningMode && (
-                            <button 
-                                onClick={() => { setIsPlanningMode(false); setWizardStep(1); }}
-                                className="w-9 h-9 rounded-xl bg-white border border-[#E2E8F0] flex items-center justify-center text-[#1E3A8A] hover:bg-blue-50 transition-all shadow-sm"
-                            >
-                                <ArrowLeft className="w-4 h-4" />
-                            </button>
-                        )}
-                        <div>
-                            <h1 className="text-xl font-black text-[#0F172A] tracking-tighter italic">Mülakat Yönetimi</h1>
-                            <p className="text-[11px] font-bold text-[#64748B] uppercase tracking-widest mt-0.5 opacity-60">Aktif Operasyonlar</p>
-                        </div>
-                    </div>
-                    {!isPlanningMode && (
-                        <button 
-                            onClick={() => { setWizardStep(1); setSelectedCandidate(null); setManualDate(''); setManualTime('09:00'); setIsPlanningMode(true); }}
-                            className="bg-[#1E3A8A] text-white px-4 py-2 rounded-xl font-bold text-[12px] flex items-center gap-2 shadow-lg shadow-blue-900/10 hover:bg-blue-800 transition-all active:scale-95"
-                        >
-                            <Plus className="w-4 h-4" /> Yeni Seans Başlat/Planla
-                        </button>
-                    )}
-                </div>
+    // ── Calendar computed vars ────────────────────────────────────────────────
+    const allCalSessions = useMemo(() => {
+        const all = [];
+        enrichedCandidates.forEach(c => {
+            (c.interviewSessions || []).forEach(s => {
+                all.push({ ...s, candidateName: c.name, position: c.position, matchScore: c.matchScore });
+            });
+        });
+        return all;
+    }, [enrichedCandidates]);
 
-                {isPlanningMode && (
-                    <div className="bg-white rounded-[24px] border border-[#E2E8F0] shadow-sm overflow-hidden flex flex-col animate-in fade-in slide-in-from-top-2 duration-300">
+    const calDaysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+    const calFirstDow = (() => {
+        // JS getDay(): 0=Sun, 1=Mon ... 6=Sat → map to Mon-start 0-indexed
+        const d = new Date(calYear, calMonth, 1).getDay();
+        return d === 0 ? 6 : d - 1;
+    })();
+
+    const dayCalSessions = useMemo(() => {
+        if (!selectedCalDate) return [];
+        return allCalSessions.filter(s => (s.date || '').split('T')[0] === selectedCalDate)
+            .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+    }, [allCalSessions, selectedCalDate]);
+
+    const navigateCal = (dir) => {
+        let y = calYear, m = calMonth + dir;
+        if (m < 0) { m = 11; y--; }
+        if (m > 11) { m = 0; y++; }
+        setCalYear(y); setCalMonth(m);
+    };
+
+    const openWizardWithDate = () => {
+        setWizardStep(1);
+        setSelectedCandidate(null);
+        setManualDate(selectedCalDate || '');
+        setManualTime('09:00');
+        setIsPlanningMode(true);
+    };
+
+    const getCalStatusConfig = (status) => {
+        switch (status) {
+            case 'live':     return { bg: 'bg-emerald-50', text: 'text-emerald-600', icon: <Play className="w-3 h-3" />, label: 'CANLI' };
+            case 'scheduled': return { bg: 'bg-blue-50', text: 'text-blue-600', icon: <Clock className="w-3 h-3" />, label: 'PLANLANDI' };
+            case 'completed': return { bg: 'bg-slate-100', text: 'text-slate-600', icon: <CheckCircle2 className="w-3 h-3" />, label: 'TAMAMLANDI' };
+            case 'postponed': return { bg: 'bg-amber-50', text: 'text-amber-600', icon: <AlertCircle className="w-3 h-3" />, label: 'ERTELENDİ' };
+            case 'cancelled': return { bg: 'bg-red-50', text: 'text-red-600', icon: <AlertTriangle className="w-3 h-3" />, label: 'İPTAL' };
+            default:         return { bg: 'bg-slate-100', text: 'text-slate-600', icon: null, label: status || '—' };
+        }
+    };
+
+
+    return (
+        <div className="flex flex-col h-screen bg-[#FAFAF8] font-inter">
+            <Header title="Mülakat Yönetimi" />
+
+            {/* ═══ PLANNING WIZARD MODE ═══════════════════════════════════════ */}
+            {isPlanningMode && (
+                <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                    <div className="flex items-center gap-4 mb-4 px-2 pt-2">
+                        <button
+                            onClick={() => { setIsPlanningMode(false); setWizardStep(1); }}
+                            className="w-9 h-9 rounded-xl bg-white border border-[#E2E8F0] flex items-center justify-center text-[#1E3A8A] hover:bg-blue-50 transition-all shadow-sm"
+                        >
+                            <ArrowLeft className="w-4 h-4" />
+                        </button>
+                        <div>
+                            <h1 className="text-xl font-semibold text-[#0F172A]">Yeni Mülakat Planla</h1>
+                            <p className="text-xs text-[#64748B] mt-0.5 font-medium">3 adımda tamamlayın</p>
+                        </div>
+                        {(wizardStep === 2 || wizardStep === 3) && selectedCandidate && manualDate && (
+                            <div className="ml-auto text-xs text-[#64748B] bg-white border border-[#E2E8F0] rounded-full px-3 py-1 flex items-center gap-1.5 shadow-sm">
+                                <span className="font-semibold text-[#0F172A]">{selectedCandidate.name}</span>
+                                <span>·</span>
+                                <span>{new Date(manualDate + 'T12:00:00').toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}</span>
+                            </div>
+                        )}
+                    </div>
+                                        <div className="bg-white rounded-[24px] border border-[#E2E8F0] shadow-sm overflow-hidden flex flex-col animate-in fade-in slide-in-from-top-2 duration-300">
 
                         {/* WIZARD STEP PROGRESS BAR */}
                         <div className="px-8 pt-6 pb-5 border-b border-[#F1F5F9] bg-slate-50/40">
@@ -1085,274 +1136,222 @@ export default function InterviewManagementPage() {
                             )}
                         </div>
                     </div>
-                )}
+                </div>
+            )}
 
-                {/* SESSIONS DASHBOARD OVERHAUL */}
-                <div className="space-y-4 flex-1 flex flex-col min-h-0">
-                    {/* STATS STRIP */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        {[
-                            { label: 'CANLI YAYIN', value: stats.live, icon: Activity, color: 'text-rose-600', bg: 'bg-rose-50' },
-                            { label: 'BUGÜN', value: stats.today, icon: Calendar, color: 'text-blue-600', bg: 'bg-blue-50' },
-                            { label: 'BEKLEYEN', value: stats.pending, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50' },
-                            { label: 'TOPLAM OPERASYON', value: stats.total, icon: Zap, color: 'text-emerald-600', bg: 'bg-emerald-50' }
-                        ].map((stat, i) => (
-                            <div key={i} className={`p-4 rounded-[20px] bg-white border border-[#E2E8F0] shadow-sm flex items-center justify-between`}>
-                                <div className="flex flex-col">
-                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">{stat.label}</span>
-                                    <span className={`text-xl font-black ${stat.color}`}>{stat.value}</span>
-                                </div>
-                                <div className={`w-10 h-10 rounded-xl ${stat.bg} ${stat.color} flex items-center justify-center`}>
-                                    <stat.icon className="w-5 h-5" />
-                                </div>
+            {/* ═══ CALENDAR-FIRST DASHBOARD ════════════════════════════════════ */}
+            {!isPlanningMode && (
+                <div className="flex-1 flex flex-col overflow-hidden">
+                    {/* Top bar */}
+                    <div className="px-8 py-5 flex items-center justify-between border-b border-[#E2E8F0]/60 bg-white/70 backdrop-blur-sm flex-shrink-0">
+                        <div>
+                            <h1 className="text-xl font-semibold text-[#0F172A] tracking-tight">Mülakat Yönetimi</h1>
+                            <p className="text-xs text-[#64748B] mt-0.5 font-medium">Aktif operasyonları ve geçmiş seansları yönetin</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <div className="relative">
+                                <Search className="w-4 h-4 text-[#94A3B8] absolute left-3 top-1/2 -translate-y-1/2" />
+                                <input
+                                    type="text"
+                                    placeholder="Aday veya pozisyon ara..."
+                                    className="pl-9 pr-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1E3A8A] focus:border-transparent w-64 shadow-sm transition-all"
+                                />
                             </div>
-                        ))}
+                            <button
+                                onClick={() => { setWizardStep(1); setSelectedCandidate(null); setManualDate(''); setManualTime('09:00'); setIsPlanningMode(true); }}
+                                className="flex items-center gap-2 bg-[#1E3A8A] text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-800 transition-all shadow-md shadow-blue-900/10"
+                            >
+                                <Plus className="w-4 h-4" /> Yeni Seans Planla
+                            </button>
+                        </div>
                     </div>
 
-                    <div className="bg-white rounded-[24px] border border-[#E2E8F0] shadow-sm overflow-hidden flex-1 flex flex-col min-h-0">
-                        <div className="p-4 border-b border-[#F1F5F9] flex items-center justify-between bg-slate-50/30">
-                            <div className="flex items-center gap-6">
-                                <div className="flex items-center gap-1">
-                                    <button 
-                                        onClick={() => setViewTab('active')}
-                                        className={`px-4 py-1.5 text-[11px] font-black uppercase tracking-widest rounded-lg transition-all ${viewTab === 'active' ? 'bg-[#1E3A8A] text-white shadow-md' : 'text-slate-400 hover:text-[#1E3A8A]'}`}
-                                    >
-                                        Aktif Seanslar ({activeInterviews.length})
-                                    </button>
-                                    <button 
-                                        onClick={() => setViewTab('past')}
-                                        className={`px-4 py-1.5 text-[11px] font-black uppercase tracking-widest rounded-lg transition-all ${viewTab === 'past' ? 'bg-[#1E3A8A] text-white shadow-md' : 'text-slate-400 hover:text-[#1E3A8A]'}`}
-                                    >
-                                        Geçmiş ({pastInterviews.length})
-                                    </button>
-                                </div>
+                    {/* Two-column layout */}
+                    <div className="flex-1 flex overflow-hidden">
+
+                        {/* LEFT: Stats + Calendar ─────────────────────────────── */}
+                        <div className="w-[55%] border-r border-[#E2E8F0]/60 flex flex-col bg-white">
+
+                            {/* Stats row */}
+                            <div className="px-8 py-6 grid grid-cols-4 gap-4 border-b border-[#E2E8F0]/40 flex-shrink-0">
+                                {[
+                                    { label: 'CANLI YAYIN', value: stats.live, color: 'text-rose-600' },
+                                    { label: 'BUGÜN', value: stats.today, color: 'text-[#0F172A]' },
+                                    { label: 'BEKLEYEN', value: stats.pending, color: 'text-amber-500' },
+                                    { label: 'TOPLAM', value: stats.total, color: 'text-[#64748B]' },
+                                ].map((stat, i) => (
+                                    <div key={i} className="flex flex-col gap-1">
+                                        <span className="text-[10px] font-black text-[#94A3B8] uppercase tracking-widest">{stat.label}</span>
+                                        <span className={`text-2xl font-semibold tracking-tight ${stat.color}`}>{stat.value}</span>
+                                    </div>
+                                ))}
                             </div>
-                            <div className="flex items-center gap-2">
-                                <div className="bg-white px-3 py-1 rounded-lg border border-[#E2E8F0] text-[10px] font-bold text-slate-500 flex items-center gap-2">
-                                    <CalendarDays className="w-3.5 h-3.5" /> {new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })}
+
+                            {/* Calendar */}
+                            <div className="flex-1 overflow-y-auto p-8">
+                                <div className="flex items-center justify-between mb-6">
+                                    <h2 className="text-lg font-semibold tracking-tight text-[#0F172A]">
+                                        {new Date(calYear, calMonth).toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })}
+                                    </h2>
+                                    <div className="flex items-center gap-1">
+                                        <button onClick={() => navigateCal(-1)} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-100 text-[#64748B] transition-colors">
+                                            <ChevronLeft className="w-4 h-4" />
+                                        </button>
+                                        <button onClick={() => navigateCal(1)} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-100 text-[#64748B] transition-colors">
+                                            <ChevronRight className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-7 gap-y-4 gap-x-1 text-center">
+                                    {['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'].map(d => (
+                                        <div key={d} className="text-[10px] font-black text-[#94A3B8] uppercase tracking-wider pb-2">{d}</div>
+                                    ))}
+                                    {Array.from({ length: calFirstDow }).map((_, i) => <div key={`e${i}`} />)}
+                                    {Array.from({ length: calDaysInMonth }).map((_, i) => {
+                                        const day = i + 1;
+                                        const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                                        const isSelected = selectedCalDate === dateStr;
+                                        const isToday = dateStr === todayStr;
+                                        const isPastDay = dateStr < todayStr;
+                                        const hasEvents = allCalSessions.some(s => (s.date || '').split('T')[0] === dateStr);
+                                        return (
+                                            <div key={day} className="flex justify-center">
+                                                <button
+                                                    onClick={() => setSelectedCalDate(dateStr)}
+                                                    className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium transition-all relative ${
+                                                        isSelected
+                                                            ? 'bg-[#1E3A8A] text-white shadow-md'
+                                                            : isToday
+                                                                ? 'text-[#1E3A8A] font-semibold bg-blue-50/50 hover:bg-blue-100/50'
+                                                                : isPastDay
+                                                                    ? 'text-[#CBD5E1] hover:bg-slate-50'
+                                                                    : 'text-[#334155] hover:bg-slate-100'
+                                                    }`}
+                                                >
+                                                    {day}
+                                                    {hasEvents && !isSelected && (
+                                                        <span className="absolute bottom-1 w-1 h-1 rounded-full bg-[#1E3A8A]" />
+                                                    )}
+                                                    {isToday && !isSelected && (
+                                                        <span className="absolute bottom-0 w-4 h-[2px] rounded-full bg-[#1E3A8A]" />
+                                                    )}
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </div>
                         </div>
 
-                        <div className="overflow-x-auto flex-1 min-h-[400px] custom-scrollbar overflow-y-visible">
-                            <table className="w-full text-left border-separate border-spacing-0">
-                                <thead className="bg-[#F8FAFC] sticky top-0 z-[60] border-b border-[#F1F5F9]">
-                                    <tr>
-                                        <th className="px-6 py-4 text-[10px] font-black text-[#64748B] uppercase tracking-widest">ADAY VE POZİSYON</th>
-                                        <th className="px-6 py-4 text-[10px] font-black text-[#64748B] uppercase tracking-widest text-center">ZAMANLAMA</th>
-                                        <th className="px-6 py-4 text-[10px] font-black text-[#64748B] uppercase tracking-widest">DURUM</th>
-                                        <th className="px-6 py-4 text-[10px] font-black text-[#64748B] uppercase tracking-widest">MÜLAKATÇI</th>
-                                        <th className="px-6 py-4"></th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-[#F1F5F9]">
-                                    {(viewTab === 'active' ? activeInterviews : pastInterviews).map((int, idx) => {
-                                        const isToday = int.date === new Date().toISOString().split('T')[0];
-                                        const isCompleted = int._effectiveCompleted || int.status === 'completed';
-                                        return (
-                                            <tr key={idx} className={`hover:bg-blue-50/20 transition-all ${isToday && !isCompleted ? 'bg-blue-50/10' : ''}`}>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-8 h-8 bg-white border border-[#E2E8F0] text-[#1E3A8A] rounded-xl flex items-center justify-center text-[11px] font-black shadow-sm">
-                                                            {int.candidateName ? int.candidateName[0] : 'A'}
-                                                        </div>
-                                                        <div className="flex flex-col">
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="text-[13px] font-bold text-[#0F172A] leading-none">{int.candidateName}</span>
-                                                                <span className={`px-1.5 py-0.5 rounded text-[8px] font-black tracking-widest uppercase ${
-                                                                    int.type === 'technical' ? 'bg-blue-50 text-blue-600' : (int.type === 'hr' ? 'bg-amber-50 text-amber-600' : 'bg-purple-50 text-purple-600')
-                                                                }`}>{int.type === 'technical' ? 'TEKNİK' : (int.type === 'hr' ? 'İK' : 'PROD')}</span>
-                                                            </div>
-                                                            <span className="text-[11px] text-[#64748B] font-medium mt-1 uppercase tracking-tighter">{int.role}</span>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4 text-center">
-                                                    <div className="inline-flex flex-col items-center min-w-[100px] p-2 bg-slate-50 border border-slate-100 rounded-xl">
-                                                        <span className="text-[12px] font-black text-[#0F172A] tabular-nums">{int.time}</span>
-                                                        <span className="text-[9px] font-bold text-slate-400 uppercase">{new Date(int.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center gap-2">
-                                                        {int._effectiveStatus === 'live' ? (
-                                                            <>
-                                                                <div className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
-                                                                <span className="text-[10px] font-black tracking-tight text-rose-600 uppercase">CANLI YAYIN</span>
-                                                            </>
-                                                        ) : isCompleted ? (
-                                                            <>
-                                                                <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                                                                <span className="text-[10px] font-black tracking-tight text-emerald-600 uppercase">TAMAMLANDI</span>
-                                                            </>
-                                                        ) : int._effectiveStatus === 'cancelled' ? (
-                                                            <>
-                                                                <div className="w-2 h-2 rounded-full bg-slate-400" />
-                                                                <span className="text-[10px] font-black tracking-tight text-slate-400 uppercase">İPTAL EDİLDİ</span>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <div className="w-2 h-2 rounded-full bg-amber-400" />
-                                                                <span className="text-[10px] font-black tracking-tight text-[#0F172A] uppercase">
-                                                                    {int._effectiveStatus === 'postponed' ? 'ERTELENDİ / BEKLEMEDE' : 'PLANLANDI'}
-                                                                </span>
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="w-6 h-6 rounded-lg bg-slate-100 border border-white shadow-sm flex items-center justify-center text-[9px] font-bold text-[#1E3A8A]">
-                                                            {int.interviewer ? int.interviewer[0] : '?'}
-                                                        </div>
-                                                        <span className="text-[11px] font-bold text-[#475569] uppercase tracking-tighter">{int.interviewer || 'Atanmadı'}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4 text-right">
-                                                    <div className="flex items-center justify-end gap-2">
-                                                        <button 
-                                                            onClick={() => {
-                                                                const link = `${window.location.origin}/join/${int.id}`;
-                                                                navigator.clipboard.writeText(link);
-                                                                alert("Aday katılım linki kopyalandı!");
-                                                            }}
-                                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-500 hover:text-blue-600 hover:border-blue-200 transition-all text-[9px] font-black uppercase tracking-widest cursor-pointer shadow-sm active:scale-95 group/copy"
-                                                            title="Aday Katılım Bağlantısını Kopyala"
-                                                        >
-                                                            <Copy className="w-3 h-3 group-hover/copy:scale-110 transition-transform" /> BAĞLANTIYI KOPYALA
-                                                        </button>
-                                                        {/* Status dependent primary actions */}
-                                                        {int._effectiveStatus === 'live' ? (
-                                                            <button 
-                                                                onClick={() => navigate(`/live-interview/${int.id}`)}
-                                                                className="bg-rose-600 text-white px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-rose-700 transition-all shadow-lg shadow-rose-600/20 active:scale-95"
-                                                            >
-                                                                KATIL
-                                                            </button>
-                                                        ) : isCompleted ? (
-                                                            <button 
-                                                                onClick={() => navigate(`/interview-report/${int.id}`)}
-                                                                className="bg-[#1E3A8A] text-white px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-sm active:scale-95"
-                                                            >
-                                                                RAPOR
-                                                            </button>
-                                                        ) : (
-                                                            <button 
-                                                                onClick={async () => {
-                                                                    try {
-                                                                        const snap = await getDoc(doc(db, 'interviews', int.id));
-                                                                        if (snap.exists() && snap.data()?.status === 'completed') {
-                                                                            navigate(`/interview-report/${int.id}`);
-                                                                        } else {
-                                                                            navigate(`/live-interview/${int.id}`);
-                                                                        }
-                                                                    } catch {
-                                                                        navigate(`/live-interview/${int.id}`);
-                                                                    }
-                                                                }}
-                                                                className="bg-[#1E3A8A] text-white px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-blue-800 transition-all shadow-sm active:scale-95"
-                                                            >
-                                                                BAŞLAT
-                                                            </button>
-                                                        )}
+                        {/* RIGHT: Day Sessions + Quick Plan ───────────────────── */}
+                        <div className="w-[45%] flex flex-col bg-[#FAFAF8]">
+                            <div className="px-8 py-6 flex-1 overflow-y-auto custom-scrollbar">
+                                <div className="mb-6">
+                                    <p className="text-[10px] font-black text-[#94A3B8] uppercase tracking-widest mb-1">Seçili Gün</p>
+                                    <div className="text-xl font-semibold text-[#0F172A] flex items-center gap-3">
+                                        {selectedCalDate
+                                            ? new Date(selectedCalDate + 'T12:00:00').toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })
+                                            : 'Yaklaşan Mülakatlar'}
+                                        {selectedCalDate === todayStr && (
+                                            <span className="text-[10px] font-black bg-blue-100 text-[#1E3A8A] px-2 py-0.5 rounded-full uppercase tracking-wider">Bugün</span>
+                                        )}
+                                    </div>
+                                </div>
 
-                                                        {/* Actions Dropdown */}
-                                                        <div className="relative">
-                                                            <button 
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setOpenMenuId(openMenuId === int.id ? null : int.id);
-                                                                }}
-                                                                className={`p-2 rounded-lg transition-all border border-transparent ${openMenuId === int.id ? 'text-[#0F172A] bg-slate-100 border-slate-200' : 'text-slate-400 hover:text-[#0F172A] hover:bg-slate-100 hover:border-slate-200'}`}
-                                                            >
-                                                                <MoreHorizontal className="w-4 h-4" />
-                                                            </button>
-                                                            
-                                                            {openMenuId === int.id && (
-                                                                <div className="absolute top-full right-0 mt-1 w-52 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden z-[100] animate-in fade-in zoom-in-95 duration-100">
-                                                                    {(int.status === 'scheduled' || int.status === 'live' || int.status === 'postponed') && (
-                                                                        <div className="py-1">
-                                                                            <button 
-                                                                                onClick={async (e) => {
-                                                                                    e.stopPropagation();
-                                                                                    if (window.confirm("Bu mülakatı ertelemek ve statüsünü değiştirmek istediğinize emin misiniz?")) {
-                                                                                        const updatedSessions = int.candidate.interviewSessions.map(s => 
-                                                                                            s.id === int.id ? { ...s, status: 'postponed' } : s
-                                                                                        );
-                                                                                        await updateCandidate(int.candidate.id, { interviewSessions: updatedSessions });
-                                                                                        setOpenMenuId(null);
-                                                                                    }
-                                                                                }}
-                                                                                className="w-full px-4 py-2.5 text-left text-[11px] font-bold text-slate-600 hover:bg-slate-50 flex items-center gap-2 transition-colors border-b border-slate-50"
-                                                                            >
-                                                                                <Clock className="w-4 h-4" /> Ertele / Beklemeye Al
-                                                                            </button>
-                                                                            <button 
-                                                                                onClick={async (e) => {
-                                                                                    e.stopPropagation();
-                                                                                    if (window.confirm("Bu mülakatı iptal etmek istediğinize emin misiniz?")) {
-                                                                                        const updatedSessions = int.candidate.interviewSessions.map(s => 
-                                                                                            s.id === int.id ? { ...s, status: 'cancelled' } : s
-                                                                                        );
-                                                                                        await updateCandidate(int.candidate.id, { interviewSessions: updatedSessions });
-                                                                                        setOpenMenuId(null);
-                                                                                    }
-                                                                                }}
-                                                                                className="w-full px-4 py-2.5 text-left text-[11px] font-bold text-amber-600 hover:bg-amber-50 flex items-center gap-2 transition-colors border-b border-slate-50"
-                                                                            >
-                                                                                <AlertCircle className="w-4 h-4" /> Mülakatı İptal Et
-                                                                            </button>
-                                                                            <button 
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    setPreselectedInterviewData({ candidateId: int.candidate.id, session: int });
-                                                                                    setIsPlanningMode(true);
-                                                                                    setOpenMenuId(null);
-                                                                                }}
-                                                                                className="w-full px-4 py-2.5 text-left text-[11px] font-bold text-blue-600 hover:bg-blue-50 flex items-center gap-2 transition-colors border-b border-slate-50"
-                                                                            >
-                                                                                <RefreshCw className="w-4 h-4" /> Yeniden Planla
-                                                                            </button>
-                                                                        </div>
-                                                                    )}
-                                                                    <div className="py-1 bg-slate-50/50">
-                                                                        <button 
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                handleDeleteSession(int.candidate.id, int.id);
-                                                                                setOpenMenuId(null);
-                                                                            }}
-                                                                            className="w-full px-4 py-2.5 text-left text-[11px] font-bold text-rose-600 hover:bg-rose-50 flex items-center gap-2 transition-colors"
-                                                                        >
-                                                                            <Trash2 className="w-4 h-4" /> Seansı Tamamen Sil
-                                                                        </button>
-                                                                    </div>
+                                {dayCalSessions.length > 0 ? (
+                                    <div className="space-y-4">
+                                        {dayCalSessions.map(s => {
+                                            const statusInfo = getCalStatusConfig(s.status);
+                                            const initials = (s.candidateName || '?').split(' ').map(p => p[0]).join('').substring(0, 2).toUpperCase();
+                                            return (
+                                                <div key={s.id} className="flex group">
+                                                    <div className="w-16 pt-3 flex-shrink-0">
+                                                        <span className="text-sm font-semibold text-[#64748B] group-hover:text-[#1E3A8A] transition-colors">{s.time || '—'}</span>
+                                                    </div>
+                                                    <div className="flex-1 bg-white rounded-xl border border-[#E2E8F0] p-4 shadow-sm hover:shadow-md hover:border-[#CBD5E1] transition-all relative overflow-hidden">
+                                                        {s.status === 'live' && <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500" />}
+                                                        <div className="flex justify-between items-start mb-3">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold ${s.status === 'live' ? 'bg-emerald-100 text-emerald-700' : 'bg-[#F1F5F9] text-[#475569]'}`}>
+                                                                    {initials}
                                                                 </div>
+                                                                <div>
+                                                                    <h4 className="text-sm font-semibold text-[#0F172A]">{s.candidateName}</h4>
+                                                                    <p className="text-xs text-[#64748B]">{s.position || s.title || '—'}</p>
+                                                                </div>
+                                                            </div>
+                                                            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wide ${statusInfo.bg} ${statusInfo.text}`}>
+                                                                {statusInfo.icon} {statusInfo.label}
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center justify-between mt-4 pt-4 border-t border-[#F1F5F9]">
+                                                            <div className="flex items-center gap-4 text-xs text-[#64748B]">
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <User className="w-3.5 h-3.5" />
+                                                                    <span>{s.interviewerName || s.interviewer || '—'}</span>
+                                                                </div>
+                                                                {s.matchScore && (
+                                                                    <div className="px-1.5 py-0.5 bg-slate-100 rounded text-[10px] font-semibold text-slate-600">%{s.matchScore} UYUM</div>
+                                                                )}
+                                                            </div>
+                                                            {s.status === 'live' ? (
+                                                                <button
+                                                                    onClick={() => navigate(`/interviews/${s.id}`)}
+                                                                    className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg transition-colors"
+                                                                >
+                                                                    <Video className="w-3.5 h-3.5" /> Katıl
+                                                                </button>
+                                                            ) : (
+                                                                <button className="w-6 h-6 flex items-center justify-center text-[#94A3B8] hover:bg-slate-100 hover:text-[#0F172A] rounded-md transition-colors">
+                                                                    <MoreVertical className="w-4 h-4" />
+                                                                </button>
                                                             )}
                                                         </div>
                                                     </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                    {(viewTab === 'active' ? activeInterviews : pastInterviews).length === 0 && (
-                                        <tr>
-                                            <td colSpan="5" className="px-6 py-20 text-center">
-                                                <div className="flex flex-col items-center gap-3">
-                                                    <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center text-slate-300"><CalendarDays className="w-6 h-6" /></div>
-                                                    <p className="text-[13px] text-slate-400 font-medium italic">Henüz planlanmış veya aktif bir mülakat seansı bulunmuyor.</p>
                                                 </div>
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <div className="bg-white rounded-xl border border-dashed border-[#E2E8F0] p-10 flex flex-col items-center justify-center text-center">
+                                        <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+                                            <Calendar className="w-5 h-5 text-[#94A3B8]" />
+                                        </div>
+                                        <h4 className="text-sm font-semibold text-[#0F172A] mb-1">Bu gün için planlanmış mülakat yok</h4>
+                                        <p className="text-xs text-[#64748B] max-w-[200px] mb-6">Yeni bir mülakat planlayarak süreci başlatabilirsiniz.</p>
+                                        <button
+                                            onClick={openWizardWithDate}
+                                            className="text-sm font-semibold text-[#1E3A8A] hover:underline flex items-center gap-1.5"
+                                        >
+                                            <Plus className="w-4 h-4" /> Yeni Planla
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Hızlı Planlama */}
+                            <div className="bg-white border-t border-[#E2E8F0] p-5 mx-4 mb-4 rounded-2xl shadow-sm flex-shrink-0">
+                                <h4 className="text-xs font-black text-[#0F172A] uppercase tracking-wider mb-3 flex items-center gap-2">
+                                    <Plus className="w-3.5 h-3.5 text-[#1E3A8A]" /> Hızlı Planlama
+                                </h4>
+                                <button
+                                    onClick={openWizardWithDate}
+                                    className="w-full bg-[#1E3A8A] text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-800 transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    {selectedCalDate
+                                        ? new Date(selectedCalDate + 'T12:00:00').toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' }) + ' için Planla'
+                                        : 'Yeni Seans Planla'}
+                                </button>
+                                <p className="text-xs text-[#94A3B8] text-center mt-2">Tam sihirbaz 3 adımda planlamanıza yardımcı olur</p>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </main>
+            )}
 
-            {/* OVERLAYS */}
+                        {/* OVERLAYS */}
             {/* EMAIL PREVIEW MODAL */}
             {isEmailModalOpen && (
                 <div className="fixed inset-0 z-[110] bg-[#0F172A]/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
@@ -1428,6 +1427,7 @@ export default function InterviewManagementPage() {
                     </div>
                 </div>
             )}
-        </div>
+    
+    </div>
     );
 }
