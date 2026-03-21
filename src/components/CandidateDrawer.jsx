@@ -308,7 +308,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                             </button>
                             <button
                                 onClick={async () => {
-                                    const sessId = `iv-${candidate.id}-${Date.now()}`;
+                                    const sessId = `iv-${crypto.randomUUID()}`;
                                     const newSession = {
                                         id: sessId,
                                         status: 'planned',
@@ -649,7 +649,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                             {/* Start New Interview */}
                             <button
                                 onClick={async () => {
-                                    const sessId = `iv-${candidate.id}-${Date.now()}`;
+                                    const sessId = `iv-${crypto.randomUUID()}`;
                                     const newSession = {
                                         id: sessId,
                                         status: 'planned',

@@ -144,6 +144,20 @@ const aiLimiter = rateLimit({
     message: { error: 'AI istek limiti aşıldı. Lütfen 1 dakika sonra tekrar deneyin.' }
 });
 
+// Public session polling + candidate status updates.
+// 60 req/min is plenty for a live interview heartbeat but blocks enumeration.
+const sessionLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Çok fazla oturum sorgusu. Lütfen bekleyin.' }
+});
+
+// Trust the first reverse-proxy hop (Replit's ingress layer adds X-Forwarded-For)
+// This lets express-rate-limit use the real client IP instead of the proxy IP.
+app.set('trust proxy', 1);
+
 // Strict CORS setup
 app.use(cors({
     origin: (origin, callback) => {
@@ -930,20 +944,15 @@ app.post('/api/google/create-calendar-event', async (req, res) => {
 });
 
 // GET /api/session/:sessionId - Public endpoint for candidates to poll session status
-app.get('/api/session/:sessionId', async (req, res) => {
+app.get('/api/session/:sessionId', sessionLimiter, async (req, res) => {
     const { sessionId } = req.params;
     if (!sessionId) return res.status(400).json({ error: 'sessionId required' });
     try {
-        // Optimisation: extract the 4-char prefix from the session ID (format: iv-XXXX-NNNN)
-        // and only scan the candidate whose ID starts with that prefix when possible.
-        const parts = sessionId.split('-'); // ['iv', '4charPrefix', '4digits']
-        const prefix = parts.length >= 2 ? parts[1] : null;
-
+        // Session IDs are now cryptographically random UUIDs (iv-<uuid>), so we
+        // can't extract a candidateId prefix.  Full scan is required; the rate
+        // limiter (sessionLimiter) keeps this from being abused.
         const snapshot = await db.collection('artifacts/talent-flow/public/data/candidates').get();
         for (const docSnap of snapshot.docs) {
-            // Skip documents whose ID doesn't match the prefix — fast short-circuit
-            if (prefix && !docSnap.id.startsWith(prefix)) continue;
-
             const data = docSnap.data();
             const session = (data.interviewSessions || []).find(s => s.id === sessionId);
             if (session) {
@@ -962,29 +971,6 @@ app.get('/api/session/:sessionId', async (req, res) => {
                 });
             }
         }
-        // Fallback: second pass over the same snapshot without the prefix filter
-        if (prefix) {
-            for (const docSnap of snapshot.docs) {
-                if (docSnap.id.startsWith(prefix)) continue; // already checked above
-                const data = docSnap.data();
-                const session = (data.interviewSessions || []).find(s => s.id === sessionId);
-                if (session) {
-                    const visibleQuestions = (session.questions || []).filter(q => q.visibleToCandidate);
-                    console.log(`[GET /api/session] Fallback found session ${sessionId} — ${visibleQuestions.length} visible question(s)`);
-                    return res.json({
-                        found: true,
-                        candidateId: docSnap.id,
-                        candidateName: data.name,
-                        status: session.status,
-                        candidateStatus: session.candidateStatus,
-                        recruiterPresence: session.recruiterPresence,
-                        lastActive: session.lastActive,
-                        questions: visibleQuestions,
-                        currentQuestionIndex: session.currentQuestionIndex,
-                    });
-                }
-            }
-        }
         return res.status(404).json({ found: false, error: 'Seans bulunamadı.' });
     } catch (err) {
         console.error('GET /api/session error:', err.message);
@@ -992,10 +978,33 @@ app.get('/api/session/:sessionId', async (req, res) => {
     }
 });
 
-app.post('/api/update-candidate-status', async (req, res) => {
+// Fields the CANDIDATE side is permitted to write — everything else is recruiter-only.
+// This prevents a tampered client from inflating AI scores or clearing session data.
+const CANDIDATE_ALLOWED_FIELDS = new Set([
+    'candidateStatus',      // lobby state (waiting, ready, left)
+    'candidateConnected',   // WebRTC readiness flag
+    'candidatePresence',    // heartbeat timestamp
+    'lastActive',           // ISO timestamp
+    'hasConsent',           // KVKK flag set by candidate UI
+]);
+
+app.post('/api/update-candidate-status', sessionLimiter, async (req, res) => {
     const { sessionId, candidateId, updates } = req.body;
-    if (!sessionId || !candidateId || !updates) {
+    if (!sessionId || !candidateId || !updates || typeof updates !== 'object') {
         return res.status(400).json({ error: "Missing required fields." });
+    }
+
+    // ── Field whitelist: strip any keys the candidate should never touch ──
+    const safeUpdates = {};
+    for (const key of Object.keys(updates)) {
+        if (CANDIDATE_ALLOWED_FIELDS.has(key)) {
+            safeUpdates[key] = updates[key];
+        } else {
+            console.warn(`[update-candidate-status] Blocked field "${key}" from session ${sessionId}`);
+        }
+    }
+    if (Object.keys(safeUpdates).length === 0) {
+        return res.status(400).json({ error: "No permitted fields to update." });
     }
 
     try {
@@ -1006,21 +1015,14 @@ app.post('/api/update-candidate-status', async (req, res) => {
 
             const data = doc.data();
             const sessions = data.interviewSessions || [];
-            
-            let updated = false;
-            const newSessions = sessions.map(session => {
-                if (session.id === sessionId) {
-                    updated = true;
-                    return { ...session, ...updates };
-                }
-                return session;
-            });
 
-            if (!updated) {
-                // Should we append? Usually it exists. Let's just append for safety.
-                newSessions.push({ id: sessionId, ...updates });
-            }
+            // ── Ownership check: session must belong to this candidateId ──
+            const sessionExists = sessions.some(s => s.id === sessionId);
+            if (!sessionExists) throw new Error("Session not found for this candidate.");
 
+            const newSessions = sessions.map(session =>
+                session.id === sessionId ? { ...session, ...safeUpdates } : session
+            );
             t.update(candidateRef, { interviewSessions: newSessions });
         });
 
@@ -1171,6 +1173,32 @@ app.post('/api/ai/generate', aiLimiter, async (req, res) => {
         res.json({ text: result.response.text() });
     } catch (err) {
         console.error('AI Generate Error:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ─── STT + Emotion Analysis Proxy ───────────────────────────────────────────
+// Accepts raw base64 audio from LiveInterviewPage and returns transcript +
+// emotion scores.  Gemini API key NEVER leaves the server.
+app.post('/api/ai/stt', aiLimiter, async (req, res) => {
+    const { audio, mimeType = 'audio/webm' } = req.body || {};
+    if (!audio || typeof audio !== 'string') {
+        return res.status(400).json({ error: 'audio (base64) is required' });
+    }
+
+    const apiKey = await getApiKey();
+    if (!apiKey) return res.status(503).json({ error: 'AI service unavailable' });
+
+    try {
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        const result = await model.generateContent([
+            { inlineData: { data: audio, mimeType } },
+            `Bu ses dosyasını analiz et. YALNIZCA aşağıdaki JSON formatında yanıt döndür, başka hiçbir şey yazma:\n{"text":"türkçe transkript metni","stress":30,"excitement":70,"confidence":60,"hesitation":20}\nKurallar:\n- text: konuşulan Türkçe sözcükler. Konuşma yoksa boş string.\n- stress/excitement/confidence/hesitation: 0-100 tam sayı.\n- 'Sessizlik', 'Ses yok', 'Boş' gibi ifadeler text alanına YAZMA.`
+        ]);
+        res.json({ text: result.response.text() });
+    } catch (err) {
+        console.error('STT Error:', err.message);
         res.status(500).json({ error: err.message });
     }
 });

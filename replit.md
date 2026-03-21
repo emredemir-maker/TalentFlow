@@ -79,6 +79,30 @@ Copy `.env.example` to `.env` and fill in:
 ## Package Manager
 npm (with package-lock.json)
 
+## Security Architecture
+
+### API Key Protection (Complete)
+- **All** Gemini API calls route through the Express backend — the API key NEVER reaches the browser bundle
+- `POST /api/ai/generate` — text/prompt-based AI calls (rate-limited: 20 req/min via `aiLimiter`)
+- `POST /api/ai/stt` — audio (base64) → STT + emotion analysis via Gemini (same limiter)
+- `POST /api/check-duplicate` — server-side candidate deduplication via Firestore Admin SDK
+- `src/services/ai/config.js`: `getModel()` POSTs to `/api/ai/generate`; `getGlobalGeminiKey()` returns null (client-side stub, kept for compat)
+- `LiveInterviewPage.jsx`: `sendAudioToGemini()` now POSTs to `/api/ai/stt` — no direct Gemini calls remain
+
+### Session & Endpoint Security
+- `GET /api/session/:sessionId` — rate-limited (60 req/min per IP via `sessionLimiter`); returns only `visibleToCandidate` questions
+- `POST /api/update-candidate-status` — field whitelist: only `[candidateStatus, candidateConnected, candidatePresence, lastActive, hasConsent]` allowed; blocks all AI-related fields (`aiScore`, `summary`, etc.); session ownership validated before update
+- Rate limiters require `app.set('trust proxy', 1)` for Replit's proxy environment
+
+### Session ID Security
+- All new session IDs use `crypto.randomUUID()` → format `iv-<uuid>` (122-bit random)
+- Old format was `iv-<candidateId>-<timestamp>` (predictable, enabled enumeration)
+- Server-side session lookup now does a full candidate scan (prefix optimization removed)
+
+### Firestore Security Rules
+- `interviews/{sessionId}`: `create: false`, `delete: false` (client cannot create/delete), `update: true` (candidate can update existing session), `read: true` (WebRTC signaling)
+- Session documents are always created by the backend Admin SDK (bypasses rules)
+
 ## Live Interview System Notes
 
 ### Candidate Flow (Anonymous Users)

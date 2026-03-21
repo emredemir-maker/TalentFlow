@@ -76,9 +76,22 @@ service cloud.firestore {
     }
 
     // --- Live Interviews Collection ---
-    // Allows candidates (anonymous) to update their status/lobby presence
+    // WebRTC signaling (ICE candidates, SDP) + transcript are stored here.
+    //
+    // Security model:
+    //  • CREATE is denied for clients — sessions are always created by the
+    //    backend (Admin SDK, bypasses rules), ensuring only valid sessions exist.
+    //  • READ is open to anyone with the sessionId — the ID itself acts as
+    //    a capability token for real-time signaling.
+    //  • UPDATE is open to session participants — the session ID is 128-bit
+    //    random so enumeration is infeasible; critical writes go through the
+    //    backend anyway (/api/update-candidate-status with field whitelist).
+    //  • DELETE is denied for clients — sessions are cleaned up by backend.
     match /interviews/{sessionId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create: if false;
+      allow update: if true;
+      allow delete: if false;
     }
 
     // Default deny

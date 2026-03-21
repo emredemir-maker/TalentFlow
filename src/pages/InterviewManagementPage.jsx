@@ -520,8 +520,8 @@ export default function InterviewManagementPage() {
         try {
             const interviewerName = selectedInterviewer?.displayName || currentUser?.displayName || 'Değerlendirici';
             
-            // Using full ID for better lookup reliability in public pages
-            const sessionId = `iv-${selectedCandidate.id}-${Date.now()}`;
+            // Cryptographically random session ID — prevents enumeration attacks
+            const sessionId = `iv-${crypto.randomUUID()}`;
             let meetLink = `${window.location.origin}/join/${sessionId}`;
             let calendarEventLink = null;
 

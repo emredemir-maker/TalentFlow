@@ -12,12 +12,10 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useCandidates } from '../context/CandidatesContext';
 import { generateInterviewPaths, generateFollowUpQuestion, analyzeSTARRealTime, stripPII } from '../services/geminiService';
-import { getGlobalGeminiKey } from '../services/ai/config.js';
 import LoadingScreen from '../components/LoadingScreen';
 import CandidateExitPage from './CandidateExitPage';
 import { db } from '../config/firebase';
 import { doc, onSnapshot, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export default function LiveInterviewPage() {
     const { sessionId } = useParams();
@@ -837,7 +835,7 @@ export default function LiveInterviewPage() {
         if (blob.size < 1000) return;
 
         try {
-            // Call Gemini API directly from frontend — bypasses Firebase Cloud Function routing entirely
+            // Encode audio and send to backend STT proxy — API key stays server-side
             const arrayBuffer = await blob.arrayBuffer();
             const bytes = new Uint8Array(arrayBuffer);
             let binary = '';
@@ -845,16 +843,14 @@ export default function LiveInterviewPage() {
             const base64Audio = btoa(binary);
             const mimeType = blob.type.split(';')[0] || 'audio/webm';
 
-            const apiKey = await getGlobalGeminiKey();
-            if (!apiKey) { console.warn('[STT] No Gemini API key found.'); return; }
-            const genAI = new GoogleGenerativeAI(apiKey);
-            const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-            const result = await model.generateContent([
-                { inlineData: { data: base64Audio, mimeType } },
-                `Bu ses dosyasını analiz et. YALNIZCA aşağıdaki JSON formatında yanıt döndür, başka hiçbir şey yazma:\n{"text":"türkçe transkript metni","stress":30,"excitement":70,"confidence":60,"hesitation":20}\nKurallar:\n- text: konuşulan Türkçe sözcükler. Konuşma yoksa boş string.\n- stress: stres/gerginlik seviyesi 0-100\n- excitement: heyecan/coşku seviyesi 0-100\n- confidence: özgüven/kararlılık seviyesi 0-100\n- hesitation: tereddüt/dolgu sesi seviyesi 0-100\n- Skorlar 0-100 arası tam sayı olmalı.\n- 'Sessizlik', 'Ses yok', 'Boş' gibi ifadeler text alanına YAZMA.`
-            ]);
-
-            const raw = result.response.text().trim();
+            const sttRes = await fetch('/api/ai/stt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ audio: base64Audio, mimeType }),
+            });
+            if (!sttRes.ok) { console.warn('[STT] Backend error:', sttRes.status); return; }
+            const { text: rawText } = await sttRes.json();
+            const raw = (rawText || '').trim();
             let text = raw;
             let emotion = null;
             try {
