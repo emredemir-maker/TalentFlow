@@ -1,54 +1,50 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import { db } from '../../config/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+/**
+ * AI config — client-side facade.
+ *
+ * ALL Gemini calls are proxied through the backend (/api/ai/generate) so the
+ * API key NEVER reaches the browser bundle.  The returned "model" object
+ * matches the @google/generative-ai interface that callers already use:
+ *
+ *   const model = await getModel(modelId);
+ *   const result = await model.generateContent(prompt);
+ *   const text = result.response.text();
+ *
+ * Rate-limiting and cost control are enforced by the backend's aiLimiter
+ * (20 req / min), so there is no need for a separate client-side queue.
+ */
 
-const DEFAULT_GEMINI_MODEL = 'gemini-2.0-flash'; // High speed Flash 2.0
-const DEFAULT_CLAUDE_MODEL = 'claude-3-7-sonnet-latest';
-let genAI = null;
-let currentApiKey = null;
+const DEFAULT_GEMINI_MODEL = 'gemini-2.0-flash';
 
-export async function getGlobalGeminiKey() {
-    try {
-        // Primary: SuperAdmin saves to settings/api_keys → gemini field
-        const apiKeysRef = doc(db, 'artifacts/talent-flow/public/data/settings', 'api_keys');
-        const apiKeysSnap = await getDoc(apiKeysRef);
-        if (apiKeysSnap.exists() && apiKeysSnap.data().gemini) {
-            return apiKeysSnap.data().gemini;
-        }
-        // Legacy fallback: settings/system → geminiApiKey
-        const systemRef = doc(db, 'artifacts/talent-flow/public/data/settings', 'system');
-        const systemSnap = await getDoc(systemRef);
-        if (systemSnap.exists() && systemSnap.data().geminiApiKey) {
-            return systemSnap.data().geminiApiKey;
-        }
-    } catch (e) {
-        console.warn("Global API Key fetching error:", e);
-    }
-    return import.meta.env.VITE_GEMINI_API_KEY || '';
+/**
+ * Returns a lightweight proxy object that forwards generateContent() calls
+ * to the backend /api/ai/generate endpoint.
+ */
+export async function getModel(modelId = DEFAULT_GEMINI_MODEL) {
+    return {
+        generateContent: async (prompt) => {
+            const res = await fetch('/api/ai/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt, modelId }),
+            });
+
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.error || `AI isteği başarısız: ${res.status}`);
+            }
+
+            const { text } = await res.json();
+            // Mimic the @google/generative-ai response shape
+            return { response: { text: () => text } };
+        },
+    };
 }
 
 /**
- * Initializes and returns a Gemini model with deterministic settings.
+ * Kept for backwards compatibility — components that imported this
+ * previously will still compile.  It is no longer needed; the key lives
+ * only on the server.
  */
-export async function getModel(modelId = DEFAULT_GEMINI_MODEL) {
-    const apiKey = await getGlobalGeminiKey();
-    if (!apiKey) {
-        throw new Error('Gemini API anahtarı bulunamadı. Lütfen Sistem Ayarları üzerinden anahtarınızı ekleyin.');
-    }
-
-    if (!genAI || currentApiKey !== apiKey) {
-        currentApiKey = apiKey;
-        genAI = new GoogleGenerativeAI(apiKey);
-    }
-
-    return genAI.getGenerativeModel({
-        model: modelId,
-        generationConfig: {
-            temperature: 0,
-            topP: 0,
-            topK: 1,
-            maxOutputTokens: 2048,
-            responseMimeType: 'application/json',
-        },
-    });
+export async function getGlobalGeminiKey() {
+    return null;
 }

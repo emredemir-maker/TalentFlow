@@ -1141,6 +1141,88 @@ app.post('/api/applications', async (req, res) => {
     }
 });
 
+// ─── AI Generate Proxy ──────────────────────────────────────────────────────
+// Routes ALL Gemini calls through the backend so VITE_GEMINI_API_KEY never
+// reaches the browser bundle. Rate-limited to 20 req/min via aiLimiter.
+app.post('/api/ai/generate', aiLimiter, async (req, res) => {
+    const { prompt, modelId = 'gemini-2.0-flash' } = req.body || {};
+    if (!prompt || typeof prompt !== 'string') {
+        return res.status(400).json({ error: 'prompt is required' });
+    }
+
+    const apiKey = await getApiKey();
+    if (!apiKey) {
+        return res.status(503).json({ error: 'AI service unavailable — API key missing' });
+    }
+
+    try {
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({
+            model: modelId,
+            generationConfig: {
+                temperature: 0,
+                topP: 0,
+                topK: 1,
+                maxOutputTokens: 2048,
+                responseMimeType: 'application/json',
+            },
+        });
+        const result = await model.generateContent(prompt);
+        res.json({ text: result.response.text() });
+    } catch (err) {
+        console.error('AI Generate Error:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ─── Server-side Duplicate Candidate Check ──────────────────────────────────
+// Checks Firestore directly — catches duplicates even when client cache is stale
+// or two users submit simultaneously. Fails open (isDuplicate: false) on error.
+app.post('/api/check-duplicate', async (req, res) => {
+    try {
+        const norm = (s) => (s || '').trim().toLowerCase().replace(/[\s\-().+]/g, '');
+        const email = norm(req.body?.email);
+        const phone = norm(req.body?.phone);
+
+        if (!email && !phone) return res.json({ isDuplicate: false });
+
+        const candidatesRef = db.collection('artifacts/talent-flow/public/data/candidates');
+        let existing = null;
+        let foundBy = null;
+
+        if (email) {
+            const snap = await candidatesRef
+                .where('email', '==', email)
+                .limit(1)
+                .get();
+            if (!snap.empty) {
+                existing = { id: snap.docs[0].id, ...snap.docs[0].data() };
+                foundBy = 'email';
+            }
+        }
+
+        if (!existing && phone) {
+            const snap = await candidatesRef
+                .where('phone', '==', phone)
+                .limit(1)
+                .get();
+            if (!snap.empty) {
+                existing = { id: snap.docs[0].id, ...snap.docs[0].data() };
+                foundBy = 'phone';
+            }
+        }
+
+        res.json({
+            isDuplicate: !!existing,
+            foundBy,
+            existingName: existing?.name || null,
+        });
+    } catch (err) {
+        console.error('Duplicate check error:', err.message);
+        res.json({ isDuplicate: false }); // fail open — never block the user
+    }
+});
+
 const PORT = process.env.PORT || 3001;
 
 // Only listen if this is the main module

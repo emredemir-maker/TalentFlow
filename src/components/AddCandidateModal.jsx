@@ -44,7 +44,7 @@ function ScoreRing({ score }) {
 // Normalise contact fields the same way ApplyPage does
 function norm(str) { return (str || '').trim().toLowerCase().replace(/\s+/g, ''); }
 
-// Find an existing candidate by email OR phone in the already-loaded pool
+// Client-side check against the already-loaded candidate pool
 function findDuplicate(parsedCandidate, allCandidates) {
     if (!parsedCandidate) return null;
     const email = norm(parsedCandidate.email);
@@ -55,6 +55,26 @@ function findDuplicate(parsedCandidate, allCandidates) {
         if (phone && norm(c.phone) === phone) return true;
         return false;
     }) || null;
+}
+
+// Server-side check — catches duplicates even when local state is stale or
+// two users submit simultaneously. Fails open (null) on network error.
+async function checkDuplicateServer(parsedCandidate) {
+    if (!parsedCandidate) return null;
+    const { email, phone } = parsedCandidate;
+    if (!email && !phone) return null;
+    try {
+        const res = await fetch('/api/check-duplicate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, phone }),
+        });
+        if (!res.ok) return null;
+        const data = await res.json();
+        return data.isDuplicate ? data : null;
+    } catch {
+        return null; // fail open
+    }
 }
 
 export default function AddCandidateModal({ isOpen, onClose }) {
@@ -127,8 +147,10 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                         continue;
                     }
 
-                    // --- DUPLICATE CHECK (email / phone) ---
-                    const duplicate = findDuplicate(candidate, enrichedCandidates);
+                    // --- DUPLICATE CHECK: client-side first, then server confirms ---
+                    const clientDup = findDuplicate(candidate, enrichedCandidates);
+                    const serverDupResult = clientDup ? null : await checkDuplicateServer(candidate);
+                    const duplicate = clientDup || (serverDupResult?.isDuplicate ? { name: serverDupResult.existingName } : null);
                     if (duplicate) {
                         resultsData.push({
                             fileName: file.name,
@@ -161,30 +183,37 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                 }
             }
 
-            const processedResults = await Promise.all(resultsData.map(async (res) => {
-                if (!res.success || res.isDuplicate) return res;
+            // Sequential (not parallel) so we never fire concurrent AI calls and
+            // avoid hitting the backend rate-limit (20 req/min).
+            const processedResults = [];
+            for (const res of resultsData) {
+                if (!res.success || res.isDuplicate) {
+                    processedResults.push(res);
+                    continue;
+                }
                 // Filter positions to only those compatible with the candidate's domain
                 const compatiblePositions = filterPositionsByDomain(res.candidate, openPositions);
-                const candidates = compatiblePositions.map(pos => ({
+                const ranked = compatiblePositions.map(pos => ({
                     pos,
                     static: calculateMatchScore(res.candidate, pos),
                 })).sort((a, b) => b.static.score - a.static.score);
 
-                const topCandidate = candidates[0];
+                const topCandidate = ranked[0];
                 if (topCandidate && topCandidate.static.score > 0) {
                     try {
                         const jobText = `${topCandidate.pos.title}\n${topCandidate.pos.requirements?.join(', ')}`;
                         const aiQuick = await analyzeCandidateMatch(jobText, res.candidate);
-                        return {
+                        processedResults.push({
                             ...res,
                             match: { ...topCandidate.pos, score: aiQuick.score, aiInsight: aiQuick.summary },
-                        };
+                        });
                     } catch {
-                        return { ...res, match: { ...topCandidate.pos, score: topCandidate.static.score } };
+                        processedResults.push({ ...res, match: { ...topCandidate.pos, score: topCandidate.static.score } });
                     }
+                } else {
+                    processedResults.push({ ...res, match: null });
                 }
-                return { ...res, match: null };
-            }));
+            }
 
             setResults(processedResults);
         } catch (err) {
