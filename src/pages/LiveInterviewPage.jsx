@@ -1099,9 +1099,13 @@ export default function LiveInterviewPage() {
         return <LoadingScreen message="Oturum verileri senkronize ediliyor..." subtext="Lütfen bekleyin" />;
     }
 
-    // Allow access without login if it's a candidate join link and session is valid
+    // Allow access without login if it's a candidate join link and session is valid.
+    // Also allow anonymous candidates who have a valid apiSession (API-polled fallback)
+    // while the Firestore candidateData is still loading from the session doc lookup.
     const isCandidateJoinRoute = window.location.pathname.startsWith('/join/');
-    const canContinue = isAuthenticated || (isCandidateJoinRoute && candidateData);
+    const canContinue = isAuthenticated ||
+        (isCandidateJoinRoute && candidateData) ||
+        (isCandidateJoinRoute && user?.isAnonymous && (apiSession || candidatesLoading));
 
     if (!canContinue) return (
         <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6 text-white font-sans">

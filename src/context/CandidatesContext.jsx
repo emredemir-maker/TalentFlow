@@ -3,7 +3,7 @@
 // Rule 2 Compliance: Uses onSnapshot without complex queries, filters client-side
 
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
-import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, where, getDoc } from 'firebase/firestore';
 import { signInAnonymously } from 'firebase/auth';
 import { db, auth } from '../config/firebase';
 import { useAuth } from './AuthContext';
@@ -130,37 +130,57 @@ export function CandidatesProvider({ children }) {
             return;
         }
 
-        // IF Anonymous or on public route, we might want a targeted listener to avoid permission errors
-        if (user?.isAnonymous || (!isAuthenticated && isPublicAccessRoute)) {
+        // IF Anonymous user on a live-interview join route, look up the candidate
+        // by reading the public session document (/interviews/{sessionId}) which
+        // contains the actual candidateId.  Session IDs are now iv-{uuid}, so
+        // we can no longer extract the candidateId from the URL directly.
+        if (user?.isAnonymous) {
             const pathParts = window.location.pathname.split('/');
             const sessionIdFromUrl = pathParts.find(p => p.startsWith('iv-'));
-            
-            if (sessionIdFromUrl) {
-                // Extract candidateId: iv-{candidateId}-{timestamp}
-                const parts = sessionIdFromUrl.split('-');
-                const candidateId = parts[1];
 
-                if (candidateId) {
-                    console.log(`[TalentFlow] Public route detected. Starting TARGETED listener for candidate: ${candidateId}`);
+            if (sessionIdFromUrl) {
+                console.log(`[TalentFlow] Anonymous user detected. Resolving candidateId from session doc: ${sessionIdFromUrl}`);
+                let innerUnsub = null;
+
+                // Read the session document (allow read: if true) to get the real candidateId
+                getDoc(doc(db, 'interviews', sessionIdFromUrl)).then((sessionSnap) => {
+                    if (!sessionSnap.exists()) {
+                        console.warn(`[TalentFlow] Session doc not found: ${sessionIdFromUrl}`);
+                        setCandidates([]);
+                        setLoading(false);
+                        return;
+                    }
+                    const candidateId = sessionSnap.data()?.candidateId;
+                    if (!candidateId) {
+                        console.warn(`[TalentFlow] Session doc has no candidateId`);
+                        setCandidates([]);
+                        setLoading(false);
+                        return;
+                    }
+                    console.log(`[TalentFlow] Starting TARGETED listener for candidate: ${candidateId}`);
                     const candidateDocRef = doc(db, CANDIDATES_COLLECTION, candidateId);
-                    
-                    unsubCandidates = onSnapshot(candidateDocRef, (docSnap) => {
+                    innerUnsub = onSnapshot(candidateDocRef, (docSnap) => {
                         if (docSnap.exists()) {
                             setCandidates([{ id: docSnap.id, ...docSnap.data() }]);
-                            setLoading(false);
                             console.log(`[TalentFlow] Targeted candidate data loaded.`);
                         } else {
                             console.warn(`[TalentFlow] Candidate document not found: ${candidateId}`);
                             setCandidates([]);
-                            setLoading(false);
                         }
+                        setLoading(false);
                     }, (err) => {
                         console.error('[TalentFlow] Targeted candidate listener error:', err);
                         setCandidates([]);
                         setLoading(false);
                     });
-                    return () => unsubCandidates && unsubCandidates();
-                }
+                }).catch((err) => {
+                    console.error('[TalentFlow] Session doc read error:', err);
+                    setCandidates([]);
+                    setLoading(false);
+                });
+
+                unsubCandidates = () => { if (innerUnsub) innerUnsub(); };
+                return () => unsubCandidates();
             }
         }
 

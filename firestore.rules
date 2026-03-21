@@ -78,15 +78,20 @@ service cloud.firestore {
 
     // ── Candidates ────────────────────────────────────────────────────────────
     // • create: anonymous candidates submitting public forms
-    // • get:    document-level read — recruiter sees all, dept_user only
-    //           sees candidates in their own departments array
-    // • list:   query-level — recruiter or dept_user (client code MUST
-    //           include a .where('department', 'in', [...]) filter for
-    //           dept_users; Firestore returns only matching docs)
+    // • get:    document-level read —
+    //     - Anonymous users (live interview candidates): can read any candidate
+    //       document by ID. The session ID (128-bit UUID capability token) is
+    //       the access gate; without the link they can't know the candidate ID.
+    //     - Authenticated recruiter: sees all candidates
+    //     - Authenticated dept_user: only candidates in their departments array
+    // • list:   query-level — recruiter or dept_user (client code sends a
+    //           .where('department', 'in', [...]) filter for dept_users)
     // • update/delete: recruiter or super_admin only
     match /artifacts/talent-flow/public/data/candidates/{candidateId} {
       allow create:        if isAuthenticatedIncAnon();
-      allow get:           if canAccessCandidate(resource.data);
+      allow get:           if (isAuthenticatedIncAnon() &&
+                                request.auth.token.firebase.sign_in_provider == 'anonymous') ||
+                              canAccessCandidate(resource.data);
       allow list:          if isRecruiter() || isDepartmentUser();
       allow update, delete: if isRecruiter();
     }
