@@ -95,6 +95,7 @@ export default function LiveInterviewPage() {
 
     // Settings Modal
     const [showSettings, setShowSettings] = useState(false);
+    const [showFinishConfirm, setShowFinishConfirm] = useState(false);
     const [devices, setDevices] = useState({ audio: [], video: [] });
     const [selectedDevices, setSelectedDevices] = useState({ audioId: '', videoId: '' });
 
@@ -635,11 +636,7 @@ export default function LiveInterviewPage() {
             return;
         }
 
-        // Recruiter finishing: Logic remains the same but ensure persistence
-        if (!window.confirm("Mülakatı sonlandırmak istediğinize emin misiniz?")) {
-            return;
-        }
-
+        // Recruiter finishing
         isFinishedRef.current = true; // block ghost writes from heartbeat/cleanup
         setPhase('finished');
 
@@ -696,17 +693,34 @@ export default function LiveInterviewPage() {
                 interviewSessions: updatedSessions,
                 status: 'Evaluation'
             });
-            // Also mark the public Firestore interview doc as completed so candidates get notified
-            await setDoc(doc(db, 'interviews', sessionId), { status: 'completed' }, { merge: true });
+            // Mark the public Firestore interview doc as completed so candidates get notified
+            // Try direct write first; fall back to backend Admin SDK if permission-denied (first CREATE)
+            try {
+                await setDoc(doc(db, 'interviews', sessionId), { status: 'completed', completedAt: new Date().toISOString() }, { merge: true });
+            } catch (writeErr) {
+                if (writeErr?.code === 'permission-denied') {
+                    console.warn("[LiveInterview] Direct setDoc denied — using backend to mark completed");
+                    await fetch('/api/init-interview-session', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ sessionId, status: 'completed', completedAt: new Date().toISOString() })
+                    });
+                } else {
+                    throw writeErr;
+                }
+            }
             console.log("[LiveInterview] Session saved successfully.");
             navigate(`/interview-report/${sessionId}`);
         } catch (err) {
             console.error("Error saving session:", err);
-            // Fallback to simpler persistence if detailed one fails
-            await persistSessionData({
-                status: 'completed',
-                completedAt: new Date().toISOString()
-            });
+            // Fallback: use backend to at least mark the public doc as completed
+            try {
+                await fetch('/api/init-interview-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sessionId, status: 'completed', completedAt: new Date().toISOString() })
+                });
+            } catch (_) {}
             navigate(`/interview-report/${sessionId}`);
         }
     };
@@ -1832,13 +1846,31 @@ export default function LiveInterviewPage() {
                                 </>
                             )}
 
-                            <button
-                                onClick={handleFinishInterview}
-                                className="px-4 py-1.5 rounded-lg bg-emerald-600/90 hover:bg-emerald-600 text-white font-black text-[9px] tracking-[0.1em] uppercase transition-all shadow-lg active:scale-95 flex items-center gap-2"
-                                title="Mülakatı Başarıyla Tamamla ve Raporu Oluştur"
-                            >
-                                <CheckCircle2 className="w-3 h-3" /> Mülakatı Tamamla
-                            </button>
+                            {showFinishConfirm ? (
+                                <div className="flex items-center gap-1.5 bg-rose-950/60 border border-rose-500/30 rounded-lg px-3 py-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                                    <span className="text-[8px] text-rose-300 font-semibold mr-1 whitespace-nowrap">Mülakatı sonlandır?</span>
+                                    <button
+                                        onClick={() => { setShowFinishConfirm(false); handleFinishInterview(); }}
+                                        className="px-3 py-1 rounded-md bg-rose-600 hover:bg-rose-500 text-white font-black text-[8px] tracking-wide uppercase transition-all active:scale-95"
+                                    >
+                                        Evet
+                                    </button>
+                                    <button
+                                        onClick={() => setShowFinishConfirm(false)}
+                                        className="px-3 py-1 rounded-md bg-white/10 hover:bg-white/20 text-white/70 font-black text-[8px] tracking-wide uppercase transition-all active:scale-95"
+                                    >
+                                        Vazgeç
+                                    </button>
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => setShowFinishConfirm(true)}
+                                    className="px-4 py-1.5 rounded-lg bg-emerald-600/90 hover:bg-emerald-600 text-white font-black text-[9px] tracking-[0.1em] uppercase transition-all shadow-lg active:scale-95 flex items-center gap-2"
+                                    title="Mülakatı Başarıyla Tamamla ve Raporu Oluştur"
+                                >
+                                    <CheckCircle2 className="w-3 h-3" /> Mülakatı Tamamla
+                                </button>
+                            )}
 
                             <div className="relative">
                                 <button
@@ -2234,12 +2266,6 @@ export default function LiveInterviewPage() {
                                 >
                                     {isVideoOn ? <Video className="w-3 h-3" /> : <VideoOff className="w-3 h-3" />}
                                     <span className="hidden sm:inline">{isVideoOn ? 'Kamera' : 'Kapalı'}</span>
-                                </button>
-                                <button
-                                    onClick={handleFinishInterview}
-                                    className="flex-1 h-7 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center gap-1 text-[7px] font-black uppercase tracking-wide transition-all shadow-md shadow-emerald-900/30 active:scale-95 border border-emerald-500"
-                                >
-                                    <CheckCircle2 className="w-3 h-3" /> Bitir
                                 </button>
                             </div>
 
