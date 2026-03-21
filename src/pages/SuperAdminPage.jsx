@@ -11,7 +11,6 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
-import { usePositions } from '../context/PositionsContext';
 
 const USERS_PATH = 'artifacts/talent-flow/public/data/users';
 const INVITATIONS_PATH = 'artifacts/talent-flow/public/data/invitations';
@@ -38,8 +37,6 @@ export default function SuperAdminPage() {
 
     const [showEditModal, setShowEditModal] = useState(false);
     const [editingUser, setEditingUser] = useState(null);
-    const { positions } = usePositions();
-
     useEffect(() => {
         const unsub = onSnapshot(collection(db, 'artifacts/talent-flow/public/data/departments'), (snap) => {
             setDepartments(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -48,10 +45,8 @@ export default function SuperAdminPage() {
     }, []);
 
     const departmentOptions = useMemo(() => {
-        const fromDepts = departments.map(d => d.name);
-        const fromPositions = positions.filter(p => p.department).map(p => p.department);
-        return [...new Set([...fromDepts, ...fromPositions])].sort();
-    }, [departments, positions]);
+        return departments.map(d => d.name).sort();
+    }, [departments]);
 
     useEffect(() => {
         if (!isSuperAdmin) return;

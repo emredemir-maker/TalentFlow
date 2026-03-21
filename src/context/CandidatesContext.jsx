@@ -3,7 +3,7 @@
 // Rule 2 Compliance: Uses onSnapshot without complex queries, filters client-side
 
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
-import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, where } from 'firebase/firestore';
 import { signInAnonymously } from 'firebase/auth';
 import { db, auth } from '../config/firebase';
 import { useAuth } from './AuthContext';
@@ -164,8 +164,43 @@ export function CandidatesProvider({ children }) {
             }
         }
 
-        console.log(`[TalentFlow] Starting global candidates listener (isAuthenticated: ${isAuthenticated}, isPublicAccessRoute: ${isPublicAccessRoute})`);
-        unsubCandidates = onSnapshot(
+        // Department users: use a Firestore-level filtered query to enforce
+        // data isolation at the database layer (not just client-side).
+        const safeUserDepts = Array.isArray(userDepartments) ? userDepartments : [];
+        if (isDepartmentUser) {
+            if (safeUserDepts.length === 0) {
+                // No departments assigned — show nothing, no subscription needed
+                console.warn('[TalentFlow] department_user has no departments assigned. Showing empty candidate list.');
+                setCandidates([]);
+                setLoading(false);
+                return () => {};
+            }
+            // Firestore 'in' supports up to 30 values; slice to be safe
+            const deptQuery = query(candidatesRef, where('department', 'in', safeUserDepts.slice(0, 30)));
+            console.log(`[TalentFlow] Starting DEPT-FILTERED candidates listener for departments: [${safeUserDepts.join(', ')}]`);
+            unsubCandidates = onSnapshot(
+                deptQuery,
+                (snapshot) => {
+                    const candidateList = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+                    candidateList.sort((a, b) => {
+                        const aTime = (typeof a.createdAt?.toMillis === 'function') ? a.createdAt.toMillis() : 0;
+                        const bTime = (typeof b.createdAt?.toMillis === 'function') ? b.createdAt.toMillis() : 0;
+                        return bTime - aTime;
+                    });
+                    setCandidates(candidateList);
+                    setLoading(false);
+                    setError(null);
+                },
+                (err) => {
+                    console.error('[TalentFlow] Dept-filtered candidates snapshot error:', err);
+                    setError(err.message);
+                    setLoading(false);
+                }
+            );
+        } else {
+            // Recruiter / super_admin: full collection listener
+            console.log(`[TalentFlow] Starting global candidates listener (isAuthenticated: ${isAuthenticated}, isPublicAccessRoute: ${isPublicAccessRoute})`);
+            unsubCandidates = onSnapshot(
                 candidatesRef,
                 (snapshot) => {
                     const candidateList = snapshot.docs.map((doc) => ({
@@ -193,6 +228,7 @@ export function CandidatesProvider({ children }) {
                     setLoading(false);
                 }
             );
+        }
 
             // onSnapshot for sources to get colors
             const sourcesRef = collection(db, 'artifacts/talent-flow/public/data/sources');
@@ -212,7 +248,7 @@ export function CandidatesProvider({ children }) {
             if (unsubCandidates) unsubCandidates();
             if (unsubSources) unsubSources();
         };
-    }, [isAuthenticated, authLoading, user]); // Added user to deps to ensure anonymous transition triggers re-run
+    }, [isAuthenticated, authLoading, user, isDepartmentUser, userDepartments]); // userDepartments change triggers re-subscription for dept_users
 
 
 

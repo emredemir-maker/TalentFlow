@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import {
     collection, addDoc, updateDoc, deleteDoc, doc,
-    onSnapshot, serverTimestamp, query
+    onSnapshot, serverTimestamp, query, getDocs, where, writeBatch
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
@@ -17,6 +17,7 @@ import { usePositions } from '../context/PositionsContext';
 
 const DEPARTMENTS_PATH = 'artifacts/talent-flow/public/data/departments';
 const USERS_PATH = 'artifacts/talent-flow/public/data/users';
+const POSITIONS_PATH = 'artifacts/talent-flow/public/data/positions';
 
 const COLORS = [
     '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b',
@@ -54,7 +55,11 @@ export default function DepartmentManagementPage() {
     const deptStats = useMemo(() => {
         const stats = {};
         departments.forEach(d => {
-            const deptUsers = allUsers.filter(u => u.department === d.name);
+            // Handle both legacy `department` (string) and current `departments` (array) fields
+            const deptUsers = allUsers.filter(u =>
+                u.department === d.name ||
+                (Array.isArray(u.departments) && u.departments.includes(d.name))
+            );
             const deptPositions = positions.filter(p => p.department === d.name);
             stats[d.id] = {
                 users: deptUsers,
@@ -67,10 +72,16 @@ export default function DepartmentManagementPage() {
     }, [departments, allUsers, positions]);
 
     const unassignedUsers = useMemo(() => {
-        const deptNames = departments.map(d => d.name);
-        return allUsers.filter(u =>
-            u.role === 'department_user' && (!u.department || !deptNames.includes(u.department))
-        );
+        const deptNames = new Set(departments.map(d => d.name));
+        return allUsers.filter(u => {
+            if (u.role !== 'department_user') return false;
+            // Check legacy string field
+            const hasSingleDept = u.department && deptNames.has(u.department);
+            // Check current array field
+            const hasArrayDept = Array.isArray(u.departments) &&
+                u.departments.some(d => deptNames.has(d));
+            return !hasSingleDept && !hasArrayDept;
+        });
     }, [allUsers, departments]);
 
     const handleSaveDepartment = async (e) => {
@@ -84,9 +95,33 @@ export default function DepartmentManagementPage() {
                     color: formData.color, updatedAt: serverTimestamp()
                 });
                 if (editingDept.name !== formData.name.trim()) {
-                    const usersToUpdate = allUsers.filter(u => u.department === editingDept.name);
+                    const newName = formData.name.trim();
+                    const oldName = editingDept.name;
+
+                    // Cascade rename → users (both `department` string and `departments` array)
+                    const usersToUpdate = allUsers.filter(u =>
+                        u.department === oldName ||
+                        (Array.isArray(u.departments) && u.departments.includes(oldName))
+                    );
                     for (const u of usersToUpdate) {
-                        await updateDoc(doc(db, USERS_PATH, u.id), { department: formData.name.trim() });
+                        const updates = {};
+                        if (u.department === oldName) updates.department = newName;
+                        if (Array.isArray(u.departments) && u.departments.includes(oldName)) {
+                            updates.departments = u.departments.map(d => d === oldName ? newName : d);
+                        }
+                        await updateDoc(doc(db, USERS_PATH, u.id), updates);
+                    }
+
+                    // Cascade rename → positions
+                    const posSnap = await getDocs(
+                        query(collection(db, POSITIONS_PATH), where('department', '==', oldName))
+                    );
+                    if (!posSnap.empty) {
+                        const batch = writeBatch(db);
+                        posSnap.docs.forEach(posDoc => {
+                            batch.update(posDoc.ref, { department: newName });
+                        });
+                        await batch.commit();
                     }
                 }
             } else {
@@ -105,15 +140,46 @@ export default function DepartmentManagementPage() {
 
     const handleDeleteDept = async (dept) => {
         const stats = deptStats[dept.id];
-        if (stats?.userCount > 0) {
-            if (!window.confirm(`"${dept.name}" departmanında ${stats.userCount} kullanıcı var. Silmek istediğinize emin misiniz?`)) return;
-            for (const u of stats.users) {
-                await updateDoc(doc(db, USERS_PATH, u.id), { department: null });
+        const posCount = stats?.positionCount ?? 0;
+        const userCount = stats?.userCount ?? 0;
+
+        const parts = [];
+        if (userCount > 0) parts.push(`${userCount} kullanıcı`);
+        if (posCount > 0) parts.push(`${posCount} pozisyon`);
+        const detail = parts.length > 0 ? ` (${parts.join(', ')} etkilenecek)` : '';
+
+        if (!window.confirm(`"${dept.name}" departmanını silmek istediğinize emin misiniz?${detail}`)) return;
+
+        try {
+            // Clear department from users (both field formats)
+            if (userCount > 0) {
+                for (const u of stats.users) {
+                    const updates = {};
+                    if (u.department === dept.name) updates.department = null;
+                    if (Array.isArray(u.departments) && u.departments.includes(dept.name)) {
+                        updates.departments = u.departments.filter(d => d !== dept.name);
+                    }
+                    await updateDoc(doc(db, USERS_PATH, u.id), updates);
+                }
             }
-        } else {
-            if (!window.confirm(`"${dept.name}" departmanını silmek istediğinize emin misiniz?`)) return;
+
+            // Clear department from positions using a batch
+            const posSnap = await getDocs(
+                query(collection(db, POSITIONS_PATH), where('department', '==', dept.name))
+            );
+            if (!posSnap.empty) {
+                const batch = writeBatch(db);
+                posSnap.docs.forEach(posDoc => {
+                    batch.update(posDoc.ref, { department: null });
+                });
+                await batch.commit();
+            }
+
+            await deleteDoc(doc(db, DEPARTMENTS_PATH, dept.id));
+        } catch (err) {
+            console.error('Dept delete error:', err);
+            alert('Departman silinirken hata oluştu: ' + err.message);
         }
-        await deleteDoc(doc(db, DEPARTMENTS_PATH, dept.id));
     };
 
     const handleAssignUser = async (userId, deptName) => {

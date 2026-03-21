@@ -1,100 +1,163 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper functions
-    function isAuthenticated() {
+
+    // ── Auth helpers ──────────────────────────────────────────────────────────
+    // Strict: excludes anonymous sessions
+    function isStrictAuthenticated() {
+      return request.auth != null &&
+        request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    // Loose: includes anonymous candidates on public routes
+    function isAuthenticatedIncAnon() {
       return request.auth != null;
     }
 
-    
+    // Check if the caller's user document exists in Firestore
+    function userDocExists() {
+      return exists(/databases/$(database)/documents/artifacts/talent-flow/public/data/users/$(request.auth.uid));
+    }
+
+    // Read the caller's user profile (cached per request by Firestore)
+    function getUserProfile() {
+      return get(/databases/$(database)/documents/artifacts/talent-flow/public/data/users/$(request.auth.uid)).data;
+    }
+
+    // ── Role helpers ──────────────────────────────────────────────────────────
     function isSuperAdmin() {
-      return isAuthenticated() && 
-        (request.auth.token.email == 'emre.demir@infoset.app' || 
-         (exists(/databases/$(database)/documents/artifacts/talent-flow/public/data/users/$(request.auth.uid)) && 
-          get(/databases/$(database)/documents/artifacts/talent-flow/public/data/users/$(request.auth.uid)).data.role == 'super_admin'));
+      return isStrictAuthenticated() &&
+        (request.auth.token.email == 'emre.demir@infoset.app' ||
+         (userDocExists() && getUserProfile().role == 'super_admin'));
     }
 
     function isRecruiter() {
-      return isAuthenticated() && 
-        (isSuperAdmin() || 
-         (exists(/databases/$(database)/documents/artifacts/talent-flow/public/data/users/$(request.auth.uid)) && 
-          get(/databases/$(database)/documents/artifacts/talent-flow/public/data/users/$(request.auth.uid)).data.role == 'recruiter'));
+      return isStrictAuthenticated() &&
+        (isSuperAdmin() ||
+         (userDocExists() && getUserProfile().role == 'recruiter'));
     }
 
-    // --- Critical Path: Invitations ---
-    // Anyone (even unauthenticated) MUST be able to check if an invitation exists
-    // for their email during registration.
+    function isDepartmentUser() {
+      return isStrictAuthenticated() &&
+        userDocExists() &&
+        getUserProfile().role == 'department_user';
+    }
+
+    // Department-scoped candidate access check (document-level read)
+    function canAccessCandidate(candidateData) {
+      return isRecruiter() ||
+        (isDepartmentUser() &&
+         candidateData.department != null &&
+         'departments' in getUserProfile() &&
+         getUserProfile().departments != null &&
+         candidateData.department in getUserProfile().departments);
+    }
+
+    // ── Invitations ───────────────────────────────────────────────────────────
+    // Open read is required: pre-auth registration checks need to verify
+    // invitation by email before the account even exists.
+    // Write is super_admin only.
     match /artifacts/talent-flow/public/data/invitations/{inviteId} {
-      allow read: if true;
+      allow read:  if true;
       allow write: if isSuperAdmin();
     }
 
-    // --- Public Job Application System ---
-    // Positions: anyone can read (to display the apply form)
+    // ── Positions (public job board) ──────────────────────────────────────────
+    // Anyone can read (job applicants). Recruiters can write.
     match /artifacts/talent-flow/public/data/positions/{positionId} {
-      allow read: if true;
+      allow read:  if true;
       allow write: if isRecruiter();
     }
 
-    // Applications: anyone can create (public form submission)
-    // Only authenticated recruiters can read/update/delete
+    // ── Applications (public submission) ─────────────────────────────────────
+    // Anyone can submit. Only recruiters can read/manage.
     match /artifacts/talent-flow/public/data/applications/{applicationId} {
-      allow create: if true;
+      allow create:              if true;
       allow read, update, delete: if isRecruiter();
     }
 
-    // Candidates: authenticated users (incl. anonymous) can create
-    // so public form submissions auto-appear in the HR dashboard
+    // ── Candidates ────────────────────────────────────────────────────────────
+    // • create: anonymous candidates submitting public forms
+    // • get:    document-level read — recruiter sees all, dept_user only
+    //           sees candidates in their own departments array
+    // • list:   query-level — recruiter or dept_user (client code MUST
+    //           include a .where('department', 'in', [...]) filter for
+    //           dept_users; Firestore returns only matching docs)
+    // • update/delete: recruiter or super_admin only
     match /artifacts/talent-flow/public/data/candidates/{candidateId} {
-      allow create: if isAuthenticated();
-      allow read, update, delete: if isRecruiter();
+      allow create:        if isAuthenticatedIncAnon();
+      allow get:           if canAccessCandidate(resource.data);
+      allow list:          if isRecruiter() || isDepartmentUser();
+      allow update, delete: if isRecruiter();
     }
 
-    // --- Users & Settings ---
+    // ── Users ─────────────────────────────────────────────────────────────────
+    // • read:   self, or any recruiter/super_admin (needed for user-management UI)
+    //           department_users can only read their own profile
+    // • create: allow any authenticated user (registration flow)
+    // • update: super_admin (any user), or self (own profile only)
+    // • delete: super_admin only
     match /artifacts/talent-flow/public/data/users/{userId} {
-      allow read, create: if isAuthenticated();
-      allow update: if isSuperAdmin() || (request.auth.uid == userId);
+      allow read:   if isSuperAdmin() ||
+                       isRecruiter()  ||
+                       (isStrictAuthenticated() && request.auth.uid == userId);
+      allow create: if isAuthenticatedIncAnon();
+      allow update: if isSuperAdmin() ||
+                       (isStrictAuthenticated() && request.auth.uid == userId);
       allow delete: if isSuperAdmin();
-      
+
       match /{allChildren=**} {
-        allow read, write: if isAuthenticated() && (request.auth.uid == userId || isSuperAdmin());
+        allow read, write: if isStrictAuthenticated() &&
+                              (request.auth.uid == userId || isSuperAdmin());
       }
     }
 
-    // --- Candidates, Positions, Departments, etc. ---
-    // Broad rule for talent-flow data to ensure recruiters can work
-    match /artifacts/talent-flow/public/data/{collectionName}/{docId} {
-      allow read: if isAuthenticated();
-      allow write: if isRecruiter();
-    }
-
-    // Recursive match for any other talent-flow paths
-    match /artifacts/talent-flow/{allPaths=**} {
-      allow read: if isAuthenticated();
+    // ── Departments ───────────────────────────────────────────────────────────
+    // Read: any authenticated user (org chart visibility)
+    // Write: super_admin only (structure changes are sensitive)
+    match /artifacts/talent-flow/public/data/departments/{deptId} {
+      allow read:  if isStrictAuthenticated();
       allow write: if isSuperAdmin();
     }
 
-    // --- Live Interviews Collection ---
-    // WebRTC signaling (ICE candidates, SDP) + transcript are stored here.
-    //
-    // Security model:
-    //  • CREATE is denied for clients — sessions are always created by the
-    //    backend (Admin SDK, bypasses rules), ensuring only valid sessions exist.
-    //  • READ is open to anyone with the sessionId — the ID itself acts as
-    //    a capability token for real-time signaling.
-    //  • UPDATE is open to session participants — the session ID is 128-bit
-    //    random so enumeration is infeasible; critical writes go through the
-    //    backend anyway (/api/update-candidate-status with field whitelist).
-    //  • DELETE is denied for clients — sessions are cleaned up by backend.
+    // ── Sources (candidate origin tracking) ──────────────────────────────────
+    match /artifacts/talent-flow/public/data/sources/{sourceId} {
+      allow read:  if isStrictAuthenticated();
+      allow write: if isRecruiter();
+    }
+
+    // ── Settings ─────────────────────────────────────────────────────────────
+    match /artifacts/talent-flow/public/data/settings/{settingId} {
+      allow read:  if isRecruiter();
+      allow write: if isSuperAdmin();
+    }
+
+    // ── Broad catch-all for any other talent-flow collections ─────────────────
+    match /artifacts/talent-flow/public/data/{collectionName}/{docId} {
+      allow read:  if isStrictAuthenticated();
+      allow write: if isRecruiter();
+    }
+
+    // Recursive catch-all for deeper talent-flow paths
+    match /artifacts/talent-flow/{allPaths=**} {
+      allow read:  if isStrictAuthenticated();
+      allow write: if isSuperAdmin();
+    }
+
+    // ── Live Interview Sessions ───────────────────────────────────────────────
+    // • read:   open — sessionId (128-bit UUID) acts as capability token
+    // • create: denied — only backend Admin SDK creates sessions
+    // • update: requires ANY authenticated session (anon candidates included)
+    //           prevents random internet users from tampering with sessions
+    // • delete: denied — backend-only cleanup
     match /interviews/{sessionId} {
-      allow read: if true;
+      allow read:   if true;
       allow create: if false;
-      allow update: if true;
+      allow update: if isAuthenticatedIncAnon();
       allow delete: if false;
     }
 
-    // Default deny
+    // ── Default deny ──────────────────────────────────────────────────────────
     match /{document=**} {
       allow read, write: if false;
     }

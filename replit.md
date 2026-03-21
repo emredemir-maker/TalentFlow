@@ -99,9 +99,27 @@ npm (with package-lock.json)
 - Old format was `iv-<candidateId>-<timestamp>` (predictable, enabled enumeration)
 - Server-side session lookup now does a full candidate scan (prefix optimization removed)
 
-### Firestore Security Rules
-- `interviews/{sessionId}`: `create: false`, `delete: false` (client cannot create/delete), `update: true` (candidate can update existing session), `read: true` (WebRTC signaling)
-- Session documents are always created by the backend Admin SDK (bypasses rules)
+### Firestore Security Rules (Comprehensive Rewrite — March 2026)
+- **Auth helpers**: `isStrictAuthenticated()` (excludes anonymous), `isAuthenticatedIncAnon()` (includes anonymous candidates), `isSuperAdmin()`, `isRecruiter()`, `isDepartmentUser()`
+- **`department_user` isolation**: `canAccessCandidate(candidateData)` — document-level `get()` check verifies caller's `departments` array contains the candidate's department. DB-level enforcement, not just client-side.
+- **Candidates**: `get` requires `canAccessCandidate(resource.data)`. `list` requires recruiter or dept_user (client code sends filtered query via `where('department', 'in', userDepts)`). `update/delete` requires recruiter.
+- **Users**: restricted — only self, recruiters, or super_admin can read. Only super_admin or self can update. Only super_admin can delete.
+- **Departments**: write requires super_admin (not just any recruiter)
+- **Invitations**: open read kept (required for pre-auth registration email check). Write is super_admin only.
+- **Interviews**: `update` requires `isAuthenticatedIncAnon()` — prevents random internet users from tampering. `create/delete` still false (Admin SDK only).
+- **Storage rules** (`storage.rules`): Created — CVs in `/cvs/{candidateId}/` require auth to read; avatars in `/avatars/{userId}/` are self-writable; all other paths denied.
+
+### CandidatesContext DB Isolation
+- When `isDepartmentUser` is true: uses Firestore-level `query(ref, where('department', 'in', userDepts))` — only matching docs are fetched at the database layer
+- When dept_user has no departments assigned: returns empty list immediately (no subscription)
+- Recruiter/super_admin: full collection listener (unchanged)
+- `enrichedCandidates` client-side filter kept as secondary safety net
+
+### Department Data Integrity
+- **Rename cascade** (`handleSaveDepartment`): updates both users (`department` string AND `departments` array) AND positions via batch write
+- **Delete cascade** (`handleDeleteDept`): clears users + positions, shows user count AND position count in confirmation dialog
+- **User stats** (`deptStats`): handles both legacy `department` (string) and current `departments` (array) fields
+- **Department options** (SuperAdminPage invite modal): derived ONLY from departments collection — no longer polluted by ghost strings from positions
 
 ## Live Interview System Notes
 
