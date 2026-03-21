@@ -1,110 +1,107 @@
 export function Nexus() {
   return (
-    <div className="min-h-screen bg-[#0A0F1E] flex flex-col items-center justify-center gap-8 p-8 font-['Inter']">
-      <div className="text-center">
-        <p className="text-[10px] font-semibold tracking-[0.25em] text-slate-600 uppercase">Konsept B — Diagonal Kontrast</p>
-      </div>
+    <div className="min-h-screen bg-[#F8F9FC] flex flex-col items-center justify-center gap-10 p-8">
+      <p className="text-[10px] font-semibold tracking-[0.25em] text-slate-400 uppercase">Konsept B — Merdiven / Büyüme</p>
 
-      {/* Hero showcase */}
-      <div className="flex flex-col items-center gap-5">
-        <DiagonalMark size={96} />
+      {/* ── Dark showcase ── */}
+      <div className="bg-[#0D1424] rounded-3xl p-10 w-full max-w-sm flex flex-col items-center gap-8">
 
-        {/* Full wordmark */}
-        <div className="flex items-center gap-4 mt-2">
-          <DiagonalMark size={44} />
-          <div className="flex flex-col">
-            <div className="flex items-baseline gap-[2px] leading-none">
-              <span style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800, fontSize: 26, letterSpacing: '-0.03em', color: 'white' }}>Talent</span>
-              <span style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800, fontSize: 26, letterSpacing: '-0.03em', color: '#38BDF8' }}>-Inn</span>
+        {/* Primary lockup */}
+        <div className="flex items-center gap-5">
+          <StairMark size={72} />
+          <div className="flex flex-col leading-none select-none">
+            <div className="flex items-baseline gap-[2px]">
+              <span style={{ fontFamily: "'Inter', system-ui", fontWeight: 800, fontSize: 24, color: 'white', letterSpacing: '-0.03em' }}>Talent</span>
+              <span style={{ fontFamily: "'Inter', system-ui", fontWeight: 800, fontSize: 24, color: '#06B6D4', letterSpacing: '-0.03em' }}>-Inn</span>
             </div>
-            <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.18em', color: '#4B5563', textTransform: 'uppercase', marginTop: 3 }}>AI-Powered HR Platform</span>
+            <span style={{ fontFamily: "'Inter', system-ui", fontWeight: 500, fontSize: 9, color: '#475569', letterSpacing: '0.2em', textTransform: 'uppercase', marginTop: 4 }}>AI-Powered HR Platform</span>
           </div>
+        </div>
+
+        {/* Icon-only strip */}
+        <div className="flex gap-4 items-end">
+          {[28, 38, 50, 64].map(s => <StairMark key={s} size={s} />)}
         </div>
       </div>
 
-      {/* Light bg test */}
-      <div className="bg-white rounded-2xl p-6 w-full max-w-xs flex flex-col items-center gap-4">
-        <DiagonalMark size={56} />
-        <div className="flex items-center gap-3">
-          <DiagonalMark size={32} />
-          <div className="flex items-baseline gap-[2px]">
-            <span style={{ fontWeight: 800, fontSize: 18, letterSpacing: '-0.02em', color: '#0F172A' }}>Talent</span>
-            <span style={{ fontWeight: 800, fontSize: 18, letterSpacing: '-0.02em', color: '#0EA5E9' }}>-Inn</span>
+      {/* ── Light showcase ── */}
+      <div className="bg-white rounded-3xl p-10 w-full max-w-sm flex flex-col items-center gap-8 border border-slate-100 shadow-sm">
+
+        {/* Primary lockup — light */}
+        <div className="flex items-center gap-5">
+          <StairMark size={72} />
+          <div className="flex flex-col leading-none select-none">
+            <div className="flex items-baseline gap-[2px]">
+              <span style={{ fontFamily: "'Inter', system-ui", fontWeight: 800, fontSize: 24, color: '#0F172A', letterSpacing: '-0.03em' }}>Talent</span>
+              <span style={{ fontFamily: "'Inter', system-ui", fontWeight: 800, fontSize: 24, color: '#06B6D4', letterSpacing: '-0.03em' }}>-Inn</span>
+            </div>
+            <span style={{ fontFamily: "'Inter', system-ui", fontWeight: 500, fontSize: 9, color: '#94A3B8', letterSpacing: '0.2em', textTransform: 'uppercase', marginTop: 4 }}>Think-Inn Ailesi</span>
           </div>
         </div>
-        <div className="flex gap-3 items-end mt-1">
-          {[20, 28, 36, 48].map(s => <DiagonalMark key={s} size={s} />)}
+
+        {/* Stacked vertical wordmark */}
+        <div className="flex flex-col items-center gap-1">
+          <StairMark size={56} />
+          <div className="flex items-baseline gap-[2px] mt-2">
+            <span style={{ fontFamily: "'Inter', system-ui", fontWeight: 800, fontSize: 18, color: '#0F172A', letterSpacing: '-0.02em' }}>Talent</span>
+            <span style={{ fontFamily: "'Inter', system-ui", fontWeight: 800, fontSize: 18, color: '#06B6D4', letterSpacing: '-0.02em' }}>-Inn</span>
+          </div>
         </div>
-        <p className="text-[9px] text-slate-400 tracking-wider uppercase">Favicon → App Icon</p>
+
+        {/* Scale test */}
+        <div className="flex gap-3 items-end">
+          {[20, 28, 36, 48].map(s => <StairMark key={s} size={s} />)}
+        </div>
+        <p className="text-[9px] text-slate-400 tracking-wider uppercase">Ölçekleme — 20px → 48px</p>
       </div>
     </div>
   );
 }
 
-function DiagonalMark({ size }: { size: number }) {
+function StairMark({ size }: { size: number }) {
   const rx = size * 0.18;
-  // The diagonal splits the badge: top-left = navy, bottom-right = cyan
-  // Clip paths for each half
+  // 3 ascending steps — each a rounded rect
+  // Total canvas 100x100
+  // Step widths: 60, 42, 26 centered
+  // Step heights: 18px each, stacked bottom-to-top
+  const steps = [
+    { x: 20, y: 64, w: 60, h: 16 }, // bottom — wide
+    { x: 29, y: 46, w: 42, h: 16 }, // middle
+    { x: 37, y: 28, w: 26, h: 16 }, // top — narrow
+  ];
+  const colors = ['#1E40AF', '#0284C7', '#06B6D4'];
+
   return (
     <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <linearGradient id="dg-navy" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#0F1F5C" />
-          <stop offset="100%" stopColor="#1E3A8A" />
+        <linearGradient id="st-bg" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#0F172A" />
+          <stop offset="100%" stopColor="#172040" />
         </linearGradient>
-        <linearGradient id="dg-cyan" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#0EA5E9" />
-          <stop offset="100%" stopColor="#06B6D4" />
-        </linearGradient>
-        <clipPath id="dg-clip-top">
-          <polygon points="0,0 100,0 100,100" />
-        </clipPath>
-        <clipPath id="dg-clip-bottom">
-          <polygon points="0,0 0,100 100,100" />
-        </clipPath>
-        <clipPath id="dg-badge">
-          <rect width="100" height="100" rx={rx} />
-        </clipPath>
       </defs>
 
-      <g clipPath="url(#dg-badge)">
-        {/* Top-right triangle — navy */}
-        <polygon points="0,0 100,0 100,100" fill="url(#dg-navy)" />
-        {/* Bottom-left triangle — cyan */}
-        <polygon points="0,0 0,100 100,100" fill="url(#dg-cyan)" />
+      {/* Badge background */}
+      <rect width="100" height="100" rx={rx} fill="url(#st-bg)" />
 
-        {/* Diagonal edge highlight */}
-        <line x1="0" y1="0" x2="100" y2="100" stroke="white" strokeWidth="1.5" strokeOpacity="0.25" />
+      {/* Steps — ascending from bottom-left to top-right, centered */}
+      {steps.map((step, i) => (
+        <rect
+          key={i}
+          x={step.x}
+          y={step.y}
+          width={step.w}
+          height={step.h}
+          rx="4"
+          fill={colors[i]}
+        />
+      ))}
 
-        {/* "T" glyph — upper right zone, white */}
-        <text
-          x="64" y="44"
-          textAnchor="middle"
-          dominantBaseline="middle"
-          fontFamily="'Inter', system-ui, sans-serif"
-          fontWeight="900"
-          fontSize="36"
-          fill="white"
-          fillOpacity="0.95"
-          letterSpacing="-2"
-        >T</text>
+      {/* Riser connectors (thin lines between steps) */}
+      <line x1="29" y1="62" x2="29" y2="46" stroke="#0284C7" strokeWidth="1.5" strokeOpacity="0.5" />
+      <line x1="37" y1="44" x2="37" y2="28" stroke="#06B6D4" strokeWidth="1.5" strokeOpacity="0.5" />
 
-        {/* "I" glyph — lower left zone, dark navy on cyan */}
-        <text
-          x="36" y="72"
-          textAnchor="middle"
-          dominantBaseline="middle"
-          fontFamily="'Inter', system-ui, sans-serif"
-          fontWeight="900"
-          fontSize="36"
-          fill="#0F1F5C"
-          fillOpacity="0.9"
-          letterSpacing="-2"
-        >i</text>
-      </g>
-
-      {/* Badge border */}
-      <rect width="100" height="100" rx={rx} fill="none" stroke="white" strokeWidth="1" strokeOpacity="0.08" />
+      {/* Sparkle at top step */}
+      <circle cx="63" cy="28" r="3" fill="#67E8F9" fillOpacity="0.9" />
     </svg>
   );
 }

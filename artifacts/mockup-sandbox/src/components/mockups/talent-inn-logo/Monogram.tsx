@@ -1,97 +1,159 @@
 export function Monogram() {
   return (
-    <div className="min-h-screen bg-[#0A0F1E] flex flex-col items-center justify-center gap-8 p-8 font-['Inter']">
-      <div className="text-center">
-        <p className="text-[10px] font-semibold tracking-[0.25em] text-slate-600 uppercase">Konsept C — Noktalı-i Mark</p>
-      </div>
+    <div className="min-h-screen bg-[#F8F9FC] flex flex-col items-center justify-center gap-10 p-8">
+      <p className="text-[10px] font-semibold tracking-[0.25em] text-slate-400 uppercase">Konsept C — Ağ Merkezi / Hub</p>
 
-      {/* Hero showcase */}
-      <div className="flex flex-col items-center gap-5">
-        <DotIMark size={96} />
+      {/* ── Dark showcase ── */}
+      <div className="bg-[#0D1424] rounded-3xl p-10 w-full max-w-sm flex flex-col items-center gap-8">
 
-        {/* Full wordmark */}
-        <div className="flex items-center gap-4 mt-2">
-          <DotIMark size={44} />
-          <div className="flex flex-col">
-            <div className="flex items-baseline gap-[2px] leading-none">
-              <span style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800, fontSize: 26, letterSpacing: '-0.03em', color: 'white' }}>Talent</span>
-              <span style={{ fontFamily: "'Inter', sans-serif", fontWeight: 800, fontSize: 26, letterSpacing: '-0.03em', color: '#A78BFA' }}>-Inn</span>
+        <div className="flex items-center gap-5">
+          <HubMark size={72} />
+          <div className="flex flex-col leading-none select-none">
+            <div className="flex items-baseline gap-[2px]">
+              <span style={{ fontFamily: "'Inter', system-ui", fontWeight: 800, fontSize: 24, color: 'white', letterSpacing: '-0.03em' }}>Talent</span>
+              <span style={{ fontFamily: "'Inter', system-ui", fontWeight: 800, fontSize: 24, color: '#06B6D4', letterSpacing: '-0.03em' }}>-Inn</span>
             </div>
-            <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.18em', color: '#4B5563', textTransform: 'uppercase', marginTop: 3 }}>AI-Powered HR Platform</span>
+            <span style={{ fontFamily: "'Inter', system-ui", fontWeight: 500, fontSize: 9, color: '#475569', letterSpacing: '0.2em', textTransform: 'uppercase', marginTop: 4 }}>AI-Powered HR Platform</span>
           </div>
+        </div>
+
+        <div className="flex gap-4 items-end">
+          {[28, 38, 50, 64].map(s => <HubMark key={s} size={s} />)}
         </div>
       </div>
 
-      {/* Light bg test */}
-      <div className="bg-white rounded-2xl p-6 w-full max-w-xs flex flex-col items-center gap-4">
-        <DotIMark size={56} />
-        <div className="flex items-center gap-3">
-          <DotIMark size={32} />
-          <div className="flex items-baseline gap-[2px]">
-            <span style={{ fontWeight: 800, fontSize: 18, letterSpacing: '-0.02em', color: '#0F172A' }}>Talent</span>
-            <span style={{ fontWeight: 800, fontSize: 18, letterSpacing: '-0.02em', color: '#7C3AED' }}>-Inn</span>
+      {/* ── Light showcase ── */}
+      <div className="bg-white rounded-3xl p-10 w-full max-w-sm flex flex-col items-center gap-8 border border-slate-100 shadow-sm">
+
+        <div className="flex items-center gap-5">
+          <HubMark size={72} />
+          <div className="flex flex-col leading-none select-none">
+            <div className="flex items-baseline gap-[2px]">
+              <span style={{ fontFamily: "'Inter', system-ui", fontWeight: 800, fontSize: 24, color: '#0F172A', letterSpacing: '-0.03em' }}>Talent</span>
+              <span style={{ fontFamily: "'Inter', system-ui", fontWeight: 800, fontSize: 24, color: '#06B6D4', letterSpacing: '-0.03em' }}>-Inn</span>
+            </div>
+            <span style={{ fontFamily: "'Inter', system-ui", fontWeight: 500, fontSize: 9, color: '#94A3B8', letterSpacing: '0.2em', textTransform: 'uppercase', marginTop: 4 }}>Think-Inn Ailesi</span>
           </div>
         </div>
-        <div className="flex gap-3 items-end mt-1">
-          {[20, 28, 36, 48].map(s => <DotIMark key={s} size={s} />)}
+
+        <div className="flex flex-col items-center gap-1 mt-2">
+          <HubMark size={56} />
+          <div className="flex items-baseline gap-[2px] mt-2">
+            <span style={{ fontFamily: "'Inter', system-ui", fontWeight: 800, fontSize: 18, color: '#0F172A', letterSpacing: '-0.02em' }}>Talent</span>
+            <span style={{ fontFamily: "'Inter', system-ui", fontWeight: 800, fontSize: 18, color: '#06B6D4', letterSpacing: '-0.02em' }}>-Inn</span>
+          </div>
         </div>
-        <p className="text-[9px] text-slate-400 tracking-wider uppercase">Favicon → App Icon</p>
+
+        <div className="flex gap-3 items-end">
+          {[20, 28, 36, 48].map(s => <HubMark key={s} size={s} />)}
+        </div>
+        <p className="text-[9px] text-slate-400 tracking-wider uppercase">Ölçekleme — 20px → 48px</p>
       </div>
     </div>
   );
 }
 
-function DotIMark({ size }: { size: number }) {
-  const rx = size * 0.22;
+function HubMark({ size }: { size: number }) {
+  const rx = size * 0.18;
+
+  // Center node + 6 satellites at 60° intervals, plus 3 outer micro-nodes
+  const cx = 50, cy = 50;
+  const orbitR = 28;
+  const satellites = Array.from({ length: 6 }, (_, i) => {
+    const angle = (i * 60 - 90) * Math.PI / 180;
+    return { x: cx + orbitR * Math.cos(angle), y: cy + orbitR * Math.sin(angle) };
+  });
+
+  // Outer micro nodes between some satellites
+  const outerR = 40;
+  const outerNodes = [30, 150, 270].map(deg => {
+    const angle = (deg - 90) * Math.PI / 180;
+    return { x: cx + outerR * Math.cos(angle), y: cy + outerR * Math.sin(angle) };
+  });
+
   return (
     <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <linearGradient id="di-bg" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#13004D" />
-          <stop offset="50%" stopColor="#1E0B6E" />
-          <stop offset="100%" stopColor="#2D1B69" />
+        <linearGradient id="hb-bg" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#0F172A" />
+          <stop offset="100%" stopColor="#0C1F40" />
         </linearGradient>
-        <linearGradient id="di-spark" x1="0" y1="0" x2="1" y2="1" gradientUnits="objectBoundingBox">
-          <stop offset="0%" stopColor="#C4B5FD" />
-          <stop offset="50%" stopColor="#A78BFA" />
-          <stop offset="100%" stopColor="#7C3AED" />
+        <radialGradient id="hb-center-glow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#06B6D4" stopOpacity="0.35" />
+          <stop offset="100%" stopColor="#06B6D4" stopOpacity="0" />
+        </radialGradient>
+        <linearGradient id="hb-center" x1="35" y1="35" x2="65" y2="65" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#38BDF8" />
+          <stop offset="100%" stopColor="#06B6D4" />
         </linearGradient>
-        <filter id="di-glow" x="-60%" y="-60%" width="220%" height="220%">
-          <feGaussianBlur stdDeviation="4" result="blur" />
-          <feComposite in="SourceGraphic" in2="blur" operator="over" />
-        </filter>
       </defs>
 
       {/* Background */}
-      <rect width="100" height="100" rx={rx} fill="url(#di-bg)" />
+      <rect width="100" height="100" rx={rx} fill="url(#hb-bg)" />
 
-      {/*
-        The "i" letterform:
-        - Stem: a rounded vertical bar, centered, lower portion
-        - Tittle (dot): replaced by a 4-point diamond spark in vibrant violet/lavender
-      */}
+      {/* Center glow */}
+      <circle cx={cx} cy={cy} r="22" fill="url(#hb-center-glow)" />
 
-      {/* "i" stem */}
-      <rect x="42" y="48" width="16" height="34" rx="5" fill="white" fillOpacity="0.92" />
+      {/* Spoke lines — center to each satellite */}
+      {satellites.map((s, i) => (
+        <line
+          key={`spoke-${i}`}
+          x1={cx} y1={cy}
+          x2={s.x} y2={s.y}
+          stroke="#0EA5E9"
+          strokeWidth="1.2"
+          strokeOpacity="0.45"
+          strokeLinecap="round"
+        />
+      ))}
 
-      {/* Spark/diamond tittle — 4-point star replacing the dot */}
-      {/* Glow halo first */}
-      <path
-        d="M50 17 L55 28 L66 33 L55 38 L50 49 L45 38 L34 33 L45 28 Z"
-        fill="#A78BFA"
-        fillOpacity="0.4"
-        filter="url(#di-glow)"
-      />
-      {/* Sharp 4-point diamond star */}
-      <path
-        d="M50 17 L55 28 L66 33 L55 38 L50 49 L45 38 L34 33 L45 28 Z"
-        fill="url(#di-spark)"
-      />
-      {/* Bright center */}
-      <circle cx="50" cy="33" r="4" fill="white" fillOpacity="0.85" />
+      {/* Satellite-to-satellite ring */}
+      {satellites.map((s, i) => {
+        const next = satellites[(i + 1) % 6];
+        return (
+          <line
+            key={`ring-${i}`}
+            x1={s.x} y1={s.y}
+            x2={next.x} y2={next.y}
+            stroke="#0EA5E9"
+            strokeWidth="0.8"
+            strokeOpacity="0.2"
+          />
+        );
+      })}
 
-      {/* Badge border */}
-      <rect width="100" height="100" rx={rx} fill="none" stroke="white" strokeWidth="1" strokeOpacity="0.07" />
+      {/* Outer micro nodes with spokes */}
+      {outerNodes.map((n, i) => {
+        const nearestSat = satellites[i * 2];
+        return (
+          <g key={`outer-${i}`}>
+            <line
+              x1={nearestSat.x} y1={nearestSat.y}
+              x2={n.x} y2={n.y}
+              stroke="#06B6D4"
+              strokeWidth="0.8"
+              strokeOpacity="0.25"
+              strokeDasharray="2 2"
+            />
+            <circle cx={n.x} cy={n.y} r="2.2" fill="#0EA5E9" fillOpacity="0.5" />
+          </g>
+        );
+      })}
+
+      {/* Satellite nodes */}
+      {satellites.map((s, i) => (
+        <circle
+          key={`sat-${i}`}
+          cx={s.x} cy={s.y} r="4.5"
+          fill={i % 2 === 0 ? '#0EA5E9' : '#0369A1'}
+          fillOpacity="0.9"
+        />
+      ))}
+
+      {/* Central hub — the Inn */}
+      <circle cx={cx} cy={cy} r="10" fill="url(#hb-center)" />
+      {/* Hub inner white glow */}
+      <circle cx={cx} cy={cy} r="5" fill="white" fillOpacity="0.9" />
     </svg>
   );
 }
