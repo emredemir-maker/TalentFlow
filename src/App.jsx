@@ -22,6 +22,7 @@ import LiveInterviewPage from './pages/LiveInterviewPage';
 import InterviewReportPage from './pages/InterviewReportPage';
 import CandidateExitPage from './pages/CandidateExitPage';
 import ApplyPage from './pages/ApplyPage';
+import TechDocsPage from './pages/TechDocsPage';
 
 export default function App() {
   return (
@@ -105,6 +106,7 @@ function AuthenticatedApp() {
       case 'departments': return <SettingsPage initialTab="departments" />;
       case 'guide': return <SettingsPage initialTab="guide" />;
       case 'super-admin': return <SettingsPage initialTab="system" />;
+      case 'tech-docs': return <TechDocsPage />;
       case 'live-interview': return <LiveInterviewPage />;
       case 'interview-report': return <InterviewReportPage />;
       default: return <Dashboard />;

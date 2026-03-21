@@ -11,6 +11,7 @@ import {
     LogOut,
     ChevronLeft,
     ChevronRight,
+    Code2,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import TalentInnLogo, { TIIconMark } from './TalentInnLogo';
@@ -29,6 +30,10 @@ export default function Sidebar({ activeView, onNavigate, collapsed, onToggleCol
 
     const adminItems = [
         { id: 'settings', label: 'Genel Ayarlar', icon: Settings },
+    ];
+
+    const docsItems = [
+        { id: 'tech-docs', label: 'Teknik Dokümantasyon', icon: Code2 },
     ];
 
     const isSettingsGroup = ['settings', 'sources', 'departments', 'guide', 'super-admin'].includes(activeView);
@@ -84,6 +89,15 @@ export default function Sidebar({ activeView, onNavigate, collapsed, onToggleCol
                         </h5>
                     )}
                     {adminItems.map(item => <MenuItem key={item.id} item={item} />)}
+                </div>
+
+                <div className="pt-4">
+                    {!collapsed && (
+                        <h5 className="text-[10px] text-[#475569] font-bold px-8 mb-2 uppercase tracking-widest">
+                            Geliştirici
+                        </h5>
+                    )}
+                    {docsItems.map(item => <MenuItem key={item.id} item={item} />)}
                 </div>
             </nav>
 
