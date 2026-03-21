@@ -1,140 +1,172 @@
-# TalentFlow - AI-Powered HR Dashboard & ATS
+# Talent-Inn — AI-Powered HR Dashboard & ATS
 
-## Project Overview
-TalentFlow is an AI-powered Strategic Human Resources Dashboard and Applicant Tracking System (ATS). It automates modern recruitment processes using Google Gemini AI with features like AI STAR Analysis, automated interview planning, live interview support with real-time transcription, and HUD-style analytics.
+## Proje Hakkında
+Talent-Inn, modern işe alım süreçlerini yapay zeka ile otomatize eden stratejik bir İK platformu ve Aday Takip Sistemidir (ATS). Google Gemini AI entegrasyonu ile STAR analizi, otomatik mülakat planlama, gerçek zamanlı transkripsiyon ile canlı mülakat desteği ve analitik paneller sunar. Think-Inn marka ailesinin bir üyesidir.
 
-## Tech Stack
+---
+
+## Teknoloji Yığını
 
 ### Frontend
 - **Framework**: React 19
-- **Build Tool**: Vite 7
-- **Styling**: Tailwind CSS 4.x (via `@tailwindcss/vite` plugin)
-- **State Management**: React Context API
+- **Build**: Vite 7
+- **Styling**: Tailwind CSS 4.x (`@tailwindcss/vite` eklentisi)
+- **State**: React Context API (`AuthContext`, `CandidatesContext`, `PositionsContext`, `NotificationContext`, `MessageQueueContext`, `UserSettingsContext`)
 - **Routing**: React Router DOM 7
 - **Charts**: Recharts
 - **Icons**: Lucide React
+- **Animasyonlar**: tailwindcss-animate
 
 ### Backend
 - **Runtime**: Node.js (ES Modules)
 - **Framework**: Express 5
-- **AI**: Google Generative AI (`@google/generative-ai`) - Gemini Flash/Pro
-- **PDF Parsing**: pdf-parse, pdfjs-dist
-- **DOCX Parsing**: Mammoth
+- **AI**: Google Generative AI (`@google/generative-ai`) — Gemini 2.0 Flash
+- **CV Ayrıştırma**: pdf-parse, pdfjs-dist, Mammoth (DOCX)
 - **Web Scraping**: Puppeteer
-- **Email**: Nodemailer
-- **Security**: Helmet, express-rate-limit, xss-clean, hpp
+- **Email**: Nodemailer (Gmail SMTP)
+- **Güvenlik**: Helmet, express-rate-limit, xss-clean, hpp
 
-### Cloud Services
-- **Database**: Firebase Firestore (real-time)
-- **Auth**: Firebase Auth (Email/Password + Google OAuth)
+### Cloud & Veritabanı
+- **Veritabanı**: Firebase Firestore (gerçek zamanlı)
+- **Auth**: Firebase Authentication (Email/Şifre + Google OAuth + Anonim)
 - **Storage**: Firebase Storage
-- **Backend Admin**: Firebase Admin SDK
+- **Admin**: Firebase Admin SDK (server-side, kuralları atlar)
 
-## Project Structure
+---
+
+## Proje Yapısı
+
 ```
-TalentFlow/
-├── src/                   # Frontend source code
-│   ├── components/        # Reusable UI components
-│   ├── config/            # Firebase config, position data
-│   ├── context/           # Auth, Candidates, Notifications contexts
-│   ├── pages/             # Route-level pages (Dashboard, Analytics, etc.)
-│   ├── services/          # AI logic, Firestore interactions, CV parsing
-│   ├── App.jsx            # Main app component with routing
-│   └── main.jsx           # Entry point
-├── functions/             # Firebase Cloud Functions
-├── public/                # Static assets
-├── server.js              # Express backend (port 3001)
-├── vite.config.js         # Vite config (port 5000, proxy /api -> 3001)
+talent-inn/
+├── src/
+│   ├── components/          # Paylaşılan UI bileşenleri
+│   │   ├── Header.jsx
+│   │   ├── TalentInnLogo.jsx
+│   │   └── ...
+│   ├── config/              # Firebase config, pozisyon verileri
+│   ├── context/             # Global state yönetimi
+│   │   ├── AuthContext.jsx
+│   │   ├── CandidatesContext.jsx
+│   │   ├── PositionsContext.jsx
+│   │   └── ...
+│   ├── pages/               # Route bazlı sayfalar
+│   │   ├── Dashboard.jsx
+│   │   ├── InterviewManagementPage.jsx   # Takvim-odaklı mülakat yönetimi
+│   │   ├── LiveInterviewPage.jsx
+│   │   ├── AnalyticsPage.jsx
+│   │   ├── AIMatchPage.jsx
+│   │   ├── SuperAdminPage.jsx
+│   │   └── ...
+│   ├── services/            # İş mantığı servisleri
+│   │   ├── ai/              # Gemini AI servisleri
+│   │   ├── agenticWorkflow.js
+│   │   ├── cvParser.js
+│   │   ├── firestoreService.js
+│   │   ├── matchService.js
+│   │   └── integrationService.js
+│   ├── App.jsx              # Routing + korumalı rotalar
+│   └── main.jsx             # Giriş noktası
+├── artifacts/
+│   └── mockup-sandbox/      # UI tasarım prototipleri (Vite sunucusu)
+├── functions/               # Firebase Cloud Functions
+├── public/
+│   └── favicon.svg          # Talent-Inn marka ikonu (SVG)
+├── server.js                # Express backend (port 3001) — geliştirme
+├── functions/server.js      # Express backend — production (deploy)
+├── firestore.rules          # Firestore güvenlik kuralları
+├── storage.rules            # Firebase Storage güvenlik kuralları
+├── vite.config.js           # Vite config (port 5000, proxy /api → 3001)
 └── package.json
 ```
 
-## Running the App
+---
 
-### Development
+## Çalıştırma
+
+### Geliştirme
 ```bash
 npm run dev
 ```
-Runs both Vite (port 5000) and Express backend (port 3001) concurrently.
+Vite (port 5000) + Express (port 3001) eş zamanlı başlar. Webview port 5000'i gösterir.
 
-### Workflow
-- **Start application**: `npm run dev` — webview on port 5000
+### Production Build
+```bash
+npm run build
+```
+```bash
+bash -c "node server.js & npx vite preview --port 5000 --host 0.0.0.0"
+```
 
-## Environment Variables Required
-Copy `.env.example` to `.env` and fill in:
-- `VITE_FIREBASE_API_KEY` - Firebase API key
-- `VITE_FIREBASE_AUTH_DOMAIN` - Firebase auth domain
-- `VITE_FIREBASE_PROJECT_ID` - Firebase project ID
-- `VITE_FIREBASE_STORAGE_BUCKET` - Firebase storage bucket
-- `VITE_FIREBASE_MESSAGING_SENDER_ID` - Firebase messaging sender ID
-- `VITE_FIREBASE_APP_ID` - Firebase app ID
-- `VITE_GEMINI_API_KEY` - Google Gemini AI API key
-- `EMAIL_USER` - Gmail account for sending emails
-- `EMAIL_PASS` - Gmail app password
+---
+
+## Ortam Değişkenleri
+
+| Değişken | Açıklama |
+|---|---|
+| `VITE_FIREBASE_API_KEY` | Firebase Web API anahtarı |
+| `VITE_FIREBASE_AUTH_DOMAIN` | Firebase auth domain |
+| `VITE_FIREBASE_PROJECT_ID` | Firebase proje ID |
+| `VITE_FIREBASE_STORAGE_BUCKET` | Firebase storage bucket |
+| `VITE_FIREBASE_MESSAGING_SENDER_ID` | FCM sender ID |
+| `VITE_FIREBASE_APP_ID` | Firebase app ID |
+| `VITE_GEMINI_API_KEY` | Google Gemini API anahtarı (VITE_ ile başlar ama yalnızca server.js okur) |
+| `EMAIL_USER` | Gmail hesabı (Nodemailer) |
+| `EMAIL_PASS` | Gmail uygulama şifresi |
+| `GITHUB_PERSONAL_ACCESS_TOKEN_NEW` | GitHub push tokeni |
+
+---
 
 ## Deployment
-- **Target**: Autoscale
+- **Platform**: Replit Autoscale
 - **Build**: `npm run build`
-- **Run**: `bash -c "node server.js & npx vite preview --port 5000 --host 0.0.0.0"`
+- **Start**: `bash -c "node server.js & npx vite preview --port 5000 --host 0.0.0.0"`
+- **GitHub**: `https://github.com/emredemir-maker/TalentFlow`
 
-## Package Manager
-npm (with package-lock.json)
+---
 
-## Security Architecture
+## Güvenlik Mimarisi (Özet)
 
-### API Key Protection (Complete)
-- **All** Gemini API calls route through the Express backend — the API key NEVER reaches the browser bundle
-- `POST /api/ai/generate` — text/prompt-based AI calls (rate-limited: 20 req/min via `aiLimiter`)
-- `POST /api/ai/stt` — audio (base64) → STT + emotion analysis via Gemini (same limiter)
-- `POST /api/check-duplicate` — server-side candidate deduplication via Firestore Admin SDK
-- `src/services/ai/config.js`: `getModel()` POSTs to `/api/ai/generate`; `getGlobalGeminiKey()` returns null (client-side stub, kept for compat)
-- `LiveInterviewPage.jsx`: `sendAudioToGemini()` now POSTs to `/api/ai/stt` — no direct Gemini calls remain
+### API Anahtar Koruması
+- Tüm Gemini çağrıları Express backend üzerinden geçer — API anahtarı tarayıcı bundle'ına asla ulaşmaz
+- `POST /api/ai/generate` — metin/prompt tabanlı AI çağrıları (rate-limit: 20 istek/dk)
+- `POST /api/ai/stt` — ses → transkripsiyon + duygu analizi
 
-### Session & Endpoint Security
-- `GET /api/session/:sessionId` — rate-limited (60 req/min per IP via `sessionLimiter`); returns only `visibleToCandidate` questions
-- `POST /api/update-candidate-status` — field whitelist: only `[candidateStatus, candidateConnected, candidatePresence, lastActive, hasConsent]` allowed; blocks all AI-related fields (`aiScore`, `summary`, etc.); session ownership validated before update
-- Rate limiters require `app.set('trust proxy', 1)` for Replit's proxy environment
+### Rate Limiting
+- `generalLimiter`: Tüm rotalar için genel sınır
+- `aiLimiter`: AI endpoint'leri için 20 istek/dakika
+- `sessionLimiter`: Mülakat oturumu endpoint'leri için 60 istek/dakika
 
-### Session ID Security
-- All new session IDs use `crypto.randomUUID()` → format `iv-<uuid>` (122-bit random)
-- Old format was `iv-<candidateId>-<timestamp>` (predictable, enabled enumeration)
-- Server-side session lookup now does a full candidate scan (prefix optimization removed)
+### Firestore Kuralları
+- **Rol tabanlı erişim**: `super_admin`, `recruiter`, `department_user`, anonim aday
+- **Departman izolasyonu**: `department_user` yalnızca kendi departmanındaki adayları görür (DB katmanında zorunlu)
+- **Aday verileri**: Anonim kullanıcılar Firestore'u okuyamaz — canlı mülakat sayfası server polling kullanır
 
-### Firestore Security Rules (Comprehensive Rewrite — March 2026)
-- **Auth helpers**: `isStrictAuthenticated()` (excludes anonymous), `isAuthenticatedIncAnon()` (includes anonymous candidates), `isSuperAdmin()`, `isRecruiter()`, `isDepartmentUser()`
-- **`department_user` isolation**: `canAccessCandidate(candidateData)` — document-level `get()` check verifies caller's `departments` array contains the candidate's department. DB-level enforcement, not just client-side.
-- **Candidates**: `get` requires `canAccessCandidate(resource.data)`. `list` requires recruiter or dept_user (client code sends filtered query via `where('department', 'in', userDepts)`). `update/delete` requires recruiter.
-- **Users**: restricted — only self, recruiters, or super_admin can read. Only super_admin or self can update. Only super_admin can delete.
-- **Departments**: write requires super_admin (not just any recruiter)
-- **Invitations**: open read kept (required for pre-auth registration email check). Write is super_admin only.
-- **Interviews**: `update` requires `isAuthenticatedIncAnon()` — prevents random internet users from tampering. `create/delete` still false (Admin SDK only).
-- **Storage rules** (`storage.rules`): Created — CVs in `/cvs/{candidateId}/` require auth to read; avatars in `/avatars/{userId}/` are self-writable; all other paths denied.
+### Session Güvenliği
+- Tüm session ID'leri `crypto.randomUUID()` ile üretilir → `iv-<uuid>` formatı (122-bit rastgele)
+- Tahmin edilebilir eski format (`iv-candidateId-timestamp`) kaldırıldı
 
-### CandidatesContext DB Isolation
-- When `isDepartmentUser` is true: uses Firestore-level `query(ref, where('department', 'in', userDepts))` — only matching docs are fetched at the database layer
-- When dept_user has no departments assigned: returns empty list immediately (no subscription)
-- Recruiter/super_admin: full collection listener (unchanged)
-- `enrichedCandidates` client-side filter kept as secondary safety net
+---
 
-### Department Data Integrity
-- **Rename cascade** (`handleSaveDepartment`): updates both users (`department` string AND `departments` array) AND positions via batch write
-- **Delete cascade** (`handleDeleteDept`): clears users + positions, shows user count AND position count in confirmation dialog
-- **User stats** (`deptStats`): handles both legacy `department` (string) and current `departments` (array) fields
-- **Department options** (SuperAdminPage invite modal): derived ONLY from departments collection — no longer polluted by ghost strings from positions
+## Temel Sayfalar
 
-## Live Interview System Notes
+| Sayfa | Rota | Açıklama |
+|---|---|---|
+| Dashboard | `/` | Genel KPI paneli |
+| Mülakat Yönetimi | `/interviews` | Takvim-odaklı mülakat planlama ve takip |
+| Canlı Mülakat | `/live-interview/:id` | Gerçek zamanlı mülakat + transkripsiyon |
+| Aday Katılım | `/join/:sessionId` | Anonim aday girişi |
+| AI Eşleştirme | `/ai-match` | Aday-pozisyon uyum analizi |
+| Analitik | `/analytics` | Grafik ve raporlar |
+| Ayarlar | `/settings` | Kullanıcı ve sistem ayarları |
+| Süper Admin | `/super-admin` | Kullanıcı ve departman yönetimi |
 
-### Candidate Flow (Anonymous Users)
-- Candidates join via `/join/:sessionId` — they authenticate anonymously via Firebase Auth
-- Anonymous users **cannot read Firestore** (rules don't allow it), so `candidateData` from the CandidatesContext may be null
-- To handle this, `LiveInterviewPage` polls `GET /api/session/:sessionId` every 3 seconds — the server uses Firebase Admin SDK (bypasses auth rules) to fetch and return session status and only the questions marked `visibleToCandidate: true`
-- The `apiSession` state stores this polled data; `effectiveSession = session || apiSession` is used throughout the lifecycle effects
+---
 
-### API Calls
-- All frontend-to-backend API calls must use **relative URLs** (e.g., `/api/gemini-stt`) — NOT `http://localhost:3001/...`
-- Vite proxy routes `/api/*` → `http://localhost:3001/api/*` (see `vite.config.js`)
-- `VITE_SERVER_URL` env var is optional; the default is `''` (empty string = relative URL)
+## Kritik Geliştirici Notları
 
-### Question Visibility
-- Questions in Firestore have a `visibleToCandidate` boolean field
-- Recruiters see ALL questions; candidates only see questions explicitly sent to them via "ADAYA GÖNDER"
-- The polling endpoint (`GET /api/session/:sessionId`) filters questions server-side before returning to candidates
+1. **İki sunucu dosyası**: `server.js` (geliştirme) VE `functions/server.js` (production) — her değişikliği her ikisine de uygulamak gerekir.
+2. **Göreceli URL'ler**: Tüm frontend → backend çağrıları `/api/...` kullanmalıdır, asla `http://localhost:3001/...` değil. Vite proxy halletir.
+3. **CandidatesContext DB izolasyonu**: `department_user` rolünde Firestore `where('department', 'in', userDepts)` sorgusu yapılır; istemci tarafı filtre ikincil güvenlik katmanıdır.
+4. **Anonim aday akışı**: `/join/:sessionId` → Firebase anonim auth → `GET /api/session/:sessionId` polling (3 sn aralıklı) — Firestore kuralları anonim okumayı engeller.
+5. **Mockup sandbox**: `artifacts/mockup-sandbox/` altındaki tasarım prototipleri ayrı bir Vite sunucusunda çalışır — kanvasta iframe olarak gösterilir.
+6. **Tema renkleri**: bg `#F8FAFC`, kart `#FFFFFF`, kenarlık `#E2E8F0`, primary `#1E3A8A`, metin `#0F172A`, ikincil `#64748B`.
