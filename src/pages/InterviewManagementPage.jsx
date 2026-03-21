@@ -53,6 +53,7 @@ export default function InterviewManagementPage() {
     
     // UI States
     const [isPlanningMode, setIsPlanningMode] = useState(false);
+    const [wizardStep, setWizardStep] = useState(1); // 1 = aday seç, 2 = zaman belirle, 3 = onayla
     const [selectedCandidate, setSelectedCandidate] = useState(null);
     const [interviewType, setInterviewType] = useState('technical'); // technical, hr, product
     const [isAnalyzingSlots, setIsAnalyzingSlots] = useState(false);
@@ -310,6 +311,9 @@ export default function InterviewManagementPage() {
                     setInterviewType(session.type || 'technical');
                     setManualDate(session.date || '');
                     setManualTime(session.time || '09:00');
+                    setWizardStep(2); // skip to time step since candidate is preselected
+                } else {
+                    setWizardStep(2); // candidate already known, skip to time step
                 }
             }
             
@@ -632,7 +636,7 @@ export default function InterviewManagementPage() {
                     <div className="flex items-center gap-4">
                         {isPlanningMode && (
                             <button 
-                                onClick={() => setIsPlanningMode(false)}
+                                onClick={() => { setIsPlanningMode(false); setWizardStep(1); }}
                                 className="w-9 h-9 rounded-xl bg-white border border-[#E2E8F0] flex items-center justify-center text-[#1E3A8A] hover:bg-blue-50 transition-all shadow-sm"
                             >
                                 <ArrowLeft className="w-4 h-4" />
@@ -645,7 +649,7 @@ export default function InterviewManagementPage() {
                     </div>
                     {!isPlanningMode && (
                         <button 
-                            onClick={() => setIsPlanningMode(true)}
+                            onClick={() => { setWizardStep(1); setSelectedCandidate(null); setManualDate(''); setManualTime('09:00'); setIsPlanningMode(true); }}
                             className="bg-[#1E3A8A] text-white px-4 py-2 rounded-xl font-bold text-[12px] flex items-center gap-2 shadow-lg shadow-blue-900/10 hover:bg-blue-800 transition-all active:scale-95"
                         >
                             <Plus className="w-4 h-4" /> Yeni Seans Başlat/Planla
@@ -654,295 +658,429 @@ export default function InterviewManagementPage() {
                 </div>
 
                 {isPlanningMode && (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                        {/* FORM AREA */}
-                        <div className="lg:col-span-2 bg-white rounded-[24px] border border-[#E2E8F0] shadow-sm overflow-hidden flex flex-col">
-                            <div className="p-4 border-b border-[#F1F5F9] flex items-center justify-between bg-slate-50/50">
-                                <div className="flex items-center gap-2.5">
-                                    <div className="w-7 h-7 rounded-lg bg-blue-100/50 text-[#1E3A8A] flex items-center justify-center">
-                                        <Plus className="w-4 h-4" />
+                    <div className="bg-white rounded-[24px] border border-[#E2E8F0] shadow-sm overflow-hidden flex flex-col animate-in fade-in slide-in-from-top-2 duration-300">
+
+                        {/* WIZARD STEP PROGRESS BAR */}
+                        <div className="px-8 pt-6 pb-5 border-b border-[#F1F5F9] bg-slate-50/40">
+                            <div className="relative flex justify-between items-start">
+                                <div className="absolute left-5 right-5 top-5 h-0.5 bg-[#E2E8F0] z-0" />
+                                <div
+                                    className="absolute left-5 top-5 h-0.5 bg-[#1E3A8A] z-0 transition-all duration-500"
+                                    style={{ right: wizardStep === 1 ? 'calc(66%)' : wizardStep === 2 ? 'calc(33%)' : '20px', left: '20px' }}
+                                />
+                                {[
+                                    { num: 1, label: 'Aday Seçimi' },
+                                    { num: 2, label: 'Zaman Belirle' },
+                                    { num: 3, label: 'Onayla & Gönder' }
+                                ].map(step => (
+                                    <div
+                                        key={step.num}
+                                        className="relative z-10 flex flex-col items-center gap-2 cursor-pointer select-none"
+                                        onClick={() => step.num < wizardStep && setWizardStep(step.num)}
+                                    >
+                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-sm border-2 transition-all ${
+                                            step.num < wizardStep
+                                                ? 'bg-[#10B981] border-[#10B981] text-white shadow-md shadow-emerald-500/20'
+                                                : step.num === wizardStep
+                                                ? 'bg-[#1E3A8A] border-[#1E3A8A] text-white shadow-lg shadow-blue-900/15'
+                                                : 'bg-white border-[#E2E8F0] text-[#94A3B8]'
+                                        }`}>
+                                            {step.num < wizardStep ? <Check className="w-5 h-5" /> : step.num}
+                                        </div>
+                                        <span className={`text-[10px] font-black uppercase tracking-widest whitespace-nowrap ${
+                                            step.num === wizardStep ? 'text-[#1E3A8A]' : step.num < wizardStep ? 'text-[#10B981]' : 'text-[#94A3B8]'
+                                        }`}>{step.label}</span>
                                     </div>
-                                    <h2 className="text-[13px] font-black text-[#0F172A] uppercase tracking-tight">Yeni Seans Konfigürasyonu</h2>
-                                </div>
+                                ))}
                             </div>
-                            
-                            <div className="p-5 space-y-4">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-black text-[#64748B] uppercase tracking-widest">Aday Seçimi</label>
-                                        <select 
-                                            value={selectedCandidate?.id || ''}
-                                            onChange={(e) => setSelectedCandidate(enrichedCandidates.find(c => c.id === e.target.value))}
-                                            className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-4 py-2 text-[12px] font-bold text-[#0F172A] outline-none focus:border-blue-500 transition-all"
-                                        >
-                                            <option value="">Aday seçiniz...</option>
-                                            {enrichedCandidates.map(c => (
-                                                <option key={c.id} value={c.id}>{c.name} - %{Math.round(c.bestScore || 0)}</option>
-                                            ))}
-                                        </select>
-                                    </div>
+                        </div>
 
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-black text-[#64748B] uppercase tracking-widest">Pozisyon</label>
-                                        <div className="w-full bg-[#F1F5F9] border border-[#E2E8F0] rounded-xl px-4 py-2 text-[12px] font-bold text-[#64748B] italic">
-                                            {selectedCandidate?.position || selectedCandidate?.bestTitle || 'Otomatik Belirlenir'}
+                        {/* STEP 1: ADAY SEÇİMİ */}
+                        {wizardStep === 1 && (
+                            <div className="p-6 overflow-y-auto custom-scrollbar" style={{ maxHeight: 440 }}>
+                                <p className="text-[10px] font-black text-[#64748B] uppercase tracking-widest mb-4">Görüşeceğiniz adayı seçin</p>
+                                {enrichedCandidates.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center py-16 text-[#94A3B8]">
+                                        <User className="w-8 h-8 mb-2 opacity-30" />
+                                        <p className="text-[12px] font-medium">Sistemde henüz aday bulunmuyor.</p>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                                        {enrichedCandidates.map(c => (
+                                            <button
+                                                key={c.id}
+                                                onClick={() => setSelectedCandidate(c)}
+                                                className={`flex items-center gap-3.5 p-4 rounded-2xl border-2 transition-all text-left w-full ${
+                                                    selectedCandidate?.id === c.id
+                                                        ? 'border-[#1E3A8A] bg-blue-50/50 shadow-md shadow-blue-900/5'
+                                                        : 'border-[#E2E8F0] bg-white hover:border-[#CBD5E1] hover:bg-slate-50'
+                                                }`}
+                                            >
+                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-[11px] font-black flex-shrink-0 ${
+                                                    selectedCandidate?.id === c.id ? 'bg-[#1E3A8A] text-white' : 'bg-[#F1F5F9] text-[#475569]'
+                                                }`}>
+                                                    {c.name ? c.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() : 'A'}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className={`text-[13px] font-black truncate ${selectedCandidate?.id === c.id ? 'text-[#1E3A8A]' : 'text-[#0F172A]'}`}>{c.name}</p>
+                                                    <p className="text-[11px] text-[#64748B] font-medium mt-0.5 truncate">{c.position || c.bestTitle || '—'}</p>
+                                                </div>
+                                                <div className={`px-2.5 py-1.5 rounded-xl text-[11px] font-black flex-shrink-0 ${selectedCandidate?.id === c.id ? 'bg-[#1E3A8A] text-white' : 'bg-[#F1F5F9] text-[#475569]'}`}>
+                                                    %{Math.round(c.bestScore || 0)}
+                                                </div>
+                                                {selectedCandidate?.id === c.id && (
+                                                    <div className="w-5 h-5 rounded-full bg-[#10B981] flex items-center justify-center flex-shrink-0">
+                                                        <Check className="w-3 h-3 text-white" />
+                                                    </div>
+                                                )}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* STEP 2: ZAMAN BELİRLE */}
+                        {wizardStep === 2 && (() => {
+                            const today = new Date();
+                            const calYear = today.getFullYear();
+                            const calMonth = today.getMonth();
+                            const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+                            const firstDow = (new Date(calYear, calMonth, 1).getDay() + 6) % 7;
+                            const todayStr = today.toISOString().split('T')[0];
+                            const monthLabel = today.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' });
+                            const compactSlots = ['09:00','09:30','10:00','10:30','11:00','11:30','13:00','13:30','14:00','14:30','15:00','15:30','16:00','16:30','17:00','17:30'];
+                            const isSlotBusy = (slotTime) => {
+                                if (!manualDate) return false;
+                                if (checkLocalConflict(manualDate, slotTime)) return true;
+                                const slotStart = new Date(`${manualDate}T${slotTime}:00`);
+                                const slotEnd = new Date(slotStart.getTime() + 60 * 60 * 1000);
+                                return dayCalendarBusy.some(ev => slotStart < ev.end && slotEnd > ev.start);
+                            };
+                            return (
+                                <div className="flex overflow-hidden" style={{ minHeight: 420 }}>
+                                    {/* Calendar panel */}
+                                    <div className="w-1/2 p-6 border-r border-[#F1F5F9] overflow-y-auto custom-scrollbar">
+                                        <div className="flex items-center gap-2 mb-4">
+                                            <CalendarDays className="w-3.5 h-3.5 text-[#1E3A8A]" />
+                                            <p className="text-[10px] font-black text-[#64748B] uppercase tracking-widest">{monthLabel}</p>
+                                            {isCheckingDay && <Loader2 className="w-3 h-3 animate-spin text-slate-400 ml-auto" />}
+                                        </div>
+                                        <div className="grid grid-cols-7 gap-y-1 gap-x-0.5 text-center">
+                                            {['Pt','Sl','Çr','Pr','Cm','Ct','Pz'].map(d => (
+                                                <div key={d} className="text-[8px] font-black text-[#94A3B8] uppercase tracking-wider py-1">{d}</div>
+                                            ))}
+                                            {Array.from({ length: firstDow }).map((_, i) => <div key={`e${i}`} />)}
+                                            {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => {
+                                                const dateStr = `${calYear}-${String(calMonth + 1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+                                                const isPast = dateStr < todayStr;
+                                                const isSelected = manualDate === dateStr;
+                                                return (
+                                                    <div key={day} className="flex justify-center">
+                                                        <button
+                                                            disabled={isPast}
+                                                            onClick={() => !isPast && setManualDate(dateStr)}
+                                                            className={`w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold transition-all ${
+                                                                isPast ? 'text-[#CBD5E1] cursor-not-allowed' :
+                                                                isSelected ? 'bg-[#1E3A8A] text-white shadow-md font-black' :
+                                                                'text-[#334155] hover:bg-[#F1F5F9]'
+                                                            }`}
+                                                        >
+                                                            {day}
+                                                        </button>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+
+                                        {/* Interview type selector */}
+                                        <div className="mt-6">
+                                            <p className="text-[10px] font-black text-[#64748B] uppercase tracking-widest mb-2.5">Mülakat Tipi</p>
+                                            <div className="grid grid-cols-3 gap-1.5">
+                                                {[
+                                                    { id: 'technical', label: 'TEKNİK', Icon: Settings },
+                                                    { id: 'hr', label: 'İK FİLTRE', Icon: User },
+                                                    { id: 'product', label: 'PRODUCT', Icon: Package }
+                                                ].map(({ id, label, Icon }) => (
+                                                    <button
+                                                        key={id}
+                                                        onClick={() => setInterviewType(id)}
+                                                        className={`py-2 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-1 transition-all border ${
+                                                            interviewType === id
+                                                                ? 'bg-[#1E3A8A] text-white border-[#1E3A8A] shadow-md'
+                                                                : 'bg-white text-[#64748B] border-[#E2E8F0] hover:bg-slate-50'
+                                                        }`}
+                                                    >
+                                                        <Icon className="w-3 h-3" /> {label}
+                                                    </button>
+                                                ))}
+                                            </div>
                                         </div>
                                     </div>
 
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-black text-[#64748B] uppercase tracking-widest">Email</label>
-                                        <input type="text" readOnly value={selectedCandidate?.email || '-'} className="w-full bg-[#F1F5F9] border border-[#E2E8F0] rounded-xl px-4 py-2 text-[11px] font-bold text-[#64748B]" />
-                                    </div>
+                                    {/* Time slots panel */}
+                                    <div className="w-1/2 p-6 bg-[#F8FAFC]/50 overflow-y-auto custom-scrollbar">
+                                        <p className="text-[11px] font-black text-[#0F172A]">
+                                            {manualDate
+                                                ? new Date(manualDate + 'T12:00:00').toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })
+                                                : 'Önce tarih seçin'}
+                                        </p>
+                                        <p className="text-[9px] text-[#94A3B8] font-medium mb-4 mt-0.5">GMT+3 — İstanbul</p>
 
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-1.5">
-                                            Manuel Tarih
-                                            {isCheckingDay && <Loader2 className="w-3 h-3 animate-spin text-slate-400" />}
-                                        </label>
-                                        <input 
-                                            type="date" 
-                                            value={manualDate}
-                                            min={new Date().toISOString().split('T')[0]}
-                                            onChange={(e) => setManualDate(e.target.value)}
-                                            className="w-full bg-emerald-50/30 border border-emerald-100 rounded-xl px-4 py-2 text-[11px] font-bold text-[#0F172A] outline-none focus:border-emerald-500" 
-                                        />
-                                    </div>
+                                        {conflictWarning && (
+                                            <div className="mb-3 bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-2">
+                                                <AlertTriangle className="w-3.5 h-3.5 text-red-500 flex-shrink-0 mt-0.5" />
+                                                <p className="text-[10px] text-red-600 font-semibold leading-relaxed">{conflictWarning.message}</p>
+                                            </div>
+                                        )}
 
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-black text-[#10B981] uppercase tracking-widest flex items-center gap-1.5">
-                                            Saat Seçimi
-                                            {conflictWarning && <span className="text-red-500 text-[9px] font-black">⚠ ÇAKIŞMA</span>}
-                                            {!conflictWarning && manualDate && manualTime && !isCheckingDay && <span className="text-emerald-500 text-[9px] font-black">✓ UYGUN</span>}
-                                        </label>
-                                        <select 
-                                            value={manualTime}
-                                            onChange={(e) => setManualTime(e.target.value)}
-                                            className={`w-full rounded-xl px-4 py-2 text-[11px] font-bold text-[#0F172A] outline-none appearance-none pointer-events-auto transition-all ${
-                                                conflictWarning 
-                                                    ? 'bg-red-50 border border-red-300 focus:border-red-500' 
-                                                    : 'bg-emerald-50/30 border border-emerald-100 focus:border-emerald-500'
-                                            }`}
-                                        >
-                                            {timeSlots.map(t => (
-                                                <option key={t} value={t}>{t}</option>
-                                            ))}
-                                        </select>
-                                    </div>
+                                        {!manualDate ? (
+                                            <div className="flex flex-col items-center justify-center h-40 text-[#CBD5E1]">
+                                                <Clock className="w-7 h-7 mb-2 opacity-40" />
+                                                <p className="text-[11px] font-medium">Soldan tarih seçin</p>
+                                            </div>
+                                        ) : isCheckingDay ? (
+                                            <div className="flex items-center justify-center h-40 gap-2 text-[#94A3B8]">
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                <span className="text-[11px] font-medium">Takvim kontrol ediliyor...</span>
+                                            </div>
+                                        ) : (
+                                            <div className="grid grid-cols-2 gap-2">
+                                                {compactSlots.map((slotTime, i) => {
+                                                    const isSelected = manualTime === slotTime;
+                                                    const isBusy = isSlotBusy(slotTime);
+                                                    return (
+                                                        <button
+                                                            key={i}
+                                                            disabled={isBusy}
+                                                            onClick={() => !isBusy && setManualTime(slotTime)}
+                                                            className={`flex items-center justify-between px-3 py-2.5 rounded-xl border transition-all ${
+                                                                isSelected
+                                                                    ? 'border-[#1E3A8A] bg-blue-50 ring-1 ring-[#1E3A8A]/20 shadow-md shadow-blue-900/5'
+                                                                    : isBusy
+                                                                    ? 'border-[#F1F5F9] bg-white cursor-not-allowed'
+                                                                    : 'border-[#E2E8F0] bg-white hover:border-[#1E3A8A]/30 hover:bg-blue-50/30'
+                                                            }`}
+                                                        >
+                                                            <span className={`text-[13px] font-black tracking-tight ${isBusy ? 'text-[#CBD5E1]' : isSelected ? 'text-[#1E3A8A]' : 'text-[#0F172A]'}`}>{slotTime}</span>
+                                                            {isSelected ? (
+                                                                <span className="text-[8px] font-black px-1.5 py-0.5 bg-[#1E3A8A] text-white rounded-md flex items-center gap-0.5">
+                                                                    <CheckCircle2 className="w-2.5 h-2.5" /> SEÇİLİ
+                                                                </span>
+                                                            ) : isBusy ? (
+                                                                <span className="text-[8px] font-black px-1.5 py-0.5 bg-rose-50 text-rose-400 rounded-md flex items-center gap-0.5">
+                                                                    <AlertCircle className="w-2.5 h-2.5" /> DOLU
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-[8px] font-medium px-1.5 py-0.5 bg-[#F1F5F9] text-[#94A3B8] rounded-md">UYGUN</span>
+                                                            )}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
 
-                                    {/* CONFLICT WARNING + DAY FREE SLOTS */}
-                                    {manualDate && (
-                                        <div className="col-span-2 space-y-2 animate-in fade-in duration-200">
-                                            {conflictWarning ? (
-                                                <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-2.5">
-                                                    <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="text-[11px] font-black text-red-700">
-                                                            {conflictWarning.type === 'system' ? 'Sistem Çakışması' : 'Takvim Çakışması'}
-                                                        </p>
-                                                        <p className="text-[10px] text-red-600 mt-0.5 leading-relaxed">{conflictWarning.message}</p>
-                                                        {dayFreeSlots.length > 0 && (
-                                                            <div className="mt-2.5">
-                                                                <p className="text-[9px] font-black text-red-500 uppercase tracking-widest mb-1.5">Bu gün uygun saatler:</p>
-                                                                <div className="flex flex-wrap gap-1.5">
-                                                                    {dayFreeSlots.map((slot, i) => (
-                                                                        <button
-                                                                            key={i}
-                                                                            type="button"
-                                                                            onClick={() => setManualTime(slot.time)}
-                                                                            className="px-3 py-1 bg-white border border-emerald-300 rounded-lg text-[10px] font-black text-emerald-700 hover:bg-emerald-50 transition-all"
-                                                                        >
-                                                                            {slot.time}
-                                                                        </button>
-                                                                    ))}
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                        {dayFreeSlots.length === 0 && !isCheckingDay && (
-                                                            <p className="text-[9px] text-red-500 mt-1.5 font-bold">Bu gün için uygun saat bulunamadı.</p>
-                                                        )}
-                                                    </div>
+                                        {isGoogleConnected && (
+                                            <button
+                                                onClick={handleAutoPlan}
+                                                disabled={isAnalyzingSlots}
+                                                className="mt-4 w-full py-2 rounded-xl border border-emerald-100 bg-emerald-50/60 text-[10px] font-black uppercase tracking-widest text-emerald-700 flex items-center justify-center gap-1.5 hover:bg-emerald-100 transition-all"
+                                            >
+                                                {isAnalyzingSlots ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                                                AI Slot Öner
+                                            </button>
+                                        )}
+                                        {suggestedSlots.length > 0 && (
+                                            <div className="mt-3 space-y-1.5">
+                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">AI Önerileri:</p>
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {suggestedSlots.map((slot, i) => (
+                                                        <button
+                                                            key={i}
+                                                            onClick={() => { setManualDate(slot.date); setManualTime(slot.time); }}
+                                                            className="px-3 py-1.5 bg-white border border-emerald-200 rounded-lg text-[10px] font-black text-emerald-700 hover:bg-emerald-50 transition-all"
+                                                        >
+                                                            {new Date(slot.date + 'T12:00:00').toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })} {slot.time}
+                                                        </button>
+                                                    ))}
                                                 </div>
-                                            ) : dayFreeSlots.length > 0 ? (
-                                                <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-3 flex items-start gap-2.5">
-                                                    <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="text-[10px] font-black text-emerald-700">Bu gün müsait saatler</p>
-                                                        <div className="flex flex-wrap gap-1.5 mt-1.5">
-                                                            {dayFreeSlots.map((slot, i) => (
-                                                                <button
-                                                                    key={i}
-                                                                    type="button"
-                                                                    onClick={() => setManualTime(slot.time)}
-                                                                    className={`px-3 py-1 rounded-lg text-[10px] font-black transition-all border ${
-                                                                        manualTime === slot.time
-                                                                            ? 'bg-emerald-500 text-white border-emerald-500'
-                                                                            : 'bg-white border-emerald-200 text-emerald-700 hover:bg-emerald-100'
-                                                                    }`}
-                                                                >
-                                                                    {slot.time}
-                                                                </button>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ) : isCheckingDay ? (
-                                                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 flex items-center gap-2">
-                                                    <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
-                                                    <span className="text-[10px] text-slate-500 font-bold">Takvim kontrol ediliyor...</span>
-                                                </div>
-                                            ) : null}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })()}
+
+                        {/* STEP 3: ONAYLA & GÖNDER */}
+                        {wizardStep === 3 && (
+                            <div className="p-6 space-y-4 overflow-y-auto custom-scrollbar" style={{ minHeight: 360 }}>
+                                <p className="text-[10px] font-black text-[#64748B] uppercase tracking-widest">Mülakat detaylarını kontrol edin</p>
+                                <div className="grid grid-cols-2 gap-3">
+                                    {/* Candidate card */}
+                                    <div className="bg-[#F8FAFC] rounded-2xl border border-[#E2E8F0] p-4 space-y-2.5">
+                                        <p className="text-[9px] font-black text-[#64748B] uppercase tracking-widest">Aday</p>
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-9 h-9 rounded-full bg-[#1E3A8A] text-white flex items-center justify-center text-[10px] font-black flex-shrink-0">
+                                                {selectedCandidate?.name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="text-[13px] font-black text-[#0F172A] truncate">{selectedCandidate?.name}</p>
+                                                <p className="text-[11px] text-[#64748B] truncate">{selectedCandidate?.position || selectedCandidate?.bestTitle}</p>
+                                            </div>
                                         </div>
-                                    )}
-
-                                    <div className="space-y-1 col-span-2">
-                                        <label className="text-[10px] font-black text-[#64748B] uppercase tracking-widest">Mülakat Tipi</label>
-                                        <div className="grid grid-cols-3 gap-1.5">
-                                            {[
-                                                { id: 'technical', label: 'TEKNİK', icon: Settings },
-                                                { id: 'hr', label: 'İK FİLTRE', icon: User },
-                                                { id: 'product', label: 'PRODUCT', icon: Package }
-                                            ].map(type => (
-                                                <button 
-                                                    key={type.id}
-                                                    onClick={() => setInterviewType(type.id)}
-                                                    className={`py-2 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5 transition-all border ${interviewType === type.id ? 'bg-[#1E3A8A] text-white border-[#1E3A8A] shadow-md' : 'bg-white text-[#64748B] border-[#E2E8F0] hover:bg-slate-50'}`}
-                                                >
-                                                    <type.icon className="w-3 h-3" /> {type.label}
-                                                </button>
-                                            ))}
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-4 h-4 rounded-full bg-emerald-100 flex items-center justify-center">
+                                                <Check className="w-2.5 h-2.5 text-emerald-600" />
+                                            </div>
+                                            <span className="text-[10px] font-bold text-[#64748B] truncate">{selectedCandidate?.email || '—'}</span>
+                                        </div>
+                                    </div>
+                                    {/* Interview detail card */}
+                                    <div className="bg-[#F8FAFC] rounded-2xl border border-[#E2E8F0] p-4 space-y-2.5">
+                                        <p className="text-[9px] font-black text-[#64748B] uppercase tracking-widest">Mülakat Detayı</p>
+                                        <div className="flex items-center gap-2">
+                                            <CalendarDays className="w-3.5 h-3.5 text-[#1E3A8A]" />
+                                            <span className="text-[13px] font-black text-[#0F172A]">
+                                                {manualDate
+                                                    ? new Date(manualDate + 'T12:00:00').toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })
+                                                    : 'Tarih belirlenmedi'} · {manualTime}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <User className="w-3.5 h-3.5 text-[#64748B]" />
+                                            <span className="text-[11px] text-[#64748B] font-medium">
+                                                {selectedInterviewer?.displayName || currentUser?.displayName || 'Değerlendirici'}
+                                            </span>
+                                        </div>
+                                        <div className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest ${
+                                            interviewType === 'technical' ? 'bg-blue-50 text-blue-600' :
+                                            interviewType === 'hr' ? 'bg-amber-50 text-amber-600' :
+                                            'bg-purple-50 text-purple-600'
+                                        }`}>
+                                            {interviewType === 'technical' ? 'TEKNİK MÜLAKAT' : interviewType === 'hr' ? 'İK FİLTRE' : 'PRODUCT MÜLAKATI'}
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="bg-[#F0FFF4] border border-[#C6F6D5] rounded-xl px-4 py-3 flex items-center justify-between">
-                                    <div className="flex flex-col">
-                                        <label className="text-[8px] font-black text-[#22543D] uppercase tracking-[0.2em] mb-0.5">Aday Katılım Linki</label>
-                                        <span className="text-[11px] font-mono text-[#2F855A] font-black italic">{window.location.origin}/join/{selectedCandidate?.id.substring(0,4)}...</span>
+                                {/* AI Score section */}
+                                {selectedCandidate && (
+                                    <div className="bg-[#EBF4FF] rounded-2xl border border-[#D1E9FF] p-4 flex items-center gap-5">
+                                        <div className="relative w-16 h-16 flex-shrink-0">
+                                            <svg className="w-full h-full -rotate-90">
+                                                <circle cx="32" cy="32" r="28" stroke="white" strokeWidth="6" fill="transparent" opacity="0.5" />
+                                                <circle cx="32" cy="32" r="28" stroke="#10B981" strokeWidth="6" fill="transparent"
+                                                    strokeDasharray="176"
+                                                    strokeDashoffset={176 - (176 * (selectedCandidate.bestScore || 0) / 100)}
+                                                    strokeLinecap="round" className="transition-all duration-1000" />
+                                            </svg>
+                                            <div className="absolute inset-0 flex items-center justify-center">
+                                                <span className="text-sm font-black text-[#0F172A] tabular-nums">%{Math.round(selectedCandidate.bestScore || 0)}</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-black text-[#1E3A8A] uppercase tracking-widest mb-0.5">AI Aday Analizi</p>
+                                            <p className="text-[11px] text-[#475569] font-medium leading-relaxed italic">
+                                                "{selectedCandidate.bestTitle || 'İlgili alan'} deneyimiyle %{Math.round(selectedCandidate.bestScore || 0)} uyum puanı güçlü bir potansiyel sergiliyor."
+                                            </p>
+                                        </div>
                                     </div>
-                                    <button 
-                                        onClick={() => {
-                                            if (selectedCandidate) {
-                                                const link = `${window.location.origin}/join/iv-${selectedCandidate.id}-NEW`;
-                                                navigator.clipboard.writeText(link);
-                                                alert("Link kopyalandı!");
-                                            }
-                                        }}
-                                        className="p-2 text-[#2F855A] hover:bg-white rounded-lg transition-all"
+                                )}
+
+                                {/* Join link preview */}
+                                <div className="bg-[#F0FFF4] border border-[#C6F6D5] rounded-2xl px-4 py-3 flex items-center justify-between">
+                                    <div>
+                                        <p className="text-[9px] font-black text-[#22543D] uppercase tracking-[0.2em] mb-0.5">Aday Katılım Linki</p>
+                                        <span className="text-[11px] font-mono text-[#2F855A] font-black">{window.location.origin}/join/iv-{selectedCandidate?.id?.substring(0,6)}…</span>
+                                    </div>
+                                    <button
+                                        onClick={() => selectedCandidate && navigator.clipboard.writeText(`${window.location.origin}/join/iv-${selectedCandidate.id}-preview`)}
+                                        className="p-2 text-[#2F855A] hover:bg-white rounded-xl transition-all border border-transparent hover:border-[#C6F6D5]"
                                     >
                                         <Copy className="w-3.5 h-3.5" />
                                     </button>
                                 </div>
+                            </div>
+                        )}
 
-                                <div className="pt-2 flex flex-wrap gap-2">
-                                    <button 
-                                        onClick={openEmailPreview}
-                                        disabled={!selectedCandidate}
-                                        className="flex-1 bg-white border-2 border-blue-50 text-[#1E3A8A] py-3 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-blue-50 transition-all disabled:opacity-40"
-                                    >
-                                        <Mail className="w-3.5 h-3.5" /> E-POSTA GÖNDER
-                                    </button>
-                                    <button 
-                                        disabled={true} 
-                                        className="flex-1 bg-white border border-slate-100 text-[#94A3B8] py-3 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 cursor-not-allowed opacity-50"
-                                    >
-                                        <MessageSquare className="w-3.5 h-3.5" /> SMS GÖNDER
-                                    </button>
-                                    <div className="flex-[2] flex gap-2">
-                                        <button 
-                                            onClick={handleAutoPlan}
-                                            disabled={isAnalyzingSlots || !selectedCandidate}
-                                            className="w-11 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center hover:bg-emerald-100 transition-all border border-emerald-100"
-                                            title="Akıllı Planlayıcıyı Çalıştır"
-                                        >
-                                            {isAnalyzingSlots ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                                        </button>
-                                        {manualDate && manualTime ? (
-                                            <button 
-                                                onClick={() => {
-                                                    if (conflictWarning) {
-                                                        const confirmed = window.confirm(
-                                                            `⚠️ Çakışma Uyarısı\n\n${conflictWarning.message}\n\nYine de bu saatte planlamak istiyor musunuz?`
-                                                        );
-                                                        if (!confirmed) return;
-                                                    }
-                                                    createInterviewRecord({ date: manualDate, time: manualTime }, false);
-                                                }}
-                                                disabled={!selectedCandidate || isCheckingDay}
-                                                className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-xl ${
-                                                    conflictWarning
-                                                        ? 'bg-orange-500 hover:bg-orange-600 text-white shadow-orange-500/10'
-                                                        : 'bg-[#10B981] hover:bg-emerald-600 text-white shadow-emerald-500/10'
-                                                }`}
-                                            >
-                                                {conflictWarning 
-                                                    ? <><AlertTriangle className="w-3.5 h-3.5" /> YINE DE PLANLA</>
-                                                    : <><Calendar className="w-3.5 h-3.5" /> MÜLAKATI PLANLA</>
-                                                }
-                                            </button>
-                                        ) : (
-                                            <button 
-                                                onClick={() => createInterviewRecord(null, true)}
-                                                disabled={!selectedCandidate}
-                                                className="flex-1 bg-[#1E3A8A] text-white py-3 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-blue-800 transition-all shadow-xl shadow-blue-900/10 disabled:opacity-40"
-                                            >
-                                                <Play className="w-3.5 h-3.5 fill-current" /> ŞİMDİ BAŞLAT
-                                            </button>
-                                        )}
-                                    </div>
+                        {/* WIZARD FOOTER NAVIGATION */}
+                        <div className="px-6 py-4 border-t border-[#F1F5F9] bg-slate-50/40 flex items-center justify-between">
+                            <button
+                                onClick={() => wizardStep > 1 && setWizardStep(s => s - 1)}
+                                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${
+                                    wizardStep > 1
+                                        ? 'text-[#64748B] hover:text-[#0F172A] hover:bg-[#F1F5F9] border border-[#E2E8F0]'
+                                        : 'text-[#CBD5E1] cursor-not-allowed border border-transparent'
+                                }`}
+                            >
+                                <ChevronLeft className="w-3.5 h-3.5" />
+                                {wizardStep === 2 ? 'Aday Seçimi' : wizardStep === 3 ? 'Zaman Belirle' : 'Geri'}
+                            </button>
+
+                            {/* Center summary chip */}
+                            <div className="flex items-center gap-2 bg-white border border-[#E2E8F0] px-3.5 py-1.5 rounded-full shadow-sm text-[11px]">
+                                <div className="w-5 h-5 rounded-full bg-[#1E3A8A]/10 text-[#1E3A8A] flex items-center justify-center">
+                                    <User className="w-3 h-3" />
                                 </div>
-
-                                {suggestedSlots.length > 0 && (
-                                    <div className="flex flex-col gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest italic">UYGUN SLOTLAR (PLANLA):</span>
-                                        <div className="grid grid-cols-3 gap-2">
-                                            {suggestedSlots.map((slot, i) => (
-                                                <button 
-                                                    key={i}
-                                                    onClick={() => createInterviewRecord(slot, false)}
-                                                    className="p-3 bg-slate-50 border border-slate-200 rounded-xl hover:bg-emerald-50 hover:border-emerald-400 transition-all text-left flex flex-col gap-0.5 group"
-                                                >
-                                                    <span className="text-[10px] font-black text-[#1E3A8A] tabular-nums">{slot.time}</span>
-                                                    <span className="text-[9px] font-bold text-slate-500 uppercase">{new Date(slot.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}</span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
+                                <span className="font-black text-[#0F172A]">{selectedCandidate?.name || '—'}</span>
+                                {wizardStep >= 2 && manualDate && (
+                                    <>
+                                        <span className="text-[#CBD5E1]">•</span>
+                                        <span className="font-bold text-[#1E3A8A]">
+                                            {new Date(manualDate + 'T12:00:00').toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })} · {manualTime}
+                                        </span>
+                                    </>
                                 )}
                             </div>
-                        </div>
 
-                        {/* AI ANALYSIS BAR */}
-                        <div className="bg-[#EBF4FF] rounded-[24px] border border-[#D1E9FF] p-6 flex flex-col items-center">
-                            <div className="w-full flex items-center gap-2 mb-6">
-                                <Sparkles className="w-3.5 h-3.5 text-[#1E3A8A]" />
-                                <h3 className="text-[10px] font-black text-[#1E3A8A] uppercase tracking-widest">AI ADAY ANALİZİ</h3>
-                            </div>
-
-                            <div className="relative w-32 h-32 mb-8">
-                                <svg className="w-full h-full transform -rotate-90">
-                                    <circle cx="64" cy="64" r="58" stroke="white" strokeWidth="10" fill="transparent" opacity="0.4" />
-                                    <circle cx="64" cy="64" r="58" stroke="#10B981" strokeWidth="10" fill="transparent" strokeDasharray={364} strokeDashoffset={364 - (364 * (selectedCandidate?.bestScore || 0)) / 100} strokeLinecap="round" className="transition-all duration-1000" />
-                                </svg>
-                                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                    <span className="text-3xl font-black text-[#0F172A] tabular-nums">%{Math.round(selectedCandidate?.bestScore || 0)}</span>
-                                    <span className="text-[8px] font-black text-[#64748B] uppercase tracking-widest">UYUM</span>
-                                </div>
-                            </div>
-
-                            <div className="w-full space-y-4 mb-4">
-                               <div className="space-y-1.5">
-                                   <div className="flex justify-between items-center text-[10px] font-black text-[#64748B] uppercase"><span>Teknik Yetkinlik</span><span>%{Math.round((selectedCandidate?.bestScore || 0) * 0.85)}</span></div>
-                                   <div className="w-full h-1 bg-white/50 rounded-full"><div className="h-full bg-[#1E3A8A] rounded-full" style={{ width: `${(selectedCandidate?.bestScore || 0) * 0.85}%` }} /></div>
-                               </div>
-                               <div className="space-y-1.5">
-                                   <div className="flex justify-between items-center text-[10px] font-black text-[#64748B] uppercase"><span>Kültürel Uyum</span><span>%{Math.round((selectedCandidate?.bestScore || 0) * 0.9)}</span></div>
-                                   <div className="w-full h-1 bg-white/50 rounded-full"><div className="h-full bg-[#1E3A8A] rounded-full" style={{ width: `${(selectedCandidate?.bestScore || 0) * 0.9}%` }} /></div>
-                               </div>
-                            </div>
-                            
-                            {selectedCandidate && (
-                                <div className="mt-4 bg-white/40 p-4 rounded-xl border border-white flex flex-col gap-2 shadow-sm">
-                                    <p className="text-[11px] text-[#475569] font-medium leading-relaxed italic">"Adayın {selectedCandidate.bestTitle || 'ilgili alan'} tecrübesi %{Math.round(selectedCandidate.bestScore || 0)} uyum ile güçlü bir potansiyel sergiliyor."</p>
+                            {/* Right action */}
+                            {wizardStep < 3 ? (
+                                <button
+                                    onClick={() => { if (wizardStep === 1 && !selectedCandidate) return; setWizardStep(s => s + 1); }}
+                                    disabled={wizardStep === 1 && !selectedCandidate}
+                                    className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest bg-[#1E3A8A] hover:bg-blue-800 text-white shadow-lg shadow-blue-900/15 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                    {wizardStep === 1 ? 'Zaman Belirle' : 'Onayla & Gönder'}
+                                    <ChevronRight className="w-3.5 h-3.5" />
+                                </button>
+                            ) : (
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={openEmailPreview}
+                                        disabled={!selectedCandidate}
+                                        className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest bg-white border-2 border-blue-100 text-[#1E3A8A] hover:bg-blue-50 transition-all disabled:opacity-40"
+                                    >
+                                        <Mail className="w-3.5 h-3.5" /> E-Posta
+                                    </button>
+                                    {manualDate && manualTime ? (
+                                        <button
+                                            onClick={() => {
+                                                if (conflictWarning) {
+                                                    if (window.confirm(`⚠️ Çakışma: ${conflictWarning.message}\n\nYine de planlamak istiyor musunuz?`)) {
+                                                        createInterviewRecord({ date: manualDate, time: manualTime }, false);
+                                                    }
+                                                } else {
+                                                    createInterviewRecord({ date: manualDate, time: manualTime }, false);
+                                                }
+                                            }}
+                                            disabled={!selectedCandidate}
+                                            className={`flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest text-white shadow-lg transition-all active:scale-95 disabled:opacity-40 ${
+                                                conflictWarning
+                                                    ? 'bg-orange-500 hover:bg-orange-600 shadow-orange-500/15'
+                                                    : 'bg-[#10B981] hover:bg-emerald-600 shadow-emerald-500/15'
+                                            }`}
+                                        >
+                                            {conflictWarning ? <AlertTriangle className="w-3.5 h-3.5" /> : <Calendar className="w-3.5 h-3.5" />}
+                                            {conflictWarning ? 'Yine de Planla' : 'Mülakatı Planla'}
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={() => createInterviewRecord(null, true)}
+                                            disabled={!selectedCandidate}
+                                            className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest bg-[#1E3A8A] hover:bg-blue-800 text-white shadow-lg shadow-blue-900/15 transition-all active:scale-95 disabled:opacity-40"
+                                        >
+                                            <Play className="w-3.5 h-3.5 fill-current" /> Şimdi Başlat
+                                        </button>
+                                    )}
                                 </div>
                             )}
                         </div>
