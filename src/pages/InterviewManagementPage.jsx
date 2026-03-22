@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import { useCandidates } from '../context/CandidatesContext';
 import { useAuth } from '../context/AuthContext';
-import { collection, onSnapshot, doc, getDoc, setDoc, serverTimestamp, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, doc, getDoc, setDoc, deleteDoc, serverTimestamp, query, where } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { getCalendarEvents, connectGoogleWorkspace, sendDirectEmail, createDirectCalendarEvent, ensureValidGoogleToken } from '../services/integrationService';
 import { 
@@ -690,24 +690,25 @@ export default function InterviewManagementPage() {
                             calendarEventLink = calResult.htmlLink;
                             newSession.calendarEventLink = calResult.htmlLink;
                         }
-
-                        // Send notification emails to internal participants (not the candidate)
-                        for (const participant of selectedParticipants) {
-                            if (!participant.email) continue;
-                            try {
-                                await sendDirectEmail(userId, freshCalToken, {
-                                    to: participant.email,
-                                    subject: `Mülakat Daveti: ${newSession.title} — ${selectedCandidate.name}`,
-                                    body: `Merhaba ${participant.name || participant.email},\n\nTalent-Inn üzerinden bir mülakata katılımcı olarak eklendiniz.\n\nAday: ${selectedCandidate.name}\nPozisyon: ${selectedCandidate.position || '—'}\nTarih: ${slot.date}\nSaat: ${slot.time}\nMülakat Tipi: ${newSession.title}\n\nMülakat Linki: ${meetLink}\n\nTalent-Inn Ekibi`
-                                });
-                            } catch (emailErr) {
-                                console.warn('[Participants] Email send failed for:', participant.email, emailErr.message);
-                            }
-                        }
                     } else {
                         // Warn but don't block — interview record is still saved
                         console.warn('[Calendar] Event creation failed:', calResult.error);
                         alert(`⚠️ Takvim etkinliği oluşturulamadı: ${calResult.error}\n\nMülakat yine de sisteme kaydedilecek.`);
+                    }
+
+                    // Send notification emails to internal participants (not the candidate)
+                    // regardless of calendar creation result — notifications must always go out.
+                    for (const participant of selectedParticipants) {
+                        if (!participant.email) continue;
+                        try {
+                            await sendDirectEmail(userId, freshCalToken, {
+                                to: participant.email,
+                                subject: `Mülakat Daveti: ${newSession.title} — ${selectedCandidate.name}`,
+                                body: `Merhaba ${participant.name || participant.email},\n\nTalent-Inn üzerinden bir mülakata katılımcı olarak eklendiniz.\n\nAday: ${selectedCandidate.name}\nPozisyon: ${selectedCandidate.position || '—'}\nTarih: ${slot.date}\nSaat: ${slot.time}\nMülakat Tipi: ${newSession.title}\n\nMülakat Linki: ${meetLink}\n\nTalent-Inn Ekibi`
+                            });
+                        } catch (emailErr) {
+                            console.warn('[Participants] Email send failed for:', participant.email, emailErr.message);
+                        }
                     }
                 }
             }
@@ -773,6 +774,12 @@ export default function InterviewManagementPage() {
                 interviewSessions: updatedSessions,
                 hasInterview: updatedSessions.length > 0
             });
+            // Clean up participantInvites so cross-dept calendar entries don't go stale
+            try {
+                await deleteDoc(doc(db, PARTICIPANT_INVITES_PATH, sessionId));
+            } catch (piErr) {
+                console.warn('[ParticipantInvites] Delete failed (non-blocking):', piErr.message);
+            }
             setSaveStatus('success');
             setTimeout(() => setSaveStatus('idle'), 1000);
         } catch (err) {
