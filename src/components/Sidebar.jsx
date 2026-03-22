@@ -91,14 +91,16 @@ export default function Sidebar({ activeView, onNavigate, collapsed, onToggleCol
                     {adminItems.map(item => <MenuItem key={item.id} item={item} />)}
                 </div>
 
-                <div className="pt-4">
-                    {!collapsed && (
-                        <h5 className="text-[10px] text-[#475569] font-bold px-8 mb-2 uppercase tracking-widest">
-                            Geliştirici
-                        </h5>
-                    )}
-                    {docsItems.map(item => <MenuItem key={item.id} item={item} />)}
-                </div>
+                {userProfile?.role === 'super_admin' && (
+                    <div className="pt-4">
+                        {!collapsed && (
+                            <h5 className="text-[10px] text-[#475569] font-bold px-8 mb-2 uppercase tracking-widest">
+                                Geliştirici
+                            </h5>
+                        )}
+                        {docsItems.map(item => <MenuItem key={item.id} item={item} />)}
+                    </div>
+                )}
             </nav>
 
             {/* Bottom Profile Section */}

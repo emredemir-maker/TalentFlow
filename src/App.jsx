@@ -48,7 +48,7 @@ export default function App() {
 }
 
 function AuthenticatedApp() {
-  const { loading, error, isAuthenticated, user } = useAuth();
+  const { loading, error, isAuthenticated, user, userProfile } = useAuth();
   const { settings } = useUserSettings();
   const [activeView, setActiveView] = useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -106,7 +106,7 @@ function AuthenticatedApp() {
       case 'departments': return <SettingsPage initialTab="departments" />;
       case 'guide': return <SettingsPage initialTab="guide" />;
       case 'super-admin': return <SettingsPage initialTab="system" />;
-      case 'tech-docs': return <TechDocsPage />;
+      case 'tech-docs': return userProfile?.role === 'super_admin' ? <TechDocsPage /> : <Dashboard />;
       case 'live-interview': return <LiveInterviewPage />;
       case 'interview-report': return <InterviewReportPage />;
       default: return <Dashboard />;
