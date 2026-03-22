@@ -184,8 +184,11 @@ export function CandidatesProvider({ children }) {
             }
         }
 
-        // Department users: use a Firestore-level filtered query to enforce
-        // data isolation at the database layer (not just client-side).
+        // Department users: run TWO parallel Firestore queries and merge results.
+        // Query 1: candidates whose primary `department` field is in the user's depts.
+        // Query 2: candidates from ANY department that a recruiter has released to
+        //          the user's dept via the `visibleToDepartments` array.
+        // Both result sets are merged by candidate ID so there are no duplicates.
         const safeUserDepts = Array.isArray(userDepartments) ? userDepartments : [];
         if (isDepartmentUser) {
             if (safeUserDepts.length === 0) {
@@ -195,28 +198,61 @@ export function CandidatesProvider({ children }) {
                 setLoading(false);
                 return () => {};
             }
-            // Firestore 'in' supports up to 30 values; slice to be safe
-            const deptQuery = query(candidatesRef, where('department', 'in', safeUserDepts.slice(0, 30)));
-            console.log(`[TalentFlow] Starting DEPT-FILTERED candidates listener for departments: [${safeUserDepts.join(', ')}]`);
-            unsubCandidates = onSnapshot(
-                deptQuery,
-                (snapshot) => {
-                    const candidateList = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-                    candidateList.sort((a, b) => {
-                        const aTime = (typeof a.createdAt?.toMillis === 'function') ? a.createdAt.toMillis() : 0;
-                        const bTime = (typeof b.createdAt?.toMillis === 'function') ? b.createdAt.toMillis() : 0;
-                        return bTime - aTime;
-                    });
-                    setCandidates(candidateList);
-                    setLoading(false);
-                    setError(null);
+
+            console.log(`[TalentFlow] Starting DUAL-QUERY candidates listener for departments: [${safeUserDepts.join(', ')}]`);
+
+            // Shared mutable snapshot store — updated independently by each listener
+            const snapshots = { dept: [], visible: [] };
+            // Count down from 2; when it hits 0 both queries have emitted at least once
+            let pendingFirst = 2;
+
+            const mergeAndSet = () => {
+                const combined = new Map();
+                snapshots.dept.forEach(c => combined.set(c.id, c));
+                snapshots.visible.forEach(c => combined.set(c.id, c));
+                const merged = Array.from(combined.values()).sort((a, b) => {
+                    const aTime = (typeof a.createdAt?.toMillis === 'function') ? a.createdAt.toMillis() : 0;
+                    const bTime = (typeof b.createdAt?.toMillis === 'function') ? b.createdAt.toMillis() : 0;
+                    return bTime - aTime;
+                });
+                setCandidates(merged);
+                setError(null);
+            };
+
+            // Query 1: primary department field ('in' supports up to 30 values)
+            const deptQ = query(candidatesRef, where('department', 'in', safeUserDepts.slice(0, 30)));
+            const unsubDept = onSnapshot(
+                deptQ,
+                (snap) => {
+                    snapshots.dept = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    if (pendingFirst > 0) { pendingFirst--; if (pendingFirst === 0) setLoading(false); }
+                    mergeAndSet();
                 },
                 (err) => {
-                    console.error('[TalentFlow] Dept-filtered candidates snapshot error:', err);
+                    console.error('[TalentFlow] Dept-query snapshot error:', err);
                     setError(err.message);
-                    setLoading(false);
+                    if (pendingFirst > 0) { pendingFirst--; if (pendingFirst === 0) setLoading(false); }
                 }
             );
+
+            // Query 2: released cross-dept candidates ('array-contains-any' supports up to 10)
+            const visibleQ = query(candidatesRef, where('visibleToDepartments', 'array-contains-any', safeUserDepts.slice(0, 10)));
+            const unsubVisible = onSnapshot(
+                visibleQ,
+                (snap) => {
+                    snapshots.visible = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    if (pendingFirst > 0) { pendingFirst--; if (pendingFirst === 0) setLoading(false); }
+                    mergeAndSet();
+                },
+                (err) => {
+                    // Non-blocking: if the index is missing or permission denied, log and continue
+                    console.warn('[TalentFlow] visibleToDepartments query error (non-blocking):', err.message);
+                    if (pendingFirst > 0) { pendingFirst--; if (pendingFirst === 0) setLoading(false); }
+                    mergeAndSet();
+                }
+            );
+
+            unsubCandidates = () => { unsubDept(); unsubVisible(); };
         } else {
             // Recruiter / super_admin: full collection listener
             console.log(`[TalentFlow] Starting global candidates listener (isAuthenticated: ${isAuthenticated}, isPublicAccessRoute: ${isPublicAccessRoute})`);

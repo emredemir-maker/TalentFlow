@@ -37,9 +37,7 @@ const APPLY_SOURCES = ['LinkedIn', 'Kariyer.net', 'Instagram', 'Twitter/X', 'Fac
 
 function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onToggleStatus, onDelete, isRecruiterOrAdmin, releaseLoading, releasingPosId, onCandidateClick }) {
     const sc = STATUS_CONFIG[pos.status] || STATUS_CONFIG.closed;
-    const candidateCount = candidates.filter(c =>
-        c.position === pos.title || c.matchedPositionTitle === pos.title || c.bestTitle === pos.title
-    ).length;
+    const candidateCount = pos.matchedCandidates?.length || 0;
     const openDays = pos.createdAt ? Math.floor((Date.now() - pos.createdAt.toDate?.()?.getTime?.()) / 86400000) : null;
 
     const [activeTab, setActiveTab] = useState('detail');
@@ -516,9 +514,7 @@ function PositionEditModal({ pos, candidates, departments, isDepartmentUser, use
         requirements: pos.requirements?.join(', ') || '',
         description: pos.description || '',
     });
-    const candidateCount = candidates.filter(c =>
-        c.position === pos.title || c.matchedPositionTitle === pos.title || c.bestTitle === pos.title
-    ).length;
+    const candidateCount = pos.matchedCandidates?.length || 0;
     const sc = STATUS_CONFIG[pos.status] || STATUS_CONFIG.closed;
 
     const handleSubmit = (e) => {
@@ -758,7 +754,14 @@ export default function PositionsPage() {
                 const cur = c.visibleToDepartments || [];
                 if (!cur.includes(pos.department)) { await updateCandidate(c.id, { visibleToDepartments: [...cur, pos.department] }); released++; }
             }
-            await updatePosition(pos.id, { releasedToDepartment: true });
+            // Build matchedCandidates list so the detail drawer can display them for dept users
+            const matchedCandidates = matches.map(c => ({
+                id: c.id,
+                name: c.name || '—',
+                score: c.effectiveScore,
+                reason: c.positionAnalyses?.[pos.title]?.summary || `%${c.effectiveScore} eşleşme`,
+            }));
+            await updatePosition(pos.id, { releasedToDepartment: true, matchedCandidates });
             alert(`✅ ${released} aday "${pos.department}" departmanına açıldı.`);
         } catch (err) { alert('Bir hata oluştu: ' + err.message); }
         finally { setReleasingPosId(null); setReleaseLoading(false); }
