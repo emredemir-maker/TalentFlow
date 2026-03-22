@@ -43,7 +43,9 @@ import {
     Trash2,
     RefreshCw,
     CheckCircle,
-    X
+    X,
+    UserPlus,
+    AtSign
 } from 'lucide-react';
 
 const PARTICIPANT_INVITES_PATH = 'artifacts/talent-flow/public/data/participantInvites';
@@ -73,6 +75,8 @@ export default function InterviewManagementPage() {
     const [openMenuId, setOpenMenuId] = useState(null);
     const [postponeModal, setPostponeModal] = useState(null); // { candidateId, sessionId, date, time }
     const [branding, setBranding] = useState({ companyName: 'Talent-Inn', primaryColor: '#1E3A8A' });
+    const [externalEmail, setExternalEmail] = useState('');
+    const [externalEmailError, setExternalEmailError] = useState('');
 
     // Participant selection states (wizard step 2)
     const [selectedParticipants, setSelectedParticipants] = useState([]);
@@ -618,6 +622,27 @@ export default function InterviewManagementPage() {
         );
     };
 
+    // Add an external (outside-the-system) participant by email
+    const addExternalParticipant = () => {
+        const email = externalEmail.trim().toLowerCase();
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!email) { setExternalEmailError('E-posta adresi girin.'); return; }
+        if (!emailRegex.test(email)) { setExternalEmailError('Geçerli bir e-posta adresi girin.'); return; }
+        const extId = `external_${email}`;
+        if (selectedParticipants.some(p => p.id === extId)) {
+            setExternalEmailError('Bu e-posta zaten eklendi.'); return;
+        }
+        setSelectedParticipants(prev => [...prev, {
+            id: extId,
+            name: email,
+            email,
+            role: 'external',
+            isExternal: true
+        }]);
+        setExternalEmail('');
+        setExternalEmailError('');
+    };
+
     // Fetch availability for ALL system users on step 2 or 3 when date/time are set
     // This lets users see who is free BEFORE selecting them, not just after.
     useEffect(() => {
@@ -1120,6 +1145,39 @@ export default function InterviewManagementPage() {
                                         )}
                                     </div>
                                 )}
+
+                                {/* External email invite */}
+                                <div className="mt-4 p-4 bg-slate-50 border border-dashed border-[#CBD5E1] rounded-2xl">
+                                    <p className="text-[10px] font-black text-[#64748B] uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                                        <UserPlus className="w-3.5 h-3.5" />
+                                        Harici Katılımcı Ekle
+                                    </p>
+                                    <div className="flex gap-2">
+                                        <div className="relative flex-1">
+                                            <AtSign className="w-3.5 h-3.5 text-[#94A3B8] absolute left-3 top-1/2 -translate-y-1/2" />
+                                            <input
+                                                type="email"
+                                                placeholder="ornek@sirket.com"
+                                                value={externalEmail}
+                                                onChange={e => { setExternalEmail(e.target.value); setExternalEmailError(''); }}
+                                                onKeyDown={e => e.key === 'Enter' && addExternalParticipant()}
+                                                className="w-full pl-9 pr-3 py-2.5 text-[12px] bg-white border border-[#E2E8F0] rounded-xl focus:outline-none focus:border-[#1E3A8A] focus:ring-1 focus:ring-[#1E3A8A]/20 text-[#0F172A] placeholder:text-[#94A3B8]"
+                                            />
+                                        </div>
+                                        <button
+                                            onClick={addExternalParticipant}
+                                            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#1E3A8A] text-white text-[12px] font-bold hover:bg-[#1e40af] transition-colors shrink-0"
+                                        >
+                                            <UserPlus className="w-3.5 h-3.5" />
+                                            Ekle
+                                        </button>
+                                    </div>
+                                    {externalEmailError && (
+                                        <p className="text-[11px] text-red-500 mt-1.5 font-medium">{externalEmailError}</p>
+                                    )}
+                                    <p className="text-[10px] text-[#94A3B8] mt-2">Sistemde kayıtlı olmayan kişilere de mülakat daveti gönderebilirsiniz.</p>
+                                </div>
+
                                 {selectedParticipants.length > 0 && (
                                     <div className="mt-4 p-3.5 bg-blue-50 border border-blue-100 rounded-2xl">
                                         <p className="text-[10px] font-black text-[#1E3A8A] uppercase tracking-widest mb-2">
@@ -1127,7 +1185,12 @@ export default function InterviewManagementPage() {
                                         </p>
                                         <div className="flex flex-wrap gap-2">
                                             {selectedParticipants.map(p => (
-                                                <span key={p.id} className="flex items-center gap-1.5 bg-white border border-blue-200 px-3 py-1.5 rounded-full text-[11px] font-semibold text-[#1E3A8A]">
+                                                <span key={p.id} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold border ${
+                                                    p.isExternal
+                                                        ? 'bg-amber-50 border-amber-200 text-amber-700'
+                                                        : 'bg-white border-blue-200 text-[#1E3A8A]'
+                                                }`}>
+                                                    {p.isExternal && <AtSign className="w-2.5 h-2.5" />}
                                                     {p.name || p.email}
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); toggleParticipant(p); }}
@@ -1322,20 +1385,24 @@ export default function InterviewManagementPage() {
                                                         {selectedParticipants.map(p => {
                                                             const avail = participantAvailability[p.id];
                                                             return (
-                                                                <div key={p.id} className="flex items-center justify-between bg-white border border-[#F1F5F9] rounded-xl px-3 py-2">
+                                                                <div key={p.id} className={`flex items-center justify-between border rounded-xl px-3 py-2 ${p.isExternal ? 'bg-amber-50 border-amber-100' : 'bg-white border-[#F1F5F9]'}`}>
                                                                     <div className="flex items-center gap-2">
-                                                                        <div className="w-6 h-6 rounded-full bg-[#1E3A8A]/10 text-[#1E3A8A] flex items-center justify-center text-[9px] font-black">
-                                                                            {(p.name || p.displayName || p.email || '?').charAt(0).toUpperCase()}
+                                                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-black ${p.isExternal ? 'bg-amber-100 text-amber-700' : 'bg-[#1E3A8A]/10 text-[#1E3A8A]'}`}>
+                                                                            {p.isExternal ? '@' : (p.name || p.displayName || p.email || '?').charAt(0).toUpperCase()}
                                                                         </div>
                                                                         <span className="text-[11px] font-semibold text-[#0F172A]">{p.name || p.displayName || p.email}</span>
                                                                     </div>
-                                                                    <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest ${
-                                                                        avail === 'available' ? 'bg-emerald-100 text-emerald-700' :
-                                                                        avail === 'busy' ? 'bg-red-100 text-red-600' :
-                                                                        'bg-slate-100 text-slate-500'
-                                                                    }`}>
-                                                                        {avail === 'available' ? 'MÜSAİT' : avail === 'busy' ? 'MEŞGUL' : 'BİLGİSİZ'}
-                                                                    </span>
+                                                                    {p.isExternal ? (
+                                                                        <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest bg-amber-100 text-amber-600">HARİCİ</span>
+                                                                    ) : (
+                                                                        <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest ${
+                                                                            avail === 'available' ? 'bg-emerald-100 text-emerald-700' :
+                                                                            avail === 'busy' ? 'bg-red-100 text-red-600' :
+                                                                            'bg-slate-100 text-slate-500'
+                                                                        }`}>
+                                                                            {avail === 'available' ? 'MÜSAİT' : avail === 'busy' ? 'MEŞGUL' : 'BİLGİSİZ'}
+                                                                        </span>
+                                                                    )}
                                                                 </div>
                                                             );
                                                         })}
@@ -1410,16 +1477,28 @@ export default function InterviewManagementPage() {
                                         <p className="text-[9px] font-black text-[#64748B] uppercase tracking-widest">Katılımcılar ({selectedParticipants.length})</p>
                                         <div className="flex flex-wrap gap-2">
                                             {selectedParticipants.map(p => (
-                                                <div key={p.id} className="flex items-center gap-2 bg-white border border-[#E2E8F0] px-3 py-1.5 rounded-full">
-                                                    <div className="w-5 h-5 rounded-full bg-[#1E3A8A]/10 text-[#1E3A8A] flex items-center justify-center text-[9px] font-black">
-                                                        {(p.name || p.displayName || p.email || '?').charAt(0).toUpperCase()}
+                                                <div key={p.id} className={`flex items-center gap-2 px-3 py-1.5 rounded-full border ${
+                                                    p.isExternal
+                                                        ? 'bg-amber-50 border-amber-200'
+                                                        : 'bg-white border-[#E2E8F0]'
+                                                }`}>
+                                                    <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black ${
+                                                        p.isExternal ? 'bg-amber-100 text-amber-700' : 'bg-[#1E3A8A]/10 text-[#1E3A8A]'
+                                                    }`}>
+                                                        {p.isExternal ? '@' : (p.name || p.displayName || p.email || '?').charAt(0).toUpperCase()}
                                                     </div>
                                                     <span className="text-[11px] font-semibold text-[#0F172A]">{p.name || p.displayName || p.email}</span>
-                                                    <span className="text-[9px] text-[#94A3B8] capitalize">{(p.role || '').replace('_', ' ')}</span>
+                                                    <span className={`text-[9px] capitalize ${p.isExternal ? 'text-amber-500 font-bold' : 'text-[#94A3B8]'}`}>
+                                                        {p.isExternal ? 'Harici' : (p.role || '').replace('_', ' ')}
+                                                    </span>
                                                 </div>
                                             ))}
                                         </div>
-                                        <p className="text-[9px] text-[#94A3B8]">Google Takvim daveti ve bildirim e-postası gönderilecek.</p>
+                                        <p className="text-[9px] text-[#94A3B8]">
+                                            {selectedParticipants.some(p => p.isExternal)
+                                                ? 'Sistem kullanıcılarına Google Takvim daveti, harici katılımcılara e-posta bildirimi gönderilecek.'
+                                                : 'Google Takvim daveti ve bildirim e-postası gönderilecek.'}
+                                        </p>
                                     </div>
                                 )}
 
