@@ -1286,17 +1286,24 @@ app.post('/api/check-duplicate', async (req, res) => {
     }
 });
 
-// Auth middleware: require a valid Firebase ID token (non-candidate roles only)
+// Auth middleware: verify Firebase ID token + authoritative Firestore role check
+const ALLOWED_ROLES = ['super_admin', 'recruiter', 'department_user'];
 const requireAuth = async (req, res, next) => {
     const authHeader = req.headers['authorization'] || '';
     const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
     if (!token) return res.status(401).json({ error: 'Missing Authorization header.' });
     try {
         const decoded = await admin.auth().verifyIdToken(token);
-        req.user = decoded;
-        if (decoded.role === 'candidate') {
-            return res.status(403).json({ error: 'Candidates cannot access this endpoint.' });
+        // Fetch role from Firestore — JWT custom claims may not carry role
+        const userDoc = await db.doc(`artifacts/talent-flow/public/data/users/${decoded.uid}`).get();
+        if (!userDoc.exists) {
+            return res.status(403).json({ error: 'User profile not found.' });
         }
+        const role = userDoc.data().role || '';
+        if (!ALLOWED_ROLES.includes(role)) {
+            return res.status(403).json({ error: 'Insufficient permissions.' });
+        }
+        req.user = { uid: decoded.uid, role };
         next();
     } catch (err) {
         return res.status(401).json({ error: 'Invalid or expired token.' });
