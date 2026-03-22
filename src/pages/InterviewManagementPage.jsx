@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import { useCandidates } from '../context/CandidatesContext';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import { collection, onSnapshot, doc, getDoc, setDoc, deleteDoc, serverTimestamp, query, where, addDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { getCalendarEvents, connectGoogleWorkspace, sendDirectEmail, createDirectCalendarEvent, ensureValidGoogleToken } from '../services/integrationService';
@@ -54,6 +55,7 @@ export default function InterviewManagementPage() {
     const navigate = useNavigate();
     const { user: currentUser, userProfile, userId, isDepartmentUser, role } = useAuth();
     const { enrichedCandidates, updateCandidate, preselectedInterviewData, setPreselectedInterviewData } = useCandidates();
+    const { addNotification } = useNotifications();
     
     // UI States
     const [isPlanningMode, setIsPlanningMode] = useState(false);
@@ -817,6 +819,11 @@ export default function InterviewManagementPage() {
             }
 
             setSaveStatus('success');
+            addNotification({
+                title: 'Mülakat Planlandı',
+                message: `${selectedCandidate.name} için ${newSession.title} mülakatı ${newSession.date} tarihinde planlandı.`,
+                type: 'success'
+            });
             setTimeout(() => {
                 setSaveStatus('idle');
                 if (startNow) {

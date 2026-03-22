@@ -59,6 +59,7 @@ const PAGE_TABS = [
 export default function MessagesPage() {
     const { messages, loading, stats } = useMessageQueue();
     const { user: currentUser, userId, userProfile } = useAuth();
+    const { addNotification } = useNotifications();
     const [pageTab, setPageTab] = useState('queue');
     const [filter, setFilter] = useState('all');
     const [expandedId, setExpandedId] = useState(null);
@@ -121,6 +122,13 @@ export default function MessagesPage() {
                 const hasReply = result.messages.length > 1;
                 if (hasReply !== thread.hasReply) {
                     await updateDoc(doc(db, 'artifacts/talent-flow/public/data/emailThreads', thread.id), { hasReply });
+                    if (hasReply && !thread.hasReply) {
+                        addNotification({
+                            title: 'Yeni E-posta Yanıtı',
+                            message: `${thread.candidateName} konuya yanıt verdi: "${thread.subject}"`,
+                            type: 'info'
+                        });
+                    }
                 }
             }
         } catch (err) {

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useCandidates } from '../context/CandidatesContext';
+import { useNotifications } from '../context/NotificationContext';
 import { getAvailableModels, parseCandidateFromText } from '../services/geminiService';
 import Header from '../components/Header';
 import {
@@ -18,6 +19,7 @@ import {
 
 export default function ScraperPage() {
     const { addCandidate } = useCandidates();
+    const { addNotification } = useNotifications();
     const [textInput, setTextInput] = useState('');
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState(null);
@@ -63,7 +65,11 @@ export default function ScraperPage() {
 
             // Save to Firestore via Context
             const docId = await addCandidate(candidateData);
-
+            addNotification({
+                title: 'Aday Eklendi',
+                message: `"${parsedData.name || 'Aday'}" scraper ile sisteme eklendi.`,
+                type: 'success'
+            });
             setResult({ ...candidateData, id: docId });
             setTextInput(''); // Clear input on success
         } catch (err) {
@@ -99,7 +105,11 @@ export default function ScraperPage() {
                     successCount++;
                 }
 
-                alert(`${successCount} aday başarıyla yüklendi!`);
+                addNotification({
+                    title: 'Toplu Yükleme Tamamlandı',
+                    message: `${successCount} aday dosyadan başarıyla sisteme eklendi.`,
+                    type: 'success'
+                });
                 setResult({ name: `${successCount} Aday`, position: 'Toplu Yükleme', company: 'Dosya', location: 'Sistem' });
             } catch (err) {
                 console.error('File upload error:', err);
@@ -150,7 +160,11 @@ export default function ScraperPage() {
                     successCount++;
                 }
                 setAutoResults(data.candidates);
-                alert(`${successCount} aday başarıyla bulundu ve eklendi!`);
+                addNotification({
+                    title: 'Otomatik Tarama Tamamlandı',
+                    message: `${successCount} aday "${searchQuery}" aramasından sisteme eklendi.`,
+                    type: 'success'
+                });
             } else {
                 alert('Arama botu LinkedIn veya Arama Motoru tarafından engellendi.\n\nLütfen "Manuel Profil Metni" kutusuna profil sayfasını kopyalayıp yapıştırarak devam edin. Bu yöntem %100 çalışır durumdadır.');
             }

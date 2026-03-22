@@ -5,6 +5,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import Header from '../components/Header';
 import { usePositions } from '../context/PositionsContext';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import {
@@ -651,6 +652,7 @@ export default function PositionsPage() {
     const { enrichedCandidates, updateCandidate } = useCandidates();
     const candidates = enrichedCandidates || [];
     const { isDepartmentUser, userDepartments, userProfile, user, role } = useAuth();
+    const { addNotification } = useNotifications();
 
     const [searchTerm, setSearchTerm]           = useState('');
     const [statusFilter, setStatusFilter]       = useState('all');
@@ -684,6 +686,17 @@ export default function PositionsPage() {
         window.addEventListener('openPosition', handleOpenPosition);
         return () => window.removeEventListener('openPosition', handleOpenPosition);
     }, [positions]);
+
+    const handleToggleStatus = async (id, currentStatus) => {
+        const positionTitle = positions.find(p => p.id === id)?.title || 'Pozisyon';
+        await togglePositionStatus(id, currentStatus);
+        const newStatus = currentStatus === 'open' ? 'closed' : 'open';
+        addNotification({
+            title: newStatus === 'closed' ? 'Pozisyon Kapatıldı' : 'Pozisyon Yeniden Açıldı',
+            message: `"${positionTitle}" pozisyonu ${newStatus === 'closed' ? 'kapatıldı' : 'aktif duruma alındı'}.`,
+            type: newStatus === 'closed' ? 'warning' : 'success'
+        });
+    };
 
     const handleExtract = async (formData, setFormData) => {
         if (!jdText || jdText.length < 50) return;
@@ -947,7 +960,7 @@ export default function PositionsPage() {
                                                     </button>
                                                 )}
                                                 <button onClick={() => setEditPos(pos)} className="p-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-400 hover:bg-amber-50 hover:border-amber-200 hover:text-amber-500 transition-colors" title="Düzenle"><Edit2 className="w-4 h-4" /></button>
-                                                <button onClick={() => togglePositionStatus(pos.id, pos.status)} className="p-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-400 hover:bg-red-50 hover:border-red-200 hover:text-red-400 transition-colors" title="Kapat"><XCircle className="w-4 h-4" /></button>
+                                                <button onClick={() => handleToggleStatus(pos.id, pos.status)} className="p-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-400 hover:bg-red-50 hover:border-red-200 hover:text-red-400 transition-colors" title="Kapat"><XCircle className="w-4 h-4" /></button>
                                                 <button onClick={() => deletePosition(pos.id)} className="p-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-400 hover:bg-red-50 hover:border-red-200 hover:text-red-400 transition-colors" title="Sil"><Trash2 className="w-4 h-4" /></button>
                                             </>}
                                             {isPending && isRecruiterOrAdmin && <>
@@ -1006,7 +1019,7 @@ export default function PositionsPage() {
                     onClose={() => setDetailPos(null)}
                     onEdit={() => { setEditPos(detailPos); setDetailPos(null); }}
                     onRelease={() => handleRelease(detailPos)}
-                    onToggleStatus={() => togglePositionStatus(detailPos.id, detailPos.status)}
+                    onToggleStatus={() => handleToggleStatus(detailPos.id, detailPos.status)}
                     onDelete={() => { deletePosition(detailPos.id); setDetailPos(null); }}
                     isRecruiterOrAdmin={isRecruiterOrAdmin}
                     releaseLoading={releaseLoading}

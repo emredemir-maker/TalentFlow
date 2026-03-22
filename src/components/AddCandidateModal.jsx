@@ -252,6 +252,13 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                     throw candidateErr;
                 }
             }));
+            addNotification({
+                title: 'Aday Eklendi',
+                message: toSave.length === 1
+                    ? `"${toSave[0].candidate?.name || 'Aday'}" sisteme başarıyla eklendi.`
+                    : `${toSave.length} aday sisteme başarıyla eklendi.`,
+                type: 'success'
+            });
             handleClose();
         } catch (err) {
             setError('Adaylar kaydedilirken hata oluştu: ' + err.message);
