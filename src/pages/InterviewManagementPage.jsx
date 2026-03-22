@@ -41,7 +41,8 @@ import {
     Activity,
     Trash2,
     RefreshCw,
-    CheckCircle
+    CheckCircle,
+    X
 } from 'lucide-react';
 
 const PARTICIPANT_INVITES_PATH = 'artifacts/talent-flow/public/data/participantInvites';
@@ -69,6 +70,7 @@ export default function InterviewManagementPage() {
     const [systemUsers, setSystemUsers] = useState([]);
     const [selectedInterviewer, setSelectedInterviewer] = useState(null);
     const [openMenuId, setOpenMenuId] = useState(null);
+    const [postponeModal, setPostponeModal] = useState(null); // { candidateId, sessionId, date, time }
 
     // Participant selection states (wizard step 2)
     const [selectedParticipants, setSelectedParticipants] = useState([]);
@@ -788,12 +790,43 @@ export default function InterviewManagementPage() {
         }
     };
 
+    // Update session status (postponed / cancelled) across candidate record + participantInvites
+    const handleUpdateSessionStatus = async (candidateId, sessionId, newStatus, newDate, newTime) => {
+        const candidate = enrichedCandidates.find(c => c.id === candidateId);
+        if (!candidate) return;
+        const updatedSessions = (candidate.interviewSessions || []).map(s => {
+            if (s.id !== sessionId) return s;
+            return {
+                ...s,
+                status: newStatus,
+                ...(newDate ? { date: newDate } : {}),
+                ...(newTime ? { time: newTime } : {}),
+            };
+        });
+        try {
+            await updateCandidate(candidateId, { interviewSessions: updatedSessions });
+            // Mirror status (and optional reschedule) into participantInvites for cross-dept view
+            try {
+                await setDoc(doc(db, PARTICIPANT_INVITES_PATH, sessionId), {
+                    status: newStatus,
+                    ...(newDate ? { date: newDate } : {}),
+                    ...(newTime ? { time: newTime } : {}),
+                }, { merge: true });
+            } catch (piErr) {
+                console.warn('[ParticipantInvites] Status sync failed (non-blocking):', piErr.message);
+            }
+        } catch (err) {
+            console.error('Update session status error:', err);
+            alert('Güncellenemedi: ' + err.message);
+        }
+    };
+
     // ── Calendar computed vars ────────────────────────────────────────────────
     const allCalSessions = useMemo(() => {
         const all = [];
         enrichedCandidates.forEach(c => {
             (c.interviewSessions || []).forEach(s => {
-                all.push({ ...s, candidateName: c.name, position: c.position, matchScore: c.matchScore });
+                all.push({ ...s, candidateName: c.name, position: c.position, matchScore: c.matchScore, _candidateId: c.id });
             });
         });
         return all;
@@ -1638,16 +1671,24 @@ export default function InterviewManagementPage() {
                                             const statusInfo = getCalStatusConfig(s.status);
                                             const initials = (s.candidateName || '?').split(' ').map(p => p[0]).join('').substring(0, 2).toUpperCase();
                                             const participants = Array.isArray(s.participants) ? s.participants : [];
+                                            const sessionKey = s.id || s.sessionId;
+                                            const resolvedCandidateId = s._candidateId || s.candidateId;
+                                            const isMenuOpen = openMenuId === sessionKey;
+                                            const canModify = !['live', 'completed'].includes(s.status);
                                             return (
-                                                <div key={s.id || s.sessionId} className="flex group">
+                                                <div key={sessionKey} className="flex group">
                                                     <div className="w-16 pt-3 flex-shrink-0">
                                                         <span className="text-sm font-semibold text-[#64748B] group-hover:text-[#1E3A8A] transition-colors">{s.time || '—'}</span>
                                                     </div>
-                                                    <div className="flex-1 bg-white rounded-xl border border-[#E2E8F0] p-4 shadow-sm hover:shadow-md hover:border-[#CBD5E1] transition-all relative overflow-hidden">
-                                                        {s.status === 'live' && <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500" />}
+                                                    <div className={`flex-1 bg-white rounded-xl border p-4 shadow-sm hover:shadow-md transition-all relative ${
+                                                        s.status === 'live' ? 'border-l-4 border-l-emerald-500 border-[#E2E8F0]' :
+                                                        s.status === 'cancelled' ? 'border-[#FEE2E2] opacity-70' :
+                                                        s.status === 'postponed' ? 'border-amber-200' :
+                                                        'border-[#E2E8F0] hover:border-[#CBD5E1]'
+                                                    }`}>
                                                         <div className="flex justify-between items-start mb-3">
                                                             <div className="flex items-center gap-3">
-                                                                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold ${s.status === 'live' ? 'bg-emerald-100 text-emerald-700' : 'bg-[#F1F5F9] text-[#475569]'}`}>
+                                                                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold ${s.status === 'live' ? 'bg-emerald-100 text-emerald-700' : s.status === 'cancelled' ? 'bg-red-50 text-red-400' : 'bg-[#F1F5F9] text-[#475569]'}`}>
                                                                     {initials}
                                                                 </div>
                                                                 <div>
@@ -1689,9 +1730,66 @@ export default function InterviewManagementPage() {
                                                                     <Video className="w-3.5 h-3.5" /> Katıl
                                                                 </button>
                                                             ) : (
-                                                                <button className="w-6 h-6 flex items-center justify-center text-[#94A3B8] hover:bg-slate-100 hover:text-[#0F172A] rounded-md transition-colors">
-                                                                    <MoreVertical className="w-4 h-4" />
-                                                                </button>
+                                                                <div className="relative">
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); setOpenMenuId(isMenuOpen ? null : sessionKey); }}
+                                                                        className={`w-7 h-7 flex items-center justify-center rounded-md transition-colors ${isMenuOpen ? 'bg-slate-100 text-[#0F172A]' : 'text-[#94A3B8] hover:bg-slate-100 hover:text-[#0F172A]'}`}
+                                                                    >
+                                                                        <MoreVertical className="w-4 h-4" />
+                                                                    </button>
+                                                                    {isMenuOpen && (
+                                                                        <div
+                                                                            className="absolute right-0 bottom-8 w-44 bg-white rounded-xl shadow-lg border border-[#E2E8F0] py-1 z-50"
+                                                                            onClick={(e) => e.stopPropagation()}
+                                                                        >
+                                                                            {canModify && (
+                                                                                <button
+                                                                                    onClick={() => {
+                                                                                        setOpenMenuId(null);
+                                                                                        setPostponeModal({ candidateId: resolvedCandidateId, sessionId: sessionKey, date: s.date || '', time: s.time || '09:00' });
+                                                                                    }}
+                                                                                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-50 transition-colors"
+                                                                                >
+                                                                                    <AlertCircle className="w-3.5 h-3.5" /> Ertele
+                                                                                </button>
+                                                                            )}
+                                                                            {canModify && s.status !== 'cancelled' && (
+                                                                                <button
+                                                                                    onClick={async () => {
+                                                                                        setOpenMenuId(null);
+                                                                                        if (window.confirm('Bu mülakatı iptal etmek istediğinize emin misiniz?')) {
+                                                                                            await handleUpdateSessionStatus(resolvedCandidateId, sessionKey, 'cancelled');
+                                                                                        }
+                                                                                    }}
+                                                                                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors"
+                                                                                >
+                                                                                    <AlertTriangle className="w-3.5 h-3.5" /> İptal Et
+                                                                                </button>
+                                                                            )}
+                                                                            {s.status === 'cancelled' && (
+                                                                                <button
+                                                                                    onClick={async () => {
+                                                                                        setOpenMenuId(null);
+                                                                                        await handleUpdateSessionStatus(resolvedCandidateId, sessionKey, 'scheduled');
+                                                                                    }}
+                                                                                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-blue-600 hover:bg-blue-50 transition-colors"
+                                                                                >
+                                                                                    <RefreshCw className="w-3.5 h-3.5" /> Yeniden Planla
+                                                                                </button>
+                                                                            )}
+                                                                            <div className="my-1 border-t border-[#F1F5F9]" />
+                                                                            <button
+                                                                                onClick={async () => {
+                                                                                    setOpenMenuId(null);
+                                                                                    handleDeleteSession(resolvedCandidateId, sessionKey);
+                                                                                }}
+                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-50 transition-colors"
+                                                                            >
+                                                                                <Trash2 className="w-3.5 h-3.5" /> Sil
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
                                                             )}
                                                         </div>
                                                     </div>
@@ -1815,6 +1913,76 @@ export default function InterviewManagementPage() {
                 </div>
             )}
     
+            {/* Postpone Modal */}
+            {postponeModal && (
+                <div className="fixed inset-0 z-[120] bg-[#0F172A]/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in duration-200">
+                        <div className="flex items-center justify-between p-5 border-b border-[#F1F5F9] bg-amber-50/60">
+                            <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center">
+                                    <AlertCircle className="w-4.5 h-4.5 text-amber-600" />
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-black text-[#0F172A] uppercase tracking-tight">Mülakatı Ertele</h3>
+                                    <p className="text-[11px] text-[#64748B]">Yeni tarih ve saat belirleyin</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setPostponeModal(null)}
+                                className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-[#0F172A] mb-1.5 uppercase tracking-wide">Yeni Tarih</label>
+                                <input
+                                    type="date"
+                                    value={postponeModal.date}
+                                    min={new Date().toISOString().split('T')[0]}
+                                    onChange={(e) => setPostponeModal(m => ({ ...m, date: e.target.value }))}
+                                    className="w-full border border-[#E2E8F0] rounded-lg px-3 py-2.5 text-sm text-[#0F172A] focus:outline-none focus:border-[#1E3A8A] focus:ring-2 focus:ring-[#1E3A8A]/10"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-[#0F172A] mb-1.5 uppercase tracking-wide">Yeni Saat</label>
+                                <input
+                                    type="time"
+                                    value={postponeModal.time}
+                                    onChange={(e) => setPostponeModal(m => ({ ...m, time: e.target.value }))}
+                                    className="w-full border border-[#E2E8F0] rounded-lg px-3 py-2.5 text-sm text-[#0F172A] focus:outline-none focus:border-[#1E3A8A] focus:ring-2 focus:ring-[#1E3A8A]/10"
+                                />
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3 px-6 pb-6">
+                            <button
+                                onClick={() => setPostponeModal(null)}
+                                className="flex-1 py-2.5 border border-[#E2E8F0] text-[#64748B] text-sm font-semibold rounded-xl hover:bg-slate-50 transition-colors"
+                            >
+                                Vazgeç
+                            </button>
+                            <button
+                                disabled={!postponeModal.date || !postponeModal.time}
+                                onClick={async () => {
+                                    await handleUpdateSessionStatus(
+                                        postponeModal.candidateId,
+                                        postponeModal.sessionId,
+                                        'postponed',
+                                        postponeModal.date,
+                                        postponeModal.time,
+                                    );
+                                    setPostponeModal(null);
+                                }}
+                                className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                                Ertele
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
     </div>
     );
 }
