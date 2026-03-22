@@ -12,7 +12,7 @@ import {
     Briefcase, Plus, Trash2, CheckCircle2, XCircle, Users, Clock,
     Search, Sparkles, Loader2, Cpu, ArrowUpRight, Building2,
     AlertCircle, Unlock, Edit2, X, Send, Link2, Copy, Check,
-    ExternalLink, FileText, ChevronRight, TrendingUp,
+    ExternalLink, FileText, ChevronRight, TrendingUp, RefreshCw,
 } from 'lucide-react';
 import {
     subscribeToApplications, getSourceColor, APP_STATUS_CONFIG, updateApplicationStatus
@@ -382,6 +382,18 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                                 className="flex-1 py-3 rounded-xl bg-white border border-red-200 hover:bg-red-50 hover:border-red-300 transition-colors text-red-400 font-bold text-xs flex items-center justify-center gap-2"
                             >
                                 <XCircle size={14} />Pozisyonu Kapat
+                            </button>
+                        </div>
+                    ) : pos.status === 'closed' && isRecruiterOrAdmin ? (
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => { onToggleStatus(); onClose(); }}
+                                className="flex-1 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors shadow-sm shadow-emerald-200"
+                            >
+                                <RefreshCw size={14} />Pozisyonu Yeniden Aç
+                            </button>
+                            <button onClick={onClose} className="py-3 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs transition-colors">
+                                Vazgeç
                             </button>
                         </div>
                     ) : (
@@ -969,6 +981,12 @@ export default function PositionsPage() {
                                             </>}
                                             {isRejected && isRecruiterOrAdmin && (
                                                 <button onClick={() => deletePosition(pos.id)} className="p-1.5 rounded-lg bg-red-50 border border-red-200 text-red-400 hover:bg-red-100 transition-colors" title="Sil"><Trash2 className="w-4 h-4" /></button>
+                                            )}
+                                            {pos.status === 'closed' && isRecruiterOrAdmin && (
+                                                <>
+                                                    <button onClick={() => handleToggleStatus(pos.id, pos.status)} className="p-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-500 hover:bg-emerald-100 transition-colors" title="Yeniden Aç"><RefreshCw className="w-4 h-4" /></button>
+                                                    <button onClick={() => deletePosition(pos.id)} className="p-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-400 hover:bg-red-50 hover:border-red-200 hover:text-red-400 transition-colors" title="Sil"><Trash2 className="w-4 h-4" /></button>
+                                                </>
                                             )}
                                         </div>
                                     </div>
