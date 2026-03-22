@@ -7,7 +7,7 @@ import {
     Zap, Lock, Users, GitBranch, Terminal, FileText,
     ChevronDown, ChevronRight, ExternalLink, Copy,
     CheckCircle, AlertTriangle, Info, Layers, Cpu,
-    Network, Activity, BookOpen, Hash
+    Network, Activity, BookOpen, Hash, Mail
 } from 'lucide-react';
 
 // ─── SECTION DATA ───────────────────────────────────────────────────────────
@@ -76,6 +76,14 @@ const SECTIONS = [
         title: 'State Yönetimi & Context',
         summary: 'Context haritası, CandidatesContext mimarisi, enrichedCandidates',
         content: <StateSection />,
+    },
+    {
+        id: 'email',
+        icon: Mail,
+        color: '#ec4899',
+        title: 'E-posta Sistemi',
+        summary: 'HTML şablon mimarisi, marka entegrasyonu, Gmail API thread takibi',
+        content: <EmailSection />,
     },
     {
         id: 'deploy',
@@ -230,16 +238,24 @@ function AuthSection() {
                 ]}
             />
 
-            <SectionTitle>Davet Sistemi</SectionTitle>
+            <SectionTitle>Davet & Domain Beyaz Listesi Sistemi</SectionTitle>
             <InfoBox type="warning">
-                Yeni kullanıcılar yalnızca davet ile kayıt olabilir. İlk super_admin dışında kimse doğrudan kayıt yapamaz.
+                Yeni kullanıcılar yalnızca davet ile kayıt olabilir — ANCAK e-posta domain'i settings/system.allowedDomains listesindeyse davet kontrolü atlanır.
             </InfoBox>
-            <CodeBlock lang="akış">{`1. super_admin → invitations koleksiyonuna kayıt ekler
-   { email, role, departments[], createdBy }
-2. Kayıt sayfası → e-postayı invitations'da arar
-3. Eşleşme bulunursa kayıt tamamlanır
-4. Eşleşme yoksa → "Davet bulunamadı" hatası
-5. İstisna: INITIAL_SUPER_ADMIN_EMAIL doğrudan kayıt olabilir`}</CodeBlock>
+            <CodeBlock lang="akış">{`Kayıt akışı (AuthContext → RegisterPage):
+
+1. Kullanıcı e-posta girer → domain çıkarılır (@ sonrası)
+2. Firestore: settings/system.allowedDomains okunur
+   a. Domain listede varsa → davet kontrolü ATLANIR
+      → Kullanıcı otomatik 'recruiter' rolüyle kaydolur
+   b. Domain listede yoksa → invitations koleksiyonu sorgulanır
+      → Eşleşme varsa kayıt tamamlanır
+      → Eşleşme yoksa → "Davet bulunamadı" hatası
+3. İstisna: INITIAL_SUPER_ADMIN_EMAIL her zaman kayıt olabilir`}</CodeBlock>
+
+            <InfoBox type="info">
+                allowedDomains listesi Süper Admin tarafından settings/system belgesi üzerinden yönetilir. Domain ekleme/silme anında aktif olur.
+            </InfoBox>
 
             <SectionTitle>Departman DB İzolasyonu</SectionTitle>
             <CodeBlock lang="javascript">{`// department_user rolünde Firestore sorgu katmanında filtre
@@ -349,7 +365,11 @@ function DataModelSection() {
 ├── departments/     {deptId}
 ├── invitations/     {email}
 ├── sources/         {sourceId}
-└── interviews/      {sessionId}`}</CodeBlock>
+├── interviews/      {sessionId}
+├── emailThreads/    {autoId}       ← Gmail thread takibi
+└── settings/
+    ├── branding     (tek belge)    ← Kurumsal kimlik
+    └── system       (tek belge)   ← Domain beyaz listesi`}</CodeBlock>
 
             <SectionTitle>Aday Belgesi Şeması</SectionTitle>
             <CodeBlock lang="javascript">{`{
@@ -397,6 +417,25 @@ function DataModelSection() {
   googleAccessToken: string,
   googleRefreshToken: string,
   createdAt: Timestamp,
+}`}</CodeBlock>
+
+            <SectionTitle>settings/branding Belgesi Şeması</SectionTitle>
+            <CodeBlock lang="javascript">{`// artifacts/talent-flow/public/data/settings/branding
+{
+  companyName: string,    // Şirket adı
+  logoUrl: string,        // Firebase Storage download URL
+  primaryColor: string,   // HEX renk kodu (örn: '#1E3A8A')
+  tagline: string,        // E-posta başlığı altı slogan
+  website: string,        // Footer linki
+  updatedAt: Timestamp,
+}`}</CodeBlock>
+
+            <SectionTitle>settings/system Belgesi Şeması</SectionTitle>
+            <CodeBlock lang="javascript">{`// artifacts/talent-flow/public/data/settings/system
+{
+  allowedDomains: string[],  // Davet gerektirmeyen e-posta domain'leri
+                              // ör: ['btcturk.com', 'infoset.app']
+  updatedAt: Timestamp,
 }`}</CodeBlock>
         </div>
     );
@@ -595,6 +634,123 @@ const enrichedCandidates = useMemo(() => {
         // İstemci tarafı ikincil filtre (DB izolasyonuna ek)
         .filter(c => canAccess(c, userProfile));
 }, [rawCandidates, positions, userProfile]);`}</CodeBlock>
+        </div>
+    );
+}
+
+function EmailSection() {
+    return (
+        <div>
+            <SectionTitle>Genel Bakış</SectionTitle>
+            <p className="text-xs text-slate-600 leading-relaxed mb-3">
+                Talent-Inn iki farklı e-posta kanalı kullanır: sistem davetleri için Nodemailer (Gmail SMTP), mülakat yazışmaları için Gmail API (OAuth 2.0 — recruiter hesabı üzerinden). Tüm e-postalar branding nesnesiyle kişiselleştirilebilen HTML şablonlarıyla gönderilir.
+            </p>
+            <Table
+                headers={['Kanal', 'Kullanım', 'Kimlik Doğrulama']}
+                rows={[
+                    ['Nodemailer / Gmail SMTP', 'Kullanıcı davet e-postası (sistem → yeni kullanıcı)', 'EMAIL_USER + EMAIL_PASS secret'],
+                    ['Gmail API (OAuth 2.0)', 'Mülakat daveti (recruiter → aday/katılımcı)', 'googleAccessToken / googleRefreshToken (Firestore\'da saklı)'],
+                ]}
+            />
+
+            <SectionTitle>Şablon Mimarisi</SectionTitle>
+            <p className="text-xs text-slate-600 leading-relaxed mb-2">
+                <code className="font-mono text-[11px] bg-slate-100 text-violet-700 px-1.5 py-0.5 rounded">src/utils/emailTemplates.js</code> — Frontend ve backend tarafında ortak kullanılan şablon üreticisi. Tüm fonksiyonlar <code className="font-mono text-[11px] bg-slate-100 text-violet-700 px-1.5 py-0.5 rounded">branding</code> nesnesini parametre olarak alır.
+            </p>
+            <Table
+                headers={['Fonksiyon', 'Tipi', 'Alıcı', 'İçerik']}
+                rows={[
+                    ['`buildInviteEmail()`', 'Sistem daveti', 'Yeni kullanıcı', 'Hoş geldiniz, rol bilgisi, davet linki'],
+                    ['`buildInterviewInviteEmail()`', 'Mülakat daveti', 'Aday', 'Pozisyon, tarih/saat, mülakat türü, "Mülakata Katıl" butonu'],
+                    ['`buildParticipantNotificationEmail()`', 'Katılımcı bildirimi', 'İç/harici katılımcı', 'Aday bilgisi, mülakat detayları, Meet linki'],
+                ]}
+            />
+
+            <SectionTitle>Branding Nesnesi</SectionTitle>
+            <CodeBlock lang="javascript">{`// Firestore: artifacts/talent-flow/public/data/settings/branding
+const branding = {
+    companyName: string,    // Şirket adı (fallback: 'Talent-Inn')
+    logoUrl: string,        // Firebase Storage URL veya boş
+    primaryColor: string,   // HEX — başlık arka planı ve buton rengi
+    tagline: string,        // Slogan (başlık altında)
+    website: string,        // Footer web sitesi linki
+};
+
+// Varsayılan (branding kayıtlı değilse):
+DEFAULT_BRANDING = { companyName: 'Talent-Inn', primaryColor: '#1E3A8A', ... }`}</CodeBlock>
+
+            <SectionTitle>HTML Şablon Yapısı</SectionTitle>
+            <CodeBlock lang="html">{`<!-- baseLayout() her şablona sarılır -->
+<table width="600">
+  <!-- HEADER: primaryColor arka plan, logo veya şirket adı -->
+  <tr><td style="background:{primaryColor}">
+    <img src="{logoUrl}" /> | <span>{companyName}</span>
+    <p>{tagline}</p>
+  </td></tr>
+
+  <!-- CONTENT: şablona özgü içerik (branding rengi accent olarak) -->
+  <tr><td style="padding:40px">
+    {content}   ← buildInterviewInviteEmail() vb. tarafından doldurulur
+  </td></tr>
+
+  <!-- FOOTER: şirket adı + web sitesi -->
+  <tr><td style="background:#F8FAFC">
+    Bu e-posta {companyName} tarafından gönderilmiştir.
+  </td></tr>
+</table>`}</CodeBlock>
+
+            <SectionTitle>Gmail API — Mülakat Daveti Gönderimi</SectionTitle>
+            <CodeBlock lang="akış">{`1. InterviewManagementPage → buildInterviewInviteEmail(branding, {...})
+   → HTML string üretilir
+2. POST /api/google/send-email  { to, subject, html, threadId? }
+   → server.js: Gmail API messages.send (multipart/mixed, base64url)
+   → Yanıt: { messageId, threadId }
+3. Firestore: emailThreads/{autoId} belgesi yazılır
+   { threadId, messageId, candidateId, candidateName,
+     candidateEmail, subject, recruiterId, recruiterName,
+     sentAt, hasReply: false }
+4. Katılımcı döngüsü → buildParticipantNotificationEmail() ile tekrarlanır`}</CodeBlock>
+
+            <SectionTitle>Gmail API — Thread Yanıt Takibi</SectionTitle>
+            <CodeBlock lang="akış">{`1. MessagesPage → "E-posta Yazışmaları" sekmesi
+2. Firestore: emailThreads — recruiterId == currentUser.uid filtreli
+3. Kullanıcı "Yanıtları Kontrol Et" butonuna basar
+4. POST /api/google/send-email (fetchThread: true, threadId)
+   → GET https://gmail.googleapis.com/gmail/v1/users/me/threads/{threadId}
+   → Thread mesajları döner
+5. messages.length > 1 → yanıt var
+6. Firestore: emailThreads/{docId}.hasReply = true güncellenir
+7. UI: "Yanıt Var" rozeti yeşil olarak gösterilir`}</CodeBlock>
+
+            <SectionTitle>emailThreads Koleksiyon Şeması</SectionTitle>
+            <CodeBlock lang="javascript">{`// artifacts/talent-flow/public/data/emailThreads/{autoId}
+{
+    threadId: string,         // Gmail thread ID
+    messageId: string,        // Gmail message ID (ilk mesaj)
+    candidateId: string,      // Aday Firestore ID
+    candidateName: string,
+    candidateEmail: string,
+    subject: string,          // E-posta konusu
+    recruiterId: string,      // Gönderen recruiter uid
+    recruiterName: string,
+    sentAt: Timestamp,
+    hasReply: boolean,        // false → true (yanıt gelince güncellenir)
+}`}</CodeBlock>
+
+            <SectionTitle>Harici Katılımcı Akışı</SectionTitle>
+            <InfoBox type="info">
+                Harici katılımcılar sistemde kayıtlı değildir; id alanı "external_{`{email}`}" formatıyla üretilir ve isExternal: true ile işaretlenir.
+            </InfoBox>
+            <Table
+                headers={['Özellik', 'Sistem Kullanıcısı', 'Harici Katılımcı']}
+                rows={[
+                    ['id formatı', '`{firestoreUid}`', '`external_{email}`'],
+                    ['Müsaitlik kontrolü', 'Google Takvim sorgulanır', 'Kontrol edilmez'],
+                    ['E-posta bildirimi', 'buildParticipantNotificationEmail()', 'Aynı şablon'],
+                    ['Google Takvim daveti', 'Evet', 'Hayır'],
+                    ['UI rozeti', 'Mavi (dahili)', 'Amber (@ rozeti)'],
+                ]}
+            />
         </div>
     );
 }

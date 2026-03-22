@@ -138,16 +138,18 @@ const FEATURES = [
         color: '#f59e0b',
         title: 'Mülakat Planlama & Davetler',
         subtitle: 'Mülakatlar sayfası',
-        description: 'Mülakatları planlayın, adaylara otomatik davet e-postaları gönderin ve Google Calendar entegrasyonu ile takviminize ekleyin. Her mülakat için benzersiz bir katılım bağlantısı otomatik oluşturulur.',
+        description: 'Mülakatları planlayın, adaylara kurumsal markalı HTML davetiyeler gönderin ve Google Calendar entegrasyonu ile takviminize ekleyin. Katılımcı listesine sistem dışı harici e-posta adresleri de ekleyebilirsiniz. Her mülakat için benzersiz bir katılım bağlantısı otomatik oluşturulur.',
         steps: [
             '"Mülakatlar" menüsünden "Yeni Mülakat Planla" butonuna tıklayın.',
             'Aday, pozisyon, tarih ve saat seçin. Mülakat türünü belirleyin (Teknik / İK / Ürün).',
-            '"E-posta Gönder" seçeneği ile adaya otomatik davetiye ve mülakat bağlantısı gönderilir.',
-            'Google Calendar bağlantısı varsa etkinlik otomatik takviminize eklenir.',
+            'Katılımcı adımında sistem kullanıcılarını seçin; "Harici Katılımcı Ekle" alanından sistemde kayıtlı olmayan kişilerin e-posta adreslerini ekleyin.',
+            '"E-posta Gönder" seçeneği ile adaya kurumsal markalı HTML davetiye ve mülakat bağlantısı gönderilir.',
+            'Google Calendar bağlantısı varsa etkinlik otomatik takviminize eklenir; tüm katılımcılara davet gönderilir.',
+            'Gönderilen e-postalar "Mesajlar → E-posta Yazışmaları" sekmesinden takip edilir. Yanıtları kontrol etmek için Gmail API\'si kullanılır.',
             'Mülakat günü, "Mülakatı Başlat" butonuyla Canlı Mülakat ekranına geçin.',
         ],
-        tip: 'Google Workspace entegrasyonu aktifken takvim görünürlüğünüzü kontrol edebilir, adayın kendi zamanını seçmesini sağlayabilirsiniz.',
-        tags: ['mülakat', 'planlama', 'takvim', 'google calendar', 'davet', 'email', 'link', 'zamanlama'],
+        tip: 'Harici katılımcılar (@ rozetiyle gösterilir) Google Takvim\'e eklenmez; sadece e-posta bildirimi alır. Kurumsal markayı "Kurumsal Kimlik" ayarlarından özelleştirebilirsiniz.',
+        tags: ['mülakat', 'planlama', 'takvim', 'google calendar', 'davet', 'email', 'link', 'zamanlama', 'harici katılımcı', 'html email', 'marka', 'e-posta takibi'],
         mockup: (
             <div className="space-y-2.5">
                 <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
@@ -157,6 +159,13 @@ const FEATURES = [
                     </div>
                     <div className="text-[11px] text-slate-700 font-medium">Ahmet Yılmaz — Teknik Mülakat</div>
                     <div className="text-[9px] text-slate-400 mt-0.5">Yazılım Müh. • meet.google.com/···</div>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                    {[{ l: 'Ahmet B.', ext: false }, { l: 'dış@partner.com', ext: true }].map((p, i) => (
+                        <span key={i} className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-medium border ${p.ext ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-blue-50 border-blue-200 text-blue-700'}`}>
+                            {p.ext ? '@' : '✓'} {p.l}
+                        </span>
+                    ))}
                 </div>
                 <div className="flex gap-2">
                     <div className="flex-1 bg-emerald-50 border border-emerald-100 rounded-lg px-2 py-1.5 text-center">
@@ -300,32 +309,75 @@ const FEATURES = [
         category: 'iletisim',
         icon: MessageSquare,
         color: '#ec4899',
-        title: 'Mesajlaşma',
-        subtitle: 'Ekip içi iletişim',
-        description: 'Takım üyelerinizle anlık mesajlaşın. Aday bilgilerini, mülakat notlarını ve önemli güncellemeleri ekibinizle paylaşın. Tüm konuşmalar organize kanallar halinde saklanır.',
+        title: 'Mesaj Kuyruğu & E-posta Takibi',
+        subtitle: 'Mesajlar sayfası — 2 sekme',
+        description: 'Mesajlar ekranı iki sekmeden oluşur: "Mesaj Kuyruğu" LinkedIn Sales Navigator DM taslak ve gönderim akışını; "E-posta Yazışmaları" ise adaylara gönderilen tüm e-posta thread\'lerini ve yanıt durumlarını gösterir.',
         steps: [
-            '"Mesajlaşma" menüsüne tıklayın.',
-            'Sol panelde mevcut sohbet kanallarını görün veya yeni kanal oluşturun.',
-            'Mesaj kutusuna yazın ve gönderin.',
-            'Aday kartını mesaja eklemek için ek seçeneğini kullanın.',
+            '"Mesajlar" menüsüne tıklayın.',
+            '"Mesaj Kuyruğu" sekmesinde LinkedIn DM taslakları, hazır ve gönderilmiş mesajları filtreleyin.',
+            '"E-posta Yazışmaları" sekmesine geçin — gönderilen tüm mülakat davetleri listede görünür.',
+            'Bir e-posta thread\'ine tıklayarak genişletin, ardından "Yanıtları Kontrol Et" butonuna basın.',
+            'Gmail API üzerinden thread\'deki tüm mesajlar çekilir — yanıt varsa "Yanıt Var" rozeti gösterilir.',
         ],
-        tip: 'Önemli konuşmaları sabitleyin (pin) — kritik mülakat notlarına hızlıca ulaşın.',
-        tags: ['mesaj', 'iletişim', 'sohbet', 'ekip', 'kanal', 'bildirim'],
+        tip: 'Yanıt Var rozeti (yeşil) olan thread\'ler adayın e-postanızı okuduğunu ve yanıtladığını gösterir. Google bağlantısı aktif olmalıdır.',
+        tags: ['mesaj', 'kuyruk', 'linkedin', 'email', 'e-posta', 'yazışma', 'yanıt', 'thread', 'gmail', 'takip', 'bildirim'],
         mockup: (
             <div className="space-y-2">
-                <div className="bg-slate-50 border border-slate-100 rounded-xl p-2 flex gap-2">
-                    <div className="w-6 h-6 rounded-full bg-pink-100 flex items-center justify-center text-[9px] font-bold text-pink-600">A</div>
-                    <div className="flex-1">
-                        <div className="text-[10px] font-semibold text-slate-700">Ahmet B.</div>
-                        <div className="text-[9px] text-slate-500 mt-0.5">Zeynep K. mülakatı nasıl geçti?</div>
-                    </div>
+                <div className="flex gap-1 p-0.5 bg-slate-100 rounded-lg">
+                    <div className="flex-1 bg-white rounded-md px-2 py-1 text-center text-[8px] font-semibold text-pink-600 shadow-sm">Mesaj Kuyruğu</div>
+                    <div className="flex-1 px-2 py-1 text-center text-[8px] text-slate-400">E-posta Yazışmaları</div>
                 </div>
-                <div className="bg-cyan-50 border border-cyan-100 rounded-xl p-2 flex gap-2">
-                    <div className="w-6 h-6 rounded-full bg-cyan-100 flex items-center justify-center text-[9px] font-bold text-cyan-600">S</div>
-                    <div className="flex-1">
-                        <div className="text-[10px] font-semibold text-slate-700">Siz</div>
-                        <div className="text-[9px] text-slate-500 mt-0.5">Çok iyi! STAR skoru 91 çıktı 🎯</div>
+                {[
+                    { name: 'Zeynep K.', sub: 'Teknik Mülakat Daveti', replied: true },
+                    { name: 'Mert A.', sub: 'İK Mülakat Daveti', replied: false },
+                ].map((t, i) => (
+                    <div key={i} className="flex items-center gap-2 bg-white border border-slate-100 rounded-xl p-2">
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[9px] font-bold ${t.replied ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{t.name[0]}</div>
+                        <div className="flex-1 min-w-0">
+                            <div className="text-[10px] font-semibold text-slate-700">{t.name}</div>
+                            <div className="text-[8px] text-slate-400 truncate">{t.sub}</div>
+                        </div>
+                        {t.replied && <span className="text-[7px] bg-emerald-50 text-emerald-600 border border-emerald-100 px-1.5 py-0.5 rounded-full font-bold">Yanıt Var</span>}
                     </div>
+                ))}
+            </div>
+        )
+    },
+    {
+        id: 'email-templates',
+        category: 'iletisim',
+        icon: Mail,
+        color: '#3b82f6',
+        title: 'Kurumsal HTML E-posta Şablonları',
+        subtitle: 'Markaya özel e-posta tasarımı',
+        description: 'Talent-Inn\'den gönderilen her e-posta, Kurumsal Kimlik ayarlarınızdaki logo, renk ve şirket adınızı yansıtan profesyonel HTML şablonlarla gönderilir. 3 farklı şablon tipi mevcuttur: kullanıcı daveti, mülakat daveti (adaya) ve katılımcı bildirimi.',
+        steps: [
+            'Ayarlar → "Kurumsal Kimlik" bölümünden logo, renk ve şirket bilgilerini doldurun.',
+            'Canlı önizlemede e-postanın son halini görün.',
+            'Mülakat daveti gönderdiğinizde e-posta otomatik olarak kurumsal kimliğinizle gider.',
+            'Kullanıcı davet e-postası (sistem yönetimi), mülakat daveti (adaya) ve katılımcı bildirim e-postası ayrı tasarımlara sahiptir.',
+        ],
+        tip: 'Logo URL\'si Firebase Storage\'dan otomatik alınır. Logo yüklü değilse şirket adı metin olarak gösterilir.',
+        tags: ['email', 'e-posta', 'şablon', 'html', 'marka', 'logo', 'tasarım', 'davet', 'kurumsal', 'bildirim'],
+        mockup: (
+            <div className="space-y-2">
+                <div className="border border-slate-200 rounded-xl overflow-hidden text-[9px]">
+                    <div className="bg-[#1E3A8A] px-3 py-2 text-center">
+                        <div className="inline-block bg-white/20 rounded-lg px-2 py-0.5 text-white font-bold">Şirket Adı</div>
+                        <div className="text-white/70 text-[7px] mt-0.5">Akıllı İK Platformu</div>
+                    </div>
+                    <div className="bg-white px-3 py-2 space-y-1.5">
+                        <div className="font-bold text-slate-800 text-[10px]">Mülakat Davetiniz</div>
+                        <div className="text-slate-500 leading-relaxed">Merhaba <strong>Zeynep K.</strong>, sizinle tanışmak isteriz.</div>
+                        <div className="bg-blue-50 border-l-2 border-blue-500 pl-2 py-1 space-y-0.5">
+                            <div className="text-slate-600">📋 Frontend Developer</div>
+                            <div className="text-slate-600">📅 25 Mart 2026 · 14:00</div>
+                        </div>
+                        <div className="text-center">
+                            <span className="bg-[#1E3A8A] text-white px-3 py-1 rounded text-[8px] font-bold inline-block">Mülakata Katıl →</span>
+                        </div>
+                    </div>
+                    <div className="bg-slate-50 border-t border-slate-100 px-3 py-1.5 text-center text-slate-400 text-[7px]">Talent-Inn Platformu</div>
                 </div>
             </div>
         )
@@ -437,6 +489,78 @@ const FEATURES = [
                         </div>
                     </div>
                 ))}
+            </div>
+        )
+    },
+    {
+        id: 'branding',
+        category: 'sistem',
+        icon: Building2,
+        color: '#8b5cf6',
+        title: 'Kurumsal Kimlik',
+        subtitle: 'Logo, renk & e-posta markalaması',
+        description: 'Şirketinizin logosunu, ana rengini, etiket sloganını ve web adresini tanımlayın. Bu bilgiler tüm sistemden gönderilen e-postalarda otomatik kullanılır. Canlı önizleme ile e-postanın son halini kaydetmeden görebilirsiniz.',
+        steps: [
+            'Ayarlar → "Kurumsal Kimlik" sekmesine gidin (Süper Admin yetkisi gerekir).',
+            'Şirket adı, web sitesi ve slogan alanlarını doldurun.',
+            '"Logo Yükle" butonuyla görsel yükleyin — Firebase Storage\'a kaydedilir.',
+            'Renk seçiciden şirket rengini seçin veya HEX kodunu yapıştırın. Hazır kurumsal paletler sunulur.',
+            '"Canlı Önizleme" alanında e-postanın gerçek görünümünü inceleyin.',
+            '"Kaydet" butonuyla ayarları Firestore\'a yazın — anında tüm yeni e-postalara yansır.',
+        ],
+        tip: 'Marka rengi sadece e-postalarda değil, ileride uygulama temasında da kullanılacaktır. Markaya özgü bir renk seçin.',
+        tags: ['marka', 'logo', 'renk', 'kurumsal', 'kimlik', 'email', 'e-posta', 'ayarlar', 'şablon', 'slogan'],
+        mockup: (
+            <div className="space-y-2">
+                <div className="border border-slate-200 rounded-xl overflow-hidden">
+                    <div className="bg-[#1E3A8A] p-2 text-center">
+                        <div className="inline-block bg-white/20 rounded px-2 py-0.5 text-white text-[9px] font-bold">LOGO</div>
+                    </div>
+                    <div className="p-2 space-y-1.5 bg-white">
+                        {[['Şirket Adı', 'BTC Türk A.Ş.'], ['Slogan', 'Kripto & Blockchain'], ['Ana Renk', '#1E3A8A']].map(([l, v]) => (
+                            <div key={l} className="flex items-center gap-2">
+                                <span className="text-[8px] text-slate-400 w-16">{l}</span>
+                                <span className="text-[9px] font-medium text-slate-700">{v}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+                <div className="bg-emerald-50 border border-emerald-100 rounded-lg px-2 py-1.5 text-center text-[9px] text-emerald-600 font-medium">Canlı Önizleme Aktif</div>
+            </div>
+        )
+    },
+    {
+        id: 'domain-whitelist',
+        category: 'sistem',
+        icon: Globe,
+        color: '#06b6d4',
+        title: 'Domain Beyaz Listesi',
+        subtitle: 'Kurumsal e-posta ile otomatik erişim',
+        description: 'Belirli e-posta alan adlarını (örn: şirket.com) sisteme tanımlayarak, bu domainlere sahip kullanıcıların davet gerekmeksizin sisteme kayıt olmasını sağlayın. Domain beyaz listesindeki kullanıcılar otomatik olarak "Recruiter" rolüyle kayıt olur.',
+        steps: [
+            'Sistem Yönetimi → "Domain Yönetimi" sekmesine gidin (Süper Admin yetkisi gerekir).',
+            '"İzin Verilen Domain Ekle" alanına domain adını girin (ör: btcturk.com).',
+            '"Ekle" butonuyla listeye kaydedin — anında aktif olur.',
+            'Bu domainden kayıt olmaya çalışan kullanıcılar davet kontrolünü atlar.',
+            'Artık istenmeyen bir domain varsa çöp kutusu ikonu ile silin.',
+        ],
+        tip: 'Kurumsal e-posta alanınızı eklemek, HR ekibinizin her üyesinin anında erişmesini sağlar. Harici domain\'leri (gmail.com gibi) eklemeyin.',
+        tags: ['domain', 'whitelist', 'alan adı', 'erişim', 'otomatik', 'kayıt', 'güvenlik', 'recruiter', 'kurumsal email'],
+        mockup: (
+            <div className="space-y-2">
+                {[{ d: 'btcturk.com', users: 12 }, { d: 'infoset.app', users: 5 }].map((item, i) => (
+                    <div key={i} className="flex items-center gap-2 bg-white border border-slate-100 rounded-xl p-2.5">
+                        <div className="w-7 h-7 rounded-lg bg-cyan-50 border border-cyan-100 flex items-center justify-center">
+                            <Globe className="w-3.5 h-3.5 text-cyan-500" />
+                        </div>
+                        <div className="flex-1 text-xs font-medium text-slate-700">@{item.d}</div>
+                        <span className="text-[8px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded-full">{item.users} kullanıcı</span>
+                    </div>
+                ))}
+                <div className="border border-dashed border-slate-200 rounded-xl px-3 py-2 flex items-center gap-2">
+                    <span className="text-[9px] text-slate-400 flex-1">yenidomain.com ekle…</span>
+                    <span className="text-[9px] bg-cyan-50 text-cyan-600 px-2 py-0.5 rounded font-medium">Ekle</span>
+                </div>
             </div>
         )
     },
