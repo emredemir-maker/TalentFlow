@@ -6,6 +6,7 @@ import { collection, onSnapshot, query, where, doc, updateDoc } from 'firebase/f
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 import { useMessageQueue } from '../context/MessageQueueContext';
+import { useNotifications } from '../context/NotificationContext';
 import {
     updateMessageStatus,
     simulateSend,
