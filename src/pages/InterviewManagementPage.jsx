@@ -48,7 +48,7 @@ const USERS_PATH = 'artifacts/talent-flow/public/data/users';
 
 export default function InterviewManagementPage() {
     const navigate = useNavigate();
-    const { user: currentUser, userProfile, userId } = useAuth();
+    const { user: currentUser, userProfile, userId, isDepartmentUser, role } = useAuth();
     const { enrichedCandidates, updateCandidate, preselectedInterviewData, setPreselectedInterviewData } = useCandidates();
     
     // UI States
@@ -69,6 +69,14 @@ export default function InterviewManagementPage() {
     const [systemUsers, setSystemUsers] = useState([]);
     const [selectedInterviewer, setSelectedInterviewer] = useState(null);
     const [openMenuId, setOpenMenuId] = useState(null);
+
+    // Participant selection states (wizard step 3)
+    const [selectedParticipants, setSelectedParticipants] = useState([]);
+    const [participantAvailability, setParticipantAvailability] = useState({});
+    const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
+
+    // "My Interviews" filter for department users in calendar view
+    const [showMyInterviews, setShowMyInterviews] = useState(false);
     
     // Close menu when clicking outside
     useEffect(() => {
@@ -287,6 +295,8 @@ export default function InterviewManagementPage() {
         setDayCalendarBusy([]);
         setManualDate('');
         setManualTime('09:00');
+        setSelectedParticipants([]);
+        setParticipantAvailability({});
     }, [selectedCandidate]);
 
     // Fetch system users
@@ -518,6 +528,43 @@ export default function InterviewManagementPage() {
         }
     };
 
+    // Toggle a participant in/out of the selectedParticipants list
+    const toggleParticipant = (user) => {
+        setSelectedParticipants(prev =>
+            prev.some(p => p.id === user.id)
+                ? prev.filter(p => p.id !== user.id)
+                : [...prev, user]
+        );
+    };
+
+    // Fetch availability for all platform users when entering wizard step 3
+    useEffect(() => {
+        if (wizardStep !== 3 || !manualDate || !manualTime || systemUsers.length === 0) return;
+        let cancelled = false;
+        const fetchAvailability = async () => {
+            setIsLoadingAvailability(true);
+            try {
+                const userIds = systemUsers.filter(u => u.role !== 'candidate').map(u => u.id);
+                if (userIds.length === 0) return;
+                const res = await fetch('/api/users/availability', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userIds, date: manualDate, time: manualTime })
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                if (!cancelled) setParticipantAvailability(data.availability || {});
+            } catch (err) {
+                console.warn('[Availability] Fetch error:', err.message);
+            } finally {
+                if (!cancelled) setIsLoadingAvailability(false);
+            }
+        };
+        fetchAvailability();
+        return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [wizardStep, manualDate, manualTime]);
+
     // Helper: build a local-time ISO string (no trailing Z) from date + "HH:MM"
     const toLocalISOString = (date) => {
         const pad = n => String(n).padStart(2, '0');
@@ -543,8 +590,15 @@ export default function InterviewManagementPage() {
                 time: slot ? slot.time : new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
                 type: interviewType,
                 interviewer: interviewerName,
+                interviewerId: userId,
                 status: startNow ? 'live' : 'scheduled',
-                meetLink
+                meetLink,
+                participants: selectedParticipants.map(p => ({
+                    userId: p.id,
+                    displayName: p.displayName || p.email || 'Kullanıcı',
+                    email: p.email || null,
+                    role: p.role || 'unknown'
+                }))
             };
 
             // Create Google Calendar event when a date/time is specified and Google is connected
@@ -562,12 +616,14 @@ export default function InterviewManagementPage() {
                     console.warn('[Calendar] Could not obtain valid token — skipping calendar event.');
                     alert('⚠️ Google token alınamadı. Mülakat sisteme kaydedilecek ama takvime eklenemeyecek.');
                 } else {
+                    const participantEmails = selectedParticipants.map(p => p.email).filter(Boolean);
                     const calResult = await createDirectCalendarEvent(userId, freshCalToken, {
                         summary: `${selectedCandidate.name} — ${newSession.title}`,
-                        description: `Talent-Inn üzerinden planlanan mülakat.\nAday: ${selectedCandidate.name}\nPozisyon: ${selectedCandidate.position || '—'}\nDeğerlendirici: ${interviewerName}\nMülakat linki: ${meetLink}`,
+                        description: `Talent-Inn üzerinden planlanan mülakat.\nAday: ${selectedCandidate.name}\nPozisyon: ${selectedCandidate.position || '—'}\nDeğerlendirici: ${interviewerName}\n${participantEmails.length > 0 ? `Katılımcılar: ${participantEmails.join(', ')}\n` : ''}Mülakat linki: ${meetLink}`,
                         startDateTime: toLocalISOString(startDT),
                         endDateTime: toLocalISOString(endDT),
                         guestEmail: selectedCandidate.email,
+                        guestEmails: participantEmails,
                         timeZone: userTimeZone
                     });
 
@@ -579,6 +635,20 @@ export default function InterviewManagementPage() {
                         if (calResult.htmlLink) {
                             calendarEventLink = calResult.htmlLink;
                             newSession.calendarEventLink = calResult.htmlLink;
+                        }
+
+                        // Send notification emails to internal participants (not the candidate)
+                        for (const participant of selectedParticipants) {
+                            if (!participant.email) continue;
+                            try {
+                                await sendDirectEmail(userId, freshCalToken, {
+                                    to: participant.email,
+                                    subject: `Mülakat Daveti: ${newSession.title} — ${selectedCandidate.name}`,
+                                    body: `Merhaba ${participant.displayName || participant.email},\n\nTalent-Inn üzerinden bir mülakata katılımcı olarak eklendiniz.\n\nAday: ${selectedCandidate.name}\nPozisyon: ${selectedCandidate.position || '—'}\nTarih: ${slot.date}\nSaat: ${slot.time}\nMülakat Tipi: ${newSession.title}\n\nMülakat Linki: ${meetLink}\n\nTalent-Inn Ekibi`
+                                });
+                            } catch (emailErr) {
+                                console.warn('[Participants] Email send failed for:', participant.email, emailErr.message);
+                            }
                         }
                     } else {
                         // Warn but don't block — interview record is still saved
@@ -699,9 +769,9 @@ export default function InterviewManagementPage() {
                         </button>
                         <div>
                             <h1 className="text-xl font-semibold text-[#0F172A]">Yeni Mülakat Planla</h1>
-                            <p className="text-xs text-[#64748B] mt-0.5 font-medium">3 adımda tamamlayın</p>
+                            <p className="text-xs text-[#64748B] mt-0.5 font-medium">4 adımda tamamlayın</p>
                         </div>
-                        {(wizardStep === 2 || wizardStep === 3) && selectedCandidate && manualDate && (
+                        {(wizardStep >= 2) && selectedCandidate && manualDate && (
                             <div className="ml-auto text-xs text-[#64748B] bg-white border border-[#E2E8F0] rounded-full px-3 py-1 flex items-center gap-1.5 shadow-sm">
                                 <span className="font-semibold text-[#0F172A]">{selectedCandidate.name}</span>
                                 <span>·</span>
@@ -717,12 +787,13 @@ export default function InterviewManagementPage() {
                                 <div className="absolute left-5 right-5 top-5 h-0.5 bg-[#E2E8F0] z-0" />
                                 <div
                                     className="absolute left-5 top-5 h-0.5 bg-[#1E3A8A] z-0 transition-all duration-500"
-                                    style={{ right: wizardStep === 1 ? 'calc(66%)' : wizardStep === 2 ? 'calc(33%)' : '20px', left: '20px' }}
+                                    style={{ right: wizardStep === 1 ? 'calc(75%)' : wizardStep === 2 ? 'calc(50%)' : wizardStep === 3 ? 'calc(25%)' : '20px', left: '20px' }}
                                 />
                                 {[
                                     { num: 1, label: 'Aday Seçimi' },
                                     { num: 2, label: 'Zaman Belirle' },
-                                    { num: 3, label: 'Onayla & Gönder' }
+                                    { num: 3, label: 'Katılımcılar' },
+                                    { num: 4, label: 'Onayla & Gönder' }
                                 ].map(step => (
                                     <div
                                         key={step.num}
@@ -962,8 +1033,97 @@ export default function InterviewManagementPage() {
                             );
                         })()}
 
-                        {/* STEP 3: ONAYLA & GÖNDER */}
+                        {/* STEP 3: KATILIMCILAR */}
                         {wizardStep === 3 && (
+                            <div className="p-6 overflow-y-auto custom-scrollbar" style={{ maxHeight: 440 }}>
+                                <p className="text-[10px] font-black text-[#64748B] uppercase tracking-widest mb-1">Mülakate katılacak ekip üyelerini seçin</p>
+                                <p className="text-[11px] text-[#94A3B8] mb-4">
+                                    {manualDate && manualTime
+                                        ? `${new Date(manualDate + 'T12:00:00').toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })} · ${manualTime} için müsaitlik kontrol ediliyor`
+                                        : 'Tarih ve saat belirlenmeden müsaitlik gösterilemez'}
+                                </p>
+                                {isLoadingAvailability ? (
+                                    <div className="flex items-center justify-center py-16 gap-2 text-[#94A3B8]">
+                                        <Loader2 className="w-5 h-5 animate-spin" />
+                                        <span className="text-sm font-medium">Takvimler kontrol ediliyor...</span>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                                        {systemUsers.filter(u => u.role !== 'candidate').map(u => {
+                                            const isSelected = selectedParticipants.some(p => p.id === u.id);
+                                            const availability = participantAvailability[u.id];
+                                            const initials = (u.displayName || u.email || '?').substring(0, 2).toUpperCase();
+                                            return (
+                                                <button
+                                                    key={u.id}
+                                                    onClick={() => toggleParticipant(u)}
+                                                    className={`flex items-center gap-3.5 p-4 rounded-2xl border-2 transition-all text-left w-full ${
+                                                        isSelected
+                                                            ? 'border-[#1E3A8A] bg-blue-50/50 shadow-md shadow-blue-900/5'
+                                                            : 'border-[#E2E8F0] bg-white hover:border-[#CBD5E1] hover:bg-slate-50'
+                                                    }`}
+                                                >
+                                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-[11px] font-black flex-shrink-0 ${
+                                                        isSelected ? 'bg-[#1E3A8A] text-white' : 'bg-[#F1F5F9] text-[#475569]'
+                                                    }`}>
+                                                        {initials}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className={`text-[13px] font-black truncate ${isSelected ? 'text-[#1E3A8A]' : 'text-[#0F172A]'}`}>
+                                                            {u.displayName || u.email || 'Kullanıcı'}
+                                                        </p>
+                                                        <p className="text-[11px] text-[#64748B] font-medium truncate capitalize">
+                                                            {(u.role || '').replace('_', ' ')}
+                                                        </p>
+                                                    </div>
+                                                    {manualDate && manualTime && (
+                                                        <div className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest flex-shrink-0 ${
+                                                            availability === 'available' ? 'bg-emerald-100 text-emerald-700' :
+                                                            availability === 'busy' ? 'bg-red-100 text-red-600' :
+                                                            'bg-slate-100 text-slate-500'
+                                                        }`}>
+                                                            {availability === 'available' ? 'MÜSAİT' : availability === 'busy' ? 'MEŞGUL' : 'BİLGİSİZ'}
+                                                        </div>
+                                                    )}
+                                                    {isSelected && (
+                                                        <div className="w-5 h-5 rounded-full bg-[#10B981] flex items-center justify-center flex-shrink-0">
+                                                            <Check className="w-3 h-3 text-white" />
+                                                        </div>
+                                                    )}
+                                                </button>
+                                            );
+                                        })}
+                                        {systemUsers.filter(u => u.role !== 'candidate').length === 0 && (
+                                            <div className="col-span-2 flex flex-col items-center justify-center py-16 text-[#94A3B8]">
+                                                <User className="w-8 h-8 mb-2 opacity-30" />
+                                                <p className="text-[12px] font-medium">Sistemde kullanıcı bulunamadı.</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                                {selectedParticipants.length > 0 && (
+                                    <div className="mt-4 p-3.5 bg-blue-50 border border-blue-100 rounded-2xl">
+                                        <p className="text-[10px] font-black text-[#1E3A8A] uppercase tracking-widest mb-2">
+                                            Seçili Katılımcılar ({selectedParticipants.length})
+                                        </p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {selectedParticipants.map(p => (
+                                                <span key={p.id} className="flex items-center gap-1.5 bg-white border border-blue-200 px-3 py-1.5 rounded-full text-[11px] font-semibold text-[#1E3A8A]">
+                                                    {p.displayName || p.email}
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); toggleParticipant(p); }}
+                                                        className="text-[#94A3B8] hover:text-red-500 transition-colors leading-none"
+                                                    >×</button>
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* STEP 4: ONAYLA & GÖNDER */}
+                        {wizardStep === 4 && (
                             <div className="p-6 space-y-4 overflow-y-auto custom-scrollbar" style={{ minHeight: 360 }}>
                                 <p className="text-[10px] font-black text-[#64748B] uppercase tracking-widest">Mülakat detaylarını kontrol edin</p>
                                 <div className="grid grid-cols-2 gap-3">
@@ -1012,6 +1172,25 @@ export default function InterviewManagementPage() {
                                         </div>
                                     </div>
                                 </div>
+
+                                {/* Participants section in confirmation */}
+                                {selectedParticipants.length > 0 && (
+                                    <div className="bg-[#F8FAFC] rounded-2xl border border-[#E2E8F0] p-4 space-y-2.5">
+                                        <p className="text-[9px] font-black text-[#64748B] uppercase tracking-widest">Katılımcılar ({selectedParticipants.length})</p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {selectedParticipants.map(p => (
+                                                <div key={p.id} className="flex items-center gap-2 bg-white border border-[#E2E8F0] px-3 py-1.5 rounded-full">
+                                                    <div className="w-5 h-5 rounded-full bg-[#1E3A8A]/10 text-[#1E3A8A] flex items-center justify-center text-[9px] font-black">
+                                                        {(p.displayName || p.email || '?').charAt(0).toUpperCase()}
+                                                    </div>
+                                                    <span className="text-[11px] font-semibold text-[#0F172A]">{p.displayName || p.email}</span>
+                                                    <span className="text-[9px] text-[#94A3B8] capitalize">{(p.role || '').replace('_', ' ')}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <p className="text-[9px] text-[#94A3B8]">Google Takvim daveti ve bildirim e-postası gönderilecek.</p>
+                                    </div>
+                                )}
 
                                 {/* AI Score section */}
                                 {selectedCandidate && (
@@ -1064,7 +1243,7 @@ export default function InterviewManagementPage() {
                                 }`}
                             >
                                 <ChevronLeft className="w-3.5 h-3.5" />
-                                {wizardStep === 2 ? 'Aday Seçimi' : wizardStep === 3 ? 'Zaman Belirle' : 'Geri'}
+                                {wizardStep === 2 ? 'Aday Seçimi' : wizardStep === 3 ? 'Zaman Belirle' : wizardStep === 4 ? 'Katılımcılar' : 'Geri'}
                             </button>
 
                             {/* Center summary chip */}
@@ -1084,13 +1263,13 @@ export default function InterviewManagementPage() {
                             </div>
 
                             {/* Right action */}
-                            {wizardStep < 3 ? (
+                            {wizardStep < 4 ? (
                                 <button
                                     onClick={() => { if (wizardStep === 1 && !selectedCandidate) return; setWizardStep(s => s + 1); }}
                                     disabled={wizardStep === 1 && !selectedCandidate}
                                     className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest bg-[#1E3A8A] hover:bg-blue-800 text-white shadow-lg shadow-blue-900/15 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
-                                    {wizardStep === 1 ? 'Zaman Belirle' : 'Onayla & Gönder'}
+                                    {wizardStep === 1 ? 'Zaman Belirle' : wizardStep === 2 ? 'Katılımcılar' : 'Onayla & Gönder'}
                                     <ChevronRight className="w-3.5 h-3.5" />
                                 </button>
                             ) : (
@@ -1247,7 +1426,7 @@ export default function InterviewManagementPage() {
                         {/* RIGHT: Day Sessions + Quick Plan ───────────────────── */}
                         <div className="w-[45%] flex flex-col bg-[#FAFAF8]">
                             <div className="px-8 py-6 flex-1 overflow-y-auto custom-scrollbar">
-                                <div className="mb-6">
+                                <div className="mb-4">
                                     <p className="text-[10px] font-black text-[#94A3B8] uppercase tracking-widest mb-1">Seçili Gün</p>
                                     <div className="text-xl font-semibold text-[#0F172A] flex items-center gap-3">
                                         {selectedCalDate
@@ -1259,11 +1438,41 @@ export default function InterviewManagementPage() {
                                     </div>
                                 </div>
 
-                                {dayCalSessions.length > 0 ? (
+                                {/* Tab filter: Tüm / Benim Mülakatlarım */}
+                                <div className="flex gap-1 mb-5 bg-[#F1F5F9] rounded-xl p-1">
+                                    {!isDepartmentUser && (
+                                        <button
+                                            onClick={() => setShowMyInterviews(false)}
+                                            className={`flex-1 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                                                !showMyInterviews ? 'bg-white text-[#0F172A] shadow-sm' : 'text-[#94A3B8]'
+                                            }`}
+                                        >
+                                            Tüm Mülakatlar
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => setShowMyInterviews(true)}
+                                        className={`flex-1 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                                            showMyInterviews || isDepartmentUser ? 'bg-white text-[#1E3A8A] shadow-sm' : 'text-[#94A3B8]'
+                                        }`}
+                                    >
+                                        Benim Mülakatlarım
+                                    </button>
+                                </div>
+
+                                {(() => {
+                                    const filteredSessions = (showMyInterviews || isDepartmentUser)
+                                        ? dayCalSessions.filter(s =>
+                                            s.interviewerId === currentUser?.uid ||
+                                            (Array.isArray(s.participants) && s.participants.some(p => p.userId === currentUser?.uid))
+                                        )
+                                        : dayCalSessions;
+                                    return filteredSessions.length > 0 ? (
                                     <div className="space-y-4">
-                                        {dayCalSessions.map(s => {
+                                        {filteredSessions.map(s => {
                                             const statusInfo = getCalStatusConfig(s.status);
                                             const initials = (s.candidateName || '?').split(' ').map(p => p[0]).join('').substring(0, 2).toUpperCase();
+                                            const participants = Array.isArray(s.participants) ? s.participants : [];
                                             return (
                                                 <div key={s.id} className="flex group">
                                                     <div className="w-16 pt-3 flex-shrink-0">
@@ -1291,6 +1500,18 @@ export default function InterviewManagementPage() {
                                                                     <User className="w-3.5 h-3.5" />
                                                                     <span>{s.interviewerName || s.interviewer || '—'}</span>
                                                                 </div>
+                                                                {participants.length > 0 && (
+                                                                    <div className="flex items-center gap-1">
+                                                                        {participants.slice(0, 3).map((p, idx) => (
+                                                                            <div key={idx} title={p.displayName || p.email} className="w-5 h-5 rounded-full bg-[#1E3A8A]/10 text-[#1E3A8A] flex items-center justify-center text-[8px] font-black border border-white">
+                                                                                {(p.displayName || p.email || '?').charAt(0).toUpperCase()}
+                                                                            </div>
+                                                                        ))}
+                                                                        {participants.length > 3 && (
+                                                                            <span className="text-[9px] text-[#94A3B8] font-bold">+{participants.length - 3}</span>
+                                                                        )}
+                                                                    </div>
+                                                                )}
                                                                 {s.matchScore && (
                                                                     <div className="px-1.5 py-0.5 bg-slate-100 rounded text-[10px] font-semibold text-slate-600">%{s.matchScore} UYUM</div>
                                                                 )}
@@ -1327,7 +1548,8 @@ export default function InterviewManagementPage() {
                                             <Plus className="w-4 h-4" /> Yeni Planla
                                         </button>
                                     </div>
-                                )}
+                                );
+                                })()}
                             </div>
 
                             {/* Hızlı Planlama */}
@@ -1344,7 +1566,7 @@ export default function InterviewManagementPage() {
                                         ? new Date(selectedCalDate + 'T12:00:00').toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' }) + ' için Planla'
                                         : 'Yeni Seans Planla'}
                                 </button>
-                                <p className="text-xs text-[#94A3B8] text-center mt-2">Tam sihirbaz 3 adımda planlamanıza yardımcı olur</p>
+                                <p className="text-xs text-[#94A3B8] text-center mt-2">Tam sihirbaz 4 adımda planlamanıza yardımcı olur</p>
                             </div>
                         </div>
                     </div>

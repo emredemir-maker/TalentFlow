@@ -1286,6 +1286,65 @@ app.post('/api/check-duplicate', async (req, res) => {
     }
 });
 
+// GET /api/users — List platform users for participant selection in interview wizard
+app.get('/api/users', async (req, res) => {
+    try {
+        const usersRef = db.collection('artifacts/talent-flow/public/data/users');
+        const snapshot = await usersRef.get();
+        const users = snapshot.docs.map(d => {
+            const data = d.data();
+            return {
+                id: d.id,
+                displayName: data.displayName || data.name || data.email || 'Kullanıcı',
+                email: data.email || null,
+                role: data.role || 'unknown',
+                departments: data.departments || [],
+                photoURL: data.photoURL || null,
+                googleConnected: !!(data.integrations?.google?.connected),
+            };
+        });
+        res.json({ users });
+    } catch (err) {
+        console.error('[API /api/users] Error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /api/users/availability — Check Google Calendar free/busy for multiple platform users
+app.post('/api/users/availability', async (req, res) => {
+    const { userIds, date, time } = req.body;
+    if (!Array.isArray(userIds) || !date || !time) {
+        return res.status(400).json({ error: 'userIds[], date, and time are required.' });
+    }
+    const slotStartMs = new Date(`${date}T${time}:00`).getTime();
+    if (isNaN(slotStartMs)) return res.status(400).json({ error: 'Invalid date/time format.' });
+    const slotStart = new Date(slotStartMs).toISOString();
+    const slotEnd = new Date(slotStartMs + 60 * 60 * 1000).toISOString();
+
+    const results = {};
+    await Promise.all(userIds.map(async (uid) => {
+        try {
+            const userDoc = await db.doc(`artifacts/talent-flow/public/data/users/${uid}`).get();
+            if (!userDoc.exists) { results[uid] = 'unknown'; return; }
+            const googleIntegration = userDoc.data()?.integrations?.google;
+            if (!googleIntegration?.connected || !googleIntegration?.accessToken) { results[uid] = 'unknown'; return; }
+            const resp = await fetch('https://www.googleapis.com/calendar/v3/freeBusy', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${googleIntegration.accessToken}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ timeMin: slotStart, timeMax: slotEnd, items: [{ id: 'primary' }] })
+            });
+            if (!resp.ok) { results[uid] = 'unknown'; return; }
+            const fbData = await resp.json();
+            const busy = fbData.calendars?.primary?.busy || [];
+            results[uid] = busy.length > 0 ? 'busy' : 'available';
+        } catch (err) {
+            console.warn(`[Availability] uid=${uid}:`, err.message);
+            results[uid] = 'unknown';
+        }
+    }));
+    res.json({ availability: results });
+});
+
 const PORT = process.env.PORT || 3001;
 
 // Only listen if this is the main module

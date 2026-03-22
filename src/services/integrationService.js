@@ -175,7 +175,7 @@ export const sendDirectEmail = async (userId, token, emailData) => {
 // ─── CREATE CALENDAR EVENT ────────────────────────────────────────────────────
 export const createDirectCalendarEvent = async (userId, token, eventData) => {
     try {
-        const { summary, description, startDateTime, endDateTime, guestEmail, timeZone } = eventData;
+        const { summary, description, startDateTime, endDateTime, guestEmail, guestEmails, timeZone } = eventData;
 
         // startDateTime / endDateTime should be LOCAL time strings (no trailing Z)
         // when timeZone is supplied — e.g. "2026-03-19T09:00:00"
@@ -201,8 +201,13 @@ export const createDirectCalendarEvent = async (userId, token, eventData) => {
             }
         };
 
-        if (guestEmail) {
-            event.attendees = [{ email: guestEmail }];
+        const allGuests = [];
+        if (guestEmail) allGuests.push(guestEmail);
+        if (Array.isArray(guestEmails)) {
+            guestEmails.forEach(e => { if (e && !allGuests.includes(e)) allGuests.push(e); });
+        }
+        if (allGuests.length > 0) {
+            event.attendees = allGuests.map(email => ({ email }));
             event.guestsCanModify = false;
         }
 

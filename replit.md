@@ -152,7 +152,7 @@ bash -c "node server.js & npx vite preview --port 5000 --host 0.0.0.0"
 | Sayfa | Rota | Açıklama |
 |---|---|---|
 | Dashboard | `/` | Genel KPI paneli |
-| Mülakat Yönetimi | `/interviews` | Takvim-odaklı mülakat planlama ve takip |
+| Mülakat Yönetimi | `/interviews` | Takvim-odaklı mülakat planlama ve takip (çok katılımcılı, 4-adım wizard) |
 | Canlı Mülakat | `/live-interview/:id` | Gerçek zamanlı mülakat + transkripsiyon |
 | Aday Katılım | `/join/:sessionId` | Anonim aday girişi |
 | AI Eşleştirme | `/ai-match` | Aday-pozisyon uyum analizi |
@@ -170,3 +170,5 @@ bash -c "node server.js & npx vite preview --port 5000 --host 0.0.0.0"
 4. **Anonim aday akışı**: `/join/:sessionId` → Firebase anonim auth → `GET /api/session/:sessionId` polling (3 sn aralıklı) — Firestore kuralları anonim okumayı engeller.
 5. **Mockup sandbox**: `artifacts/mockup-sandbox/` altındaki tasarım prototipleri ayrı bir Vite sunucusunda çalışır — kanvasta iframe olarak gösterilir.
 6. **Tema renkleri**: bg `#F8FAFC`, kart `#FFFFFF`, kenarlık `#E2E8F0`, primary `#1E3A8A`, metin `#0F172A`, ikincil `#64748B`.
+7. **Çok katılımcılı mülakat wizard (4 adım)**: Adım 1 → Aday seç, Adım 2 → Zaman seç, Adım 3 → Katılımcı seç (availability badge + freebusy API), Adım 4 → Onayla & Gönder (Google Calendar çoklu davet + email bildirim). Katılımcılar `session.participants[]` dizisinde saklanır; `department_user` rolü "Benim Mülakatlarım" sekmesiyle yalnızca kendi mülakatlarını görür.
+8. **API endpointleri** (her iki sunucuda da): `GET /api/users` — Firestore'dan tüm sisteme kayıtlı kullanıcıları getirir; `POST /api/users/availability` — Google Calendar freebusy API ile takvim uygunluk kontrolü yapar.
