@@ -44,7 +44,7 @@ import {
     CheckCircle
 } from 'lucide-react';
 
-const USERS_PATH = 'artifacts/talent-flow/public/data/users';
+const PARTICIPANT_INVITES_PATH = 'artifacts/talent-flow/public/data/participantInvites';
 
 export default function InterviewManagementPage() {
     const navigate = useNavigate();
@@ -145,7 +145,7 @@ export default function InterviewManagementPage() {
     useEffect(() => {
         if (!currentUser?.uid) return;
         const q = query(
-            collection(db, 'artifacts/talent-flow/public/data/participantInvites'),
+            collection(db, PARTICIPANT_INVITES_PATH),
             where('participantIds', 'array-contains', currentUser.uid)
         );
         const unsub = onSnapshot(q,
@@ -324,18 +324,32 @@ export default function InterviewManagementPage() {
         setParticipantSearch('');
     }, [selectedCandidate]);
 
-    // Fetch system users
+    // Fetch system users via authenticated API (recruiter + department_user + super_admin only)
     useEffect(() => {
-        const unsub = onSnapshot(collection(db, USERS_PATH), (snap) => {
-            const users = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setSystemUsers(users);
-            if (currentUser && !selectedInterviewer) {
-                const found = users.find(u => u.id === currentUser.uid);
-                if (found) setSelectedInterviewer(found);
+        if (!currentUser) return;
+        let cancelled = false;
+        const load = async () => {
+            try {
+                const token = await currentUser.getIdToken();
+                const res = await fetch('/api/users', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                if (!cancelled) {
+                    const users = data.users || [];
+                    setSystemUsers(users);
+                    const found = users.find(u => u.id === currentUser.uid);
+                    if (found && !selectedInterviewer) setSelectedInterviewer(found);
+                }
+            } catch (err) {
+                console.warn('[SystemUsers] API load failed:', err.message);
             }
-        });
-        return unsub;
-    }, [currentUser]);
+        };
+        load();
+        return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentUser?.uid]);
 
     // Handle Preselection from other pages (Candidate Page)
     useEffect(() => {
@@ -568,14 +582,17 @@ export default function InterviewManagementPage() {
         );
     };
 
-    // Fetch availability for selected participants on step 2 or 3 when date/time are set
+    // Fetch availability for ALL system users on step 2 or 3 when date/time are set
+    // This lets users see who is free BEFORE selecting them, not just after.
     useEffect(() => {
-        if ((wizardStep !== 2 && wizardStep !== 3) || !manualDate || !manualTime || selectedParticipants.length === 0 || !currentUser) return;
+        if ((wizardStep !== 2 && wizardStep !== 3) || !manualDate || !manualTime || systemUsers.length === 0 || !currentUser) return;
         let cancelled = false;
         const fetchAvailability = async () => {
             setIsLoadingAvailability(true);
             try {
-                const userIds = selectedParticipants.map(p => p.id);
+                // Fetch availability for ALL eligible users in the list — not just already-selected
+                // ones — so the user can see who is free BEFORE deciding whom to invite.
+                const userIds = systemUsers.map(u => u.id).filter(Boolean);
                 if (userIds.length === 0) return;
                 const token = await currentUser.getIdToken();
                 const res = await fetch('/api/users/availability', {
@@ -595,7 +612,7 @@ export default function InterviewManagementPage() {
         fetchAvailability();
         return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [wizardStep, manualDate, manualTime, selectedParticipants.length]);
+    }, [wizardStep, manualDate, manualTime, systemUsers.length]);
 
     // Helper: build a local-time ISO string (no trailing Z) from date + "HH:MM"
     const toLocalISOString = (date) => {
@@ -700,7 +717,7 @@ export default function InterviewManagementPage() {
             const participantIds = newSession.participants.map(p => p.userId).filter(Boolean);
             if (participantIds.length > 0) {
                 try {
-                    await setDoc(doc(db, 'artifacts/talent-flow/public/data/participantInvites', sessionId), {
+                    await setDoc(doc(db, PARTICIPANT_INVITES_PATH, sessionId), {
                         sessionId,
                         candidateId: selectedCandidate.id,
                         candidateName: selectedCandidate.name,
@@ -950,11 +967,11 @@ export default function InterviewManagementPage() {
                                             if (u.role === 'candidate') return false;
                                             if (!participantSearch.trim()) return true;
                                             const q = participantSearch.toLowerCase();
-                                            return (u.displayName || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q);
+                                            return (u.name || u.displayName || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q);
                                         }).map(u => {
                                             const isSelected = selectedParticipants.some(p => p.id === u.id);
                                             const availability = participantAvailability[u.id];
-                                            const initials = (u.displayName || u.email || '?').substring(0, 2).toUpperCase();
+                                            const initials = (u.name || u.displayName || u.email || '?').substring(0, 2).toUpperCase();
                                             return (
                                                 <button
                                                     key={u.id}
@@ -972,7 +989,7 @@ export default function InterviewManagementPage() {
                                                     </div>
                                                     <div className="flex-1 min-w-0">
                                                         <p className={`text-[13px] font-black truncate ${isSelected ? 'text-[#1E3A8A]' : 'text-[#0F172A]'}`}>
-                                                            {u.displayName || u.email || 'Kullanıcı'}
+                                                            {u.name || u.displayName || u.email || 'Kullanıcı'}
                                                         </p>
                                                         <p className="text-[11px] text-[#64748B] font-medium truncate capitalize">
                                                             {(u.role || '').replace('_', ' ')}
@@ -1004,7 +1021,7 @@ export default function InterviewManagementPage() {
                                         {systemUsers.filter(u => u.role !== 'candidate').length > 0 &&
                                          participantSearch.trim() &&
                                          systemUsers.filter(u => u.role !== 'candidate' && (
-                                             (u.displayName || '').toLowerCase().includes(participantSearch.toLowerCase()) ||
+                                             (u.name || u.displayName || '').toLowerCase().includes(participantSearch.toLowerCase()) ||
                                              (u.email || '').toLowerCase().includes(participantSearch.toLowerCase())
                                          )).length === 0 && (
                                             <div className="col-span-2 flex flex-col items-center justify-center py-12 text-[#94A3B8]">

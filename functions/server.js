@@ -1031,22 +1031,25 @@ const requireAuth = async (req, res, next) => {
     }
 };
 
-// GET /api/users — List platform users for participant selection in interview wizard
+// GET /api/users — List participant-eligible users for interview wizard
+// Only recruiter / department_user / super_admin accounts are returned.
+// Minimal fields to reduce unnecessary data exposure.
+const PARTICIPANT_ROLES = ['super_admin', 'recruiter', 'department_user'];
 app.get('/api/users', requireAuth, async (req, res) => {
     try {
-        const usersRef = db.collection('artifacts/talent-flow/public/data/users');
-        const snapshot = await usersRef.get();
-        const users = snapshot.docs.map(d => {
+        const snap = await db.collection('artifacts/talent-flow/public/data/users').get();
+        const users = [];
+        snap.forEach(d => {
             const data = d.data();
-            return {
+            const role = data.role || '';
+            if (!PARTICIPANT_ROLES.includes(role)) return; // skip candidates and unknown roles
+            users.push({
                 id: d.id,
-                displayName: data.displayName || data.name || data.email || 'Kullanıcı',
+                name: data.name || data.displayName || data.email || 'Kullanıcı',
                 email: data.email || null,
-                role: data.role || 'unknown',
-                departments: data.departments || [],
-                photoURL: data.photoURL || null,
-                googleConnected: !!(data.integrations?.google?.connected),
-            };
+                role,
+                googleConnected: Boolean(data.integrations?.google?.connected),
+            });
         });
         res.json({ users });
     } catch (err) {
