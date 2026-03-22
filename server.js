@@ -1286,8 +1286,25 @@ app.post('/api/check-duplicate', async (req, res) => {
     }
 });
 
+// Auth middleware: require a valid Firebase ID token (non-candidate roles only)
+const requireAuth = async (req, res, next) => {
+    const authHeader = req.headers['authorization'] || '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    if (!token) return res.status(401).json({ error: 'Missing Authorization header.' });
+    try {
+        const decoded = await admin.auth().verifyIdToken(token);
+        req.user = decoded;
+        if (decoded.role === 'candidate') {
+            return res.status(403).json({ error: 'Candidates cannot access this endpoint.' });
+        }
+        next();
+    } catch (err) {
+        return res.status(401).json({ error: 'Invalid or expired token.' });
+    }
+};
+
 // GET /api/users — List platform users for participant selection in interview wizard
-app.get('/api/users', async (req, res) => {
+app.get('/api/users', requireAuth, async (req, res) => {
     try {
         const usersRef = db.collection('artifacts/talent-flow/public/data/users');
         const snapshot = await usersRef.get();
@@ -1311,7 +1328,7 @@ app.get('/api/users', async (req, res) => {
 });
 
 // POST /api/users/availability — Check Google Calendar free/busy for multiple platform users
-app.post('/api/users/availability', async (req, res) => {
+app.post('/api/users/availability', requireAuth, async (req, res) => {
     const { userIds, date, time } = req.body;
     if (!Array.isArray(userIds) || !date || !time) {
         return res.status(400).json({ error: 'userIds[], date, and time are required.' });
