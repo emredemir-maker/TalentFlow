@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import { useCandidates } from '../context/CandidatesContext';
 import { useAuth } from '../context/AuthContext';
-import { collection, onSnapshot, doc, getDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, getDoc, setDoc, serverTimestamp, query, where } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { getCalendarEvents, connectGoogleWorkspace, sendDirectEmail, createDirectCalendarEvent, ensureValidGoogleToken } from '../services/integrationService';
 import { 
@@ -133,6 +133,29 @@ export default function InterviewManagementPage() {
         );
         return () => unsubscribe();
     }, []);
+
+    // ─── PARTICIPANT INVITES — Cross-department visibility for department_users ──
+    // When a department_user is invited to an interview with a candidate from
+    // another department, they cannot see it via enrichedCandidates (which is
+    // dept-filtered).  We maintain a flat `participantInvites/{sessionId}` collection
+    // and query it by participantIds array-contains so any user can find ALL their
+    // interviews regardless of candidate department.
+    const [myParticipantSessions, setMyParticipantSessions] = useState([]);
+
+    useEffect(() => {
+        if (!currentUser?.uid) return;
+        const q = query(
+            collection(db, 'artifacts/talent-flow/public/data/participantInvites'),
+            where('participantIds', 'array-contains', currentUser.uid)
+        );
+        const unsub = onSnapshot(q,
+            (snap) => {
+                setMyParticipantSessions(snap.docs.map(d => ({ ...d.data(), _fromInvite: true })));
+            },
+            (err) => console.warn('[ParticipantInvites] listener error:', err)
+        );
+        return () => unsub();
+    }, [currentUser?.uid]);
 
     const isGoogleConnected = userProfile?.integrations?.google?.connected;
     const googleToken = userProfile?.integrations?.google?.accessToken;
@@ -672,6 +695,31 @@ export default function InterviewManagementPage() {
                 hasInterview: true,
                 status: startNow ? 'Interview' : 'Review'
             });
+
+            // Write participantInvites so department_users can find cross-department interviews
+            const participantIds = newSession.participants.map(p => p.userId).filter(Boolean);
+            if (participantIds.length > 0) {
+                try {
+                    await setDoc(doc(db, 'artifacts/talent-flow/public/data/participantInvites', sessionId), {
+                        sessionId,
+                        candidateId: selectedCandidate.id,
+                        candidateName: selectedCandidate.name,
+                        date: newSession.date,
+                        time: newSession.time,
+                        type: newSession.type,
+                        title: newSession.title,
+                        role: selectedCandidate.position || selectedCandidate.bestTitle || 'Pozisyon',
+                        interviewerId: newSession.interviewerId,
+                        participantIds,
+                        participants: newSession.participants,
+                        meetLink: newSession.meetLink,
+                        status: newSession.status,
+                        createdAt: serverTimestamp(),
+                    });
+                } catch (piErr) {
+                    console.warn('[ParticipantInvites] Write failed (non-blocking):', piErr.message);
+                }
+            }
 
             setSaveStatus('success');
             setTimeout(() => {
@@ -1537,11 +1585,23 @@ export default function InterviewManagementPage() {
                                 </div>
 
                                 {(() => {
+                                    const myUid = currentUser?.uid;
+                                    // Cross-department participant invites for the selected date
+                                    const crossDeptSessions = myParticipantSessions.filter(s =>
+                                        (s.date || '').split('T')[0] === selectedCalDate
+                                    );
                                     const filteredSessions = (showMyInterviews || isDepartmentUser)
-                                        ? dayCalSessions.filter(s =>
-                                            s.interviewerId === currentUser?.uid ||
-                                            (Array.isArray(s.participants) && s.participants.some(p => p.userId === currentUser?.uid))
-                                        )
+                                        ? (() => {
+                                            // Sessions from own-department candidates where user is interviewer or participant
+                                            const ownDeptFiltered = dayCalSessions.filter(s =>
+                                                s.interviewerId === myUid ||
+                                                (Array.isArray(s.participants) && s.participants.some(p => p.userId === myUid))
+                                            );
+                                            // Merge cross-department invites, avoid duplicates by sessionId
+                                            const seenIds = new Set(ownDeptFiltered.map(s => s.id || s.sessionId));
+                                            const extras = crossDeptSessions.filter(s => !seenIds.has(s.sessionId));
+                                            return [...ownDeptFiltered, ...extras];
+                                        })()
                                         : dayCalSessions;
                                     return filteredSessions.length > 0 ? (
                                     <div className="space-y-4">
