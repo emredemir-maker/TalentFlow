@@ -1337,16 +1337,37 @@ app.get('/api/users', requireAuth, async (req, res) => {
     }
 });
 
+// Helper: convert a local date+time string to a UTC Date using the client's IANA timezone.
+// This avoids the UTC-server / local-client timezone mismatch for freeBusy checks.
+// e.g. date='2024-01-15', time='09:00', timezone='Europe/Istanbul' → 06:00 UTC
+const localToUTC = (dateStr, timeStr, timezone) => {
+    const naiveUTC = new Date(`${dateStr}T${timeStr}:00Z`);
+    if (!timezone) return naiveUTC; // fallback: treat as UTC (legacy behaviour)
+    try {
+        const fmt = new Intl.DateTimeFormat('sv', {
+            timeZone: timezone,
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit'
+        });
+        const localStr = fmt.format(naiveUTC).replace(' ', 'T');
+        const localAsUTC = new Date(localStr + 'Z');
+        const offsetMs = localAsUTC.getTime() - naiveUTC.getTime();
+        return new Date(naiveUTC.getTime() - offsetMs);
+    } catch (e) {
+        return naiveUTC; // unknown/invalid timezone — fall back to UTC
+    }
+};
+
 // POST /api/users/availability — Check Google Calendar free/busy for multiple platform users
 app.post('/api/users/availability', requireAuth, async (req, res) => {
-    const { userIds, date, time } = req.body;
+    const { userIds, date, time, timezone } = req.body;
     if (!Array.isArray(userIds) || !date || !time) {
         return res.status(400).json({ error: 'userIds[], date, and time are required.' });
     }
-    const slotStartMs = new Date(`${date}T${time}:00`).getTime();
-    if (isNaN(slotStartMs)) return res.status(400).json({ error: 'Invalid date/time format.' });
-    const slotStart = new Date(slotStartMs).toISOString();
-    const slotEnd = new Date(slotStartMs + 60 * 60 * 1000).toISOString();
+    const slotStartDate = localToUTC(date, time, timezone);
+    if (isNaN(slotStartDate.getTime())) return res.status(400).json({ error: 'Invalid date/time format.' });
+    const slotStart = slotStartDate.toISOString();
+    const slotEnd = new Date(slotStartDate.getTime() + 60 * 60 * 1000).toISOString();
 
     const results = {};
     await Promise.all(userIds.map(async (uid) => {

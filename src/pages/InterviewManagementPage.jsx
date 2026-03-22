@@ -598,7 +598,12 @@ export default function InterviewManagementPage() {
                 const res = await fetch('/api/users/availability', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                    body: JSON.stringify({ userIds, date: manualDate, time: manualTime })
+                    body: JSON.stringify({
+                        userIds,
+                        date: manualDate,
+                        time: manualTime,
+                        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+                    })
                 });
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const data = await res.json();
@@ -1627,7 +1632,7 @@ export default function InterviewManagementPage() {
                                             const initials = (s.candidateName || '?').split(' ').map(p => p[0]).join('').substring(0, 2).toUpperCase();
                                             const participants = Array.isArray(s.participants) ? s.participants : [];
                                             return (
-                                                <div key={s.id} className="flex group">
+                                                <div key={s.id || s.sessionId} className="flex group">
                                                     <div className="w-16 pt-3 flex-shrink-0">
                                                         <span className="text-sm font-semibold text-[#64748B] group-hover:text-[#1E3A8A] transition-colors">{s.time || '—'}</span>
                                                     </div>
