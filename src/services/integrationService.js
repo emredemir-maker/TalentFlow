@@ -132,21 +132,52 @@ export const disconnectGoogleWorkspace = async (userId) => {
 };
 
 // ─── SEND EMAIL ───────────────────────────────────────────────────────────────
+// emailData: { to, subject, body (plain text), html (optional HTML body) }
+// Returns: { success, messageId, threadId }
 export const sendDirectEmail = async (userId, token, emailData) => {
     try {
-        const { to, subject, body } = emailData;
+        const { to, subject, body, html } = emailData;
 
         const utf8Subject = `=?utf-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`;
-        const messageParts = [
-            `To: ${to}`,
-            `Subject: ${utf8Subject}`,
-            'Content-Type: text/plain; charset="UTF-8"',
-            'MIME-Version: 1.0',
-            '',
-            body
-        ];
-        const message = messageParts.join('\n');
-        const encodedMessage = btoa(unescape(encodeURIComponent(message)))
+
+        let rawMessage;
+        if (html) {
+            // Multipart: plain text fallback + HTML body
+            const boundary = `boundary_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+            const parts = [
+                `To: ${to}`,
+                `Subject: ${utf8Subject}`,
+                'MIME-Version: 1.0',
+                `Content-Type: multipart/alternative; boundary="${boundary}"`,
+                '',
+                `--${boundary}`,
+                'Content-Type: text/plain; charset="UTF-8"',
+                'Content-Transfer-Encoding: quoted-printable',
+                '',
+                body || '',
+                '',
+                `--${boundary}`,
+                'Content-Type: text/html; charset="UTF-8"',
+                'Content-Transfer-Encoding: quoted-printable',
+                '',
+                html,
+                '',
+                `--${boundary}--`
+            ];
+            rawMessage = parts.join('\r\n');
+        } else {
+            const messageParts = [
+                `To: ${to}`,
+                `Subject: ${utf8Subject}`,
+                'Content-Type: text/plain; charset="UTF-8"',
+                'MIME-Version: 1.0',
+                '',
+                body
+            ];
+            rawMessage = messageParts.join('\n');
+        }
+
+        const encodedMessage = btoa(unescape(encodeURIComponent(rawMessage)))
             .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
         const response = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
@@ -165,10 +196,40 @@ export const sendDirectEmail = async (userId, token, emailData) => {
             throw new Error(data.error?.message || `E-posta gönderilemedi (${response.status})`);
         }
 
-        return { success: true, messageId: data.id };
+        return { success: true, messageId: data.id, threadId: data.threadId };
     } catch (error) {
         console.error('[Google] Send email error:', error);
         return { success: false, error: error.message };
+    }
+};
+
+// ─── FETCH EMAIL THREAD REPLIES ───────────────────────────────────────────────
+// Returns messages in a thread (to detect replies from candidates)
+export const fetchEmailThread = async (token, threadId) => {
+    try {
+        const response = await fetch(
+            `https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date`,
+            { headers: { 'Authorization': `Bearer ${token}` } }
+        );
+        if (!response.ok) return { success: false, messages: [] };
+        const data = await response.json();
+        const messages = (data.messages || []).map(msg => {
+            const headers = msg.payload?.headers || [];
+            const get = (name) => headers.find(h => h.name.toLowerCase() === name.toLowerCase())?.value || '';
+            return {
+                id: msg.id,
+                threadId: msg.threadId,
+                from: get('From'),
+                to: get('To'),
+                subject: get('Subject'),
+                date: get('Date'),
+                snippet: msg.snippet || '',
+                labelIds: msg.labelIds || []
+            };
+        });
+        return { success: true, messages };
+    } catch (err) {
+        return { success: false, messages: [], error: err.message };
     }
 };
 

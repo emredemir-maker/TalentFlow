@@ -3,11 +3,11 @@ import { useState, useEffect, useMemo } from 'react';
 import {
     Users, UserPlus, Mail, Shield, CheckCircle, XCircle,
     Loader2, ShieldCheck, Copy, Trash2, UserX, UserCheck,
-    Edit2, Settings, Key, Eye, EyeOff, X
+    Edit2, Settings, Key, Eye, EyeOff, X, Globe, Plus, AlertCircle
 } from 'lucide-react';
 import {
     collection, query, onSnapshot, addDoc, serverTimestamp,
-    where, deleteDoc, getDocs, doc, updateDoc, setDoc
+    where, deleteDoc, getDocs, doc, updateDoc, setDoc, getDoc
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
@@ -37,6 +37,15 @@ export default function SuperAdminPage() {
 
     const [showEditModal, setShowEditModal] = useState(false);
     const [editingUser, setEditingUser] = useState(null);
+
+    // Domain whitelist
+    const [allowedDomains, setAllowedDomains] = useState([]);
+    const [newDomain, setNewDomain] = useState('');
+    const [savingDomains, setSavingDomains] = useState(false);
+    const [domainSaved, setDomainSaved] = useState(false);
+
+    // Branding (for invite emails)
+    const [branding, setBrandingLocal] = useState({ companyName: 'Talent-Inn', primaryColor: '#1E3A8A' });
     useEffect(() => {
         const unsub = onSnapshot(collection(db, 'artifacts/talent-flow/public/data/departments'), (snap) => {
             setDepartments(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -57,14 +66,18 @@ export default function SuperAdminPage() {
             setInvitations(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
             setLoading(false);
         });
-        const fetchGeminiKey = async () => {
+        const fetchSettings = async () => {
             try {
                 const docSnap = await getDocs(query(collection(db, 'artifacts/talent-flow/public/data/settings')));
                 const apiKeysDoc = docSnap.docs.find(d => d.id === 'api_keys');
                 if (apiKeysDoc?.data().gemini) setGeminiKey(apiKeysDoc.data().gemini);
-            } catch (err) { console.warn("Could not fetch API keys:", err); }
+                const systemDoc = docSnap.docs.find(d => d.id === 'system');
+                if (systemDoc?.data().allowedDomains) setAllowedDomains(systemDoc.data().allowedDomains);
+                const brandingDoc = docSnap.docs.find(d => d.id === 'branding');
+                if (brandingDoc?.exists()) setBrandingLocal(b => ({ ...b, ...brandingDoc.data() }));
+            } catch (err) { console.warn("Could not fetch settings:", err); }
         };
-        fetchGeminiKey();
+        fetchSettings();
         return () => { unsubUsers(); unsubInvites(); };
     }, [isSuperAdmin]);
 
@@ -97,6 +110,26 @@ export default function SuperAdminPage() {
         await updateDoc(doc(db, USERS_PATH, userId), { status: newStatus });
     };
 
+    const handleAddDomain = () => {
+        const d = newDomain.trim().toLowerCase().replace(/^@/, '').replace(/^https?:\/\//, '');
+        if (!d || !d.includes('.')) return;
+        if (allowedDomains.includes(d)) return;
+        setAllowedDomains(prev => [...prev, d]);
+        setNewDomain('');
+    };
+
+    const handleRemoveDomain = (d) => setAllowedDomains(prev => prev.filter(x => x !== d));
+
+    const handleSaveDomains = async () => {
+        setSavingDomains(true);
+        try {
+            await setDoc(doc(db, 'artifacts/talent-flow/public/data/settings', 'system'), { allowedDomains }, { merge: true });
+            setDomainSaved(true);
+            setTimeout(() => setDomainSaved(false), 3000);
+        } catch (err) { alert('Kayıt hatası: ' + err.message); }
+        finally { setSavingDomains(false); }
+    };
+
     const handleSendInvite = async (e) => {
         e.preventDefault();
         if (!inviteEmail.trim()) return;
@@ -118,7 +151,13 @@ export default function SuperAdminPage() {
                 const res = await fetch('/api/send-invite', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: inviteEmail.trim().toLowerCase(), role: inviteRole, inviteLink })
+                    body: JSON.stringify({
+                        email: inviteEmail.trim().toLowerCase(),
+                        role: inviteRole,
+                        inviteLink,
+                        branding,
+                        invitedByName: user?.displayName || ''
+                    })
                 });
                 if (!res.ok) console.warn('Email send error');
             } catch { }
@@ -224,7 +263,11 @@ export default function SuperAdminPage() {
 
             {/* Sub-tabs */}
             <div className="flex gap-1 border-b border-slate-200">
-                {[{ id: 'users', label: 'Kullanıcılar' }, { id: 'settings', label: 'Sistem Ayarları' }].map(t => (
+                {[
+                    { id: 'users', label: 'Kullanıcılar' },
+                    { id: 'domains', label: 'Domain Yönetimi' },
+                    { id: 'settings', label: 'Sistem Ayarları' }
+                ].map(t => (
                     <button
                         key={t.id}
                         onClick={() => setActiveTab(t.id)}
@@ -237,7 +280,82 @@ export default function SuperAdminPage() {
                 ))}
             </div>
 
-            {activeTab === 'users' ? (
+            {activeTab === 'domains' && (
+                <div className="max-w-lg space-y-4">
+                    <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
+                        <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
+                            <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center">
+                                <Globe className="w-4 h-4 text-blue-600" />
+                            </div>
+                            <div>
+                                <h2 className="text-[13px] font-black text-slate-800">Domain Beyaz Listesi</h2>
+                                <p className="text-[10px] text-slate-400">Davet zorunluluğu olmadan giriş yapabilecek e-posta domainleri</p>
+                            </div>
+                        </div>
+
+                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex gap-2">
+                            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                            <p className="text-[11px] text-amber-700 leading-relaxed">
+                                Bu listedeki domaine sahip e-posta adresleri <strong>davetiye olmadan</strong> platforma kayıt olabilir.
+                                Örn: <span className="font-mono bg-amber-100 px-1 rounded">btcturk.com</span> eklendiğinde
+                                tüm @btcturk.com adresleri doğrudan kayıt olabilir.
+                            </p>
+                        </div>
+
+                        {/* Domain ekleme */}
+                        <div className="flex gap-2">
+                            <input
+                                type="text"
+                                value={newDomain}
+                                onChange={e => setNewDomain(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddDomain())}
+                                placeholder="btcturk.com"
+                                className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-700 font-mono outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition-all"
+                            />
+                            <button
+                                onClick={handleAddDomain}
+                                disabled={!newDomain.trim()}
+                                className="px-3 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-xl text-sm font-bold transition-colors disabled:opacity-40 flex items-center gap-1"
+                            >
+                                <Plus className="w-4 h-4" /> Ekle
+                            </button>
+                        </div>
+
+                        {/* Domain listesi */}
+                        {allowedDomains.length === 0 ? (
+                            <p className="text-center text-[11px] text-slate-400 italic py-4">Henüz beyaz listeye alınmış domain yok.</p>
+                        ) : (
+                            <div className="space-y-2">
+                                {allowedDomains.map(d => (
+                                    <div key={d} className="flex items-center justify-between px-3 py-2 bg-slate-50 rounded-xl border border-slate-200">
+                                        <div className="flex items-center gap-2">
+                                            <Globe className="w-3.5 h-3.5 text-blue-500" />
+                                            <span className="text-sm font-mono font-semibold text-slate-700">@{d}</span>
+                                        </div>
+                                        <button
+                                            onClick={() => handleRemoveDomain(d)}
+                                            className="p-1 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                        >
+                                            <X className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        <button
+                            onClick={handleSaveDomains}
+                            disabled={savingDomains}
+                            className="w-full py-2.5 bg-[#1E3A8A] hover:bg-[#1e3a8a]/90 text-white font-bold text-sm rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+                        >
+                            {savingDomains ? <Loader2 className="w-4 h-4 animate-spin" /> : domainSaved ? <CheckCircle className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
+                            {savingDomains ? 'Kaydediliyor...' : domainSaved ? 'Kaydedildi!' : 'Değişiklikleri Kaydet'}
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'users' && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     {/* Users Table */}
                     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
@@ -331,7 +449,9 @@ export default function SuperAdminPage() {
                         </div>
                     </div>
                 </div>
-            ) : (
+            )}
+
+            {activeTab === 'settings' && (
                 <div className="max-w-lg bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
                     <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
                         <div className="w-8 h-8 rounded-lg bg-cyan-50 border border-cyan-100 flex items-center justify-center">

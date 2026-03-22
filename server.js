@@ -734,9 +734,46 @@ Kurallar:
     }
 });
 
+// ─── Email HTML Template Builder ─────────────────────────────────────────────
+function buildInviteEmailHtml({ companyName = 'Talent-Inn', logoUrl = '', primaryColor = '#1E3A8A', tagline = '', website = '' }, { inviteLink, role, invitedByName = '' }) {
+    const roleLabel = role === 'super_admin' ? 'Süper Admin' : role === 'department_user' ? 'Departman Kullanıcısı' : 'Recruiter';
+    return `<!DOCTYPE html>
+<html lang="tr"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>${companyName}</title></head>
+<body style="margin:0;padding:0;background:#F1F5F9;font-family:'Segoe UI',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#F1F5F9;padding:32px 0;"><tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+<tr><td style="background:${primaryColor};padding:32px 40px;text-align:center;">
+${logoUrl ? `<img src="${logoUrl}" alt="${companyName}" style="max-height:56px;max-width:200px;object-fit:contain;margin-bottom:12px;display:block;margin-left:auto;margin-right:auto;"/>` : `<div style="display:inline-block;background:rgba(255,255,255,0.15);border-radius:12px;padding:10px 20px;margin-bottom:12px;"><span style="color:#ffffff;font-size:22px;font-weight:700;">${companyName}</span></div>`}
+${tagline ? `<p style="color:rgba(255,255,255,0.75);font-size:13px;margin:0;">${tagline}</p>` : ''}
+</td></tr>
+<tr><td style="padding:40px 40px 32px 40px;">
+<h2 style="color:#0F172A;font-size:22px;font-weight:700;margin:0 0 8px 0;">Hoş Geldiniz! 🎉</h2>
+<p style="color:#475569;font-size:15px;margin:0 0 24px 0;">${invitedByName ? `<strong>${invitedByName}</strong> tarafından ` : ''}<strong>${companyName}</strong>'a <span style="color:${primaryColor};font-weight:600;">${roleLabel}</span> olarak davet edildiniz.</p>
+<div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;padding:20px 24px;margin-bottom:28px;">
+<p style="color:#64748B;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin:0 0 12px 0;">Erişim Bilgileriniz</p>
+<table cellpadding="0" cellspacing="0" width="100%">
+<tr><td style="color:#64748B;font-size:14px;padding:4px 0;width:120px;">Platform</td><td style="color:#0F172A;font-size:14px;font-weight:600;padding:4px 0;">${companyName}</td></tr>
+<tr><td style="color:#64748B;font-size:14px;padding:4px 0;">Rol</td><td style="color:#0F172A;font-size:14px;font-weight:600;padding:4px 0;">${roleLabel}</td></tr>
+</table></div>
+<div style="text-align:center;margin-bottom:28px;">
+<a href="${inviteLink}" style="background:${primaryColor};color:#ffffff;padding:15px 36px;text-decoration:none;border-radius:10px;font-weight:700;font-size:15px;display:inline-block;">Daveti Kabul Et →</a>
+</div>
+<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:14px 18px;">
+<p style="color:#92400E;font-size:12px;margin:0;"><strong>Not:</strong> Bu davet linki kişiseldir ve yalnızca bir kez kullanılabilir.</p>
+</div>
+<p style="color:#94A3B8;font-size:12px;margin:24px 0 0 0;">Butona tıklayamıyorsanız: <a href="${inviteLink}" style="color:${primaryColor};word-break:break-all;">${inviteLink}</a></p>
+</td></tr>
+<tr><td style="background:#F8FAFC;padding:24px 40px;border-top:1px solid #E2E8F0;text-align:center;">
+<p style="color:#94A3B8;font-size:12px;margin:0;">Bu e-posta <strong style="color:${primaryColor};">${companyName}</strong> tarafından ${website ? `<a href="${website}" style="color:${primaryColor};text-decoration:none;">${website}</a>` : 'Talent-Inn platformu'} üzerinden gönderilmiştir.</p>
+</td></tr>
+</table>
+</td></tr></table>
+</body></html>`;
+}
+
 // Invite Email Endpoint
 app.post('/api/send-invite', async (req, res) => {
-    const { email, role, inviteLink } = req.body;
+    const { email, role, inviteLink, branding, invitedByName } = req.body;
     console.log(`✉️ Received invite request for: ${email}, role: ${role}`);
 
     if (!email || !inviteLink) {
@@ -763,28 +800,15 @@ app.post('/api/send-invite', async (req, res) => {
             socketTimeout: 20000
         });
 
-        // Skip extra verify() call if it hangs, sendMail will throw if failed
-        // await transporter.verify();
+        const brandingData = branding || { companyName: 'Talent-Inn', primaryColor: '#1E3A8A' };
+        const roleLabel = role === 'super_admin' ? 'Süper Admin' : role === 'department_user' ? 'Departman Kullanıcısı' : 'Recruiter';
+        const fromName = brandingData.companyName || 'Talent-Inn';
 
         const mailOptions = {
-            from: `"Talent-Inn" <${process.env.EMAIL_USER}>`,
+            from: `"${fromName}" <${process.env.EMAIL_USER}>`,
             to: email,
-            subject: 'Talent-Inn\'a Davet Edildiniz',
-            html: `
-                <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px; background-color: #ffffff;">
-                    <h2 style="color: #4f46e5; border-bottom: 2px solid #f3f4f6; padding-bottom: 10px;">Talent-Inn'a Hoş Geldiniz!</h2>
-                    <p style="color: #374151; font-size: 16px;">Merhaba,</p>
-                    <p style="color: #374151; font-size: 15px; line-height: 1.5;">Talent-Inn platformuna <strong>${role === 'super_admin' ? 'Süper Admin' : 'Recruiter'}</strong> olarak davet edildiniz.</p>
-                    <p style="color: #374151; font-size: 15px;">Aşağıdaki butona tıklayarak hesabınızı oluşturabilir ve ekibe katılabilirsiniz:</p>
-                    <div style="text-align: center; margin: 35px 0;">
-                        <a href="${inviteLink}" style="background-color: #4f46e5; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 16px;">Daveti Kabul Et</a>
-                    </div>
-                    <p style="color: #6b7280; font-size: 12px; border-top: 1px solid #f3f4f6; padding-top: 20px;">
-                        Eğer butona tıklayamıyorsanız, bu bağlantıyı tarayıcınıza yapıştırın:<br/>
-                        <span style="color: #4f46e5;">${inviteLink}</span>
-                    </p>
-                </div>
-            `
+            subject: `${fromName}'a Davet Edildiniz — ${roleLabel}`,
+            html: buildInviteEmailHtml(brandingData, { inviteLink, role, invitedByName })
         };
 
         await transporter.sendMail(mailOptions);

@@ -97,6 +97,7 @@ export function AuthProvider({ children }) {
             if (!currentUser || !currentUser.email || currentUser.isAnonymous) return;
             try {
                 const emailLower = currentUser.email.toLowerCase();
+                const emailDomain = emailLower.split('@')[1] || '';
                 const isPrimaryAdmin = INITIAL_SUPER_ADMINS.includes(emailLower);
 
                 // Safety check for user doc
@@ -107,7 +108,15 @@ export function AuthProvider({ children }) {
                     return;
                 }
 
-                // Removed isFirstUser check to avoid permission errors
+                // Check allowed domains from Firestore
+                let allowedDomains = [];
+                try {
+                    const systemSnap = await getDoc(doc(db, 'artifacts/talent-flow/public/data/settings', 'system'));
+                    if (systemSnap.exists()) allowedDomains = systemSnap.data().allowedDomains || [];
+                } catch { /* ignore */ }
+
+                const isDomainAllowed = allowedDomains.includes(emailDomain);
+
                 if (isPrimaryAdmin) {
                     const firstProfile = {
                         uid: currentUser.uid,
@@ -120,6 +129,20 @@ export function AuthProvider({ children }) {
                     };
                     await setDoc(userDocRef, firstProfile);
                     setUserProfile(firstProfile);
+                } else if (isDomainAllowed) {
+                    // Domain whitelist bypass — automatically allow as recruiter
+                    const domainProfile = {
+                        uid: currentUser.uid,
+                        email: emailLower,
+                        displayName: currentUser.displayName || emailLower.split('@')[0],
+                        photoURL: currentUser.photoURL || '',
+                        role: 'recruiter',
+                        departments: [],
+                        status: 'active',
+                        createdAt: serverTimestamp()
+                    };
+                    await setDoc(userDocRef, domainProfile);
+                    setUserProfile(domainProfile);
                 } else {
                     const q = query(collection(db, INVITATIONS_PATH),
                         where("email", "==", emailLower),
@@ -209,6 +232,15 @@ export function AuthProvider({ children }) {
             const emailLower = email.trim().toLowerCase();
             const isPrimaryAdmin = INITIAL_SUPER_ADMINS.includes(emailLower);
 
+            // Check allowed domains
+            const emailDomain = emailLower.split('@')[1] || '';
+            let allowedDomains = [];
+            try {
+                const systemSnap = await getDoc(doc(db, 'artifacts/talent-flow/public/data/settings', 'system'));
+                if (systemSnap.exists()) allowedDomains = systemSnap.data().allowedDomains || [];
+            } catch { /* ignore */ }
+            const isDomainAllowed = allowedDomains.includes(emailDomain);
+
             console.log(`[Registration] Checking invitations for ${emailLower}...`);
             let invitation = null;
             let inviteDocId = null;
@@ -226,14 +258,13 @@ export function AuthProvider({ children }) {
                 }
             } catch (snapErr) {
                 console.error("[Registration] Invitation check failed:", snapErr);
-                // If it's a permission error here, it means the 'allow read: if true' rule isn't working as expected
-                if (!isPrimaryAdmin) {
+                if (!isPrimaryAdmin && !isDomainAllowed) {
                     throw new Error(`Davetiye kontrolü başarısız: ${snapErr.message}`);
                 }
             }
 
-            if (!invitation && !isPrimaryAdmin) {
-                console.warn(`[Registration] No invitation and not primary admin.`);
+            if (!invitation && !isPrimaryAdmin && !isDomainAllowed) {
+                console.warn(`[Registration] No invitation and not primary admin or allowed domain.`);
                 throw new Error("Geçerli bir davetiyeniz bulunmuyor. Lütfen administratörden davet isteyeniz.");
             }
 
@@ -254,7 +285,7 @@ export function AuthProvider({ children }) {
                 displayName: name,
                 photoURL: '',
                 role: isPrimaryAdmin ? 'super_admin' : (invitation?.role || 'recruiter'),
-                departments: invitation?.departments ? invitation.departments : (invitation?.department ? [invitation.department] : []),
+                departments: invitation?.departments ? invitation.departments : (invitation?.department ? [invitation.department] : [] ),
                 status: 'active',
                 createdAt: serverTimestamp()
             };

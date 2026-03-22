@@ -4,9 +4,10 @@ import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import { useCandidates } from '../context/CandidatesContext';
 import { useAuth } from '../context/AuthContext';
-import { collection, onSnapshot, doc, getDoc, setDoc, deleteDoc, serverTimestamp, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, doc, getDoc, setDoc, deleteDoc, serverTimestamp, query, where, addDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { getCalendarEvents, connectGoogleWorkspace, sendDirectEmail, createDirectCalendarEvent, ensureValidGoogleToken } from '../services/integrationService';
+import { buildInterviewInviteEmail, buildParticipantNotificationEmail } from '../utils/emailTemplates';
 import { 
     Plus, 
     Video, 
@@ -71,6 +72,7 @@ export default function InterviewManagementPage() {
     const [selectedInterviewer, setSelectedInterviewer] = useState(null);
     const [openMenuId, setOpenMenuId] = useState(null);
     const [postponeModal, setPostponeModal] = useState(null); // { candidateId, sessionId, date, time }
+    const [branding, setBranding] = useState({ companyName: 'Talent-Inn', primaryColor: '#1E3A8A' });
 
     // Participant selection states (wizard step 2)
     const [selectedParticipants, setSelectedParticipants] = useState([]);
@@ -326,6 +328,13 @@ export default function InterviewManagementPage() {
         setParticipantSearch('');
     }, [selectedCandidate]);
 
+    // Load branding settings for email templates
+    useEffect(() => {
+        getDoc(doc(db, 'artifacts/talent-flow/public/data/settings', 'branding'))
+            .then(snap => { if (snap.exists()) setBranding(b => ({ ...b, ...snap.data() })); })
+            .catch(() => {});
+    }, []);
+
     // Fetch system users via authenticated API (recruiter + department_user + super_admin only)
     useEffect(() => {
         if (!currentUser) return;
@@ -549,11 +558,36 @@ export default function InterviewManagementPage() {
                 throw new Error("Google bağlantısı kurulamadı. Lütfen Ayarlar → Sistem bölümünden yeniden bağlanın.");
             }
 
+            const htmlBody = buildInterviewInviteEmail(branding, {
+                candidateName: selectedCandidate.name,
+                recruiterName: userProfile?.displayName || '',
+                position: selectedCandidate.position,
+                interviewType: emailSubject,
+                joinLink: null
+            });
+
             const result = await sendDirectEmail(userId, freshToken, {
                 to: selectedCandidate.email,
                 subject: emailSubject,
-                body: emailBody
+                body: emailBody,
+                html: htmlBody
             });
+
+            // Store threadId for reply tracking
+            if (result.success && result.threadId) {
+                addDoc(collection(db, 'artifacts/talent-flow/public/data/emailThreads'), {
+                    threadId: result.threadId,
+                    messageId: result.messageId,
+                    candidateId: selectedCandidate.id,
+                    candidateName: selectedCandidate.name,
+                    candidateEmail: selectedCandidate.email,
+                    subject: emailSubject,
+                    recruiterId: userId,
+                    recruiterName: userProfile?.displayName || '',
+                    sentAt: serverTimestamp(),
+                    hasReply: false
+                }).catch(() => {});
+            }
 
             if (result.success) {
                 setSaveStatus('success');
@@ -703,10 +737,21 @@ export default function InterviewManagementPage() {
                     for (const participant of selectedParticipants) {
                         if (!participant.email) continue;
                         try {
+                            const participantHtml = buildParticipantNotificationEmail(branding, {
+                                participantName: participant.name,
+                                candidateName: selectedCandidate.name,
+                                position: selectedCandidate.position,
+                                date: slot.date,
+                                time: slot.time,
+                                interviewType: newSession.title,
+                                meetLink,
+                                recruiterName: userProfile?.displayName || ''
+                            });
                             await sendDirectEmail(userId, freshCalToken, {
                                 to: participant.email,
                                 subject: `Mülakat Daveti: ${newSession.title} — ${selectedCandidate.name}`,
-                                body: `Merhaba ${participant.name || participant.email},\n\nTalent-Inn üzerinden bir mülakata katılımcı olarak eklendiniz.\n\nAday: ${selectedCandidate.name}\nPozisyon: ${selectedCandidate.position || '—'}\nTarih: ${slot.date}\nSaat: ${slot.time}\nMülakat Tipi: ${newSession.title}\n\nMülakat Linki: ${meetLink}\n\nTalent-Inn Ekibi`
+                                body: `Merhaba ${participant.name || participant.email},\n\nTalent-Inn üzerinden bir mülakata katılımcı olarak eklendiniz.\n\nAday: ${selectedCandidate.name}\nPozisyon: ${selectedCandidate.position || '—'}\nTarih: ${slot.date}\nSaat: ${slot.time}\nMülakat Tipi: ${newSession.title}\n\nMülakat Linki: ${meetLink}\n\nTalent-Inn Ekibi`,
+                                html: participantHtml
                             });
                         } catch (emailErr) {
                             console.warn('[Participants] Email send failed for:', participant.email, emailErr.message);

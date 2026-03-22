@@ -19,13 +19,15 @@ import SourceManagementPage from './SourceManagementPage';
 import DepartmentManagementPage from './DepartmentManagementPage';
 import GuidePage from './GuidePage';
 import SuperAdminPage from './SuperAdminPage';
+import BrandingSettingsPage from './BrandingSettingsPage';
 
 const TABS = [
-    { id: 'general',      label: 'Genel Ayarlar',    icon: Settings  },
-    { id: 'sources',      label: 'Kaynak Yönetimi',  icon: Share2    },
-    { id: 'departments',  label: 'Departmanlar',      icon: Building2 },
-    { id: 'guide',        label: 'Platform Kılavuzu', icon: BookOpen  },
-    { id: 'system',       label: 'Sistem Yönetimi',   icon: Shield    },
+    { id: 'general',      label: 'Genel Ayarlar',    icon: Settings,  adminOnly: false },
+    { id: 'branding',     label: 'Kurumsal Kimlik',   icon: Palette,   adminOnly: true  },
+    { id: 'sources',      label: 'Kaynak Yönetimi',  icon: Share2,    adminOnly: false },
+    { id: 'departments',  label: 'Departmanlar',      icon: Building2, adminOnly: false },
+    { id: 'guide',        label: 'Platform Kılavuzu', icon: BookOpen,  adminOnly: false },
+    { id: 'system',       label: 'Sistem Yönetimi',   icon: Shield,    adminOnly: true  },
 ];
 
 export default function SettingsPage({ initialTab }) {
@@ -210,7 +212,7 @@ export default function SettingsPage({ initialTab }) {
                 </div>
                 {/* Tab Bar */}
                 <div className="flex gap-1 pb-0 -mb-px overflow-x-auto no-scrollbar">
-                    {TABS.map(tab => {
+                    {TABS.filter(tab => !tab.adminOnly || userProfile?.role === 'super_admin').map(tab => {
                         const Icon = tab.icon;
                         return (
                             <button
@@ -478,6 +480,12 @@ export default function SettingsPage({ initialTab }) {
                                 )}
                             </div>
                         </div>
+                    </div>
+                )}
+
+                {activeTab === 'branding' && (
+                    <div className="px-6 lg:px-8 py-8 max-w-3xl mx-auto">
+                        <BrandingSettingsPage />
                     </div>
                 )}
 
