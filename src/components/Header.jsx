@@ -10,6 +10,7 @@ import { useNotifications } from '../context/NotificationContext';
 import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
 import { useAuth } from '../context/AuthContext';
+import { useUserSettings } from '../context/UserSettingsContext';
 
 const ROLE_LABELS = {
     super_admin: 'Sistem Yöneticisi',
@@ -94,6 +95,8 @@ export default function Header({ title }) {
     const { enrichedCandidates } = useCandidates();
     const { positions } = usePositions();
     const { userProfile, logout } = useAuth();
+    const { settings: userSettings } = useUserSettings();
+    const notificationsEnabled = userSettings?.notifications !== false;
 
     const [query, setQuery]         = useState('');
     const [panelOpen, setPanelOpen] = useState(false);
@@ -433,19 +436,19 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                 {/* Notifications */}
                 <div className="relative" ref={notifRef}>
                     <button
-                        onClick={() => { setNotifOpen(o => !o); setSettOpen(false); }}
-                        className={`p-2.5 rounded-lg transition-colors relative ${notifOpen ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'}`}
-                        title="Bildirimler"
+                        onClick={() => { if (notificationsEnabled) { setNotifOpen(o => !o); setSettOpen(false); } }}
+                        className={`p-2.5 rounded-lg transition-colors relative ${notifOpen ? 'bg-blue-50 text-blue-600' : notificationsEnabled ? 'text-slate-500 hover:bg-slate-100 hover:text-slate-800' : 'text-slate-300 cursor-not-allowed'}`}
+                        title={notificationsEnabled ? 'Bildirimler' : 'Bildirimler kapalı'}
                     >
                         <Bell className="w-5 h-5" />
-                        {unreadCount > 0 && (
+                        {notificationsEnabled && unreadCount > 0 && (
                             <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 bg-red-500 rounded-full border-2 border-white text-[9px] font-black text-white flex items-center justify-center px-0.5 leading-none">
                                 {unreadCount > 9 ? '9+' : unreadCount}
                             </span>
                         )}
                     </button>
 
-                    {notifOpen && (
+                    {notificationsEnabled && notifOpen && (
                         <div className="absolute right-0 top-full mt-2 w-[360px] bg-white rounded-xl shadow-2xl border border-slate-100 z-50 overflow-hidden">
                             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
                                 <div className="flex items-center gap-2">

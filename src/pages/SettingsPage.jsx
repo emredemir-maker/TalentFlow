@@ -5,7 +5,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useUserSettings } from '../context/UserSettingsContext';
 import { useAuth } from '../context/AuthContext';
 import {
-    Settings, Palette, Globe, Bell, LayoutGrid, Hash, Mail,
+    Settings, Palette, Bell, Mail,
     CheckCircle, Loader2, Mic, MicOff, Zap, Activity,
     Share2, Building2, BookOpen, Shield, Key, Eye, EyeOff, ShieldCheck
 } from 'lucide-react';
@@ -253,20 +253,8 @@ export default function SettingsPage({ initialTab }) {
                                 <Select value={settings.theme} onChange={(v) => updateSettings({ theme: v })}
                                     options={[{ value: 'dark', label: '🌙 Koyu' }, { value: 'light', label: '☀️ Açık' }]} />
                             </SettingRow>
-                            <SettingRow icon={Globe} label="Dil" description="Arayüz dilini değiştirin">
-                                <Select value={settings.language} onChange={(v) => updateSettings({ language: v })}
-                                    options={[{ value: 'tr', label: '🇹🇷 Türkçe' }, { value: 'en', label: '🇬🇧 English' }]} />
-                            </SettingRow>
-                            <SettingRow icon={Bell} label="Bildirimler" description="E-posta bildirimlerini yönetin">
-                                <Toggle checked={settings.notifications} onChange={(v) => updateSettings({ notifications: v })} />
-                            </SettingRow>
-                            <SettingRow icon={LayoutGrid} label="Dashboard Düzeni" description="Kart yerleşimi">
-                                <Select value={settings.dashboardLayout} onChange={(v) => updateSettings({ dashboardLayout: v })}
-                                    options={[{ value: 'grid', label: 'Grid' }, { value: 'list', label: 'Liste' }]} />
-                            </SettingRow>
-                            <SettingRow icon={Hash} label="Sayfa Başına Aday" description="Görüntüleme limiti" noBorder>
-                                <Select value={settings.candidatesPerPage} onChange={(v) => updateSettings({ candidatesPerPage: parseInt(v) })}
-                                    options={[{ value: 6, label: '6' }, { value: 12, label: '12' }, { value: 24, label: '24' }, { value: 48, label: '48' }]} />
+                            <SettingRow icon={Bell} label="Uygulama Bildirimleri" description="Bildirim rozeti ve paneli göster / gizle" noBorder>
+                                <Toggle checked={settings.notifications !== false} onChange={(v) => updateSettings({ notifications: v })} />
                             </SettingRow>
                         </div>
 
