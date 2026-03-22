@@ -235,7 +235,9 @@ export function CandidatesProvider({ children }) {
                 }
             );
 
-            // Query 2: released cross-dept candidates ('array-contains-any' supports up to 10)
+            // Query 2: released cross-dept candidates ('array-contains-any' supports up to 10 values).
+            // NOTE: if a user belongs to more than 10 departments only the first 10 are queried;
+            // this is an unlikely edge case for normal HR workflows.
             const visibleQ = query(candidatesRef, where('visibleToDepartments', 'array-contains-any', safeUserDepts.slice(0, 10)));
             const unsubVisible = onSnapshot(
                 visibleQ,
@@ -245,8 +247,13 @@ export function CandidatesProvider({ children }) {
                     mergeAndSet();
                 },
                 (err) => {
-                    // Non-blocking: if the index is missing or permission denied, log and continue
-                    console.warn('[TalentFlow] visibleToDepartments query error (non-blocking):', err.message);
+                    // Non-blocking: if the Firestore index is missing or permission denied,
+                    // log at error level so it is discoverable, but do not crash the UI.
+                    // Cross-dept released candidates will be invisible until this is fixed.
+                    console.error(
+                        '[TalentFlow] visibleToDepartments query failed — released cross-dept candidates will NOT be visible to this department user.',
+                        'Code:', err.code, '| Message:', err.message
+                    );
                     if (pendingFirst > 0) { pendingFirst--; if (pendingFirst === 0) setLoading(false); }
                     mergeAndSet();
                 }
