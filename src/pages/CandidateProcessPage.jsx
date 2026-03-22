@@ -237,6 +237,15 @@ export default function CandidateProcessPage() {
 
     const score = Math.round(candidate?.bestScore || 0);
 
+    // ── TOP 2% BADGE ────────────────────────────────────────────────────────────
+    const isTop2Percent = useMemo(() => {
+        if (!candidate || candidates.length < 10) return false;
+        const sorted = [...candidates].sort((a, b) => (b.bestScore || 0) - (a.bestScore || 0));
+        const topCount = Math.max(1, Math.ceil(sorted.length * 0.02));
+        const threshold = sorted[topCount - 1]?.bestScore || 0;
+        return (candidate.bestScore || 0) >= threshold && threshold > 0;
+    }, [candidate, candidates]);
+
     // ── POSITION MATCHES (domain-filtered) ─────────────────────────────────────
     const positionMatches = useMemo(() => {
         if (!candidate || !positions) return { candidateDomain: 'general', compatible: [], incompatible: [] };
@@ -426,8 +435,11 @@ export default function CandidateProcessPage() {
                                     }`}
                                 >
                                     {isActive && <div className="w-[6px] h-[6px] rounded-full bg-cyan-500 shrink-0" />}
-                                    <div className="w-8 h-8 rounded-lg bg-slate-100 overflow-hidden shrink-0 border border-black/5">
-                                        <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${c.name}`} className="w-full h-full object-cover" alt="" />
+                                    <div className="w-8 h-8 rounded-lg bg-slate-100 overflow-hidden shrink-0 border border-black/5 flex items-center justify-center">
+                                        {c.photo || c.photoUrl || c.profileImage
+                                            ? <img src={c.photo || c.photoUrl || c.profileImage} className="w-full h-full object-cover" alt="" onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
+                                            : null}
+                                        <span className={`text-[11px] font-black text-slate-500 ${c.photo || c.photoUrl || c.profileImage ? 'hidden' : 'flex'}`}>{c.name?.charAt(0)?.toUpperCase() || '?'}</span>
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className={`text-[12px] font-bold truncate leading-tight ${isActive ? 'text-cyan-700' : 'text-slate-700'}`}>{c.name}</p>
@@ -467,15 +479,20 @@ export default function CandidateProcessPage() {
                             {/* Candidate header */}
                             <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-xl border-2 border-white shadow-md overflow-hidden shrink-0 ring-2 ring-cyan-100">
-                                        <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${candidate.name}`} className="w-full h-full object-cover" alt="" />
+                                    <div className="w-10 h-10 rounded-xl border-2 border-white shadow-md overflow-hidden shrink-0 ring-2 ring-cyan-100 bg-cyan-50 flex items-center justify-center">
+                                        {candidate.photo || candidate.photoUrl || candidate.profileImage
+                                            ? <img src={candidate.photo || candidate.photoUrl || candidate.profileImage} className="w-full h-full object-cover" alt="" onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
+                                            : null}
+                                        <span className={`text-sm font-black text-cyan-700 ${candidate.photo || candidate.photoUrl || candidate.profileImage ? 'hidden' : 'flex'}`}>{candidate.name?.charAt(0)?.toUpperCase() || '?'}</span>
                                     </div>
                                     <div>
                                         <div className="flex items-center gap-2">
                                             <h2 className="text-[15px] font-black text-slate-900 tracking-tight leading-none">{candidate.name}</h2>
-                                            <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 flex items-center gap-1">
-                                                <Target className="w-2.5 h-2.5" /> İlk %2
-                                            </span>
+                                            {isTop2Percent && (
+                                                <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 flex items-center gap-1">
+                                                    <Target className="w-2.5 h-2.5" /> İlk %2
+                                                </span>
+                                            )}
                                             <span className="text-[9px] font-black text-cyan-600 bg-cyan-50 px-2 py-0.5 rounded-full border border-cyan-100 flex items-center gap-1">
                                                 <Zap className="w-2.5 h-2.5 fill-cyan-500" /> %{score} Uyum
                                             </span>

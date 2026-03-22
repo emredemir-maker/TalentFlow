@@ -140,8 +140,11 @@ export default function InterviewReportPage() {
                     {/* CANDIDATE HEADER SECTION */}
                     <div className="flex items-center justify-between bg-white p-6 rounded-[24px] border border-[#E2E8F0] shadow-sm">
                         <div className="flex items-center gap-5">
-                            <div className="w-20 h-20 rounded-2xl border-[3px] border-white shadow-xl overflow-hidden">
-                                <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${candidate.name}`} alt={candidate.name} className="w-full h-full object-cover" />
+                            <div className="w-20 h-20 rounded-2xl border-[3px] border-white shadow-xl overflow-hidden bg-cyan-50 flex items-center justify-center">
+                                {candidate.photo || candidate.photoUrl || candidate.profileImage
+                                    ? <img src={candidate.photo || candidate.photoUrl || candidate.profileImage} alt={candidate.name} className="w-full h-full object-cover" />
+                                    : <span className="text-3xl font-black text-cyan-700">{candidate.name?.charAt(0)?.toUpperCase() || '?'}</span>
+                                }
                             </div>
                             <div className="space-y-1.5">
                                 <div className="flex items-center gap-3">
