@@ -226,6 +226,32 @@ export default function CandidateProcessPage() {
 
     const careerHistory = candidate?.experiences || candidate?.careerHistory || [];
 
+    function parseCareerFromCvData(text) {
+        if (!text) return [];
+        const MONTHS = 'Ocak|Şubat|Mart|Nisan|Mayıs|Haziran|Temmuz|Ağustos|Eylül|Ekim|Kasım|Aralık|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec';
+        const dateRange = `((?:${MONTHS})\\.?\\s+\\d{4}\\s*[–\\-]\\s*(?:Günümüz|Present|Halen|(?:${MONTHS})\\.?\\s+\\d{4}))`;
+        const splitRegex = new RegExp(`(?=.{3,80}\\s*\\|?\\s*${dateRange})`, 'g');
+        const chunks = text.split(splitRegex).filter(c => c.trim().length > 20);
+        if (chunks.length <= 1) {
+            const bullets = text.split(/[•\n]/).map(s => s.trim()).filter(s => s.length > 10);
+            if (bullets.length === 0) return [];
+            return bullets.map(b => ({ role: '', company: '', duration: '', desc: b, milestones: [] }));
+        }
+        return chunks.slice(0, 6).map(chunk => {
+            const lines = chunk.split('\n').map(l => l.trim()).filter(Boolean);
+            const header = lines[0] || '';
+            const dateMatch = header.match(new RegExp(dateRange));
+            const duration = dateMatch ? dateMatch[0] : '';
+            const titlePart = header.replace(duration, '').replace(/\|/g, '').trim();
+            const [role, ...rest] = titlePart.split(/[,|]/).map(s => s.trim());
+            const company = rest.join(', ');
+            const bodyLines = lines.slice(1);
+            const bullets = bodyLines.filter(l => /^[•\-\*]/.test(l)).map(l => l.replace(/^[•\-\*]\s*/, ''));
+            const desc = bodyLines.filter(l => !/^[•\-\*]/.test(l)).join(' ').slice(0, 200);
+            return { role: role || titlePart, company, duration, desc, milestones: bullets.slice(0, 3) };
+        }).filter(e => e.role || e.desc);
+    }
+
     const getSourceLabel = (c) => {
         if (!c?.source) return 'Manuel / PDF';
         return c.sourceDetail ? `${c.source} (${c.sourceDetail})` : c.source;
@@ -691,37 +717,42 @@ export default function CandidateProcessPage() {
                                                     <h3 className="text-[10px] font-black text-slate-700 uppercase tracking-widest">Kariyer Kronolojisi</h3>
                                                 </div>
                                                 <div className="space-y-5 pl-2">
-                                                    {careerHistory.length > 0 ? careerHistory.map((exp, i) => (
-                                                        <div key={i} className="relative pl-5 border-l-2 border-cyan-100 pb-4">
-                                                            <div className="absolute -left-[5px] top-1 w-2.5 h-2.5 rounded-full bg-white border-2 border-cyan-400 shadow-sm" />
-                                                            <div className="flex justify-between items-start mb-1.5">
-                                                                <div>
-                                                                    <h4 className="text-[13px] font-black text-slate-800">{exp.role}</h4>
-                                                                    <p className="text-[10px] font-bold text-slate-500 uppercase">{exp.company}</p>
-                                                                </div>
-                                                                <span className="text-[9px] font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200 shrink-0 ml-2">{exp.duration}</span>
+                                                    {(() => {
+                                                        const items = careerHistory.length > 0
+                                                            ? careerHistory
+                                                            : parseCareerFromCvData(candidate?.cvData || candidate?.cvText || '');
+                                                        if (items.length === 0) {
+                                                            return <p className="text-[12px] text-slate-400 italic">Kariyer bilgisi bulunamadı.</p>;
+                                                        }
+                                                        return items.map((exp, i) => (
+                                                            <div key={i} className="relative pl-5 border-l-2 border-cyan-100 pb-4 last:pb-0">
+                                                                <div className="absolute -left-[5px] top-1 w-2.5 h-2.5 rounded-full bg-white border-2 border-cyan-400 shadow-sm" />
+                                                                {(exp.role || exp.company || exp.duration) && (
+                                                                    <div className="flex justify-between items-start mb-1.5 flex-wrap gap-1">
+                                                                        <div>
+                                                                            {exp.role && <h4 className="text-[13px] font-black text-slate-800">{exp.role}</h4>}
+                                                                            {exp.company && <p className="text-[10px] font-bold text-slate-500 uppercase">{exp.company}</p>}
+                                                                        </div>
+                                                                        {exp.duration && (
+                                                                            <span className="text-[9px] font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200 shrink-0">{exp.duration}</span>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                                {exp.desc && (
+                                                                    <p className="text-[11px] text-slate-500 leading-relaxed bg-slate-50 p-2 rounded-lg border border-slate-100">{exp.desc}</p>
+                                                                )}
+                                                                {exp.milestones?.length > 0 && (
+                                                                    <div className="flex flex-wrap gap-1.5 mt-2">
+                                                                        {exp.milestones.map((m, idx) => (
+                                                                            <span key={idx} className="flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[8.5px] font-black rounded-lg border border-emerald-100">
+                                                                                <Trophy className="w-2 h-2" /> {m}
+                                                                            </span>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
                                                             </div>
-                                                            <p className="text-[11px] text-slate-500 leading-relaxed bg-slate-50 p-2 rounded-lg border border-slate-100">{exp.desc}</p>
-                                                            {exp.milestones?.length > 0 && (
-                                                                <div className="flex flex-wrap gap-1.5 mt-2">
-                                                                    {exp.milestones.map((m, idx) => (
-                                                                        <span key={idx} className="flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[8.5px] font-black rounded-lg border border-emerald-100">
-                                                                            <Trophy className="w-2 h-2" /> {m}
-                                                                        </span>
-                                                                    ))}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    )) : (candidate?.cvData || candidate?.cvText) ? (
-                                                        <div className="relative pl-5 border-l-2 border-cyan-100">
-                                                            <div className="absolute -left-[5px] top-1 w-2.5 h-2.5 rounded-full bg-white border-2 border-cyan-400 shadow-sm" />
-                                                            <pre className="text-[11px] text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100 whitespace-pre-wrap font-sans">
-                                                                {(candidate?.cvData || candidate?.cvText || '').slice(0, 4000)}
-                                                            </pre>
-                                                        </div>
-                                                    ) : (
-                                                        <p className="text-[12px] text-slate-400 italic">Kariyer bilgisi bulunamadı.</p>
-                                                    )}
+                                                        ));
+                                                    })()}
                                                 </div>
                                             </div>
 

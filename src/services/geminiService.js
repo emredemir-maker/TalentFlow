@@ -45,6 +45,7 @@ export async function parseCandidateFromText(text, modelId = 'gemini-2.0-flash')
 ÇOK ÖNEMLİ KURALLAR (KVKK / GDPR UYGUNLUĞU İÇİN):
 Ad, iletişim bilgileri gibi kişisel nitelikli verileri sadece kendi alanlarında (name, email, phone, vb.) tut.
 'cvData' alanunda ise adayın TÜM PROFESYONEL GEÇMİŞİNİ (iş tecrübeleri, görev tanımları, başarıları, eğitimleri, sertifikaları, yetenekleri) İSİM VE İLETİŞİM BİLGİSİNDEN ARINDIRILMIŞ ŞEKİLDE kelimesi kelimesine detaylıca yaz.
+'experiences' alanına her iş deneyimini ayrı bir nesne olarak ekle. Başarıları kısa maddeler halinde 'milestones' dizisine yaz (maksimum 3 madde).
 
 Sadece şu JSON formatında dön:
 {
@@ -59,7 +60,16 @@ Sadece şu JSON formatında dön:
   "experience": <integer>,
   "education": "Son Okul / Bölüm",
   "summary": "Kısa önizleme özeti (Turkish)",
-  "cvData": "Detaylı döküm."
+  "cvData": "Detaylı döküm.",
+  "experiences": [
+    {
+      "role": "Pozisyon Ünvanı",
+      "company": "Şirket Adı",
+      "duration": "Ay Yıl – Ay Yıl veya Günümüz",
+      "desc": "1-2 cümle görev özeti.",
+      "milestones": ["Başarı 1", "Başarı 2"]
+    }
+  ]
 }`;
 
     const prompt = buildStructuredPrompt(instruction, { "PROFIL_METNI": sanitizeForPrompt(text, 20000) });
