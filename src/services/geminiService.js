@@ -86,6 +86,42 @@ Sadece şu JSON formatında dön:
     return parseAIJson(result.response.text());
 }
 
+export async function parseExperiencesFromText(text, modelId = 'gemini-2.0-flash') {
+    if (!text || text.length < 30) return [];
+    const instruction = `CV metninden SADECE iş deneyimlerini çıkart. Profil özeti, yetenek listesi veya eğitim bilgisi ekleme.
+
+Kural:
+- Her girdi için mutlaka şirket adı (company) VE tarih aralığı (duration) olmalı.
+- role: maksimum 50 karakter (kısa ünvan).
+- desc: tek cümle, maksimum 120 karakter.
+- milestones: maksimum 2 sayısal başarı maddesi (yoksa boş dizi).
+
+Sadece şu JSON formatında dön (başka hiçbir şey yazma):
+[
+  {
+    "role": "Pozisyon Ünvanı",
+    "company": "Tam Şirket Adı",
+    "duration": "Ay Yıl – Ay Yıl (veya Günümüz)",
+    "desc": "Tek cümle görev özeti.",
+    "milestones": ["Başarı 1"]
+  }
+]`;
+    const prompt = buildStructuredPrompt(instruction, { "CV_METNI": sanitizeForPrompt(text, 15000) });
+    const model = await getModel(modelId);
+    const result = await model.generateContent(prompt);
+    const raw = result.response.text().replace(/```json|```/gi, '').trim();
+    try {
+        const arr = JSON.parse(raw);
+        return Array.isArray(arr) ? arr.filter(e => e.company && e.duration) : [];
+    } catch {
+        const match = raw.match(/\[[\s\S]*\]/);
+        if (match) {
+            try { const arr = JSON.parse(match[0]); return Array.isArray(arr) ? arr.filter(e => e.company && e.duration) : []; } catch { return []; }
+        }
+        return [];
+    }
+}
+
 export async function getAvailableModels() {
     return [
         { id: 'gemini-2.0-flash', displayName: 'Gemini 2.0 Flash (Fast & Deterministic)' }

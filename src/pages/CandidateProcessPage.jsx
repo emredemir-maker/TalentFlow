@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
 import { useAuth } from '../context/AuthContext';
-import { analyzeCandidateMatch } from '../services/geminiService';
+import { analyzeCandidateMatch, parseExperiencesFromText } from '../services/geminiService';
 import { calculateMatchScore, filterPositionsByDomain, detectJobDomain, domainLabel } from '../services/matchService';
 import SystemScanner from '../components/SystemScanner';
 import AddCandidateModal from '../components/AddCandidateModal';
@@ -51,10 +51,28 @@ export default function CandidateProcessPage() {
     const [analyzingIds, setAnalyzingIds]       = useState(new Set());
     const [analysisError, setAnalysisError]     = useState(null);
     const [isAddModalOpen, setIsAddModalOpen]   = useState(false);
+    const [reparsingCareer, setReparsingCareer] = useState(false);
 
     const showSuccess = (type) => {
         setActionSuccess(type);
         setTimeout(() => setActionSuccess(null), 3000);
+    };
+
+    const handleReparseCareer = async () => {
+        if (!candidate || reparsingCareer) return;
+        const text = candidate.cvText || candidate.cvData;
+        if (!text || text.length < 30) return;
+        setReparsingCareer(true);
+        try {
+            const experiences = await parseExperiencesFromText(text);
+            if (experiences.length > 0) {
+                await updateCandidate(candidate.id, { experiences });
+            }
+        } catch (err) {
+            console.error('Career reparse error:', err);
+        } finally {
+            setReparsingCareer(false);
+        }
     };
 
     const handleComment = async () => {
@@ -723,9 +741,24 @@ export default function CandidateProcessPage() {
                                         <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
                                             {/* Career timeline */}
                                             <div className="md:col-span-8 space-y-4">
-                                                <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-                                                    <Clock className="w-4 h-4 text-cyan-500" />
-                                                    <h3 className="text-[10px] font-black text-slate-700 uppercase tracking-widest">Kariyer Kronolojisi</h3>
+                                                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                                                    <div className="flex items-center gap-2">
+                                                        <Clock className="w-4 h-4 text-cyan-500" />
+                                                        <h3 className="text-[10px] font-black text-slate-700 uppercase tracking-widest">Kariyer Kronolojisi</h3>
+                                                    </div>
+                                                    {(candidate?.cvText || candidate?.cvData) && (
+                                                        <button
+                                                            onClick={handleReparseCareer}
+                                                            disabled={reparsingCareer}
+                                                            title="CV metninden kariyer verilerini yeniden çek"
+                                                            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 text-[9px] font-black text-slate-500 hover:border-cyan-300 hover:text-cyan-600 hover:bg-cyan-50 transition-colors disabled:opacity-50"
+                                                        >
+                                                            {reparsingCareer
+                                                                ? <><Loader2 size={10} className="animate-spin" /> Güncelleniyor...</>
+                                                                : <><RefreshCw size={10} /> Yenile</>
+                                                            }
+                                                        </button>
+                                                    )}
                                                 </div>
                                                 <div className="space-y-5 pl-2">
                                                     {(() => {
