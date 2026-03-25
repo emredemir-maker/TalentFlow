@@ -52,14 +52,27 @@ export function AuthProvider({ children }) {
 
         const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
             if (currentUser) {
-                setUser(currentUser);
-
-                // If anonymous (candidate), skip heavy profile fetching
+                // Anonymous sessions are only valid on candidate-facing public routes.
+                // If a stale anonymous session is restored on a non-public route (e.g. the
+                // dashboard), sign it out immediately so the user lands on the Login page
+                // instead of being stuck on /exit.
                 if (currentUser.isAnonymous) {
+                    const path = window.location.pathname;
+                    const isPublicRoute = path.startsWith('/join/') ||
+                                         path.startsWith('/live-interview/') ||
+                                         path.startsWith('/interview-report/');
+                    if (!isPublicRoute) {
+                        // Signing out triggers onAuthStateChanged again with null → LoginPage
+                        signOut(auth);
+                        return;
+                    }
+                    setUser(currentUser);
                     setUserProfile({ role: 'candidate', isAnonymous: true });
                     setLoading(false);
                     return;
                 }
+
+                setUser(currentUser);
 
                 // Set up real-time listener for the user profile
                 const userDocRef = doc(db, USERS_PATH, currentUser.uid);
