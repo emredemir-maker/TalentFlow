@@ -36,6 +36,8 @@ jobs:
       - name: Install Functions Dependencies
         working-directory: ./functions
         run: npm install
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: true
 
       - name: Deploy to Firebase
         uses: w9jds/firebase-action@master
