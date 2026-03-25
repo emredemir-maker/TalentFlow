@@ -3,23 +3,45 @@ service firebase.storage {
   match /b/{bucket}/o {
 
     // ── CV uploads ────────────────────────────────────────────────────────────
-    // Candidates upload their own CVs to /cvs/{candidateId}/{filename}
-    // Recruiters and super_admins can read all CVs
-    // Owners can read/write their own CV slot
+    // AddCandidateModal uploads to: cvs/{timestamp}_{random}.{ext}  (flat path)
+    // Write: any authenticated user (recruiters upload CVs for candidates)
+    // Read:  any authenticated user (dashboard CV viewing)
+    match /cvs/{filename} {
+      allow read:  if request.auth != null;
+      allow write: if request.auth != null
+                      && request.resource.size < 20 * 1024 * 1024;
+    }
+
+    // Nested paths under /cvs/ (future-proofing for sub-folder uploads)
     match /cvs/{candidateId}/{allPaths=**} {
       allow read:  if request.auth != null;
-      allow write: if request.auth != null &&
-                      (request.auth.uid == candidateId ||
-                       request.auth.token.email == 'emre.demir@infoset.app');
+      allow write: if request.auth != null
+                      && request.resource.size < 20 * 1024 * 1024;
     }
 
-    // ── Profile images ────────────────────────────────────────────────────────
+    // ── Branding assets ───────────────────────────────────────────────────────
+    // BrandingSettingsPage uploads to: branding/logo_{timestamp}_{filename}
+    // Write: super_admin only  |  Read: any authenticated user
+    match /branding/{filename} {
+      allow read:  if request.auth != null;
+      allow write: if request.auth != null
+                      && (request.auth.token.email == 'emre.demir@infoset.app'
+                          || request.auth.token.role == 'super_admin')
+                      && request.resource.size < 10 * 1024 * 1024
+                      && request.resource.contentType.matches('image/.*');
+    }
+
+    // ── Profile / avatar images ───────────────────────────────────────────────
+    // Write: only the owner of the avatar slot
     match /avatars/{userId}/{allPaths=**} {
       allow read:  if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null
+                      && request.auth.uid == userId
+                      && request.resource.size < 5 * 1024 * 1024
+                      && request.resource.contentType.matches('image/.*');
     }
 
-    // ── Default deny ─────────────────────────────────────────────────────────
+    // ── Default deny ──────────────────────────────────────────────────────────
     match /{allPaths=**} {
       allow read, write: if false;
     }
