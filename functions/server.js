@@ -141,6 +141,16 @@ const aiLimiter = rateLimit({
     message: { error: 'Too many AI requests, please slow down.' },
 });
 
+// Public session polling + candidate status updates.
+// 60 req/min is plenty for a live interview heartbeat but blocks enumeration.
+const sessionLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Çok fazla oturum sorgusu. Lütfen bekleyin.' }
+});
+
 // Load API Key from .env with Firestore Fallback
 async function getApiKey() {
     // 1. Try Environment Variable
@@ -849,6 +859,118 @@ app.post('/api/google/create-calendar-event', async (req, res) => {
     }
 });
 
+// GET /api/session/:sessionId - Public endpoint for candidates to poll session status
+app.get('/api/session/:sessionId', sessionLimiter, async (req, res) => {
+    const { sessionId } = req.params;
+    if (!sessionId) return res.status(400).json({ error: 'sessionId required' });
+    try {
+        const snapshot = await db.collection('artifacts/talent-flow/public/data/candidates').get();
+        for (const docSnap of snapshot.docs) {
+            const data = docSnap.data();
+            const session = (data.interviewSessions || []).find(s => s.id === sessionId);
+            if (session) {
+                const visibleQuestions = (session.questions || []).filter(q => q.visibleToCandidate);
+                console.log(`[GET /api/session] Found session ${sessionId} — ${visibleQuestions.length} visible question(s), status: ${session.candidateStatus}`);
+                return res.json({
+                    found: true,
+                    candidateId: docSnap.id,
+                    candidateName: data.name,
+                    status: session.status,
+                    candidateStatus: session.candidateStatus,
+                    recruiterPresence: session.recruiterPresence,
+                    lastActive: session.lastActive,
+                    questions: visibleQuestions,
+                    currentQuestionIndex: session.currentQuestionIndex,
+                });
+            }
+        }
+        return res.status(404).json({ found: false, error: 'Seans bulunamadı.' });
+    } catch (err) {
+        console.error('GET /api/session error:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Fields the CANDIDATE side is permitted to write
+const CANDIDATE_ALLOWED_FIELDS = new Set([
+    'candidateStatus',
+    'candidateConnected',
+    'candidatePresence',
+    'lastActive',
+    'hasConsent',
+]);
+
+// POST /api/init-interview-session — creates /interviews/{sessionId} via Admin SDK
+app.post('/api/init-interview-session', sessionLimiter, async (req, res) => {
+    const { sessionId, initialData } = req.body;
+    if (!sessionId || typeof sessionId !== 'string' || !sessionId.startsWith('iv-')) {
+        return res.status(400).json({ error: 'Invalid sessionId.' });
+    }
+    if (initialData && typeof initialData !== 'object') {
+        return res.status(400).json({ error: 'initialData must be an object.' });
+    }
+    try {
+        const sessionRef = db.doc(`interviews/${sessionId}`);
+        const snap = await sessionRef.get();
+        if (!snap.exists) {
+            await sessionRef.set({ sessionId, createdAt: new Date().toISOString(), ...(initialData || {}) });
+            console.log(`[init-interview-session] Created /interviews/${sessionId}`);
+        } else {
+            if (initialData && Object.keys(initialData).length > 0) {
+                await sessionRef.set(initialData, { merge: true });
+            }
+            console.log(`[init-interview-session] /interviews/${sessionId} already exists.`);
+        }
+        res.json({ success: true });
+    } catch (err) {
+        console.error('[init-interview-session] Error:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /api/update-candidate-status — candidate-side status updates (field-whitelisted)
+app.post('/api/update-candidate-status', sessionLimiter, async (req, res) => {
+    const { sessionId, candidateId, updates } = req.body;
+    if (!sessionId || !candidateId || !updates || typeof updates !== 'object') {
+        return res.status(400).json({ error: "Missing required fields." });
+    }
+
+    const safeUpdates = {};
+    for (const key of Object.keys(updates)) {
+        if (CANDIDATE_ALLOWED_FIELDS.has(key)) {
+            safeUpdates[key] = updates[key];
+        } else {
+            console.warn(`[update-candidate-status] Blocked field "${key}" from session ${sessionId}`);
+        }
+    }
+    if (Object.keys(safeUpdates).length === 0) {
+        return res.status(400).json({ error: "No permitted fields to update." });
+    }
+
+    try {
+        const candidateRef = db.doc(`artifacts/talent-flow/public/data/candidates/${candidateId}`);
+        await db.runTransaction(async (t) => {
+            const doc = await t.get(candidateRef);
+            if (!doc.exists) throw new Error("Candidate not found.");
+
+            const data = doc.data();
+            const sessions = data.interviewSessions || [];
+            const sessionExists = sessions.some(s => s.id === sessionId);
+            if (!sessionExists) throw new Error("Session not found for this candidate.");
+
+            const newSessions = sessions.map(session =>
+                session.id === sessionId ? { ...session, ...safeUpdates } : session
+            );
+            t.update(candidateRef, { interviewSessions: newSessions });
+        });
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error("Failed to update candidate session via proxy:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Gemini STT Endpoint (Audio to Text)
 // Accepts both multipart/form-data (LiveInterviewPage) and base64 JSON (SettingsPage)
 const audioUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
@@ -1134,6 +1256,46 @@ app.post('/api/users/availability', requireAuth, async (req, res) => {
         }
     }));
     res.json({ availability: results });
+});
+
+// ─── Server-side Duplicate Candidate Check ──────────────────────────────────
+app.post('/api/check-duplicate', async (req, res) => {
+    try {
+        const norm = (s) => (s || '').trim().toLowerCase().replace(/[\s\-().+]/g, '');
+        const email = norm(req.body?.email);
+        const phone = norm(req.body?.phone);
+
+        if (!email && !phone) return res.json({ isDuplicate: false });
+
+        const candidatesRef = db.collection('artifacts/talent-flow/public/data/candidates');
+        let existing = null;
+        let foundBy = null;
+
+        if (email) {
+            const snap = await candidatesRef.where('email', '==', email).limit(1).get();
+            if (!snap.empty) {
+                existing = { id: snap.docs[0].id, ...snap.docs[0].data() };
+                foundBy = 'email';
+            }
+        }
+
+        if (!existing && phone) {
+            const snap = await candidatesRef.where('phone', '==', phone).limit(1).get();
+            if (!snap.empty) {
+                existing = { id: snap.docs[0].id, ...snap.docs[0].data() };
+                foundBy = 'phone';
+            }
+        }
+
+        res.json({
+            isDuplicate: !!existing,
+            foundBy,
+            existingName: existing?.name || null,
+        });
+    } catch (err) {
+        console.error('Duplicate check error:', err.message);
+        res.json({ isDuplicate: false });
+    }
 });
 
 // ─── AI Generate Proxy ──────────────────────────────────────────────────────
