@@ -6,7 +6,7 @@ import Header from '../components/Header';
 import { usePositions } from '../context/PositionsContext';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, getDocs, query, where, serverTimestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import {
     Briefcase, Plus, Trash2, CheckCircle2, XCircle, Users, Clock,
@@ -46,6 +46,8 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
     const [appsLoading, setAppsLoading] = useState(false);
     const [linkSource, setLinkSource] = useState('LinkedIn');
     const [copied, setCopied] = useState(false);
+    const [syncingAppId, setSyncingAppId] = useState(null);
+    const [syncedAppIds, setSyncedAppIds] = useState(new Set());
 
     // Build the apply URL
     const baseUrl = typeof window !== 'undefined' ? `${window.location.origin}/apply/${pos.id}` : `/apply/${pos.id}`;
@@ -67,6 +69,55 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
         });
+    }
+
+    async function syncApplicationToCandidate(app) {
+        if (syncingAppId) return;
+        setSyncingAppId(app.id);
+        try {
+            const CANDIDATES_COLLECTION = 'artifacts/talent-flow/public/data/candidates';
+            const emailNorm = app.email?.trim().toLowerCase() || '';
+            const q = query(collection(db, CANDIDATES_COLLECTION), where('email', '==', emailNorm));
+            const existing = await getDocs(q);
+            if (!existing.empty) {
+                setSyncedAppIds(prev => new Set([...prev, app.id]));
+                return;
+            }
+            const candidateData = {
+                name: app.name || '',
+                email: emailNorm,
+                phone: app.phone || '',
+                linkedinUrl: app.linkedin || '',
+                position: pos.title || '',
+                company: app.parsedCandidate?.company || '',
+                location: app.parsedCandidate?.location || '',
+                skills: app.parsedCandidate?.skills || [],
+                experience: app.parsedCandidate?.experience || 0,
+                education: app.parsedCandidate?.education || '',
+                summary: app.parsedCandidate?.summary || app.aiSummary || '',
+                cvData: app.parsedCandidate?.cvData || '',
+                cvText: app.cvText || '',
+                cvFileName: app.cvFileName || '',
+                source: app.source || '',
+                sourceCategory: app.sourceCategory || '',
+                status: 'new',
+                matchScore: app.aiScore || 0,
+                combinedScore: app.aiScore || 0,
+                aiAnalysis: app.aiScoreBreakdown || (app.aiScore > 0 ? { score: app.aiScore, summary: app.aiSummary || '' } : null),
+                applicationId: app.id,
+                positionId: pos.id,
+                appliedDate: app.createdAt?.toDate?.()?.toISOString?.()?.split('T')?.[0] || new Date().toISOString().split('T')[0],
+                interviewSessions: [],
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+            };
+            await addDoc(collection(db, CANDIDATES_COLLECTION), candidateData);
+            setSyncedAppIds(prev => new Set([...prev, app.id]));
+        } catch (err) {
+            console.error('Sync error:', err);
+        } finally {
+            setSyncingAppId(null);
+        }
     }
 
     const TABS = [
@@ -293,6 +344,26 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                                                         {cfg.label}
                                                     </button>
                                                 ))}
+                                            </div>
+                                            {/* Sync to candidates */}
+                                            <div className="mt-2">
+                                                {syncedAppIds.has(app.id) ? (
+                                                    <div className="flex items-center justify-center gap-1.5 py-1.5 rounded-xl text-[10px] font-black text-emerald-600 bg-emerald-50 border border-emerald-200">
+                                                        <Check size={11} /> Adaylar listesine eklendi
+                                                    </div>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => syncApplicationToCandidate(app)}
+                                                        disabled={syncingAppId === app.id}
+                                                        className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-xl text-[10px] font-black text-violet-600 bg-violet-50 border border-violet-200 hover:bg-violet-100 transition-colors disabled:opacity-50"
+                                                    >
+                                                        {syncingAppId === app.id ? (
+                                                            <><Loader2 size={11} className="animate-spin" /> Ekleniyor...</>
+                                                        ) : (
+                                                            <><Users size={11} /> Adaylar Listesine Ekle</>
+                                                        )}
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
                                     );
