@@ -132,6 +132,15 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
+// Rate limiter for AI endpoints (20 req/min/IP)
+const aiLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many AI requests, please slow down.' },
+});
+
 // Load API Key from .env with Firestore Fallback
 async function getApiKey() {
     // 1. Try Environment Variable
@@ -1125,6 +1134,64 @@ app.post('/api/users/availability', requireAuth, async (req, res) => {
         }
     }));
     res.json({ availability: results });
+});
+
+// ─── AI Generate Proxy ──────────────────────────────────────────────────────
+// Routes ALL Gemini calls through the backend so VITE_GEMINI_API_KEY never
+// reaches the browser bundle. Rate-limited to 20 req/min via aiLimiter.
+app.post('/api/ai/generate', aiLimiter, async (req, res) => {
+    const { prompt, modelId = 'gemini-2.0-flash' } = req.body || {};
+    if (!prompt || typeof prompt !== 'string') {
+        return res.status(400).json({ error: 'prompt is required' });
+    }
+
+    const apiKey = await getApiKey();
+    if (!apiKey) {
+        return res.status(503).json({ error: 'AI service unavailable — API key missing' });
+    }
+
+    try {
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({
+            model: modelId,
+            generationConfig: {
+                temperature: 0,
+                topP: 0,
+                topK: 1,
+                maxOutputTokens: 2048,
+                responseMimeType: 'application/json',
+            },
+        });
+        const result = await model.generateContent(prompt);
+        res.json({ text: result.response.text() });
+    } catch (err) {
+        console.error('AI Generate Error:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ─── STT + Emotion Analysis Proxy ───────────────────────────────────────────
+app.post('/api/ai/stt', aiLimiter, async (req, res) => {
+    const { audio, mimeType = 'audio/webm' } = req.body || {};
+    if (!audio || typeof audio !== 'string') {
+        return res.status(400).json({ error: 'audio (base64) is required' });
+    }
+
+    const apiKey = await getApiKey();
+    if (!apiKey) return res.status(503).json({ error: 'AI service unavailable' });
+
+    try {
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        const result = await model.generateContent([
+            { inlineData: { data: audio, mimeType } },
+            `Bu ses dosyasını analiz et. YALNIZCA aşağıdaki JSON formatında yanıt döndür, başka hiçbir şey yazma:\n{"text":"türkçe transkript metni","stress":30,"excitement":70,"confidence":60,"hesitation":20}\nKurallar:\n- text: konuşulan Türkçe sözcükler. Konuşma yoksa boş string.\n- stress/excitement/confidence/hesitation: 0-100 tam sayı.\n- 'Sessizlik', 'Ses yok', 'Boş' gibi ifadeler text alanına YAZMA.`
+        ]);
+        res.json({ text: result.response.text() });
+    } catch (err) {
+        console.error('STT Error:', err.message);
+        res.status(500).json({ error: err.message });
+    }
 });
 
 const PORT = process.env.PORT || 3001;
