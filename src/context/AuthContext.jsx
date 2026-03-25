@@ -60,7 +60,8 @@ export function AuthProvider({ children }) {
                     const path = window.location.pathname;
                     const isPublicRoute = path.startsWith('/join/') ||
                                          path.startsWith('/live-interview/') ||
-                                         path.startsWith('/interview-report/');
+                                         path.startsWith('/interview-report/') ||
+                                         path.startsWith('/apply/');
                     if (!isPublicRoute) {
                         // Signing out triggers onAuthStateChanged again with null → LoginPage
                         signOut(auth);
@@ -200,9 +201,11 @@ export function AuthProvider({ children }) {
 
     // Anonymous SignIn for Public Routes - Separate effect to handle dependency changes correctly
     useEffect(() => {
-        const isPublicRoute = window.location.pathname.startsWith('/join/') || 
-                              window.location.pathname.startsWith('/live-interview/') || 
-                              window.location.pathname.startsWith('/interview-report/');
+        const path = window.location.pathname;
+        const isPublicRoute = path.startsWith('/join/') ||
+                              path.startsWith('/live-interview/') ||
+                              path.startsWith('/interview-report/') ||
+                              path.startsWith('/apply/');
 
         if (isPublicRoute && !user && !loading) {
             console.log("[TalentFlow] Public route & unauthenticated. Triggering anonymous sign-in...");
