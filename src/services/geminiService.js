@@ -45,7 +45,15 @@ export async function parseCandidateFromText(text, modelId = 'gemini-2.0-flash')
 ÇOK ÖNEMLİ KURALLAR (KVKK / GDPR UYGUNLUĞU İÇİN):
 Ad, iletişim bilgileri gibi kişisel nitelikli verileri sadece kendi alanlarında (name, email, phone, vb.) tut.
 'cvData' alanunda ise adayın TÜM PROFESYONEL GEÇMİŞİNİ (iş tecrübeleri, görev tanımları, başarıları, eğitimleri, sertifikaları, yetenekleri) İSİM VE İLETİŞİM BİLGİSİNDEN ARINDIRILMIŞ ŞEKİLDE kelimesi kelimesine detaylıca yaz.
-'experiences' alanına her iş deneyimini ayrı bir nesne olarak ekle. Başarıları kısa maddeler halinde 'milestones' dizisine yaz (maksimum 3 madde).
+
+'experiences' KURALLARI — SIKI UYU:
+- SADECE GERÇEK İŞ DENEYİMLERİNİ ekle (şirkette çalışılan pozisyonlar).
+- Profil özeti, yetenek listesi, eğitim bilgisi KESINLIKLE 'experiences' içine girmez.
+- Her girdinin MUTLAKA tam şirket adı ("company") VE tarih aralığı ("duration") olmalı.
+- Tarih veya şirket adı yoksa o girdiyi LISTEYE EKLEME.
+- "role" maksimum 50 karakter olmalı (kısa ünvan). Uzun açıklama yazma.
+- "desc" tek cümle, maksimum 120 karakter.
+- "milestones" maksimum 2 madde, sayısal başarılar tercih edilir.
 
 Sadece şu JSON formatında dön:
 {
@@ -63,11 +71,11 @@ Sadece şu JSON formatında dön:
   "cvData": "Detaylı döküm.",
   "experiences": [
     {
-      "role": "Pozisyon Ünvanı",
-      "company": "Şirket Adı",
-      "duration": "Ay Yıl – Ay Yıl veya Günümüz",
-      "desc": "1-2 cümle görev özeti.",
-      "milestones": ["Başarı 1", "Başarı 2"]
+      "role": "Kısa Pozisyon Ünvanı",
+      "company": "Tam Şirket Adı",
+      "duration": "Ay Yıl – Ay Yıl (veya Günümüz)",
+      "desc": "Tek cümle görev özeti.",
+      "milestones": ["Sayısal Başarı 1", "Sayısal Başarı 2"]
     }
   ]
 }`;

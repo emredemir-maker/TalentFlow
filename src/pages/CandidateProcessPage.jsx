@@ -224,32 +224,43 @@ export default function CandidateProcessPage() {
         Result:    { reason: 'Mülakat verisi bekleniyor.', score: 0 },
     };
 
-    const careerHistory = candidate?.experiences || candidate?.careerHistory || [];
+    const rawExperiences = candidate?.experiences || candidate?.careerHistory || [];
+    const careerHistory = rawExperiences.filter(exp =>
+        exp &&
+        (exp.duration || exp.company) &&
+        (!exp.role || exp.role.length <= 80) &&
+        !(exp.role && !exp.company && !exp.duration)
+    );
 
     function parseCareerFromCvData(text) {
         if (!text) return [];
         const MONTHS = 'Ocak|Şubat|Mart|Nisan|Mayıs|Haziran|Temmuz|Ağustos|Eylül|Ekim|Kasım|Aralık|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec';
-        const dateRange = `((?:${MONTHS})\\.?\\s+\\d{4}\\s*[–\\-]\\s*(?:Günümüz|Present|Halen|(?:${MONTHS})\\.?\\s+\\d{4}))`;
-        const splitRegex = new RegExp(`(?=.{3,80}\\s*\\|?\\s*${dateRange})`, 'g');
-        const chunks = text.split(splitRegex).filter(c => c.trim().length > 20);
-        if (chunks.length <= 1) {
-            const bullets = text.split(/[•\n]/).map(s => s.trim()).filter(s => s.length > 10);
-            if (bullets.length === 0) return [];
-            return bullets.map(b => ({ role: '', company: '', duration: '', desc: b, milestones: [] }));
-        }
-        return chunks.slice(0, 6).map(chunk => {
-            const lines = chunk.split('\n').map(l => l.trim()).filter(Boolean);
-            const header = lines[0] || '';
-            const dateMatch = header.match(new RegExp(dateRange));
-            const duration = dateMatch ? dateMatch[0] : '';
-            const titlePart = header.replace(duration, '').replace(/\|/g, '').trim();
-            const [role, ...rest] = titlePart.split(/[,|]/).map(s => s.trim());
-            const company = rest.join(', ');
-            const bodyLines = lines.slice(1);
-            const bullets = bodyLines.filter(l => /^[•\-\*]/.test(l)).map(l => l.replace(/^[•\-\*]\s*/, ''));
-            const desc = bodyLines.filter(l => !/^[•\-\*]/.test(l)).join(' ').slice(0, 200);
-            return { role: role || titlePart, company, duration, desc, milestones: bullets.slice(0, 3) };
-        }).filter(e => e.role || e.desc);
+        const dateRx = new RegExp(
+            `((?:${MONTHS})\\s+\\d{4})\\s*[–\\-]+\\s*((?:${MONTHS})\\s+\\d{4}|Günümüz|Present|Halen)`,
+            'gi'
+        );
+        const matches = [...text.matchAll(dateRx)];
+        if (matches.length === 0) return [];
+        return matches.slice(0, 8).map(m => {
+            const duration = m[0];
+            const startIdx = m.index;
+            const lineStart = text.lastIndexOf('\n', startIdx);
+            const lineEnd = text.indexOf('\n', startIdx + duration.length);
+            const headerLine = text.slice(lineStart + 1, lineEnd > 0 ? lineEnd : startIdx + 120).replace(duration, '').trim();
+            const parts = headerLine.split(/[|\-–,]/).map(s => s.trim()).filter(Boolean);
+            const role = parts[0] || '';
+            const company = parts[1] || parts[0] || '';
+            const afterDate = lineEnd > 0 ? text.slice(lineEnd, lineEnd + 250) : '';
+            const descLine = afterDate.split('\n').map(s => s.trim()).find(s => s.length > 20 && !/^[•\-\*]/.test(s)) || '';
+            const bulletLines = afterDate.split('\n').filter(l => /^[•\-\*]/.test(l.trim())).map(l => l.replace(/^[•\-\*]\s*/, '').trim()).slice(0, 2);
+            return {
+                role: role.slice(0, 60),
+                company: company === role ? '' : company.slice(0, 60),
+                duration,
+                desc: descLine.slice(0, 140),
+                milestones: bulletLines,
+            };
+        }).filter(e => e.duration);
     }
 
     const getSourceLabel = (c) => {
