@@ -961,9 +961,13 @@ export default function CandidateProcessPage() {
                                             </button>
                                         </div>
 
-                                        {(candidate.interviewSessions || []).length > 0 ? (
+                                        {(() => {
+                                            const visibleSessions = (candidate.interviewSessions || []).filter(s =>
+                                                s.status !== 'planned' || (s.title && s.participants?.length > 0)
+                                            );
+                                            return visibleSessions.length > 0 ? (
                                             <div className="space-y-3">
-                                                {candidate.interviewSessions.map((session, sidx) => {
+                                                {visibleSessions.map((session, sidx) => {
                                                     const cfg = getStatusCfg(session.status);
                                                     const isCompleted = session.status === 'completed';
                                                     const isLive = session.status === 'live';
@@ -1097,7 +1101,8 @@ export default function CandidateProcessPage() {
                                                     Mülakat Planla
                                                 </button>
                                             </div>
-                                        )}
+                                        );
+                                        })()}
                                     </div>
                                 )}
 
@@ -1138,7 +1143,9 @@ export default function CandidateProcessPage() {
                                             </div>
 
                                             {/* Dynamic: session milestones */}
-                                            {(candidate.interviewSessions || []).map((session, sidx) => {
+                                            {(candidate.interviewSessions || []).filter(s =>
+                                                s.status !== 'planned' || (s.title && s.participants?.length > 0)
+                                            ).map((session, sidx) => {
                                                 const cfg = getStatusCfg(session.status);
                                                 return (
                                                     <div key={sidx} className="bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between hover:border-slate-300 transition-all group shadow-sm">
