@@ -486,6 +486,36 @@ function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser,
         title: '', department: isDepartmentUser ? (userDepartments?.[0] || '') : '', minExperience: '', requirements: '', description: '',
         screeningEnabled: false, screeningQuestions: [''],
     });
+    const [suggestingQuestions, setSuggestingQuestions] = useState(false);
+
+    const handleSuggestQuestions = async () => {
+        if (suggestingQuestions) return;
+        const posTitle = formData.title.trim() || 'Genel Pozisyon';
+        const posReqs = formData.requirements.trim() || '';
+        setSuggestingQuestions(true);
+        try {
+            const prompt = `Sen bir kıdemli İK uzmanısın. Aşağıdaki pozisyon için başvuru formunda adaylara sorulacak en fazla 5 adet ön eleme sorusu öner. Sorular kısa, net ve pozisyona özel olmalı.\n\nPozisyon: ${posTitle}\nGereksinimler: ${posReqs}\n\nYalnızca şu JSON formatında yanıt ver (başka hiçbir şey yazma):\n{"questions": ["Soru 1", "Soru 2", "Soru 3"]}`;
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${import.meta.env.VITE_GEMINI_API_KEY}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+            });
+            const data = await res.json();
+            const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            const match = rawText.match(/\{[\s\S]*\}/);
+            if (match) {
+                const parsed = JSON.parse(match[0]);
+                const qs = (parsed.questions || []).slice(0, 5).filter(q => q && q.trim());
+                if (qs.length > 0) {
+                    setFormData(p => ({ ...p, screeningEnabled: true, screeningQuestions: qs }));
+                }
+            }
+        } catch (err) {
+            console.error('Screening question suggestion error:', err);
+        } finally {
+            setSuggestingQuestions(false);
+        }
+    };
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -583,13 +613,25 @@ function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser,
                                     <p className="text-[11px] font-black text-slate-700">Ön Eleme Soruları</p>
                                     <p className="text-[10px] text-slate-400">Başvuruculardan cevaplamaları isteniyor</p>
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={() => setFormData(p => ({ ...p, screeningEnabled: !p.screeningEnabled }))}
-                                    className={`relative w-9 h-5 rounded-full transition-colors ${formData.screeningEnabled ? 'bg-cyan-500' : 'bg-slate-200'}`}
-                                >
-                                    <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${formData.screeningEnabled ? 'left-4' : 'left-0.5'}`} />
-                                </button>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={handleSuggestQuestions}
+                                        disabled={suggestingQuestions}
+                                        title="AI ile otomatik soru öner"
+                                        className="flex items-center gap-1 px-2 py-1 rounded-lg bg-violet-50 border border-violet-200 text-[9px] font-black text-violet-600 hover:bg-violet-100 transition-colors disabled:opacity-50"
+                                    >
+                                        {suggestingQuestions ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />}
+                                        AI Öner
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormData(p => ({ ...p, screeningEnabled: !p.screeningEnabled }))}
+                                        className={`relative w-9 h-5 rounded-full transition-colors ${formData.screeningEnabled ? 'bg-cyan-500' : 'bg-slate-200'}`}
+                                    >
+                                        <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${formData.screeningEnabled ? 'left-4' : 'left-0.5'}`} />
+                                    </button>
+                                </div>
                             </div>
                             {formData.screeningEnabled && (
                                 <div className="space-y-2 pt-1">

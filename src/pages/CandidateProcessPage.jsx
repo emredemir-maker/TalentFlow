@@ -767,7 +767,12 @@ export default function CandidateProcessPage() {
                                         <span className={`text-[11px] font-black text-slate-500 ${c.photo || c.photoUrl || c.profileImage ? 'hidden' : 'flex'}`}>{mc.name?.charAt(0)?.toUpperCase() || '?'}</span>
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className={`text-[12px] font-bold truncate leading-tight ${isActive ? 'text-cyan-700' : 'text-slate-700'}`}>{mc.name}</p>
+                                        <div className="flex items-center gap-1">
+                                            <p className={`text-[12px] font-bold truncate leading-tight ${isActive ? 'text-cyan-700' : 'text-slate-700'}`}>{mc.name}</p>
+                                            {c.screeningScore != null && (
+                                                <span title={`Ön eleme: %${Math.round(c.screeningScore)}`} className="shrink-0 w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                                            )}
+                                        </div>
                                         <span
                                             className="text-[8px] font-bold px-1.5 py-0.5 rounded-md mt-0.5 inline-flex items-center gap-0.5 uppercase"
                                             style={{ color: srcColor, backgroundColor: `${srcColor}15` }}
@@ -1013,6 +1018,59 @@ export default function CandidateProcessPage() {
                                                 <Zap className="w-3 h-3 text-amber-400 fill-amber-400" /> %{score} Uyum Skoru Doğrulandı
                                             </div>
                                         </div>
+
+                                        {/* ── Screening Result Breakdown ── */}
+                                        {candidate.screeningResult && (
+                                            <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-5 space-y-3">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-6 h-6 rounded-lg bg-indigo-100 flex items-center justify-center shrink-0">
+                                                            <span className="text-[11px]">🎯</span>
+                                                        </div>
+                                                        <h3 className="text-[11px] font-black text-indigo-700 uppercase tracking-widest">Ön Eleme Değerlendirmesi</h3>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5 bg-white border border-indigo-200 rounded-lg px-3 py-1">
+                                                        <span className="text-[9px] font-bold text-indigo-400 uppercase">Genel Skor</span>
+                                                        <span className="text-[15px] font-black text-indigo-600">%{Math.round(candidate.screeningResult.aggregateScore ?? candidate.screeningScore ?? 0)}</span>
+                                                    </div>
+                                                </div>
+                                                {candidate.screeningResult.summary && (
+                                                    <p className="text-[11px] text-indigo-700 leading-relaxed italic bg-white border border-indigo-100 rounded-xl px-4 py-2.5">
+                                                        {candidate.screeningResult.summary}
+                                                    </p>
+                                                )}
+                                                {(candidate.screeningResult.scores || []).length > 0 && (
+                                                    <div className="space-y-2">
+                                                        {(candidate.screeningResult.scores || []).map((item, idx) => {
+                                                            const s = item.score ?? 0;
+                                                            const barColor = s >= 75 ? 'bg-emerald-400' : s >= 50 ? 'bg-amber-400' : 'bg-red-400';
+                                                            const textColor = s >= 75 ? 'text-emerald-600' : s >= 50 ? 'text-amber-600' : 'text-red-500';
+                                                            const answer = candidate.screeningResult.answers?.[idx]?.answer || '';
+                                                            return (
+                                                                <div key={idx} className="bg-white border border-indigo-100 rounded-xl p-3 space-y-2">
+                                                                    <div className="flex items-start gap-2">
+                                                                        <span className="text-[9px] font-black text-indigo-400 mt-0.5 shrink-0">{idx + 1}.</span>
+                                                                        <p className="text-[12px] font-semibold text-slate-700 leading-snug flex-1">{item.question}</p>
+                                                                        <span className={`shrink-0 text-[12px] font-black ${textColor}`}>%{s}</span>
+                                                                    </div>
+                                                                    <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
+                                                                        <div className={`h-full rounded-full ${barColor} transition-all`} style={{ width: `${s}%` }} />
+                                                                    </div>
+                                                                    {answer && (
+                                                                        <p className="text-[10px] text-slate-500 leading-relaxed bg-slate-50 rounded-lg px-2.5 py-1.5 border border-slate-100">
+                                                                            <span className="font-black text-slate-400 uppercase text-[9px] mr-1">Cevap:</span>{answer}
+                                                                        </p>
+                                                                    )}
+                                                                    {item.rationale && (
+                                                                        <p className="text-[10px] text-indigo-500 italic leading-relaxed">{item.rationale}</p>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
 
                                         <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
                                             {/* Career timeline */}
