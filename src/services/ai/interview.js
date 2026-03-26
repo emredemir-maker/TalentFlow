@@ -28,6 +28,8 @@ ZORUNLU DEĞERLENDİRME KURALLARI (Bias Guardrail):
 // Evaluates the 5 competency dimensions displayed in the radar chart and
 // returns a recruiter-facing insight. Uses STAR as the evaluation framework.
 export async function analyzeSTARRealTime(anonymizedProfile, recentTranscript, currentQuestion) {
+    // Defense-in-depth: always strip PII inside the function regardless of caller.
+    const safeProfile = stripPiiForAI(anonymizedProfile);
     const instruction = `Sen tarafsız bir mülakat gözlemcisisin. Son aday konuşmasını STAR metodolojisini kullanarak 5 yetkinlik boyutunda değerlendir.
 
 ${BIAS_GUARDRAIL}
@@ -55,7 +57,7 @@ JSON formatında SADECE şu yapıda dön (başka hiçbir metin ekleme):
 }`;
 
     const prompt = buildStructuredPrompt(instruction, {
-        "ADAY_PROFİLİ": JSON.stringify(anonymizedProfile),
+        "ADAY_PROFİLİ": JSON.stringify(safeProfile),
         "GÜNCEL_SORU": currentQuestion || '(Recruiter tarafından sözlü soruldu)',
         "SON_KONUŞMALAR": JSON.stringify(
             recentTranscript.map(t => ({ rol: t.role, metin: t.text }))

@@ -92,7 +92,11 @@ Sadece şu JSON formatında dön:
     const parsed = parseAIJson(result.response.text());
     // Merge regex-extracted contact info so the record is complete
     // without having leaked PII to the AI model.
-    return parsed ? { ...parsed, ...contactInfo } : parsed;
+    // Null-safe merge: only overwrite parsed fields with extracted values that are non-null.
+    const safeContactInfo = Object.fromEntries(
+        Object.entries(contactInfo).filter(([, v]) => v !== null && v !== undefined)
+    );
+    return parsed ? { ...parsed, ...safeContactInfo } : parsed;
 }
 
 export async function parseExperiencesFromText(text, modelId = 'gemini-2.0-flash') {
