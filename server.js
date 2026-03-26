@@ -1430,16 +1430,12 @@ Sadece şu JSON formatında yanıt ver (başka hiçbir şey yazma):
 
 CV:
 ${text.substring(0, 8000)}`;
-    try {
-        const result = await model.generateContent(prompt);
-        const raw = result.response.text().replace(/```json|```/gi, '').trim();
-        const match = raw.match(/\{[\s\S]*\}/);
-        if (!match) return null;
-        return JSON.parse(match[0]);
-    } catch (e) {
-        console.error('[parseTextWithGemini]', e.message);
-        return null;
-    }
+    // Do NOT swallow quota errors — let callers handle retry/backoff
+    const result = await model.generateContent(prompt);
+    const raw = result.response.text().replace(/```json|```/gi, '').trim();
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+    try { return JSON.parse(match[0]); } catch { return null; }
 }
 
 function calculateSimpleMatchScore(candidate, positionTitle) {
@@ -1463,6 +1459,19 @@ async function extractCvText(buffer, ext) {
         return (result.value || '').trim();
     }
     throw new Error('Desteklenmeyen format: ' + ext);
+}
+
+// Fetch a CV from a URL and extract text. Supports PDF and DOCX by MIME or URL extension.
+async function extractCvTextFromUrl(cvUrl) {
+    const res = await fetch(cvUrl, { redirect: 'follow' });
+    if (!res.ok) throw new Error(`cvUrl GET failed: ${res.status}`);
+    const buf = Buffer.from(await res.arrayBuffer());
+    const ct = (res.headers.get('content-type') || '').toLowerCase();
+    let ext = '';
+    if (ct.includes('pdf') || cvUrl.toLowerCase().endsWith('.pdf')) ext = 'pdf';
+    else if (ct.includes('docx') || ct.includes('officedocument') || cvUrl.toLowerCase().endsWith('.docx')) ext = 'docx';
+    else throw new Error('cvUrl yanıtı PDF veya DOCX değil: ' + ct);
+    return extractCvText(buf, ext);
 }
 
 async function processBulkJob(jobId) {
@@ -1502,9 +1511,15 @@ async function processBulkJob(jobId) {
                     let cvText = '';
 
                     if (item.source === 'json_record') {
-                        // JSON record: text may be pre-supplied or we generate from name/email
-                        cvText = (item.cvText || `${item.name || ''} ${item.email || ''}`).trim();
-                        if (!cvText || cvText.length < 5) throw new Error('CV metni boş');
+                        // JSON record: prefer cvText, fallback to fetching cvUrl
+                        if (item.cvText && item.cvText.trim().length > 5) {
+                            cvText = item.cvText.trim();
+                        } else if (item.cvUrl) {
+                            cvText = await extractCvTextFromUrl(item.cvUrl);
+                            if (!cvText || cvText.length < 20) throw new Error('cvUrl içeriği okunamadı');
+                        } else {
+                            throw new Error('JSON kaydında cvText veya cvUrl gereklidir');
+                        }
                     } else {
                         // File-based item: read from tempPath
                         const filePath = item.tempPath;
@@ -1574,12 +1589,50 @@ async function processBulkJob(jobId) {
             ? Math.round(doneSnap.docs.reduce((sum, d) => sum + (d.data().matchScore || 0), 0) / doneSnap.size)
             : 0;
 
-        await jobRef.update({ status: 'completed', processedCount, failedCount, totalCount: total, avgScore, completedAt: admin.firestore.FieldValue.serverTimestamp() });
+        // Build per-position avgScore map for completion summary
+        const avgScoreByPosition = {};
+        if (positionId && positionTitle) {
+            avgScoreByPosition[positionId] = { positionTitle, avgScore, count: doneSnap.size };
+        }
+
+        await jobRef.update({
+            status: 'completed',
+            processedCount,
+            failedCount,
+            totalCount: total,
+            avgScore,
+            avgScoreByPosition,
+            completedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
         console.log(`[bulk-import] Job ${jobId} complete: ${processedCount} done, ${failedCount} failed`);
     } finally {
         runningBulkJobs.delete(jobId);
     }
 }
+
+// Auth middleware: verify Firebase ID token + authoritative Firestore role check
+const ALLOWED_ROLES = ['super_admin', 'recruiter', 'department_user'];
+const requireAuth = async (req, res, next) => {
+    const authHeader = req.headers['authorization'] || '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    if (!token) return res.status(401).json({ error: 'Missing Authorization header.' });
+    try {
+        const decoded = await admin.auth().verifyIdToken(token);
+        // Fetch role from Firestore — JWT custom claims may not carry role
+        const userDoc = await db.doc(`artifacts/talent-flow/public/data/users/${decoded.uid}`).get();
+        if (!userDoc.exists) {
+            return res.status(403).json({ error: 'User profile not found.' });
+        }
+        const role = userDoc.data().role || '';
+        if (!ALLOWED_ROLES.includes(role)) {
+            return res.status(403).json({ error: 'Insufficient permissions.' });
+        }
+        req.user = { uid: decoded.uid, role };
+        next();
+    } catch (err) {
+        return res.status(401).json({ error: 'Invalid or expired token.' });
+    }
+};
 
 // ─── POST /api/bulk-import ────────────────────────────────────────────────────
 // Accepts:
@@ -1609,7 +1662,7 @@ const bulkUpload = multer({
     },
 });
 
-app.post('/api/bulk-import', bulkUpload.array('cvs', 20), async (req, res) => {
+app.post('/api/bulk-import', requireAuth, bulkUpload.array('cvs', 20), async (req, res) => {
     try {
         const positionId = req.body?.positionId || '';
         const positionTitle = req.body?.positionTitle || '';
@@ -1655,8 +1708,9 @@ app.post('/api/bulk-import', bulkUpload.array('cvs', 20), async (req, res) => {
                 }
             }
         } else if (req.body?.records) {
-            // JSON records path: [{name, email, cvText, positionId?}]
-            const rawRecords = typeof req.body.records === 'string' ? JSON.parse(req.body.records) : req.body.records;
+            // JSON records path: [{name, email, cvText?, cvUrl?, positionId?}]
+            // Accepts top-level array or object with .records property
+            let rawRecords = typeof req.body.records === 'string' ? JSON.parse(req.body.records) : req.body.records;
             if (!Array.isArray(rawRecords)) return res.status(400).json({ error: 'records bir dizi olmalıdır.' });
             items = rawRecords.map((r, i) => ({
                 index: i,
@@ -1664,6 +1718,7 @@ app.post('/api/bulk-import', bulkUpload.array('cvs', 20), async (req, res) => {
                 name: r.name || '',
                 email: r.email || '',
                 cvText: r.cvText || '',
+                cvUrl: r.cvUrl || '',
                 positionId: r.positionId || positionId,
                 source: 'json_record',
                 status: 'pending',
@@ -1704,7 +1759,7 @@ app.post('/api/bulk-import', bulkUpload.array('cvs', 20), async (req, res) => {
 });
 
 // ─── GET /api/bulk-import/:jobId ─────────────────────────────────────────────
-app.get('/api/bulk-import/:jobId', async (req, res) => {
+app.get('/api/bulk-import/:jobId', requireAuth, async (req, res) => {
     try {
         const snap = await db.doc(`${BULK_JOBS_COLL}/${req.params.jobId}`).get();
         if (!snap.exists) return res.status(404).json({ error: 'Job bulunamadı.' });
@@ -1822,30 +1877,6 @@ app.post('/api/check-duplicate', async (req, res) => {
         res.json({ isDuplicate: false }); // fail open — never block the user
     }
 });
-
-// Auth middleware: verify Firebase ID token + authoritative Firestore role check
-const ALLOWED_ROLES = ['super_admin', 'recruiter', 'department_user'];
-const requireAuth = async (req, res, next) => {
-    const authHeader = req.headers['authorization'] || '';
-    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-    if (!token) return res.status(401).json({ error: 'Missing Authorization header.' });
-    try {
-        const decoded = await admin.auth().verifyIdToken(token);
-        // Fetch role from Firestore — JWT custom claims may not carry role
-        const userDoc = await db.doc(`artifacts/talent-flow/public/data/users/${decoded.uid}`).get();
-        if (!userDoc.exists) {
-            return res.status(403).json({ error: 'User profile not found.' });
-        }
-        const role = userDoc.data().role || '';
-        if (!ALLOWED_ROLES.includes(role)) {
-            return res.status(403).json({ error: 'Insufficient permissions.' });
-        }
-        req.user = { uid: decoded.uid, role };
-        next();
-    } catch (err) {
-        return res.status(401).json({ error: 'Invalid or expired token.' });
-    }
-};
 
 // GET /api/users — List participant-eligible users for interview wizard
 // Only recruiter / department_user / super_admin accounts are returned.

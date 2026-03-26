@@ -1531,16 +1531,12 @@ Sadece şu JSON formatında yanıt ver (başka hiçbir şey yazma):
 
 CV:
 ${text.substring(0, 8000)}`;
-    try {
-        const result = await model.generateContent(prompt);
-        const raw = result.response.text().replace(/```json|```/gi, '').trim();
-        const match = raw.match(/\{[\s\S]*\}/);
-        if (!match) return null;
-        return JSON.parse(match[0]);
-    } catch (e) {
-        console.error('[parseTextWithGemini]', e.message);
-        return null;
-    }
+    // Do NOT swallow quota errors — let callers handle retry/backoff
+    const result = await model.generateContent(prompt);
+    const raw = result.response.text().replace(/```json|```/gi, '').trim();
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+    try { return JSON.parse(match[0]); } catch { return null; }
 }
 
 function calculateSimpleMatchScore(candidate, positionTitle) {
@@ -1563,6 +1559,18 @@ async function extractCvText(buffer, ext) {
         return (result.value || '').trim();
     }
     throw new Error('Desteklenmeyen format: ' + ext);
+}
+
+async function extractCvTextFromUrl(cvUrl) {
+    const res = await fetch(cvUrl, { redirect: 'follow' });
+    if (!res.ok) throw new Error(`cvUrl GET failed: ${res.status}`);
+    const buf = Buffer.from(await res.arrayBuffer());
+    const ct = (res.headers.get('content-type') || '').toLowerCase();
+    let ext = '';
+    if (ct.includes('pdf') || cvUrl.toLowerCase().endsWith('.pdf')) ext = 'pdf';
+    else if (ct.includes('docx') || ct.includes('officedocument') || cvUrl.toLowerCase().endsWith('.docx')) ext = 'docx';
+    else throw new Error('cvUrl yanıtı PDF veya DOCX değil: ' + ct);
+    return extractCvText(buf, ext);
 }
 
 async function processBulkJob(jobId) {
@@ -1593,8 +1601,14 @@ async function processBulkJob(jobId) {
                 try {
                     let cvText = '';
                     if (item.source === 'json_record') {
-                        cvText = (item.cvText || `${item.name || ''} ${item.email || ''}`).trim();
-                        if (!cvText || cvText.length < 5) throw new Error('CV metni boş');
+                        if (item.cvText && item.cvText.trim().length > 5) {
+                            cvText = item.cvText.trim();
+                        } else if (item.cvUrl) {
+                            cvText = await extractCvTextFromUrl(item.cvUrl);
+                            if (!cvText || cvText.length < 20) throw new Error('cvUrl içeriği okunamadı');
+                        } else {
+                            throw new Error('JSON kaydında cvText veya cvUrl gereklidir');
+                        }
                     } else {
                         const filePath = item.tempPath;
                         if (!filePath || !fs.existsSync(filePath)) throw new Error('Dosya bulunamadı');
@@ -1655,7 +1669,19 @@ async function processBulkJob(jobId) {
         const avgScore = doneSnap.size > 0
             ? Math.round(doneSnap.docs.reduce((sum, d) => sum + (d.data().matchScore || 0), 0) / doneSnap.size)
             : 0;
-        await jobRef.update({ status: 'completed', processedCount, failedCount, totalCount: total, avgScore, completedAt: admin.firestore.FieldValue.serverTimestamp() });
+        const avgScoreByPosition = {};
+        if (positionId && positionTitle) {
+            avgScoreByPosition[positionId] = { positionTitle, avgScore, count: doneSnap.size };
+        }
+        await jobRef.update({
+            status: 'completed',
+            processedCount,
+            failedCount,
+            totalCount: total,
+            avgScore,
+            avgScoreByPosition,
+            completedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
         console.log(`[bulk-import] Job ${jobId} complete: ${processedCount} done, ${failedCount} failed`);
     } finally {
         runningBulkJobs.delete(jobId);
@@ -1685,7 +1711,7 @@ const bulkUpload = multer({
     },
 });
 
-app.post('/api/bulk-import', bulkUpload.array('cvs', 20), async (req, res) => {
+app.post('/api/bulk-import', requireAuth, bulkUpload.array('cvs', 20), async (req, res) => {
     try {
         const positionId = req.body?.positionId || '';
         const positionTitle = req.body?.positionTitle || '';
@@ -1718,6 +1744,7 @@ app.post('/api/bulk-import', bulkUpload.array('cvs', 20), async (req, res) => {
                 }
             }
         } else if (req.body?.records) {
+            // JSON records path: [{name, email, cvText?, cvUrl?, positionId?}]
             const rawRecords = typeof req.body.records === 'string' ? JSON.parse(req.body.records) : req.body.records;
             if (!Array.isArray(rawRecords)) return res.status(400).json({ error: 'records bir dizi olmalıdır.' });
             items = rawRecords.map((r, i) => ({
@@ -1726,6 +1753,7 @@ app.post('/api/bulk-import', bulkUpload.array('cvs', 20), async (req, res) => {
                 name: r.name || '',
                 email: r.email || '',
                 cvText: r.cvText || '',
+                cvUrl: r.cvUrl || '',
                 positionId: r.positionId || positionId,
                 source: 'json_record',
                 status: 'pending',
@@ -1752,7 +1780,7 @@ app.post('/api/bulk-import', bulkUpload.array('cvs', 20), async (req, res) => {
     }
 });
 
-app.get('/api/bulk-import/:jobId', async (req, res) => {
+app.get('/api/bulk-import/:jobId', requireAuth, async (req, res) => {
     try {
         const snap = await db.doc(`${BULK_JOBS_COLL}/${req.params.jobId}`).get();
         if (!snap.exists) return res.status(404).json({ error: 'Job bulunamadı.' });
