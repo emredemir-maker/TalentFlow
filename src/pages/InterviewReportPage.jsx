@@ -45,17 +45,25 @@ export default function InterviewReportPage() {
         if (session?.recruiterEval) setRecruiterEval(session.recruiterEval);
     }, [session]);
 
-    // Auto-trigger evaluation once per page load when session is complete but no saved eval exists.
-    // Uses a ref to prevent double-firing caused by React re-renders.
+    // Auto-trigger evaluation once per completed session when no saved eval exists yet.
+    // Reset the ref whenever sessionId changes so navigating to a different report works correctly.
     const autoEvalFiredRef = useRef(false);
     useEffect(() => {
-        if (!session || autoEvalFiredRef.current || session.recruiterEval) return;
+        autoEvalFiredRef.current = false;
+    }, [sessionId]);
+
+    useEffect(() => {
+        // Only trigger for sessions that are truly completed, have enough signal (transcript),
+        // and haven't been evaluated yet.
+        const isCompleted = session?.status === 'completed';
+        const hasTranscript = (session?.transcript?.length ?? 0) > 0 || (session?.messages?.length ?? 0) > 0;
+        if (!session || !isCompleted || !hasTranscript || autoEvalFiredRef.current || session.recruiterEval) return;
         autoEvalFiredRef.current = true;
         // Small delay to let session data settle after Firestore write on session completion
         const timer = setTimeout(() => runEvaluateInterviewer(), 800);
         return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [session?.id]);
+    }, [session?.id, session?.status]);
 
     const runEvaluateInterviewer = useCallback(async () => {
         if (!session || evalLoading) return;
