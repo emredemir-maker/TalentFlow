@@ -328,8 +328,11 @@ export default function ApplyPage() {
                         new Promise((_, reject) => setTimeout(() => reject(new Error('Screening AI timeout')), 20000)),
                     ]);
                     const respData = await resp.json();
-                    if (respData && respData.aggregateScore != null) {
-                        screeningResult = { ...respData, answers: rawScreeningAnswers };
+                    if (respData && (respData.aggregateScore != null || (respData.scores || []).length > 0)) {
+                        const agg = respData.aggregateScore != null
+                            ? respData.aggregateScore
+                            : Math.round((respData.scores || []).reduce((sum, s) => sum + (s.score || 0), 0) / Math.max((respData.scores || []).length, 1));
+                        screeningResult = { ...respData, aggregateScore: agg, answers: rawScreeningAnswers };
                     }
                 } catch (screenErr) {
                     console.warn('Screening AI error (non-blocking):', screenErr.message);
