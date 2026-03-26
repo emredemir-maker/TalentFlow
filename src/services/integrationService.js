@@ -273,7 +273,7 @@ export const createDirectCalendarEvent = async (userId, token, eventData) => {
         }
 
         const response = await fetch(
-            'https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1&sendUpdates=all',
+            'https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1&sendUpdates=none',
             {
                 method: 'POST',
                 headers: {
