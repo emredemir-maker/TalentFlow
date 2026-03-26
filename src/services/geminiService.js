@@ -41,10 +41,10 @@ export {
 };
 
 export async function parseCandidateFromText(text, modelId = 'gemini-2.0-flash') {
-    // Extract contact fields with regex BEFORE redacting — they will be merged back
-    // into the result so the candidate record retains them without leaking to AI.
+    // Extract contact fields (incl. name) with regex BEFORE redacting — they will be
+    // merged back into the result so the candidate record retains them without leaking to AI.
     const contactInfo = extractPiiFromText(text);
-    const safeText = redactPiiFromText(text);
+    const safeText = redactPiiFromText(text, contactInfo.name);
 
     const instruction = `Sen bir uzman İK Profil Ayrıştırıcısısın (CV Parser). Aşağıdaki profil metninden aday bilgilerini çıkart.
 

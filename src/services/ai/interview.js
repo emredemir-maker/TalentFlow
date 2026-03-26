@@ -1,32 +1,14 @@
 // src/services/ai/interview.js
 import { getModel } from './config.js';
 import { parseAIJson, buildStructuredPrompt, sanitizeForPrompt } from './utils.js';
+import { stripPiiForAI } from '../../utils/pii.js';
 
 // ─── PII Stripping ────────────────────────────────────────────────────────────
-// Removes all personally-identifiable fields before sending candidate data to
-// any external AI model. Only professional/skill attributes are forwarded.
-const PII_FIELDS = [
-    'name', 'email', 'phone', 'mobile', 'tel',
-    'address', 'city', 'country', 'nationality', 'location',
-    'photo', 'photoURL', 'avatar', 'image', 'picture',
-    'linkedin', 'github', 'website', 'social', 'portfolio', 'url',
-    'dateOfBirth', 'birthDate', 'age', 'gender', 'sex',
-    'maritalStatus', 'religion', 'ethnicity', 'race',
-    'id', 'uid', 'cvUrl', 'color', 'interviewSessions',
-    'createdAt', 'updatedAt', 'addedAt', 'invitedAt',
-];
-
+// Delegate to the centralized pii.js utility so stripping logic is maintained
+// in a single place. Exported as `stripPII` for backward compatibility with
+// callers in geminiService.js and LiveInterviewPage.jsx.
 export function stripPII(candidate) {
-    if (!candidate || typeof candidate !== 'object') return {};
-    const safe = { ...candidate };
-    for (const field of PII_FIELDS) {
-        delete safe[field];
-    }
-    // Strip name from free-text summary fields to prevent leakage
-    if (safe.summary && typeof safe.summary === 'string') {
-        safe.summary = safe.summary.replace(/\b[A-ZÇĞİÖŞÜ][a-zçğışöşü]+ [A-ZÇĞİÖŞÜ][a-zçğışöşü]+\b/g, 'Aday');
-    }
-    return safe;
+    return stripPiiForAI(candidate);
 }
 
 // ─── Bias Guardrail Preamble ──────────────────────────────────────────────────
