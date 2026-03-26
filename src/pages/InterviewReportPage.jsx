@@ -1,5 +1,5 @@
 // src/pages/InterviewReportPage.jsx
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useCandidates } from '../context/CandidatesContext';
 import { evaluateInterviewer } from '../services/ai/interview.js';
@@ -44,6 +44,18 @@ export default function InterviewReportPage() {
         if (session?.finalDecision) setFinalDecision(session.finalDecision);
         if (session?.recruiterEval) setRecruiterEval(session.recruiterEval);
     }, [session]);
+
+    // Auto-trigger evaluation once per page load when session is complete but no saved eval exists.
+    // Uses a ref to prevent double-firing caused by React re-renders.
+    const autoEvalFiredRef = useRef(false);
+    useEffect(() => {
+        if (!session || autoEvalFiredRef.current || session.recruiterEval) return;
+        autoEvalFiredRef.current = true;
+        // Small delay to let session data settle after Firestore write on session completion
+        const timer = setTimeout(() => runEvaluateInterviewer(), 800);
+        return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [session?.id]);
 
     const runEvaluateInterviewer = useCallback(async () => {
         if (!session || evalLoading) return;
