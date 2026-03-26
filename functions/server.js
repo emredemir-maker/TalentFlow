@@ -132,6 +132,16 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
+const generalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 200,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Çok fazla istek gönderildi. Lütfen 15 dakika sonra tekrar deneyin.' }
+});
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
 // Rate limiter for AI endpoints (20 req/min/IP)
 const aiLimiter = rateLimit({
     windowMs: 60 * 1000,
@@ -734,9 +744,11 @@ function cleanupOldFiles() {
 }
 
 // Candidate Feedback Email Endpoint (Task #7)
-app.post('/api/send-feedback', async (req, res) => {
+app.post('/api/send-feedback', generalLimiter, async (req, res) => {
     const { to, candidateName, recruiterName, outcome, feedbackText, branding } = req.body;
     if (!to || !feedbackText) return res.status(400).json({ error: 'Email ve geri bildirim metni gereklidir.' });
+    if (!EMAIL_RE.test(to)) return res.status(400).json({ error: 'Geçersiz email adresi.' });
+    if (typeof feedbackText !== 'string' || feedbackText.length > 10000) return res.status(400).json({ error: 'Geri bildirim metni geçersiz.' });
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
         return res.status(500).json({ error: 'Sistem email yapılandırması eksik.' });
     }
@@ -794,26 +806,36 @@ app.post('/api/send-feedback', async (req, res) => {
 });
 
 // --- Interview Invite via Nodemailer (Google-bağımsız fallback) ---
-app.post('/api/send-interview-invite', async (req, res) => {
-    const { to, subject, html, candidateName, branding } = req.body;
+app.post('/api/send-interview-invite', generalLimiter, async (req, res) => {
+    const { to, subject, html, ics, candidateName, branding } = req.body;
     if (!to || !html) return res.status(400).json({ error: 'Email ve HTML içerik gereklidir.' });
+    if (!EMAIL_RE.test(to)) return res.status(400).json({ error: 'Geçersiz email adresi.' });
+    if (typeof html !== 'string' || html.length > 200000) return res.status(400).json({ error: 'HTML içerik geçersiz.' });
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
         return res.status(500).json({ error: 'Sistem email yapılandırması eksik.' });
     }
     const b = branding || { companyName: 'Talent-Inn', primaryColor: '#1E3A8A' };
-    const fromName = b.companyName || 'Talent-Inn';
+    const fromName = (b.companyName || 'Talent-Inn').slice(0, 100);
     try {
         const transporter = nodemailer.createTransport({
             host: 'smtp.gmail.com', port: 465, secure: true,
             auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
             connectionTimeout: 10000, greetingTimeout: 5000, socketTimeout: 20000
         });
-        await transporter.sendMail({
+        const mailOptions = {
             from: `"${fromName}" <${process.env.EMAIL_USER}>`,
             to,
-            subject: subject || `Mülakat Davetiniz — ${candidateName || 'Aday'}`,
+            subject: (subject || `Mülakat Davetiniz — ${candidateName || 'Aday'}`).slice(0, 200),
             html,
-        });
+        };
+        if (ics && typeof ics === 'string') {
+            mailOptions.attachments = [{
+                filename: 'mulakat.ics',
+                content: ics,
+                contentType: 'text/calendar; charset=utf-8; method=REQUEST',
+            }];
+        }
+        await transporter.sendMail(mailOptions);
         console.log(`✉️ Interview invite sent to: ${to}`);
         res.json({ success: true });
     } catch (error) {

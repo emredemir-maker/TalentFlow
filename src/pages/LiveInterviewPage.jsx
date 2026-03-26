@@ -1661,25 +1661,20 @@ export default function LiveInterviewPage() {
 
                                                 <button
                                                     onClick={async () => {
-                                                        if (hasConsent) {
-                                                            if (!isRecruiterActive) {
-                                                                alert("Mülakatçı henüz odaya katılmadı. Lütfen odaya girmesini bekleyin.");
-                                                                return;
-                                                            }
-                                                            if (effectiveSession?.status !== 'live') {
-                                                                alert("Mülakatçı henüz oturumu (Live) başlatmadı. Lütfen hazırlıkların bitmesini bekleyin.");
-                                                                return;
-                                                            }
-
-                                                             // Phase 6: Sync to DB via atomic proxy
-                                                             setPhase('lobby_ready');
-                                                             await persistSessionData({ candidateStatus: 'waiting_room' });
-                                                        } else {
+                                                        if (!hasConsent) {
                                                             alert("Lütfen KVKK onayını kabul edin.");
+                                                            return;
                                                         }
+                                                        if (effectiveSession?.status !== 'live') {
+                                                            alert("Oturum henüz başlatılmadı. Lütfen biraz bekleyin.");
+                                                            return;
+                                                        }
+                                                        // Phase 6: Sync to DB via atomic proxy
+                                                        setPhase('lobby_ready');
+                                                        await persistSessionData({ candidateStatus: 'waiting_room' });
                                                     }}
-                                                    className={`w-full h-16 rounded-2xl text-white font-black text-[12px] uppercase tracking-[0.2em] shadow-2xl flex items-center justify-center gap-3 transition-all hover:scale-[1.02] active:scale-95 group italic ${isRecruiterActive && effectiveSession?.status === 'live' ? 'bg-[#0F172A] shadow-blue-900/40' : 'bg-slate-800 opacity-50 cursor-not-allowed'}`}
-                                                    disabled={!hasConsent || !isRecruiterActive || effectiveSession?.status !== 'live'}
+                                                    className={`w-full h-16 rounded-2xl text-white font-black text-[12px] uppercase tracking-[0.2em] shadow-2xl flex items-center justify-center gap-3 transition-all hover:scale-[1.02] active:scale-95 group italic ${effectiveSession?.status === 'live' ? 'bg-[#0F172A] shadow-blue-900/40' : 'bg-slate-800 opacity-50 cursor-not-allowed'}`}
+                                                    disabled={!hasConsent || effectiveSession?.status !== 'live'}
                                                 >
                                                     KATILMAYA HAZIRIM <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                                                 </button>

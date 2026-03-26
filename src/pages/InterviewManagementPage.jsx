@@ -877,6 +877,16 @@ export default function InterviewManagementPage() {
                         joinLink:      platformJoinLink,
                         companyEmail:  userProfile?.email || null,
                     });
+                    const candidateICS = buildICS({
+                        date:        slot.date,
+                        time:        slot.time,
+                        title:       newSession.title,
+                        description: `Aday: ${selectedCandidate.name}\nPozisyon: ${selectedCandidate.position || ''}\nMülakat linki: ${platformJoinLink}`,
+                        location:    platformJoinLink,
+                        uid:         `${newSession.id}-candidate@talentflow`,
+                        organizer:   { name: userProfile?.displayName || '', email: userProfile?.email || '' },
+                        attendee:    { name: selectedCandidate.name, email: selectedCandidate.email },
+                    });
                     await fetch('/api/send-interview-invite', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -884,6 +894,7 @@ export default function InterviewManagementPage() {
                             to: selectedCandidate.email,
                             subject: `Mülakat Davetiniz: ${newSession.title}`,
                             html: candidateHtml,
+                            ics: candidateICS,
                             candidateName: selectedCandidate.name,
                             branding,
                         }),
