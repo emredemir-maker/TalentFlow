@@ -1507,7 +1507,8 @@ const BULK_JOBS_COLL = 'artifacts/talent-flow/public/data/bulkImportJobs';
 const CANDIDATES_COLL = 'artifacts/talent-flow/public/data/candidates';
 const AdmZip = require('adm-zip');
 
-const runningBulkJobs = new Set();
+// ── Global single-worker flag: only one job runs at a time across all requests
+let bulkWorkerActive = false;
 
 async function parseTextWithGemini(text, positionTitle) {
     const apiKey = await getApiKey();
@@ -1584,16 +1585,93 @@ async function extractCvTextFromUrl(cvUrl) {
     return extractCvText(buf, ext);
 }
 
-async function processBulkJob(jobId) {
-    if (runningBulkJobs.has(jobId)) {
-        console.warn(`[bulk-import] Job ${jobId} already running, skipping re-entry`);
-        return;
+// ── Claim a single queued job atomically via Firestore transaction.
+async function claimNextQueuedJob() {
+    // Simple single-field query to avoid needing composite index
+    const snap = await db.collection(BULK_JOBS_COLL)
+        .where('status', '==', 'queued')
+        .limit(5)
+        .get();
+    if (snap.empty) return null;
+    // Pick earliest by createdAt if available, else first result
+    const sorted = snap.docs.sort((a, b) => {
+        const ta = a.data().createdAt?.toMillis?.() || 0;
+        const tb = b.data().createdAt?.toMillis?.() || 0;
+        return ta - tb;
+    });
+    const jobDoc = sorted[0];
+    let claimed = false;
+    await db.runTransaction(async (tx) => {
+        const fresh = await tx.get(jobDoc.ref);
+        if (!fresh.exists || fresh.data().status !== 'queued') return;
+        tx.update(jobDoc.ref, { status: 'processing', startedAt: admin.firestore.FieldValue.serverTimestamp() });
+        claimed = true;
+    });
+    return claimed ? jobDoc.id : null;
+}
+
+// ── Recover stale 'processing' jobs left from a previous crash/restart.
+async function recoverStaleJobs() {
+    try {
+        const snap = await db.collection(BULK_JOBS_COLL).where('status', '==', 'processing').get();
+        for (const doc of snap.docs) {
+            console.log(`[bulk-import] Recovering stale job ${doc.id}`);
+            await doc.ref.update({ status: 'queued' });
+        }
+        if (!snap.empty) console.log(`[bulk-import] Recovered ${snap.size} stale job(s)`);
+    } catch (err) {
+        console.warn('[bulk-import] Recovery scan failed:', err.message);
     }
-    runningBulkJobs.add(jobId);
+}
+
+// ── Queue worker loop: runs continuously, picks up one job at a time.
+async function runBulkWorkerLoop() {
+    if (bulkWorkerActive) return;
+    bulkWorkerActive = true;
+    console.log('[bulk-import] Worker loop started');
+    try {
+        while (true) {
+            let jobId = null;
+            try {
+                jobId = await claimNextQueuedJob();
+            } catch (pollErr) {
+                // Firestore poll failed — retry after backoff
+                console.warn('[bulk-import] Poll error:', pollErr.message);
+                await new Promise(r => setTimeout(r, 10000));
+                continue;
+            }
+            if (!jobId) {
+                await new Promise(r => setTimeout(r, 5000));
+                continue;
+            }
+            console.log(`[bulk-import] Worker claimed job ${jobId}`);
+            try {
+                await executeJob(jobId);
+            } catch (err) {
+                console.error(`[bulk-import] Job ${jobId} fatal error:`, err.message);
+                try {
+                    await db.doc(`${BULK_JOBS_COLL}/${jobId}`).update({
+                        status: 'error',
+                        errorMessage: err.message,
+                        completedAt: admin.firestore.FieldValue.serverTimestamp(),
+                    });
+                } catch {}
+            }
+            await new Promise(r => setTimeout(r, 1000));
+        }
+    } finally {
+        bulkWorkerActive = false;
+        console.warn('[bulk-import] Worker loop exited — restarting in 5s');
+        setTimeout(runBulkWorkerLoop, 5000);
+    }
+}
+
+// ── Execute a single job (already claimed, status = processing)
+async function executeJob(jobId) {
     const jobRef = db.doc(`${BULK_JOBS_COLL}/${jobId}`);
     const itemsRef = db.collection(`${BULK_JOBS_COLL}/${jobId}/items`);
     try {
-        await jobRef.update({ status: 'processing', startedAt: admin.firestore.FieldValue.serverTimestamp() });
+        // status already set to 'processing' by claimNextQueuedJob
         const itemsSnap = await itemsRef.orderBy('index').get();
         const total = itemsSnap.size;
         let processedCount = 0;
@@ -1710,8 +1788,9 @@ async function processBulkJob(jobId) {
             completedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
         console.log(`[bulk-import] Job ${jobId} complete: ${processedCount} done, ${failedCount} failed`);
-    } finally {
-        runningBulkJobs.delete(jobId);
+    } catch (err) {
+        console.error(`[bulk-import] executeJob ${jobId} error:`, err.message);
+        throw err;
     }
 }
 
@@ -1804,10 +1883,7 @@ app.post('/api/bulk-import', requireAuth, bulkUpload.array('cvs', 20), async (re
         }
         await batch.commit();
         res.json({ jobId: jobRef.id, totalCount: items.length });
-        processBulkJob(jobRef.id).catch(err => {
-            console.error(`[bulk-import] Job ${jobRef.id} failed:`, err.message);
-            jobRef.update({ status: 'error', errorMessage: err.message }).catch(() => {});
-        });
+        // Worker loop will pick this job up automatically via polling
     } catch (err) {
         console.error('[bulk-import] Error:', err.message);
         res.status(500).json({ error: err.message });
@@ -1890,10 +1966,15 @@ const PORT = process.env.PORT || 3001;
 // Only listen if this is the main module
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 if (isMain) {
-    app.listen(PORT, '0.0.0.0', () => {
+    app.listen(PORT, '0.0.0.0', async () => {
         console.log(`🚀 Backend Server running on http://localhost:${PORT}`);
         console.log(`📡 Health: http://localhost:${PORT}/api/health`);
         cleanupOldFiles();
+        // Start the durable bulk-import queue worker (with brief startup delay for SDK init)
+        setTimeout(async () => {
+            await recoverStaleJobs();
+            runBulkWorkerLoop().catch(err => console.error('[bulk-import] Worker loop fatal:', err));
+        }, 3000);
     });
 }
 
