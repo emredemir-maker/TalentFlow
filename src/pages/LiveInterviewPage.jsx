@@ -829,7 +829,9 @@ export default function LiveInterviewPage() {
                     ? questions.find(q => !q.answered)?.question || null
                     : null;
 
-                const linkedPosition = positions?.find(p => p.id === candidateData?.positionId);
+                // Prefer the interview session's positionId as the authoritative link; fall back to candidate record
+                const resolvedPositionId = session?.positionId || candidateData?.positionId;
+                const linkedPosition = positions?.find(p => p.id === resolvedPositionId);
                 const positionReqs = linkedPosition?.requirements?.length
                     ? linkedPosition.requirements.join(', ')
                     : null;
