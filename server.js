@@ -1397,6 +1397,32 @@ app.post('/api/ai/stt', aiLimiter, async (req, res) => {
     }
 });
 
+// ─── Screening Question Suggestion (AI — server-side, keeps API key off browser)
+app.post('/api/suggest-screening-questions', aiLimiter, async (req, res) => {
+    const { positionTitle, requirements } = req.body || {};
+    if (!positionTitle && !requirements) {
+        return res.status(400).json({ error: 'positionTitle or requirements is required.' });
+    }
+    const apiKey = await getApiKey();
+    if (!apiKey) return res.status(503).json({ error: 'AI service unavailable.' });
+
+    const prompt = `Sen bir kıdemli İK uzmanısın. Aşağıdaki pozisyon için başvuru formunda adaylara sorulacak en fazla 5 adet ön eleme sorusu öner. Sorular kısa, net ve pozisyona özel olmalı.\n\nPozisyon: ${positionTitle || 'Genel Pozisyon'}\nGereksinimler: ${requirements || ''}\n\nYalnızca şu JSON formatında yanıt ver (başka hiçbir şey yazma):\n{"questions": ["Soru 1", "Soru 2", "Soru 3"]}`;
+    try {
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        const result = await model.generateContent(prompt);
+        const rawText = result.response.text().replace(/```json|```/gi, '').trim();
+        const match = rawText.match(/\{[\s\S]*\}/);
+        if (!match) return res.status(500).json({ error: 'AI response could not be parsed.' });
+        const parsed = JSON.parse(match[0]);
+        const questions = (parsed.questions || []).slice(0, 5).filter(q => q && q.trim());
+        res.json({ questions });
+    } catch (err) {
+        console.error('[suggest-screening-questions] Error:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // ─── Server-side Duplicate Candidate Check ──────────────────────────────────
 // Checks Firestore directly — catches duplicates even when client cache is stale
 // or two users submit simultaneously. Fails open (isDuplicate: false) on error.

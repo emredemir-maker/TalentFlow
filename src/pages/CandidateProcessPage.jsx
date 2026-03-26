@@ -457,7 +457,7 @@ export default function CandidateProcessPage() {
 
     const filtered = useMemo(() => {
         const q = searchQuery.toLowerCase();
-        return candidates.filter(c => {
+        const results = candidates.filter(c => {
             if (q && !c.name?.toLowerCase().includes(q) && !(c.position || c.bestTitle)?.toLowerCase().includes(q)) return false;
             if (filterSource && c.source !== filterSource) return false;
             if (filterStatus && normalizePipelineStatus(c.status) !== filterStatus) return false;
@@ -465,6 +465,15 @@ export default function CandidateProcessPage() {
             if (filterMinScore > 0 && (c.bestScore || 0) < filterMinScore) return false;
             return true;
         });
+        const hasScreening = results.some(c => c.screeningScore != null);
+        if (hasScreening) {
+            results.sort((a, b) => {
+                const sa = a.screeningScore ?? -1;
+                const sb = b.screeningScore ?? -1;
+                return sb - sa;
+            });
+        }
+        return results;
     }, [candidates, searchQuery, filterSource, filterStatus, filterPosition, filterMinScore]);
 
     const parseFeedback = (text) => {
@@ -767,18 +776,20 @@ export default function CandidateProcessPage() {
                                         <span className={`text-[11px] font-black text-slate-500 ${c.photo || c.photoUrl || c.profileImage ? 'hidden' : 'flex'}`}>{mc.name?.charAt(0)?.toUpperCase() || '?'}</span>
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-1">
-                                            <p className={`text-[12px] font-bold truncate leading-tight ${isActive ? 'text-cyan-700' : 'text-slate-700'}`}>{mc.name}</p>
+                                        <p className={`text-[12px] font-bold truncate leading-tight ${isActive ? 'text-cyan-700' : 'text-slate-700'}`}>{mc.name}</p>
+                                        <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                                            <span
+                                                className="text-[8px] font-bold px-1.5 py-0.5 rounded-md inline-flex items-center gap-0.5 uppercase"
+                                                style={{ color: srcColor, backgroundColor: `${srcColor}15` }}
+                                            >
+                                                {getSourceLabel(c)}
+                                            </span>
                                             {c.screeningScore != null && (
-                                                <span title={`Ön eleme: %${Math.round(c.screeningScore)}`} className="shrink-0 w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                                                <span className="text-[8px] font-black px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-600 border border-indigo-100 uppercase">
+                                                    🎯 %{Math.round(c.screeningScore)}
+                                                </span>
                                             )}
                                         </div>
-                                        <span
-                                            className="text-[8px] font-bold px-1.5 py-0.5 rounded-md mt-0.5 inline-flex items-center gap-0.5 uppercase"
-                                            style={{ color: srcColor, backgroundColor: `${srcColor}15` }}
-                                        >
-                                            {getSourceLabel(c)}
-                                        </span>
                                     </div>
                                     <div className="shrink-0">
                                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${

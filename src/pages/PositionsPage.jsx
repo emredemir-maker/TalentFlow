@@ -490,25 +490,20 @@ function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser,
 
     const handleSuggestQuestions = async () => {
         if (suggestingQuestions) return;
-        const posTitle = formData.title.trim() || 'Genel Pozisyon';
-        const posReqs = formData.requirements.trim() || '';
         setSuggestingQuestions(true);
         try {
-            const prompt = `Sen bir kıdemli İK uzmanısın. Aşağıdaki pozisyon için başvuru formunda adaylara sorulacak en fazla 5 adet ön eleme sorusu öner. Sorular kısa, net ve pozisyona özel olmalı.\n\nPozisyon: ${posTitle}\nGereksinimler: ${posReqs}\n\nYalnızca şu JSON formatında yanıt ver (başka hiçbir şey yazma):\n{"questions": ["Soru 1", "Soru 2", "Soru 3"]}`;
-            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${import.meta.env.VITE_GEMINI_API_KEY}`, {
+            const res = await fetch('/api/suggest-screening-questions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+                body: JSON.stringify({
+                    positionTitle: formData.title.trim() || 'Genel Pozisyon',
+                    requirements: formData.requirements.trim() || '',
+                }),
             });
             const data = await res.json();
-            const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-            const match = rawText.match(/\{[\s\S]*\}/);
-            if (match) {
-                const parsed = JSON.parse(match[0]);
-                const qs = (parsed.questions || []).slice(0, 5).filter(q => q && q.trim());
-                if (qs.length > 0) {
-                    setFormData(p => ({ ...p, screeningEnabled: true, screeningQuestions: qs }));
-                }
+            const qs = (data.questions || []).filter(q => q && q.trim());
+            if (qs.length > 0) {
+                setFormData(p => ({ ...p, screeningEnabled: true, screeningQuestions: qs }));
             }
         } catch (err) {
             console.error('Screening question suggestion error:', err);
