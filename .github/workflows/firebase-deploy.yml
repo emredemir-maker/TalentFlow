@@ -18,32 +18,10 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      - name: Install Dependencies
-        run: npm install
-
-      - name: Build Frontend
-        run: npm run build
-        env:
-          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY || 'AIzaSyDFJfVrKGBnIsCXBldxpeIDlE_OxxJPKbQ' }}
-          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN || 'talentflow-84bb6.firebaseapp.com' }}
-          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID || 'talentflow-84bb6' }}
-          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET || 'talentflow-84bb6.firebasestorage.app' }}
-          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID || '132883257197' }}
-          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID || '1:132883257197:web:9c569a6c8fa52b0cfe6c64' }}
-          VITE_SERVER_URL: https://talentflow-84bb6.web.app
-          VITE_APP_URL: https://talentflow-84bb6.web.app
-
-      - name: Install Functions Dependencies
-        working-directory: ./functions
-        run: npm install
-        env:
-          PUPPETEER_SKIP_DOWNLOAD: true
-
       - name: Check required secrets
         run: |
           if [ -z "$EMAIL_USER" ] || [ -z "$EMAIL_PASS" ]; then
             echo "❌ EMAIL_USER veya EMAIL_PASS secret eksik!"
-            echo "GitHub repo → Settings → Secrets and variables → Actions → New repository secret"
             exit 1
           fi
           echo "✅ Tüm gerekli secrets mevcut"
@@ -51,20 +29,52 @@ jobs:
           EMAIL_USER: ${{ secrets.EMAIL_USER }}
           EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
 
+      - name: Install root dependencies
+        run: npm install
+
+      - name: Build Frontend
+        run: npm run build
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: talentflow-84bb6.firebaseapp.com
+          VITE_FIREBASE_PROJECT_ID: talentflow-84bb6
+          VITE_FIREBASE_STORAGE_BUCKET: talentflow-84bb6.firebasestorage.app
+          VITE_FIREBASE_MESSAGING_SENDER_ID: "132883257197"
+          VITE_FIREBASE_APP_ID: 1:132883257197:web:9c569a6c8fa52b0cfe6c64
+          VITE_SERVER_URL: https://talentflow-84bb6.web.app
+          VITE_APP_URL: https://talentflow-84bb6.web.app
+
+      - name: Install Functions dependencies
+        run: npm install
+        working-directory: ./functions
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: true
+
       - name: Create functions/.env.production
         run: |
           printf 'EMAIL_USER=%s\nEMAIL_PASS=%s\nVITE_GEMINI_API_KEY=%s\nVITE_FIREBASE_API_KEY=%s\n' \
-            "${{ secrets.EMAIL_USER }}" \
-            "${{ secrets.EMAIL_PASS }}" \
-            "${{ secrets.VITE_GEMINI_API_KEY }}" \
-            "${{ secrets.VITE_FIREBASE_API_KEY }}" \
+            "$EMAIL_USER" \
+            "$EMAIL_PASS" \
+            "$VITE_GEMINI_API_KEY" \
+            "$VITE_FIREBASE_API_KEY" \
             > functions/.env.production
+          echo "✅ functions/.env.production oluşturuldu:"
+          cat functions/.env.production | sed 's/=.*/=***/' 
+        env:
+          EMAIL_USER: ${{ secrets.EMAIL_USER }}
+          EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
+          VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+
+      - name: Authenticate to Google Cloud
+        run: |
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/gcp-sa.json
+          echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-sa.json" >> $GITHUB_ENV
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
 
       - name: Deploy to Firebase
-        uses: w9jds/firebase-action@master
-        with:
-          args: deploy --only hosting,functions,firestore --project talentflow-84bb6
+        run: firebase deploy --only hosting,functions,firestore --project talentflow-84bb6
         env:
-          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-
-# Trigger redeploy
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcp-sa.json
