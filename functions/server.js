@@ -1500,8 +1500,14 @@ app.post('/api/ai/stt', aiLimiter, async (req, res) => {
 });
 
 // ─── Bulk Import Background Processor ────────────────────────────────────────
+// Accepts: PDF, DOCX files directly OR a ZIP containing PDF/DOCX files
+// OR a JSON body with records [{name, email, cvText, positionId}]
+// Processing: sequential, exponential backoff on Gemini quota errors
 const BULK_JOBS_COLL = 'artifacts/talent-flow/public/data/bulkImportJobs';
 const CANDIDATES_COLL = 'artifacts/talent-flow/public/data/candidates';
+const AdmZip = require('adm-zip');
+
+const runningBulkJobs = new Set();
 
 async function parseTextWithGemini(text, positionTitle) {
     const apiKey = await getApiKey();
@@ -1548,95 +1554,112 @@ function calculateSimpleMatchScore(candidate, positionTitle) {
     return Math.min(100, Math.round((hits / Math.max(pWords.length, 1)) * 100));
 }
 
+async function extractCvText(buffer, ext) {
+    if (ext === 'pdf') {
+        const data = await pdf(buffer);
+        return (data.text || '').trim();
+    } else if (ext === 'docx') {
+        const result = await mammoth.extractRawText({ buffer });
+        return (result.value || '').trim();
+    }
+    throw new Error('Desteklenmeyen format: ' + ext);
+}
+
 async function processBulkJob(jobId) {
+    if (runningBulkJobs.has(jobId)) {
+        console.warn(`[bulk-import] Job ${jobId} already running, skipping re-entry`);
+        return;
+    }
+    runningBulkJobs.add(jobId);
     const jobRef = db.doc(`${BULK_JOBS_COLL}/${jobId}`);
     const itemsRef = db.collection(`${BULK_JOBS_COLL}/${jobId}/items`);
-    await jobRef.update({ status: 'processing', startedAt: admin.firestore.FieldValue.serverTimestamp() });
-    const itemsSnap = await itemsRef.orderBy('index').get();
-    const total = itemsSnap.size;
-    let processedCount = 0;
-    let failedCount = 0;
-    const jobData = (await jobRef.get()).data() || {};
-    const positionId = jobData.positionId || '';
-    const positionTitle = jobData.positionTitle || '';
+    try {
+        await jobRef.update({ status: 'processing', startedAt: admin.firestore.FieldValue.serverTimestamp() });
+        const itemsSnap = await itemsRef.orderBy('index').get();
+        const total = itemsSnap.size;
+        let processedCount = 0;
+        let failedCount = 0;
+        const jobData = (await jobRef.get()).data() || {};
+        const positionId = jobData.positionId || '';
+        const positionTitle = jobData.positionTitle || '';
 
-    for (const itemDoc of itemsSnap.docs) {
-        const item = itemDoc.data();
-        if (item.status === 'done' || item.status === 'error') { processedCount++; continue; }
-        await itemDoc.ref.update({ status: 'processing' });
-        let retries = 0;
-        const MAX_RETRIES = 3;
-        while (retries <= MAX_RETRIES) {
-            try {
-                const filePath = item.tempPath;
-                if (!filePath || !fs.existsSync(filePath)) throw new Error('Dosya bulunamadı');
-                const fileBuffer = fs.readFileSync(filePath);
-                let cvText = '';
-                const ext = (item.originalName || '').toLowerCase().split('.').pop();
-                if (ext === 'pdf') {
-                    const data = await pdf(fileBuffer);
-                    cvText = (data.text || '').trim();
-                } else if (ext === 'docx') {
-                    const result = await mammoth.extractRawText({ buffer: fileBuffer });
-                    cvText = (result.value || '').trim();
-                } else {
-                    throw new Error('Desteklenmeyen format');
-                }
-                if (!cvText || cvText.length < 30) throw new Error('CV içeriği okunamadı');
-                const parsed = await parseTextWithGemini(cvText, positionTitle);
-                const matchScore = calculateSimpleMatchScore(parsed, positionTitle);
-                await db.collection(CANDIDATES_COLL).add({
-                    name: parsed?.name || item.originalName.replace(/\.[^.]+$/, ''),
-                    email: parsed?.email || '',
-                    phone: parsed?.phone || '',
-                    position: positionTitle || parsed?.position || '',
-                    positionId: positionId || '',
-                    company: parsed?.company || '',
-                    location: parsed?.location || '',
-                    skills: parsed?.skills || [],
-                    experience: parsed?.experience || 0,
-                    education: parsed?.education || '',
-                    summary: parsed?.summary || '',
-                    cvText: cvText.slice(0, 6000),
-                    cvFileName: item.originalName,
-                    matchScore,
-                    combinedScore: matchScore,
-                    source: 'bulk_import',
-                    status: 'ai_analysis',
-                    appliedDate: new Date().toISOString().split('T')[0],
-                    interviewSessions: [],
-                    bulkJobId: jobId,
-                    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-                });
-                try { fs.unlinkSync(filePath); } catch {}
-                processedCount++;
-                await itemDoc.ref.update({ status: 'done', matchScore, candidateName: parsed?.name || '' });
-                await jobRef.update({ processedCount, failedCount, lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp() });
-                break;
-            } catch (err) {
-                const isQuota = err.message?.includes('429') || err.message?.includes('quota') || err.message?.includes('RESOURCE_EXHAUSTED');
-                retries++;
-                if (retries > MAX_RETRIES || !isQuota) {
-                    failedCount++;
-                    await itemDoc.ref.update({ status: 'error', error: err.message });
+        for (const itemDoc of itemsSnap.docs) {
+            const item = itemDoc.data();
+            if (item.status === 'done' || item.status === 'error') { processedCount++; continue; }
+            await itemDoc.ref.update({ status: 'processing' });
+            let retries = 0;
+            const MAX_RETRIES = 3;
+            while (retries <= MAX_RETRIES) {
+                try {
+                    let cvText = '';
+                    if (item.source === 'json_record') {
+                        cvText = (item.cvText || `${item.name || ''} ${item.email || ''}`).trim();
+                        if (!cvText || cvText.length < 5) throw new Error('CV metni boş');
+                    } else {
+                        const filePath = item.tempPath;
+                        if (!filePath || !fs.existsSync(filePath)) throw new Error('Dosya bulunamadı');
+                        const fileBuffer = fs.readFileSync(filePath);
+                        const ext = (item.originalName || '').toLowerCase().split('.').pop();
+                        cvText = await extractCvText(fileBuffer, ext);
+                        if (!cvText || cvText.length < 30) throw new Error('CV içeriği okunamadı');
+                    }
+                    const parsed = await parseTextWithGemini(cvText, positionTitle);
+                    const matchScore = calculateSimpleMatchScore(parsed, positionTitle);
+                    await db.collection(CANDIDATES_COLL).add({
+                        name: parsed?.name || item.name || item.originalName?.replace(/\.[^.]+$/, '') || '',
+                        email: parsed?.email || item.email || '',
+                        phone: parsed?.phone || '',
+                        position: positionTitle || parsed?.position || '',
+                        positionId: positionId || item.positionId || '',
+                        company: parsed?.company || '',
+                        location: parsed?.location || '',
+                        skills: parsed?.skills || [],
+                        experience: parsed?.experience || 0,
+                        education: parsed?.education || '',
+                        summary: parsed?.summary || '',
+                        cvText: cvText.slice(0, 6000),
+                        cvFileName: item.originalName || '',
+                        matchScore,
+                        combinedScore: matchScore,
+                        source: 'bulk_import',
+                        status: 'ai_analysis',
+                        appliedDate: new Date().toISOString().split('T')[0],
+                        interviewSessions: [],
+                        bulkJobId: jobId,
+                        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                    });
+                    if (item.tempPath) { try { fs.unlinkSync(item.tempPath); } catch {} }
+                    processedCount++;
+                    await itemDoc.ref.update({ status: 'done', matchScore, candidateName: parsed?.name || '' });
                     await jobRef.update({ processedCount, failedCount, lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp() });
                     break;
+                } catch (err) {
+                    const isQuota = err.message?.includes('429') || err.message?.includes('quota') || err.message?.includes('RESOURCE_EXHAUSTED');
+                    retries++;
+                    if (retries > MAX_RETRIES || !isQuota) {
+                        failedCount++;
+                        await itemDoc.ref.update({ status: 'error', error: err.message });
+                        await jobRef.update({ processedCount, failedCount, lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp() });
+                        break;
+                    }
+                    const backoffMs = Math.pow(2, retries) * 5000;
+                    console.warn(`[bulk-import] quota error on ${item.originalName}, backoff ${backoffMs}ms`);
+                    await new Promise(r => setTimeout(r, backoffMs));
                 }
-                const backoffMs = Math.pow(2, retries) * 5000;
-                console.warn(`[bulk-import] quota error on ${item.originalName}, backoff ${backoffMs}ms`);
-                await new Promise(r => setTimeout(r, backoffMs));
             }
+            await new Promise(r => setTimeout(r, 1500));
         }
-        await new Promise(r => setTimeout(r, 1500));
-    }
 
-    const doneItems = (await itemsRef.where('status', '==', 'done').get()).docs;
-    const avgScore = doneItems.length > 0
-        ? Math.round(doneItems.reduce((sum, d) => sum + (d.data().matchScore || 0), 0) / doneItems.length)
-        : 0;
-    await jobRef.update({ status: 'completed', processedCount, failedCount, totalCount: total, avgScore, completedAt: admin.firestore.FieldValue.serverTimestamp() });
-    console.log(`[bulk-import] Job ${jobId} complete: ${processedCount} done, ${failedCount} failed`);
+        const doneSnap = await itemsRef.where('status', '==', 'done').get();
+        const avgScore = doneSnap.size > 0
+            ? Math.round(doneSnap.docs.reduce((sum, d) => sum + (d.data().matchScore || 0), 0) / doneSnap.size)
+            : 0;
+        await jobRef.update({ status: 'completed', processedCount, failedCount, totalCount: total, avgScore, completedAt: admin.firestore.FieldValue.serverTimestamp() });
+        console.log(`[bulk-import] Job ${jobId} complete: ${processedCount} done, ${failedCount} failed`);
+    } finally {
+        runningBulkJobs.delete(jobId);
+    }
 }
 
 const bulkUpload = multer({
@@ -1651,33 +1674,66 @@ const bulkUpload = multer({
             cb(null, `bulk-${Date.now()}-${Math.round(Math.random() * 1e6)}${ext}`);
         },
     }),
-    limits: { fileSize: 10 * 1024 * 1024 },
+    limits: { fileSize: 50 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
-        const ok = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'].includes(file.mimetype)
-            || file.originalname.endsWith('.pdf') || file.originalname.endsWith('.docx');
-        ok ? cb(null, true) : cb(new Error('PDF veya DOCX olmalı'));
+        const name = file.originalname.toLowerCase();
+        const mime = file.mimetype;
+        const ok = mime === 'application/pdf' || name.endsWith('.pdf')
+            || mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || name.endsWith('.docx')
+            || mime === 'application/zip' || mime === 'application/x-zip-compressed' || name.endsWith('.zip');
+        ok ? cb(null, true) : cb(new Error('PDF, DOCX veya ZIP olmalı'));
     },
 });
 
-app.post('/api/bulk-import', bulkUpload.array('cvs', 100), async (req, res) => {
+app.post('/api/bulk-import', bulkUpload.array('cvs', 20), async (req, res) => {
     try {
         const positionId = req.body?.positionId || '';
         const positionTitle = req.body?.positionTitle || '';
         let items = [];
         if (req.files && req.files.length > 0) {
-            items = req.files.map((f, i) => ({
+            const bulkDir = path.join(uploadBaseDir, 'uploads', 'bulk-tmp');
+            for (const file of req.files) {
+                const name = file.originalname.toLowerCase();
+                if (name.endsWith('.zip')) {
+                    try {
+                        const zip = new AdmZip(file.path);
+                        const entries = zip.getEntries().filter(e => {
+                            const en = e.entryName.toLowerCase();
+                            return !e.isDirectory && (en.endsWith('.pdf') || en.endsWith('.docx'));
+                        });
+                        for (const entry of entries) {
+                            const entryExt = path.extname(entry.entryName);
+                            const destName = `bulk-${Date.now()}-${Math.round(Math.random() * 1e6)}${entryExt}`;
+                            const destPath = path.join(bulkDir, destName);
+                            fs.writeFileSync(destPath, entry.getData());
+                            items.push({ index: items.length, originalName: path.basename(entry.entryName), tempPath: destPath, status: 'pending' });
+                        }
+                        try { fs.unlinkSync(file.path); } catch {}
+                    } catch (zipErr) {
+                        console.error('[bulk-import] ZIP extraction error:', zipErr.message);
+                        try { fs.unlinkSync(file.path); } catch {}
+                    }
+                } else {
+                    items.push({ index: items.length, originalName: file.originalname, tempPath: file.path, status: 'pending' });
+                }
+            }
+        } else if (req.body?.records) {
+            const rawRecords = typeof req.body.records === 'string' ? JSON.parse(req.body.records) : req.body.records;
+            if (!Array.isArray(rawRecords)) return res.status(400).json({ error: 'records bir dizi olmalıdır.' });
+            items = rawRecords.map((r, i) => ({
                 index: i,
-                originalName: f.originalname,
-                tempPath: f.path,
+                originalName: r.name || `aday-${i + 1}`,
+                name: r.name || '',
+                email: r.email || '',
+                cvText: r.cvText || '',
+                positionId: r.positionId || positionId,
+                source: 'json_record',
                 status: 'pending',
             }));
-        } else if (req.body?.records) {
-            const records = typeof req.body.records === 'string' ? JSON.parse(req.body.records) : req.body.records;
-            items = records.map((r, i) => ({ index: i, originalName: r.name || `record-${i}`, name: r.name, email: r.email, cvUrl: r.cvUrl, tempPath: null, status: 'pending' }));
         } else {
             return res.status(400).json({ error: 'cvs (multipart) veya records (JSON) gereklidir.' });
         }
-        if (items.length === 0) return res.status(400).json({ error: 'Hiç dosya bulunamadı.' });
+        if (items.length === 0) return res.status(400).json({ error: 'İşlenecek dosya veya kayıt bulunamadı.' });
         const jobRef = db.collection(BULK_JOBS_COLL).doc();
         await jobRef.set({ status: 'queued', totalCount: items.length, processedCount: 0, failedCount: 0, positionId, positionTitle, createdAt: admin.firestore.FieldValue.serverTimestamp() });
         const batch = db.batch();

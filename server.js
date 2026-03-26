@@ -1398,10 +1398,15 @@ app.post('/api/ai/stt', aiLimiter, async (req, res) => {
 });
 
 // ─── Bulk Import Background Processor ────────────────────────────────────────
-// Runs asynchronously after /api/bulk-import creates the job record.
-// Processes each item sequentially with exponential backoff on quota errors.
+// Accepts: PDF, DOCX files directly OR a ZIP containing PDF/DOCX files
+// OR a JSON body with records [{name, email, cvText, positionId}]
+// Processing: sequential, exponential backoff on Gemini quota errors
 const BULK_JOBS_COLL = 'artifacts/talent-flow/public/data/bulkImportJobs';
 const CANDIDATES_COLL = 'artifacts/talent-flow/public/data/candidates';
+const AdmZip = require('adm-zip');
+
+// Global set to prevent re-entry: once a job is running, don't spawn again
+const runningBulkJobs = new Set();
 
 async function parseTextWithGemini(text, positionTitle) {
     const apiKey = await getApiKey();
@@ -1448,141 +1453,139 @@ function calculateSimpleMatchScore(candidate, positionTitle) {
     return Math.min(100, Math.round((hits / Math.max(pWords.length, 1)) * 100));
 }
 
+// Extract text from a buffer given the file extension
+async function extractCvText(buffer, ext) {
+    if (ext === 'pdf') {
+        const data = await pdf(buffer);
+        return (data.text || '').trim();
+    } else if (ext === 'docx') {
+        const result = await mammoth.extractRawText({ buffer });
+        return (result.value || '').trim();
+    }
+    throw new Error('Desteklenmeyen format: ' + ext);
+}
+
 async function processBulkJob(jobId) {
+    if (runningBulkJobs.has(jobId)) {
+        console.warn(`[bulk-import] Job ${jobId} already running, skipping re-entry`);
+        return;
+    }
+    runningBulkJobs.add(jobId);
+
     const jobRef = db.doc(`${BULK_JOBS_COLL}/${jobId}`);
     const itemsRef = db.collection(`${BULK_JOBS_COLL}/${jobId}/items`);
 
-    // Mark job as processing
-    await jobRef.update({ status: 'processing', startedAt: admin.firestore.FieldValue.serverTimestamp() });
+    try {
+        await jobRef.update({ status: 'processing', startedAt: admin.firestore.FieldValue.serverTimestamp() });
 
-    const itemsSnap = await itemsRef.orderBy('index').get();
-    const total = itemsSnap.size;
-    let processedCount = 0;
-    let failedCount = 0;
-    const jobData = (await jobRef.get()).data() || {};
-    const positionId = jobData.positionId || '';
-    const positionTitle = jobData.positionTitle || '';
-    let positionDoc = null;
-    if (positionId) {
-        try {
-            const snap = await db.doc(`artifacts/talent-flow/public/data/positions/${positionId}`).get();
-            if (snap.exists) positionDoc = snap.data();
-        } catch {}
-    }
+        const itemsSnap = await itemsRef.orderBy('index').get();
+        const total = itemsSnap.size;
+        let processedCount = 0;
+        let failedCount = 0;
+        const jobData = (await jobRef.get()).data() || {};
+        const positionId = jobData.positionId || '';
+        const positionTitle = jobData.positionTitle || '';
 
-    for (const itemDoc of itemsSnap.docs) {
-        const item = itemDoc.data();
-        if (item.status === 'done' || item.status === 'error') { processedCount++; continue; }
-
-        await itemDoc.ref.update({ status: 'processing' });
-
-        let retries = 0;
-        const MAX_RETRIES = 3;
-        while (retries <= MAX_RETRIES) {
-            try {
-                // Read file buffer from temp path
-                const filePath = item.tempPath;
-                if (!filePath || !fs.existsSync(filePath)) throw new Error('Dosya bulunamadı');
-
-                const fileBuffer = fs.readFileSync(filePath);
-                let cvText = '';
-                const ext = (item.originalName || '').toLowerCase().split('.').pop();
-                if (ext === 'pdf') {
-                    const data = await pdf(fileBuffer);
-                    cvText = (data.text || '').trim();
-                } else if (ext === 'docx') {
-                    const result = await mammoth.extractRawText({ buffer: fileBuffer });
-                    cvText = (result.value || '').trim();
-                } else {
-                    throw new Error('Desteklenmeyen format');
-                }
-
-                if (!cvText || cvText.length < 30) throw new Error('CV içeriği okunamadı');
-
-                const parsed = await parseTextWithGemini(cvText, positionTitle);
-                const matchScore = calculateSimpleMatchScore(parsed, positionTitle);
-
-                // Save candidate
-                await db.collection(CANDIDATES_COLL).add({
-                    name: parsed?.name || item.originalName.replace(/\.[^.]+$/, ''),
-                    email: parsed?.email || '',
-                    phone: parsed?.phone || '',
-                    position: positionTitle || parsed?.position || '',
-                    positionId: positionId || '',
-                    company: parsed?.company || '',
-                    location: parsed?.location || '',
-                    skills: parsed?.skills || [],
-                    experience: parsed?.experience || 0,
-                    education: parsed?.education || '',
-                    summary: parsed?.summary || '',
-                    cvText: cvText.slice(0, 6000),
-                    cvFileName: item.originalName,
-                    matchScore,
-                    combinedScore: matchScore,
-                    source: 'bulk_import',
-                    status: 'ai_analysis',
-                    appliedDate: new Date().toISOString().split('T')[0],
-                    interviewSessions: [],
-                    bulkJobId: jobId,
-                    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-                });
-
-                // Clean up temp file
-                try { fs.unlinkSync(filePath); } catch {}
-
+        for (const itemDoc of itemsSnap.docs) {
+            const item = itemDoc.data();
+            if (item.status === 'done' || item.status === 'error') {
                 processedCount++;
-                await itemDoc.ref.update({ status: 'done', matchScore, candidateName: parsed?.name || '' });
-                await jobRef.update({
-                    processedCount,
-                    failedCount,
-                    lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
-                });
-                break;
-            } catch (err) {
-                const isQuota = err.message?.includes('429') || err.message?.includes('quota') || err.message?.includes('RESOURCE_EXHAUSTED');
-                retries++;
-                if (retries > MAX_RETRIES || !isQuota) {
-                    failedCount++;
-                    await itemDoc.ref.update({ status: 'error', error: err.message });
-                    await jobRef.update({
-                        processedCount,
-                        failedCount,
-                        lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
-                    });
-                    break;
-                }
-                const backoffMs = Math.pow(2, retries) * 5000;
-                console.warn(`[bulk-import] quota error on ${item.originalName}, backoff ${backoffMs}ms (retry ${retries})`);
-                await new Promise(r => setTimeout(r, backoffMs));
+                continue;
             }
+
+            await itemDoc.ref.update({ status: 'processing' });
+
+            let retries = 0;
+            const MAX_RETRIES = 3;
+            while (retries <= MAX_RETRIES) {
+                try {
+                    let cvText = '';
+
+                    if (item.source === 'json_record') {
+                        // JSON record: text may be pre-supplied or we generate from name/email
+                        cvText = (item.cvText || `${item.name || ''} ${item.email || ''}`).trim();
+                        if (!cvText || cvText.length < 5) throw new Error('CV metni boş');
+                    } else {
+                        // File-based item: read from tempPath
+                        const filePath = item.tempPath;
+                        if (!filePath || !fs.existsSync(filePath)) throw new Error('Dosya bulunamadı');
+                        const fileBuffer = fs.readFileSync(filePath);
+                        const ext = (item.originalName || '').toLowerCase().split('.').pop();
+                        cvText = await extractCvText(fileBuffer, ext);
+                        if (!cvText || cvText.length < 30) throw new Error('CV içeriği okunamadı');
+                    }
+
+                    const parsed = await parseTextWithGemini(cvText, positionTitle);
+                    const matchScore = calculateSimpleMatchScore(parsed, positionTitle);
+
+                    await db.collection(CANDIDATES_COLL).add({
+                        name: parsed?.name || item.name || item.originalName?.replace(/\.[^.]+$/, '') || '',
+                        email: parsed?.email || item.email || '',
+                        phone: parsed?.phone || '',
+                        position: positionTitle || parsed?.position || '',
+                        positionId: positionId || item.positionId || '',
+                        company: parsed?.company || '',
+                        location: parsed?.location || '',
+                        skills: parsed?.skills || [],
+                        experience: parsed?.experience || 0,
+                        education: parsed?.education || '',
+                        summary: parsed?.summary || '',
+                        cvText: cvText.slice(0, 6000),
+                        cvFileName: item.originalName || '',
+                        matchScore,
+                        combinedScore: matchScore,
+                        source: 'bulk_import',
+                        status: 'ai_analysis',
+                        appliedDate: new Date().toISOString().split('T')[0],
+                        interviewSessions: [],
+                        bulkJobId: jobId,
+                        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                    });
+
+                    // Clean up temp file
+                    if (item.tempPath) { try { fs.unlinkSync(item.tempPath); } catch {} }
+
+                    processedCount++;
+                    await itemDoc.ref.update({ status: 'done', matchScore, candidateName: parsed?.name || '' });
+                    await jobRef.update({ processedCount, failedCount, lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp() });
+                    break;
+                } catch (err) {
+                    const isQuota = err.message?.includes('429') || err.message?.includes('quota') || err.message?.includes('RESOURCE_EXHAUSTED');
+                    retries++;
+                    if (retries > MAX_RETRIES || !isQuota) {
+                        failedCount++;
+                        await itemDoc.ref.update({ status: 'error', error: err.message });
+                        await jobRef.update({ processedCount, failedCount, lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp() });
+                        break;
+                    }
+                    const backoffMs = Math.pow(2, retries) * 5000;
+                    console.warn(`[bulk-import] quota error on ${item.originalName}, backoff ${backoffMs}ms (retry ${retries})`);
+                    await new Promise(r => setTimeout(r, backoffMs));
+                }
+            }
+
+            // Small delay between items to respect Gemini rate limits
+            await new Promise(r => setTimeout(r, 1500));
         }
 
-        // Small delay between items to respect Gemini rate limits
-        await new Promise(r => setTimeout(r, 1500));
+        const doneSnap = await itemsRef.where('status', '==', 'done').get();
+        const avgScore = doneSnap.size > 0
+            ? Math.round(doneSnap.docs.reduce((sum, d) => sum + (d.data().matchScore || 0), 0) / doneSnap.size)
+            : 0;
+
+        await jobRef.update({ status: 'completed', processedCount, failedCount, totalCount: total, avgScore, completedAt: admin.firestore.FieldValue.serverTimestamp() });
+        console.log(`[bulk-import] Job ${jobId} complete: ${processedCount} done, ${failedCount} failed`);
+    } finally {
+        runningBulkJobs.delete(jobId);
     }
-
-    // Compute average score for summary
-    const doneItems = (await itemsRef.where('status', '==', 'done').get()).docs;
-    const avgScore = doneItems.length > 0
-        ? Math.round(doneItems.reduce((sum, d) => sum + (d.data().matchScore || 0), 0) / doneItems.length)
-        : 0;
-
-    await jobRef.update({
-        status: 'completed',
-        processedCount,
-        failedCount,
-        totalCount: total,
-        avgScore,
-        completedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-    console.log(`[bulk-import] Job ${jobId} complete: ${processedCount} done, ${failedCount} failed`);
 }
 
 // ─── POST /api/bulk-import ────────────────────────────────────────────────────
-// Accepts multiple CV files via multipart/form-data field 'cvs' (PDF/DOCX)
-// OR a JSON body with { records: [{name, email, cvUrl, positionId}] }
-// Returns: { jobId }
+// Accepts:
+//   A) multipart/form-data with field 'cvs': PDF, DOCX, or ZIP (containing PDF/DOCX)
+//   B) JSON body: { positionId, positionTitle, records: [{name, email, cvText, positionId?}] }
+// Returns: { jobId, totalCount }
 const bulkUpload = multer({
     storage: multer.diskStorage({
         destination: (req, file, cb) => {
@@ -1595,45 +1598,82 @@ const bulkUpload = multer({
             cb(null, `bulk-${Date.now()}-${Math.round(Math.random() * 1e6)}${ext}`);
         },
     }),
-    limits: { fileSize: 10 * 1024 * 1024 },
+    limits: { fileSize: 50 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
-        const ok = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'].includes(file.mimetype)
-            || file.originalname.endsWith('.pdf') || file.originalname.endsWith('.docx');
-        ok ? cb(null, true) : cb(new Error('PDF veya DOCX olmalı'));
+        const name = file.originalname.toLowerCase();
+        const mime = file.mimetype;
+        const ok = mime === 'application/pdf' || name.endsWith('.pdf')
+            || mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || name.endsWith('.docx')
+            || mime === 'application/zip' || mime === 'application/x-zip-compressed' || name.endsWith('.zip');
+        ok ? cb(null, true) : cb(new Error('PDF, DOCX veya ZIP olmalı'));
     },
 });
 
-app.post('/api/bulk-import', bulkUpload.array('cvs', 100), async (req, res) => {
+app.post('/api/bulk-import', bulkUpload.array('cvs', 20), async (req, res) => {
     try {
         const positionId = req.body?.positionId || '';
         const positionTitle = req.body?.positionTitle || '';
         let items = [];
 
         if (req.files && req.files.length > 0) {
-            items = req.files.map((f, i) => ({
-                index: i,
-                originalName: f.originalname,
-                tempPath: f.path,
-                status: 'pending',
-            }));
+            const bulkDir = path.join(uploadBaseDir, 'uploads', 'bulk-tmp');
+            for (const file of req.files) {
+                const name = file.originalname.toLowerCase();
+                if (name.endsWith('.zip')) {
+                    // Unpack ZIP and extract each PDF/DOCX entry to disk
+                    try {
+                        const zip = new AdmZip(file.path);
+                        const entries = zip.getEntries().filter(e => {
+                            const en = e.entryName.toLowerCase();
+                            return !e.isDirectory && (en.endsWith('.pdf') || en.endsWith('.docx'));
+                        });
+                        for (const entry of entries) {
+                            const entryExt = path.extname(entry.entryName);
+                            const destName = `bulk-${Date.now()}-${Math.round(Math.random() * 1e6)}${entryExt}`;
+                            const destPath = path.join(bulkDir, destName);
+                            fs.writeFileSync(destPath, entry.getData());
+                            items.push({
+                                index: items.length,
+                                originalName: path.basename(entry.entryName),
+                                tempPath: destPath,
+                                status: 'pending',
+                            });
+                        }
+                        // Remove the ZIP file
+                        try { fs.unlinkSync(file.path); } catch {}
+                    } catch (zipErr) {
+                        console.error('[bulk-import] ZIP extraction error:', zipErr.message);
+                        try { fs.unlinkSync(file.path); } catch {}
+                    }
+                } else {
+                    items.push({
+                        index: items.length,
+                        originalName: file.originalname,
+                        tempPath: file.path,
+                        status: 'pending',
+                    });
+                }
+            }
         } else if (req.body?.records) {
-            const records = typeof req.body.records === 'string' ? JSON.parse(req.body.records) : req.body.records;
-            items = records.map((r, i) => ({
+            // JSON records path: [{name, email, cvText, positionId?}]
+            const rawRecords = typeof req.body.records === 'string' ? JSON.parse(req.body.records) : req.body.records;
+            if (!Array.isArray(rawRecords)) return res.status(400).json({ error: 'records bir dizi olmalıdır.' });
+            items = rawRecords.map((r, i) => ({
                 index: i,
-                originalName: r.name || `record-${i}`,
-                name: r.name,
-                email: r.email,
-                cvUrl: r.cvUrl,
-                tempPath: null,
+                originalName: r.name || `aday-${i + 1}`,
+                name: r.name || '',
+                email: r.email || '',
+                cvText: r.cvText || '',
+                positionId: r.positionId || positionId,
+                source: 'json_record',
                 status: 'pending',
             }));
         } else {
             return res.status(400).json({ error: 'cvs (multipart) veya records (JSON) gereklidir.' });
         }
 
-        if (items.length === 0) return res.status(400).json({ error: 'Hiç dosya bulunamadı.' });
+        if (items.length === 0) return res.status(400).json({ error: 'İşlenecek dosya veya kayıt bulunamadı.' });
 
-        // Create job document
         const jobRef = db.collection(BULK_JOBS_COLL).doc();
         await jobRef.set({
             status: 'queued',
@@ -1645,18 +1685,14 @@ app.post('/api/bulk-import', bulkUpload.array('cvs', 100), async (req, res) => {
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
 
-        // Write items as subcollection
         const batch = db.batch();
         for (const item of items) {
-            const ref = jobRef.collection('items').doc(String(item.index));
-            batch.set(ref, item);
+            batch.set(jobRef.collection('items').doc(String(item.index)), item);
         }
         await batch.commit();
 
-        // Return jobId immediately; process in background (non-blocking)
         res.json({ jobId: jobRef.id, totalCount: items.length });
 
-        // Kick off async processing (fire-and-forget)
         processBulkJob(jobRef.id).catch(err => {
             console.error(`[bulk-import] Job ${jobRef.id} failed:`, err.message);
             jobRef.update({ status: 'error', errorMessage: err.message }).catch(() => {});
@@ -1668,7 +1704,6 @@ app.post('/api/bulk-import', bulkUpload.array('cvs', 100), async (req, res) => {
 });
 
 // ─── GET /api/bulk-import/:jobId ─────────────────────────────────────────────
-// Returns job status (for polling fallback; primary UX uses Firestore onSnapshot)
 app.get('/api/bulk-import/:jobId', async (req, res) => {
     try {
         const snap = await db.doc(`${BULK_JOBS_COLL}/${req.params.jobId}`).get();

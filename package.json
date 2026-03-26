@@ -15,6 +15,7 @@
     "@splinetool/react-spline": "^4.1.0",
     "@splinetool/runtime": "^1.12.61",
     "@tailwindcss/vite": "^4.1.18",
+    "adm-zip": "^0.5.16",
     "antigravity-awesome-skills": "^6.3.1",
     "concurrently": "^9.2.1",
     "cors": "^2.8.6",

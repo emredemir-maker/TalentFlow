@@ -91,6 +91,8 @@ export default function CandidateProcessPage() {
     const [bulkProgress, setBulkProgress]       = useState({ total: 0, completed: 0, failed: 0, items: [], avgScore: null, status: null });
     const [bulkJobId, setBulkJobId]             = useState(null);
     const [bulkToast, setBulkToast]             = useState(null);
+    const [bulkTab, setBulkTab]                 = useState('files');
+    const [bulkJsonText, setBulkJsonText]       = useState('');
 
     // Feedback email modal
     const [feedbackModal, setFeedbackModal]     = useState(false);
@@ -309,31 +311,50 @@ export default function CandidateProcessPage() {
     };
 
     const handleBulkImport = async () => {
-        if (!bulkFiles.length || bulkImporting) return;
+        if (bulkImporting) return;
         setBulkImporting(true);
         setBulkJobId(null);
         const selectedPos = positions.find(p => p.id === bulkPositionId);
-        const initialItems = bulkFiles.map(f => ({ name: f.name, status: 'pending' }));
-        setBulkProgress({ total: bulkFiles.length, completed: 0, failed: 0, items: initialItems, avgScore: null, status: 'queued' });
 
         try {
-            const formData = new FormData();
-            bulkFiles.forEach(f => formData.append('cvs', f));
-            if (selectedPos) {
-                formData.append('positionId', selectedPos.id);
-                formData.append('positionTitle', selectedPos.title);
-            }
+            let resp, data;
 
-            const resp = await fetch('/api/bulk-import', { method: 'POST', body: formData });
-            const data = await resp.json();
+            if (bulkTab === 'json') {
+                // JSON records path
+                let records;
+                try { records = JSON.parse(bulkJsonText.trim()); } catch {
+                    throw new Error('Geçersiz JSON formatı.');
+                }
+                if (!Array.isArray(records) || records.length === 0) throw new Error('Kayıt dizisi boş veya geçersiz.');
+                const initialItems = records.map(r => ({ name: r.name || 'Aday', status: 'pending' }));
+                setBulkProgress({ total: records.length, completed: 0, failed: 0, items: initialItems, avgScore: null, status: 'queued' });
+                resp = await fetch('/api/bulk-import', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ positionId: selectedPos?.id || '', positionTitle: selectedPos?.title || '', records }),
+                });
+                data = await resp.json();
+            } else {
+                // File upload path
+                if (!bulkFiles.length) { setBulkImporting(false); return; }
+                const initialItems = bulkFiles.map(f => ({ name: f.name, status: 'pending' }));
+                setBulkProgress({ total: bulkFiles.length, completed: 0, failed: 0, items: initialItems, avgScore: null, status: 'queued' });
+                const formData = new FormData();
+                bulkFiles.forEach(f => formData.append('cvs', f));
+                if (selectedPos) {
+                    formData.append('positionId', selectedPos.id);
+                    formData.append('positionTitle', selectedPos.title);
+                }
+                resp = await fetch('/api/bulk-import', { method: 'POST', body: formData });
+                data = await resp.json();
+            }
 
             if (!resp.ok || !data.jobId) {
                 throw new Error(data.error || 'Toplu yükleme başlatılamadı.');
             }
 
-            // Store jobId — onSnapshot subscription will take over progress tracking
             setBulkJobId(data.jobId);
-            setBulkProgress(prev => ({ ...prev, total: data.totalCount || bulkFiles.length, status: 'queued' }));
+            setBulkProgress(prev => ({ ...prev, total: data.totalCount || prev.total, status: 'queued' }));
         } catch (err) {
             console.error('Bulk import start error:', err);
             setBulkImporting(false);
@@ -1954,48 +1975,82 @@ export default function CandidateProcessPage() {
                         </div>
 
                         <div className="px-6 py-4 space-y-4">
-                            {/* Drag-drop area */}
+                            {/* Drag-drop / JSON area */}
                             {!bulkImporting && bulkProgress.total === 0 && (
                                 <>
-                                    <div
-                                        onDragOver={e => e.preventDefault()}
-                                        onDrop={e => {
-                                            e.preventDefault();
-                                            const files = Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.pdf') || f.name.endsWith('.docx'));
-                                            setBulkFiles(prev => [...prev, ...files].slice(0, 50));
-                                        }}
-                                        onClick={() => document.getElementById('bulk-cv-input')?.click()}
-                                        className="border-2 border-dashed border-violet-200 rounded-xl p-8 text-center cursor-pointer hover:border-violet-400 hover:bg-violet-50/30 transition-all"
-                                    >
-                                        <input
-                                            id="bulk-cv-input"
-                                            type="file"
-                                            accept=".pdf,.docx"
-                                            multiple
-                                            className="hidden"
-                                            onChange={e => {
-                                                const files = Array.from(e.target.files || []);
-                                                setBulkFiles(prev => [...prev, ...files].slice(0, 50));
-                                            }}
-                                        />
-                                        <Upload className="w-8 h-8 text-violet-300 mx-auto mb-2" />
-                                        <p className="text-[13px] font-bold text-slate-500">Sürükleyin veya tıklayın</p>
-                                        <p className="text-[10px] text-slate-400 mt-1">PDF veya DOCX • Maks. 50 dosya</p>
+                                    {/* Tab switcher */}
+                                    <div className="flex rounded-xl overflow-hidden border border-slate-200 bg-slate-50 p-0.5">
+                                        <button
+                                            onClick={() => setBulkTab('files')}
+                                            className={`flex-1 h-7 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${bulkTab === 'files' ? 'bg-white text-violet-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                                        >
+                                            Dosya Yükle
+                                        </button>
+                                        <button
+                                            onClick={() => setBulkTab('json')}
+                                            className={`flex-1 h-7 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${bulkTab === 'json' ? 'bg-white text-violet-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                                        >
+                                            JSON Kayıt
+                                        </button>
                                     </div>
 
-                                    {bulkFiles.length > 0 && (
-                                        <div className="space-y-1 max-h-32 overflow-y-auto">
-                                            {bulkFiles.map((f, i) => (
-                                                <div key={i} className="flex items-center justify-between px-3 py-1.5 bg-slate-50 rounded-lg border border-slate-200">
-                                                    <span className="text-[11px] text-slate-600 font-medium truncate">{f.name}</span>
-                                                    <button
-                                                        onClick={() => setBulkFiles(prev => prev.filter((_, j) => j !== i))}
-                                                        className="text-slate-300 hover:text-red-400 shrink-0 ml-2"
-                                                    >
-                                                        <X className="w-3 h-3" />
-                                                    </button>
+                                    {bulkTab === 'files' && (
+                                        <>
+                                            <div
+                                                onDragOver={e => e.preventDefault()}
+                                                onDrop={e => {
+                                                    e.preventDefault();
+                                                    const files = Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.pdf') || f.name.endsWith('.docx') || f.name.endsWith('.zip'));
+                                                    setBulkFiles(prev => [...prev, ...files].slice(0, 50));
+                                                }}
+                                                onClick={() => document.getElementById('bulk-cv-input')?.click()}
+                                                className="border-2 border-dashed border-violet-200 rounded-xl p-8 text-center cursor-pointer hover:border-violet-400 hover:bg-violet-50/30 transition-all"
+                                            >
+                                                <input
+                                                    id="bulk-cv-input"
+                                                    type="file"
+                                                    accept=".pdf,.docx,.zip"
+                                                    multiple
+                                                    className="hidden"
+                                                    onChange={e => {
+                                                        const files = Array.from(e.target.files || []);
+                                                        setBulkFiles(prev => [...prev, ...files].slice(0, 50));
+                                                    }}
+                                                />
+                                                <Upload className="w-8 h-8 text-violet-300 mx-auto mb-2" />
+                                                <p className="text-[13px] font-bold text-slate-500">Sürükleyin veya tıklayın</p>
+                                                <p className="text-[10px] text-slate-400 mt-1">PDF, DOCX veya ZIP (içinde PDF/DOCX) • Maks. 20 dosya</p>
+                                            </div>
+
+                                            {bulkFiles.length > 0 && (
+                                                <div className="space-y-1 max-h-32 overflow-y-auto">
+                                                    {bulkFiles.map((f, i) => (
+                                                        <div key={i} className="flex items-center justify-between px-3 py-1.5 bg-slate-50 rounded-lg border border-slate-200">
+                                                            <span className="text-[11px] text-slate-600 font-medium truncate">{f.name}</span>
+                                                            <button
+                                                                onClick={() => setBulkFiles(prev => prev.filter((_, j) => j !== i))}
+                                                                className="text-slate-300 hover:text-red-400 shrink-0 ml-2"
+                                                            >
+                                                                <X className="w-3 h-3" />
+                                                            </button>
+                                                        </div>
+                                                    ))}
                                                 </div>
-                                            ))}
+                                            )}
+                                        </>
+                                    )}
+
+                                    {bulkTab === 'json' && (
+                                        <div className="space-y-2">
+                                            <p className="text-[10px] text-slate-400">Şu formatta bir JSON dizisi yapıştırın:</p>
+                                            <pre className="text-[9px] text-slate-400 bg-slate-50 rounded-lg px-3 py-2 border border-slate-200 overflow-x-auto">{`[{"name":"Ali Veli","email":"ali@sirket.com","cvText":"..."}]`}</pre>
+                                            <textarea
+                                                value={bulkJsonText}
+                                                onChange={e => setBulkJsonText(e.target.value)}
+                                                placeholder='[{"name":"...","email":"...","cvText":"..."}]'
+                                                rows={5}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[11px] text-slate-700 outline-none focus:border-violet-300 transition-all resize-none font-mono"
+                                            />
                                         </div>
                                     )}
 
@@ -2018,11 +2073,11 @@ export default function CandidateProcessPage() {
                                         <button onClick={() => setBulkImportModal(false)} className="h-9 px-4 rounded-xl text-[10px] font-black text-slate-500 border border-slate-200 hover:bg-slate-50 transition-all">İptal</button>
                                         <button
                                             onClick={handleBulkImport}
-                                            disabled={!bulkFiles.length}
+                                            disabled={bulkTab === 'files' ? !bulkFiles.length : !bulkJsonText.trim()}
                                             className="h-9 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 bg-violet-500 hover:bg-violet-600 text-white shadow-sm transition-all disabled:opacity-60"
                                         >
                                             <Upload className="w-3.5 h-3.5" />
-                                            Yüklemeyi Başlat ({bulkFiles.length} dosya)
+                                            {bulkTab === 'json' ? 'Kayıtları İçe Aktar' : `Yüklemeyi Başlat (${bulkFiles.length} dosya)`}
                                         </button>
                                     </div>
                                 </>
@@ -2098,7 +2153,7 @@ export default function CandidateProcessPage() {
 
                                     {!bulkImporting && (
                                         <button
-                                            onClick={() => { setBulkImportModal(false); setBulkProgress({ total: 0, completed: 0, failed: 0, items: [], avgScore: null, status: null }); setBulkJobId(null); setBulkFiles([]); }}
+                                            onClick={() => { setBulkImportModal(false); setBulkProgress({ total: 0, completed: 0, failed: 0, items: [], avgScore: null, status: null }); setBulkJobId(null); setBulkFiles([]); setBulkTab('files'); setBulkJsonText(''); }}
                                             className="w-full h-9 rounded-xl text-[10px] font-black text-white bg-slate-800 hover:bg-slate-900 uppercase tracking-widest transition-all"
                                         >
                                             Kapat
