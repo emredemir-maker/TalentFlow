@@ -42,11 +42,11 @@ function ScoreBadge({ score }) {
 }
 
 // ── Kanban ────────────────────────────────────────────────────────────────────
-function CandidateCard({ candidate, stageColor }) {
+function CandidateCard({ candidate, stageColor, onSelect }) {
     const score = candidate.combinedScore || candidate.matchScore || candidate.initialAiScore || 0;
     return (
         <button
-            onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'candidate-process' }))}
+            onClick={onSelect}
             className="w-full text-left bg-white rounded-lg border border-slate-100 p-3 shadow-sm hover:shadow-md hover:border-slate-200 transition-all"
         >
             <div className="flex items-start gap-2.5">
@@ -67,7 +67,7 @@ function CandidateCard({ candidate, stageColor }) {
     );
 }
 
-function KanbanColumn({ stage, candidates }) {
+function KanbanColumn({ stage, candidates, onSelectCandidate }) {
     return (
         <div className="flex flex-col gap-2 min-w-[195px] flex-1">
             <div className="flex items-center justify-between px-3 py-2 rounded-lg sticky top-0 z-10"
@@ -81,7 +81,14 @@ function KanbanColumn({ stage, candidates }) {
             <div className="flex flex-col gap-2">
                 {candidates.length === 0
                     ? <div className="h-14 rounded-lg border-2 border-dashed border-slate-100 flex items-center justify-center text-[10px] text-slate-300">Aday yok</div>
-                    : candidates.map(c => <CandidateCard key={c.id} candidate={c} stageColor={stage.color} />)
+                    : candidates.map(c => (
+                        <CandidateCard
+                            key={c.id}
+                            candidate={c}
+                            stageColor={stage.color}
+                            onSelect={() => onSelectCandidate(c.id)}
+                        />
+                    ))
                 }
             </div>
         </div>
@@ -111,7 +118,7 @@ const TYPE_MAP = { technical: 'Teknik', hr: 'İK', product: 'Ürün', cultural: 
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function PipelinePage() {
-    const { candidates } = useCandidates();
+    const { candidates, setViewCandidateId } = useCandidates();
     const [tab, setTab] = useState('kanban'); // 'kanban' | 'interviews'
     const [search, setSearch] = useState('');
     const [ivFilter, setIvFilter] = useState('all');
@@ -257,7 +264,15 @@ export default function PipelinePage() {
                     {/* Kanban columns */}
                     <div className="flex gap-3 min-w-max pb-4">
                         {STAGE_DEFS.map(stage => (
-                            <KanbanColumn key={stage.key} stage={stage} candidates={kanbanData[stage.key] || []} />
+                            <KanbanColumn
+                                key={stage.key}
+                                stage={stage}
+                                candidates={kanbanData[stage.key] || []}
+                                onSelectCandidate={(id) => {
+                                    setViewCandidateId(id);
+                                    window.dispatchEvent(new CustomEvent('changeView', { detail: 'candidate-process' }));
+                                }}
+                            />
                         ))}
                     </div>
                 </div>
