@@ -10,7 +10,7 @@ import { calculateMatchScore, filterPositionsByDomain, detectJobDomain, domainLa
 import { applyPiiMask, stripPiiForAI } from '../utils/pii';
 import { getFeedbackEmail } from '../utils/templateService';
 import { db } from '../config/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import SystemScanner from '../components/SystemScanner';
 import AddCandidateModal from '../components/AddCandidateModal';
 import {
@@ -88,7 +88,9 @@ export default function CandidateProcessPage() {
     const [bulkFiles, setBulkFiles]             = useState([]);
     const [bulkPositionId, setBulkPositionId]   = useState('');
     const [bulkImporting, setBulkImporting]     = useState(false);
-    const [bulkProgress, setBulkProgress]       = useState({ total: 0, completed: 0, failed: 0, items: [] });
+    const [bulkProgress, setBulkProgress]       = useState({ total: 0, completed: 0, failed: 0, items: [], avgScore: null, status: null });
+    const [bulkJobId, setBulkJobId]             = useState(null);
+    const [bulkToast, setBulkToast]             = useState(null);
 
     // Feedback email modal
     const [feedbackModal, setFeedbackModal]     = useState(false);
@@ -105,6 +107,41 @@ export default function CandidateProcessPage() {
             .then(snap => { if (snap.exists()) setBranding(snap.data()); })
             .catch(() => {});
     }, []);
+
+    // Real-time Firestore subscription for active bulk import job
+    useEffect(() => {
+        if (!bulkJobId || !db) return;
+        const jobDocRef = doc(db, `artifacts/talent-flow/public/data/bulkImportJobs/${bulkJobId}`);
+        const unsub = onSnapshot(jobDocRef, (snap) => {
+            if (!snap.exists()) return;
+            const data = snap.data();
+            const total = data.totalCount || 0;
+            const completed = data.processedCount || 0;
+            const failed = data.failedCount || 0;
+            const status = data.status || 'queued';
+            const avgScore = data.avgScore ?? null;
+            setBulkProgress(prev => ({
+                ...prev,
+                total,
+                completed,
+                failed,
+                avgScore,
+                status,
+            }));
+            if (status === 'completed' || status === 'error') {
+                setBulkImporting(false);
+                setBulkToast({
+                    total,
+                    completed,
+                    failed,
+                    avgScore,
+                    positionTitle: data.positionTitle || '',
+                });
+                setTimeout(() => setBulkToast(null), 8000);
+            }
+        });
+        return () => unsub();
+    }, [bulkJobId]);
 
     const showSuccess = (type) => {
         setActionSuccess(type);
@@ -274,74 +311,34 @@ export default function CandidateProcessPage() {
     const handleBulkImport = async () => {
         if (!bulkFiles.length || bulkImporting) return;
         setBulkImporting(true);
-        const total = bulkFiles.length;
-        const items = bulkFiles.map(f => ({ name: f.name, status: 'pending' }));
-        setBulkProgress({ total, completed: 0, failed: 0, items });
-
+        setBulkJobId(null);
         const selectedPos = positions.find(p => p.id === bulkPositionId);
+        const initialItems = bulkFiles.map(f => ({ name: f.name, status: 'pending' }));
+        setBulkProgress({ total: bulkFiles.length, completed: 0, failed: 0, items: initialItems, avgScore: null, status: 'queued' });
 
-        for (let i = 0; i < bulkFiles.length; i++) {
-            const file = bulkFiles[i];
-            try {
-                // Update status to processing
-                setBulkProgress(prev => {
-                    const next = [...prev.items];
-                    next[i] = { ...next[i], status: 'processing' };
-                    return { ...prev, items: next };
-                });
-
-                // Extract text
-                const cvText = await extractTextFromFile(file);
-
-                // Parse candidate
-                const parsed = await parseCandidateFromText(cvText);
-
-                // Calculate match score
-                let matchScore = 0;
-                if (parsed && selectedPos) {
-                    try {
-                        const result = calculateMatchScore(parsed, selectedPos);
-                        matchScore = result.score ?? 0;
-                    } catch {}
-                }
-
-                // Save candidate
-                await addCandidate({
-                    name: parsed?.name || file.name.replace(/\.[^.]+$/, ''),
-                    email: parsed?.email || '',
-                    phone: parsed?.phone || '',
-                    skills: parsed?.skills || [],
-                    experience: parsed?.experience || 0,
-                    education: parsed?.education || '',
-                    summary: parsed?.summary || '',
-                    cvText: cvText?.slice(0, 6000) || '',
-                    cvFileName: file.name,
-                    position: selectedPos?.title || '',
-                    positionId: selectedPos?.id || '',
-                    matchScore,
-                    source: 'bulk_import',
-                    status: 'ai_analysis',
-                    appliedDate: new Date().toISOString().split('T')[0],
-                    interviewSessions: [],
-                });
-
-                setBulkProgress(prev => {
-                    const next = [...prev.items];
-                    next[i] = { ...next[i], status: 'done', score: matchScore };
-                    return { ...prev, items: next, completed: prev.completed + 1 };
-                });
-            } catch (err) {
-                console.error('Bulk import error for', file.name, err);
-                setBulkProgress(prev => {
-                    const next = [...prev.items];
-                    next[i] = { ...next[i], status: 'error', error: err.message };
-                    return { ...prev, items: next, failed: prev.failed + 1 };
-                });
+        try {
+            const formData = new FormData();
+            bulkFiles.forEach(f => formData.append('cvs', f));
+            if (selectedPos) {
+                formData.append('positionId', selectedPos.id);
+                formData.append('positionTitle', selectedPos.title);
             }
-            // Small delay to avoid rate limiting
-            if (i < bulkFiles.length - 1) await new Promise(r => setTimeout(r, 1500));
+
+            const resp = await fetch('/api/bulk-import', { method: 'POST', body: formData });
+            const data = await resp.json();
+
+            if (!resp.ok || !data.jobId) {
+                throw new Error(data.error || 'Toplu yükleme başlatılamadı.');
+            }
+
+            // Store jobId — onSnapshot subscription will take over progress tracking
+            setBulkJobId(data.jobId);
+            setBulkProgress(prev => ({ ...prev, total: data.totalCount || bulkFiles.length, status: 'queued' }));
+        } catch (err) {
+            console.error('Bulk import start error:', err);
+            setBulkImporting(false);
+            setBulkProgress(prev => ({ ...prev, status: 'error' }));
         }
-        setBulkImporting(false);
     };
 
     const handleStatusChange = async (newStatus) => {
@@ -2042,40 +2039,66 @@ export default function CandidateProcessPage() {
                                         </div>
                                         <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
                                             <div
-                                                className="h-full bg-violet-500 rounded-full transition-all duration-300"
+                                                className={`h-full rounded-full transition-all duration-500 ${bulkProgress.failed > 0 && bulkProgress.completed === 0 ? 'bg-red-400' : 'bg-violet-500'}`}
                                                 style={{ width: `${bulkProgress.total > 0 ? ((bulkProgress.completed + bulkProgress.failed) / bulkProgress.total) * 100 : 0}%` }}
                                             />
                                         </div>
-                                        {!bulkImporting && (
-                                            <p className="text-[10px] text-slate-500 mt-1 text-center font-bold">
-                                                {bulkProgress.completed} başarılı{bulkProgress.failed > 0 && `, ${bulkProgress.failed} hatalı`}
-                                            </p>
-                                        )}
                                     </div>
 
-                                    {/* Item list */}
+                                    {/* File list — static display, icons reflect aggregate job counters */}
                                     <div className="space-y-1 max-h-48 overflow-y-auto">
-                                        {bulkProgress.items.map((item, i) => (
-                                            <div key={i} className={`flex items-center justify-between px-3 py-2 rounded-lg border text-[11px] ${
-                                                item.status === 'done' ? 'bg-emerald-50 border-emerald-200' :
-                                                item.status === 'error' ? 'bg-red-50 border-red-200' :
-                                                item.status === 'processing' ? 'bg-violet-50 border-violet-200' :
-                                                'bg-slate-50 border-slate-200'
-                                            }`}>
-                                                <span className="font-medium text-slate-700 truncate">{item.name}</span>
-                                                <span className="shrink-0 ml-2 font-bold">
-                                                    {item.status === 'done' && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
-                                                    {item.status === 'error' && <XCircle className="w-3.5 h-3.5 text-red-500" />}
-                                                    {item.status === 'processing' && <Loader2 className="w-3.5 h-3.5 text-violet-500 animate-spin" />}
-                                                    {item.status === 'pending' && <Clock className="w-3.5 h-3.5 text-slate-300" />}
-                                                </span>
-                                            </div>
-                                        ))}
+                                        {bulkProgress.items.map((item, i) => {
+                                            const doneCount = bulkProgress.completed;
+                                            const failedCount = bulkProgress.failed;
+                                            const rank = i + 1;
+                                            const itemStatus =
+                                                rank <= doneCount ? 'done' :
+                                                rank <= doneCount + failedCount ? 'error' :
+                                                (bulkProgress.status === 'processing' && rank === doneCount + failedCount + 1) ? 'processing' :
+                                                'pending';
+                                            return (
+                                                <div key={i} className={`flex items-center justify-between px-3 py-2 rounded-lg border text-[11px] ${
+                                                    itemStatus === 'done' ? 'bg-emerald-50 border-emerald-200' :
+                                                    itemStatus === 'error' ? 'bg-red-50 border-red-200' :
+                                                    itemStatus === 'processing' ? 'bg-violet-50 border-violet-200' :
+                                                    'bg-slate-50 border-slate-200'
+                                                }`}>
+                                                    <span className="font-medium text-slate-700 truncate">{item.name}</span>
+                                                    <span className="shrink-0 ml-2">
+                                                        {itemStatus === 'done' && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
+                                                        {itemStatus === 'error' && <XCircle className="w-3.5 h-3.5 text-red-500" />}
+                                                        {itemStatus === 'processing' && <Loader2 className="w-3.5 h-3.5 text-violet-500 animate-spin" />}
+                                                        {itemStatus === 'pending' && <Clock className="w-3.5 h-3.5 text-slate-300" />}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
+
+                                    {/* Status badge */}
+                                    {bulkProgress.status && (
+                                        <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-bold ${
+                                            bulkProgress.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                                            bulkProgress.status === 'error' ? 'bg-red-50 text-red-700 border border-red-200' :
+                                            bulkProgress.status === 'processing' ? 'bg-violet-50 text-violet-700 border border-violet-200' :
+                                            'bg-slate-50 text-slate-500 border border-slate-200'
+                                        }`}>
+                                            {bulkProgress.status === 'processing' && <Loader2 className="w-3 h-3 animate-spin" />}
+                                            {bulkProgress.status === 'completed' && <CheckCircle2 className="w-3 h-3" />}
+                                            {bulkProgress.status === 'error' && <XCircle className="w-3 h-3" />}
+                                            {bulkProgress.status === 'queued' && <Clock className="w-3 h-3" />}
+                                            <span>
+                                                {bulkProgress.status === 'completed' ? `Tamamlandı — ${bulkProgress.completed} başarılı${bulkProgress.failed > 0 ? `, ${bulkProgress.failed} hatalı` : ''}${bulkProgress.avgScore != null ? ` · Ort. Eşleşme: %${bulkProgress.avgScore}` : ''}` :
+                                                 bulkProgress.status === 'error' ? 'İşlem hatası oluştu' :
+                                                 bulkProgress.status === 'processing' ? `İşleniyor… ${bulkProgress.completed + bulkProgress.failed}/${bulkProgress.total}` :
+                                                 'Sıraya alındı'}
+                                            </span>
+                                        </div>
+                                    )}
 
                                     {!bulkImporting && (
                                         <button
-                                            onClick={() => { setBulkImportModal(false); setBulkProgress({ total: 0, completed: 0, failed: 0, items: [] }); }}
+                                            onClick={() => { setBulkImportModal(false); setBulkProgress({ total: 0, completed: 0, failed: 0, items: [], avgScore: null, status: null }); setBulkJobId(null); setBulkFiles([]); }}
                                             className="w-full h-9 rounded-xl text-[10px] font-black text-white bg-slate-800 hover:bg-slate-900 uppercase tracking-widest transition-all"
                                         >
                                             Kapat
@@ -2085,6 +2108,24 @@ export default function CandidateProcessPage() {
                             )}
                         </div>
                     </div>
+                </div>
+            )}
+
+            {/* Bulk Import completion toast */}
+            {bulkToast && (
+                <div className="fixed bottom-6 right-6 z-[200] flex items-start gap-3 px-4 py-3 bg-white rounded-2xl shadow-2xl border border-emerald-200 max-w-sm animate-in slide-in-from-bottom-4 duration-300">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
+                    <div>
+                        <p className="text-[12px] font-black text-slate-800">Toplu Yükleme Tamamlandı</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                            {bulkToast.positionTitle ? `"${bulkToast.positionTitle}" — ` : ''}{bulkToast.completed} aday eklendi
+                            {bulkToast.failed > 0 && <span className="text-red-500">, {bulkToast.failed} hata</span>}
+                            {bulkToast.avgScore != null && <span className="text-violet-600"> · Ort. eşleşme %{bulkToast.avgScore}</span>}
+                        </p>
+                    </div>
+                    <button onClick={() => setBulkToast(null)} className="text-slate-300 hover:text-slate-500 ml-2 shrink-0">
+                        <X className="w-3.5 h-3.5" />
+                    </button>
                 </div>
             )}
 
