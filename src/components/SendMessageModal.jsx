@@ -53,7 +53,9 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
 
     // Initialize
     useEffect(() => {
-        generateDM(initialPurpose, interviewType);
+        if (initialPurpose !== 'info-request') {
+            generateDM(initialPurpose, interviewType);
+        }
     }, [initialPurpose]);
 
     async function generateDM(selectedPurpose, type = interviewType) {

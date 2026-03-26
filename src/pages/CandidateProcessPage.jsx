@@ -13,13 +13,14 @@ import { db } from '../config/firebase';
 import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import SystemScanner from '../components/SystemScanner';
 import AddCandidateModal from '../components/AddCandidateModal';
+import SendMessageModal from '../components/SendMessageModal';
 import {
     Plus, Search, Zap, Brain, X,
     Target, ShieldCheck, ArrowRight, FileText, Clock,
     AlertCircle, Trophy, Calendar, Edit3,
     CheckCircle2, Link2, ExternalLink, Video, Play, Award, User, Mail,
     ChevronRight, ChevronDown, BarChart2, MessageSquare, XCircle, Send, Loader2,
-    Sparkles, Trash2, RefreshCw, Layers, TrendingUp, Upload
+    Sparkles, Trash2, RefreshCw, Layers, TrendingUp, Upload, FileQuestion
 } from 'lucide-react';
 
 const STATUS_CONFIG = {
@@ -95,6 +96,7 @@ export default function CandidateProcessPage() {
     const [bulkJsonText, setBulkJsonText]       = useState('');
 
     // Feedback email modal
+    const [infoRequestModal, setInfoRequestModal] = useState(false);
     const [feedbackModal, setFeedbackModal]     = useState(false);
     const [feedbackOutcome, setFeedbackOutcome] = useState('positive');
     const [feedbackText, setFeedbackText]       = useState('');
@@ -1621,6 +1623,15 @@ export default function CandidateProcessPage() {
                                     </button>
                                     {candidate?.email && (
                                         <button
+                                            onClick={() => setInfoRequestModal(true)}
+                                            className="h-8 px-3 bg-cyan-50 text-cyan-600 rounded-lg text-[9px] font-black uppercase border border-cyan-200 hover:bg-cyan-100 transition-all flex items-center gap-1.5"
+                                            title="Adaydan Bilgi / Belge İste"
+                                        >
+                                            <FileQuestion className="w-3 h-3" /> Bilgi İste
+                                        </button>
+                                    )}
+                                    {candidate?.email && (
+                                        <button
                                             onClick={() => { setFeedbackText(''); setFeedbackOutcome('positive'); setFeedbackModal(true); }}
                                             className="h-8 px-3 bg-emerald-50 text-emerald-600 rounded-lg text-[9px] font-black uppercase border border-emerald-200 hover:bg-emerald-100 transition-all flex items-center gap-1.5"
                                             title="Aday Geri Bildirim E-postası Gönder"
@@ -2200,6 +2211,15 @@ export default function CandidateProcessPage() {
             )}
 
             <AddCandidateModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
+
+            {infoRequestModal && candidate && (
+                <SendMessageModal
+                    candidate={candidate}
+                    initialPurpose="info-request"
+                    onClose={() => setInfoRequestModal(false)}
+                    onSent={() => setInfoRequestModal(false)}
+                />
+            )}
         </div>
     );
 }
