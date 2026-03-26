@@ -136,12 +136,47 @@ export const disconnectGoogleWorkspace = async (userId) => {
 // Returns: { success, messageId, threadId }
 export const sendDirectEmail = async (userId, token, emailData) => {
     try {
-        const { to, subject, body, html, replyTo } = emailData;
+        const { to, subject, body, html, replyTo, ics } = emailData;
 
         const utf8Subject = `=?utf-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`;
 
         let rawMessage;
-        if (html) {
+        if (html && ics) {
+            // multipart/mixed → (multipart/alternative + text/calendar)
+            const outer = `outer_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+            const inner = `inner_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+            const parts = [
+                `To: ${to}`,
+                `Subject: ${utf8Subject}`,
+                ...(replyTo ? [`Reply-To: ${replyTo}`] : []),
+                'MIME-Version: 1.0',
+                `Content-Type: multipart/mixed; boundary="${outer}"`,
+                '',
+                `--${outer}`,
+                `Content-Type: multipart/alternative; boundary="${inner}"`,
+                '',
+                `--${inner}`,
+                'Content-Type: text/plain; charset="UTF-8"',
+                '',
+                body || '',
+                '',
+                `--${inner}`,
+                'Content-Type: text/html; charset="UTF-8"',
+                '',
+                html,
+                '',
+                `--${inner}--`,
+                '',
+                `--${outer}`,
+                'Content-Type: text/calendar; method=REQUEST; charset="UTF-8"',
+                'Content-Disposition: attachment; filename="invite.ics"',
+                '',
+                ics,
+                '',
+                `--${outer}--`
+            ];
+            rawMessage = parts.join('\r\n');
+        } else if (html) {
             // Multipart: plain text fallback + HTML body
             const boundary = `boundary_${Date.now()}_${Math.random().toString(36).slice(2)}`;
             const parts = [

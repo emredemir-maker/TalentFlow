@@ -9,6 +9,7 @@ import { collection, onSnapshot, doc, getDoc, setDoc, deleteDoc, serverTimestamp
 import { db } from '../config/firebase';
 import { getCalendarEvents, connectGoogleWorkspace, sendDirectEmail, createDirectCalendarEvent, ensureValidGoogleToken } from '../services/integrationService';
 import { getInviteEmail, getParticipantEmail, getRescheduleEmail } from '../utils/templateService';
+import { buildICS } from '../utils/emailTemplates';
 import { 
     Plus, 
     Video, 
@@ -577,11 +578,23 @@ export default function InterviewManagementPage() {
                 companyEmail:  userProfile?.email || null,
             });
 
+            const candidateICS = buildICS({
+                date:        manualDate || null,
+                time:        manualTime || null,
+                title:       emailSubject,
+                description: `Aday: ${selectedCandidate.name}\nPozisyon: ${selectedCandidate.position || ''}\nMülakat linki: ${emailJoinLink || ''}`,
+                location:    emailJoinLink || '',
+                uid:         `${emailJoinLink || Date.now()}@talentflow`,
+                organizer:   { name: userProfile?.displayName || '', email: userProfile?.email || '' },
+                attendee:    { name: selectedCandidate.name, email: selectedCandidate.email },
+            });
+
             const result = await sendDirectEmail(userId, freshToken, {
                 to:      selectedCandidate.email,
                 subject: emailSubject,
                 body:    emailBody,
                 html:    htmlBody,
+                ics:     candidateICS,
                 replyTo: userProfile?.email || null,
             });
 
@@ -782,11 +795,22 @@ export default function InterviewManagementPage() {
                                 googleMeetLink:  calResult?.success && calResult.meetLink ? calResult.meetLink : null,
                                 recruiterName:   userProfile?.displayName || ''
                             });
+                            const participantICS = buildICS({
+                                date:        slot.date,
+                                time:        slot.time,
+                                title:       `${newSession.title} — ${selectedCandidate.name}`,
+                                description: `Aday: ${selectedCandidate.name}\nPozisyon: ${selectedCandidate.position || '—'}\nOrganizatör: ${userProfile?.displayName || ''}\nMülakat linki: ${platformJoinLink}`,
+                                location:    platformJoinLink,
+                                uid:         `${newSession.id}-${participant.email}@talentflow`,
+                                organizer:   { name: userProfile?.displayName || '', email: userProfile?.email || '' },
+                                attendee:    { name: participant.name, email: participant.email },
+                            });
                             await sendDirectEmail(userId, freshCalToken, {
                                 to:      participant.email,
                                 subject: `Mülakat Daveti: ${newSession.title} — ${selectedCandidate.name}`,
-                                body:    `Merhaba ${participant.name || participant.email},\n\nTalent-Inn üzerinden bir mülakata katılımcı olarak eklendiniz.\n\nAday: ${selectedCandidate.name}\nPozisyon: ${selectedCandidate.position || '—'}\nTarih: ${slot.date}\nSaat: ${slot.time}\nMülakat Tipi: ${newSession.title}\n\nMülakat Linki: ${meetLink}\n\nTalent-Inn Ekibi`,
+                                body:    `Merhaba ${participant.name || participant.email},\n\nTalent-Inn üzerinden bir mülakata katılımcı olarak eklendiniz.\n\nAday: ${selectedCandidate.name}\nPozisyon: ${selectedCandidate.position || '—'}\nTarih: ${slot.date}\nSaat: ${slot.time}\nMülakat Tipi: ${newSession.title}\n\nMülakat Linki: ${platformJoinLink}\n\nTalent-Inn Ekibi`,
                                 html:    participantHtml,
+                                ics:     participantICS,
                                 replyTo: userProfile?.email || null,
                             });
                         } catch (emailErr) {

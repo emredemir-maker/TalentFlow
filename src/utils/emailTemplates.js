@@ -421,3 +421,43 @@ export function buildParticipantNotificationEmail(branding, {
     `;
     return baseLayout(b, content);
 }
+
+
+// ─── ICS (iCalendar) Builder ──────────────────────────────────────────────────
+// Generates a .ics string accepted by Outlook, Apple Mail, Google Calendar etc.
+// date: "YYYY-MM-DD", time: "HH:MM", organizer: { name, email }, attendee: { name, email }
+export function buildICS({ date, time, title, description, location, uid, organizer, attendee }) {
+    if (!date || !time) return null;
+    try {
+        const cleanDate = date.replace(/-/g, '');
+        const [h, m] = time.replace('.', ':').split(':').map(Number);
+        const fmt = (n) => String(n).padStart(2, '0');
+        const dtStart = `${cleanDate}T${fmt(h)}${fmt(m || 0)}00`;
+        const dtEnd   = `${cleanDate}T${fmt((h + 1) % 24)}${fmt(m || 0)}00`;
+        const now     = new Date();
+        const dtStamp = `${now.getUTCFullYear()}${fmt(now.getUTCMonth()+1)}${fmt(now.getUTCDate())}T${fmt(now.getUTCHours())}${fmt(now.getUTCMinutes())}${fmt(now.getUTCSeconds())}Z`;
+        const safeUid = uid || `${Date.now()}-${Math.random().toString(36).slice(2)}@talentflow`;
+        const icsLines = [
+            'BEGIN:VCALENDAR',
+            'VERSION:2.0',
+            'PRODID:-//TalentFlow//HR Platform//TR',
+            'CALSCALE:GREGORIAN',
+            'METHOD:REQUEST',
+            'BEGIN:VEVENT',
+            `DTSTART:${dtStart}`,
+            `DTEND:${dtEnd}`,
+            `DTSTAMP:${dtStamp}`,
+            `UID:${safeUid}`,
+            `SUMMARY:${(title || 'Mülakat').replace(/\n/g, '\\n')}`,
+            `DESCRIPTION:${(description || '').replace(/\n/g, '\\n')}`,
+            `LOCATION:${(location || '').replace(/\n/g, '\\n')}`,
+            ...(organizer?.email ? [`ORGANIZER;CN=${organizer.name || organizer.email}:mailto:${organizer.email}`] : []),
+            ...(attendee?.email  ? [`ATTENDEE;RSVP=TRUE;CN=${attendee.name || attendee.email}:mailto:${attendee.email}`] : []),
+            'STATUS:CONFIRMED',
+            'SEQUENCE:0',
+            'END:VEVENT',
+            'END:VCALENDAR'
+        ];
+        return icsLines.join('\r\n');
+    } catch { return null; }
+}
