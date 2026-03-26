@@ -224,6 +224,11 @@ export default function ApplyPage() {
         setSubmitError(null);
 
         try {
+            // Ensure anonymous auth is active before any Firestore writes
+            if (auth && !auth.currentUser) {
+                await signInAnonymously(auth);
+            }
+
             // Step 1 — Extract text from CV
             setProgress('CV okunuyor...');
             const cvText = await extractTextFromFile(cvFile);
@@ -232,7 +237,10 @@ export default function ApplyPage() {
             setProgress('CV analiz ediliyor...');
             let parsedCandidate = null;
             try {
-                parsedCandidate = await parseCandidateFromText(cvText);
+                const parseTimeout = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('CV parse timed out after 25s')), 25000)
+                );
+                parsedCandidate = await Promise.race([parseCandidateFromText(cvText), parseTimeout]);
             } catch {
                 parsedCandidate = null;
             }
@@ -257,7 +265,13 @@ export default function ApplyPage() {
             if (parsedCandidate && position) {
                 try {
                     const jobText = `${position.title}\n${(position.requirements || []).join(', ')}\n${position.description || ''}`;
-                    const aiResult = await analyzeCandidateMatch(jobText, parsedCandidate);
+                    const timeoutPromise = new Promise((_, reject) =>
+                        setTimeout(() => reject(new Error('STAR analysis timed out after 30s')), 30000)
+                    );
+                    const aiResult = await Promise.race([
+                        analyzeCandidateMatch(jobText, parsedCandidate),
+                        timeoutPromise,
+                    ]);
                     starAiAnalysis = {
                         score: aiResult.score,
                         summary: aiResult.summary,

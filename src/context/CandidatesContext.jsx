@@ -90,7 +90,8 @@ export function CandidatesProvider({ children }) {
         // EXCEPT for candidate join and live interview routes which handle their own validation
         const isPublicAccessRoute = window.location.pathname.startsWith('/join/') || 
                                      window.location.pathname.startsWith('/live-interview/') ||
-                                     window.location.pathname.startsWith('/interview-report/');
+                                     window.location.pathname.startsWith('/interview-report/') ||
+                                     window.location.pathname.startsWith('/apply/');
 
         if (authLoading) {
             return;
@@ -182,6 +183,13 @@ export function CandidatesProvider({ children }) {
                 unsubCandidates = () => { if (innerUnsub) innerUnsub(); };
                 return () => unsubCandidates();
             }
+
+            // Anonymous user on /apply/ (or other public route without a session ID):
+            // no candidates needed — bail out to avoid hitting the global listener.
+            setCandidates([]);
+            setLoading(false);
+            setError(null);
+            return;
         }
 
         // Department users: run TWO parallel Firestore queries and merge results.
