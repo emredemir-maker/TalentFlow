@@ -2007,7 +2007,7 @@ export default function CandidateProcessPage() {
                                                 onDrop={e => {
                                                     e.preventDefault();
                                                     const files = Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.pdf') || f.name.endsWith('.docx') || f.name.endsWith('.zip'));
-                                                    setBulkFiles(prev => [...prev, ...files].slice(0, 50));
+                                                    setBulkFiles(prev => [...prev, ...files].slice(0, 20));
                                                 }}
                                                 onClick={() => document.getElementById('bulk-cv-input')?.click()}
                                                 className="border-2 border-dashed border-violet-200 rounded-xl p-8 text-center cursor-pointer hover:border-violet-400 hover:bg-violet-50/30 transition-all"
@@ -2020,7 +2020,7 @@ export default function CandidateProcessPage() {
                                                     className="hidden"
                                                     onChange={e => {
                                                         const files = Array.from(e.target.files || []);
-                                                        setBulkFiles(prev => [...prev, ...files].slice(0, 50));
+                                                        setBulkFiles(prev => [...prev, ...files].slice(0, 20));
                                                     }}
                                                 />
                                                 <Upload className="w-8 h-8 text-violet-300 mx-auto mb-2" />

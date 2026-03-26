@@ -1892,7 +1892,7 @@ app.post('/api/bulk-import', requireAuth, bulkUpload.array('cvs', 20), async (re
             }
         }
         const jobRef = db.collection(BULK_JOBS_COLL).doc();
-        await jobRef.set({ status: 'queued', totalCount: items.length, processedCount: 0, failedCount: 0, positionId, positionTitle, createdAt: admin.firestore.FieldValue.serverTimestamp() });
+        await jobRef.set({ status: 'queued', totalCount: items.length, processedCount: 0, failedCount: 0, positionId, positionTitle, createdBy: req.user.uid, createdAt: admin.firestore.FieldValue.serverTimestamp() });
         const batch = db.batch();
         for (const item of items) {
             batch.set(jobRef.collection('items').doc(String(item.index)), item);
@@ -1910,7 +1910,12 @@ app.get('/api/bulk-import/:jobId', requireAuth, async (req, res) => {
     try {
         const snap = await db.doc(`${BULK_JOBS_COLL}/${req.params.jobId}`).get();
         if (!snap.exists) return res.status(404).json({ error: 'Job bulunamadı.' });
-        res.json({ jobId: snap.id, ...snap.data() });
+        const data = snap.data();
+        // Ownership check: only allow access by the job creator or admins
+        if (data.createdBy && data.createdBy !== req.user.uid && req.user.role !== 'admin') {
+            return res.status(403).json({ error: 'Bu işe erişim izniniz yok.' });
+        }
+        res.json({ jobId: snap.id, ...data });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
