@@ -1880,7 +1880,7 @@ app.post('/api/bulk-import', requireAuth, bulkUpload.array('cvs', 20), async (re
         for (const item of items) {
             if (item.tempPath && !item.cvText) {
                 try {
-                    const ext = path.extname(item.tempPath).toLowerCase();
+                    const ext = path.extname(item.tempPath).replace(/^\./, '').toLowerCase();
                     const buf = fs.readFileSync(item.tempPath);
                     item.cvText = (await extractCvText(buf, ext)).slice(0, 6000);
                 } catch (extractErr) {
