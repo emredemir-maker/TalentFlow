@@ -23,6 +23,7 @@ import InterviewReportPage from './pages/InterviewReportPage';
 import CandidateExitPage from './pages/CandidateExitPage';
 import ApplyPage from './pages/ApplyPage';
 import TechDocsPage from './pages/TechDocsPage';
+import PipelinePage from './pages/PipelinePage';
 
 export default function App() {
   return (
@@ -102,6 +103,7 @@ function AuthenticatedApp() {
       case 'candidate-process': return <CandidateProcessPage />;
       case 'positions': return <PositionsPage />;
       case 'interviews': return <InterviewManagementPage />;
+      case 'pipeline': return <PipelinePage />;
       case 'sources': return <SettingsPage initialTab="sources" />;
       case 'departments': return <SettingsPage initialTab="departments" />;
       case 'guide': return <SettingsPage initialTab="guide" />;

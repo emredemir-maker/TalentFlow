@@ -234,7 +234,7 @@ export default function Dashboard() {
                                     <span className="text-[13px] font-black text-[#0F172A]">Aday Pipeline</span>
                                 </div>
                                 <button
-                                    onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'candidate-process' }))}
+                                    onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'pipeline' }))}
                                     className="flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:underline"
                                 >
                                     Detaylı Görünüm <ChevronRight className="w-3 h-3" />
