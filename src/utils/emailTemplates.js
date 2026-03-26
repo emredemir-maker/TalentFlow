@@ -103,6 +103,34 @@ function infoRow(label, value) {
     </tr>`;
 }
 
+// ─── YARDIMCI: Google Calendar "Takvime Ekle" linki ─────────────────────────
+function makeGoogleCalLink(date, time, title, details, location) {
+    if (!date || !time) return null;
+    try {
+        const cleanDate = date.replace(/-/g, '');
+        const [h, m] = time.replace('.', ':').split(':').map(Number);
+        const start = `${cleanDate}T${String(h).padStart(2,'0')}${String(m||0).padStart(2,'0')}00`;
+        const endH = (h + 1) % 24;
+        const end   = `${cleanDate}T${String(endH).padStart(2,'0')}${String(m||0).padStart(2,'0')}00`;
+        const p = `action=TEMPLATE&text=${encodeURIComponent(title||'Mülakat')}&dates=${start}/${end}&details=${encodeURIComponent(details||'')}&location=${encodeURIComponent(location||'')}`;
+        return `https://calendar.google.com/calendar/render?${p}`;
+    } catch { return null; }
+}
+
+// ─── YARDIMCI: "Takvime Ekle" badge butonu ───────────────────────────────────
+function calendarBadge(calLink, color) {
+    if (!calLink) return '';
+    return `
+    <div style="text-align:center;margin:0 0 28px 0;">
+      <a href="${calLink}" target="_blank"
+         style="display:inline-flex;align-items:center;gap:7px;padding:9px 20px;
+                border:1.5px solid ${color};border-radius:8px;color:${color};
+                font-size:13px;font-weight:600;text-decoration:none;background:#ffffff;">
+        <span style="font-size:16px;">📅</span> Google Takvime Ekle
+      </a>
+    </div>`;
+}
+
 // ─── YARDIMCI: primary button ────────────────────────────────────────────────
 function primaryButton(href, label, color) {
     return `
@@ -214,6 +242,11 @@ export function buildInterviewInviteEmail(branding, {
         Butona tıklayamıyorsanız bu bağlantıyı kopyalayın:<br/>
         <a href="${joinLink}" style="color:${color};word-break:break-all;font-size:11px;">${joinLink}</a>
       </p>` : ''}
+
+      ${calendarBadge(makeGoogleCalLink(date, time,
+          `Mülakat: ${position || interviewType} — ${b.companyName}`,
+          `Aday: ${candidateName}\nPozisyon: ${position}\nMülakat linki: ${joinLink || ''}`,
+          joinLink || ''), color)}
 
       <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;padding:16px 20px;margin-bottom:24px;">
         <p style="color:#15803D;font-size:13px;margin:0;line-height:1.6;">
@@ -364,6 +397,11 @@ export function buildParticipantNotificationEmail(branding, {
       ${infoCard(rows, color)}
 
       ${meetLink ? primaryButton(meetLink, 'Mülakata Katıl (Platform) &rarr;', color) : ''}
+
+      ${calendarBadge(makeGoogleCalLink(date, time,
+          `Mülakat: ${candidateName} — ${interviewType}`,
+          `Aday: ${candidateName}\nPozisyon: ${position}\nOrganizatör: ${recruiterName}\nMülakat linki: ${meetLink || ''}`,
+          meetLink || ''), color)}
 
       ${googleMeetLink ? `
       <div style="text-align:center;margin:0 0 24px 0;">
