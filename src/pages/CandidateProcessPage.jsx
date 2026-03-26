@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { analyzeCandidateMatch, parseExperiencesFromText, parseCandidateFromText } from '../services/geminiService';
 import { extractTextFromFile } from '../services/cvParser';
 import { calculateMatchScore, filterPositionsByDomain, detectJobDomain, domainLabel } from '../services/matchService';
-import { applyPiiMask } from '../utils/pii';
+import { applyPiiMask, stripPiiForAI } from '../utils/pii';
 import SystemScanner from '../components/SystemScanner';
 import AddCandidateModal from '../components/AddCandidateModal';
 import {
@@ -189,8 +189,9 @@ export default function CandidateProcessPage() {
         if (!candidate) return;
         setFeedbackAiLoading(true);
         try {
+            const safeCandidate = stripPiiForAI(candidate);
             const outcomeWord = feedbackOutcome === 'positive' ? 'olumlu' : feedbackOutcome === 'negative' ? 'olumsuz' : 'beklemede';
-            const prompt = `Sen deneyimli bir İK uzmanısın. "${candidate.name}" adlı adayın başvurusu ${outcomeWord} sonuçlanmıştır. Bu adayın profil bilgileri: pozisyon başvurusu: ${candidate.appliedPosition || candidate.position || 'belirtilmemiş'}, eşleşme skoru: ${candidate.matchScore ?? '-'}/100. Adaya gönderilecek, profesyonel, empatik ve kısa (3-4 cümle) bir geri bildirim e-postası metni yaz. Selamlama veya imza ekleme, sadece geri bildirim paragrafını yaz. Türkçe yaz.`;
+            const prompt = `Sen deneyimli bir İK uzmanısın. Bir adayın başvurusu ${outcomeWord} sonuçlanmıştır. Bu adayın profil bilgileri: pozisyon başvurusu: ${safeCandidate.appliedPosition || safeCandidate.position || 'belirtilmemiş'}, eşleşme skoru: ${safeCandidate.matchScore ?? '-'}/100. Adaya gönderilecek, profesyonel, empatik ve kısa (3-4 cümle) bir geri bildirim e-postası metni yaz. Selamlama veya imza ekleme, sadece geri bildirim paragrafını yaz. Türkçe yaz.`;
             const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${import.meta.env.VITE_GEMINI_API_KEY}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
