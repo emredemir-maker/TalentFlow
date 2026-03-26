@@ -54,9 +54,11 @@ export default function CandidateCard({ candidate, index = 0, onClick, isSelecte
         setStatusOpen(false);
         setStatusLoading(true);
         try {
+            const now = new Date().toISOString();
             await updateCandidate(candidate.id, {
                 status: newStatus,
-                statusChangedAt: new Date().toISOString(),
+                statusChangedAt: now,
+                statusChangedBy: 'HR',
             });
         } finally {
             setStatusLoading(false);
