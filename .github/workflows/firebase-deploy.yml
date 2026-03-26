@@ -39,6 +39,18 @@ jobs:
         env:
           PUPPETEER_SKIP_DOWNLOAD: true
 
+      - name: Check required secrets
+        run: |
+          if [ -z "$EMAIL_USER" ] || [ -z "$EMAIL_PASS" ]; then
+            echo "❌ EMAIL_USER veya EMAIL_PASS secret eksik!"
+            echo "GitHub repo → Settings → Secrets and variables → Actions → New repository secret"
+            exit 1
+          fi
+          echo "✅ Tüm gerekli secrets mevcut"
+        env:
+          EMAIL_USER: ${{ secrets.EMAIL_USER }}
+          EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
+
       - name: Create functions/.env.production
         run: |
           printf 'EMAIL_USER=%s\nEMAIL_PASS=%s\nVITE_GEMINI_API_KEY=%s\nVITE_FIREBASE_API_KEY=%s\n' \
