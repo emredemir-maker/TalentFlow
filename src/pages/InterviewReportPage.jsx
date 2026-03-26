@@ -45,29 +45,8 @@ export default function InterviewReportPage() {
         if (session?.recruiterEval) setRecruiterEval(session.recruiterEval);
     }, [session]);
 
-    // Auto-trigger evaluation once per completed session when no saved eval exists yet.
-    // Reset the ref whenever sessionId changes so navigating to a different report works correctly.
-    const autoEvalFiredRef = useRef(false);
-    useEffect(() => {
-        autoEvalFiredRef.current = false;
-    }, [sessionId]);
-
-    useEffect(() => {
-        // Only trigger for sessions that are truly completed, have enough signal (transcript),
-        // and haven't been evaluated yet.  All data fields are in deps so the effect retries
-        // if transcript/messages arrive after status already changed to 'completed'.
-        const isCompleted = session?.status === 'completed';
-        const transcriptLen = session?.transcript?.length ?? 0;
-        const messagesLen   = session?.messages?.length ?? 0;
-        const hasTranscript = transcriptLen > 0 || messagesLen > 0;
-        const alreadyDone   = Boolean(session?.recruiterEval);
-        if (!session || !isCompleted || !hasTranscript || alreadyDone || autoEvalFiredRef.current) return;
-        autoEvalFiredRef.current = true;
-        // Small delay to let session data settle after Firestore write on session completion
-        const timer = setTimeout(() => runEvaluateInterviewer(), 800);
-        return () => clearTimeout(timer);
-    }, [session, session?.id, session?.status, session?.transcript, session?.messages, session?.recruiterEval, runEvaluateInterviewer]);
-
+    // runEvaluateInterviewer must be declared BEFORE the auto-trigger useEffect
+    // so that the ref is stable when it appears in the dependency array.
     const runEvaluateInterviewer = useCallback(async () => {
         if (!session || evalLoading) return;
         setEvalLoading(true);
@@ -94,6 +73,29 @@ export default function InterviewReportPage() {
             setEvalLoading(false);
         }
     }, [session, candidate, sessionId, evalLoading, updateCandidate]);
+
+    // Auto-trigger evaluation once per completed session when no saved eval exists yet.
+    // Reset the ref whenever sessionId changes so navigating to a different report works correctly.
+    const autoEvalFiredRef = useRef(false);
+    useEffect(() => {
+        autoEvalFiredRef.current = false;
+    }, [sessionId]);
+
+    useEffect(() => {
+        // Only trigger for sessions that are truly completed, have enough signal (transcript),
+        // and haven't been evaluated yet.  All data fields are in deps so the effect retries
+        // if transcript/messages arrive after status already changed to 'completed'.
+        const isCompleted = session?.status === 'completed';
+        const transcriptLen = session?.transcript?.length ?? 0;
+        const messagesLen   = session?.messages?.length ?? 0;
+        const hasTranscript = transcriptLen > 0 || messagesLen > 0;
+        const alreadyDone   = Boolean(session?.recruiterEval);
+        if (!session || !isCompleted || !hasTranscript || alreadyDone || autoEvalFiredRef.current) return;
+        autoEvalFiredRef.current = true;
+        // Small delay to let session data settle after Firestore write on session completion
+        const timer = setTimeout(() => runEvaluateInterviewer(), 800);
+        return () => clearTimeout(timer);
+    }, [session, session?.id, session?.status, session?.transcript, session?.messages, session?.recruiterEval, runEvaluateInterviewer]);
 
     const showToast = (message, type = 'success') => {
         setToast({ message, type });
