@@ -78,3 +78,18 @@ jobs:
         run: firebase deploy --only hosting,functions,firestore --project talentflow-84bb6
         env:
           GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcp-sa.json
+
+      - name: Set Cloud Run env vars (guaranteed delivery)
+        run: |
+          gcloud auth activate-service-account --key-file=/tmp/gcp-sa.json
+          gcloud config set project talentflow-84bb6
+          # Use ^|^ as delimiter to handle spaces/commas in values
+          gcloud run services update api \
+            --region us-central1 \
+            --update-env-vars "^|^EMAIL_USER=${EMAIL_USER}|EMAIL_PASS=${EMAIL_PASS}|VITE_GEMINI_API_KEY=${VITE_GEMINI_API_KEY}|VITE_FIREBASE_API_KEY=${VITE_FIREBASE_API_KEY}"
+          echo "✅ Cloud Run env vars set"
+        env:
+          EMAIL_USER: ${{ secrets.EMAIL_USER }}
+          EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
+          VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
