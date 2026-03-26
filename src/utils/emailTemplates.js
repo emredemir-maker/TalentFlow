@@ -338,7 +338,7 @@ export function buildRescheduleEmail(branding, {
 // ─── 4. KATILIMCı BİLDİRİM MAİLİ (recruiter → internal participant) ─────────
 export function buildParticipantNotificationEmail(branding, {
     participantName, candidateName, position,
-    date, time, interviewType, meetLink, recruiterName
+    date, time, interviewType, meetLink, googleMeetLink, recruiterName
 }) {
     const b = { ...DEFAULT_BRANDING, ...branding };
     const color = b.primaryColor || '#0E7490';
@@ -363,7 +363,16 @@ export function buildParticipantNotificationEmail(branding, {
 
       ${infoCard(rows, color)}
 
-      ${meetLink ? primaryButton(meetLink, 'Mülakata Katıl &rarr;', color) : ''}
+      ${meetLink ? primaryButton(meetLink, 'Mülakata Katıl (Platform) &rarr;', color) : ''}
+
+      ${googleMeetLink ? `
+      <div style="text-align:center;margin:0 0 24px 0;">
+        <a href="${googleMeetLink}"
+           style="display:inline-block;padding:10px 24px;background:#ffffff;border:2px solid ${color};border-radius:8px;color:${color};font-size:14px;font-weight:600;text-decoration:none;">
+          Google Meet ile Katıl
+        </a>
+        <p style="color:#94A3B8;font-size:11px;margin:8px 0 0 0;">Alternatif: <a href="${googleMeetLink}" style="color:#94A3B8;">${googleMeetLink}</a></p>
+      </div>` : ''}
 
       <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:16px 20px;">
         <p style="color:#1E40AF;font-size:13px;margin:0;line-height:1.6;">

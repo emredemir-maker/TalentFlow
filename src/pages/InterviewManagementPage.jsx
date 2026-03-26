@@ -703,7 +703,8 @@ export default function InterviewManagementPage() {
             
             // Cryptographically random session ID — prevents enumeration attacks
             const sessionId = `iv-${crypto.randomUUID()}`;
-            let meetLink = `${window.location.origin}/join/${sessionId}`;
+            const platformJoinLink = `${window.location.origin}/join/${sessionId}`;
+            let meetLink = platformJoinLink;
             let calendarEventLink = null;
 
             const newSession = {
@@ -777,7 +778,8 @@ export default function InterviewManagementPage() {
                                 date:            slot.date,
                                 time:            slot.time,
                                 interviewType:   newSession.title,
-                                meetLink,
+                                meetLink:        platformJoinLink,
+                                googleMeetLink:  calResult?.success && calResult.meetLink ? calResult.meetLink : null,
                                 recruiterName:   userProfile?.displayName || ''
                             });
                             await sendDirectEmail(userId, freshCalToken, {

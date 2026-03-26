@@ -86,6 +86,7 @@ export async function getParticipantEmail(branding, vars) {
         time:            vars.time,
         interviewType:   vars.interviewType,
         meetLink:        vars.meetLink,
+        googleMeetLink:  vars.googleMeetLink || null,
         recruiterName:   vars.recruiterName,
     });
     return { html, subject: null };
