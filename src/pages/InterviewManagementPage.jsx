@@ -758,8 +758,50 @@ export default function InterviewManagementPage() {
                 const freshCalToken = await ensureValidGoogleToken(userId, userProfile);
 
                 if (!freshCalToken) {
-                    console.warn('[Calendar] Could not obtain valid token — skipping calendar event.');
+                    console.warn('[Calendar] Could not obtain valid token — skipping calendar event; will use nodemailer for candidate invite.');
                     alert('⚠️ Google token alınamadı. Mülakat sisteme kaydedilecek ama takvime eklenemeyecek.');
+                    // Nodemailer fallback when Google token is unavailable
+                    if (selectedCandidate?.email) {
+                        try {
+                            const { html: fbHtml } = await getInviteEmail(branding, {
+                                candidateName: selectedCandidate.name,
+                                recruiterName: userProfile?.displayName || '',
+                                position:      selectedCandidate.position,
+                                interviewType: newSession.title,
+                                date:          slot.date,
+                                time:          slot.time,
+                                joinLink:      platformJoinLink,
+                                companyEmail:  userProfile?.email || null,
+                            });
+                            const fbICS = buildICS({
+                                date:        slot.date,
+                                time:        slot.time,
+                                title:       newSession.title,
+                                description: `Aday: ${selectedCandidate.name}\nPozisyon: ${selectedCandidate.position || ''}\nMülakat linki: ${platformJoinLink}`,
+                                location:    platformJoinLink,
+                                uid:         `${newSession.id}-candidate@talentflow`,
+                                organizer:   { name: userProfile?.displayName || '', email: userProfile?.email || '' },
+                                attendee:    { name: selectedCandidate.name, email: selectedCandidate.email },
+                            });
+                            const authTok = await currentUser?.getIdToken?.() || '';
+                            const fbRes = await fetch('/api/send-interview-invite', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authTok}` },
+                                body: JSON.stringify({
+                                    to: selectedCandidate.email,
+                                    subject: `Mülakat Davetiniz: ${newSession.title}`,
+                                    html: fbHtml,
+                                    ics: fbICS,
+                                    candidateName: selectedCandidate.name,
+                                    branding,
+                                }),
+                            });
+                            if (!fbRes.ok) throw new Error(await fbRes.text());
+                            console.log('[createInterviewRecord] Token-fail nodemailer invite sent to:', selectedCandidate.email);
+                        } catch (fbErr) {
+                            console.warn('[createInterviewRecord] Token-fail nodemailer invite failed (non-blocking):', fbErr.message);
+                        }
+                    }
                 } else {
                     const participantEmails = selectedParticipants.map(p => p.email).filter(Boolean);
                     const calResult = await createDirectCalendarEvent(userId, freshCalToken, {
@@ -887,9 +929,10 @@ export default function InterviewManagementPage() {
                         organizer:   { name: userProfile?.displayName || '', email: userProfile?.email || '' },
                         attendee:    { name: selectedCandidate.name, email: selectedCandidate.email },
                     });
-                    await fetch('/api/send-interview-invite', {
+                    const authTok2 = await currentUser?.getIdToken?.() || '';
+                    const inviteResp = await fetch('/api/send-interview-invite', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authTok2}` },
                         body: JSON.stringify({
                             to: selectedCandidate.email,
                             subject: `Mülakat Davetiniz: ${newSession.title}`,
@@ -899,6 +942,7 @@ export default function InterviewManagementPage() {
                             branding,
                         }),
                     });
+                    if (!inviteResp.ok) throw new Error(await inviteResp.text());
                     console.log('[createInterviewRecord] Nodemailer candidate invite sent to:', selectedCandidate.email);
                 } catch (inviteErr) {
                     console.warn('[createInterviewRecord] Nodemailer candidate invite failed (non-blocking):', inviteErr.message);

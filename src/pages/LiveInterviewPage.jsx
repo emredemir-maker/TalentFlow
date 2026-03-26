@@ -1837,12 +1837,14 @@ export default function LiveInterviewPage() {
                                                 </div>
                                                 <button
                                                     onClick={async () => {
+                                                        if (!inLobby) return;
                                                         await persistSessionData({ candidateStatus: 'admitted' });
                                                     }}
-                                                    className={`h-8 px-4 rounded-lg text-white font-black text-[9px] tracking-widest uppercase transition-all shadow-lg flex items-center gap-2 border mr-2 ${inLobby ? 'bg-amber-500 hover:bg-amber-600 border-amber-400 shadow-amber-500/20 animate-pulse' : 'bg-slate-700 hover:bg-slate-600 border-slate-600 shadow-slate-900/50 opacity-80 hover:opacity-100'}`}
-                                                    title={inLobby ? 'Adayı İçeri Al' : 'Aday Henüz Lobide Değil — Yine de Zorla Al'}
+                                                    disabled={!inLobby}
+                                                    className={`h-8 px-4 rounded-lg text-white font-black text-[9px] tracking-widest uppercase transition-all shadow-lg flex items-center gap-2 border mr-2 ${inLobby ? 'bg-amber-500 hover:bg-amber-600 border-amber-400 shadow-amber-500/20 animate-pulse' : 'bg-slate-700 border-slate-600 opacity-40 cursor-not-allowed'}`}
+                                                    title={inLobby ? 'Adayı İçeri Al' : 'Aday Lobide Beklemiyor'}
                                                 >
-                                                    <Users className="w-3 h-3" /> {inLobby ? 'Adayı İçeri Al' : 'Adayı Seansa Al'}
+                                                    <Users className="w-3 h-3" /> {inLobby ? 'Adayı İçeri Al' : 'Lobide Değil'}
                                                 </button>
                                             </>
                                         );

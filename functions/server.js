@@ -142,6 +142,27 @@ const generalLimiter = rateLimit({
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
+async function verifyFirebaseToken(req, res, next) {
+    const authHeader = req.headers.authorization || '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+    if (!token) return res.status(401).json({ error: 'Kimlik doğrulama gereklidir.' });
+    const apiKey = process.env.VITE_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY;
+    if (!apiKey) {
+        console.warn('[verifyFirebaseToken] Firebase API key not set; skipping verification');
+        return next();
+    }
+    try {
+        const resp = await fetch(
+            `https://www.googleapis.com/identitytoolkit/v3/relyingparty/getAccountInfo?key=${apiKey}`,
+            { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken: token }) }
+        );
+        if (!resp.ok) return res.status(401).json({ error: 'Geçersiz kimlik bilgileri.' });
+        return next();
+    } catch {
+        return res.status(401).json({ error: 'Kimlik doğrulama başarısız.' });
+    }
+}
+
 // Rate limiter for AI endpoints (20 req/min/IP)
 const aiLimiter = rateLimit({
     windowMs: 60 * 1000,
@@ -744,7 +765,7 @@ function cleanupOldFiles() {
 }
 
 // Candidate Feedback Email Endpoint (Task #7)
-app.post('/api/send-feedback', generalLimiter, async (req, res) => {
+app.post('/api/send-feedback', generalLimiter, verifyFirebaseToken, async (req, res) => {
     const { to, candidateName, recruiterName, outcome, feedbackText, branding } = req.body;
     if (!to || !feedbackText) return res.status(400).json({ error: 'Email ve geri bildirim metni gereklidir.' });
     if (!EMAIL_RE.test(to)) return res.status(400).json({ error: 'Geçersiz email adresi.' });
@@ -806,7 +827,7 @@ app.post('/api/send-feedback', generalLimiter, async (req, res) => {
 });
 
 // --- Interview Invite via Nodemailer (Google-bağımsız fallback) ---
-app.post('/api/send-interview-invite', generalLimiter, async (req, res) => {
+app.post('/api/send-interview-invite', generalLimiter, verifyFirebaseToken, async (req, res) => {
     const { to, subject, html, ics, candidateName, branding } = req.body;
     if (!to || !html) return res.status(400).json({ error: 'Email ve HTML içerik gereklidir.' });
     if (!EMAIL_RE.test(to)) return res.status(400).json({ error: 'Geçersiz email adresi.' });

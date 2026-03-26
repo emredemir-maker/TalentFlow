@@ -210,9 +210,10 @@ export default function CandidateProcessPage() {
         if (!candidate || !feedbackText.trim()) return;
         setFeedbackLoading(true);
         try {
+            const fbAuthTok = await user?.getIdToken?.() || '';
             const res = await fetch('/api/send-feedback', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${fbAuthTok}` },
                 body: JSON.stringify({
                     to: candidate.email,
                     candidateName: candidate.name,
