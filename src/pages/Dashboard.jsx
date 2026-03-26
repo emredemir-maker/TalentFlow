@@ -72,17 +72,25 @@ export default function Dashboard() {
 
         // Direct per-stage counts (non-cumulative) for the 6 canonical pipeline stages
         const stageDefs = [
-            { key: 'ai_analysis', label: 'AI Tarama',   color: '#2563EB', legacy: ['new'] },
+            { key: 'ai_analysis', label: 'AI Tarama',   color: '#2563EB', legacy: ['new', 'pending', 'applied', 'unknown'] },
             { key: 'review',      label: 'İnceleme',    color: '#3B82F6', legacy: ['Review', 'değerlendirme'] },
-            { key: 'interview',   label: 'Mülakat',     color: '#7C3AED', legacy: ['Interview', 'mülakat'] },
+            { key: 'interview',   label: 'Mülakat',     color: '#7C3AED', legacy: ['Interview', 'mülakat', 'Mülakat'] },
             { key: 'offer',       label: 'Teklif',      color: '#F59E0B', legacy: [] },
-            { key: 'hired',       label: 'İşe Alındı',  color: '#059669', legacy: [] },
-            { key: 'rejected',    label: 'Reddedildi',  color: '#DC2626', legacy: ['Rejected'] },
+            { key: 'hired',       label: 'İşe Alındı',  color: '#059669', legacy: ['Hired'] },
+            { key: 'rejected',    label: 'Reddedildi',  color: '#DC2626', legacy: ['Rejected', 'rejected'] },
         ];
 
-        return stageDefs.map(s => {
-            const count = (byStatus[s.key] || 0) +
+        // Collect all known status keys so we can catch-all the rest into AI Tarama
+        const allKnownKeys = new Set(stageDefs.flatMap(s => [s.key, ...s.legacy]));
+        const uncategorizedCount = Object.entries(byStatus)
+            .filter(([k]) => !allKnownKeys.has(k))
+            .reduce((sum, [, v]) => sum + v, 0);
+
+        return stageDefs.map((s, idx) => {
+            let count = (byStatus[s.key] || 0) +
                 s.legacy.reduce((sum, k) => sum + (byStatus[k] || 0), 0);
+            // First stage absorbs any candidates with unrecognized statuses
+            if (idx === 0) count += uncategorizedCount;
             return {
                 label: s.label,
                 count,
