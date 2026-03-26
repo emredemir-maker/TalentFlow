@@ -463,7 +463,7 @@ export function buildICS({ date, time, title, description, location, uid, organi
 }
 
 // ─── Candidate Feedback Email ─────────────────────────────────────────────────
-export function buildFeedbackEmail(branding, { candidateName, recruiterName, outcome, feedbackText, companyEmail }) {
+export function buildFeedbackEmail(branding, { candidateName, recruiterName, position, outcome, feedbackText, companyEmail }) {
     const outcomeLabel = outcome === 'positive' ? '✅ Olumlu' : outcome === 'negative' ? '❌ Olumsuz' : '⏳ Beklemede';
     const outcomeColor = outcome === 'positive' ? '#10B981' : outcome === 'negative' ? '#EF4444' : '#F59E0B';
     const content = `
@@ -479,6 +479,7 @@ export function buildFeedbackEmail(branding, { candidateName, recruiterName, out
         <!-- Main message -->
         <tr><td style="padding:28px 48px 0;">
             <p style="margin:0;font-size:15px;color:#334155;">Sayın <strong>${candidateName}</strong>,</p>
+            ${position ? `<p style="margin:8px 0 0;font-size:12px;color:#64748B;">Başvurulan Pozisyon: <strong>${position}</strong></p>` : ''}
             <p style="margin:16px 0 0;font-size:14px;color:#475569;line-height:1.7;">
                 Başvurunuzu ve değerlendirme sürecimize gösterdiğiniz ilgiyi için teşekkür ederiz. Aşağıda sürecinize ilişkin geri bildiriminizi bulabilirsiniz.
             </p>

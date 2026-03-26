@@ -47,7 +47,8 @@ import {
     CheckCircle,
     X,
     UserPlus,
-    AtSign
+    AtSign,
+    Briefcase
 } from 'lucide-react';
 
 const PARTICIPANT_INVITES_PATH = 'artifacts/talent-flow/public/data/participantInvites';
@@ -1755,6 +1756,14 @@ export default function InterviewManagementPage() {
                                                 {selectedInterviewer?.displayName || currentUser?.displayName || 'Değerlendirici'}
                                             </span>
                                         </div>
+                                        {(selectedCandidate?.position || selectedCandidate?.bestTitle) && (
+                                            <div className="flex items-center gap-2">
+                                                <Briefcase className="w-3.5 h-3.5 text-[#1E3A8A]" />
+                                                <span className="text-[11px] text-[#0F172A] font-semibold truncate">
+                                                    {selectedCandidate?.position || selectedCandidate?.bestTitle}
+                                                </span>
+                                            </div>
+                                        )}
                                         <div className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest ${
                                             interviewType === 'technical' ? 'bg-blue-50 text-blue-600' :
                                             interviewType === 'hr' ? 'bg-amber-50 text-amber-600' :

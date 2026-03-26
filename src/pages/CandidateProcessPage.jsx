@@ -1,5 +1,5 @@
 // src/pages/CandidateProcessPage.jsx
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
@@ -8,6 +8,9 @@ import { analyzeCandidateMatch, parseExperiencesFromText, parseCandidateFromText
 import { extractTextFromFile } from '../services/cvParser';
 import { calculateMatchScore, filterPositionsByDomain, detectJobDomain, domainLabel } from '../services/matchService';
 import { applyPiiMask, stripPiiForAI } from '../utils/pii';
+import { getFeedbackEmail } from '../utils/templateService';
+import { db } from '../config/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 import SystemScanner from '../components/SystemScanner';
 import AddCandidateModal from '../components/AddCandidateModal';
 import {
@@ -94,6 +97,14 @@ export default function CandidateProcessPage() {
     const [feedbackLoading, setFeedbackLoading] = useState(false);
     const [feedbackAiLoading, setFeedbackAiLoading] = useState(false);
     const [feedbackSuccess, setFeedbackSuccess] = useState(false);
+
+    // Branding — loaded once from Firestore for email template generation
+    const [branding, setBranding] = useState({ companyName: 'Talent-Inn', primaryColor: '#1E3A8A' });
+    useEffect(() => {
+        getDoc(doc(db, 'artifacts/talent-flow/public/data/settings', 'branding'))
+            .then(snap => { if (snap.exists()) setBranding(snap.data()); })
+            .catch(() => {});
+    }, []);
 
     const showSuccess = (type) => {
         setActionSuccess(type);
@@ -211,6 +222,24 @@ export default function CandidateProcessPage() {
         if (!candidate || !feedbackText.trim()) return;
         setFeedbackLoading(true);
         try {
+            const recruiterName = user?.displayName || user?.email || 'İK Ekibi';
+            const position = candidate.position || candidate.bestTitle || '';
+            const trimmedText = feedbackText.trim();
+
+            // Build branded HTML via the template service (supports Firestore-saved overrides)
+            let emailHtml = null;
+            try {
+                const { html } = await getFeedbackEmail(branding, {
+                    candidateName: candidate.name,
+                    recruiterName,
+                    position,
+                    outcome: feedbackOutcome,
+                    feedbackText: trimmedText,
+                    companyEmail: user?.email || null,
+                });
+                emailHtml = html;
+            } catch { /* fallback: let backend build its own HTML */ }
+
             const fbAuthTok = await user?.getIdToken?.() || '';
             const res = await fetch('/api/send-feedback', {
                 method: 'POST',
@@ -218,9 +247,11 @@ export default function CandidateProcessPage() {
                 body: JSON.stringify({
                     to: candidate.email,
                     candidateName: candidate.name,
-                    recruiterName: user?.displayName || user?.email || 'İK Ekibi',
+                    recruiterName,
+                    position,
                     outcome: feedbackOutcome,
-                    feedbackText: feedbackText.trim(),
+                    feedbackText: trimmedText,
+                    html: emailHtml,
                 })
             });
             const data = await res.json();

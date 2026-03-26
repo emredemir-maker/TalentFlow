@@ -152,6 +152,7 @@ export async function getFeedbackEmail(branding, vars) {
     }
     const html = buildFeedbackEmail(branding, {
         candidateName: vars.candidateName,
+        recruiterName: vars.recruiterName,
         position:      vars.position,
         outcome:       vars.outcome,
         feedbackText:  vars.feedbackText,
