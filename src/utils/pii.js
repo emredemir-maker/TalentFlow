@@ -73,10 +73,18 @@ export function maskName(name) {
     return parts.map(p => p.charAt(0).toUpperCase() + '.').join(' ');
 }
 
+// Free-text fields on candidate objects that may contain embedded PII patterns
+const FREE_TEXT_FIELDS = [
+    'summary', 'cvData', 'cvText', 'description', 'about',
+    'responsibilities', 'notes', 'hrComments',
+];
+
 /**
  * Centralized PII stripper for candidate objects sent to any external AI.
- * Removes all personally-identifiable fields; retains only professional/skill
- * attributes. Also scrubs name from free-text summary to prevent leakage.
+ * 1. Removes all PII-carrying structured fields (name, email, phone, …).
+ * 2. Applies text-level redaction on all free-text fields so embedded
+ *    email addresses, phone numbers, or URLs in narrative text are replaced
+ *    with safe placeholder tokens.
  * @param {object} candidateData
  * @returns {object} sanitized copy safe to send to AI
  */
@@ -86,13 +94,11 @@ export function stripPiiForAI(candidateData) {
     for (const field of PII_OBJECT_FIELDS) {
         delete safe[field];
     }
-    // Remove name-like patterns from free-text fields
-    const namePattern = /\b[A-ZÇĞİÖŞÜ][a-zçğışöşü]+ [A-ZÇĞİÖŞÜ][a-zçğışöşü]+\b/g;
-    if (safe.summary && typeof safe.summary === 'string') {
-        safe.summary = safe.summary.replace(namePattern, 'Aday');
-    }
-    if (safe.cvData && typeof safe.cvData === 'string') {
-        safe.cvData = safe.cvData.replace(namePattern, 'Aday');
+    // Redact PII patterns embedded in every free-text field
+    for (const field of FREE_TEXT_FIELDS) {
+        if (safe[field] && typeof safe[field] === 'string') {
+            safe[field] = redactPiiFromText(safe[field]);
+        }
     }
     return safe;
 }
