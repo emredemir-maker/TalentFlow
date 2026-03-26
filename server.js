@@ -1604,25 +1604,22 @@ async function executeJob(jobId) {
             while (retries <= MAX_RETRIES) {
                 try {
                     let cvText = '';
-
-                    if (item.source === 'json_record') {
-                        // JSON record: prefer cvText, fallback to fetching cvUrl
-                        if (item.cvText && item.cvText.trim().length > 5) {
-                            cvText = item.cvText.trim();
-                        } else if (item.cvUrl) {
-                            cvText = await extractCvTextFromUrl(item.cvUrl);
-                            if (!cvText || cvText.length < 20) throw new Error('cvUrl içeriği okunamadı');
-                        } else {
-                            throw new Error('JSON kaydında cvText veya cvUrl gereklidir');
-                        }
-                    } else {
-                        // File-based item: read from tempPath
+                    if (item.cvText && item.cvText.trim().length > 5) {
+                        // Pre-extracted text (json_record or pre-processed file upload)
+                        cvText = item.cvText.trim();
+                    } else if (item.cvUrl) {
+                        cvText = await extractCvTextFromUrl(item.cvUrl);
+                        if (!cvText || cvText.length < 20) throw new Error('cvUrl içeriği okunamadı');
+                    } else if (item.tempPath) {
+                        // Fallback: file path still available (same-process, no restart)
                         const filePath = item.tempPath;
-                        if (!filePath || !fs.existsSync(filePath)) throw new Error('Dosya bulunamadı');
+                        if (!fs.existsSync(filePath)) throw new Error('Dosya bulunamadı ve cvText mevcut değil');
                         const fileBuffer = fs.readFileSync(filePath);
                         const ext = (item.originalName || '').toLowerCase().split('.').pop();
                         cvText = await extractCvText(fileBuffer, ext);
                         if (!cvText || cvText.length < 30) throw new Error('CV içeriği okunamadı');
+                    } else {
+                        throw new Error('cvText, cvUrl veya dosya yolu gereklidir');
                     }
 
                     const parsed = await parseTextWithGemini(cvText, positionTitle);
@@ -1653,9 +1650,7 @@ async function executeJob(jobId) {
                         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
                     });
 
-                    // Clean up temp file
-                    if (item.tempPath) { try { fs.unlinkSync(item.tempPath); } catch {} }
-
+                    // Temp file already cleaned up at upload time (pre-extraction)
                     processedCount++;
                     await itemDoc.ref.update({ status: 'done', matchScore, candidateName: parsed?.name || '' });
                     await jobRef.update({ processedCount, failedCount, lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp() });
@@ -1844,6 +1839,23 @@ app.post('/api/bulk-import', requireAuth, bulkUpload.array('cvs', 20), async (re
         }
 
         if (items.length === 0) return res.status(400).json({ error: 'İşlenecek dosya veya kayıt bulunamadı.' });
+
+        // Pre-extract CV text from uploaded files so Firestore items are durable
+        // (worker does not depend on temp files surviving a restart)
+        for (const item of items) {
+            if (item.tempPath && !item.cvText) {
+                try {
+                    const ext = path.extname(item.tempPath).toLowerCase();
+                    const buf = fs.readFileSync(item.tempPath);
+                    item.cvText = (await extractCvText(buf, ext)).slice(0, 6000);
+                } catch (extractErr) {
+                    console.warn(`[bulk-import] Pre-extract failed for ${item.originalName}:`, extractErr.message);
+                }
+                // Clean up temp file — text is now stored in Firestore
+                try { fs.unlinkSync(item.tempPath); } catch {}
+                delete item.tempPath;
+            }
+        }
 
         const jobRef = db.collection(BULK_JOBS_COLL).doc();
         await jobRef.set({
@@ -2075,18 +2087,22 @@ app.post('/api/users/availability', requireAuth, async (req, res) => {
 
 const PORT = process.env.PORT || 3001;
 
+// ── Start bulk worker in ALL runtime modes (server main OR module import)
+// Use setImmediate so the module finishes loading before the first poll attempt
+setImmediate(() => {
+    setTimeout(async () => {
+        await recoverStaleJobs();
+        runBulkWorkerLoop().catch(err => console.error('[bulk-import] Worker loop fatal:', err));
+    }, 3000);
+});
+
 // Only listen if this is the main module
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 if (isMain) {
-    app.listen(PORT, '0.0.0.0', async () => {
+    app.listen(PORT, '0.0.0.0', () => {
         console.log(`🚀 Backend Server running on http://localhost:${PORT}`);
         console.log(`📡 Health: http://localhost:${PORT}/api/health`);
         cleanupOldFiles();
-        // Start the durable bulk-import queue worker (with brief startup delay for SDK init)
-        setTimeout(async () => {
-            await recoverStaleJobs();
-            runBulkWorkerLoop().catch(err => console.error('[bulk-import] Worker loop fatal:', err));
-        }, 3000);
     });
 }
 
