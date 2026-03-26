@@ -1518,11 +1518,16 @@ app.post('/api/score-screening-answers', aiLimiter, async (req, res) => {
         const match = rawText.match(/\{[\s\S]*\}/);
         if (!match) return res.status(500).json({ error: 'AI response could not be parsed.' });
         const parsed = JSON.parse(match[0]);
-        res.json({
-            scores: parsed.scores || [],
-            aggregateScore: parsed.aggregateScore ?? null,
-            summary: parsed.summary || '',
-        });
+        const clamp = (v) => Math.min(100, Math.max(0, Math.round(Number(v) || 0)));
+        const scores = (parsed.scores || []).map(s => ({
+            question: String(s.question || ''),
+            score: clamp(s.score),
+            rationale: String(s.rationale || ''),
+        }));
+        const aggregateScore = parsed.aggregateScore != null
+            ? clamp(parsed.aggregateScore)
+            : (scores.length > 0 ? Math.round(scores.reduce((sum, s) => sum + s.score, 0) / scores.length) : null);
+        res.json({ scores, aggregateScore, summary: parsed.summary || '' });
     } catch (err) {
         console.error('[score-screening-answers] Error:', err.message);
         res.status(500).json({ error: err.message });
