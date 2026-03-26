@@ -122,12 +122,14 @@ export default function CandidateProcessPage() {
             const failed = data.failedCount || 0;
             const status = data.status || 'queued';
             const avgScore = data.avgScore ?? null;
+            const avgScoreByPosition = data.avgScoreByPosition || null;
             setBulkProgress(prev => ({
                 ...prev,
                 total,
                 completed,
                 failed,
                 avgScore,
+                avgScoreByPosition,
                 status,
             }));
             if (status === 'completed' || status === 'error') {
@@ -137,9 +139,10 @@ export default function CandidateProcessPage() {
                     completed,
                     failed,
                     avgScore,
+                    avgScoreByPosition,
                     positionTitle: data.positionTitle || '',
                 });
-                setTimeout(() => setBulkToast(null), 8000);
+                setTimeout(() => setBulkToast(null), 12000);
             }
         });
         return () => unsub();
@@ -2171,15 +2174,24 @@ export default function CandidateProcessPage() {
 
             {/* Bulk Import completion toast */}
             {bulkToast && (
-                <div className="fixed bottom-6 right-6 z-[200] flex items-start gap-3 px-4 py-3 bg-white rounded-2xl shadow-2xl border border-emerald-200 max-w-sm animate-in slide-in-from-bottom-4 duration-300">
+                <div className="fixed bottom-6 right-6 z-[200] flex items-start gap-3 px-4 py-3 bg-white rounded-2xl shadow-2xl border border-emerald-200 max-w-xs animate-in slide-in-from-bottom-4 duration-300">
                     <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
-                    <div>
+                    <div className="flex-1 min-w-0">
                         <p className="text-[12px] font-black text-slate-800">Toplu Yükleme Tamamlandı</p>
                         <p className="text-[11px] text-slate-500 mt-0.5">
-                            {bulkToast.positionTitle ? `"${bulkToast.positionTitle}" — ` : ''}{bulkToast.completed} aday eklendi
-                            {bulkToast.failed > 0 && <span className="text-red-500">, {bulkToast.failed} hata</span>}
-                            {bulkToast.avgScore != null && <span className="text-violet-600"> · Ort. eşleşme %{bulkToast.avgScore}</span>}
+                            {bulkToast.completed} aday eklendi{bulkToast.failed > 0 && <span className="text-red-500">, {bulkToast.failed} hata</span>}
                         </p>
+                        {bulkToast.avgScoreByPosition && Object.keys(bulkToast.avgScoreByPosition).length > 0 ? (
+                            <div className="mt-1 space-y-0.5">
+                                {Object.entries(bulkToast.avgScoreByPosition).map(([pId, entry]) => (
+                                    <p key={pId} className="text-[10px] text-violet-600 truncate">
+                                        {entry.positionTitle || pId}: <span className="font-bold">%{entry.avgScore}</span> ort. eşleşme ({entry.count} aday)
+                                    </p>
+                                ))}
+                            </div>
+                        ) : bulkToast.avgScore != null && (
+                            <p className="text-[11px] text-violet-600 mt-0.5">Ort. eşleşme: %{bulkToast.avgScore}</p>
+                        )}
                     </div>
                     <button onClick={() => setBulkToast(null)} className="text-slate-300 hover:text-slate-500 ml-2 shrink-0">
                         <X className="w-3.5 h-3.5" />
