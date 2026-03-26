@@ -1,21 +1,27 @@
+import { useState } from 'react';
 import MatchScoreRing from './MatchScoreRing';
-import { MapPin, Briefcase, Clock, ArrowUpRight, ShieldAlert, Sparkles, Brain, Zap, GraduationCap, Columns3 } from 'lucide-react';
+import { MapPin, Briefcase, Clock, ArrowUpRight, Sparkles, Brain, Zap, GraduationCap, Columns3, ChevronDown, CheckCircle2 } from 'lucide-react';
 import { useCandidates } from '../context/CandidatesContext';
 
 const STATUS_CONFIG = {
-    ai_analysis: { label: 'SİNYAL: AI ANALİZİ', classes: 'bg-violet-500/20 text-violet-700 dark:text-violet-400 border-violet-500/30' },
-    review: { label: 'SİNYAL: MANUEL İNCELEME', classes: 'bg-amber-500/20 text-amber-800 dark:text-amber-400 border-amber-500/30' },
-    interview: { label: 'SİNYAL: İLETİŞİM AKTİF', classes: 'bg-blue-500/20 text-blue-800 dark:text-blue-400 border-blue-500/30' },
-    offer: { label: 'SİNYAL: TEKLİF AŞAMASI', classes: 'bg-cyan-500/20 text-cyan-800 dark:text-cyan-400 border-cyan-500/30' },
-    hired: { label: 'SİNYAL: İŞE ALINDI', classes: 'bg-emerald-500/20 text-emerald-800 dark:text-emerald-400 border-emerald-500/30' },
-    rejected: { label: 'SİNYAL: BAĞLANTI KESİLDİ', classes: 'bg-red-500/20 text-red-800 dark:text-red-400 border-red-500/30' },
+    ai_analysis: { label: 'AI ANALİZİ',       classes: 'bg-violet-500/20 text-violet-700 dark:text-violet-400 border-violet-500/30' },
+    review:      { label: 'MANUEL İNCELEME', classes: 'bg-amber-500/20 text-amber-800 dark:text-amber-400 border-amber-500/30' },
+    interview:   { label: 'MÜLAKAT',         classes: 'bg-blue-500/20 text-blue-800 dark:text-blue-400 border-blue-500/30' },
+    offer:       { label: 'TEKLİF',          classes: 'bg-cyan-500/20 text-cyan-800 dark:text-cyan-400 border-cyan-500/30' },
+    hired:       { label: 'İŞE ALINDI',      classes: 'bg-emerald-500/20 text-emerald-800 dark:text-emerald-400 border-emerald-500/30' },
+    rejected:    { label: 'BAĞLANTI KESİLDİ',classes: 'bg-red-500/20 text-red-800 dark:text-red-400 border-red-500/30' },
 };
 
-const REJECTION_REASONS = [
-    { id: 'not_suitable', label: 'Uygun Değil' },
-    { id: 'declined', label: 'Reddedildi' },
-    { id: 'wrong_entry', label: 'Hatalı Kayıt' }
+const PIPELINE_STAGES = [
+    { value: 'ai_analysis', label: 'AI Analiz',  color: 'text-violet-700', bg: 'bg-violet-50', hover: 'hover:bg-violet-50' },
+    { value: 'review',      label: 'İnceleme',   color: 'text-amber-700',  bg: 'bg-amber-50',  hover: 'hover:bg-amber-50' },
+    { value: 'interview',   label: 'Mülakat',    color: 'text-blue-700',   bg: 'bg-blue-50',   hover: 'hover:bg-blue-50' },
+    { value: 'offer',       label: 'Teklif',     color: 'text-cyan-700',   bg: 'bg-cyan-50',   hover: 'hover:bg-cyan-50' },
+    { value: 'hired',       label: 'İşe Alındı', color: 'text-emerald-700',bg: 'bg-emerald-50',hover: 'hover:bg-emerald-50' },
+    { value: 'rejected',    label: 'Reddedildi', color: 'text-red-700',    bg: 'bg-red-50',    hover: 'hover:bg-red-50' },
 ];
+
+const normalizePipelineStatus = (s) => (s === 'new' ? 'ai_analysis' : s);
 
 const AVATAR_GRADIENTS = [
     'from-electric via-blue-500 to-indigo-600',
@@ -30,21 +36,39 @@ function getInitials(name) {
 }
 
 export default function CandidateCard({ candidate, index = 0, onClick, isSelected, onSelect, draggable, onDragStart }) {
-    const { sourceColors, compareIds, toggleCompareCandidate } = useCandidates();
+    const { sourceColors, compareIds, toggleCompareCandidate, updateCandidate } = useCandidates();
+    const [statusOpen, setStatusOpen] = useState(false);
+    const [statusLoading, setStatusLoading] = useState(false);
+
     const isComparing = compareIds.includes(candidate.id);
-    const status = STATUS_CONFIG[candidate.status] || STATUS_CONFIG.ai_analysis;
+    const currentStatus = normalizePipelineStatus(candidate.status);
+    const status = STATUS_CONFIG[currentStatus] || STATUS_CONFIG.ai_analysis;
     const gradient = AVATAR_GRADIENTS[index % AVATAR_GRADIENTS.length];
 
-    // Get source color
     const sourceName = (candidate.source || '').toLowerCase();
-    const scColor = sourceColors[sourceName] || '#3b82f6'; // Default to blue if not found
+    const scColor = sourceColors[sourceName] || '#3b82f6';
+
+    const handleCardStatusChange = async (e, newStatus) => {
+        e.stopPropagation();
+        if (statusLoading || newStatus === currentStatus) return;
+        setStatusOpen(false);
+        setStatusLoading(true);
+        try {
+            await updateCandidate(candidate.id, {
+                status: newStatus,
+                statusChangedAt: new Date().toISOString(),
+            });
+        } finally {
+            setStatusLoading(false);
+        }
+    };
 
     return (
         <div
             draggable={draggable}
             onDragStart={onDragStart}
             onClick={(e) => {
-                if (!e.target.closest('.selection-checkbox')) {
+                if (!e.target.closest('.selection-checkbox') && !e.target.closest('.status-selector')) {
                     onClick?.(candidate);
                 }
             }}
@@ -101,12 +125,50 @@ export default function CandidateCard({ candidate, index = 0, onClick, isSelecte
                 </div>
             </div>
 
-            {/* Status Badge */}
-            <div className="mb-4">
-                <span className={`inline-flex items-center px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-[0.1em] border ${status.classes}`}>
-                    <span className="w-1.5 h-1.5 rounded-full bg-current mr-2 animate-pulse" />
+            {/* Status Badge — clickable stage selector */}
+            <div className="mb-4 relative status-selector">
+                <button
+                    onClick={(e) => { e.stopPropagation(); setStatusOpen(v => !v); }}
+                    disabled={statusLoading}
+                    title="Aşama değiştir"
+                    className={`inline-flex items-center gap-1 px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-[0.1em] border transition-all ${status.classes} ${statusLoading ? 'opacity-50' : 'hover:opacity-80'}`}
+                >
+                    <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
                     {status.label}
-                </span>
+                    <ChevronDown className={`w-3 h-3 transition-transform ${statusOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {statusOpen && (
+                    <>
+                        <div
+                            className="fixed inset-0 z-40"
+                            onClick={(e) => { e.stopPropagation(); setStatusOpen(false); }}
+                        />
+                        <div className="absolute top-8 left-0 z-50 bg-white border border-slate-200 rounded-xl shadow-xl py-1 min-w-[140px] animate-in fade-in zoom-in-95 duration-150">
+                            {PIPELINE_STAGES.map(stage => {
+                                const isCurrent = stage.value === currentStatus;
+                                return (
+                                    <button
+                                        key={stage.value}
+                                        disabled={isCurrent}
+                                        onClick={(e) => handleCardStatusChange(e, stage.value)}
+                                        className={`w-full text-left px-3 py-1.5 text-[10px] font-bold flex items-center gap-2 transition-colors ${
+                                            isCurrent
+                                                ? `${stage.bg} ${stage.color} cursor-default`
+                                                : `text-slate-700 ${stage.hover}`
+                                        }`}
+                                    >
+                                        {isCurrent
+                                            ? <CheckCircle2 className="w-3 h-3 shrink-0" />
+                                            : <span className="w-3 h-3 shrink-0" />
+                                        }
+                                        {stage.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </>
+                )}
             </div>
 
             {/* Meta Data */}
