@@ -2,6 +2,8 @@ import { useState } from 'react';
 import MatchScoreRing from './MatchScoreRing';
 import { MapPin, Briefcase, Clock, ArrowUpRight, Sparkles, Brain, Zap, GraduationCap, Columns3, ChevronDown, CheckCircle2 } from 'lucide-react';
 import { useCandidates } from '../context/CandidatesContext';
+import { useAuth } from '../context/AuthContext';
+import { applyPiiMask } from '../utils/pii';
 
 const STATUS_CONFIG = {
     ai_analysis: { label: 'AI ANALİZİ',       classes: 'bg-violet-500/20 text-violet-700 dark:text-violet-400 border-violet-500/30' },
@@ -35,13 +37,16 @@ function getInitials(name) {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
 }
 
-export default function CandidateCard({ candidate, index = 0, onClick, isSelected, onSelect, draggable, onDragStart }) {
+export default function CandidateCard({ candidate: rawCandidate, index = 0, onClick, isSelected, onSelect, draggable, onDragStart }) {
     const { sourceColors, compareIds, toggleCompareCandidate, updateCandidate } = useCandidates();
+    const { role } = useAuth();
     const [statusOpen, setStatusOpen] = useState(false);
     const [statusLoading, setStatusLoading] = useState(false);
 
-    const isComparing = compareIds.includes(candidate.id);
-    const currentStatus = normalizePipelineStatus(candidate.status);
+    const candidate = applyPiiMask(rawCandidate, role);
+
+    const isComparing = compareIds.includes(rawCandidate.id);
+    const currentStatus = normalizePipelineStatus(rawCandidate.status);
     const status = STATUS_CONFIG[currentStatus] || STATUS_CONFIG.ai_analysis;
     const gradient = AVATAR_GRADIENTS[index % AVATAR_GRADIENTS.length];
 
@@ -71,7 +76,7 @@ export default function CandidateCard({ candidate, index = 0, onClick, isSelecte
             onDragStart={onDragStart}
             onClick={(e) => {
                 if (!e.target.closest('.selection-checkbox') && !e.target.closest('.status-selector')) {
-                    onClick?.(candidate);
+                    onClick?.(rawCandidate);
                 }
             }}
             className={`stitch-card group p-4 cursor-pointer transition-all duration-500 relative flex flex-col h-full

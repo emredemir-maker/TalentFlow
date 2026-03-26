@@ -54,7 +54,7 @@ export default function CandidateProcessPage() {
     const navigate = useNavigate();
     const { enrichedCandidates, viewCandidateId, setViewCandidateId, sourceColors, setPreselectedInterviewData, updateCandidate, deleteCandidate, addCandidate } = useCandidates();
     const { positions } = usePositions();
-    const { user, isSuperAdmin } = useAuth();
+    const { user, isSuperAdmin, role } = useAuth();
     const candidates = enrichedCandidates || [];
     const [searchQuery, setSearchQuery]   = useState('');
     const [activeTab, setActiveTab]       = useState('ai_analysis');
@@ -411,8 +411,8 @@ export default function CandidateProcessPage() {
         const raw = (!viewCandidateId && candidates.length > 0)
             ? candidates[0]
             : candidates.find(c => c.id === viewCandidateId) || (candidates.length > 0 ? candidates[0] : null);
-        return applyPiiMask(raw, user?.role);
-    }, [candidates, viewCandidateId, user?.role]);
+        return applyPiiMask(raw, role);
+    }, [candidates, viewCandidateId, role]);
 
     const filterOptions = useMemo(() => {
         const sources = [...new Set(candidates.map(c => c.source).filter(Boolean))];
@@ -713,6 +713,7 @@ export default function CandidateProcessPage() {
                             </div>
                         )}
                         {filtered.map(c => {
+                            const mc = applyPiiMask(c, role);
                             const sc = Math.round(c.bestScore || 0);
                             const srcColor = getSourceColor(c.source);
                             const isActive = c.id === candidate?.id;
@@ -731,10 +732,10 @@ export default function CandidateProcessPage() {
                                         {c.photo || c.photoUrl || c.profileImage
                                             ? <img src={c.photo || c.photoUrl || c.profileImage} className="w-full h-full object-cover" alt="" onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
                                             : null}
-                                        <span className={`text-[11px] font-black text-slate-500 ${c.photo || c.photoUrl || c.profileImage ? 'hidden' : 'flex'}`}>{c.name?.charAt(0)?.toUpperCase() || '?'}</span>
+                                        <span className={`text-[11px] font-black text-slate-500 ${c.photo || c.photoUrl || c.profileImage ? 'hidden' : 'flex'}`}>{mc.name?.charAt(0)?.toUpperCase() || '?'}</span>
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className={`text-[12px] font-bold truncate leading-tight ${isActive ? 'text-cyan-700' : 'text-slate-700'}`}>{c.name}</p>
+                                        <p className={`text-[12px] font-bold truncate leading-tight ${isActive ? 'text-cyan-700' : 'text-slate-700'}`}>{mc.name}</p>
                                         <span
                                             className="text-[8px] font-bold px-1.5 py-0.5 rounded-md mt-0.5 inline-flex items-center gap-0.5 uppercase"
                                             style={{ color: srcColor, backgroundColor: `${srcColor}15` }}
