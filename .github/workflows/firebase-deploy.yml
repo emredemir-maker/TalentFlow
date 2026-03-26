@@ -39,6 +39,15 @@ jobs:
         env:
           PUPPETEER_SKIP_DOWNLOAD: true
 
+      - name: Create functions/.env.production
+        run: |
+          printf 'EMAIL_USER=%s\nEMAIL_PASS=%s\nVITE_GEMINI_API_KEY=%s\nVITE_FIREBASE_API_KEY=%s\n' \
+            "${{ secrets.EMAIL_USER }}" \
+            "${{ secrets.EMAIL_PASS }}" \
+            "${{ secrets.VITE_GEMINI_API_KEY }}" \
+            "${{ secrets.VITE_FIREBASE_API_KEY }}" \
+            > functions/.env.production
+
       - name: Deploy to Firebase
         uses: w9jds/firebase-action@master
         with:
