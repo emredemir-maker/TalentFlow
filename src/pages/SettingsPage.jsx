@@ -20,14 +20,16 @@ import DepartmentManagementPage from './DepartmentManagementPage';
 import GuidePage from './GuidePage';
 import SuperAdminPage from './SuperAdminPage';
 import BrandingSettingsPage from './BrandingSettingsPage';
+import EmailTemplateEditorPage from './EmailTemplateEditorPage';
 
 const TABS = [
-    { id: 'general',      label: 'Genel Ayarlar',    icon: Settings,  adminOnly: false },
-    { id: 'branding',     label: 'Kurumsal Kimlik',   icon: Palette,   adminOnly: true  },
-    { id: 'sources',      label: 'Kaynak Yönetimi',  icon: Share2,    adminOnly: false },
-    { id: 'departments',  label: 'Departmanlar',      icon: Building2, adminOnly: false },
-    { id: 'guide',        label: 'Platform Kılavuzu', icon: BookOpen,  adminOnly: false },
-    { id: 'system',       label: 'Sistem Yönetimi',   icon: Shield,    adminOnly: true  },
+    { id: 'general',         label: 'Genel Ayarlar',      icon: Settings,  adminOnly: false },
+    { id: 'branding',        label: 'Kurumsal Kimlik',     icon: Palette,   adminOnly: true  },
+    { id: 'email_templates', label: 'E-posta Şablonları',  icon: Mail,      adminOnly: true  },
+    { id: 'sources',         label: 'Kaynak Yönetimi',    icon: Share2,    adminOnly: false },
+    { id: 'departments',     label: 'Departmanlar',        icon: Building2, adminOnly: false },
+    { id: 'guide',           label: 'Platform Kılavuzu',   icon: BookOpen,  adminOnly: false },
+    { id: 'system',          label: 'Sistem Yönetimi',     icon: Shield,    adminOnly: true  },
 ];
 
 export default function SettingsPage({ initialTab }) {
@@ -474,6 +476,12 @@ export default function SettingsPage({ initialTab }) {
                 {activeTab === 'branding' && (
                     <div className="px-6 lg:px-8 py-8 max-w-3xl mx-auto">
                         <BrandingSettingsPage />
+                    </div>
+                )}
+
+                {activeTab === 'email_templates' && (
+                    <div className="flex flex-col h-full min-h-0">
+                        <EmailTemplateEditorPage />
                     </div>
                 )}
 

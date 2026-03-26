@@ -8,7 +8,7 @@ import { useNotifications } from '../context/NotificationContext';
 import { collection, onSnapshot, doc, getDoc, setDoc, deleteDoc, serverTimestamp, query, where, addDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { getCalendarEvents, connectGoogleWorkspace, sendDirectEmail, createDirectCalendarEvent, ensureValidGoogleToken } from '../services/integrationService';
-import { buildInterviewInviteEmail, buildParticipantNotificationEmail, buildRescheduleEmail } from '../utils/emailTemplates';
+import { getInviteEmail, getParticipantEmail, getRescheduleEmail } from '../utils/templateService';
 import { 
     Plus, 
     Video, 
@@ -566,22 +566,23 @@ export default function InterviewManagementPage() {
                 throw new Error("Google bağlantısı kurulamadı. Lütfen Ayarlar → Sistem bölümünden yeniden bağlanın.");
             }
 
-            const htmlBody = buildInterviewInviteEmail(branding, {
+            const { html: htmlBody } = await getInviteEmail(branding, {
                 candidateName: selectedCandidate.name,
                 recruiterName: userProfile?.displayName || '',
-                position: selectedCandidate.position,
+                position:      selectedCandidate.position,
                 interviewType: emailSubject,
-                date: manualDate || null,
-                time: manualTime || null,
-                joinLink: emailJoinLink || null,
-                companyEmail: userProfile?.email || null
+                date:          manualDate || null,
+                time:          manualTime || null,
+                joinLink:      emailJoinLink || null,
+                companyEmail:  userProfile?.email || null,
             });
 
             const result = await sendDirectEmail(userId, freshToken, {
-                to: selectedCandidate.email,
+                to:      selectedCandidate.email,
                 subject: emailSubject,
-                body: emailBody,
-                html: htmlBody
+                body:    emailBody,
+                html:    htmlBody,
+                replyTo: userProfile?.email || null,
             });
 
             // Store threadId for reply tracking
@@ -769,21 +770,22 @@ export default function InterviewManagementPage() {
                     for (const participant of selectedParticipants) {
                         if (!participant.email) continue;
                         try {
-                            const participantHtml = buildParticipantNotificationEmail(branding, {
+                            const { html: participantHtml } = await getParticipantEmail(branding, {
                                 participantName: participant.name,
-                                candidateName: selectedCandidate.name,
-                                position: selectedCandidate.position,
-                                date: slot.date,
-                                time: slot.time,
-                                interviewType: newSession.title,
+                                candidateName:   selectedCandidate.name,
+                                position:        selectedCandidate.position,
+                                date:            slot.date,
+                                time:            slot.time,
+                                interviewType:   newSession.title,
                                 meetLink,
-                                recruiterName: userProfile?.displayName || ''
+                                recruiterName:   userProfile?.displayName || ''
                             });
                             await sendDirectEmail(userId, freshCalToken, {
-                                to: participant.email,
+                                to:      participant.email,
                                 subject: `Mülakat Daveti: ${newSession.title} — ${selectedCandidate.name}`,
-                                body: `Merhaba ${participant.name || participant.email},\n\nTalent-Inn üzerinden bir mülakata katılımcı olarak eklendiniz.\n\nAday: ${selectedCandidate.name}\nPozisyon: ${selectedCandidate.position || '—'}\nTarih: ${slot.date}\nSaat: ${slot.time}\nMülakat Tipi: ${newSession.title}\n\nMülakat Linki: ${meetLink}\n\nTalent-Inn Ekibi`,
-                                html: participantHtml
+                                body:    `Merhaba ${participant.name || participant.email},\n\nTalent-Inn üzerinden bir mülakata katılımcı olarak eklendiniz.\n\nAday: ${selectedCandidate.name}\nPozisyon: ${selectedCandidate.position || '—'}\nTarih: ${slot.date}\nSaat: ${slot.time}\nMülakat Tipi: ${newSession.title}\n\nMülakat Linki: ${meetLink}\n\nTalent-Inn Ekibi`,
+                                html:    participantHtml,
+                                replyTo: userProfile?.email || null,
                             });
                         } catch (emailErr) {
                             console.warn('[Participants] Email send failed for:', participant.email, emailErr.message);
@@ -905,17 +907,17 @@ export default function InterviewManagementPage() {
                     const freshToken = await ensureValidGoogleToken(userId, userProfile);
                     if (freshToken) {
                         const isCancelled = newStatus === 'cancelled';
-                        const rescheduleHtml = buildRescheduleEmail(branding, {
+                        const { html: rescheduleHtml } = await getRescheduleEmail(branding, {
                             candidateName: candidate.name,
                             recruiterName: userProfile?.displayName || '',
-                            position: candidate.position,
-                            oldDate: originalSession.date || '',
-                            oldTime: originalSession.time || '',
-                            newDate: newDate || null,
-                            newTime: newTime || null,
-                            joinLink: (newDate || newTime) ? (originalSession.meetLink || null) : null,
+                            position:      candidate.position,
+                            oldDate:       originalSession.date || '',
+                            oldTime:       originalSession.time || '',
+                            newDate:       newDate || null,
+                            newTime:       newTime || null,
+                            joinLink:      (newDate || newTime) ? (originalSession.meetLink || null) : null,
                             isCancelled,
-                            companyEmail: userProfile?.email || null
+                            companyEmail:  userProfile?.email || null,
                         });
                         const rescheduleSubject = isCancelled
                             ? `Mülakat İptali: ${originalSession.title || 'Mülakat'} - ${candidate.name}`
@@ -924,10 +926,11 @@ export default function InterviewManagementPage() {
                             ? `Sayın ${candidate.name},\n\n${branding.companyName || 'Şirketimiz'} ile planlanmış olan ${originalSession.title || 'mülakat'} (${originalSession.date || ''} ${originalSession.time || ''}) maalesef iptal edilmiştir.\n\nHerhangi bir sorunuz için bizimle iletişime geçebilirsiniz.\n\nSaygılarımızla,\n${userProfile?.displayName || 'İK Ekibi'}`
                             : `Sayın ${candidate.name},\n\n${branding.companyName || 'Şirketimiz'} ile planlanmış olan mülakatınızın (${originalSession.date || ''} ${originalSession.time || ''}) tarihi güncellenmiştir.\n\nYeni tarih: ${newDate || originalSession.date || ''} ${newTime || originalSession.time || ''}\n\nHerhangi bir sorunuz için bizimle iletişime geçebilirsiniz.\n\nSaygılarımızla,\n${userProfile?.displayName || 'İK Ekibi'}`;
                         await sendDirectEmail(userId, freshToken, {
-                            to: candidate.email,
+                            to:      candidate.email,
                             subject: rescheduleSubject,
-                            body: rescheduleBody,
-                            html: rescheduleHtml
+                            body:    rescheduleBody,
+                            html:    rescheduleHtml,
+                            replyTo: userProfile?.email || null,
                         });
                     }
                 } catch (emailErr) {
