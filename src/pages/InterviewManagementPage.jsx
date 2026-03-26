@@ -78,6 +78,12 @@ export default function InterviewManagementPage() {
     const [openMenuId, setOpenMenuId] = useState(null);
     const [postponeModal, setPostponeModal] = useState(null); // { candidateId, sessionId, date, time }
     const [branding, setBranding] = useState({ companyName: 'Talent-Inn', primaryColor: '#1E3A8A' });
+    // Quick-start state (dashboard-level "Hızlı Mülakat Başlat")
+    const [quickModal, setQuickModal]           = useState(false);
+    const [quickSearch, setQuickSearch]         = useState('');
+    const [quickCandidate, setQuickCandidate]   = useState(null);
+    const [quickType, setQuickType]             = useState('technical');
+    const [quickLoading, setQuickLoading]       = useState(false);
     const [externalEmail, setExternalEmail] = useState('');
     const [externalEmailError, setExternalEmailError] = useState('');
 
@@ -858,6 +864,36 @@ export default function InterviewManagementPage() {
                 }
             }
 
+            // Nodemailer fallback: send candidate invite when Google is NOT connected
+            if (slot && !startNow && !isGoogleConnected && selectedCandidate?.email) {
+                try {
+                    const { html: candidateHtml } = await getInviteEmail(branding, {
+                        candidateName: selectedCandidate.name,
+                        recruiterName: userProfile?.displayName || '',
+                        position:      selectedCandidate.position,
+                        interviewType: newSession.title,
+                        date:          slot.date,
+                        time:          slot.time,
+                        joinLink:      platformJoinLink,
+                        companyEmail:  userProfile?.email || null,
+                    });
+                    await fetch('/api/send-interview-invite', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            to: selectedCandidate.email,
+                            subject: `Mülakat Davetiniz: ${newSession.title}`,
+                            html: candidateHtml,
+                            candidateName: selectedCandidate.name,
+                            branding,
+                        }),
+                    });
+                    console.log('[createInterviewRecord] Nodemailer candidate invite sent to:', selectedCandidate.email);
+                } catch (inviteErr) {
+                    console.warn('[createInterviewRecord] Nodemailer candidate invite failed (non-blocking):', inviteErr.message);
+                }
+            }
+
             await updateCandidate(selectedCandidate.id, {
                 interviewSessions: [...(selectedCandidate.interviewSessions || []), newSession],
                 hasInterview: true,
@@ -935,6 +971,69 @@ export default function InterviewManagementPage() {
         }
     };
     
+    const handleQuickStart = async () => {
+        if (!quickCandidate || quickLoading) return;
+        setQuickLoading(true);
+        try {
+            const interviewerName = currentUser?.displayName || 'Değerlendirici';
+            const sessionId = `iv-${crypto.randomUUID()}`;
+            const platformJoinLink = `${window.location.origin}/join/${sessionId}`;
+            const typeLabel = quickType === 'technical' ? 'Teknik Mülakat' : quickType === 'hr' ? 'İK Filtre' : 'Product Mülakatı';
+            const now = new Date();
+            const newSession = {
+                id: sessionId,
+                title: typeLabel,
+                date: now.toISOString().split('T')[0],
+                time: now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+                type: quickType,
+                interviewer: interviewerName,
+                interviewerId: userId,
+                status: 'live',
+                meetLink: platformJoinLink,
+                positionId:    quickCandidate.positionId    || null,
+                positionTitle: quickCandidate.position || quickCandidate.bestTitle || null,
+                participants: [],
+            };
+
+            await updateCandidate(quickCandidate.id, {
+                interviewSessions: [...(quickCandidate.interviewSessions || []), newSession],
+                hasInterview: true,
+                status: 'Interview',
+            });
+
+            // Pre-create Firestore session doc
+            try {
+                await fetch('/api/init-interview-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sessionId,
+                        initialData: {
+                            status: 'live',
+                            candidateId:   quickCandidate.id,
+                            candidateName: quickCandidate.name,
+                            positionId:    newSession.positionId,
+                            positionTitle: newSession.positionTitle,
+                            createdAt: new Date().toISOString(),
+                        },
+                    }),
+                });
+            } catch (docErr) {
+                console.warn('[handleQuickStart] Pre-create failed (non-blocking):', docErr.message);
+            }
+
+            setQuickModal(false);
+            setQuickCandidate(null);
+            setQuickSearch('');
+            navigate(`/live-interview/${sessionId}`);
+        } catch (err) {
+            console.error('[handleQuickStart] Error:', err);
+            alert('Mülakat başlatılamadı: ' + err.message);
+        } finally {
+            setQuickLoading(false);
+        }
+    };
+
     const handleDeleteSession = async (candidateId, sessionId) => {
         if (!window.confirm("Bu mülakat seansını silmek istediğinize emin misiniz?")) return;
         
@@ -1787,6 +1886,12 @@ export default function InterviewManagementPage() {
                                 />
                             </div>
                             <button
+                                onClick={() => { setQuickCandidate(null); setQuickSearch(''); setQuickType('technical'); setQuickModal(true); }}
+                                className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-all shadow-md shadow-emerald-900/10"
+                            >
+                                <Play className="w-4 h-4 fill-current" /> Hızlı Mülakat Başlat
+                            </button>
+                            <button
                                 onClick={() => { setWizardStep(1); setSelectedCandidate(null); setManualDate(''); setManualTime('09:00'); setIsPlanningMode(true); }}
                                 className="flex items-center gap-2 bg-[#1E3A8A] text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-800 transition-all shadow-md shadow-blue-900/10"
                             >
@@ -2242,6 +2347,132 @@ export default function InterviewManagementPage() {
                             >
                                 Ertele
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── HIZLI MÜLAKAT BAŞLAT MODALI ──────────────────────────────── */}
+            {quickModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md">
+                        {/* Header */}
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                            <div className="flex items-center gap-2">
+                                <Play className="w-4 h-4 text-emerald-500 fill-emerald-500" />
+                                <h3 className="text-[13px] font-black text-slate-800 uppercase tracking-widest">Hızlı Mülakat Başlat</h3>
+                            </div>
+                            <button onClick={() => setQuickModal(false)} className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-50">
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        <div className="px-6 py-5 space-y-4">
+                            {/* Candidate search */}
+                            <div>
+                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Aday Seç</label>
+                                <div className="relative">
+                                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                                    <input
+                                        autoFocus
+                                        type="text"
+                                        placeholder="İsim veya pozisyon ara..."
+                                        value={quickSearch}
+                                        onChange={e => { setQuickSearch(e.target.value); setQuickCandidate(null); }}
+                                        className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-[12px] text-slate-700 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 transition-all"
+                                    />
+                                </div>
+
+                                {/* Candidate dropdown */}
+                                {quickSearch.length >= 1 && !quickCandidate && (() => {
+                                    const q = quickSearch.toLowerCase();
+                                    const hits = (enrichedCandidates || []).filter(c =>
+                                        c.name?.toLowerCase().includes(q) || c.position?.toLowerCase().includes(q)
+                                    ).slice(0, 6);
+                                    return hits.length > 0 ? (
+                                        <div className="mt-1 border border-slate-200 rounded-xl overflow-hidden shadow-lg">
+                                            {hits.map(c => (
+                                                <button
+                                                    key={c.id}
+                                                    onClick={() => { setQuickCandidate(c); setQuickSearch(c.name); }}
+                                                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-emerald-50 transition-colors text-left border-b border-slate-100 last:border-0"
+                                                >
+                                                    <div className="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center text-[10px] font-black text-emerald-600 shrink-0">
+                                                        {c.name?.[0]?.toUpperCase() || '?'}
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[12px] font-bold text-slate-700">{c.name}</p>
+                                                        <p className="text-[10px] text-slate-400">{c.position || '—'}</p>
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="text-[11px] text-slate-400 px-2 py-2">Aday bulunamadı.</p>
+                                    );
+                                })()}
+
+                                {/* Selected candidate badge */}
+                                {quickCandidate && (
+                                    <div className="mt-2 flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
+                                        <div className="w-7 h-7 rounded-full bg-emerald-500 flex items-center justify-center text-[10px] font-black text-white shrink-0">
+                                            {quickCandidate.name?.[0]?.toUpperCase()}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-[12px] font-bold text-slate-700 truncate">{quickCandidate.name}</p>
+                                            <p className="text-[10px] text-slate-400">{quickCandidate.position || '—'}</p>
+                                        </div>
+                                        <button onClick={() => { setQuickCandidate(null); setQuickSearch(''); }} className="text-slate-300 hover:text-red-400">
+                                            <X className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Interview type */}
+                            <div>
+                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Mülakat Tipi</label>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {[
+                                        { value: 'technical', label: 'Teknik' },
+                                        { value: 'hr', label: 'İK Filtre' },
+                                        { value: 'product', label: 'Product' },
+                                    ].map(opt => (
+                                        <button
+                                            key={opt.value}
+                                            onClick={() => setQuickType(opt.value)}
+                                            className={`py-2 rounded-xl text-[11px] font-black border transition-all ${
+                                                quickType === opt.value
+                                                    ? 'bg-emerald-500 border-emerald-500 text-white shadow-sm'
+                                                    : 'bg-white border-slate-200 text-slate-600 hover:border-emerald-300 hover:bg-emerald-50'
+                                            }`}
+                                        >
+                                            {opt.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Action buttons */}
+                            <div className="flex gap-2 pt-1">
+                                <button
+                                    onClick={() => setQuickModal(false)}
+                                    className="flex-1 h-10 rounded-xl text-[11px] font-black text-slate-500 border border-slate-200 hover:bg-slate-50 transition-all"
+                                >
+                                    İptal
+                                </button>
+                                <button
+                                    onClick={handleQuickStart}
+                                    disabled={!quickCandidate || quickLoading}
+                                    className="flex-1 h-10 rounded-xl text-[11px] font-black text-white bg-emerald-500 hover:bg-emerald-600 flex items-center justify-center gap-2 shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {quickLoading ? (
+                                        <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Başlatılıyor...</>
+                                    ) : (
+                                        <><Play className="w-3.5 h-3.5 fill-current" /> Hemen Başlat</>
+                                    )}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

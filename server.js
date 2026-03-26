@@ -901,6 +901,35 @@ app.post('/api/send-feedback', async (req, res) => {
     }
 });
 
+// --- Interview Invite via Nodemailer (Google-bağımsız fallback) ---
+app.post('/api/send-interview-invite', async (req, res) => {
+    const { to, subject, html, candidateName, branding } = req.body;
+    if (!to || !html) return res.status(400).json({ error: 'Email ve HTML içerik gereklidir.' });
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+        return res.status(500).json({ error: 'Sistem email yapılandırması eksik.' });
+    }
+    const b = branding || { companyName: 'Talent-Inn', primaryColor: '#1E3A8A' };
+    const fromName = b.companyName || 'Talent-Inn';
+    try {
+        const transporter = nodemailer.createTransport({
+            host: 'smtp.gmail.com', port: 465, secure: true,
+            auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+            connectionTimeout: 10000, greetingTimeout: 5000, socketTimeout: 20000
+        });
+        await transporter.sendMail({
+            from: `"${fromName}" <${process.env.EMAIL_USER}>`,
+            to,
+            subject: subject || `Mülakat Davetiniz — ${candidateName || 'Aday'}`,
+            html,
+        });
+        console.log(`✉️ Interview invite sent to: ${to}`);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('❌ Interview invite email error:', error);
+        res.status(500).json({ error: 'Mail gönderilemedi: ' + (error.code || error.message) });
+    }
+});
+
 // --- Google API Endpoints ---
 app.post('/api/google/send-email', async (req, res) => {
     const { token, to, subject, body } = req.body;
