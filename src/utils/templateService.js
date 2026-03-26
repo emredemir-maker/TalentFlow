@@ -24,19 +24,56 @@ async function loadTemplates() {
     return _templateCache;
 }
 
-function applyVars(html, vars) {
+// Apply {{variable}} substitution — merges branding fields into vars so
+// {{companyName}}, {{tagline}} etc. in saved templates are always resolved.
+function applyVars(html, vars, branding) {
+    const merged = {
+        companyName: branding?.companyName || '',
+        tagline:     branding?.tagline     || '',
+        logoUrl:     branding?.logoUrl     || '',
+        primaryColor: branding?.primaryColor || '#0E7490',
+        ...vars,
+    };
     let result = html;
-    for (const [key, value] of Object.entries(vars)) {
+    for (const [key, value] of Object.entries(merged)) {
         result = result.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value ?? '');
     }
     return result;
+}
+
+// When a template was saved before logo support was added, the header still
+// shows coloured initials.  If branding now has a logoUrl we patch the saved
+// HTML in-memory so the logo appears without requiring a re-save.
+function patchLogoInSavedHtml(html, branding) {
+    if (!branding?.logoUrl) return html;
+
+    // Already has a real <img> for the logo → nothing to do
+    if (/height:40px[^"]*object-fit:contain/.test(html)) {
+        // Update the src in case the logo URL changed
+        return html.replace(
+            /<img([^>]*?)style="height:40px[^"]*object-fit:contain[^"]*"([^>]*?)\/>/g,
+            `<img src="${branding.logoUrl}" alt="${branding.companyName || ''}" style="height:40px;max-width:160px;object-fit:contain;"/>`
+        );
+    }
+
+    // Replace the initials <div style="display:inline-flex..."> block with an <img>
+    // We target the wrapper that contains the coloured square + company name text.
+    const logoImg = `<img src="${branding.logoUrl}" alt="${branding.companyName || ''}" style="height:40px;max-width:160px;object-fit:contain;"/>`;
+    return html.replace(
+        /<div style="display:inline-flex;align-items:center;gap:10px;">[\s\S]*?<\/div>\s*<\/div>\s*<\/div>/,
+        logoImg
+    );
 }
 
 // ─── Interview Invite ─────────────────────────────────────────────────────────
 export async function getInviteEmail(branding, vars) {
     const templates = await loadTemplates();
     if (templates?.invite?.html) {
-        return { html: applyVars(templates.invite.html, vars), subject: applyVars(templates.invite.subject || '', vars) };
+        const patched = patchLogoInSavedHtml(templates.invite.html, branding);
+        return {
+            html:    applyVars(patched, vars, branding),
+            subject: applyVars(templates.invite.subject || '', vars, branding),
+        };
     }
     const html = buildInterviewInviteEmail(branding, {
         candidateName:  vars.candidateName,
@@ -55,7 +92,11 @@ export async function getInviteEmail(branding, vars) {
 export async function getRescheduleEmail(branding, vars) {
     const templates = await loadTemplates();
     if (templates?.reschedule?.html) {
-        return { html: applyVars(templates.reschedule.html, vars), subject: applyVars(templates.reschedule.subject || '', vars) };
+        const patched = patchLogoInSavedHtml(templates.reschedule.html, branding);
+        return {
+            html:    applyVars(patched, vars, branding),
+            subject: applyVars(templates.reschedule.subject || '', vars, branding),
+        };
     }
     const html = buildRescheduleEmail(branding, {
         candidateName: vars.candidateName,
@@ -76,7 +117,11 @@ export async function getRescheduleEmail(branding, vars) {
 export async function getParticipantEmail(branding, vars) {
     const templates = await loadTemplates();
     if (templates?.participant?.html) {
-        return { html: applyVars(templates.participant.html, vars), subject: applyVars(templates.participant.subject || '', vars) };
+        const patched = patchLogoInSavedHtml(templates.participant.html, branding);
+        return {
+            html:    applyVars(patched, vars, branding),
+            subject: applyVars(templates.participant.subject || '', vars, branding),
+        };
     }
     const html = buildParticipantNotificationEmail(branding, {
         participantName: vars.participantName,
