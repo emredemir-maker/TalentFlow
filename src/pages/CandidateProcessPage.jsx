@@ -319,6 +319,9 @@ export default function CandidateProcessPage() {
         try {
             let resp, data;
 
+            const fbAuthTok = await user?.getIdToken?.() || '';
+            const authHeaders = { 'Authorization': `Bearer ${fbAuthTok}` };
+
             if (bulkTab === 'json') {
                 // JSON records path
                 let records;
@@ -330,7 +333,7 @@ export default function CandidateProcessPage() {
                 setBulkProgress({ total: records.length, completed: 0, failed: 0, items: initialItems, avgScore: null, status: 'queued' });
                 resp = await fetch('/api/bulk-import', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { ...authHeaders, 'Content-Type': 'application/json' },
                     body: JSON.stringify({ positionId: selectedPos?.id || '', positionTitle: selectedPos?.title || '', records }),
                 });
                 data = await resp.json();
@@ -345,7 +348,7 @@ export default function CandidateProcessPage() {
                     formData.append('positionId', selectedPos.id);
                     formData.append('positionTitle', selectedPos.title);
                 }
-                resp = await fetch('/api/bulk-import', { method: 'POST', body: formData });
+                resp = await fetch('/api/bulk-import', { method: 'POST', headers: authHeaders, body: formData });
                 data = await resp.json();
             }
 

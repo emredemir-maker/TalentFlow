@@ -1561,8 +1561,19 @@ async function extractCvText(buffer, ext) {
     throw new Error('Desteklenmeyen format: ' + ext);
 }
 
+// SSRF validation: only allow public HTTPS URLs
+function assertSafeCvUrl(cvUrl) {
+    let parsed;
+    try { parsed = new URL(cvUrl); } catch { throw new Error('cvUrl geçersiz URL formatı'); }
+    if (parsed.protocol !== 'https:') throw new Error('cvUrl yalnızca HTTPS desteklenir');
+    const hostname = parsed.hostname.toLowerCase();
+    const privatePatterns = [/^localhost$/, /^127\./, /^10\./, /^172\.(1[6-9]|2\d|3[01])\./, /^192\.168\./, /^::1$/, /^0\.0\.0\.0$/, /\.local$/];
+    if (privatePatterns.some(p => p.test(hostname))) throw new Error('cvUrl özel/dahili IP adresine işaret ediyor');
+}
+
 async function extractCvTextFromUrl(cvUrl) {
-    const res = await fetch(cvUrl, { redirect: 'follow' });
+    assertSafeCvUrl(cvUrl);
+    const res = await fetch(cvUrl, { redirect: 'follow', signal: AbortSignal.timeout(15000) });
     if (!res.ok) throw new Error(`cvUrl GET failed: ${res.status}`);
     const buf = Buffer.from(await res.arrayBuffer());
     const ct = (res.headers.get('content-type') || '').toLowerCase();
@@ -1669,10 +1680,26 @@ async function processBulkJob(jobId) {
         const avgScore = doneSnap.size > 0
             ? Math.round(doneSnap.docs.reduce((sum, d) => sum + (d.data().matchScore || 0), 0) / doneSnap.size)
             : 0;
-        const avgScoreByPosition = {};
-        if (positionId && positionTitle) {
-            avgScoreByPosition[positionId] = { positionTitle, avgScore, count: doneSnap.size };
+
+        // Build per-position avgScore map — aggregate across all unique positionIds in the batch
+        const positionScoreMap = {};
+        for (const d of doneSnap.docs) {
+            const dat = d.data();
+            const pId = dat.positionId || positionId || '__none__';
+            const pTitle = dat.positionTitle || positionTitle || '';
+            if (!positionScoreMap[pId]) positionScoreMap[pId] = { positionTitle: pTitle, scores: [] };
+            positionScoreMap[pId].scores.push(dat.matchScore || 0);
         }
+        const avgScoreByPosition = {};
+        for (const [pId, entry] of Object.entries(positionScoreMap)) {
+            const scores = entry.scores;
+            avgScoreByPosition[pId] = {
+                positionTitle: entry.positionTitle,
+                avgScore: Math.round(scores.reduce((s, v) => s + v, 0) / scores.length),
+                count: scores.length,
+            };
+        }
+
         await jobRef.update({
             status: 'completed',
             processedCount,
@@ -1743,9 +1770,16 @@ app.post('/api/bulk-import', requireAuth, bulkUpload.array('cvs', 20), async (re
                     items.push({ index: items.length, originalName: file.originalname, tempPath: file.path, status: 'pending' });
                 }
             }
-        } else if (req.body?.records) {
-            // JSON records path: [{name, email, cvText?, cvUrl?, positionId?}]
-            const rawRecords = typeof req.body.records === 'string' ? JSON.parse(req.body.records) : req.body.records;
+        } else if (req.body?.records || Array.isArray(req.body)) {
+            // JSON records path — accepts both:
+            //   { positionId, positionTitle, records: [...] }  (wrapper object)
+            //   [{ name, email, cvText?, cvUrl?, positionId? }, ...]  (bare array)
+            let rawRecords;
+            if (Array.isArray(req.body)) {
+                rawRecords = req.body;
+            } else {
+                rawRecords = typeof req.body.records === 'string' ? JSON.parse(req.body.records) : req.body.records;
+            }
             if (!Array.isArray(rawRecords)) return res.status(400).json({ error: 'records bir dizi olmalıdır.' });
             items = rawRecords.map((r, i) => ({
                 index: i,
