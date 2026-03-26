@@ -13,7 +13,7 @@ import rateLimit from 'express-rate-limit';
 import hpp from 'hpp';
 import admin from 'firebase-admin';
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 // Initialize Firebase Admin (using local default or environment)
 if (!admin.apps.length) {

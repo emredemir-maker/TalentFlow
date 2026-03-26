@@ -13,7 +13,9 @@ import rateLimit from 'express-rate-limit';
 import hpp from 'hpp';
 import admin from 'firebase-admin';
 
-dotenv.config();
+// Load .env if present (dev). In production (Replit autoscale) secrets are
+// injected directly as env vars — no .env file needed.
+dotenv.config({ quiet: true });
 
 // Initialize Firebase Admin
 if (!admin.apps.length) {
