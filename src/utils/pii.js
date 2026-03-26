@@ -143,12 +143,21 @@ export function extractPiiFromText(text) {
     };
 }
 
+// General Turkish/Latin full-name pattern (title-cased two-word sequences).
+// Applied unconditionally so names are always redacted even without a known name.
+const NAME_PATTERN = /\b(?:[A-ZÇĞİÖŞÜ][a-zçğışöşü]+(?:\s+[A-ZÇĞİÖŞÜ][a-zçğışöşü]+){1,3})\b/g;
+
 /**
  * Redacts PII patterns from raw text before sending to any external AI model.
- * Replaces email addresses, phone numbers, LinkedIn/GitHub URLs, and optionally
- * a known candidate name with safe placeholder tokens.
+ * Replaces:
+ *  - Email addresses          → [E-POSTA]
+ *  - Phone numbers            → [TELEFON]
+ *  - LinkedIn profile URLs    → [LINKEDIN]
+ *  - GitHub profile URLs      → [GITHUB]
+ *  - Title-cased name strings → [İSİM]  (always, regardless of knownName)
+ *  - Known name (if provided) → [İSİM]  (exact-match on top of pattern)
  * @param {string} text
- * @param {string|null} [knownName] - if supplied, all occurrences are replaced
+ * @param {string|null} [knownName] - optional; exact occurrences also replaced
  * @returns {string}
  */
 export function redactPiiFromText(text, knownName = null) {
@@ -157,7 +166,10 @@ export function redactPiiFromText(text, knownName = null) {
         .replace(/\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/g, '[E-POSTA]')
         .replace(/(?:\+?\d[\d\s\-().]{6,}\d)/g, '[TELEFON]')
         .replace(/(?:https?:\/\/)?(?:www\.)?linkedin\.com\/in\/[\w\-]+/gi, '[LINKEDIN]')
-        .replace(/(?:https?:\/\/)?(?:www\.)?github\.com\/[\w\-]+/gi, '[GITHUB]');
+        .replace(/(?:https?:\/\/)?(?:www\.)?github\.com\/[\w\-]+/gi, '[GITHUB]')
+        .replace(NAME_PATTERN, '[İSİM]');
+    // Also replace any exact occurrences of the supplied known name (handles
+    // all-caps, atypical capitalizations that the pattern may miss).
     if (knownName) {
         const escaped = knownName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         result = result.replace(new RegExp(`\\b${escaped}\\b`, 'gi'), '[İSİM]');
