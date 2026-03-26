@@ -25,6 +25,18 @@ const STATUS_CONFIG = {
 };
 const getStatusCfg = (s) => STATUS_CONFIG[s] || STATUS_CONFIG.scheduled;
 
+const PIPELINE_STATUS_LABELS = {
+    new:         'AI Analiz',
+    ai_analysis: 'AI Analiz',
+    review:      'İnceleme',
+    interview:   'Mülakat',
+    offer:       'Teklif',
+    hired:       'İşe Alındı',
+    rejected:    'Red',
+    final:       'Final',
+};
+const normalizePipelineStatus = (s) => (s === 'new' ? 'ai_analysis' : s);
+
 export default function CandidateProcessPage() {
     const navigate = useNavigate();
     const { enrichedCandidates, viewCandidateId, setViewCandidateId, sourceColors, setPreselectedInterviewData, updateCandidate, deleteCandidate } = useCandidates();
@@ -208,7 +220,7 @@ export default function CandidateProcessPage() {
     const filterOptions = useMemo(() => {
         const sources = [...new Set(candidates.map(c => c.source).filter(Boolean))];
         const positions = [...new Set(candidates.map(c => c.position || c.bestTitle).filter(Boolean))];
-        const statuses = [...new Set(candidates.map(c => c.status).filter(Boolean))];
+        const statuses = [...new Set(candidates.map(c => normalizePipelineStatus(c.status)).filter(Boolean))];
         return { sources, positions, statuses };
     }, [candidates]);
 
@@ -219,7 +231,7 @@ export default function CandidateProcessPage() {
         return candidates.filter(c => {
             if (q && !c.name?.toLowerCase().includes(q) && !(c.position || c.bestTitle)?.toLowerCase().includes(q)) return false;
             if (filterSource && c.source !== filterSource) return false;
-            if (filterStatus && c.status !== filterStatus) return false;
+            if (filterStatus && normalizePipelineStatus(c.status) !== filterStatus) return false;
             if (filterPosition && (c.position || c.bestTitle) !== filterPosition) return false;
             if (filterMinScore > 0 && (c.bestScore || 0) < filterMinScore) return false;
             return true;
@@ -424,7 +436,7 @@ export default function CandidateProcessPage() {
                                     className="w-full bg-slate-50 border border-slate-200 rounded-lg py-1.5 px-2 text-[10px] text-slate-700 outline-none focus:border-cyan-400 transition-all"
                                 >
                                     <option value="">Tümü</option>
-                                    {filterOptions.statuses.map(s => <option key={s} value={s}>{s}</option>)}
+                                    {filterOptions.statuses.map(s => <option key={s} value={s}>{PIPELINE_STATUS_LABELS[s] || s}</option>)}
                                 </select>
                             </div>
                             {/* Position */}
