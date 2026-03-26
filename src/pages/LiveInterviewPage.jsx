@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCandidates } from '../context/CandidatesContext';
+import { usePositions } from '../context/PositionsContext';
 import { generateInterviewPaths, generateFollowUpQuestion, analyzeSTARRealTime, stripPII } from '../services/geminiService';
 import LoadingScreen from '../components/LoadingScreen';
 import CandidateExitPage from './CandidateExitPage';
@@ -22,6 +23,7 @@ export default function LiveInterviewPage() {
     const navigate = useNavigate();
     const { user, isAuthenticated, userProfile, role, logout } = useAuth();
     const { candidates, updateCandidate, loading: candidatesLoading, error: candidatesError } = useCandidates();
+    const { positions } = usePositions();
 
     const [phase, setPhase] = useState('lobby'); // lobby, active, finished
     const [isRecruiter, setIsRecruiter] = useState(false);
@@ -827,7 +829,14 @@ export default function LiveInterviewPage() {
                     ? questions.find(q => !q.answered)?.question || null
                     : null;
 
-                const result = await analyzeSTARRealTime(safeProfile, recentSlice, currentQ, { title: session?.positionTitle || '' });
+                const linkedPosition = positions?.find(p => p.id === candidateData?.positionId);
+                const positionReqs = linkedPosition?.requirements?.length
+                    ? linkedPosition.requirements.join(', ')
+                    : null;
+                const result = await analyzeSTARRealTime(safeProfile, recentSlice, currentQ, {
+                    title: session?.positionTitle || linkedPosition?.title || '',
+                    requirements: positionReqs,
+                });
                 if (!result || !result.scores) return;
 
                 // Weighted running average: 60% previous + 40% new observation
