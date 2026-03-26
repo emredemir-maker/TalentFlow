@@ -54,16 +54,19 @@ export default function InterviewReportPage() {
 
     useEffect(() => {
         // Only trigger for sessions that are truly completed, have enough signal (transcript),
-        // and haven't been evaluated yet.
+        // and haven't been evaluated yet.  All data fields are in deps so the effect retries
+        // if transcript/messages arrive after status already changed to 'completed'.
         const isCompleted = session?.status === 'completed';
-        const hasTranscript = (session?.transcript?.length ?? 0) > 0 || (session?.messages?.length ?? 0) > 0;
-        if (!session || !isCompleted || !hasTranscript || autoEvalFiredRef.current || session.recruiterEval) return;
+        const transcriptLen = session?.transcript?.length ?? 0;
+        const messagesLen   = session?.messages?.length ?? 0;
+        const hasTranscript = transcriptLen > 0 || messagesLen > 0;
+        const alreadyDone   = Boolean(session?.recruiterEval);
+        if (!session || !isCompleted || !hasTranscript || alreadyDone || autoEvalFiredRef.current) return;
         autoEvalFiredRef.current = true;
         // Small delay to let session data settle after Firestore write on session completion
         const timer = setTimeout(() => runEvaluateInterviewer(), 800);
         return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [session?.id, session?.status]);
+    }, [session, session?.id, session?.status, session?.transcript, session?.messages, session?.recruiterEval, runEvaluateInterviewer]);
 
     const runEvaluateInterviewer = useCallback(async () => {
         if (!session || evalLoading) return;
