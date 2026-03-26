@@ -126,8 +126,10 @@ service cloud.firestore {
     }
 
     // ── Sources (candidate origin tracking) ──────────────────────────────────
+    // Anonymous users (candidates on the apply form) need to read sources for
+    // the "where did you find us?" dropdown.
     match /artifacts/talent-flow/public/data/sources/{sourceId} {
-      allow read:  if isStrictAuthenticated();
+      allow read:  if isAuthenticatedIncAnon();
       allow write: if isRecruiter();
     }
 

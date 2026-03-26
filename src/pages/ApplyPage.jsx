@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { doc, getDoc, collection, addDoc, getDocs, query, where, updateDoc, serverTimestamp, onSnapshot, orderBy } from 'firebase/firestore';
-import { signInAnonymously } from 'firebase/auth';
+import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { db, auth } from '../config/firebase';
 import { extractTextFromFile } from '../services/cvParser';
 import { parseCandidateFromText, analyzeCandidateMatch } from '../services/geminiService';
@@ -112,36 +112,49 @@ export default function ApplyPage() {
         })();
     }, [positionId]);
 
-    // ── Load sources from Firestore (same anon auth) ─────────────────────
+    // ── Load sources from Firestore — wait for auth before subscribing ───
     useEffect(() => {
-        const q = query(collection(db, SOURCES_PATH), orderBy('createdAt', 'asc'));
-        const unsub = onSnapshot(q, (snap) => {
-            const loaded = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            setSources(loaded);
+        let sourceUnsub = null;
 
-            // Auto-select based on URL-detected source
-            if (loaded.length > 0 && detectedSource && detectedSource !== 'Direkt') {
-                const normalised = detectedSource.toLowerCase();
-                for (const main of loaded) {
-                    const matchedSub = (main.subSources || []).find(
-                        s => s.toLowerCase() === normalised || normalised.includes(s.toLowerCase())
-                    );
-                    if (matchedSub) {
-                        setSelectedMainSource(main);
-                        setSelectedSubSource(matchedSub);
-                        break;
-                    }
-                    if (main.name.toLowerCase() === normalised || normalised.includes(main.name.toLowerCase())) {
-                        setSelectedMainSource(main);
-                        break;
+        // Subscribe to auth changes; start sources listener only when a user
+        // (anonymous or real) is signed in to avoid a permission-denied race.
+        const authUnsub = onAuthStateChanged(auth, (firebaseUser) => {
+            if (!firebaseUser) return; // not yet signed in — wait
+            if (sourceUnsub) return;  // already subscribed
+
+            const q = query(collection(db, SOURCES_PATH), orderBy('createdAt', 'asc'));
+            sourceUnsub = onSnapshot(q, (snap) => {
+                const loaded = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                setSources(loaded);
+
+                // Auto-select based on URL-detected source
+                if (loaded.length > 0 && detectedSource && detectedSource !== 'Direkt') {
+                    const normalised = detectedSource.toLowerCase();
+                    for (const main of loaded) {
+                        const matchedSub = (main.subSources || []).find(
+                            s => s.toLowerCase() === normalised || normalised.includes(s.toLowerCase())
+                        );
+                        if (matchedSub) {
+                            setSelectedMainSource(main);
+                            setSelectedSubSource(matchedSub);
+                            break;
+                        }
+                        if (main.name.toLowerCase() === normalised || normalised.includes(main.name.toLowerCase())) {
+                            setSelectedMainSource(main);
+                            break;
+                        }
                     }
                 }
-            }
-        }, (err) => {
-            console.warn('Sources fetch error (non-blocking):', err.message);
+            }, (err) => {
+                console.warn('Sources fetch error (non-blocking):', err.message);
+            });
         });
-        return unsub;
-    }, []);
+
+        return () => {
+            authUnsub();
+            if (sourceUnsub) sourceUnsub();
+        };
+    }, [detectedSource]);
 
     // ── Derived: effective source values saved to Firestore ───────────────
     const effectiveSubSource  = selectedSubSource  || (selectedMainSource ? '' : detectedSource);
