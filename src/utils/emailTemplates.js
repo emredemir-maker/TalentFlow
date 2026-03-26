@@ -18,6 +18,10 @@ function hex2rgb(hex) {
     return `${r}, ${g}, ${b}`;
 }
 
+function initials(name) {
+    return (name || 'IK').split(/\s+/).map(w => w[0] || '').join('').toUpperCase().slice(0, 2) || 'IK';
+}
+
 function baseLayout(branding, content) {
     const b = { ...DEFAULT_BRANDING, ...branding };
     const color = b.primaryColor || '#0E7490';
@@ -50,7 +54,7 @@ function baseLayout(branding, content) {
                     ? `<img src="${b.logoUrl}" alt="${b.companyName}" style="height:40px;max-width:160px;object-fit:contain;"/>`
                     : `<div style="display:inline-flex;align-items:center;gap:10px;">
                          <div style="width:38px;height:38px;border-radius:10px;background:${color};display:inline-flex;align-items:center;justify-content:center;">
-                           <span style="color:#fff;font-size:15px;font-weight:800;letter-spacing:-0.5px;">TI</span>
+                           <span style="color:#fff;font-size:15px;font-weight:800;letter-spacing:-0.5px;">${initials(b.companyName)}</span>
                          </div>
                          <div>
                            <div style="color:#0F172A;font-size:17px;font-weight:800;letter-spacing:-0.3px;">${b.companyName}</div>

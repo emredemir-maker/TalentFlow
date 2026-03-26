@@ -200,8 +200,23 @@ function hexToRgb(hex) {
 function buildPreviewHtml(blocks, branding) {
     const color = branding?.primaryColor || '#0E7490';
     const rgb = hexToRgb(color);
-    const company = branding?.companyName || 'Talent-Inn';
-    const tagline = branding?.tagline || 'Akıllı İnsan Kaynakları Platformu';
+    const company = branding?.companyName || 'Şirket Adı';
+    const tagline = branding?.tagline || '';
+    const logoUrl = branding?.logoUrl || '';
+    // Dynamic initials: first letters of each word (max 2)
+    const initials = company.split(/\s+/).map(w => w[0] || '').join('').toUpperCase().slice(0, 2) || 'IK';
+
+    const logoBlock = logoUrl
+        ? `<img src="${logoUrl}" alt="${company}" style="height:44px;max-width:200px;object-fit:contain;display:block;"/>`
+        : `<div style="display:inline-flex;align-items:center;gap:10px;">
+             <div style="width:36px;height:36px;border-radius:9px;background:${color};display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">
+               <span style="color:#fff;font-size:13px;font-weight:800;letter-spacing:-0.5px;">${initials}</span>
+             </div>
+             <div>
+               <div style="color:#0F172A;font-size:16px;font-weight:800;line-height:1.2;">${company}</div>
+               ${tagline ? `<div style="color:#94A3B8;font-size:11px;margin-top:2px;">${tagline}</div>` : ''}
+             </div>
+           </div>`;
 
     const content = blocksToHtml(blocks, branding);
 
@@ -209,22 +224,15 @@ function buildPreviewHtml(blocks, branding) {
 <body style="margin:0;padding:0;background:#EFF6FF;font-family:'Segoe UI',Helvetica,Arial,sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#EFF6FF;padding:32px 0;">
   <tr><td align="center">
-    <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 6px 32px rgba(0,0,0,0.09);">
-      <tr><td style="height:4px;background:linear-gradient(90deg,${color} 0%,rgba(${rgb},0.35) 100%);"></td></tr>
-      <tr><td style="padding:28px 40px 20px;border-bottom:1px solid #E2E8F0;">
-        <div style="display:inline-flex;align-items:center;gap:10px;">
-          <div style="width:34px;height:34px;border-radius:8px;background:${color};display:inline-flex;align-items:center;justify-content:center;">
-            <span style="color:#fff;font-size:13px;font-weight:800;">TI</span>
-          </div>
-          <div>
-            <div style="color:#0F172A;font-size:16px;font-weight:800;">${company}</div>
-            <div style="color:#94A3B8;font-size:11px;">${tagline}</div>
-          </div>
-        </div>
+    <table width="580" cellpadding="0" cellspacing="0" style="max-width:580px;width:100%;background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,0.10);">
+      <tr><td style="height:5px;background:linear-gradient(90deg,${color} 0%,rgba(${rgb},0.4) 100%);"></td></tr>
+      <tr><td style="padding:32px 48px 24px;border-bottom:1px solid #E2E8F0;">
+        ${logoBlock}
       </td></tr>
-      <tr><td style="padding:32px 40px 28px;">${content}</td></tr>
-      <tr><td style="background:#F8FAFC;padding:20px 40px;border-top:1px solid #E2E8F0;text-align:center;">
+      <tr><td style="padding:36px 48px 32px;">${content}</td></tr>
+      <tr><td style="background:#F8FAFC;padding:22px 48px;border-top:1px solid #E2E8F0;text-align:center;">
         <p style="color:#94A3B8;font-size:12px;margin:0;">Bu e-posta <strong style="color:${color};">${company}</strong> İK Platformu aracılığıyla gönderilmiştir.</p>
+        <p style="color:#CBD5E1;font-size:11px;margin:4px 0 0 0;">Bu iletiyi hatalı aldıysanız lütfen görmezden geliniz.</p>
       </td></tr>
     </table>
   </td></tr>
@@ -232,8 +240,9 @@ function buildPreviewHtml(blocks, branding) {
 }
 
 // ─── Replace variables with sample data for preview ──────────────────────────
-function applySampleVars(html) {
+function applySampleVars(html, branding) {
     const today = new Date().toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' });
+    const companyName = branding?.companyName || 'Şirket Adı';
     return html
         .replace(/\{\{candidateName\}\}/g, 'Ayşe Kaya')
         .replace(/\{\{recruiterName\}\}/g, 'Emre Demir')
@@ -248,8 +257,8 @@ function applySampleVars(html) {
         .replace(/\{\{interviewType\}\}/g, 'Teknik Değerlendirmesi')
         .replace(/\{\{joinLink\}\}/g, 'https://example.com/join/abc123')
         .replace(/\{\{meetLink\}\}/g, 'https://meet.google.com/xyz')
-        .replace(/\{\{companyName\}\}/g, 'Talent-Inn')
-        .replace(/\{\{companyEmail\}\}/g, 'ik@talent-inn.com');
+        .replace(/\{\{companyName\}\}/g, companyName)
+        .replace(/\{\{companyEmail\}\}/g, `ik@${companyName.toLowerCase().replace(/\s+/g, '')}.com`);
 }
 
 // ─── Individual Block Editor ──────────────────────────────────────────────────
@@ -605,7 +614,8 @@ export default function EmailTemplateEditorPage() {
     // ── Preview html ──
     const previewHtml = mode === 'preview'
         ? applySampleVars(
-            currentHtml || buildPreviewHtml(currentBlocks, branding)
+            currentHtml || buildPreviewHtml(currentBlocks, branding),
+            branding
         )
         : '';
 
