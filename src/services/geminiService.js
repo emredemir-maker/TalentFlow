@@ -6,7 +6,7 @@
 
 import { getModel } from './ai/config.js';
 import { parseAIJson, buildStructuredPrompt, sanitizeForPrompt } from './ai/utils.js';
-import { stripPiiForAI } from '../utils/pii.js';
+import { stripPiiForAI, extractPiiFromText, redactPiiFromText } from '../utils/pii.js';
 import {
     extractCandidateEvidence,
     extractPositionFromJD,
@@ -41,10 +41,15 @@ export {
 };
 
 export async function parseCandidateFromText(text, modelId = 'gemini-2.0-flash') {
+    // Extract contact fields with regex BEFORE redacting — they will be merged back
+    // into the result so the candidate record retains them without leaking to AI.
+    const contactInfo = extractPiiFromText(text);
+    const safeText = redactPiiFromText(text);
+
     const instruction = `Sen bir uzman İK Profil Ayrıştırıcısısın (CV Parser). Aşağıdaki profil metninden aday bilgilerini çıkart.
 
 ÇOK ÖNEMLİ KURALLAR (KVKK / GDPR UYGUNLUĞU İÇİN):
-Ad, iletişim bilgileri gibi kişisel nitelikli verileri sadece kendi alanlarında (name, email, phone, vb.) tut.
+Metindeki [E-POSTA], [TELEFON], [LINKEDIN] gibi anonimleştirilmiş alanlar için ilgili JSON alanlarını null veya boş bırak.
 'cvData' alanunda ise adayın TÜM PROFESYONEL GEÇMİŞİNİ (iş tecrübeleri, görev tanımları, başarıları, eğitimleri, sertifikaları, yetenekleri) İSİM VE İLETİŞİM BİLGİSİNDEN ARINDIRILMIŞ ŞEKİLDE kelimesi kelimesine detaylıca yaz.
 
 'experiences' KURALLARI — SIKI UYU:
@@ -59,9 +64,9 @@ Ad, iletişim bilgileri gibi kişisel nitelikli verileri sadece kendi alanların
 Sadece şu JSON formatında dön:
 {
   "name": "Ad Soyad",
-  "email": "Adayın e-posta adresi",
-  "phone": "Adayın telefon numarası",
-  "linkedinUrl": "LinkedIn veya portfolyo URL'si",
+  "email": null,
+  "phone": null,
+  "linkedinUrl": null,
   "position": "Mevcut veya Hedeflenen Pozisyon",
   "company": "Mevcut Şirket",
   "location": "Şehir, Ülke",
@@ -81,10 +86,13 @@ Sadece şu JSON formatında dön:
   ]
 }`;
 
-    const prompt = buildStructuredPrompt(instruction, { "PROFIL_METNI": sanitizeForPrompt(text, 20000) });
+    const prompt = buildStructuredPrompt(instruction, { "PROFIL_METNI": sanitizeForPrompt(safeText, 20000) });
     const model = await getModel(modelId);
     const result = await model.generateContent(prompt);
-    return parseAIJson(result.response.text());
+    const parsed = parseAIJson(result.response.text());
+    // Merge regex-extracted contact info so the record is complete
+    // without having leaked PII to the AI model.
+    return parsed ? { ...parsed, ...contactInfo } : parsed;
 }
 
 export async function parseExperiencesFromText(text, modelId = 'gemini-2.0-flash') {
@@ -107,7 +115,7 @@ Sadece şu JSON formatında dön (başka hiçbir şey yazma):
     "milestones": ["Başarı 1"]
   }
 ]`;
-    const prompt = buildStructuredPrompt(instruction, { "CV_METNI": sanitizeForPrompt(text, 15000) });
+    const prompt = buildStructuredPrompt(instruction, { "CV_METNI": sanitizeForPrompt(redactPiiFromText(text), 15000) });
     const model = await getModel(modelId);
     const result = await model.generateContent(prompt);
     const raw = result.response.text().replace(/```json|```/gi, '').trim();

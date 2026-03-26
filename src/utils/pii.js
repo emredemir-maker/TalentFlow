@@ -78,6 +78,40 @@ export function stripPiiForAI(candidateData) {
 }
 
 /**
+ * Extracts contact PII from raw CV/profile text using regex.
+ * Used BEFORE redacting the text so the extracted values can be
+ * merged back into the parsed candidate record after AI processing.
+ * @param {string} text
+ * @returns {{ email: string|null, phone: string|null, linkedinUrl: string|null }}
+ */
+export function extractPiiFromText(text) {
+    if (!text || typeof text !== 'string') return { email: null, phone: null, linkedinUrl: null };
+    const emailMatch = text.match(/\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/);
+    const phoneMatch = text.match(/(?:\+?\d[\d\s\-().]{6,}\d)/);
+    const linkedinMatch = text.match(/(?:https?:\/\/)?(?:www\.)?linkedin\.com\/in\/[\w\-]+/i);
+    return {
+        email: emailMatch?.[0] || null,
+        phone: phoneMatch?.[0]?.trim() || null,
+        linkedinUrl: linkedinMatch ? (linkedinMatch[0].startsWith('http') ? linkedinMatch[0] : `https://www.${linkedinMatch[0]}`) : null,
+    };
+}
+
+/**
+ * Redacts PII patterns from raw text before sending to any external AI model.
+ * Replaces email addresses, phone numbers, LinkedIn/GitHub URLs with tokens.
+ * @param {string} text
+ * @returns {string}
+ */
+export function redactPiiFromText(text) {
+    if (!text || typeof text !== 'string') return text;
+    return text
+        .replace(/\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/g, '[E-POSTA]')
+        .replace(/(?:\+?\d[\d\s\-().]{6,}\d)/g, '[TELEFON]')
+        .replace(/(?:https?:\/\/)?(?:www\.)?linkedin\.com\/in\/[\w\-]+/gi, '[LINKEDIN]')
+        .replace(/(?:https?:\/\/)?(?:www\.)?github\.com\/[\w\-]+/gi, '[GITHUB]');
+}
+
+/**
  * Returns a candidate object with PII fields masked.
  * Non-PII fields are returned as-is.
  * @param {object} candidate
