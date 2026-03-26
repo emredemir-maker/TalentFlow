@@ -517,9 +517,9 @@ export default function EmailTemplateEditorPage() {
     const currentHtml = htmlCode[activeTemplate] || '';
     const currentSubject = subjectLines[activeTemplate] || '';
 
-    // Sync blocks → html when switching to html mode
+    // Sync blocks → html when switching to html mode (always rebuild so branding/logo is current)
     useEffect(() => {
-        if (mode === 'html' && currentBlocks.length > 0 && !htmlCode[activeTemplate]) {
+        if (mode === 'html' && currentBlocks.length > 0) {
             setHtmlCode(prev => ({ ...prev, [activeTemplate]: buildPreviewHtml(currentBlocks, branding) }));
         }
     }, [mode, activeTemplate]);
@@ -611,10 +611,10 @@ export default function EmailTemplateEditorPage() {
         }
     };
 
-    // ── Preview html ──
+    // ── Preview html — always rebuild from blocks so branding (logo, color) is always current
     const previewHtml = mode === 'preview'
         ? applySampleVars(
-            currentHtml || buildPreviewHtml(currentBlocks, branding),
+            buildPreviewHtml(currentBlocks, branding),
             branding
         )
         : '';
@@ -710,7 +710,7 @@ export default function EmailTemplateEditorPage() {
                         <button
                             key={m.id}
                             onClick={() => {
-                                if (m.id === 'html' && !htmlCode[activeTemplate]) {
+                                if (m.id === 'html') {
                                     setHtmlCode(prev => ({ ...prev, [activeTemplate]: buildPreviewHtml(currentBlocks, branding) }));
                                 }
                                 setMode(m.id);
