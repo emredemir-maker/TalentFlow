@@ -657,7 +657,12 @@ export default function CandidateProcessPage() {
                     {/* Search */}
                     <div className="px-4 pt-4 pb-2">
                         <div className="flex items-center justify-between mb-3">
-                            <div className="text-[9px] font-black text-slate-400 tracking-widest uppercase">ADAYLAR <span className="text-slate-300">({filtered.length})</span></div>
+                            <div className="text-[9px] font-black text-slate-400 tracking-widest uppercase">
+                                ADAYLAR <span className="text-slate-300">({filtered.length})</span>
+                                {filtered.some(c => c.screeningScore != null) && (
+                                    <span className="ml-1 text-indigo-400 normal-case font-medium">· Ön Eleme Puanına Göre Sıralı</span>
+                                )}
+                            </div>
                             <button
                                 onClick={() => setShowFilters(f => !f)}
                                 className={`flex items-center gap-1 text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-lg transition-all ${showFilters || activeFilterCount > 0 ? 'bg-cyan-50 text-cyan-600 border border-cyan-200' : 'text-slate-400 hover:text-slate-600'}`}

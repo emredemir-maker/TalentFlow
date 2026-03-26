@@ -235,6 +235,10 @@ export default function ApplyPage() {
         e.preventDefault();
         if (!kvkk) { alert('Lütfen KVKK aydınlatma metnini onaylayın.'); return; }
         if (!cvFile) { alert('Lütfen CV dosyanızı yükleyin.'); return; }
+        if (position?.screeningEnabled && (position?.screeningQuestions || []).length > 0) {
+            const unanswered = (position.screeningQuestions || []).some((_, i) => !screeningAnswers[i]?.trim());
+            if (unanswered) { alert('Lütfen tüm ön eleme sorularını yanıtlayın.'); return; }
+        }
 
         setStep('processing');
         setSubmitError(null);
@@ -302,28 +306,30 @@ export default function ApplyPage() {
                 }
             }
 
-            // Step 3c — AI scoring of screening answers (non-blocking)
+            // Step 3c — AI scoring of screening answers via backend (non-blocking)
+            // Raw answers are always persisted; AI scoring augments them if available.
+            const rawScreeningAnswers = (position?.screeningEnabled && (position?.screeningQuestions || []).length > 0)
+                ? (position.screeningQuestions || []).map((q, i) => ({ question: q, answer: screeningAnswers[i] || '' }))
+                : null;
+
             let screeningResult = null;
-            if (position?.screeningEnabled && (position?.screeningQuestions || []).length > 0 && screeningAnswers.some(a => a?.trim())) {
+            if (rawScreeningAnswers && rawScreeningAnswers.some(a => a.answer.trim())) {
                 setProgress('Ön eleme soruları değerlendiriliyor...');
                 try {
-                    const qaPairs = (position.screeningQuestions || []).map((q, i) => `Soru ${i + 1}: ${q}\nCevap: ${screeningAnswers[i] || '(boş)'}`).join('\n\n');
-                    const prompt = `Sen bir İK uzmanısın. Aşağıdaki pozisyon ön eleme sorularını ve adayın cevaplarını değerlendir.\n\nPozisyon: ${position.title}\n\n${qaPairs}\n\nHer soru için 0-100 arası bir puan ver ve kısa Türkçe bir gerekçe yaz. Yanıtını şu JSON formatında ver:\n{\n  "scores": [{"question": "...", "score": 85, "rationale": "..."}],\n  "aggregateScore": 85,\n  "summary": "Kısa genel değerlendirme"\n}`;
-
                     const resp = await Promise.race([
-                        fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${import.meta.env.VITE_GEMINI_API_KEY}`, {
+                        fetch('/api/score-screening-answers', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+                            body: JSON.stringify({
+                                positionTitle: position.title,
+                                answers: rawScreeningAnswers,
+                            }),
                         }),
                         new Promise((_, reject) => setTimeout(() => reject(new Error('Screening AI timeout')), 20000)),
                     ]);
                     const respData = await resp.json();
-                    const rawText = respData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-                    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-                    if (jsonMatch) {
-                        screeningResult = JSON.parse(jsonMatch[0]);
-                        screeningResult.answers = (position.screeningQuestions || []).map((q, i) => ({ question: q, answer: screeningAnswers[i] || '' }));
+                    if (respData && respData.aggregateScore != null) {
+                        screeningResult = { ...respData, answers: rawScreeningAnswers };
                     }
                 } catch (screenErr) {
                     console.warn('Screening AI error (non-blocking):', screenErr.message);
@@ -349,6 +355,7 @@ export default function ApplyPage() {
                 kvkkConsent: true,
                 createdAt: serverTimestamp(),
             };
+            if (rawScreeningAnswers) appData.screeningAnswers = rawScreeningAnswers;
             if (screeningResult) {
                 appData.screeningResult = screeningResult;
                 appData.screeningScore = screeningResult.aggregateScore ?? null;
@@ -396,6 +403,7 @@ export default function ApplyPage() {
                         source: effectiveSource,
                         sourceCategory: effectiveCategory,
                         ...(starAiAnalysis ? { aiAnalysis: starAiAnalysis } : {}),
+                        ...(rawScreeningAnswers ? { screeningAnswers: rawScreeningAnswers } : {}),
                         ...(screeningResult ? { screeningScore: screeningResult.aggregateScore ?? null, screeningResult } : {}),
                         updatedAt: serverTimestamp(),
                     });
@@ -432,6 +440,7 @@ export default function ApplyPage() {
                     positionId: position.id,
                     appliedDate: new Date().toISOString().split('T')[0],
                     interviewSessions: [],
+                    ...(rawScreeningAnswers ? { screeningAnswers: rawScreeningAnswers } : {}),
                     ...(screeningResult ? { screeningScore: screeningResult.aggregateScore ?? null, screeningResult } : {}),
                     createdAt: serverTimestamp(),
                     updatedAt: serverTimestamp(),

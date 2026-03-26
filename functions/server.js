@@ -1499,6 +1499,36 @@ app.post('/api/ai/stt', aiLimiter, async (req, res) => {
     }
 });
 
+// ─── Screening Answer Scoring (AI — server-side, keeps API key off browser)
+app.post('/api/score-screening-answers', aiLimiter, async (req, res) => {
+    const { positionTitle, answers } = req.body || {};
+    if (!Array.isArray(answers) || answers.length === 0) {
+        return res.status(400).json({ error: 'answers[] is required.' });
+    }
+    const apiKey = await getApiKey();
+    if (!apiKey) return res.status(503).json({ error: 'AI service unavailable.' });
+
+    const qaPairs = answers.map((a, i) => `Soru ${i + 1}: ${a.question}\nCevap: ${a.answer || '(boş)'}`).join('\n\n');
+    const prompt = `Sen bir İK uzmanısın. Aşağıdaki pozisyon ön eleme sorularını ve adayın cevaplarını değerlendir.\n\nPozisyon: ${positionTitle || 'Genel Pozisyon'}\n\n${qaPairs}\n\nHer soru için 0-100 arası bir puan ver ve kısa Türkçe bir gerekçe yaz. Yanıtını YALNIZCA şu JSON formatında ver (başka hiçbir şey yazma):\n{"scores":[{"question":"...","score":85,"rationale":"..."}],"aggregateScore":85,"summary":"Kısa genel değerlendirme"}`;
+    try {
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        const result = await model.generateContent(prompt);
+        const rawText = result.response.text().replace(/```json|```/gi, '').trim();
+        const match = rawText.match(/\{[\s\S]*\}/);
+        if (!match) return res.status(500).json({ error: 'AI response could not be parsed.' });
+        const parsed = JSON.parse(match[0]);
+        res.json({
+            scores: parsed.scores || [],
+            aggregateScore: parsed.aggregateScore ?? null,
+            summary: parsed.summary || '',
+        });
+    } catch (err) {
+        console.error('[score-screening-answers] Error:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // ─── Screening Question Suggestion (AI — server-side, keeps API key off browser)
 app.post('/api/suggest-screening-questions', aiLimiter, async (req, res) => {
     const { positionTitle, requirements } = req.body || {};
