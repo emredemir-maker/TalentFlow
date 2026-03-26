@@ -2093,6 +2093,105 @@ app.post('/api/users/availability', requireAuth, async (req, res) => {
     res.json({ availability: results });
 });
 
+// ─── Send Info Request Email ──────────────────────────────────────────────────
+app.post('/api/send-info-request', generalLimiter, verifyFirebaseToken, async (req, res) => {
+    const { to, candidateName, recruiterName, position, requestMessage, requestedItems, sessionId, candidateId, branding } = req.body;
+    if (!to || !candidateName) return res.status(400).json({ error: 'Email ve aday adı gereklidir.' });
+    if (!EMAIL_RE.test(to)) return res.status(400).json({ error: 'Geçersiz email adresi.' });
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+        return res.status(500).json({ error: 'Sistem email yapılandırması eksik.' });
+    }
+    const b = branding || { companyName: 'Talent-Inn', primaryColor: '#1E3A8A' };
+    const fromName = (b.companyName || 'Talent-Inn').slice(0, 100);
+    try {
+        // Create info request record in Firestore
+        const requestId = `ir-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        const APP_URL = process.env.VITE_APP_URL || process.env.VITE_SERVER_URL || 'https://talentflow-84bb6.web.app';
+        const respondUrl = `${APP_URL}/respond/${requestId}?type=info`;
+        await db.doc(`artifacts/talent-flow/public/data/infoRequests/${requestId}`).set({
+            requestId,
+            candidateId: candidateId || null,
+            sessionId: sessionId || null,
+            candidateEmail: to,
+            candidateName,
+            recruiterName: recruiterName || '',
+            position: position || '',
+            requestMessage: requestMessage || '',
+            requestedItems: requestedItems || [],
+            status: 'pending',
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        // Build and send HTML email
+        const { buildInfoRequestEmail } = await import('./src/utils/emailTemplates.js').catch(() => null) || {};
+        let html;
+        if (buildInfoRequestEmail) {
+            html = buildInfoRequestEmail(b, { candidateName, recruiterName, position, requestMessage, requestedItems, respondUrl, companyEmail: process.env.EMAIL_USER });
+        } else {
+            html = `<p>Sayın ${candidateName},</p><p>${requestMessage}</p><p><a href="${respondUrl}">Yanıtlamak için tıklayın</a></p>`;
+        }
+        const transporter = nodemailer.createTransport({
+            host: 'smtp.gmail.com', port: 465, secure: true,
+            auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+            connectionTimeout: 10000, greetingTimeout: 5000, socketTimeout: 20000,
+        });
+        await transporter.sendMail({
+            from: `"${fromName}" <${process.env.EMAIL_USER}>`,
+            to,
+            subject: `Bilgi Talebi: ${position || 'Başvurunuz'} — ${b.companyName || 'Talent-Inn'}`,
+            html,
+        });
+        console.log(`✉️ Info request sent to: ${to} | requestId: ${requestId}`);
+        res.json({ success: true, requestId, respondUrl });
+    } catch (error) {
+        console.error('❌ Info request email error:', error);
+        res.status(500).json({ error: 'Bilgi talebi gönderilemedi: ' + (error.code || error.message) });
+    }
+});
+
+// ─── Candidate Respond (public — no auth required) ────────────────────────────
+app.post('/api/candidate-respond', generalLimiter, async (req, res) => {
+    const { id, type, action, responseData } = req.body;
+    if (!id || !type) return res.status(400).json({ error: 'id ve type gereklidir.' });
+    try {
+        const now = admin.firestore.FieldValue.serverTimestamp();
+        if (type === 'info') {
+            const ref = db.doc(`artifacts/talent-flow/public/data/infoRequests/${id}`);
+            const snap = await ref.get();
+            if (!snap.exists) return res.status(404).json({ error: 'Talep bulunamadı.' });
+            await ref.update({
+                status: 'responded',
+                responseData: responseData || '',
+                respondedAt: now,
+            });
+            // Mirror onto interview if linked
+            const data = snap.data();
+            if (data.sessionId) {
+                await db.doc(`interviews/${data.sessionId}`).set({
+                    infoResponses: admin.firestore.FieldValue.arrayUnion({
+                        requestId: id,
+                        candidateName: data.candidateName,
+                        responseData: responseData || '',
+                        respondedAt: new Date().toISOString(),
+                    }),
+                }, { merge: true });
+            }
+        } else if (type === 'invite') {
+            // action: 'confirm' | 'decline'
+            const validActions = ['confirm', 'decline'];
+            if (!validActions.includes(action)) return res.status(400).json({ error: 'Geçersiz action.' });
+            await db.doc(`interviews/${id}`).set({
+                candidateResponse: { status: action, respondedAt: new Date().toISOString() },
+            }, { merge: true });
+        } else {
+            return res.status(400).json({ error: 'Geçersiz type.' });
+        }
+        res.json({ success: true });
+    } catch (error) {
+        console.error('❌ Candidate respond error:', error);
+        res.status(500).json({ error: 'Yanıt kaydedilemedi: ' + error.message });
+    }
+});
+
 const PORT = process.env.PORT || 3001;
 
 // ── Start bulk worker in ALL runtime modes (server main OR module import)

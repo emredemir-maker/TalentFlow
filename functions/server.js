@@ -1982,6 +1982,105 @@ app.post('/api/suggest-screening-questions', aiLimiter, async (req, res) => {
     }
 });
 
+// ─── Send Info Request Email ──────────────────────────────────────────────────
+app.post('/api/send-info-request', generalLimiter, verifyFirebaseToken, async (req, res) => {
+    const { to, candidateName, recruiterName, position, requestMessage, requestedItems, sessionId, candidateId, branding } = req.body;
+    if (!to || !candidateName) return res.status(400).json({ error: 'Email ve aday adı gereklidir.' });
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+    if (!emailRe.test(to)) return res.status(400).json({ error: 'Geçersiz email adresi.' });
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+        return res.status(500).json({ error: 'Sistem email yapılandırması eksik.' });
+    }
+    const b = branding || { companyName: 'Talent-Inn', primaryColor: '#1E3A8A' };
+    const fromName = (b.companyName || 'Talent-Inn').slice(0, 100);
+    try {
+        const requestId = `ir-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        const APP_URL = process.env.VITE_APP_URL || 'https://talentflow-84bb6.web.app';
+        const respondUrl = `${APP_URL}/respond/${requestId}?type=info`;
+        await db.doc(`artifacts/talent-flow/public/data/infoRequests/${requestId}`).set({
+            requestId,
+            candidateId: candidateId || null,
+            sessionId: sessionId || null,
+            candidateEmail: to,
+            candidateName,
+            recruiterName: recruiterName || '',
+            position: position || '',
+            requestMessage: requestMessage || '',
+            requestedItems: requestedItems || [],
+            status: 'pending',
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        const items = Array.isArray(requestedItems) && requestedItems.length
+            ? requestedItems.map(i => `<li style="margin:6px 0;">📎 ${i}</li>`).join('') : '';
+        const html = `<!DOCTYPE html><html><body style="font-family:sans-serif;color:#334155;max-width:600px;margin:0 auto;padding:32px;">
+            <h2 style="color:${b.primaryColor||'#0E7490'};">${b.companyName || 'Talent-Inn'}</h2>
+            <p>Sayın <strong>${candidateName}</strong>,</p>
+            ${position ? `<p style="color:#64748B;">Başvurulan Pozisyon: <strong>${position}</strong></p>` : ''}
+            <p>Başvurunuzu inceleme sürecimizde sizden bazı ek bilgi veya belgeler talep etmekteyiz.</p>
+            ${requestMessage ? `<div style="background:#F8FAFC;border-left:4px solid #0E7490;padding:16px;margin:16px 0;"><p style="margin:0;white-space:pre-line;">${requestMessage}</p></div>` : ''}
+            ${items ? `<p><strong>Talep Edilenler:</strong></p><ul>${items}</ul>` : ''}
+            <div style="text-align:center;margin:32px 0;">
+                <a href="${respondUrl}" style="background:${b.primaryColor||'#0E7490'};color:#fff;padding:14px 32px;border-radius:12px;text-decoration:none;font-weight:700;">📝 Bilgi Gönder</a>
+            </div>
+            <p style="color:#94A3B8;">Saygılarımızla, <strong>${recruiterName || 'İK Ekibi'}</strong></p>
+        </body></html>`;
+        const transporter = nodemailer.createTransport({
+            host: 'smtp.gmail.com', port: 465, secure: true,
+            auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+            connectionTimeout: 10000, greetingTimeout: 5000, socketTimeout: 20000,
+        });
+        await transporter.sendMail({
+            from: `"${fromName}" <${process.env.EMAIL_USER}>`,
+            to,
+            subject: `Bilgi Talebi: ${position || 'Başvurunuz'} — ${b.companyName || 'Talent-Inn'}`,
+            html,
+        });
+        console.log(`✉️ Info request sent to: ${to} | requestId: ${requestId}`);
+        res.json({ success: true, requestId, respondUrl });
+    } catch (error) {
+        console.error('❌ Info request email error:', error);
+        res.status(500).json({ error: 'Bilgi talebi gönderilemedi: ' + (error.code || error.message) });
+    }
+});
+
+// ─── Candidate Respond (public — no auth required) ────────────────────────────
+app.post('/api/candidate-respond', generalLimiter, async (req, res) => {
+    const { id, type, action, responseData } = req.body;
+    if (!id || !type) return res.status(400).json({ error: 'id ve type gereklidir.' });
+    try {
+        const now = admin.firestore.FieldValue.serverTimestamp();
+        if (type === 'info') {
+            const ref = db.doc(`artifacts/talent-flow/public/data/infoRequests/${id}`);
+            const snap = await ref.get();
+            if (!snap.exists) return res.status(404).json({ error: 'Talep bulunamadı.' });
+            await ref.update({ status: 'responded', responseData: responseData || '', respondedAt: now });
+            const data = snap.data();
+            if (data.sessionId) {
+                await db.doc(`interviews/${data.sessionId}`).set({
+                    infoResponses: admin.firestore.FieldValue.arrayUnion({
+                        requestId: id,
+                        candidateName: data.candidateName,
+                        responseData: responseData || '',
+                        respondedAt: new Date().toISOString(),
+                    }),
+                }, { merge: true });
+            }
+        } else if (type === 'invite') {
+            const validActions = ['confirm', 'decline'];
+            if (!validActions.includes(action)) return res.status(400).json({ error: 'Geçersiz action.' });
+            await db.doc(`interviews/${id}`).set({
+                candidateResponse: { status: action, respondedAt: new Date().toISOString() },
+            }, { merge: true });
+        } else {
+            return res.status(400).json({ error: 'Geçersiz type.' });
+        }
+        res.json({ success: true });
+    } catch (error) {
+        console.error('❌ Candidate respond error:', error);
+        res.status(500).json({ error: 'Yanıt kaydedilemedi: ' + error.message });
+    }
+});
+
 const PORT = process.env.PORT || 3001;
 
 // ── Start bulk worker in ALL runtime modes (server main OR Firebase Functions import)

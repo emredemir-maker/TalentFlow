@@ -1175,6 +1175,29 @@ export default function InterviewManagementPage() {
                             html:    rescheduleHtml,
                             replyTo: userProfile?.email || null,
                         });
+                    } else {
+                        // SMTP fallback when Google token is not available
+                        try {
+                            const { getAuth } = await import('firebase/auth');
+                            const idToken = await getAuth().currentUser?.getIdToken();
+                            const API_BASE = import.meta.env.VITE_SERVER_URL || '';
+                            await fetch(`${API_BASE}/api/send-feedback`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+                                },
+                                body: JSON.stringify({
+                                    to: candidate.email,
+                                    subject: rescheduleSubject,
+                                    body: rescheduleBody,
+                                    html: rescheduleHtml,
+                                }),
+                            });
+                            console.log('[RescheduleEmail] Sent via SMTP fallback');
+                        } catch (smtpErr) {
+                            console.warn('[RescheduleEmail] SMTP fallback failed:', smtpErr.message);
+                        }
                     }
                 } catch (emailErr) {
                     console.warn('[RescheduleEmail] Failed to send notification:', emailErr.message);
@@ -2129,8 +2152,15 @@ export default function InterviewManagementPage() {
                                                                     <p className="text-xs text-[#64748B]">{s.positionTitle || s.position || s.title || '—'}</p>
                                                                 </div>
                                                             </div>
-                                                            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wide ${statusInfo.bg} ${statusInfo.text}`}>
-                                                                {statusInfo.icon} {statusInfo.label}
+                                                            <div className="flex items-center gap-2">
+                                                                {s.candidateResponse?.status && (
+                                                                    <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold tracking-wide ${s.candidateResponse.status === 'confirm' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-50 text-red-500'}`}>
+                                                                        {s.candidateResponse.status === 'confirm' ? '✓ Katılacak' : '✗ Katılamaz'}
+                                                                    </span>
+                                                                )}
+                                                                <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wide ${statusInfo.bg} ${statusInfo.text}`}>
+                                                                    {statusInfo.icon} {statusInfo.label}
+                                                                </div>
                                                             </div>
                                                         </div>
                                                         <div className="flex items-center justify-between mt-4 pt-4 border-t border-[#F1F5F9]">

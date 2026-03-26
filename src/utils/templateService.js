@@ -4,7 +4,7 @@
 
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { buildInterviewInviteEmail, buildRescheduleEmail, buildParticipantNotificationEmail, buildFeedbackEmail } from './emailTemplates';
+import { buildInterviewInviteEmail, buildRescheduleEmail, buildParticipantNotificationEmail, buildFeedbackEmail, buildInfoRequestEmail, buildInterviewConfirmationEmail } from './emailTemplates';
 
 const SETTINGS_PATH = 'artifacts/talent-flow/public/data/settings';
 
@@ -172,6 +172,35 @@ export async function getFeedbackEmail(branding, vars) {
         outcome:       vars.outcome,
         feedbackText:  vars.feedbackText,
         companyEmail:  vars.companyEmail,
+    });
+    return { html, subject: null };
+}
+
+// ─── Info Request Email ───────────────────────────────────────────────────────
+export async function getInfoRequestEmail(branding, vars) {
+    const html = buildInfoRequestEmail(branding, {
+        candidateName:  vars.candidateName,
+        recruiterName:  vars.recruiterName,
+        position:       vars.position,
+        requestMessage: vars.requestMessage,
+        requestedItems: vars.requestedItems || [],
+        respondUrl:     vars.respondUrl,
+        companyEmail:   vars.companyEmail,
+    });
+    return { html, subject: null };
+}
+
+// ─── Interview Confirmation Email ─────────────────────────────────────────────
+export async function getInterviewConfirmationEmail(branding, vars) {
+    const html = buildInterviewConfirmationEmail(branding, {
+        candidateName:  vars.candidateName,
+        recruiterName:  vars.recruiterName,
+        position:       vars.position,
+        date:           vars.date,
+        time:           vars.time,
+        interviewType:  vars.interviewType,
+        respondUrl:     vars.respondUrl,
+        companyEmail:   vars.companyEmail,
     });
     return { html, subject: null };
 }

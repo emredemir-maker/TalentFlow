@@ -24,6 +24,7 @@ import CandidateExitPage from './pages/CandidateExitPage';
 import ApplyPage from './pages/ApplyPage';
 import TechDocsPage from './pages/TechDocsPage';
 import PipelinePage from './pages/PipelinePage';
+import CandidateRespondPage from './pages/CandidateRespondPage';
 
 export default function App() {
   return (
@@ -38,6 +39,7 @@ export default function App() {
                 <Route path="/interview-report/:sessionId" element={<InterviewReportPage />} />
                 <Route path="/exit" element={<CandidateExitPage />} />
                 <Route path="/apply/:positionId" element={<ApplyPage />} />
+                <Route path="/respond/:id" element={<CandidateRespondPage />} />
                 <Route path="/*" element={<AuthenticatedApp />} />
               </Routes>
             </MessageQueueProvider>

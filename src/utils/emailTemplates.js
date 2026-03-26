@@ -502,3 +502,103 @@ export function buildFeedbackEmail(branding, { candidateName, recruiterName, pos
     `;
     return baseLayout(branding, content);
 }
+
+// ─── Info Request Email ───────────────────────────────────────────────────────
+export function buildInfoRequestEmail(branding, { candidateName, recruiterName, position, requestMessage, requestedItems, respondUrl, companyEmail }) {
+    const items = Array.isArray(requestedItems) && requestedItems.length
+        ? requestedItems.map(item => `<li style="margin:6px 0;font-size:14px;color:#334155;">📎 ${item}</li>`).join('')
+        : '';
+    const content = `
+        <!-- Intro -->
+        <tr><td style="padding:32px 48px 0;">
+            <p style="margin:0;font-size:15px;color:#334155;">Sayın <strong>${candidateName}</strong>,</p>
+            ${position ? `<p style="margin:8px 0 0;font-size:12px;color:#64748B;">Başvurulan Pozisyon: <strong>${position}</strong></p>` : ''}
+            <p style="margin:16px 0 0;font-size:14px;color:#475569;line-height:1.7;">
+                Başvurunuzu inceleme sürecimizde sizden bazı ek bilgi veya belgeler talep etmekteyiz.
+            </p>
+        </td></tr>
+
+        <!-- Request Message -->
+        ${requestMessage ? `
+        <tr><td style="padding:20px 48px 0;">
+            <div style="background:#F8FAFC;border-left:4px solid #0E7490;border-radius:0 12px 12px 0;padding:20px 24px;">
+                <p style="margin:0 0 6px;font-size:10px;font-weight:700;color:#94A3B8;letter-spacing:0.1em;text-transform:uppercase;">İstek Detayı</p>
+                <p style="margin:0;font-size:14px;color:#334155;line-height:1.7;white-space:pre-line;">${requestMessage}</p>
+            </div>
+        </td></tr>` : ''}
+
+        <!-- Requested Items -->
+        ${items ? `
+        <tr><td style="padding:20px 48px 0;">
+            <p style="margin:0 0 10px;font-size:12px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.05em;">Talep Edilen Belgeler/Bilgiler</p>
+            <ul style="margin:0;padding-left:20px;">${items}</ul>
+        </td></tr>` : ''}
+
+        <!-- CTA Button -->
+        ${respondUrl ? `
+        <tr><td style="padding:28px 48px 0;text-align:center;">
+            <a href="${respondUrl}" style="display:inline-block;background:#0E7490;color:#ffffff;font-size:14px;font-weight:700;padding:14px 36px;border-radius:12px;text-decoration:none;letter-spacing:0.02em;">
+                📝 Bilgi Gönder
+            </a>
+            <p style="margin:12px 0 0;font-size:11px;color:#94A3B8;">Butona tıklayarak güvenli form sayfamıza yönlendirileceksiniz.</p>
+        </td></tr>` : ''}
+
+        <!-- Signature -->
+        <tr><td style="padding:32px 48px 40px;">
+            <p style="margin:0;font-size:13px;color:#94A3B8;">Saygılarımızla,</p>
+            <p style="margin:4px 0 0;font-size:14px;font-weight:700;color:#334155;">${recruiterName || 'İK Ekibi'}</p>
+            ${companyEmail ? `<p style="margin:2px 0 0;font-size:12px;color:#94A3B8;">${companyEmail}</p>` : ''}
+        </td></tr>
+    `;
+    return baseLayout(branding, content);
+}
+
+// ─── Interview Confirmation Email (sent to candidate with confirm/decline links) ─
+export function buildInterviewConfirmationEmail(branding, { candidateName, recruiterName, position, date, time, interviewType, respondUrl, companyEmail }) {
+    const typeLabel = interviewType === 'technical' ? 'Teknik Mülakat' : interviewType === 'hr' ? 'İK Mülakatı' : interviewType === 'final' ? 'Final Mülakatı' : 'Mülakat';
+    const confirmUrl = respondUrl ? `${respondUrl}?action=confirm` : '';
+    const declineUrl = respondUrl ? `${respondUrl}?action=decline` : '';
+    const content = `
+        <tr><td style="padding:32px 48px 0;">
+            <p style="margin:0;font-size:15px;color:#334155;">Sayın <strong>${candidateName}</strong>,</p>
+            ${position ? `<p style="margin:8px 0 0;font-size:12px;color:#64748B;">Pozisyon: <strong>${position}</strong></p>` : ''}
+            <p style="margin:16px 0 0;font-size:14px;color:#475569;line-height:1.7;">
+                <strong>${typeLabel}</strong> davetinizi aldığınızı teyit etmenizi rica ederiz.
+            </p>
+        </td></tr>
+
+        <tr><td style="padding:20px 48px 0;">
+            <div style="background:#F0F9FF;border:1px solid #BAE6FD;border-radius:12px;padding:20px 24px;">
+                <table cellpadding="0" cellspacing="0" width="100%">
+                    ${date ? `<tr><td style="padding:4px 0;font-size:13px;color:#0369A1;"><strong>📅 Tarih:</strong> ${date}</td></tr>` : ''}
+                    ${time ? `<tr><td style="padding:4px 0;font-size:13px;color:#0369A1;"><strong>🕐 Saat:</strong> ${time}</td></tr>` : ''}
+                </table>
+            </div>
+        </td></tr>
+
+        ${respondUrl ? `
+        <tr><td style="padding:28px 48px 0;text-align:center;">
+            <table cellpadding="0" cellspacing="0" style="margin:0 auto;">
+                <tr>
+                    <td style="padding-right:12px;">
+                        <a href="${confirmUrl}" style="display:inline-block;background:#10B981;color:#ffffff;font-size:14px;font-weight:700;padding:12px 28px;border-radius:12px;text-decoration:none;">
+                            ✅ Katılıyorum
+                        </a>
+                    </td>
+                    <td>
+                        <a href="${declineUrl}" style="display:inline-block;background:#EF4444;color:#ffffff;font-size:14px;font-weight:700;padding:12px 28px;border-radius:12px;text-decoration:none;">
+                            ❌ Katılamıyorum
+                        </a>
+                    </td>
+                </tr>
+            </table>
+        </td></tr>` : ''}
+
+        <tr><td style="padding:32px 48px 40px;">
+            <p style="margin:0;font-size:13px;color:#94A3B8;">Saygılarımızla,</p>
+            <p style="margin:4px 0 0;font-size:14px;font-weight:700;color:#334155;">${recruiterName || 'İK Ekibi'}</p>
+            ${companyEmail ? `<p style="margin:2px 0 0;font-size:12px;color:#94A3B8;">${companyEmail}</p>` : ''}
+        </td></tr>
+    `;
+    return baseLayout(branding, content);
+}
