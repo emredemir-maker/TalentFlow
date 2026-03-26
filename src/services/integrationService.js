@@ -136,7 +136,7 @@ export const disconnectGoogleWorkspace = async (userId) => {
 // Returns: { success, messageId, threadId }
 export const sendDirectEmail = async (userId, token, emailData) => {
     try {
-        const { to, subject, body, html } = emailData;
+        const { to, subject, body, html, replyTo } = emailData;
 
         const utf8Subject = `=?utf-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`;
 
@@ -147,6 +147,7 @@ export const sendDirectEmail = async (userId, token, emailData) => {
             const parts = [
                 `To: ${to}`,
                 `Subject: ${utf8Subject}`,
+                ...(replyTo ? [`Reply-To: ${replyTo}`] : []),
                 'MIME-Version: 1.0',
                 `Content-Type: multipart/alternative; boundary="${boundary}"`,
                 '',
@@ -169,6 +170,7 @@ export const sendDirectEmail = async (userId, token, emailData) => {
             const messageParts = [
                 `To: ${to}`,
                 `Subject: ${utf8Subject}`,
+                ...(replyTo ? [`Reply-To: ${replyTo}`] : []),
                 'Content-Type: text/plain; charset="UTF-8"',
                 'MIME-Version: 1.0',
                 '',

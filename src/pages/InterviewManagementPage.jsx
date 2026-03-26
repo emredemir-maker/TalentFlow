@@ -8,7 +8,7 @@ import { useNotifications } from '../context/NotificationContext';
 import { collection, onSnapshot, doc, getDoc, setDoc, deleteDoc, serverTimestamp, query, where, addDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { getCalendarEvents, connectGoogleWorkspace, sendDirectEmail, createDirectCalendarEvent, ensureValidGoogleToken } from '../services/integrationService';
-import { buildInterviewInviteEmail, buildParticipantNotificationEmail } from '../utils/emailTemplates';
+import { buildInterviewInviteEmail, buildParticipantNotificationEmail, buildRescheduleEmail } from '../utils/emailTemplates';
 import { 
     Plus, 
     Video, 
@@ -111,6 +111,7 @@ export default function InterviewManagementPage() {
     const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
     const [emailSubject, setEmailSubject] = useState('');
     const [emailBody, setEmailBody] = useState('');
+    const [emailJoinLink, setEmailJoinLink] = useState('');
 
     // Time slots helper
     const timeSlots = useMemo(() => {
@@ -549,8 +550,9 @@ export default function InterviewManagementPage() {
         }
 
         const typeLabel = interviewType === 'technical' ? 'Teknik' : (interviewType === 'hr' ? 'İK' : 'Product');
-        const joinLink = `${window.location.origin}/join/iv-${selectedCandidate.id.substring(0, 4)}-${Date.now()}`; // Mocking ID for preview
+        const joinLink = `${window.location.origin}/join/iv-${selectedCandidate.id.substring(0, 4)}-${Date.now()}`;
         
+        setEmailJoinLink(joinLink);
         setEmailSubject(`Mülakat Daveti: ${typeLabel} Değerlendirmesi - ${selectedCandidate.name}`);
         setEmailBody(`Merhaba ${selectedCandidate.name},\n\nTalent-Inn ekibi olarak sizinle ${typeLabel} mülakatı gerçekleştirmek istiyoruz.\n\nMülakat Detayları:\n- Tarih: ${manualDate || 'Henüz Belirlenmedi'}\n- Saat: ${manualTime}\n- Platform: Talent-Inn Workspace\n\nMülakat linkiniz: ${joinLink}\n\nHerhangi bir sorunuz olursa bu mail üzerinden bizimle iletişime geçebilirsiniz.\n\nİyi çalışmalar dileriz.`);
         setIsEmailModalOpen(true);
@@ -569,7 +571,10 @@ export default function InterviewManagementPage() {
                 recruiterName: userProfile?.displayName || '',
                 position: selectedCandidate.position,
                 interviewType: emailSubject,
-                joinLink: null
+                date: manualDate || null,
+                time: manualTime || null,
+                joinLink: emailJoinLink || null,
+                companyEmail: userProfile?.email || null
             });
 
             const result = await sendDirectEmail(userId, freshToken, {
@@ -871,6 +876,7 @@ export default function InterviewManagementPage() {
     const handleUpdateSessionStatus = async (candidateId, sessionId, newStatus, newDate, newTime) => {
         const candidate = enrichedCandidates.find(c => c.id === candidateId);
         if (!candidate) return;
+        const originalSession = (candidate.interviewSessions || []).find(s => s.id === sessionId);
         const updatedSessions = (candidate.interviewSessions || []).map(s => {
             if (s.id !== sessionId) return s;
             return {
@@ -891,6 +897,42 @@ export default function InterviewManagementPage() {
                 }, { merge: true });
             } catch (piErr) {
                 console.warn('[ParticipantInvites] Status sync failed (non-blocking):', piErr.message);
+            }
+
+            // Send reschedule / cancellation email to the candidate (non-blocking)
+            if (candidate.email && (newStatus === 'postponed' || newStatus === 'cancelled') && originalSession) {
+                try {
+                    const freshToken = await ensureValidGoogleToken(userId, userProfile);
+                    if (freshToken) {
+                        const isCancelled = newStatus === 'cancelled';
+                        const rescheduleHtml = buildRescheduleEmail(branding, {
+                            candidateName: candidate.name,
+                            recruiterName: userProfile?.displayName || '',
+                            position: candidate.position,
+                            oldDate: originalSession.date || '',
+                            oldTime: originalSession.time || '',
+                            newDate: newDate || null,
+                            newTime: newTime || null,
+                            joinLink: (newDate || newTime) ? (originalSession.meetLink || null) : null,
+                            isCancelled,
+                            companyEmail: userProfile?.email || null
+                        });
+                        const rescheduleSubject = isCancelled
+                            ? `Mülakat İptali: ${originalSession.title || 'Mülakat'} - ${candidate.name}`
+                            : `Mülakat Tarihi Güncellendi: ${originalSession.title || 'Mülakat'} - ${candidate.name}`;
+                        const rescheduleBody = isCancelled
+                            ? `Sayın ${candidate.name},\n\n${branding.companyName || 'Şirketimiz'} ile planlanmış olan ${originalSession.title || 'mülakat'} (${originalSession.date || ''} ${originalSession.time || ''}) maalesef iptal edilmiştir.\n\nHerhangi bir sorunuz için bizimle iletişime geçebilirsiniz.\n\nSaygılarımızla,\n${userProfile?.displayName || 'İK Ekibi'}`
+                            : `Sayın ${candidate.name},\n\n${branding.companyName || 'Şirketimiz'} ile planlanmış olan mülakatınızın (${originalSession.date || ''} ${originalSession.time || ''}) tarihi güncellenmiştir.\n\nYeni tarih: ${newDate || originalSession.date || ''} ${newTime || originalSession.time || ''}\n\nHerhangi bir sorunuz için bizimle iletişime geçebilirsiniz.\n\nSaygılarımızla,\n${userProfile?.displayName || 'İK Ekibi'}`;
+                        await sendDirectEmail(userId, freshToken, {
+                            to: candidate.email,
+                            subject: rescheduleSubject,
+                            body: rescheduleBody,
+                            html: rescheduleHtml
+                        });
+                    }
+                } catch (emailErr) {
+                    console.warn('[RescheduleEmail] Failed to send notification:', emailErr.message);
+                }
             }
         } catch (err) {
             console.error('Update session status error:', err);
