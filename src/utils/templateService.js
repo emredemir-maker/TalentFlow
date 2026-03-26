@@ -24,14 +24,29 @@ async function loadTemplates() {
     return _templateCache;
 }
 
+// Build the branding header block (logo img or initials div) from branding object.
+// Used to resolve {{BRANDING_HEADER}} at send-time so the current logo/name always shows.
+function buildBrandingHeader(branding) {
+    const color = branding?.primaryColor || '#0E7490';
+    const company = branding?.companyName || '';
+    const tagline = branding?.tagline || '';
+    const logoUrl = branding?.logoUrl || '';
+    const initials = company.split(/\s+/).map(w => w[0] || '').join('').toUpperCase().slice(0, 2) || 'IK';
+    if (logoUrl) {
+        return `<img src="${logoUrl}" alt="${company}" style="height:44px;max-width:200px;object-fit:contain;display:block;"/>`;
+    }
+    return `<div style="display:inline-flex;align-items:center;gap:10px;"><div style="width:36px;height:36px;border-radius:9px;background:${color};display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;"><span style="color:#fff;font-size:13px;font-weight:800;letter-spacing:-0.5px;">${initials}</span></div><div><div style="color:#0F172A;font-size:16px;font-weight:800;line-height:1.2;">${company}</div>${tagline ? `<div style="color:#94A3B8;font-size:11px;margin-top:2px;">${tagline}</div>` : ''}</div></div>`;
+}
+
 // Apply {{variable}} substitution — merges branding fields into vars so
-// {{companyName}}, {{tagline}} etc. in saved templates are always resolved.
+// {{companyName}}, {{tagline}}, {{BRANDING_HEADER}} etc. in saved templates are always resolved.
 function applyVars(html, vars, branding) {
     const merged = {
-        companyName: branding?.companyName || '',
-        tagline:     branding?.tagline     || '',
-        logoUrl:     branding?.logoUrl     || '',
-        primaryColor: branding?.primaryColor || '#0E7490',
+        companyName:    branding?.companyName   || '',
+        tagline:        branding?.tagline        || '',
+        logoUrl:        branding?.logoUrl        || '',
+        primaryColor:   branding?.primaryColor   || '#0E7490',
+        BRANDING_HEADER: buildBrandingHeader(branding),
         ...vars,
     };
     let result = html;
