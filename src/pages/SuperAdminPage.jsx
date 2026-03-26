@@ -147,6 +147,8 @@ export default function SuperAdminPage() {
                 createdAt: serverTimestamp()
             });
             const inviteLink = `${window.location.origin}?invite=${encodeURIComponent(inviteEmail.trim().toLowerCase())}`;
+            let emailSent = false;
+            let emailError = '';
             try {
                 const res = await fetch('/api/send-invite', {
                     method: 'POST',
@@ -159,10 +161,21 @@ export default function SuperAdminPage() {
                         invitedByName: user?.displayName || ''
                     })
                 });
-                if (!res.ok) console.warn('Email send error');
-            } catch { }
+                if (res.ok) {
+                    emailSent = true;
+                } else {
+                    const body = await res.json().catch(() => ({}));
+                    emailError = body.error || `Sunucu hatası (${res.status})`;
+                }
+            } catch (fetchErr) {
+                emailError = fetchErr.message;
+            }
             try { await navigator.clipboard.writeText(inviteLink); } catch { prompt('Davet linki:', inviteLink); }
-            alert('✅ Davet oluşturuldu ve link panoya kopyalandı!');
+            if (emailSent) {
+                alert(`✅ Davet oluşturuldu!\n📧 E-posta ${inviteEmail} adresine gönderildi.\n🔗 Davet linki panoya kopyalandı.`);
+            } else {
+                alert(`✅ Davet oluşturuldu ve link panoya kopyalandı.\n⚠️ E-posta gönderilemedi: ${emailError}\nLinki manuel olarak iletebilirsiniz.`);
+            }
             setInviteEmail('');
             setShowInviteModal(false);
         } catch (err) { setError(err.message); }
