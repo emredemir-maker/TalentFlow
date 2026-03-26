@@ -827,7 +827,7 @@ export default function LiveInterviewPage() {
                     ? questions.find(q => !q.answered)?.question || null
                     : null;
 
-                const result = await analyzeSTARRealTime(safeProfile, recentSlice, currentQ);
+                const result = await analyzeSTARRealTime(safeProfile, recentSlice, currentQ, { title: session?.positionTitle || '' });
                 if (!result || !result.scores) return;
 
                 // Weighted running average: 60% previous + 40% new observation

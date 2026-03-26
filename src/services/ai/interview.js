@@ -27,15 +27,19 @@ ZORUNLU DEĞERLENDİRME KURALLARI (Bias Guardrail):
 // Called automatically after each new ADAY transcript entry.
 // Evaluates the 5 competency dimensions displayed in the radar chart and
 // returns a recruiter-facing insight. Uses STAR as the evaluation framework.
-export async function analyzeSTARRealTime(anonymizedProfile, recentTranscript, currentQuestion) {
+export async function analyzeSTARRealTime(anonymizedProfile, recentTranscript, currentQuestion, positionContext = {}) {
     // Defense-in-depth: always strip PII inside the function regardless of caller.
     const safeProfile = stripPiiForAI(anonymizedProfile);
-    const instruction = `Sen tarafsız bir mülakat gözlemcisisin. Son aday konuşmasını STAR metodolojisini kullanarak 5 yetkinlik boyutunda değerlendir.
+    const positionLine = positionContext?.title
+        ? `\nHEDEF POZİSYON: ${positionContext.title}${positionContext.requirements ? ` — Gereksinimler: ${positionContext.requirements}` : ''}`
+        : '';
+    const instruction = `Sen tarafsız bir mülakat gözlemcisisin. Son aday konuşmasını STAR metodolojisini kullanarak 5 yetkinlik boyutunda değerlendir.${positionLine}
 
 ${BIAS_GUARDRAIL}
 
 GÖREV:
 - STAR çerçevesini (Durum, Görev, Eylem, Sonuç) rehber olarak kullanarak aday cevabında aşağıdaki 5 yetkinliği 0-100 arasında puanla.
+- Puanları hedef pozisyon gereksinimleri ışığında yorumla; pozisyon belirtilmişse teknik yetkinliğe daha fazla ağırlık ver.
 - Puanı sadece bu konuşma anına ait kanıtlara dayandır; geçmiş hakkında tahminde bulunma.
 - Mülakatçıya kısa, eyleme geçirilebilir bir içgörü üret (Türkçe).
 - Sonraki soru için somut bir öneri sun (Türkçe).

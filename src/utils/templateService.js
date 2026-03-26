@@ -137,6 +137,29 @@ export async function getParticipantEmail(branding, vars) {
     return { html, subject: null };
 }
 
+// ─── Candidate Feedback Email ─────────────────────────────────────────────────
+// Thin wrapper around buildFeedbackEmail so callers can use the same pattern
+// as getInviteEmail / getRescheduleEmail — allowing future Firestore-saved
+// overrides without changing call sites.
+export async function getFeedbackEmail(branding, vars) {
+    const templates = await loadTemplates();
+    if (templates?.feedback?.html) {
+        const patched = patchLogoInSavedHtml(templates.feedback.html, branding);
+        return {
+            html:    applyVars(patched, vars, branding),
+            subject: applyVars(templates.feedback.subject || '', vars, branding),
+        };
+    }
+    const html = buildFeedbackEmail(branding, {
+        candidateName: vars.candidateName,
+        position:      vars.position,
+        outcome:       vars.outcome,
+        feedbackText:  vars.feedbackText,
+        companyEmail:  vars.companyEmail,
+    });
+    return { html, subject: null };
+}
+
 // Invalidate cache (call after saving a template)
 export function invalidateTemplateCache() {
     _templateCache = null;
