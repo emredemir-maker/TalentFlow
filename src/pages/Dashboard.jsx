@@ -70,24 +70,26 @@ export default function Dashboard() {
         const byStatus = stats.byStatus || {};
         const total = candidates.length || 1;
 
-        // Use actual status counts — cumulative so each stage includes downstream stages
-        const hiredCount   = byStatus.hired || 0;
-        const offerCount   = (byStatus.offer || 0) + hiredCount;
-        const interviewCount = (byStatus.interview || 0) + (byStatus.Interview || 0) +
-            (byStatus.mülakat || 0) + offerCount;
-        const reviewCount  = (byStatus.review || 0) + (byStatus.Review || 0) +
-            (byStatus.değerlendirme || 0) + interviewCount;
-        // ai_analysis stage includes candidates tagged 'new' (legacy) and 'ai_analysis'
-        const aiAnalysisCount = (byStatus.ai_analysis || 0) + (byStatus.new || 0) + reviewCount;
-
-        return [
-            { label: 'Başvurular', count: candidates.length, pct: 100,                                               color: '#1E3A8A' },
-            { label: 'AI Tarama',  count: aiAnalysisCount,   pct: Math.round((aiAnalysisCount   / total) * 100),    color: '#2563EB' },
-            { label: 'İnceleme',   count: reviewCount,        pct: Math.round((reviewCount        / total) * 100),    color: '#3B82F6' },
-            { label: 'Mülakatlar', count: interviewCount,     pct: Math.round((interviewCount     / total) * 100),    color: '#60A5FA' },
-            { label: 'Teklifler',  count: offerCount,          pct: Math.round((offerCount         / total) * 100),    color: '#10B981' },
-            { label: 'İşe Alındı', count: hiredCount,          pct: Math.round((hiredCount         / total) * 100),    color: '#059669' },
+        // Direct per-stage counts (non-cumulative) for the 6 canonical pipeline stages
+        const stageDefs = [
+            { key: 'ai_analysis', label: 'AI Tarama',   color: '#2563EB', legacy: ['new'] },
+            { key: 'review',      label: 'İnceleme',    color: '#3B82F6', legacy: ['Review', 'değerlendirme'] },
+            { key: 'interview',   label: 'Mülakat',     color: '#7C3AED', legacy: ['Interview', 'mülakat'] },
+            { key: 'offer',       label: 'Teklif',      color: '#F59E0B', legacy: [] },
+            { key: 'hired',       label: 'İşe Alındı',  color: '#059669', legacy: [] },
+            { key: 'rejected',    label: 'Reddedildi',  color: '#DC2626', legacy: ['Rejected'] },
         ];
+
+        return stageDefs.map(s => {
+            const count = (byStatus[s.key] || 0) +
+                s.legacy.reduce((sum, k) => sum + (byStatus[k] || 0), 0);
+            return {
+                label: s.label,
+                count,
+                pct: Math.max(Math.round((count / total) * 100), count > 0 ? 4 : 0),
+                color: s.color,
+            };
+        });
     }, [stats, candidates]);
 
     const weeklyPlan = useMemo(() => {
@@ -260,13 +262,13 @@ export default function Dashboard() {
                                 })}
                             </div>
                             <div className="mt-5 pt-4 border-t border-slate-100 flex items-center gap-6 flex-wrap">
-                                <div className="text-[10px] text-slate-500 font-medium">Başvurudan teklife dönüşüm:</div>
+                                <div className="text-[10px] text-slate-500 font-medium">Teklife dönüşüm:</div>
                                 <div className="font-black text-[13px] text-[#1E3A8A]">
-                                    %{candidates.length > 0 ? Math.round((funnelData[4].count / candidates.length) * 100) : 0}
+                                    %{candidates.length > 0 ? Math.round((funnelData[3].count / candidates.length) * 100) : 0}
                                 </div>
                                 <div className="text-[10px] text-slate-500 font-medium mt-1">İşe alım oranı:</div>
                                 <div className="font-black text-[13px] text-emerald-700">
-                                    %{candidates.length > 0 ? Math.round((funnelData[5].count / candidates.length) * 100) : 0}
+                                    %{candidates.length > 0 ? Math.round((funnelData[4].count / candidates.length) * 100) : 0}
                                 </div>
                                 <div className="flex items-center gap-1 text-[9px] font-bold text-emerald-600">
                                     <TrendingUp className="w-3 h-3" />
