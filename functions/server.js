@@ -148,8 +148,8 @@ async function verifyFirebaseToken(req, res, next) {
     if (!token) return res.status(401).json({ error: 'Kimlik doğrulama gereklidir.' });
     const apiKey = process.env.VITE_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY;
     if (!apiKey) {
-        console.warn('[verifyFirebaseToken] Firebase API key not set; skipping verification');
-        return next();
+        console.error('[verifyFirebaseToken] Firebase API key not configured — rejecting request.');
+        return res.status(500).json({ error: 'Sunucu yapılandırma hatası.' });
     }
     try {
         const resp = await fetch(
