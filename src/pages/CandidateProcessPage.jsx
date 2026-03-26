@@ -41,10 +41,11 @@ export default function CandidateProcessPage() {
     const navigate = useNavigate();
     const { enrichedCandidates, viewCandidateId, setViewCandidateId, sourceColors, setPreselectedInterviewData, updateCandidate, deleteCandidate } = useCandidates();
     const { positions } = usePositions();
-    const { user } = useAuth();
+    const { user, isSuperAdmin } = useAuth();
     const candidates = enrichedCandidates || [];
     const [searchQuery, setSearchQuery]   = useState('');
     const [activeTab, setActiveTab]       = useState('ai_analysis');
+    const [migrateStatus, setMigrateStatus] = useState(null); // null | 'running' | 'done'
     const [showFilters, setShowFilters]   = useState(false);
     const [filterSource, setFilterSource] = useState('');
     const [filterStatus, setFilterStatus] = useState('');
@@ -68,6 +69,20 @@ export default function CandidateProcessPage() {
     const showSuccess = (type) => {
         setActionSuccess(type);
         setTimeout(() => setActionSuccess(null), 3000);
+    };
+
+    const legacyNewCandidates = candidates.filter(c => c.status === 'new');
+
+    const handleMigrateNewStatus = async () => {
+        if (migrateStatus === 'running' || legacyNewCandidates.length === 0) return;
+        setMigrateStatus('running');
+        try {
+            await Promise.all(legacyNewCandidates.map(c => updateCandidate(c.id, { status: 'ai_analysis' })));
+            setMigrateStatus('done');
+        } catch (err) {
+            console.error('Migration error:', err);
+            setMigrateStatus(null);
+        }
     };
 
     const handleReparseCareer = async () => {
@@ -372,6 +387,28 @@ export default function CandidateProcessPage() {
                     </button>
                 </div>
             </div>
+
+            {/* ONE-TIME MIGRATION BANNER — super_admin only */}
+            {isSuperAdmin && legacyNewCandidates.length > 0 && migrateStatus !== 'done' && (
+                <div className="bg-amber-50 border-b border-amber-200 px-8 py-2 flex items-center justify-between shrink-0">
+                    <span className="text-amber-700 text-[11px] font-medium">
+                        <strong>{legacyNewCandidates.length} aday</strong> eski <code className="bg-amber-100 px-1 rounded text-[10px]">new</code> statüsüyle kayıtlı — pipeline tutarlılığı için <strong>ai_analysis</strong> olarak güncellenebilir.
+                    </span>
+                    <button
+                        onClick={handleMigrateNewStatus}
+                        disabled={migrateStatus === 'running'}
+                        className="text-[10px] font-bold bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg transition-colors disabled:opacity-60 ml-4 shrink-0"
+                    >
+                        {migrateStatus === 'running' ? 'Güncelleniyor...' : 'Hepsini Düzelt'}
+                    </button>
+                </div>
+            )}
+            {isSuperAdmin && migrateStatus === 'done' && (
+                <div className="bg-emerald-50 border-b border-emerald-200 px-8 py-2 flex items-center gap-2 shrink-0">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                    <span className="text-emerald-700 text-[11px] font-medium">Tüm kayıtlar başarıyla <strong>ai_analysis</strong> olarak güncellendi.</span>
+                </div>
+            )}
 
             <div className="flex-1 flex overflow-hidden">
                 {/* ── LEFT: CANDIDATE LIST ─────────────────────────────────── */}
