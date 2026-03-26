@@ -28,6 +28,7 @@ export default function LiveInterviewPage() {
 
     // Candidate-side API session (for anonymous users who can't read Firestore directly)
     const [apiSession, setApiSession] = useState(null);
+    const [apiSessionLoading, setApiSessionLoading] = useState(true); // true until first Firestore callback
     const [apiCandidateId, setApiCandidateId] = useState(null);
 
     // Elapsed time timer (for recruiter active view)
@@ -378,6 +379,7 @@ export default function LiveInterviewPage() {
         console.log('[Candidate Listener] Starting Firestore listener on /interviews/', sessionId);
         const sessionRef = doc(db, 'interviews', sessionId);
         const unsub = onSnapshot(sessionRef, (snap) => {
+            setApiSessionLoading(false); // First callback received — stop showing "loading"
             if (snap.exists()) {
                 const data = snap.data();
                 console.log('[Candidate Listener] Snapshot received:', Object.keys(data));
@@ -398,7 +400,11 @@ export default function LiveInterviewPage() {
                     });
                 }
             } else {
-                console.warn('[Candidate Listener] Session doc not found yet, waiting...');
+                // Doc doesn't exist yet (recruiter hasn't opened the page).
+                // Set a minimal stub so the lobby renders instead of loading forever.
+                // The real data will arrive once the recruiter's heartbeat creates the doc.
+                console.warn('[Candidate Listener] Session doc not found yet — showing lobby stub...');
+                setApiSession(prev => prev || { status: 'scheduled', sessionId });
             }
         }, (err) => {
             console.error('[Candidate Listener] Firestore error:', err.message);
@@ -1138,7 +1144,9 @@ export default function LiveInterviewPage() {
     const isCandidateJoinRoute = window.location.pathname.startsWith('/join/');
     const canContinue = isAuthenticated ||
         (isCandidateJoinRoute && candidateData) ||
-        (isCandidateJoinRoute && user?.isAnonymous && (apiSession || candidatesLoading));
+        // apiSessionLoading: true until the first Firestore onSnapshot fires — prevents the
+        // "Oturum Doğrulanamadı" error from flashing before the listener has a chance to run.
+        (isCandidateJoinRoute && user?.isAnonymous && (apiSession || candidatesLoading || apiSessionLoading));
 
     if (!canContinue) return (
         <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6 text-white font-sans">
@@ -1474,7 +1482,8 @@ export default function LiveInterviewPage() {
                                                             questions,
                                                             selectedPathId,
                                                             currentQuestionIndex: 0,
-                                                            startedAt: new Date().toISOString()
+                                                            startedAt: new Date().toISOString(),
+                                                            candidateStatus: null,
                                                         };
                                                         await persistSessionData(startData);
                                                         setPhase('active');

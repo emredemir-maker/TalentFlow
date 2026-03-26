@@ -4,8 +4,10 @@ import { useNavigate } from 'react-router-dom';
 import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
 import { useAuth } from '../context/AuthContext';
-import { analyzeCandidateMatch, parseExperiencesFromText } from '../services/geminiService';
+import { analyzeCandidateMatch, parseExperiencesFromText, parseCandidateFromText } from '../services/geminiService';
+import { extractTextFromFile } from '../services/cvParser';
 import { calculateMatchScore, filterPositionsByDomain, detectJobDomain, domainLabel } from '../services/matchService';
+import { applyPiiMask } from '../utils/pii';
 import SystemScanner from '../components/SystemScanner';
 import AddCandidateModal from '../components/AddCandidateModal';
 import {
@@ -13,8 +15,8 @@ import {
     Target, ShieldCheck, ArrowRight, FileText, Clock,
     AlertCircle, Trophy, Calendar, Edit3,
     CheckCircle2, Link2, ExternalLink, Video, Play, Award, User, Mail,
-    ChevronRight, BarChart2, MessageSquare, XCircle, Send, Loader2,
-    Sparkles, Trash2, RefreshCw, Layers, TrendingUp
+    ChevronRight, ChevronDown, BarChart2, MessageSquare, XCircle, Send, Loader2,
+    Sparkles, Trash2, RefreshCw, Layers, TrendingUp, Upload
 } from 'lucide-react';
 
 const STATUS_CONFIG = {
@@ -35,11 +37,22 @@ const PIPELINE_STATUS_LABELS = {
     rejected:    'Red',
     final:       'Final',
 };
+
+// Ordered pipeline stages for the full status selector
+const PIPELINE_STAGES = [
+    { value: 'ai_analysis', label: 'AI Analiz',   color: 'text-blue-600',   bg: 'bg-blue-50' },
+    { value: 'review',      label: 'İnceleme',     color: 'text-indigo-600', bg: 'bg-indigo-50' },
+    { value: 'interview',   label: 'Mülakat',      color: 'text-violet-600', bg: 'bg-violet-50' },
+    { value: 'offer',       label: 'Teklif',       color: 'text-amber-600',  bg: 'bg-amber-50' },
+    { value: 'hired',       label: 'İşe Alındı',   color: 'text-emerald-600',bg: 'bg-emerald-50' },
+    { value: 'rejected',    label: 'Reddedildi',   color: 'text-red-600',    bg: 'bg-red-50' },
+];
+
 const normalizePipelineStatus = (s) => (s === 'new' ? 'ai_analysis' : s);
 
 export default function CandidateProcessPage() {
     const navigate = useNavigate();
-    const { enrichedCandidates, viewCandidateId, setViewCandidateId, sourceColors, setPreselectedInterviewData, updateCandidate, deleteCandidate } = useCandidates();
+    const { enrichedCandidates, viewCandidateId, setViewCandidateId, sourceColors, setPreselectedInterviewData, updateCandidate, deleteCandidate, addCandidate } = useCandidates();
     const { positions } = usePositions();
     const { user, isSuperAdmin } = useAuth();
     const candidates = enrichedCandidates || [];
@@ -60,11 +73,27 @@ export default function CandidateProcessPage() {
     const [finalModal, setFinalModal]     = useState(false);
     const [deleteModal, setDeleteModal]   = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
-    const [actionSuccess, setActionSuccess] = useState(null); // 'comment' | 'reject' | 'final'
+    const [actionSuccess, setActionSuccess] = useState(null); // 'comment' | 'reject' | 'final' | 'stage'
+    const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
     const [analyzingIds, setAnalyzingIds]       = useState(new Set());
     const [analysisError, setAnalysisError]     = useState(null);
     const [isAddModalOpen, setIsAddModalOpen]   = useState(false);
     const [reparsingCareer, setReparsingCareer] = useState(false);
+
+    // Bulk import modal
+    const [bulkImportModal, setBulkImportModal] = useState(false);
+    const [bulkFiles, setBulkFiles]             = useState([]);
+    const [bulkPositionId, setBulkPositionId]   = useState('');
+    const [bulkImporting, setBulkImporting]     = useState(false);
+    const [bulkProgress, setBulkProgress]       = useState({ total: 0, completed: 0, failed: 0, items: [] });
+
+    // Feedback email modal
+    const [feedbackModal, setFeedbackModal]     = useState(false);
+    const [feedbackOutcome, setFeedbackOutcome] = useState('positive');
+    const [feedbackText, setFeedbackText]       = useState('');
+    const [feedbackLoading, setFeedbackLoading] = useState(false);
+    const [feedbackAiLoading, setFeedbackAiLoading] = useState(false);
+    const [feedbackSuccess, setFeedbackSuccess] = useState(false);
 
     const showSuccess = (type) => {
         setActionSuccess(type);
@@ -156,6 +185,156 @@ export default function CandidateProcessPage() {
         }
     };
 
+    const handleGenerateFeedbackText = async () => {
+        if (!candidate) return;
+        setFeedbackAiLoading(true);
+        try {
+            const outcomeWord = feedbackOutcome === 'positive' ? 'olumlu' : feedbackOutcome === 'negative' ? 'olumsuz' : 'beklemede';
+            const prompt = `Sen deneyimli bir İK uzmanısın. "${candidate.name}" adlı adayın başvurusu ${outcomeWord} sonuçlanmıştır. Bu adayın profil bilgileri: pozisyon başvurusu: ${candidate.appliedPosition || candidate.position || 'belirtilmemiş'}, eşleşme skoru: ${candidate.matchScore ?? '-'}/100. Adaya gönderilecek, profesyonel, empatik ve kısa (3-4 cümle) bir geri bildirim e-postası metni yaz. Selamlama veya imza ekleme, sadece geri bildirim paragrafını yaz. Türkçe yaz.`;
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${import.meta.env.VITE_GEMINI_API_KEY}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+            });
+            const data = await res.json();
+            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            if (text) setFeedbackText(text.trim());
+        } catch (err) {
+            console.error('Feedback AI error:', err);
+        } finally {
+            setFeedbackAiLoading(false);
+        }
+    };
+
+    const handleSendFeedback = async () => {
+        if (!candidate || !feedbackText.trim()) return;
+        setFeedbackLoading(true);
+        try {
+            const res = await fetch('/api/send-feedback', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    to: candidate.email,
+                    candidateName: candidate.name,
+                    recruiterName: user?.displayName || user?.email || 'İK Ekibi',
+                    outcome: feedbackOutcome,
+                    feedbackText: feedbackText.trim(),
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                setFeedbackSuccess(true);
+                setTimeout(() => {
+                    setFeedbackModal(false);
+                    setFeedbackSuccess(false);
+                    setFeedbackText('');
+                    setFeedbackOutcome('positive');
+                }, 2000);
+            } else {
+                alert(data.error || 'Mail gönderilemedi.');
+            }
+        } finally {
+            setFeedbackLoading(false);
+        }
+    };
+
+    const handleBulkImport = async () => {
+        if (!bulkFiles.length || bulkImporting) return;
+        setBulkImporting(true);
+        const total = bulkFiles.length;
+        const items = bulkFiles.map(f => ({ name: f.name, status: 'pending' }));
+        setBulkProgress({ total, completed: 0, failed: 0, items });
+
+        const selectedPos = positions.find(p => p.id === bulkPositionId);
+
+        for (let i = 0; i < bulkFiles.length; i++) {
+            const file = bulkFiles[i];
+            try {
+                // Update status to processing
+                setBulkProgress(prev => {
+                    const next = [...prev.items];
+                    next[i] = { ...next[i], status: 'processing' };
+                    return { ...prev, items: next };
+                });
+
+                // Extract text
+                const cvText = await extractTextFromFile(file);
+
+                // Parse candidate
+                const parsed = await parseCandidateFromText(cvText);
+
+                // Calculate match score
+                let matchScore = 0;
+                if (parsed && selectedPos) {
+                    try {
+                        const result = calculateMatchScore(parsed, selectedPos);
+                        matchScore = result.score ?? 0;
+                    } catch {}
+                }
+
+                // Save candidate
+                await addCandidate({
+                    name: parsed?.name || file.name.replace(/\.[^.]+$/, ''),
+                    email: parsed?.email || '',
+                    phone: parsed?.phone || '',
+                    skills: parsed?.skills || [],
+                    experience: parsed?.experience || 0,
+                    education: parsed?.education || '',
+                    summary: parsed?.summary || '',
+                    cvText: cvText?.slice(0, 6000) || '',
+                    cvFileName: file.name,
+                    position: selectedPos?.title || '',
+                    positionId: selectedPos?.id || '',
+                    matchScore,
+                    source: 'bulk_import',
+                    status: 'ai_analysis',
+                    appliedDate: new Date().toISOString().split('T')[0],
+                    interviewSessions: [],
+                });
+
+                setBulkProgress(prev => {
+                    const next = [...prev.items];
+                    next[i] = { ...next[i], status: 'done', score: matchScore };
+                    return { ...prev, items: next, completed: prev.completed + 1 };
+                });
+            } catch (err) {
+                console.error('Bulk import error for', file.name, err);
+                setBulkProgress(prev => {
+                    const next = [...prev.items];
+                    next[i] = { ...next[i], status: 'error', error: err.message };
+                    return { ...prev, items: next, failed: prev.failed + 1 };
+                });
+            }
+            // Small delay to avoid rate limiting
+            if (i < bulkFiles.length - 1) await new Promise(r => setTimeout(r, 1500));
+        }
+        setBulkImporting(false);
+    };
+
+    const handleStatusChange = async (newStatus) => {
+        if (!candidate || newStatus === normalizePipelineStatus(candidate.status)) return;
+        setStatusDropdownOpen(false);
+        setActionLoading(true);
+        try {
+            const update = {
+                status: newStatus,
+                statusChangedAt: new Date().toISOString(),
+                statusChangedBy: user?.displayName || user?.email || 'HR',
+            };
+            if (newStatus === 'rejected') {
+                update.rejectedAt  = update.statusChangedAt;
+                update.rejectedBy  = update.statusChangedBy;
+            } else if (newStatus === 'hired') {
+                update.hiredAt  = update.statusChangedAt;
+                update.hiredBy  = update.statusChangedBy;
+            }
+            await updateCandidate(candidate.id, update);
+            showSuccess('stage');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
     const handleDelete = async () => {
         if (!candidate) return;
         setActionLoading(true);
@@ -228,9 +407,11 @@ export default function CandidateProcessPage() {
     };
 
     const candidate = useMemo(() => {
-        if (!viewCandidateId && candidates.length > 0) return candidates[0];
-        return candidates.find(c => c.id === viewCandidateId) || (candidates.length > 0 ? candidates[0] : null);
-    }, [candidates, viewCandidateId]);
+        const raw = (!viewCandidateId && candidates.length > 0)
+            ? candidates[0]
+            : candidates.find(c => c.id === viewCandidateId) || (candidates.length > 0 ? candidates[0] : null);
+        return applyPiiMask(raw, user?.role);
+    }, [candidates, viewCandidateId, user?.role]);
 
     const filterOptions = useMemo(() => {
         const sources = [...new Set(candidates.map(c => c.source).filter(Boolean))];
@@ -379,6 +560,12 @@ export default function CandidateProcessPage() {
                 </div>
                 <div className="flex items-center gap-2">
                     <SystemScanner />
+                    <button
+                        onClick={() => { setBulkFiles([]); setBulkProgress({ total: 0, completed: 0, failed: 0, items: [] }); setBulkImportModal(true); }}
+                        className="bg-violet-500 hover:bg-violet-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-colors shadow-sm shadow-violet-200 flex items-center gap-1.5"
+                    >
+                        <Upload className="w-3.5 h-3.5" /> Toplu Yükleme
+                    </button>
                     <button
                         onClick={() => setIsAddModalOpen(true)}
                         className="bg-cyan-500 hover:bg-cyan-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-colors shadow-sm shadow-cyan-200 flex items-center gap-1.5"
@@ -624,6 +811,12 @@ export default function CandidateProcessPage() {
                                             {score > 80 ? 'GÜÇLÜ' : score > 60 ? 'ORTA' : 'ZAYIF'}
                                         </span>
                                     </div>
+                                    {candidate.screeningScore != null && (
+                                        <div className="flex items-center gap-1.5 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-1.5">
+                                            <span className="text-[9px] font-bold text-indigo-400 uppercase">Eleme</span>
+                                            <span className="text-[13px] font-black text-indigo-600">%{Math.round(candidate.screeningScore)}</span>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -1191,6 +1384,22 @@ export default function CandidateProcessPage() {
                                                 <span className="text-[18px] font-black text-emerald-500">%{score}</span>
                                             </div>
 
+                                            {/* Screening Result */}
+                                            {candidate.screeningScore != null && (
+                                                <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 flex items-start justify-between">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-9 h-9 rounded-xl bg-indigo-100 border border-indigo-200 flex items-center justify-center shrink-0">
+                                                            <span className="text-[15px]">🎯</span>
+                                                        </div>
+                                                        <div>
+                                                            <h4 className="text-[13px] font-black text-slate-800">Ön Eleme Sonucu</h4>
+                                                            <span className="text-[10px] text-slate-400">{candidate.screeningResult?.summary || 'AI değerlendirmesi tamamlandı'}</span>
+                                                        </div>
+                                                    </div>
+                                                    <span className="text-[18px] font-black text-indigo-600">%{Math.round(candidate.screeningScore)}</span>
+                                                </div>
+                                            )}
+
                                             {/* Dynamic: session milestones */}
                                             {(candidate.interviewSessions || []).filter(s =>
                                                 s.status !== 'planned' || (s.title && s.participants?.length > 0)
@@ -1262,6 +1471,7 @@ export default function CandidateProcessPage() {
                                         {actionSuccess === 'comment' && 'Yorum kaydedildi'}
                                         {actionSuccess === 'reject' && 'Aday reddedildi'}
                                         {actionSuccess === 'final' && 'Final turuna taşındı'}
+                                        {actionSuccess === 'stage' && 'Aşama güncellendi'}
                                     </div>
                                 )}
 
@@ -1277,17 +1487,15 @@ export default function CandidateProcessPage() {
                                             </span>
                                         )}
                                     </button>
-                                    <button
-                                        onClick={() => setRejectModal(true)}
-                                        disabled={candidate?.status === 'rejected'}
-                                        className={`h-8 px-4 rounded-lg text-[9px] font-black uppercase border transition-all ${
-                                            candidate?.status === 'rejected'
-                                                ? 'text-slate-400 border-slate-200 bg-slate-50 cursor-not-allowed'
-                                                : 'text-red-500 border-red-100 hover:bg-red-50'
-                                        }`}
-                                    >
-                                        {candidate?.status === 'rejected' ? 'Reddedildi' : 'Ret'}
-                                    </button>
+                                    {candidate?.email && (
+                                        <button
+                                            onClick={() => { setFeedbackText(''); setFeedbackOutcome('positive'); setFeedbackModal(true); }}
+                                            className="h-8 px-3 bg-emerald-50 text-emerald-600 rounded-lg text-[9px] font-black uppercase border border-emerald-200 hover:bg-emerald-100 transition-all flex items-center gap-1.5"
+                                            title="Aday Geri Bildirim E-postası Gönder"
+                                        >
+                                            <Mail className="w-3 h-3" /> Geri Bildirim
+                                        </button>
+                                    )}
                                     <button
                                         onClick={() => setDeleteModal(true)}
                                         className="h-8 w-8 flex items-center justify-center rounded-lg text-slate-400 border border-slate-200 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-all"
@@ -1296,22 +1504,50 @@ export default function CandidateProcessPage() {
                                         <Trash2 className="w-3.5 h-3.5" />
                                     </button>
                                 </div>
-                                <button
-                                    onClick={() => setFinalModal(true)}
-                                    disabled={candidate?.status === 'final' || candidate?.status === 'rejected'}
-                                    className={`h-8 px-5 rounded-lg text-[9px] font-black uppercase tracking-widest shadow-sm flex items-center gap-2 transition-all ${
-                                        candidate?.status === 'final'
-                                            ? 'bg-emerald-100 text-emerald-700 border border-emerald-200 cursor-not-allowed'
-                                            : candidate?.status === 'rejected'
-                                                ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                                                : 'bg-cyan-500 hover:bg-cyan-600 text-white'
-                                    }`}
-                                >
-                                    {candidate?.status === 'final'
-                                        ? <><CheckCircle2 className="w-3 h-3" /> Final Turunda</>
-                                        : <>Final Turuna Taşı <ArrowRight className="w-3 h-3" /></>
-                                    }
-                                </button>
+
+                                {/* Stage selector dropdown */}
+                                <div className="relative">
+                                    <button
+                                        disabled={actionLoading}
+                                        onClick={() => setStatusDropdownOpen(v => !v)}
+                                        className="h-8 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest shadow-sm flex items-center gap-1.5 transition-all bg-cyan-500 hover:bg-cyan-600 text-white disabled:opacity-50"
+                                    >
+                                        {actionLoading
+                                            ? <Loader2 className="w-3 h-3 animate-spin" />
+                                            : (() => {
+                                                const cur = PIPELINE_STAGES.find(s => s.value === normalizePipelineStatus(candidate?.status));
+                                                return cur ? cur.label : 'Aşama';
+                                            })()
+                                        }
+                                        <ChevronDown className="w-3 h-3" />
+                                    </button>
+                                    {statusDropdownOpen && (
+                                        <div className="absolute bottom-10 right-0 z-50 bg-white border border-slate-200 rounded-xl shadow-xl py-1 min-w-[140px] animate-in fade-in zoom-in-95 duration-150">
+                                            {PIPELINE_STAGES.map(stage => {
+                                                const isCurrent = stage.value === normalizePipelineStatus(candidate?.status);
+                                                return (
+                                                    <button
+                                                        key={stage.value}
+                                                        disabled={isCurrent}
+                                                        onClick={() => handleStatusChange(stage.value)}
+                                                        className={`w-full text-left px-3 py-1.5 text-[10px] font-bold flex items-center gap-2 transition-colors ${
+                                                            isCurrent
+                                                                ? `${stage.bg} ${stage.color} cursor-default`
+                                                                : 'hover:bg-slate-50 text-slate-700'
+                                                        }`}
+                                                    >
+                                                        {isCurrent && <CheckCircle2 className="w-3 h-3 shrink-0" />}
+                                                        {!isCurrent && <span className="w-3 h-3 shrink-0" />}
+                                                        {stage.label}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                    {statusDropdownOpen && (
+                                        <div className="fixed inset-0 z-40" onClick={() => setStatusDropdownOpen(false)} />
+                                    )}
+                                </div>
                             </div>
                         </div>
                     ) : (
@@ -1502,6 +1738,243 @@ export default function CandidateProcessPage() {
                                     Evet, Sil
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── GERİ BİLDİRİM MAİLİ MODALI ──────────────────────────────── */}
+            {feedbackModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md animate-in zoom-in-95 duration-200">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                            <div className="flex items-center gap-2">
+                                <Mail className="w-4 h-4 text-emerald-500" />
+                                <h3 className="text-[13px] font-black text-slate-800">Aday Geri Bildirim Maili</h3>
+                            </div>
+                            <button onClick={() => setFeedbackModal(false)} className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-50">
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        {feedbackSuccess ? (
+                            <div className="px-6 py-10 flex flex-col items-center gap-3">
+                                <CheckCircle2 className="w-12 h-12 text-emerald-500" />
+                                <p className="text-[13px] font-black text-emerald-700">Mail başarıyla gönderildi!</p>
+                                <p className="text-[11px] text-slate-400">{candidate?.email}</p>
+                            </div>
+                        ) : (
+                            <div className="px-6 py-4 space-y-4">
+                                {/* Recipient */}
+                                <div>
+                                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Alıcı</label>
+                                    <div className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[12px] text-slate-600 font-medium">{candidate?.email}</div>
+                                </div>
+
+                                {/* Outcome */}
+                                <div>
+                                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Sonuç</label>
+                                    <div className="flex gap-2">
+                                        {[
+                                            { v: 'positive', label: 'Olumlu', active: 'bg-emerald-500 text-white border-emerald-500', inactive: 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100' },
+                                            { v: 'hold', label: 'Beklemede', active: 'bg-amber-500 text-white border-amber-500', inactive: 'bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100' },
+                                            { v: 'negative', label: 'Olumsuz', active: 'bg-red-500 text-white border-red-500', inactive: 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100' },
+                                        ].map(({ v, label, active, inactive }) => (
+                                            <button
+                                                key={v}
+                                                onClick={() => setFeedbackOutcome(v)}
+                                                className={`flex-1 h-8 rounded-lg text-[9px] font-black uppercase tracking-wide border transition-all ${feedbackOutcome === v ? active : inactive}`}
+                                            >{label}</button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Feedback text */}
+                                <div>
+                                    <div className="flex items-center justify-between mb-1.5">
+                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Geri Bildirim Metni</label>
+                                        <button
+                                            onClick={handleGenerateFeedbackText}
+                                            disabled={feedbackAiLoading}
+                                            className="flex items-center gap-1 px-2.5 py-1 bg-violet-50 text-violet-600 border border-violet-200 rounded-lg text-[9px] font-black hover:bg-violet-100 transition-all disabled:opacity-60"
+                                        >
+                                            {feedbackAiLoading
+                                                ? <Loader2 className="w-3 h-3 animate-spin" />
+                                                : <Brain className="w-3 h-3" />
+                                            }
+                                            AI ile Oluştur
+                                        </button>
+                                    </div>
+                                    <textarea
+                                        value={feedbackText}
+                                        onChange={e => setFeedbackText(e.target.value)}
+                                        placeholder="Adaya iletmek istediğiniz geri bildirimi yazın..."
+                                        rows={5}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-[12px] text-slate-700 placeholder-slate-400 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-50 resize-none transition-all"
+                                    />
+                                </div>
+
+                                <div className="flex gap-2 justify-end pt-1">
+                                    <button onClick={() => setFeedbackModal(false)} className="h-9 px-4 rounded-xl text-[10px] font-black text-slate-500 border border-slate-200 hover:bg-slate-50 transition-all">İptal</button>
+                                    <button
+                                        onClick={handleSendFeedback}
+                                        disabled={!feedbackText.trim() || feedbackLoading}
+                                        className="h-9 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm transition-all disabled:opacity-60"
+                                    >
+                                        {feedbackLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                                        Gönder
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* ── TOPLU YÜKLEME MODALI ──────────────────────────────────────── */}
+            {bulkImportModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg animate-in zoom-in-95 duration-200">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                            <div className="flex items-center gap-2">
+                                <Upload className="w-4 h-4 text-violet-500" />
+                                <h3 className="text-[13px] font-black text-slate-800">Toplu CV Yükleme</h3>
+                            </div>
+                            <button
+                                onClick={() => { if (!bulkImporting) { setBulkImportModal(false); } }}
+                                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-50"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        <div className="px-6 py-4 space-y-4">
+                            {/* Drag-drop area */}
+                            {!bulkImporting && bulkProgress.total === 0 && (
+                                <>
+                                    <div
+                                        onDragOver={e => e.preventDefault()}
+                                        onDrop={e => {
+                                            e.preventDefault();
+                                            const files = Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.pdf') || f.name.endsWith('.docx'));
+                                            setBulkFiles(prev => [...prev, ...files].slice(0, 50));
+                                        }}
+                                        onClick={() => document.getElementById('bulk-cv-input')?.click()}
+                                        className="border-2 border-dashed border-violet-200 rounded-xl p-8 text-center cursor-pointer hover:border-violet-400 hover:bg-violet-50/30 transition-all"
+                                    >
+                                        <input
+                                            id="bulk-cv-input"
+                                            type="file"
+                                            accept=".pdf,.docx"
+                                            multiple
+                                            className="hidden"
+                                            onChange={e => {
+                                                const files = Array.from(e.target.files || []);
+                                                setBulkFiles(prev => [...prev, ...files].slice(0, 50));
+                                            }}
+                                        />
+                                        <Upload className="w-8 h-8 text-violet-300 mx-auto mb-2" />
+                                        <p className="text-[13px] font-bold text-slate-500">Sürükleyin veya tıklayın</p>
+                                        <p className="text-[10px] text-slate-400 mt-1">PDF veya DOCX • Maks. 50 dosya</p>
+                                    </div>
+
+                                    {bulkFiles.length > 0 && (
+                                        <div className="space-y-1 max-h-32 overflow-y-auto">
+                                            {bulkFiles.map((f, i) => (
+                                                <div key={i} className="flex items-center justify-between px-3 py-1.5 bg-slate-50 rounded-lg border border-slate-200">
+                                                    <span className="text-[11px] text-slate-600 font-medium truncate">{f.name}</span>
+                                                    <button
+                                                        onClick={() => setBulkFiles(prev => prev.filter((_, j) => j !== i))}
+                                                        className="text-slate-300 hover:text-red-400 shrink-0 ml-2"
+                                                    >
+                                                        <X className="w-3 h-3" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {/* Position selector */}
+                                    <div>
+                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Pozisyon (İsteğe Bağlı)</label>
+                                        <select
+                                            value={bulkPositionId}
+                                            onChange={e => setBulkPositionId(e.target.value)}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[12px] text-slate-700 outline-none focus:border-violet-300 transition-all"
+                                        >
+                                            <option value="">— Pozisyon seçin —</option>
+                                            {positions.filter(p => p.status === 'open').map(p => (
+                                                <option key={p.id} value={p.id}>{p.title}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="flex gap-2 justify-end">
+                                        <button onClick={() => setBulkImportModal(false)} className="h-9 px-4 rounded-xl text-[10px] font-black text-slate-500 border border-slate-200 hover:bg-slate-50 transition-all">İptal</button>
+                                        <button
+                                            onClick={handleBulkImport}
+                                            disabled={!bulkFiles.length}
+                                            className="h-9 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 bg-violet-500 hover:bg-violet-600 text-white shadow-sm transition-all disabled:opacity-60"
+                                        >
+                                            <Upload className="w-3.5 h-3.5" />
+                                            Yüklemeyi Başlat ({bulkFiles.length} dosya)
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+
+                            {/* Progress */}
+                            {(bulkImporting || bulkProgress.total > 0) && (
+                                <div className="space-y-3">
+                                    {/* Progress bar */}
+                                    <div>
+                                        <div className="flex items-center justify-between mb-1">
+                                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">İlerleme</span>
+                                            <span className="text-[10px] font-bold text-slate-400">{bulkProgress.completed + bulkProgress.failed} / {bulkProgress.total}</span>
+                                        </div>
+                                        <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                                            <div
+                                                className="h-full bg-violet-500 rounded-full transition-all duration-300"
+                                                style={{ width: `${bulkProgress.total > 0 ? ((bulkProgress.completed + bulkProgress.failed) / bulkProgress.total) * 100 : 0}%` }}
+                                            />
+                                        </div>
+                                        {!bulkImporting && (
+                                            <p className="text-[10px] text-slate-500 mt-1 text-center font-bold">
+                                                {bulkProgress.completed} başarılı{bulkProgress.failed > 0 && `, ${bulkProgress.failed} hatalı`}
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    {/* Item list */}
+                                    <div className="space-y-1 max-h-48 overflow-y-auto">
+                                        {bulkProgress.items.map((item, i) => (
+                                            <div key={i} className={`flex items-center justify-between px-3 py-2 rounded-lg border text-[11px] ${
+                                                item.status === 'done' ? 'bg-emerald-50 border-emerald-200' :
+                                                item.status === 'error' ? 'bg-red-50 border-red-200' :
+                                                item.status === 'processing' ? 'bg-violet-50 border-violet-200' :
+                                                'bg-slate-50 border-slate-200'
+                                            }`}>
+                                                <span className="font-medium text-slate-700 truncate">{item.name}</span>
+                                                <span className="shrink-0 ml-2 font-bold">
+                                                    {item.status === 'done' && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
+                                                    {item.status === 'error' && <XCircle className="w-3.5 h-3.5 text-red-500" />}
+                                                    {item.status === 'processing' && <Loader2 className="w-3.5 h-3.5 text-violet-500 animate-spin" />}
+                                                    {item.status === 'pending' && <Clock className="w-3.5 h-3.5 text-slate-300" />}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {!bulkImporting && (
+                                        <button
+                                            onClick={() => { setBulkImportModal(false); setBulkProgress({ total: 0, completed: 0, failed: 0, items: [] }); }}
+                                            className="w-full h-9 rounded-xl text-[10px] font-black text-white bg-slate-800 hover:bg-slate-900 uppercase tracking-widest transition-all"
+                                        >
+                                            Kapat
+                                        </button>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

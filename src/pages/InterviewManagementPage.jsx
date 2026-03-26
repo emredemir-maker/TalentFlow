@@ -730,6 +730,8 @@ export default function InterviewManagementPage() {
                 interviewerId: userId,
                 status: startNow ? 'live' : 'scheduled',
                 meetLink,
+                positionId:    selectedCandidate.positionId    || null,
+                positionTitle: selectedCandidate.position || selectedCandidate.bestTitle || selectedCandidate.positionTitle || null,
                 participants: selectedParticipants.map(p => ({
                     userId: p.id || p.userId,
                     name: p.name || p.email || 'Kullanıcı',
@@ -817,6 +819,42 @@ export default function InterviewManagementPage() {
                             console.warn('[Participants] Email send failed for:', participant.email, emailErr.message);
                         }
                     }
+
+                    // Auto-send candidate invite email immediately on scheduling
+                    if (selectedCandidate?.email) {
+                        try {
+                            const { html: candidateHtml } = await getInviteEmail(branding, {
+                                candidateName: selectedCandidate.name,
+                                recruiterName: userProfile?.displayName || '',
+                                position:      selectedCandidate.position,
+                                interviewType: newSession.title,
+                                date:          slot.date,
+                                time:          slot.time,
+                                joinLink:      platformJoinLink,
+                                companyEmail:  userProfile?.email || null,
+                            });
+                            const candidateICS = buildICS({
+                                date:        slot.date,
+                                time:        slot.time,
+                                title:       newSession.title,
+                                description: `Aday: ${selectedCandidate.name}\nPozisyon: ${selectedCandidate.position || ''}\nMülakat linki: ${platformJoinLink}`,
+                                location:    platformJoinLink,
+                                uid:         `${newSession.id}-candidate@talentflow`,
+                                organizer:   { name: userProfile?.displayName || '', email: userProfile?.email || '' },
+                                attendee:    { name: selectedCandidate.name, email: selectedCandidate.email },
+                            });
+                            await sendDirectEmail(userId, freshCalToken, {
+                                to:      selectedCandidate.email,
+                                subject: `Mülakat Davetiniz: ${newSession.title}`,
+                                html:    candidateHtml,
+                                ics:     candidateICS,
+                                replyTo: userProfile?.email || null,
+                            });
+                            console.log('[createInterviewRecord] Candidate invite email sent to:', selectedCandidate.email);
+                        } catch (candidateEmailErr) {
+                            console.warn('[createInterviewRecord] Candidate invite email failed (non-blocking):', candidateEmailErr.message);
+                        }
+                    }
                 }
             }
 
@@ -825,6 +863,30 @@ export default function InterviewManagementPage() {
                 hasInterview: true,
                 status: startNow ? 'Interview' : 'Review'
             });
+
+            // Pre-create the /interviews/{sessionId} Firestore doc so candidates can open
+            // the join link immediately — without this, the doc doesn't exist until the
+            // recruiter opens the live interview page, leaving the candidate on a loading screen.
+            try {
+                await fetch('/api/init-interview-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sessionId,
+                        initialData: {
+                            status: newSession.status,
+                            candidateId:   selectedCandidate.id,
+                            candidateName: selectedCandidate.name,
+                            positionId:    newSession.positionId,
+                            positionTitle: newSession.positionTitle,
+                            createdAt: new Date().toISOString(),
+                        },
+                    }),
+                });
+                console.log('[createInterviewRecord] Pre-created /interviews/' + sessionId);
+            } catch (docErr) {
+                console.warn('[createInterviewRecord] Could not pre-create session doc (non-blocking):', docErr.message);
+            }
 
             // Write participantInvites so department_users can find cross-department interviews
             const participantIds = newSession.participants.map(p => p.userId).filter(Boolean);
@@ -1895,7 +1957,7 @@ export default function InterviewManagementPage() {
                                                                 </div>
                                                                 <div>
                                                                     <h4 className="text-sm font-semibold text-[#0F172A]">{s.candidateName}</h4>
-                                                                    <p className="text-xs text-[#64748B]">{s.position || s.title || '—'}</p>
+                                                                    <p className="text-xs text-[#64748B]">{s.positionTitle || s.position || s.title || '—'}</p>
                                                                 </div>
                                                             </div>
                                                             <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wide ${statusInfo.bg} ${statusInfo.text}`}>

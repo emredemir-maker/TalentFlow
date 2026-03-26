@@ -227,6 +227,83 @@ ${BIAS_GUARDRAIL}
     }
 }
 
+// ─── Recruiter / Interviewer Evaluation (Task #8) ─────────────────────────────
+// Analyses the recruiter's performance from a completed session transcript.
+// Returns dimension scores (1-5) with explanations and improvement tips.
+export async function evaluateInterviewer({ transcript = [], questions = [], positionTitle = '' } = {}) {
+    const instruction = `Sen kıdemli bir mülakat koçusun. Mülakatçının (recruiter) performansını aşağıdaki dört boyutta değerlendir.
+
+KURALLAR:
+1. Sadece mülakatçı MÜLAKATÇI satırlarına bak (ADAY satırlarını yok say).
+2. Her boyutu 1-5 arasında puan ver (5 = mükemmel).
+3. Her boyut için kısa (1-2 cümle) Türkçe açıklama ve somut iyileştirme önerisi yaz.
+4. Puanlamayı kanıta dayandır; tahmin etme.
+5. Mülakatçı yeterli soru sormamışsa veya transcript kısaysa bunu yansıt.
+
+BOYUTLAR:
+- question_variety: Soru çeşitliliği ve derinliği — farklı kategorilerde (teknik, davranışsal, kültürel) soru soruldu mu?
+- star_adherence: STAR metodolojisine uyum — adayı Durum-Görev-Eylem-Sonuç çerçevesinde yönlendirdi mi?
+- active_listening: Aktif dinleme — önceki cevaplara dayalı takip soruları sordu mu?
+- bias_free_language: Önyargısız dil — demografik veya önyargılı ifade var mıydı?
+
+JSON formatında SADECE şu yapıda dön:
+{
+  "dimensions": [
+    {
+      "key": "question_variety",
+      "label": "Soru Çeşitliliği",
+      "score": <1-5>,
+      "explanation": "...",
+      "tip": "..."
+    },
+    {
+      "key": "star_adherence",
+      "label": "STAR Metodolojisi",
+      "score": <1-5>,
+      "explanation": "...",
+      "tip": "..."
+    },
+    {
+      "key": "active_listening",
+      "label": "Aktif Dinleme",
+      "score": <1-5>,
+      "explanation": "...",
+      "tip": "..."
+    },
+    {
+      "key": "bias_free_language",
+      "label": "Önyargısız Dil",
+      "score": <1-5>,
+      "explanation": "...",
+      "tip": "..."
+    }
+  ],
+  "overallScore": <1-5, ortalama>,
+  "summary": "Mülakatçıya 2-3 cümle genel geri bildirim (Türkçe)"
+}`;
+
+    const recruiterLines = (transcript || [])
+        .filter(t => t.role === 'MÜLAKATÇI' || t.role === 'RECRUITER' || t.role === 'interviewer')
+        .map(t => t.text || t.content || '');
+
+    const prompt = buildStructuredPrompt(instruction, {
+        "POZİSYON": positionTitle || 'Belirtilmemiş',
+        "SORULAR": JSON.stringify((questions || []).map(q => typeof q === 'string' ? q : q.question || q.text || q)),
+        "MÜLAKATÇI_SATILARI": JSON.stringify(recruiterLines),
+    });
+
+    try {
+        const model = await getModel();
+        const result = await model.generateContent(prompt);
+        const parsed = parseAIJson(result.response.text(), null);
+        if (!parsed || !Array.isArray(parsed.dimensions)) throw new Error('Invalid response');
+        return parsed;
+    } catch (e) {
+        console.error('[evaluateInterviewer]', e.message);
+        return null;
+    }
+}
+
 export async function generateFollowUpQuestion(candidate, interviewType, conversationHistory, mode = 'deepen', category = null) {
     const safe = stripPII(candidate);
     const persona = interviewType === 'product' ? 'Product Manager' : (interviewType === 'culture' ? 'İK Direktörü' : 'Technical Lead');

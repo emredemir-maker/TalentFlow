@@ -461,3 +461,43 @@ export function buildICS({ date, time, title, description, location, uid, organi
         return icsLines.join('\r\n');
     } catch { return null; }
 }
+
+// ─── Candidate Feedback Email ─────────────────────────────────────────────────
+export function buildFeedbackEmail(branding, { candidateName, recruiterName, outcome, feedbackText, companyEmail }) {
+    const outcomeLabel = outcome === 'positive' ? '✅ Olumlu' : outcome === 'negative' ? '❌ Olumsuz' : '⏳ Beklemede';
+    const outcomeColor = outcome === 'positive' ? '#10B981' : outcome === 'negative' ? '#EF4444' : '#F59E0B';
+    const content = `
+        <!-- Outcome Badge -->
+        <tr><td style="padding:32px 48px 0;">
+            <table cellpadding="0" cellspacing="0"><tr>
+                <td style="background:${outcomeColor}15;border:1px solid ${outcomeColor}40;border-radius:12px;padding:10px 20px;">
+                    <span style="color:${outcomeColor};font-size:13px;font-weight:700;">${outcomeLabel}</span>
+                </td>
+            </tr></table>
+        </td></tr>
+
+        <!-- Main message -->
+        <tr><td style="padding:28px 48px 0;">
+            <p style="margin:0;font-size:15px;color:#334155;">Sayın <strong>${candidateName}</strong>,</p>
+            <p style="margin:16px 0 0;font-size:14px;color:#475569;line-height:1.7;">
+                Başvurunuzu ve değerlendirme sürecimize gösterdiğiniz ilgiyi için teşekkür ederiz. Aşağıda sürecinize ilişkin geri bildiriminizi bulabilirsiniz.
+            </p>
+        </td></tr>
+
+        <!-- Feedback Block -->
+        <tr><td style="padding:24px 48px 0;">
+            <div style="background:#F8FAFC;border-left:4px solid ${outcomeColor};border-radius:0 12px 12px 0;padding:20px 24px;">
+                <p style="margin:0 0 6px;font-size:10px;font-weight:700;color:#94A3B8;letter-spacing:0.1em;text-transform:uppercase;">Geri Bildirim</p>
+                <p style="margin:0;font-size:14px;color:#334155;line-height:1.7;white-space:pre-line;">${feedbackText}</p>
+            </div>
+        </td></tr>
+
+        <!-- Signature -->
+        <tr><td style="padding:32px 48px 40px;">
+            <p style="margin:0;font-size:13px;color:#94A3B8;">Saygılarımızla,</p>
+            <p style="margin:4px 0 0;font-size:14px;font-weight:700;color:#334155;">${recruiterName || 'İK Ekibi'}</p>
+            ${companyEmail ? `<p style="margin:2px 0 0;font-size:12px;color:#94A3B8;">${companyEmail}</p>` : ''}
+        </td></tr>
+    `;
+    return baseLayout(branding, content);
+}

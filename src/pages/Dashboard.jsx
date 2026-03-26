@@ -68,25 +68,25 @@ export default function Dashboard() {
 
     const funnelData = useMemo(() => {
         const byStatus = stats.byStatus || {};
-        const hiredCount = byStatus.hired || 0;
-        const offerCount = (byStatus.offer || 0) + hiredCount;
-        const interviewCount = (byStatus.interview || 0) +
-            (byStatus.Interview || 0) +
-            (byStatus.mülakat || 0) + offerCount;
-        const reviewCount = (byStatus.review || 0) +
-            (byStatus.Review || 0) +
-            (byStatus.değerlendirme || 0) + interviewCount;
-
-        const analyzedCount = candidates.filter(c => c.aiAnalysis || c.cvSummary || (c.bestScore || 0) > 0).length;
-        const aiScreenedCount = Math.max(analyzedCount, reviewCount);
         const total = candidates.length || 1;
 
+        // Use actual status counts — cumulative so each stage includes downstream stages
+        const hiredCount   = byStatus.hired || 0;
+        const offerCount   = (byStatus.offer || 0) + hiredCount;
+        const interviewCount = (byStatus.interview || 0) + (byStatus.Interview || 0) +
+            (byStatus.mülakat || 0) + offerCount;
+        const reviewCount  = (byStatus.review || 0) + (byStatus.Review || 0) +
+            (byStatus.değerlendirme || 0) + interviewCount;
+        // ai_analysis stage includes candidates tagged 'new' (legacy) and 'ai_analysis'
+        const aiAnalysisCount = (byStatus.ai_analysis || 0) + (byStatus.new || 0) + reviewCount;
+
         return [
-            { label: 'Başvurular', count: candidates.length, pct: 100, color: '#1E3A8A' },
-            { label: 'AI Tarama', count: aiScreenedCount, pct: Math.round((aiScreenedCount / total) * 100), color: '#2563EB' },
-            { label: 'İnceleme', count: reviewCount, pct: Math.round((reviewCount / total) * 100), color: '#3B82F6' },
-            { label: 'Mülakatlar', count: interviewCount, pct: Math.round((interviewCount / total) * 100), color: '#60A5FA' },
-            { label: 'Teklifler', count: offerCount, pct: Math.round((offerCount / total) * 100), color: '#10B981' },
+            { label: 'Başvurular', count: candidates.length, pct: 100,                                               color: '#1E3A8A' },
+            { label: 'AI Tarama',  count: aiAnalysisCount,   pct: Math.round((aiAnalysisCount   / total) * 100),    color: '#2563EB' },
+            { label: 'İnceleme',   count: reviewCount,        pct: Math.round((reviewCount        / total) * 100),    color: '#3B82F6' },
+            { label: 'Mülakatlar', count: interviewCount,     pct: Math.round((interviewCount     / total) * 100),    color: '#60A5FA' },
+            { label: 'Teklifler',  count: offerCount,          pct: Math.round((offerCount         / total) * 100),    color: '#10B981' },
+            { label: 'İşe Alındı', count: hiredCount,          pct: Math.round((hiredCount         / total) * 100),    color: '#059669' },
         ];
     }, [stats, candidates]);
 
@@ -263,6 +263,10 @@ export default function Dashboard() {
                                 <div className="text-[10px] text-slate-500 font-medium">Başvurudan teklife dönüşüm:</div>
                                 <div className="font-black text-[13px] text-[#1E3A8A]">
                                     %{candidates.length > 0 ? Math.round((funnelData[4].count / candidates.length) * 100) : 0}
+                                </div>
+                                <div className="text-[10px] text-slate-500 font-medium mt-1">İşe alım oranı:</div>
+                                <div className="font-black text-[13px] text-emerald-700">
+                                    %{candidates.length > 0 ? Math.round((funnelData[5].count / candidates.length) * 100) : 0}
                                 </div>
                                 <div className="flex items-center gap-1 text-[9px] font-bold text-emerald-600">
                                     <TrendingUp className="w-3 h-3" />

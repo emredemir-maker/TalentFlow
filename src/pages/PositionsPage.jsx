@@ -484,6 +484,7 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
 function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser, userDepartments, isExtracting, onExtract, jdText, setJdText }) {
     const [formData, setFormData] = useState({
         title: '', department: isDepartmentUser ? (userDepartments?.[0] || '') : '', minExperience: '', requirements: '', description: '',
+        screeningEnabled: false, screeningQuestions: [''],
     });
 
     const handleSubmit = (e) => {
@@ -575,6 +576,61 @@ function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser,
                         <Field label="Açıklama">
                             <textarea placeholder="Pozisyon hakkında kısa açıklama..." value={formData.description} onChange={e => setFormData(p => ({ ...p, description: e.target.value }))} className={INPUT_CLS + ' h-20 resize-none'} />
                         </Field>
+                        {/* Screening Questions Toggle */}
+                        <div className="border border-slate-200 rounded-xl p-3 space-y-2">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-[11px] font-black text-slate-700">Ön Eleme Soruları</p>
+                                    <p className="text-[10px] text-slate-400">Başvuruculardan cevaplamaları isteniyor</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData(p => ({ ...p, screeningEnabled: !p.screeningEnabled }))}
+                                    className={`relative w-9 h-5 rounded-full transition-colors ${formData.screeningEnabled ? 'bg-cyan-500' : 'bg-slate-200'}`}
+                                >
+                                    <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${formData.screeningEnabled ? 'left-4' : 'left-0.5'}`} />
+                                </button>
+                            </div>
+                            {formData.screeningEnabled && (
+                                <div className="space-y-2 pt-1">
+                                    {formData.screeningQuestions.map((q, i) => (
+                                        <div key={i} className="flex gap-2 items-start">
+                                            <span className="mt-2 text-[9px] font-black text-slate-400 w-4 shrink-0">{i + 1}.</span>
+                                            <input
+                                                type="text"
+                                                placeholder={`Soru ${i + 1}...`}
+                                                value={q}
+                                                onChange={e => {
+                                                    const next = [...formData.screeningQuestions];
+                                                    next[i] = e.target.value;
+                                                    setFormData(p => ({ ...p, screeningQuestions: next }));
+                                                }}
+                                                className={INPUT_CLS + ' flex-1'}
+                                            />
+                                            {formData.screeningQuestions.length > 1 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setFormData(p => ({ ...p, screeningQuestions: p.screeningQuestions.filter((_, j) => j !== i) }))}
+                                                    className="mt-2 p-0.5 text-red-400 hover:text-red-600 transition-colors"
+                                                >
+                                                    <XCircle size={12} />
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                    {formData.screeningQuestions.length < 5 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setFormData(p => ({ ...p, screeningQuestions: [...p.screeningQuestions, ''] }))}
+                                            className="text-[10px] font-black text-cyan-600 hover:text-cyan-700 flex items-center gap-1 transition-colors"
+                                        >
+                                            <Plus size={11} /> Soru Ekle
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
                         <div className="mt-auto pt-2">
                             <button type="submit" className="w-full bg-cyan-500 hover:bg-cyan-600 text-white font-black text-xs uppercase tracking-widest py-3.5 rounded-xl flex items-center justify-center gap-2 shadow-sm shadow-cyan-200 transition-colors">
                                 <Send size={14} />{isDepartmentUser ? 'Talep Gönder' : 'Pozisyon Oluştur'}
@@ -815,7 +871,15 @@ export default function PositionsPage() {
             .slice(0, 10)
             .map(c => ({ id: c.id, name: c.name, score: c.match.score, reason: c.match.score >= 70 ? 'Yüksek Uyumluluk' : 'Potansiyel Eşleşme' }));
 
-        const newPos = { title: formData.title, department: formData.department, description: formData.description || jdText || '', minExperience: parseInt(formData.minExperience) || 0, requirements: reqs, matchedCandidates };
+        const cleanedQuestions = (formData.screeningQuestions || []).map(q => q.trim()).filter(Boolean);
+        const newPos = {
+            title: formData.title, department: formData.department,
+            description: formData.description || jdText || '',
+            minExperience: parseInt(formData.minExperience) || 0,
+            requirements: reqs, matchedCandidates,
+            screeningEnabled: formData.screeningEnabled && cleanedQuestions.length > 0,
+            screeningQuestions: cleanedQuestions,
+        };
         if (isDepartmentUser) {
             await addPositionRequest(newPos, { uid: user?.uid, email: userProfile?.email, displayName: userProfile?.displayName, department: userDepartments?.[0] || '' });
             alert('✅ Pozisyon talebiniz gönderildi.');

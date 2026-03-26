@@ -82,6 +82,9 @@ export default function ApplyPage() {
     const [aiScore, setAiScore] = useState(null);
     const [submitError, setSubmitError] = useState(null);
 
+    // Screening answers — one entry per question
+    const [screeningAnswers, setScreeningAnswers] = useState([]);
+
     // ── Source selection ──────────────────────────────────────────────────
     const [sources, setSources]                     = useState([]);
     const [selectedMainSource, setSelectedMainSource] = useState(null); // full source object
@@ -299,6 +302,34 @@ export default function ApplyPage() {
                 }
             }
 
+            // Step 3c — AI scoring of screening answers (non-blocking)
+            let screeningResult = null;
+            if (position?.screeningEnabled && (position?.screeningQuestions || []).length > 0 && screeningAnswers.some(a => a?.trim())) {
+                setProgress('Ön eleme soruları değerlendiriliyor...');
+                try {
+                    const qaPairs = (position.screeningQuestions || []).map((q, i) => `Soru ${i + 1}: ${q}\nCevap: ${screeningAnswers[i] || '(boş)'}`).join('\n\n');
+                    const prompt = `Sen bir İK uzmanısın. Aşağıdaki pozisyon ön eleme sorularını ve adayın cevaplarını değerlendir.\n\nPozisyon: ${position.title}\n\n${qaPairs}\n\nHer soru için 0-100 arası bir puan ver ve kısa Türkçe bir gerekçe yaz. Yanıtını şu JSON formatında ver:\n{\n  "scores": [{"question": "...", "score": 85, "rationale": "..."}],\n  "aggregateScore": 85,\n  "summary": "Kısa genel değerlendirme"\n}`;
+
+                    const resp = await Promise.race([
+                        fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${import.meta.env.VITE_GEMINI_API_KEY}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+                        }),
+                        new Promise((_, reject) => setTimeout(() => reject(new Error('Screening AI timeout')), 20000)),
+                    ]);
+                    const respData = await resp.json();
+                    const rawText = respData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+                    if (jsonMatch) {
+                        screeningResult = JSON.parse(jsonMatch[0]);
+                        screeningResult.answers = (position.screeningQuestions || []).map((q, i) => ({ question: q, answer: screeningAnswers[i] || '' }));
+                    }
+                } catch (screenErr) {
+                    console.warn('Screening AI error (non-blocking):', screenErr.message);
+                }
+            }
+
             // Step 4 — Save to applications + candidates
             setProgress('Başvuru kaydediliyor...');
             const appData = {
@@ -318,6 +349,10 @@ export default function ApplyPage() {
                 kvkkConsent: true,
                 createdAt: serverTimestamp(),
             };
+            if (screeningResult) {
+                appData.screeningResult = screeningResult;
+                appData.screeningScore = screeningResult.aggregateScore ?? null;
+            }
             if (parsedCandidate) appData.parsedCandidate = parsedCandidate;
             if (scoreBreakdown) appData.aiScoreBreakdown = scoreBreakdown;
 
@@ -361,6 +396,7 @@ export default function ApplyPage() {
                         source: effectiveSource,
                         sourceCategory: effectiveCategory,
                         ...(starAiAnalysis ? { aiAnalysis: starAiAnalysis } : {}),
+                        ...(screeningResult ? { screeningScore: screeningResult.aggregateScore ?? null, screeningResult } : {}),
                         updatedAt: serverTimestamp(),
                     });
                 } catch (updErr) {
@@ -396,6 +432,7 @@ export default function ApplyPage() {
                     positionId: position.id,
                     appliedDate: new Date().toISOString().split('T')[0],
                     interviewSessions: [],
+                    ...(screeningResult ? { screeningScore: screeningResult.aggregateScore ?? null, screeningResult } : {}),
                     createdAt: serverTimestamp(),
                     updatedAt: serverTimestamp(),
                 };
@@ -738,6 +775,39 @@ export default function ApplyPage() {
                                     </button>
                                 </div>
                             )}
+                        </div>
+                    )}
+
+                    {/* Screening Questions — shown when position.screeningEnabled */}
+                    {position?.screeningEnabled && (position?.screeningQuestions || []).length > 0 && (
+                        <div className="bg-white rounded-2xl border border-indigo-100 shadow-sm p-6 space-y-4">
+                            <div className="flex items-center gap-2 mb-2">
+                                <div className="w-6 h-6 rounded-lg bg-indigo-100 flex items-center justify-center shrink-0">
+                                    <span className="text-[11px]">🎯</span>
+                                </div>
+                                <div>
+                                    <div className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Ön Eleme Soruları</div>
+                                    <div className="text-[10px] text-slate-400">Lütfen tüm soruları yanıtlayın</div>
+                                </div>
+                            </div>
+                            {(position.screeningQuestions || []).map((q, i) => (
+                                <div key={i} className="space-y-1.5">
+                                    <label className="text-[12px] font-semibold text-slate-700 block">
+                                        <span className="text-indigo-400 font-black mr-1.5">{i + 1}.</span>{q}
+                                    </label>
+                                    <textarea
+                                        value={screeningAnswers[i] || ''}
+                                        onChange={e => {
+                                            const next = [...screeningAnswers];
+                                            next[i] = e.target.value;
+                                            setScreeningAnswers(next);
+                                        }}
+                                        placeholder="Yanıtınızı buraya yazın..."
+                                        rows={3}
+                                        className="w-full border border-slate-200 rounded-xl p-3 text-[12px] text-slate-700 placeholder-slate-300 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-50 resize-none transition-all"
+                                    />
+                                </div>
+                            ))}
                         </div>
                     )}
 

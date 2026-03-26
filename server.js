@@ -841,6 +841,66 @@ function cleanupOldFiles() {
     if (count > 0) console.log(`🧹 KVKK Veri Minimizasyonu: ${count} adet eski ham CV dosyası diskten silindi. (İletişim kayıtları korunuyor)`);
 }
 
+// Candidate Feedback Email Endpoint (Task #7)
+app.post('/api/send-feedback', async (req, res) => {
+    const { to, candidateName, recruiterName, outcome, feedbackText, branding } = req.body;
+    if (!to || !feedbackText) return res.status(400).json({ error: 'Email ve geri bildirim metni gereklidir.' });
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+        return res.status(500).json({ error: 'Sistem email yapılandırması eksik.' });
+    }
+    const b = branding || { companyName: 'Talent-Inn', primaryColor: '#1E3A8A' };
+    const fromName = b.companyName || 'Talent-Inn';
+    const outcomeLabel = outcome === 'positive' ? 'Olumlu' : outcome === 'negative' ? 'Olumsuz' : 'Beklemede';
+    const outcomeColor = outcome === 'positive' ? '#10B981' : outcome === 'negative' ? '#EF4444' : '#F59E0B';
+
+    const html = `<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8"/></head>
+<body style="margin:0;padding:40px 0;background:#EFF6FF;font-family:'Segoe UI',Helvetica,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0">
+<tr><td align="center">
+<table width="580" cellpadding="0" cellspacing="0" style="max-width:580px;width:100%;background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,0.10);">
+<tr><td style="height:5px;background:${outcomeColor};"></td></tr>
+<tr><td style="padding:36px 48px 0;"><span style="font-size:22px;font-weight:900;color:${outcomeColor};">${fromName}</span></td></tr>
+<tr><td style="padding:24px 48px 0;">
+<span style="background:${outcomeColor}20;border:1px solid ${outcomeColor}40;border-radius:10px;padding:8px 16px;font-size:13px;font-weight:700;color:${outcomeColor};">${outcomeLabel}</span>
+</td></tr>
+<tr><td style="padding:24px 48px 0;">
+<p style="margin:0;font-size:15px;color:#334155;">Sayın <strong>${candidateName || 'Aday'}</strong>,</p>
+<p style="margin:16px 0 0;font-size:14px;color:#475569;line-height:1.7;">Başvurunuz değerlendirilmiştir. Aşağıda sürecinize ilişkin geri bildiriminizi bulabilirsiniz.</p>
+</td></tr>
+<tr><td style="padding:24px 48px 0;">
+<div style="background:#F8FAFC;border-left:4px solid ${outcomeColor};border-radius:0 12px 12px 0;padding:20px 24px;">
+<p style="margin:0 0 8px;font-size:10px;font-weight:700;color:#94A3B8;letter-spacing:0.1em;text-transform:uppercase;">Geri Bildirim</p>
+<p style="margin:0;font-size:14px;color:#334155;line-height:1.7;white-space:pre-line;">${feedbackText}</p>
+</div>
+</td></tr>
+<tr><td style="padding:32px 48px 40px;">
+<p style="margin:0;font-size:13px;color:#94A3B8;">Saygılarımızla,</p>
+<p style="margin:4px 0 0;font-size:14px;font-weight:700;color:#334155;">${recruiterName || 'İK Ekibi'}</p>
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>`;
+
+    try {
+        const transporter = nodemailer.createTransport({
+            host: 'smtp.gmail.com', port: 465, secure: true,
+            auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+            connectionTimeout: 10000, greetingTimeout: 5000, socketTimeout: 20000
+        });
+        await transporter.sendMail({
+            from: `"${fromName}" <${process.env.EMAIL_USER}>`,
+            to,
+            subject: `Başvurunuz Hakkında Geri Bildirim — ${outcomeLabel}`,
+            html,
+        });
+        res.json({ success: true });
+    } catch (error) {
+        console.error('❌ Feedback email error:', error);
+        res.status(500).json({ error: 'Mail gönderilemedi: ' + (error.code || error.message) });
+    }
+});
+
 // --- Google API Endpoints ---
 app.post('/api/google/send-email', async (req, res) => {
     const { token, to, subject, body } = req.body;

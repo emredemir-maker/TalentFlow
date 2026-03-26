@@ -6,6 +6,7 @@
 
 import { getModel } from './ai/config.js';
 import { parseAIJson, buildStructuredPrompt, sanitizeForPrompt } from './ai/utils.js';
+import { stripPiiForAI } from '../utils/pii.js';
 import {
     extractCandidateEvidence,
     extractPositionFromJD,
@@ -159,7 +160,8 @@ function calculateHybridScore(data) {
 }
 
 export async function analyzeCandidateMatch(jobDescription, candidateProfile, modelId = 'gemini-2.0-flash') {
-    const evidence = await extractCandidateEvidence(jobDescription, candidateProfile, modelId);
+    const safeCandidateProfile = stripPiiForAI(candidateProfile);
+    const evidence = await extractCandidateEvidence(jobDescription, safeCandidateProfile, modelId);
     const score = calculateHybridScore(evidence.extractedData);
 
     return {
@@ -173,7 +175,7 @@ export async function analyzeCandidateMatch(jobDescription, candidateProfile, mo
         nextAction: evidence.extractedData.totalYearsOfExperience >= 2 ? "schedule_interview" : "potential_review",
         topSkills: (evidence.extractedData.matchedKeywords || []).map(s => ({ skill: s, relevance: "High" })),
         gapAnalysis: (evidence.extractedData.missingKeywords || []).map(s => ({ gap: s, severity: "Medium", suggestion: "Eğitim veya oryantasyon önerilir" })),
-        personalizedMessage: `Merhabalar ${candidateProfile.name}. Profilinizi inceledim. ${evidence.evidence.summary}`
+        personalizedMessage: `Merhabalar ${candidateProfile.name || 'Aday'}. Profilinizi inceledim. ${evidence.evidence.summary}`
     };
 }
 
@@ -196,13 +198,15 @@ export async function analyzeComparativeCandidates(candidates, modelId = 'gemini
       "recruitingAdvice": "İK ekibine bu adaylar özelinde stratejik tavsiye (Turkish)"
     }`;
 
-    const candidateData = candidates.map(c => ({
-        name: c.name,
-        experience: c.experience,
-        skills: c.skills,
-        summary: c.aiAnalysis?.summary || c.summary,
-        score: c.combinedScore || c.matchScore
-    }));
+    const candidateData = candidates.map(c => {
+        const safe = stripPiiForAI(c);
+        return {
+            experience: safe.experience,
+            skills: safe.skills,
+            summary: safe.aiAnalysis?.summary || safe.summary,
+            score: safe.combinedScore || safe.matchScore,
+        };
+    });
 
     const prompt = buildStructuredPrompt(instruction, { "ADAY_LISTESI": JSON.stringify(candidateData) });
     const model = await getModel(modelId);

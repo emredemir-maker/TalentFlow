@@ -4,7 +4,7 @@
 
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { buildInterviewInviteEmail, buildRescheduleEmail, buildParticipantNotificationEmail } from './emailTemplates';
+import { buildInterviewInviteEmail, buildRescheduleEmail, buildParticipantNotificationEmail, buildFeedbackEmail } from './emailTemplates';
 
 const SETTINGS_PATH = 'artifacts/talent-flow/public/data/settings';
 

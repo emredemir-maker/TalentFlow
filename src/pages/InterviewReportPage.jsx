@@ -1,14 +1,16 @@
 // src/pages/InterviewReportPage.jsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useCandidates } from '../context/CandidatesContext';
+import { evaluateInterviewer } from '../services/ai/interview.js';
 import { 
     ChevronLeft, Share2, Download, Brain, 
     Target, Star, MessageSquare, Clock, Zap, 
     ShieldCheck, AlertCircle, FileText, DownloadCloud,
     ExternalLink, Search, MoreHorizontal, Printer, Mail,
     Users, Activity, TrendingUp, Award,
-    Sparkles, Briefcase, ArrowRight, Video
+    Sparkles, Briefcase, ArrowRight, Video,
+    ChevronDown, Loader2, RefreshCw
 } from 'lucide-react';
 
 export default function InterviewReportPage() {
@@ -33,11 +35,42 @@ export default function InterviewReportPage() {
     const [finalDecision, setFinalDecision] = useState('');
     const [isSavingNotes, setIsSavingNotes] = useState(false);
     const [isSavingDecision, setIsSavingDecision] = useState(false);
+    const [recruiterEval, setRecruiterEval] = useState(null);
+    const [evalLoading, setEvalLoading] = useState(false);
+    const [evalOpen, setEvalOpen] = useState(false);
 
     React.useEffect(() => {
         if (session?.recruiterNotes) setRecruiterNotes(session.recruiterNotes);
         if (session?.finalDecision) setFinalDecision(session.finalDecision);
+        if (session?.recruiterEval) setRecruiterEval(session.recruiterEval);
     }, [session]);
+
+    const runEvaluateInterviewer = useCallback(async () => {
+        if (!session || evalLoading) return;
+        setEvalLoading(true);
+        try {
+            const result = await evaluateInterviewer({
+                transcript: session.transcript || session.messages || [],
+                questions:  (session.questions || []).map(q => q.question || q.text || q),
+                positionTitle: session.positionTitle || candidate?.position || '',
+            });
+            if (result) {
+                setRecruiterEval(result);
+                setEvalOpen(true);
+                // Persist to Firestore inside the session object
+                if (candidate) {
+                    const updatedSessions = (candidate.interviewSessions || []).map(s =>
+                        String(s.id) === String(sessionId) ? { ...s, recruiterEval: result } : s
+                    );
+                    await updateCandidate(candidate.id, { interviewSessions: updatedSessions });
+                }
+            }
+        } catch (err) {
+            console.error('[RecruiterEval]', err);
+        } finally {
+            setEvalLoading(false);
+        }
+    }, [session, candidate, sessionId, evalLoading, updateCandidate]);
 
     const showToast = (message, type = 'success') => {
         setToast({ message, type });
@@ -424,6 +457,75 @@ export default function InterviewReportPage() {
                                              </p>
                                          )}
                                      </div>
+                                </section>
+
+                                {/* RECRUITER EVALUATION CARD (Task #8) */}
+                                <section className="bg-white rounded-[24px] border border-[#E2E8F0] p-6 shadow-sm space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <Award className="w-4 h-4 text-violet-500" />
+                                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] italic">MÜLAKATÇı DEĞERLENDİRMESİ</h3>
+                                        </div>
+                                        <button
+                                            onClick={runEvaluateInterviewer}
+                                            disabled={evalLoading}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase bg-violet-50 text-violet-600 border border-violet-100 hover:bg-violet-100 transition-all disabled:opacity-50"
+                                        >
+                                            {evalLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                                            {recruiterEval ? 'Yenile' : 'Analiz Et'}
+                                        </button>
+                                    </div>
+                                    {evalLoading && (
+                                        <div className="flex items-center gap-3 py-4">
+                                            <Loader2 className="w-5 h-5 text-violet-500 animate-spin" />
+                                            <p className="text-[11px] text-slate-500 font-medium">AI mülakatçı performansı analiz ediyor...</p>
+                                        </div>
+                                    )}
+                                    {!evalLoading && !recruiterEval && (
+                                        <p className="text-[11px] text-slate-400 italic py-2">
+                                            "Analiz Et" butonuna tıklayarak bu mülakata ait mülakatçı performans değerlendirmesini oluşturun.
+                                        </p>
+                                    )}
+                                    {!evalLoading && recruiterEval && (
+                                        <div className="space-y-4">
+                                            {/* Overall score */}
+                                            <div className="flex items-center gap-3 p-3 bg-violet-50 rounded-xl border border-violet-100">
+                                                <div className="w-12 h-12 rounded-xl bg-violet-100 flex items-center justify-center">
+                                                    <span className="text-[18px] font-black text-violet-700">{recruiterEval.overallScore}/5</span>
+                                                </div>
+                                                <p className="text-[11px] text-slate-700 leading-relaxed flex-1">{recruiterEval.summary}</p>
+                                            </div>
+                                            {/* Dimension scores */}
+                                            <button
+                                                onClick={() => setEvalOpen(v => !v)}
+                                                className="w-full flex items-center justify-between text-[9px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600 transition-colors"
+                                            >
+                                                Boyut Puanları
+                                                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${evalOpen ? 'rotate-180' : ''}`} />
+                                            </button>
+                                            {evalOpen && (
+                                                <div className="space-y-3">
+                                                    {(recruiterEval.dimensions || []).map(dim => (
+                                                        <div key={dim.key} className="space-y-1.5">
+                                                            <div className="flex items-center justify-between">
+                                                                <span className="text-[10px] font-black text-slate-700">{dim.label}</span>
+                                                                <div className="flex items-center gap-1">
+                                                                    {[1,2,3,4,5].map(n => (
+                                                                        <div key={n} className={`w-3 h-3 rounded-full ${n <= dim.score ? 'bg-violet-500' : 'bg-slate-200'}`} />
+                                                                    ))}
+                                                                    <span className="text-[9px] font-black text-slate-500 ml-1">{dim.score}/5</span>
+                                                                </div>
+                                                            </div>
+                                                            <p className="text-[10px] text-slate-600 leading-relaxed">{dim.explanation}</p>
+                                                            {dim.tip && (
+                                                                <p className="text-[9px] text-violet-600 font-medium italic border-l-2 border-violet-200 pl-2">{dim.tip}</p>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                 </section>
 
                             </div>
