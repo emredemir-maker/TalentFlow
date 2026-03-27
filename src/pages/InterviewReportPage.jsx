@@ -155,14 +155,8 @@ export default function InterviewReportPage() {
         );
     }
 
-    // Default mock data for completed reports if missing
-    const starScores = session.starScores || { 
-        technical: 85, 
-        communication: 72, 
-        problemSolving: 90, 
-        cultureFit: 78, 
-        adaptability: 82 
-    };
+    // Real interview scores — no hardcoded fallbacks to avoid showing CV scores
+    const starScores = session.starScores || {};
 
     const formattedDate = session.date 
         ? new Date(session.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -212,7 +206,14 @@ export default function InterviewReportPage() {
                                 <div className="flex items-center gap-4 text-[#64748B]">
                                     <span className="text-[12px] font-bold flex items-center gap-1.5"><Briefcase className="w-3.5 h-3.5" /> {candidate.position || candidate.bestTitle}</span>
                                     <div className="h-3 w-px bg-slate-200" />
-                                    <span className="text-[12px] font-bold flex items-center gap-1.5 text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-100 italic">EŞLEŞME %{session.finalScore || Math.round(candidate.bestScore)}</span>
+                                    <span className="text-[12px] font-bold flex items-center gap-1.5 text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-100 italic" title="Mülakat skoru (%70) + CV skoru (%30) ağırlıklı ortalaması">
+                                        GENEL %{session.finalScore ?? (candidate.bestScore ? Math.round(candidate.bestScore) : '—')}
+                                    </span>
+                                    {session.interviewScore != null && (
+                                        <span className="text-[11px] font-bold flex items-center gap-1.5 text-purple-600 bg-purple-50 px-2 py-0.5 rounded-lg border border-purple-100 italic" title="Bu mülakata özel skor">
+                                            MÜL. %{session.interviewScore}
+                                        </span>
+                                    )}
                                     <div className="h-3 w-px bg-slate-200" />
                                     <span className="text-[11px] font-bold flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> {formattedDate}</span>
                                 </div>
@@ -299,7 +300,7 @@ export default function InterviewReportPage() {
                                             { 
                                                 key: 'S', 
                                                 label: 'Durum (Situation)', 
-                                                score: session.starScores?.S || 85, 
+                                                score: session.starScores?.S ?? null, 
                                                 color: 'bg-blue-900', 
                                                 desc: 'Adayın mülakat sırasında paylaştığı bağlam ve senaryo derinliği.',
                                                 quote: session.transcript?.find(t => t.role === 'ADAY' && t.text.length > 50)?.text || null
@@ -307,7 +308,7 @@ export default function InterviewReportPage() {
                                             { 
                                                 key: 'T', 
                                                 label: 'Görev (Task)', 
-                                                score: session.starScores?.T || 82, 
+                                                score: session.starScores?.T ?? null, 
                                                 color: 'bg-blue-800', 
                                                 desc: 'Çözülmesi beklenen problemin veya üstlenilen sorumluluğun netliği.',
                                                 quote: null
@@ -315,7 +316,7 @@ export default function InterviewReportPage() {
                                             { 
                                                 key: 'A', 
                                                 label: 'Eylem (Action)', 
-                                                score: session.starScores?.A || 88, 
+                                                score: session.starScores?.A ?? null, 
                                                 color: 'bg-blue-700', 
                                                 desc: 'Adayın teknik ve operasyonel olarak sergilediği pratik çözümler.',
                                                 quote: session.transcript?.find(t => t.role === 'ADAY' && t.text.includes('yaptım'))?.text || null
@@ -323,7 +324,7 @@ export default function InterviewReportPage() {
                                             { 
                                                 key: 'R', 
                                                 label: 'Sonuç (Result)', 
-                                                score: session.starScores?.R || 90, 
+                                                score: session.starScores?.R ?? null, 
                                                 color: 'bg-emerald-600', 
                                                 desc: 'Eylemlerin yarattığı somut çıktı ve başarı ölçütleri.',
                                                 quote: null
@@ -336,8 +337,16 @@ export default function InterviewReportPage() {
                                                 <div className="flex-1 space-y-3">
                                                     <div className="flex items-center justify-between">
                                                         <h4 className="text-[14px] font-black text-[#0F172A] tracking-tight">{star.label}</h4>
-                                                        <span className="text-[10px] font-black bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100 text-[#1E3A8A]">Skor: {star.score}/100</span>
+                                                        {star.score !== null
+                                                            ? <span className="text-[10px] font-black bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100 text-[#1E3A8A]">Skor: {star.score}/100</span>
+                                                            : <span className="text-[10px] font-bold bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100 text-slate-400">Analiz edilmedi</span>
+                                                        }
                                                     </div>
+                                                    {star.score !== null && (
+                                                        <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                                            <div className="h-full bg-blue-600 rounded-full transition-all duration-700" style={{ width: `${star.score}%` }} />
+                                                        </div>
+                                                    )}
                                                     <p className="text-[13px] text-slate-500 font-medium leading-relaxed">{star.desc}</p>
                                                     {star.quote && (
                                                         <div className="pl-4 border-l-2 border-slate-100 py-1">
@@ -350,6 +359,42 @@ export default function InterviewReportPage() {
                                     </div>
                                 </div>
                             </div>
+
+                            {/* STRENGTHS & DEVELOPMENT AREAS — only shown when AI generated data */}
+                            {(session.strengths?.length > 0 || session.developmentAreas?.length > 0) && (
+                                <div className="grid grid-cols-2 gap-4 mb-6">
+                                    {session.strengths?.length > 0 && (
+                                        <div className="bg-emerald-50 rounded-2xl border border-emerald-100 p-5">
+                                            <h4 className="text-[10px] font-black text-emerald-700 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                                <span className="w-5 h-5 bg-emerald-600 text-white rounded-full flex items-center justify-center text-xs">✓</span>
+                                                Güçlü Yönler
+                                            </h4>
+                                            <ul className="space-y-2">
+                                                {session.strengths.map((s, i) => (
+                                                    <li key={i} className="flex items-start gap-2 text-[12px] text-emerald-800 font-medium">
+                                                        <span className="text-emerald-500 mt-0.5">•</span> {s}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                    {session.developmentAreas?.length > 0 && (
+                                        <div className="bg-amber-50 rounded-2xl border border-amber-100 p-5">
+                                            <h4 className="text-[10px] font-black text-amber-700 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                                <span className="w-5 h-5 bg-amber-500 text-white rounded-full flex items-center justify-center text-xs">↑</span>
+                                                Gelişim Alanları
+                                            </h4>
+                                            <ul className="space-y-2">
+                                                {session.developmentAreas.map((d, i) => (
+                                                    <li key={i} className="flex items-start gap-2 text-[12px] text-amber-800 font-medium">
+                                                        <span className="text-amber-500 mt-0.5">•</span> {d}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
                             {/* RIGHT COLUMN: ANALYTICS & DECISION */}
                             <div className="space-y-6">

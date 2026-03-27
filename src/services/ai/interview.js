@@ -346,3 +346,65 @@ ${BIAS_GUARDRAIL}
         };
     }
 }
+
+// ─── Final Interview Report Analysis ──────────────────────────────────────────
+// Called once when the recruiter ends the interview.
+// Generates a qualitative, interview-specific evaluation from the full transcript.
+// Returns both STAR scores (S/T/A/R) and a narrative summary.
+export async function generateInterviewFinalReport(candidate, transcript, starScores, positionContext = {}) {
+    const safe = stripPiiForAI(candidate);
+    const adayLines = transcript.filter(t => t.role === 'ADAY' && t.text.length > 10);
+    const recruiterLines = transcript.filter(t => t.role === 'YÖNETİCİ');
+
+    if (adayLines.length === 0) {
+        return null; // No transcript to analyze
+    }
+
+    const transcriptSample = transcript.slice(-20).map(t => `${t.role}: ${t.text}`).join('\n');
+    const positionLine = positionContext?.title ? `Pozisyon: ${positionContext.title}` : '';
+
+    const instruction = `Sen deneyimli bir İK analistisin. Bu mülakat transkriptini analiz et ve değerlendirme raporu oluştur.
+${positionLine}
+
+${BIAS_GUARDRAIL}
+
+GÖREV:
+1. Yalnızca mülakata özel gözlemleri kullan — CV'yi değil, bu konuşmayı değerlendir.
+2. Aday yanıtlarının kalitesini, derinliğini ve somutluğunu değerlendir.
+3. STAR metodolojisiyle 4 boyutta puan ver (0-100):
+   - S (Situation/Durum): Adayın bağlam kurup anlatısını ne kadar iyi yapılandırdı?
+   - T (Task/Görev): Problemi veya sorumluluğu ne kadar net tanımladı?
+   - A (Action/Eylem): Somut teknik/pratik adımları ne kadar açıkladı?
+   - R (Result/Sonuç): Ölçülebilir sonuç ve etkiyi ne kadar aktardı?
+4. 5 yetkinlik boyutunda puan ver (0-100): technical, communication, problemSolving, cultureFit, adaptability
+5. Türkçe, mülakata özel (3-4 cümle) niteliksel özet yaz.
+6. Güçlü yönler (2 madde) ve gelişim alanları (2 madde) listele.
+7. Genel mülakat skoru hesapla (0-100) — bu STAR ortalamalarına dayalı olmalı, CV'ye değil.
+
+JSON formatında dön:
+{
+  "starScores": { "S": <0-100>, "T": <0-100>, "A": <0-100>, "R": <0-100> },
+  "competencyScores": { "technical": <0-100>, "communication": <0-100>, "problemSolving": <0-100>, "cultureFit": <0-100>, "adaptability": <0-100> },
+  "overallInterviewScore": <0-100>,
+  "qualitativeSummary": "Mülakata özel Türkçe özet (3-4 cümle)",
+  "strengths": ["Güçlü yön 1", "Güçlü yön 2"],
+  "developmentAreas": ["Gelişim alanı 1", "Gelişim alanı 2"]
+}`;
+
+    const prompt = buildStructuredPrompt(instruction, {
+        "ADAY_PROFİLİ_ÖZETİ": JSON.stringify({ position: safe.position, experience: safe.experience, skills: safe.skills }),
+        "MÜLAKAT_TRANSKRİPTİ": transcriptSample,
+        "TOPLAM_YANIT_SAYISI": adayLines.length,
+        "MÜLAKATÇI_SORU_SAYISI": recruiterLines.length,
+        "MEVCUT_YETKINLIK_PUANLARI": JSON.stringify(starScores)
+    });
+
+    try {
+        const model = await getModel();
+        const result = await model.generateContent(prompt);
+        return parseAIJson(result.response.text(), null);
+    } catch (e) {
+        console.error('[InterviewFinalReport]', e.message);
+        return null;
+    }
+}

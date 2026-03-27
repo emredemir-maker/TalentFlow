@@ -18,6 +18,7 @@ import {
     scoreInterviewSession,
     generateFollowUpQuestion,
     analyzeSTARRealTime,
+    generateInterviewFinalReport,
     stripPII
 } from './ai/interview.js';
 import {
@@ -35,6 +36,7 @@ export {
     scoreInterviewSession,
     generateFollowUpQuestion,
     analyzeSTARRealTime,
+    generateInterviewFinalReport,
     stripPII,
     generatePersonalizedDM,
     analyzeResponseEmail

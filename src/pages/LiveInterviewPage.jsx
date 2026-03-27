@@ -12,7 +12,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
-import { generateInterviewPaths, generateFollowUpQuestion, analyzeSTARRealTime, stripPII } from '../services/geminiService';
+import { generateInterviewPaths, generateFollowUpQuestion, analyzeSTARRealTime, generateInterviewFinalReport, stripPII } from '../services/geminiService';
 import LoadingScreen from '../components/LoadingScreen';
 import CandidateExitPage from './CandidateExitPage';
 import { db } from '../config/firebase';
@@ -667,23 +667,63 @@ export default function LiveInterviewPage() {
                     color: t.text.toLowerCase().match(/başardım|tamamladım|çözdüm|geliştirdim|uyguladım/) ? 'bg-emerald-500' : 'bg-blue-500'
                 }));
 
-            // Build a meaningful aiSummary from the transcript content
+            // ── Generate real AI analysis from this specific interview's transcript
+            const positionContext = positions?.find(p => p.id === candidateData.positionId) || {};
+            let aiReport = null;
+            try {
+                aiReport = await generateInterviewFinalReport(
+                    candidateData,
+                    transcript,
+                    starScores,
+                    { title: positionContext.title || candidateData.position || candidateData.bestTitle }
+                );
+            } catch (aiErr) {
+                console.warn('[handleFinishInterview] AI report generation failed:', aiErr.message);
+            }
+
+            // ── Map competency scores → STAR format (S/T/A/R) for the report
+            // Priority: AI-generated STAR scores > real-time competency scores > logicIntegrity fallback
+            const competencyScores = aiReport?.competencyScores || starScores;
+            const finalStarScores = aiReport?.starScores || {
+                S: Math.round(competencyScores.communication || logicIntegrity || 0),
+                T: Math.round(competencyScores.problemSolving || logicIntegrity || 0),
+                A: Math.round(competencyScores.technical || logicIntegrity || 0),
+                R: Math.round(((competencyScores.cultureFit || 0) + (competencyScores.adaptability || 0)) / 2 || logicIntegrity || 0)
+            };
+
+            // ── Merge competency scores: keep both formats on the session object
+            const mergedStarScores = {
+                ...competencyScores,
+                ...finalStarScores
+            };
+
+            // ── Compute interview-specific final score (interview has 70% weight vs 30% CV)
+            const interviewScore = aiReport?.overallInterviewScore ?? logicIntegrity;
+            const cvScore = Math.round(candidateData?.bestScore || candidateData?.aiAnalysis?.overallScore || 0);
+            const weightedFinalScore = cvScore > 0
+                ? Math.round(interviewScore * 0.7 + cvScore * 0.3)
+                : interviewScore;
+
+            // ── Build qualitative summary (prefer AI-generated, fall back to transcript stats)
             const totalLines     = transcript.length;
             const candidateWords = adayLines.reduce((sum, t) => sum + t.text.split(' ').length, 0);
-            const avgStarScore   = Math.round((starScores.S + starScores.T + starScores.A + starScores.R) / 4);
-            const aiSummary = totalLines > 4
-                ? `Mülakat ${totalLines} konuşma turunu kapsadı. Aday toplamda yaklaşık ${candidateWords} kelime ile yanıt verdi. ` +
-                  `STAR analizi ortalaması %${avgStarScore}. ` +
-                  (adayLines[0] ? `En kapsamlı yanıt: "${adayLines[0].text.slice(0, 80)}…"` : '')
-                : 'Mülakat tamamlandı. Ses algılaması kısa sürdü; transkript sınırlı kaldı.';
+            const aiSummary = aiReport?.qualitativeSummary ||
+                (totalLines > 4
+                    ? `Mülakat ${totalLines} konuşma turunu kapsadı. Aday toplamda yaklaşık ${candidateWords} kelime ile yanıt verdi. ` +
+                      `Genel yetkinlik skoru %${interviewScore} olarak hesaplandı. ` +
+                      (adayLines[0] ? `En kapsamlı yanıt: "${adayLines[0].text.slice(0, 80)}…"` : '')
+                    : 'Mülakat tamamlandı. Ses algılaması kısa sürdü; transkript sınırlı kaldı.');
 
             const finalSessionData = {
                 id: sessionId,
                 status: 'completed',
-                finalScore: logicIntegrity,
-                aiOverallScore: logicIntegrity,
-                starScores: starScores,
+                finalScore: weightedFinalScore,
+                interviewScore: interviewScore,
+                aiOverallScore: weightedFinalScore,
+                starScores: mergedStarScores,
                 logicIntegrity: logicIntegrity,
+                strengths: aiReport?.strengths || [],
+                developmentAreas: aiReport?.developmentAreas || [],
                 transcript: transcript,
                 criticalMoments,
                 aiSummary,
