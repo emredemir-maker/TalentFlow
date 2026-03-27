@@ -325,6 +325,26 @@ export default function CandidateProcessPage() {
         if (!candidate?.email) { alert('Adayın email adresi bulunamadı.'); return; }
         setInfoSending(true);
         try {
+            const APP_URL = 'https://talentflow-84bb6.web.app';
+            const requestId = `ir-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+            const respondUrl = `${APP_URL}/respond/${requestId}?type=info`;
+
+            // Write the record from the client (Firebase client SDK always has auth)
+            const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
+            await setDoc(doc(db, `artifacts/talent-flow/public/data/infoRequests/${requestId}`), {
+                requestId,
+                candidateId: candidate.id || null,
+                sessionId: candidate.sessionId || null,
+                candidateEmail: candidate.email,
+                candidateName: candidate.name,
+                recruiterName: userProfile?.displayName || userProfile?.name || user?.email || '',
+                position: candidate.matchedPositionTitle || candidate.position || '',
+                requestMessage: infoMessage,
+                requestedItems: infoItems,
+                status: 'pending',
+                createdAt: serverTimestamp(),
+            });
+
             const API_BASE = import.meta.env.VITE_SERVER_URL || '';
             const token = await user?.getIdToken?.() || '';
             const res = await fetch(`${API_BASE}/api/send-info-request`, {
@@ -339,6 +359,8 @@ export default function CandidateProcessPage() {
                     requestedItems: infoItems,
                     candidateId: candidate.id || null,
                     sessionId: candidate.sessionId || null,
+                    requestId,
+                    respondUrl,
                 }),
             });
             if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Bilgi talebi gönderilemedi.'); }

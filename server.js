@@ -2185,7 +2185,7 @@ app.post('/api/users/availability', requireAuth, async (req, res) => {
 
 // ─── Send Info Request Email ──────────────────────────────────────────────────
 app.post('/api/send-info-request', generalLimiter, verifyFirebaseToken, async (req, res) => {
-    const { to, candidateName, recruiterName, position, requestMessage, requestedItems, sessionId, candidateId, branding } = req.body;
+    const { to, candidateName, recruiterName, position, requestMessage, requestedItems, sessionId, candidateId, branding, requestId: clientRequestId, respondUrl: clientRespondUrl } = req.body;
     if (!to || !candidateName) return res.status(400).json({ error: 'Email ve aday adı gereklidir.' });
     if (!EMAIL_RE.test(to)) return res.status(400).json({ error: 'Geçersiz email adresi.' });
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
@@ -2195,22 +2195,26 @@ app.post('/api/send-info-request', generalLimiter, verifyFirebaseToken, async (r
     const fromName = (b.companyName || 'Talent-Inn').slice(0, 100);
     try {
         // Create info request record in Firestore
-        const requestId = `ir-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        const requestId = clientRequestId || `ir-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
         const APP_URL = process.env.VITE_APP_URL || process.env.VITE_SERVER_URL || 'https://talentflow-84bb6.web.app';
-        const respondUrl = `${APP_URL}/respond/${requestId}?type=info`;
-        await db.doc(`artifacts/talent-flow/public/data/infoRequests/${requestId}`).set({
-            requestId,
-            candidateId: candidateId || null,
-            sessionId: sessionId || null,
-            candidateEmail: to,
-            candidateName,
-            recruiterName: recruiterName || '',
-            position: position || '',
-            requestMessage: requestMessage || '',
-            requestedItems: requestedItems || [],
-            status: 'pending',
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
+        const respondUrl = clientRespondUrl || `${APP_URL}/respond/${requestId}?type=info`;
+        try {
+            await db.doc(`artifacts/talent-flow/public/data/infoRequests/${requestId}`).set({
+                requestId,
+                candidateId: candidateId || null,
+                sessionId: sessionId || null,
+                candidateEmail: to,
+                candidateName,
+                recruiterName: recruiterName || '',
+                position: position || '',
+                requestMessage: requestMessage || '',
+                requestedItems: requestedItems || [],
+                status: 'pending',
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+        } catch (dbErr) {
+            console.warn('⚠️ infoRequests Firestore write failed (non-fatal):', dbErr.code, dbErr.message);
+        }
         // Build and send HTML email
         const { buildInfoRequestEmail } = await import('./src/utils/emailTemplates.js').catch(() => null) || {};
         let html;
