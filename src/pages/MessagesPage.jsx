@@ -34,6 +34,9 @@ import {
     ChevronRight,
     Reply,
     AlertCircle,
+    ClipboardList,
+    Paperclip,
+    User,
 } from 'lucide-react';
 
 const STATUS_CONFIG = {
@@ -55,6 +58,7 @@ const FILTER_TABS = [
 const PAGE_TABS = [
     { id: 'queue', label: 'Mesaj Kuyruğu', icon: Linkedin },
     { id: 'emails', label: 'E-posta Yazışmaları', icon: Mail },
+    { id: 'info_requests', label: 'Bilgi Talepleri', icon: ClipboardList },
 ];
 
 export default function MessagesPage() {
@@ -73,9 +77,30 @@ export default function MessagesPage() {
     const [threadMessages, setThreadMessages] = useState({}); // threadId → messages[]
     const [checkingThread, setCheckingThread] = useState(null);
 
+    // Info requests state
+    const [infoRequests, setInfoRequests] = useState([]);
+    const [infoReqLoading, setInfoReqLoading] = useState(true);
+    const [expandedInfoReq, setExpandedInfoReq] = useState(null);
+
     const filtered = filter === 'all'
         ? messages
         : messages.filter((m) => m.status === filter);
+
+    // Load info requests from Firestore
+    useEffect(() => {
+        if (!currentUser?.email) { setInfoReqLoading(false); return; }
+        const q = query(
+            collection(db, 'artifacts/talent-flow/public/data/infoRequests'),
+            where('recruiterEmail', '==', currentUser.email)
+        );
+        const unsub = onSnapshot(q, snap => {
+            const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            docs.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+            setInfoRequests(docs);
+            setInfoReqLoading(false);
+        }, () => setInfoReqLoading(false));
+        return unsub;
+    }, [currentUser?.email]);
 
     // Load email threads from Firestore
     useEffect(() => {
@@ -175,6 +200,9 @@ export default function MessagesPage() {
                                 {tab.label}
                                 {tab.id === 'emails' && emailsWithReply > 0 && (
                                     <span className="w-4 h-4 rounded-full bg-emerald-500 text-[9px] text-white font-bold flex items-center justify-center">{emailsWithReply}</span>
+                                )}
+                                {tab.id === 'info_requests' && infoRequests.length > 0 && (
+                                    <span className="w-4 h-4 rounded-full bg-cyan-500 text-[9px] text-white font-bold flex items-center justify-center">{infoRequests.length}</span>
                                 )}
                             </button>
                         );
@@ -456,6 +484,104 @@ export default function MessagesPage() {
                                                         </div>
                                                     );
                                                 })}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+            {/* ── INFO REQUESTS TAB ─────────────────────────────────────── */}
+            {pageTab === 'info_requests' && (
+                <div className="px-6 lg:px-8 py-5 pb-24 md:pb-8 space-y-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <StatMini icon={ClipboardList} label="Toplam Talep" value={infoRequests.length} color="text-cyan-400" bg="bg-cyan-500/5" />
+                        <StatMini icon={Clock} label="Yanıt Bekleniyor" value={infoRequests.filter(r => r.status === 'pending').length} color="text-amber-400" bg="bg-amber-500/5" />
+                        <StatMini icon={CheckCircle} label="Yanıtlandı" value={infoRequests.filter(r => r.status === 'responded').length} color="text-emerald-400" bg="bg-emerald-500/5" />
+                    </div>
+
+                    {infoReqLoading && (
+                        <div className="space-y-3">
+                            {[1, 2, 3].map(i => (
+                                <div key={i} className="glass rounded-2xl p-5">
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <div className="skeleton w-10 h-10 rounded-full" />
+                                        <div className="flex-1 space-y-2">
+                                            <div className="skeleton h-4 w-2/5 rounded" />
+                                            <div className="skeleton h-3 w-1/3 rounded" />
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {!infoReqLoading && infoRequests.length === 0 && (
+                        <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
+                            <div className="w-20 h-20 rounded-full bg-white/[0.03] border border-white/[0.06] flex items-center justify-center">
+                                <ClipboardList className="w-8 h-8 text-navy-500" />
+                            </div>
+                            <h3 className="text-lg font-bold text-navy-300">Bilgi Talebi Yok</h3>
+                            <p className="text-sm text-navy-500 max-w-sm">Aday kartından "Mesaj Gönder → Bilgi İste" ile talep gönderdiğinizde burada görünür.</p>
+                        </div>
+                    )}
+
+                    {!infoReqLoading && infoRequests.map(req => {
+                        const isPending = req.status === 'pending';
+                        const isExpanded = expandedInfoReq === req.id;
+                        const createdAt = req.createdAt?.toDate?.()?.toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) || '—';
+                        return (
+                            <div key={req.id} className="glass gradient-border rounded-2xl overflow-hidden">
+                                <div
+                                    className="flex items-center gap-4 p-4 cursor-pointer hover:bg-white/[0.02] transition-all"
+                                    onClick={() => setExpandedInfoReq(isExpanded ? null : req.id)}
+                                >
+                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-teal-600 flex items-center justify-center text-sm font-bold text-white shrink-0">
+                                        {req.candidateName?.split(' ').map(n => n[0]).join('').substring(0, 2) || '?'}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="text-[14px] font-semibold text-navy-200 truncate">{req.candidateName}</span>
+                                            {req.position && (
+                                                <span className="text-[10px] font-bold text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded">{req.position}</span>
+                                            )}
+                                        </div>
+                                        <div className="text-[11px] text-navy-500 truncate mt-0.5">{req.requestMessage || 'Bilgi talebi gönderildi'}</div>
+                                    </div>
+                                    <div className="flex flex-col items-end gap-1.5 shrink-0">
+                                        <span className="text-[10px] text-navy-600">{createdAt}</span>
+                                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${isPending ? 'bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/20' : 'bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20'}`}>
+                                            {isPending ? <Clock className="w-2.5 h-2.5" /> : <CheckCircle className="w-2.5 h-2.5" />}
+                                            {isPending ? 'Bekleniyor' : 'Yanıtlandı'}
+                                        </span>
+                                        {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-navy-500" /> : <ChevronRight className="w-3.5 h-3.5 text-navy-500" />}
+                                    </div>
+                                </div>
+
+                                {isExpanded && (
+                                    <div className="border-t border-white/[0.04] p-4 space-y-3 animate-fade-in">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <User className="w-3 h-3 text-navy-500" />
+                                            <span className="text-[11px] text-navy-500">{req.candidateEmail || '—'}</span>
+                                        </div>
+                                        {req.requestMessage && (
+                                            <div className="p-3 rounded-xl bg-electric/5 border border-electric/10">
+                                                <p className="text-[10px] uppercase tracking-wider text-navy-500 font-semibold mb-1.5">Mesaj</p>
+                                                <p className="text-[12px] text-navy-300 leading-relaxed whitespace-pre-wrap">{req.requestMessage}</p>
+                                            </div>
+                                        )}
+                                        {req.requestedItems?.length > 0 && (
+                                            <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                                                <p className="text-[10px] uppercase tracking-wider text-navy-500 font-semibold mb-2">Talep Edilen Belgeler</p>
+                                                <ul className="space-y-1">
+                                                    {req.requestedItems.map((item, i) => (
+                                                        <li key={i} className="flex items-center gap-1.5 text-[12px] text-navy-400">
+                                                            <Paperclip className="w-3 h-3 text-cyan-400 shrink-0" /> {item}
+                                                        </li>
+                                                    ))}
+                                                </ul>
                                             </div>
                                         )}
                                     </div>

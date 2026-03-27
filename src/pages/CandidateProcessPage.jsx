@@ -10,7 +10,7 @@ import { calculateMatchScore, filterPositionsByDomain, domainLabel, detectCandid
 import { applyPiiMask, stripPiiForAI } from '../utils/pii';
 import { getFeedbackEmail } from '../utils/templateService';
 import { db } from '../config/firebase';
-import { doc, getDoc, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, setDoc, serverTimestamp, collection, query, where } from 'firebase/firestore';
 import SystemScanner from '../components/SystemScanner';
 import AddCandidateModal from '../components/AddCandidateModal';
 import {
@@ -106,6 +106,8 @@ export default function CandidateProcessPage() {
     const [infoItems, setInfoItems]                 = useState([]);
     const [newInfoItem, setNewInfoItem]             = useState('');
     const [infoSending, setInfoSending]             = useState(false);
+    const [candidateInfoReqs, setCandidateInfoReqs] = useState([]);
+    const [infoReqsLoading, setInfoReqsLoading]     = useState(false);
 
     // Branding — loaded once from Firestore for email template generation
     const [branding, setBranding] = useState({ companyName: 'Talent-Inn', primaryColor: '#1E3A8A' });
@@ -114,6 +116,23 @@ export default function CandidateProcessPage() {
             .then(snap => { if (snap.exists()) setBranding(snap.data()); })
             .catch(() => {});
     }, []);
+
+    // Load info requests for the selected candidate
+    useEffect(() => {
+        if (!candidate?.id) { setCandidateInfoReqs([]); return; }
+        setInfoReqsLoading(true);
+        const q = query(
+            collection(db, 'artifacts/talent-flow/public/data/infoRequests'),
+            where('candidateId', '==', candidate.id)
+        );
+        const unsub = onSnapshot(q, snap => {
+            const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            docs.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+            setCandidateInfoReqs(docs);
+            setInfoReqsLoading(false);
+        }, () => setInfoReqsLoading(false));
+        return unsub;
+    }, [candidate?.id]);
 
     // Real-time Firestore subscription for active bulk import job
     useEffect(() => {
@@ -676,6 +695,7 @@ export default function CandidateProcessPage() {
         { id: 'pos_matches',      label: 'Pozisyon Eşleşmeleri', icon: <Layers className="w-3.5 h-3.5" /> },
         { id: 'sessions',         label: 'Mülakatlar',          icon: <Video className="w-3.5 h-3.5" /> },
         { id: 'history',          label: 'Süreç Geçmişi',       icon: <BarChart2 className="w-3.5 h-3.5" /> },
+        { id: 'messages',         label: 'Mesajlar',            icon: <MessageSquare className="w-3.5 h-3.5" /> },
     ];
 
     return (
@@ -1654,6 +1674,76 @@ export default function CandidateProcessPage() {
                                                 </div>
                                             </div>
                                         </div>
+                                    </div>
+                                )}
+
+                                {/* ── MESAJLAR TAB ────────────────────────────────── */}
+                                {activeTab === 'messages' && (
+                                    <div className="space-y-3 animate-in fade-in duration-300">
+                                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-1 h-4 rounded-full bg-cyan-500" />
+                                                <h3 className="text-[12px] font-black text-slate-800 uppercase tracking-widest">Bilgi Talepleri</h3>
+                                            </div>
+                                            {candidateInfoReqs.length > 0 && (
+                                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{candidateInfoReqs.length} talep</span>
+                                            )}
+                                        </div>
+
+                                        {infoReqsLoading && (
+                                            <div className="space-y-2">
+                                                {[1, 2].map(i => (
+                                                    <div key={i} className="bg-slate-50 border border-slate-200 rounded-xl p-4 animate-pulse">
+                                                        <div className="h-3 bg-slate-200 rounded w-1/2 mb-2" />
+                                                        <div className="h-2 bg-slate-200 rounded w-3/4" />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {!infoReqsLoading && candidateInfoReqs.length === 0 && (
+                                            <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
+                                                <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center">
+                                                    <MessageSquare className="w-6 h-6 text-slate-300" />
+                                                </div>
+                                                <p className="text-[11px] text-slate-400">Bu aday için henüz bilgi talebi gönderilmedi.</p>
+                                            </div>
+                                        )}
+
+                                        {!infoReqsLoading && candidateInfoReqs.map(req => {
+                                            const isPending = req.status === 'pending';
+                                            const createdAt = req.createdAt?.toDate?.()?.toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) || '—';
+                                            return (
+                                                <div key={req.id} className="bg-white border border-slate-200 rounded-xl p-4 space-y-2 shadow-sm">
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex items-center gap-2">
+                                                            <FileText className="w-3.5 h-3.5 text-cyan-500" />
+                                                            <span className="text-[11px] font-black text-slate-700">Bilgi Talebi</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black ${isPending ? 'bg-amber-50 text-amber-600 border border-amber-200' : 'bg-emerald-50 text-emerald-600 border border-emerald-200'}`}>
+                                                                {isPending ? <Clock className="w-2.5 h-2.5" /> : <CheckCircle2 className="w-2.5 h-2.5" />}
+                                                                {isPending ? 'Bekliyor' : 'Yanıtlandı'}
+                                                            </span>
+                                                            <span className="text-[9px] text-slate-400">{createdAt}</span>
+                                                        </div>
+                                                    </div>
+                                                    {req.requestMessage && (
+                                                        <p className="text-[11px] text-slate-500 bg-slate-50 rounded-lg px-3 py-2 leading-relaxed">{req.requestMessage}</p>
+                                                    )}
+                                                    {req.requestedItems?.length > 0 && (
+                                                        <ul className="space-y-1 pl-1">
+                                                            {req.requestedItems.map((item, i) => (
+                                                                <li key={i} className="flex items-center gap-1.5 text-[10px] text-slate-500">
+                                                                    <span className="w-1 h-1 rounded-full bg-cyan-400 shrink-0" /> {item}
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    )}
+                                                    <p className="text-[9px] text-slate-400">Gönderen: {req.recruiterName || '—'}</p>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </div>

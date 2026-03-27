@@ -534,14 +534,12 @@ export function buildInfoRequestEmail(branding, { candidateName, recruiterName, 
             <ul style="margin:0;padding-left:20px;">${items}</ul>
         </td></tr>` : ''}
 
-        <!-- CTA Button -->
-        ${respondUrl ? `
-        <tr><td style="padding:28px 48px 0;text-align:center;">
-            <a href="${respondUrl}" style="display:inline-block;background:#0E7490;color:#ffffff;font-size:14px;font-weight:700;padding:14px 36px;border-radius:12px;text-decoration:none;letter-spacing:0.02em;">
-                📝 Bilgi Gönder
-            </a>
-            <p style="margin:12px 0 0;font-size:11px;color:#94A3B8;">Butona tıklayarak güvenli form sayfamıza yönlendirileceksiniz.</p>
-        </td></tr>` : ''}
+        <!-- Reply instruction -->
+        <tr><td style="padding:28px 48px 0;">
+            <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:12px;padding:16px 24px;text-align:center;">
+                <p style="margin:0;font-size:14px;color:#1E40AF;font-weight:700;">📧 Bu e-postayı doğrudan yanıtlayarak belge ve bilgilerinizi gönderebilirsiniz.</p>
+            </div>
+        </td></tr>
 
         <!-- Signature -->
         <tr><td style="padding:32px 48px 40px;">
