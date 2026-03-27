@@ -2081,6 +2081,44 @@ app.post('/api/candidate-respond', generalLimiter, async (req, res) => {
     }
 });
 
+// ── Send participant invite emails when a quick-start interview goes live
+app.post('/api/send-participant-invite', generalLimiter, async (req, res) => {
+    const { participants, joinLink, sessionId, candidateName, recruiterName } = req.body;
+    if (!participants || !Array.isArray(participants) || participants.length === 0) {
+        return res.status(400).json({ error: 'participants listesi gereklidir.' });
+    }
+    if (!joinLink) return res.status(400).json({ error: 'joinLink gereklidir.' });
+    try {
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+        });
+        const results = await Promise.allSettled(participants.map(email =>
+            transporter.sendMail({
+                from: `"Talent-Inn" <${process.env.EMAIL_USER}>`,
+                to: email,
+                subject: `Mülakat Daveti — ${candidateName || 'Aday'} ile Görüşme`,
+                html: `
+                    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;">
+                        <h2 style="color:#0F172A">Canlı Mülakat Davetiyesi</h2>
+                        <p>Merhaba,</p>
+                        <p><strong>${recruiterName || 'Mülakatçı'}</strong> sizi <strong>${candidateName || 'aday'}</strong> ile gerçekleştirilecek canlı mülakata davet etti.</p>
+                        <p>Aşağıdaki bağlantıya tıklayarak katılabilirsiniz:</p>
+                        <a href="${joinLink}" style="display:inline-block;margin:16px 0;padding:12px 24px;background:#2563EB;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold;">Mülakata Katıl</a>
+                        <p style="color:#64748B;font-size:12px;margin-top:24px;">Bu e-posta Talent-Inn tarafından otomatik gönderilmiştir.<br>Oturum ID: ${sessionId}</p>
+                    </div>
+                `,
+            })
+        ));
+        const failed = results.filter(r => r.status === 'rejected').map(r => r.reason?.message);
+        if (failed.length > 0) console.warn('⚠️ Bazı katılımcı davetleri gönderilemedi:', failed);
+        res.json({ success: true, sent: results.filter(r => r.status === 'fulfilled').length, failed: failed.length });
+    } catch (error) {
+        console.error('❌ send-participant-invite error:', error);
+        res.status(500).json({ error: 'Davet gönderilemedi: ' + error.message });
+    }
+});
+
 const PORT = process.env.PORT || 3001;
 
 // ── Start bulk worker in ALL runtime modes (server main OR Firebase Functions import)

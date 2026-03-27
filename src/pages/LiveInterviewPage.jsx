@@ -7,7 +7,7 @@ import {
     ShieldCheck, Camera, Monitor, Sparkles, Brain, Zap,
     MessageSquare, Users, AlertCircle, CheckCircle2,
     Send, Play, Info, Copy, Check, ChevronRight, HelpCircle, Activity, ArrowRight, ArrowLeft,
-    Target, Box, Code, Loader2, AlertTriangle, TrendingUp, Award, ChevronDown, RefreshCw, User, Flag, Star, FileText, ExternalLink, MoreVertical, Clock, ChevronLeft, LogOut
+    Target, Box, Code, Loader2, AlertTriangle, TrendingUp, Award, ChevronDown, RefreshCw, User, Flag, Star, FileText, ExternalLink, MoreVertical, Clock, ChevronLeft, LogOut, Plus
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCandidates } from '../context/CandidatesContext';
@@ -114,6 +114,8 @@ export default function LiveInterviewPage() {
     });
     const [waveHeight, setWaveHeight] = useState([20, 40, 60, 30, 80, 40, 20]);
     const [participantCount, setParticipantCount] = useState(1);
+    const [lobbyParticipants, setLobbyParticipants] = useState([]);
+    const [addParticipantInput, setAddParticipantInput] = useState('');
     const [availablePaths, setAvailablePaths] = useState([]);
     const [pathLoading, setPathLoading] = useState(false);
     const [selectedPathId, setSelectedPathId] = useState(null);
@@ -1312,6 +1314,68 @@ export default function LiveInterviewPage() {
                                     </div>
                                 </div>
 
+                                {/* PARTICIPANT INVITE SECTION */}
+                                <div className="mt-2 pt-4 border-t border-slate-100">
+                                    <div className="flex flex-col gap-2.5">
+                                        <div className="flex items-center gap-2">
+                                            <Users className="w-3.5 h-3.5 text-slate-400" />
+                                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Ek Katılımcılar</span>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="email"
+                                                value={addParticipantInput}
+                                                onChange={e => setAddParticipantInput(e.target.value)}
+                                                onKeyDown={e => {
+                                                    if (e.key === 'Enter' && addParticipantInput.trim()) {
+                                                        const email = addParticipantInput.trim();
+                                                        if (!lobbyParticipants.includes(email)) {
+                                                            setLobbyParticipants(prev => [...prev, email]);
+                                                        }
+                                                        setAddParticipantInput('');
+                                                    }
+                                                }}
+                                                placeholder="e-posta@sirket.com"
+                                                className="flex-1 text-[11px] bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-700 placeholder-slate-300 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 transition-all"
+                                            />
+                                            <button
+                                                onClick={() => {
+                                                    const email = addParticipantInput.trim();
+                                                    if (email && !lobbyParticipants.includes(email)) {
+                                                        setLobbyParticipants(prev => [...prev, email]);
+                                                    }
+                                                    setAddParticipantInput('');
+                                                }}
+                                                disabled={!addParticipantInput.trim()}
+                                                className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center hover:bg-black transition-all disabled:opacity-30 disabled:cursor-not-allowed shrink-0"
+                                            >
+                                                <Plus className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                        {lobbyParticipants.length > 0 && (
+                                            <div className="flex flex-col gap-1">
+                                                {lobbyParticipants.map((email, idx) => (
+                                                    <div key={idx} className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2">
+                                                        <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                                                            <span className="text-[8px] font-black text-blue-600">{email[0]?.toUpperCase()}</span>
+                                                        </div>
+                                                        <span className="flex-1 text-[10px] text-slate-600 truncate">{email}</span>
+                                                        <button
+                                                            onClick={() => setLobbyParticipants(prev => prev.filter((_, i) => i !== idx))}
+                                                            className="text-slate-300 hover:text-red-400 transition-colors shrink-0"
+                                                        >
+                                                            <X className="w-3 h-3" />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                                <p className="text-[9px] text-slate-400 italic text-center mt-1">
+                                                    Mülakat başladığında katılım linki bu adreslere gönderilecek
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
                                 {/* AI Summary */}
                                 <div className="mt-2 bg-[#0F172A] rounded-[2rem] p-6 text-white relative border border-white/10 shadow-2xl overflow-visible group/summary">
                                     <div className="absolute -top-3 -right-3 p-4 bg-blue-600 rounded-2xl shadow-xl shadow-blue-900/40 z-10 transition-transform group-hover/summary:scale-110">
@@ -1495,14 +1559,34 @@ export default function LiveInterviewPage() {
                                                             currentQuestionIndex: 0,
                                                             startedAt: new Date().toISOString(),
                                                             candidateStatus: null,
+                                                            additionalParticipants: lobbyParticipants,
                                                         };
                                                         await persistSessionData(startData);
+                                                        // Notify additional participants
+                                                        if (lobbyParticipants.length > 0) {
+                                                            const joinLink = `${window.location.origin}/join/${sessionId}`;
+                                                            try {
+                                                                await fetch('/api/send-participant-invite', {
+                                                                    method: 'POST',
+                                                                    headers: { 'Content-Type': 'application/json' },
+                                                                    body: JSON.stringify({
+                                                                        participants: lobbyParticipants,
+                                                                        joinLink,
+                                                                        sessionId,
+                                                                        candidateName: candidateData?.name || 'Aday',
+                                                                        recruiterName: userProfile?.displayName || 'Mülakatçı',
+                                                                    })
+                                                                });
+                                                            } catch (err) {
+                                                                console.error('Katılımcı bildirimleri gönderilemedi:', err);
+                                                            }
+                                                        }
                                                         setPhase('active');
                                                     }}
                                                     disabled={!selectedPathId || pathLoading}
                                                     className="w-full h-16 rounded-[1.5rem] bg-[#0F172A] hover:bg-black text-white font-black text-[12px] uppercase tracking-[0.2em] transition-all shadow-2xl shadow-blue-900/40 flex items-center justify-center gap-3 italic group px-5"
                                                 >
-                                                    MOULAKATI BAŞLAT <ArrowRight className="w-5 h-5 group-hover:translate-x-2 transition-transform" />
+                                                    MÜLAKATИ BAŞLAT <ArrowRight className="w-5 h-5 group-hover:translate-x-2 transition-transform" />
                                                 </button>
                                             </div>
                                         </div>
@@ -1964,13 +2048,19 @@ export default function LiveInterviewPage() {
                                             <button
                                                 key={p.id}
                                                 onClick={() => {
-                                                    if (questions.length > 0) return;
+                                                    if (activeStrategy === p.id) return;
+                                                    if (questions.length > 0) {
+                                                        // Clear current questions and switch strategy
+                                                        setQuestions([]);
+                                                        setCurrentQuestionIndex(0);
+                                                        setSuggestedQuestion(null);
+                                                    }
                                                     setActiveStrategy(p.id);
                                                     setIsTypeSelected(true);
                                                     persistSessionData({ activeStrategy: p.id });
                                                 }}
-                                                title={questions.length > 0 ? 'Mülakat başladı — strateji kilitli' : p.label}
-                                                className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${activeStrategy === p.id ? 'bg-blue-600 text-white border border-blue-400' : questions.length > 0 ? 'bg-white/5 text-white/15 cursor-not-allowed' : 'bg-white/5 text-white/30 hover:bg-white/10'}`}
+                                                title={p.label + (questions.length > 0 && activeStrategy !== p.id ? ' — soru seti sıfırlanacak' : '')}
+                                                className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${activeStrategy === p.id ? 'bg-blue-600 text-white border border-blue-400' : 'bg-white/5 text-white/30 hover:bg-blue-600/40 hover:text-white cursor-pointer'}`}
                                             >
                                                 {p.icon}
                                             </button>
@@ -2008,9 +2098,11 @@ export default function LiveInterviewPage() {
                                             <div className="flex items-center gap-2 mt-3 pt-2.5 border-t border-white/5">
                                                 <button
                                                     onClick={() => handleGenerateAIQuestion('deepen')}
-                                                    className="px-2.5 py-1.5 bg-blue-600/20 hover:bg-blue-600/40 rounded-lg border border-blue-500/30 text-[8px] font-black text-blue-400 uppercase flex items-center gap-1 transition-all active:scale-95"
+                                                    disabled={coachGenerating || !candidateData}
+                                                    title={!candidateData ? 'Aday verisi yüklenemedi' : 'Mevcut soruya göre AI derinleştirme sorusu üret'}
+                                                    className="px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/40 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg border border-blue-500/30 text-[10px] font-black text-blue-400 uppercase flex items-center gap-1.5 transition-all active:scale-95"
                                                 >
-                                                    <Sparkles className="w-2.5 h-2.5" /> AI Derinleştir
+                                                    {coachGenerating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />} Derinleştir
                                                 </button>
                                                 {questions[currentQuestionIndex] && !questions[currentQuestionIndex].visibleToCandidate ? (
                                                     <button
@@ -2021,13 +2113,13 @@ export default function LiveInterviewPage() {
                                                             setQuestions(updated);
                                                             persistSessionData({ questions: updated });
                                                         }}
-                                                        className="px-2.5 py-1.5 bg-emerald-600 text-white rounded-lg text-[8px] font-black uppercase flex items-center gap-1 hover:bg-emerald-500 transition-all shadow-md shadow-emerald-900/30 active:scale-95"
+                                                        className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-[10px] font-black uppercase flex items-center gap-1.5 hover:bg-emerald-500 transition-all shadow-md shadow-emerald-900/30 active:scale-95"
                                                     >
-                                                        <Send className="w-2.5 h-2.5" /> Adaya Gönder
+                                                        <Send className="w-3 h-3" /> Adaya Gönder
                                                     </button>
                                                 ) : questions[currentQuestionIndex]?.visibleToCandidate ? (
-                                                    <div className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg border border-emerald-500/20 text-[7px] font-black uppercase">
-                                                        <CheckCircle2 className="w-2.5 h-2.5" /> Adayda Yayında
+                                                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg border border-emerald-500/20 text-[10px] font-black uppercase">
+                                                        <CheckCircle2 className="w-3 h-3" /> Adayda Yayında
                                                     </div>
                                                 ) : null}
                                                 <div className="flex-1" />
@@ -2287,20 +2379,23 @@ export default function LiveInterviewPage() {
                             </div>
 
                             {/* AI COACH SUGGESTION */}
-                            <section className="bg-[#0F172A] rounded-2xl border border-white/5 p-3 shrink-0 shadow-xl">
-                                <div className="flex items-center justify-between mb-2">
+                            <section className="bg-[#0F172A] rounded-2xl border border-white/5 p-4 shrink-0 shadow-xl">
+                                <div className="flex items-center justify-between mb-3">
                                     <div className="flex items-center gap-2">
-                                        <div className="w-1 h-3.5 bg-blue-500 rounded-full" />
-                                        <p className="text-[8px] font-black text-blue-400 uppercase tracking-widest italic">AI Coach</p>
-                                        <span className="text-[7px] text-amber-400/60 font-bold italic">— sadece siz görürsünüz</span>
+                                        <div className="w-1 h-4 bg-blue-500 rounded-full" />
+                                        <p className="text-xs font-black text-blue-400 uppercase tracking-widest">AI Coach</p>
+                                        <span className="text-[10px] text-amber-400/70 font-bold">— sadece siz görürsünüz</span>
                                     </div>
-                                    {coachGenerating && <Loader2 className="w-2.5 h-2.5 text-blue-400 animate-spin" />}
+                                    {coachGenerating && <Loader2 className="w-3.5 h-3.5 text-blue-400 animate-spin" />}
                                 </div>
-                                <p className="text-[10px] font-bold text-white/80 leading-snug italic border-l-2 border-blue-500/40 pl-2">
-                                    {suggestedQuestion ? suggestedQuestion.question : "Transkript otomatik takip ediyor — siz sesli sorun, sistem kaydeder. 'Derinleş' ile anlık öneri alın."}
+                                <p className="text-[13px] font-semibold text-white/90 leading-relaxed border-l-2 border-blue-500/50 pl-3">
+                                    {suggestedQuestion ? suggestedQuestion.question : "Transkript otomatik takip ediyor — siz sesli sorun, sistem kaydeder. 'Derinleştir' ile anlık soru önerisi alın."}
                                 </p>
+                                {suggestedQuestion?.evaluationHint && (
+                                    <p className="text-[11px] text-blue-400/80 mt-1.5 pl-3 italic">→ {suggestedQuestion.evaluationHint}</p>
+                                )}
                                 {suggestedQuestion && (
-                                    <div className="flex gap-1.5 mt-2">
+                                    <div className="flex gap-2 mt-3">
                                         <button
                                             onClick={() => {
                                                 const newQ = {
@@ -2316,13 +2411,13 @@ export default function LiveInterviewPage() {
                                                 setCurrentQuestionIndex(updated.length - 1);
                                                 setSuggestedQuestion(null);
                                             }}
-                                            className="flex-1 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[7px] font-black uppercase flex items-center justify-center gap-1 transition-all"
+                                            className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-black uppercase flex items-center justify-center gap-1.5 transition-all"
                                         >
-                                            <FileText className="w-2.5 h-2.5" /> Listeye Ekle
+                                            <FileText className="w-3 h-3" /> Listeye Ekle
                                         </button>
                                         <button
                                             onClick={() => setSuggestedQuestion(null)}
-                                            className="px-2.5 py-1.5 bg-white/5 hover:bg-white/10 text-white/40 rounded-lg text-[7px] font-black uppercase transition-all"
+                                            className="px-3 py-2 bg-white/5 hover:bg-white/10 text-white/50 rounded-lg text-[11px] font-black uppercase transition-all"
                                         >
                                             Yoksay
                                         </button>
@@ -2335,27 +2430,27 @@ export default function LiveInterviewPage() {
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-1.5">
                                         <Sparkles className="w-3 h-3 text-blue-400" />
-                                        <h3 className="text-[8px] font-black text-white/30 uppercase tracking-widest italic">Analytical Insight</h3>
+                                        <h3 className="text-[10px] font-black text-white/50 uppercase tracking-widest">Analytical Insight</h3>
                                     </div>
                                     <div className="flex items-center gap-1">
-                                        {starAnalyzing && <Loader2 className="w-2 h-2 text-blue-400 animate-spin" />}
-                                        <div className="px-1.5 py-0.5 bg-blue-600/20 text-blue-400 border border-blue-500/20 rounded text-[5px] font-black uppercase">REAL-TIME</div>
+                                        {starAnalyzing && <Loader2 className="w-2.5 h-2.5 text-blue-400 animate-spin" />}
+                                        <div className="px-1.5 py-0.5 bg-blue-600/20 text-blue-400 border border-blue-500/20 rounded text-[9px] font-black uppercase">REAL-TIME</div>
                                     </div>
                                 </div>
 
                                 {biasWarning && (
-                                    <div className="flex items-start gap-1.5 bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-2">
-                                        <AlertTriangle className="w-2.5 h-2.5 text-yellow-400 shrink-0 mt-0.5" />
+                                    <div className="flex items-start gap-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-2.5">
+                                        <AlertTriangle className="w-3 h-3 text-yellow-400 shrink-0 mt-0.5" />
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-[7px] font-black text-yellow-400 uppercase">Önyargı Uyarısı</p>
-                                            <p className="text-[7px] text-yellow-300/80 mt-0.5 leading-snug">{biasWarning}</p>
+                                            <p className="text-[10px] font-black text-yellow-400 uppercase">Önyargı Uyarısı</p>
+                                            <p className="text-[11px] text-yellow-300/90 mt-0.5 leading-snug">{biasWarning}</p>
                                         </div>
-                                        <button onClick={() => setBiasWarning(null)} className="text-yellow-500/60 text-[9px] shrink-0">✕</button>
+                                        <button onClick={() => setBiasWarning(null)} className="text-yellow-500/60 text-xs shrink-0">✕</button>
                                     </div>
                                 )}
 
                                 {/* STAR scores as compact bars */}
-                                <div className="flex flex-col gap-1">
+                                <div className="flex flex-col gap-2">
                                     {[
                                         { key: 'technical', label: 'Teknik' },
                                         { key: 'communication', label: 'İletişim' },
@@ -2364,30 +2459,30 @@ export default function LiveInterviewPage() {
                                         { key: 'adaptability', label: 'Adaptasyon' },
                                     ].map(({ key, label }) => (
                                         <div key={key} className="flex items-center gap-2">
-                                            <span className="text-[7px] text-white/30 w-16 shrink-0">{label}</span>
-                                            <div className="flex-1 h-1 bg-white/5 rounded-full overflow-hidden">
+                                            <span className="text-[11px] text-white/50 w-18 shrink-0">{label}</span>
+                                            <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
                                                 <div className="h-full bg-blue-500 rounded-full transition-all duration-700" style={{ width: `${starScores[key] || 0}%` }} />
                                             </div>
-                                            <span className="text-[7px] text-white/30 font-mono w-5 text-right">{starScores[key] || 0}</span>
+                                            <span className="text-[11px] text-white/50 font-mono w-6 text-right">{starScores[key] || 0}</span>
                                         </div>
                                     ))}
                                 </div>
 
                                 {/* AI insights */}
                                 {aiInsights.length > 0 && (
-                                    <div className="flex flex-col gap-1">
-                                        <p className="text-[6px] font-black text-white/20 uppercase tracking-widest">Tespitler</p>
-                                        {aiInsights.slice(0, 3).map(ins => (
+                                    <div className="flex flex-col gap-1.5">
+                                        <p className="text-[10px] font-black text-white/30 uppercase tracking-widest">Tespitler</p>
+                                        {aiInsights.slice(0, 5).map(ins => (
                                             <div
                                                 key={ins.id}
-                                                className={`rounded-lg p-1.5 border text-[7px] leading-snug ${
+                                                className={`rounded-lg p-2 border text-[11px] leading-snug ${
                                                     ins.type === 'warning'
                                                         ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-300/90'
-                                                        : 'bg-white/5 border-white/5 text-white/50'
+                                                        : 'bg-white/5 border-white/5 text-white/70'
                                                 }`}
                                             >
                                                 {ins.text}
-                                                {ins.hint && <p className="mt-0.5 text-blue-400/60 italic">→ {ins.hint}</p>}
+                                                {ins.hint && <p className="mt-1 text-blue-400/80 italic text-[10px]">→ {ins.hint}</p>}
                                             </div>
                                         ))}
                                     </div>
@@ -2395,11 +2490,11 @@ export default function LiveInterviewPage() {
 
                                 {/* Emotion analysis */}
                                 {emotionData && (
-                                    <div className="flex flex-col gap-1.5">
-                                        <p className="text-[6px] font-black text-white/20 uppercase tracking-widest flex items-center gap-1">
-                                            <Activity className="w-2 h-2 text-purple-400" /> Ses Duygu
+                                    <div className="flex flex-col gap-2">
+                                        <p className="text-[10px] font-black text-white/30 uppercase tracking-widest flex items-center gap-1.5">
+                                            <Activity className="w-2.5 h-2.5 text-purple-400" /> Ses Duygu Analizi
                                         </p>
-                                        <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                                        <div className="grid grid-cols-2 gap-x-3 gap-y-2">
                                             {[
                                                 { label: 'Stres', value: emotionData.stress, color: '#EF4444' },
                                                 { label: 'Heyecan', value: emotionData.excitement, color: '#F59E0B' },
@@ -2407,11 +2502,11 @@ export default function LiveInterviewPage() {
                                                 { label: 'Tereddüt', value: emotionData.hesitation, color: '#8B5CF6' },
                                             ].map(({ label, value, color }) => (
                                                 <div key={label}>
-                                                    <div className="flex justify-between mb-0.5">
-                                                        <span className="text-[7px] text-white/30">{label}</span>
-                                                        <span className="text-[7px] font-bold tabular-nums" style={{ color }}>%{value || 0}</span>
+                                                    <div className="flex justify-between mb-1">
+                                                        <span className="text-[11px] text-white/50">{label}</span>
+                                                        <span className="text-[11px] font-bold tabular-nums" style={{ color }}>%{value || 0}</span>
                                                     </div>
-                                                    <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+                                                    <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
                                                         <div className="h-full rounded-full transition-all duration-700" style={{ width: `${value || 0}%`, background: color }} />
                                                     </div>
                                                 </div>
@@ -2421,12 +2516,12 @@ export default function LiveInterviewPage() {
                                 )}
 
                                 {/* Logic Integrity */}
-                                <div className="flex items-center justify-between gap-3 pt-1 border-t border-white/5">
-                                    <span className="text-[7px] font-black text-white/20 uppercase tracking-widest">Logic Integrity</span>
-                                    <div className="flex-1 h-1 bg-white/5 rounded-full overflow-hidden">
+                                <div className="flex items-center justify-between gap-3 pt-2 border-t border-white/5">
+                                    <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">Logic Integrity</span>
+                                    <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
                                         <div className="h-full bg-gradient-to-r from-blue-600 to-indigo-600 transition-all duration-700 rounded-full" style={{ width: `${logicIntegrity}%` }} />
                                     </div>
-                                    <span className="text-[8px] font-black text-blue-500 tabular-nums">%{logicIntegrity}</span>
+                                    <span className="text-xs font-black text-blue-400 tabular-nums">%{logicIntegrity}</span>
                                 </div>
                             </section>
                         </div>
