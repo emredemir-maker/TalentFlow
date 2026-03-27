@@ -1334,7 +1334,32 @@ export default function InterviewManagementPage() {
                         {/* STEP 1: ADAY SEÇİMİ */}
                         {wizardStep === 1 && (
                             <div className="p-6 overflow-y-auto custom-scrollbar" style={{ maxHeight: 440 }}>
-                                <p className="text-[10px] font-black text-[#64748B] uppercase tracking-widest mb-4">Görüşeceğiniz adayı seçin</p>
+                                {/* Position selector — always at the top */}
+                                <div className="mb-5 pb-4 border-b border-[#F1F5F9]">
+                                    <p className="text-[10px] font-black text-[#64748B] uppercase tracking-widest mb-2">Mülakat Pozisyonu</p>
+                                    {openPositions.length > 0 ? (
+                                        <select
+                                            value={wizardPosition?.id || ''}
+                                            onChange={e => setWizardPosition(openPositions.find(p => p.id === e.target.value) || null)}
+                                            className="w-full border border-[#E2E8F0] rounded-xl px-3 py-2.5 text-[12px] text-[#0F172A] outline-none focus:border-[#1E3A8A] focus:ring-2 focus:ring-[#1E3A8A]/10 bg-white"
+                                        >
+                                            <option value="">Pozisyon seçin...</option>
+                                            {openPositions.map(p => (
+                                                <option key={p.id} value={p.id}>{p.title}{p.department ? ` — ${p.department}` : ''}</option>
+                                            ))}
+                                        </select>
+                                    ) : (
+                                        <input
+                                            type="text"
+                                            placeholder="Pozisyon adı girin..."
+                                            value={wizardPosition?.title || ''}
+                                            onChange={e => setWizardPosition(e.target.value ? { title: e.target.value } : null)}
+                                            className="w-full border border-[#E2E8F0] rounded-xl px-3 py-2.5 text-[12px] text-[#0F172A] outline-none focus:border-[#1E3A8A] focus:ring-2 focus:ring-[#1E3A8A]/10 bg-white placeholder:text-[#94A3B8]"
+                                        />
+                                    )}
+                                </div>
+                                {/* Candidate list */}
+                                <p className="text-[10px] font-black text-[#64748B] uppercase tracking-widest mb-3">Görüşeceğiniz adayı seçin</p>
                                 {enrichedCandidates.length === 0 ? (
                                     <div className="flex flex-col items-center justify-center py-16 text-[#94A3B8]">
                                         <User className="w-8 h-8 mb-2 opacity-30" />
@@ -1345,7 +1370,7 @@ export default function InterviewManagementPage() {
                                         {enrichedCandidates.map(c => (
                                             <button
                                                 key={c.id}
-                                                onClick={() => { setSelectedCandidate(c); setWizardPosition(null); }}
+                                                onClick={() => { setSelectedCandidate(c); }}
                                                 className={`flex items-center gap-3.5 p-4 rounded-2xl border-2 transition-all text-left w-full ${
                                                     selectedCandidate?.id === c.id
                                                         ? 'border-[#1E3A8A] bg-blue-50/50 shadow-md shadow-blue-900/5'
@@ -1371,31 +1396,6 @@ export default function InterviewManagementPage() {
                                                 )}
                                             </button>
                                         ))}
-                                    </div>
-                                )}
-                                {selectedCandidate && (
-                                    <div className="mt-4 pt-4 border-t border-[#E2E8F0]">
-                                        <p className="text-[10px] font-black text-[#64748B] uppercase tracking-widest mb-2">Pozisyon Seç</p>
-                                        {openPositions.length > 0 ? (
-                                            <select
-                                                value={wizardPosition?.id || ''}
-                                                onChange={e => setWizardPosition(openPositions.find(p => p.id === e.target.value) || null)}
-                                                className="w-full border border-[#E2E8F0] rounded-xl px-3 py-2.5 text-[12px] text-[#0F172A] outline-none focus:border-[#1E3A8A] focus:ring-2 focus:ring-[#1E3A8A]/10 bg-white"
-                                            >
-                                                <option value="">Adayın mevcut pozisyonu ({selectedCandidate.position || '—'})</option>
-                                                {openPositions.map(p => (
-                                                    <option key={p.id} value={p.id}>{p.title}{p.department ? ` — ${p.department}` : ''}</option>
-                                                ))}
-                                            </select>
-                                        ) : (
-                                            <input
-                                                type="text"
-                                                placeholder={`Pozisyon adı girin (mevcut: ${selectedCandidate.position || '—'})`}
-                                                value={wizardPosition?.title || ''}
-                                                onChange={e => setWizardPosition(e.target.value ? { title: e.target.value } : null)}
-                                                className="w-full border border-[#E2E8F0] rounded-xl px-3 py-2.5 text-[12px] text-[#0F172A] outline-none focus:border-[#1E3A8A] focus:ring-2 focus:ring-[#1E3A8A]/10 bg-white placeholder:text-[#94A3B8]"
-                                            />
-                                        )}
                                     </div>
                                 )}
                             </div>
