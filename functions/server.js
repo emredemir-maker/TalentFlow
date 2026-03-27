@@ -158,10 +158,51 @@ async function verifyFirebaseToken(req, res, next) {
             { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken: token }) }
         );
         if (!resp.ok) return res.status(401).json({ error: 'Geçersiz kimlik bilgileri.' });
+        req.firebaseToken = token;
         return next();
     } catch {
         return res.status(401).json({ error: 'Kimlik doğrulama başarısız.' });
     }
+}
+
+// ── Firestore REST API helpers ─────────────────────────────────────────────────
+const FS_BASE = () => `https://firestore.googleapis.com/v1/projects/${process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID}/databases/(default)/documents`;
+
+function toFsValue(v) {
+    if (v === null || v === undefined) return { nullValue: null };
+    if (typeof v === 'boolean') return { booleanValue: v };
+    if (typeof v === 'number') return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
+    if (v instanceof Date) return { timestampValue: v.toISOString() };
+    if (Array.isArray(v)) return { arrayValue: { values: v.map(toFsValue) } };
+    if (typeof v === 'object') return { mapValue: { fields: Object.fromEntries(Object.entries(v).map(([k, val]) => [k, toFsValue(val)])) } };
+    return { stringValue: String(v) };
+}
+async function fsGet(docPath, token) {
+    const r = await fetch(`${FS_BASE()}/${docPath}`, { headers: { Authorization: `Bearer ${token}` } });
+    if (r.status === 404) return null;
+    if (!r.ok) throw new Error(`Firestore GET failed: ${r.status}`);
+    return r.json();
+}
+async function fsPatch(docPath, fields, token) {
+    const fsFields = Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, toFsValue(v)]));
+    const mask = Object.keys(fields).map(k => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
+    const r = await fetch(`${FS_BASE()}/${docPath}?${mask}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: fsFields }),
+    });
+    if (!r.ok) throw new Error(`Firestore PATCH failed: ${r.status} ${await r.text()}`);
+    return r.json();
+}
+async function fsSet(collPath, docId, fields, token) {
+    const fsFields = Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, toFsValue(v)]));
+    const r = await fetch(`${FS_BASE()}/${collPath}?documentId=${docId}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: fsFields }),
+    });
+    if (!r.ok) throw new Error(`Firestore SET failed: ${r.status} ${await r.text()}`);
+    return r.json();
 }
 
 // Rate limiter for AI endpoints (20 req/min/IP)
@@ -2098,21 +2139,28 @@ app.post('/api/send-info-request', generalLimiter, verifyFirebaseToken, async (r
         const APP_URL = process.env.VITE_APP_URL || 'https://talentflow-84bb6.web.app';
         const respondUrl = clientRespondUrl || `${APP_URL}/respond/${requestId}?type=info`;
         try {
-            await db.doc(`artifacts/talent-flow/public/data/infoRequests/${requestId}`).set({
+            await fsSet(
+                'artifacts/talent-flow/public/data/infoRequests',
                 requestId,
-                candidateId: candidateId || null,
-                sessionId: sessionId || null,
-                candidateEmail: to,
-                candidateName,
-                recruiterName: recruiterName || '',
-                position: position || '',
-                requestMessage: requestMessage || '',
-                requestedItems: requestedItems || [],
-                status: 'pending',
-                createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            });
+                {
+                    requestId,
+                    candidateId: candidateId || null,
+                    sessionId: sessionId || null,
+                    candidateEmail: to,
+                    candidateName,
+                    recruiterEmail: recruiterEmail || process.env.EMAIL_USER || '',
+                    recruiterName: recruiterName || '',
+                    position: position || '',
+                    requestMessage: requestMessage || '',
+                    requestedItems: requestedItems || [],
+                    status: 'pending',
+                    createdAt: new Date(),
+                },
+                req.firebaseToken
+            );
+            console.log(`✅ infoRequest Firestore'a yazıldı: ${requestId}`);
         } catch (dbErr) {
-            console.warn('⚠️ infoRequests Firestore write failed (non-fatal):', dbErr.code, dbErr.message);
+            console.warn('⚠️ infoRequests Firestore write failed (non-fatal):', dbErr.message);
         }
         const items = Array.isArray(requestedItems) && requestedItems.length
             ? requestedItems.map(i => `<li style="margin:6px 0;">📎 ${i}</li>`).join('') : '';
@@ -2186,6 +2234,19 @@ app.post('/api/candidate-respond', generalLimiter, async (req, res) => {
     }
 });
 
+// ── Decode RFC 2047 encoded-word subjects ─────────────────────────────────────
+function decodeEncodedWords(str) {
+    if (!str) return '';
+    str = str.replace(/\r?\n[ \t]+/g, '');
+    return str.replace(/=\?([^?]+)\?([BbQq])\?([^?]*)\?=/g, (_, _cs, enc, text) => {
+        try {
+            if (enc.toUpperCase() === 'B') return Buffer.from(text, 'base64').toString('utf8');
+            const qp = text.replace(/_/g, '\x20').replace(/=([0-9A-Fa-f]{2})/g, (__, h) => String.fromCharCode(parseInt(h, 16)));
+            return Buffer.from(qp, 'binary').toString('utf8');
+        } catch { return text; }
+    });
+}
+
 // ── Check for email replies to info requests via IMAP ─────────────────────────
 function fetchImapInfoReplies() {
     return new Promise((resolve, reject) => {
@@ -2199,44 +2260,40 @@ function fetchImapInfoReplies() {
             port: 993,
             tls: true,
             tlsOptions: { rejectUnauthorized: false },
-            connTimeout: 15000,
-            authTimeout: 10000,
+            connTimeout: 20000,
+            authTimeout: 15000,
         });
-
         const replies = [];
-
         function finish() { try { imap.end(); } catch (_) {} resolve(replies); }
-
         imap.once('error', err => { try { imap.end(); } catch (_) {} reject(err); });
-
         imap.once('ready', () => {
             imap.openBox('INBOX', true, (err) => {
                 if (err) return reject(err);
-                imap.search(['ALL', ['SUBJECT', 'Re: Bilgi Talebi']], (err, uids) => {
+                const since = new Date();
+                since.setDate(since.getDate() - 90);
+                imap.search([['SINCE', since]], (err, uids) => {
                     if (err || !uids || uids.length === 0) return finish();
-                    const slice = uids.slice(-50);
-                    const f = imap.fetch(slice, { bodies: 'HEADER.FIELDS (FROM SUBJECT DATE)', struct: false });
+                    const slice = uids.slice(-200);
+                    const f = imap.fetch(slice, { bodies: 'HEADER.FIELDS (FROM SUBJECT)', struct: false });
                     let pending = 0;
                     f.on('message', (msg) => {
                         pending++;
-                        let header = '';
+                        let raw = '';
                         msg.on('body', (stream) => {
                             let buf = '';
-                            stream.on('data', chunk => buf += chunk.toString('utf8'));
-                            stream.once('end', () => { header = buf; });
+                            stream.on('data', c => buf += c.toString('utf8'));
+                            stream.once('end', () => { raw = buf; });
                         });
                         msg.once('end', () => {
                             pending--;
-                            const fromMatch = header.match(/^From:\s*.+?[<\s]([^\s<>]+@[^\s<>]+)[>\s]?/im);
-                            const subjMatch = header.match(/^Subject:\s*(.+)/im);
-                            const subject = subjMatch ? subjMatch[1].trim() : '';
-                            const idMatch = subject.match(/\[#([^\]]+)\]/);
-                            if (fromMatch && idMatch) {
-                                replies.push({
-                                    from: fromMatch[1].trim().toLowerCase(),
-                                    subject,
-                                    requestId: idMatch[1].trim(),
-                                });
+                            const rawSubj = (raw.match(/^Subject:[ \t]*([\s\S]*?)(?=\r?\n\S|\r?\n\r?\n|$)/im) || [])[1] || '';
+                            const subject = decodeEncodedWords(rawSubj.replace(/\r?\n[ \t]+/g, ' ').trim());
+                            const idMatch = subject.match(/\[#(ir-[^\]]+)\]/);
+                            const fromRaw = (raw.match(/^From:[ \t]*(.+)/im) || [])[1] || '';
+                            const fromDecoded = decodeEncodedWords(fromRaw.trim());
+                            const emailMatch = fromDecoded.match(/<([^>]+@[^>]+)>/) || fromDecoded.match(/([^\s<>]+@[^\s<>]+)/);
+                            if (idMatch && emailMatch) {
+                                replies.push({ requestId: idMatch[1].trim(), from: emailMatch[1].trim().toLowerCase(), subject });
                             }
                             if (pending === 0) finish();
                         });
@@ -2246,7 +2303,6 @@ function fetchImapInfoReplies() {
                 });
             });
         });
-
         imap.connect();
     });
 }
@@ -2254,19 +2310,24 @@ function fetchImapInfoReplies() {
 app.post('/api/check-info-replies', generalLimiter, verifyFirebaseToken, async (req, res) => {
     try {
         const replies = await fetchImapInfoReplies();
+        console.log(`📬 IMAP tarama tamamlandı: ${replies.length} eşleşme`, replies.map(r => r.requestId));
         let updated = 0;
-        const now = admin.firestore.FieldValue.serverTimestamp();
+        const token = req.firebaseToken;
         for (const reply of replies) {
-            const ref = db.doc(`artifacts/talent-flow/public/data/infoRequests/${reply.requestId}`);
-            const docSnap = await ref.get();
-            if (!docSnap.exists) continue;
-            const data = docSnap.data();
-            if (data.status === 'pending') {
-                await ref.update({ status: 'responded', respondedAt: now, replySubject: reply.subject });
+            try {
+                const docPath = `artifacts/talent-flow/public/data/infoRequests/${reply.requestId}`;
+                const existing = await fsGet(docPath, token);
+                if (!existing) { console.warn(`⚠️ requestId ${reply.requestId} bulunamadı`); continue; }
+                const status = existing.fields?.status?.stringValue;
+                if (status !== 'pending') continue;
+                await fsPatch(docPath, { status: 'responded', respondedAt: new Date(), replySubject: reply.subject }, token);
                 updated++;
+                console.log(`✅ Yanıt işaretlendi: ${reply.requestId}`);
+            } catch (err) {
+                console.error(`❌ ${reply.requestId} güncellenemedi:`, err.message);
             }
         }
-        console.log(`📬 Info reply check: ${replies.length} e-posta tarandı, ${updated} talep güncellendi.`);
+        console.log(`📬 Tamamlandı: ${replies.length} tarandı, ${updated} güncellendi.`);
         res.json({ success: true, scanned: replies.length, updated });
     } catch (error) {
         console.error('❌ IMAP check-info-replies error:', error);
