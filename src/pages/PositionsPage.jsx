@@ -19,7 +19,6 @@ import {
 } from '../services/applicationService';
 
 import PotentialCandidatesTab from '../components/PotentialCandidatesTab';
-import CandidateDrawer from '../components/CandidateDrawer';
 import { useCandidates } from '../context/CandidatesContext';
 import { extractPositionFromJD } from '../services/geminiService';
 import { calculateMatchScore, filterCandidatesByDomain } from '../services/matchService';
@@ -1094,7 +1093,7 @@ function Field({ label, children }) {
 // ─────────────────────────────────────────────────────────────
 export default function PositionsPage() {
     const { positions, loading, addPosition, addPositionRequest, approvePosition, rejectPosition, deletePosition, togglePositionStatus, updatePosition } = usePositions();
-    const { enrichedCandidates, updateCandidate } = useCandidates();
+    const { enrichedCandidates, updateCandidate, setViewCandidateId } = useCandidates();
     const candidates = enrichedCandidates || [];
     const { isDepartmentUser, userDepartments, userProfile, user, role } = useAuth();
     const { addNotification } = useNotifications();
@@ -1105,8 +1104,6 @@ export default function PositionsPage() {
     const [detailPos, setDetailPos]             = useState(null);
     const [createOpen, setCreateOpen]           = useState(false);
     const [editPos, setEditPos]                 = useState(null);
-    const [selectedCandidate, setSelectedCandidate] = useState(null);
-    const [activePosition, setActivePosition]   = useState(null);
     const [releasingPosId, setReleasingPosId]   = useState(null);
     const [releaseLoading, setReleaseLoading]   = useState(false);
     const [departments, setDepartments]         = useState([]);
@@ -1483,15 +1480,10 @@ export default function PositionsPage() {
                     isRecruiterOrAdmin={isRecruiterOrAdmin}
                     releaseLoading={releaseLoading}
                     releasingPosId={releasingPosId}
-                    onCandidateClick={(c) => { setSelectedCandidate(c); setActivePosition(detailPos); }}
-                />
-            )}
-
-            {selectedCandidate && (
-                <CandidateDrawer
-                    candidate={selectedCandidate}
-                    positionContext={activePosition}
-                    onClose={() => { setSelectedCandidate(null); setActivePosition(null); }}
+                    onCandidateClick={(c) => {
+                        setViewCandidateId(c.id);
+                        window.dispatchEvent(new CustomEvent('changeView', { detail: 'candidate-process' }));
+                    }}
                 />
             )}
         </div>
