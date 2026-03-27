@@ -121,7 +121,15 @@ Sadece şu JSON formatında dön (başka hiçbir şey yazma):
     "milestones": ["Başarı 1"]
   }
 ]`;
-    const prompt = buildStructuredPrompt(instruction, { "CV_METNI": sanitizeForPrompt(redactPiiFromText(text), 15000) });
+    // For structural parsing (job titles, companies, dates) we only strip
+    // contact details — NOT the generic name pattern, because that regex
+    // incorrectly replaces Turkish title-cased words like "Müdür" → "[İSİM]ü".
+    const structuralSafeText = text
+        .replace(/\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/g, '[E-POSTA]')
+        .replace(/(?:\+?\d[\d\s\-().]{6,}\d)/g, '[TELEFON]')
+        .replace(/(?:https?:\/\/)?(?:www\.)?linkedin\.com\/in\/[\w\-]+/gi, '[LINKEDIN]')
+        .replace(/(?:https?:\/\/)?(?:www\.)?github\.com\/[\w\-]+/gi, '[GITHUB]');
+    const prompt = buildStructuredPrompt(instruction, { "CV_METNI": sanitizeForPrompt(structuralSafeText, 15000) });
     const model = await getModel(modelId);
     const result = await model.generateContent(prompt);
     const raw = result.response.text().replace(/```json|```/gi, '').trim();

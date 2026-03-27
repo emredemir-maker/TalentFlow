@@ -143,10 +143,6 @@ export function extractPiiFromText(text) {
     };
 }
 
-// General Turkish/Latin full-name pattern (title-cased two-word sequences).
-// Applied unconditionally so names are always redacted even without a known name.
-const NAME_PATTERN = /\b(?:[A-ZÇĞİÖŞÜ][a-zçğışöşü]+(?:\s+[A-ZÇĞİÖŞÜ][a-zçğışöşü]+){1,3})\b/g;
-
 /**
  * Redacts PII patterns from raw text before sending to any external AI model.
  * Replaces:
@@ -154,10 +150,16 @@ const NAME_PATTERN = /\b(?:[A-ZÇĞİÖŞÜ][a-zçğışöşü]+(?:\s+[A-ZÇĞİ
  *  - Phone numbers            → [TELEFON]
  *  - LinkedIn profile URLs    → [LINKEDIN]
  *  - GitHub profile URLs      → [GITHUB]
- *  - Title-cased name strings → [İSİM]  (always, regardless of knownName)
- *  - Known name (if provided) → [İSİM]  (exact-match on top of pattern)
+ *  - Known name (if provided) → [İSİM]  (exact match on each name part and full name)
+ *
+ * NOTE: The previous version used a generic title-cased word regex to redact
+ * "any name-like string". This was removed because JavaScript's \b word boundary
+ * is ASCII-only — it fires mid-word between ASCII chars (e.g. "r") and
+ * Turkish suffix chars (e.g. "ü"), causing job titles like "Müdür" → "[İSİM]ü"
+ * and "Direktörü" → "[İSİM]ü". The specific known-name match is sufficient.
+ *
  * @param {string} text
- * @param {string|null} [knownName] - optional; exact occurrences also replaced
+ * @param {string|null} [knownName] - optional; exact occurrences are replaced
  * @returns {string}
  */
 export function redactPiiFromText(text, knownName = null) {
@@ -166,13 +168,18 @@ export function redactPiiFromText(text, knownName = null) {
         .replace(/\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/g, '[E-POSTA]')
         .replace(/(?:\+?\d[\d\s\-().]{6,}\d)/g, '[TELEFON]')
         .replace(/(?:https?:\/\/)?(?:www\.)?linkedin\.com\/in\/[\w\-]+/gi, '[LINKEDIN]')
-        .replace(/(?:https?:\/\/)?(?:www\.)?github\.com\/[\w\-]+/gi, '[GITHUB]')
-        .replace(NAME_PATTERN, '[İSİM]');
-    // Also replace any exact occurrences of the supplied known name (handles
-    // all-caps, atypical capitalizations that the pattern may miss).
-    if (knownName) {
-        const escaped = knownName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        result = result.replace(new RegExp(`\\b${escaped}\\b`, 'gi'), '[İSİM]');
+        .replace(/(?:https?:\/\/)?(?:www\.)?github\.com\/[\w\-]+/gi, '[GITHUB]');
+    // Redact each word of the known name individually (handles partial appearances
+    // like first-name-only) then the full name, using case-insensitive matching.
+    if (knownName && knownName.trim()) {
+        const parts = knownName.trim().split(/\s+/).filter(p => p.length > 2);
+        for (const part of parts) {
+            const escaped = part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            result = result.replace(new RegExp(escaped, 'gi'), '[İSİM]');
+        }
+        // Full name exact match as a safety net
+        const escapedFull = knownName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        result = result.replace(new RegExp(escapedFull, 'gi'), '[İSİM]');
     }
     return result;
 }
