@@ -3,6 +3,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import { useCandidates } from '../context/CandidatesContext';
+import { usePositions } from '../context/PositionsContext';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 import { collection, onSnapshot, doc, getDoc, setDoc, deleteDoc, serverTimestamp, query, where, addDoc } from 'firebase/firestore';
@@ -57,6 +58,8 @@ export default function InterviewManagementPage() {
     const navigate = useNavigate();
     const { user: currentUser, userProfile, userId, isDepartmentUser, role } = useAuth();
     const { enrichedCandidates, updateCandidate, preselectedInterviewData, setPreselectedInterviewData } = useCandidates();
+    const { positions } = usePositions();
+    const openPositions = useMemo(() => (positions || []).filter(p => p.status === 'open'), [positions]);
     const { addNotification } = useNotifications();
     
     // UI States
@@ -85,6 +88,9 @@ export default function InterviewManagementPage() {
     const [quickCandidate, setQuickCandidate]   = useState(null);
     const [quickType, setQuickType]             = useState('technical');
     const [quickLoading, setQuickLoading]       = useState(false);
+    const [quickPosition, setQuickPosition]     = useState(null);
+    // Wizard position state
+    const [wizardPosition, setWizardPosition]   = useState(null);
     const [externalEmail, setExternalEmail] = useState('');
     const [externalEmailError, setExternalEmailError] = useState('');
 
@@ -737,8 +743,8 @@ export default function InterviewManagementPage() {
                 interviewerId: userId,
                 status: startNow ? 'live' : 'scheduled',
                 meetLink,
-                positionId:    selectedCandidate.positionId    || null,
-                positionTitle: selectedCandidate.position || selectedCandidate.bestTitle || selectedCandidate.positionTitle || null,
+                positionId:    wizardPosition?.id    || selectedCandidate.positionId    || null,
+                positionTitle: wizardPosition?.title || selectedCandidate.position || selectedCandidate.bestTitle || selectedCandidate.positionTitle || null,
                 participants: selectedParticipants.map(p => ({
                     userId: p.id || p.userId,
                     name: p.name || p.email || 'Kullanıcı',
@@ -1017,6 +1023,7 @@ export default function InterviewManagementPage() {
                     navigate(`/live-interview/${newSession.id}`);
                 } else {
                     setSelectedCandidate(null);
+                    setWizardPosition(null);
                     setIsPlanningMode(false);
                 }
             }, 1000);
@@ -1046,8 +1053,8 @@ export default function InterviewManagementPage() {
                 interviewerId: userId,
                 status: 'live',
                 meetLink: platformJoinLink,
-                positionId:    quickCandidate.positionId    || null,
-                positionTitle: quickCandidate.position || quickCandidate.bestTitle || null,
+                positionId:    quickPosition?.id    || quickCandidate.positionId    || null,
+                positionTitle: quickPosition?.title || quickCandidate.position || quickCandidate.bestTitle || null,
                 participants: [],
             };
 
@@ -1269,7 +1276,7 @@ export default function InterviewManagementPage() {
                 <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
                     <div className="flex items-center gap-4 mb-4 px-2 pt-2">
                         <button
-                            onClick={() => { setIsPlanningMode(false); setWizardStep(1); }}
+                            onClick={() => { setIsPlanningMode(false); setWizardStep(1); setWizardPosition(null); }}
                             className="w-9 h-9 rounded-xl bg-white border border-[#E2E8F0] flex items-center justify-center text-[#1E3A8A] hover:bg-blue-50 transition-all shadow-sm"
                         >
                             <ArrowLeft className="w-4 h-4" />
@@ -1338,7 +1345,7 @@ export default function InterviewManagementPage() {
                                         {enrichedCandidates.map(c => (
                                             <button
                                                 key={c.id}
-                                                onClick={() => setSelectedCandidate(c)}
+                                                onClick={() => { setSelectedCandidate(c); setWizardPosition(null); }}
                                                 className={`flex items-center gap-3.5 p-4 rounded-2xl border-2 transition-all text-left w-full ${
                                                     selectedCandidate?.id === c.id
                                                         ? 'border-[#1E3A8A] bg-blue-50/50 shadow-md shadow-blue-900/5'
@@ -1364,6 +1371,21 @@ export default function InterviewManagementPage() {
                                                 )}
                                             </button>
                                         ))}
+                                    </div>
+                                )}
+                                {selectedCandidate && openPositions.length > 0 && (
+                                    <div className="mt-4 pt-4 border-t border-[#E2E8F0]">
+                                        <p className="text-[10px] font-black text-[#64748B] uppercase tracking-widest mb-2">Pozisyon Seç</p>
+                                        <select
+                                            value={wizardPosition?.id || ''}
+                                            onChange={e => setWizardPosition(openPositions.find(p => p.id === e.target.value) || null)}
+                                            className="w-full border border-[#E2E8F0] rounded-xl px-3 py-2.5 text-[12px] text-[#0F172A] outline-none focus:border-[#1E3A8A] focus:ring-2 focus:ring-[#1E3A8A]/10 bg-white"
+                                        >
+                                            <option value="">Adayın mevcut pozisyonu ({selectedCandidate.position || '—'})</option>
+                                            {openPositions.map(p => (
+                                                <option key={p.id} value={p.id}>{p.title}{p.department ? ` — ${p.department}` : ''}</option>
+                                            ))}
+                                        </select>
                                     </div>
                                 )}
                             </div>
@@ -2547,10 +2569,27 @@ export default function InterviewManagementPage() {
                                 </div>
                             </div>
 
+                            {/* Position selection */}
+                            {openPositions.length > 0 && (
+                                <div>
+                                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Pozisyon (İsteğe Bağlı)</label>
+                                    <select
+                                        value={quickPosition?.id || ''}
+                                        onChange={e => setQuickPosition(openPositions.find(p => p.id === e.target.value) || null)}
+                                        className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-[12px] text-slate-700 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 bg-white"
+                                    >
+                                        <option value="">Pozisyon seçin...</option>
+                                        {openPositions.map(p => (
+                                            <option key={p.id} value={p.id}>{p.title}{p.department ? ` — ${p.department}` : ''}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+
                             {/* Action buttons */}
                             <div className="flex gap-2 pt-1">
                                 <button
-                                    onClick={() => setQuickModal(false)}
+                                    onClick={() => { setQuickModal(false); setQuickPosition(null); }}
                                     className="flex-1 h-10 rounded-xl text-[11px] font-black text-slate-500 border border-slate-200 hover:bg-slate-50 transition-all"
                                 >
                                     İptal
