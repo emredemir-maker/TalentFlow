@@ -75,9 +75,9 @@ export default function Dashboard() {
             { key: 'ai_analysis', label: 'AI Tarama',   color: '#2563EB', legacy: ['new', 'pending', 'applied', 'unknown'] },
             { key: 'review',      label: 'İnceleme',    color: '#3B82F6', legacy: ['Review', 'değerlendirme', 'Evaluation'] },
             { key: 'interview',   label: 'Mülakat',     color: '#7C3AED', legacy: ['Interview', 'mülakat', 'Mülakat'] },
-            { key: 'offer',       label: 'Teklif',      color: '#F59E0B', legacy: [] },
+            { key: 'offer',       label: 'Teklif',      color: '#F59E0B', legacy: ['Offer'] },
             { key: 'hired',       label: 'İşe Alındı',  color: '#059669', legacy: ['Hired'] },
-            { key: 'rejected',    label: 'Reddedildi',  color: '#DC2626', legacy: ['Rejected', 'rejected'] },
+            { key: 'rejected',    label: 'Reddedildi',  color: '#DC2626', legacy: ['Rejected'] },
         ];
 
         // Collect all known status keys so we can catch-all the rest into AI Tarama

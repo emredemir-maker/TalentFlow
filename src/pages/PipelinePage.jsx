@@ -12,9 +12,9 @@ const STAGE_DEFS = [
     { key: 'ai_analysis', label: 'AI Tarama',  color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE', legacy: ['new', 'pending', 'applied', 'unknown'] },
     { key: 'review',      label: 'İnceleme',   color: '#0891B2', bg: '#ECFEFF', border: '#A5F3FC', legacy: ['Review', 'değerlendirme', 'Evaluation'] },
     { key: 'interview',   label: 'Mülakat',    color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE', legacy: ['Interview', 'mülakat', 'Mülakat'] },
-    { key: 'offer',       label: 'Teklif',     color: '#D97706', bg: '#FFFBEB', border: '#FDE68A', legacy: ['Offer', 'offer'] },
-    { key: 'hired',       label: 'İşe Alındı', color: '#059669', bg: '#ECFDF5', border: '#A7F3D0', legacy: ['Hired', 'hired'] },
-    { key: 'rejected',    label: 'Reddedildi', color: '#DC2626', bg: '#FEF2F2', border: '#FECACA', legacy: ['Rejected', 'rejected'] },
+    { key: 'offer',       label: 'Teklif',     color: '#D97706', bg: '#FFFBEB', border: '#FDE68A', legacy: ['Offer'] },
+    { key: 'hired',       label: 'İşe Alındı', color: '#059669', bg: '#ECFDF5', border: '#A7F3D0', legacy: ['Hired'] },
+    { key: 'rejected',    label: 'Reddedildi', color: '#DC2626', bg: '#FEF2F2', border: '#FECACA', legacy: ['Rejected'] },
 ];
 
 function resolveStage(status) {
