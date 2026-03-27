@@ -50,6 +50,11 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
     const [syncedAppIds, setSyncedAppIds] = useState(new Set());
     const [deletingAppId, setDeletingAppId] = useState(null);
     const [screeningFilter, setScreeningFilter] = useState('all');
+    const [selectedAppIds, setSelectedAppIds] = useState(new Set());
+    const [shortlisting, setShortlisting] = useState(false);
+    const [departments, setDepartments] = useState([]);
+    const [shortlistDept, setShortlistDept] = useState('');
+    const [showShortlistBar, setShowShortlistBar] = useState(false);
 
     // Build the apply URL
     const baseUrl = typeof window !== 'undefined' ? `${window.location.origin}/apply/${pos.id}` : `/apply/${pos.id}`;
@@ -66,6 +71,16 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
         return () => unsub();
     }, [activeTab, pos.id]);
 
+    // Load departments once for shortlist modal
+    useEffect(() => {
+        const unsub = onSnapshot(
+            collection(db, 'artifacts/talent-flow/public/data/departments'),
+            (snap) => setDepartments(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+            () => {}
+        );
+        return () => unsub();
+    }, []);
+
     function copyLink() {
         navigator.clipboard.writeText(applyUrl).then(() => {
             setCopied(true);
@@ -73,7 +88,7 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
         });
     }
 
-    async function syncApplicationToCandidate(app) {
+    async function syncApplicationToCandidate(app, deptId) {
         if (syncingAppId) return;
         setSyncingAppId(app.id);
         try {
@@ -83,8 +98,10 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
             const existing = await getDocs(q);
             if (!existing.empty) {
                 setSyncedAppIds(prev => new Set([...prev, app.id]));
+                await updateApplicationStatus(app.id, 'shortlisted');
                 return;
             }
+            const deptName = deptId ? (departments.find(d => d.id === deptId)?.name || '') : '';
             const candidateData = {
                 name: app.name || '',
                 email: emailNorm,
@@ -110,16 +127,36 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                 positionId: pos.id,
                 appliedDate: app.createdAt?.toDate?.()?.toISOString?.()?.split('T')?.[0] || new Date().toISOString().split('T')[0],
                 interviewSessions: [],
+                ...(app.screeningAnswers ? { screeningAnswers: app.screeningAnswers } : {}),
+                ...(app.screeningLevel ? { screeningLevel: app.screeningLevel } : {}),
+                ...(deptId ? { department: deptName } : {}),
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp(),
             };
             await addDoc(collection(db, CANDIDATES_COLLECTION), candidateData);
+            await updateApplicationStatus(app.id, 'shortlisted');
             setSyncedAppIds(prev => new Set([...prev, app.id]));
         } catch (err) {
             console.error('Sync error:', err);
         } finally {
             setSyncingAppId(null);
         }
+    }
+
+    async function handleBulkShortlist() {
+        if (!selectedAppIds.size || shortlisting) return;
+        setShortlisting(true);
+        const deptId = shortlistDept || '';
+        const appsToProcess = applications.filter(a => selectedAppIds.has(a.id));
+        for (const app of appsToProcess) {
+            try {
+                await syncApplicationToCandidate(app, deptId);
+            } catch {/* non-fatal */}
+        }
+        setSelectedAppIds(new Set());
+        setShortlistDept('');
+        setShowShortlistBar(false);
+        setShortlisting(false);
     }
 
     async function handleDeleteApp(appId) {
@@ -315,26 +352,41 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                                     })}
                                 </div>
 
-                                {/* Screening Score Filter */}
+                                {/* Screening Score Filter + Bulk Select */}
                                 {(() => {
-                                    const getScreeningLevel = (score) => {
+                                    const getScreeningLevel = (app) => {
+                                        if (app.screeningLevel) {
+                                            const map = {
+                                                'Çok İyi':    { key: 'best',   label: 'Çok İyi',    cls: 'bg-emerald-50 text-emerald-600 border-emerald-200' },
+                                                'İyi':        { key: 'good',   label: 'İyi',        cls: 'bg-blue-50 text-blue-600 border-blue-200' },
+                                                'Fena Değil': { key: 'medium', label: 'Fena Değil', cls: 'bg-amber-50 text-amber-600 border-amber-200' },
+                                                'Yetersiz':   { key: 'weak',   label: 'Yetersiz',   cls: 'bg-red-50 text-red-500 border-red-200' },
+                                            };
+                                            return map[app.screeningLevel] || { key: 'none', label: 'Taranmadı', cls: 'bg-slate-100 text-slate-400 border-slate-200' };
+                                        }
+                                        const score = app.screeningScore;
                                         if (score == null) return { key: 'none', label: 'Taranmadı', cls: 'bg-slate-100 text-slate-400 border-slate-200' };
-                                        if (score >= 85) return { key: 'best', label: 'Çok İyi', cls: 'bg-emerald-50 text-emerald-600 border-emerald-200' };
-                                        if (score >= 65) return { key: 'good', label: 'İyi', cls: 'bg-blue-50 text-blue-600 border-blue-200' };
-                                        if (score >= 40) return { key: 'medium', label: 'Orta', cls: 'bg-amber-50 text-amber-600 border-amber-200' };
-                                        return { key: 'weak', label: 'Zayıf', cls: 'bg-red-50 text-red-500 border-red-200' };
+                                        if (score >= 75) return { key: 'best',   label: 'Çok İyi',    cls: 'bg-emerald-50 text-emerald-600 border-emerald-200' };
+                                        if (score >= 50) return { key: 'good',   label: 'İyi',        cls: 'bg-blue-50 text-blue-600 border-blue-200' };
+                                        if (score >= 25) return { key: 'medium', label: 'Fena Değil', cls: 'bg-amber-50 text-amber-600 border-amber-200' };
+                                        return { key: 'weak', label: 'Yetersiz', cls: 'bg-red-50 text-red-500 border-red-200' };
                                     };
                                     const FILTER_OPTS = [
-                                        { key: 'all', label: 'Tümü' },
-                                        { key: 'best', label: 'Çok İyi ≥85' },
-                                        { key: 'good', label: 'İyi 65–84' },
-                                        { key: 'medium', label: 'Orta 40–64' },
-                                        { key: 'weak', label: 'Zayıf <40' },
-                                        { key: 'none', label: 'Taranmadı' },
+                                        { key: 'all',    label: 'Tümü' },
+                                        { key: 'best',   label: 'Çok İyi' },
+                                        { key: 'good',   label: 'İyi' },
+                                        { key: 'medium', label: 'Fena Değil' },
+                                        { key: 'weak',   label: 'Yetersiz' },
+                                        { key: 'none',   label: 'Taranmadı' },
                                     ];
                                     const filteredApps = screeningFilter === 'all'
                                         ? applications
-                                        : applications.filter(a => getScreeningLevel(a.screeningScore).key === screeningFilter);
+                                        : applications.filter(a => getScreeningLevel(a).key === screeningFilter);
+                                    const allSelected = filteredApps.length > 0 && filteredApps.every(a => selectedAppIds.has(a.id));
+                                    const toggleAll = () => {
+                                        if (allSelected) setSelectedAppIds(new Set());
+                                        else setSelectedAppIds(new Set(filteredApps.map(a => a.id)));
+                                    };
                                     return (<>
                                         <div className="flex gap-1.5 flex-wrap mb-3 pt-1">
                                             {FILTER_OPTS.map(o => (
@@ -347,16 +399,76 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                                                 </button>
                                             ))}
                                         </div>
+
+                                        {/* Bulk action bar */}
+                                        {selectedAppIds.size > 0 && (
+                                            <div className="flex items-center gap-3 mb-3 px-3 py-2.5 bg-violet-50 border border-violet-200 rounded-xl">
+                                                <span className="text-[11px] font-black text-violet-700 flex-1">{selectedAppIds.size} başvuru seçildi</span>
+                                                <select
+                                                    value={shortlistDept}
+                                                    onChange={e => setShortlistDept(e.target.value)}
+                                                    className="text-[10px] font-semibold border border-violet-200 rounded-lg px-2 py-1 bg-white text-slate-600 focus:outline-none"
+                                                >
+                                                    <option value="">Departman seç (opsiyonel)</option>
+                                                    {departments.map(d => (
+                                                        <option key={d.id} value={d.id}>{d.name}</option>
+                                                    ))}
+                                                </select>
+                                                <button
+                                                    onClick={handleBulkShortlist}
+                                                    disabled={shortlisting}
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black bg-violet-500 text-white hover:bg-violet-600 transition-colors disabled:opacity-50"
+                                                >
+                                                    {shortlisting ? <Loader2 size={11} className="animate-spin" /> : <Users size={11} />}
+                                                    Kısa Listeye Ekle
+                                                </button>
+                                                <button
+                                                    onClick={() => setSelectedAppIds(new Set())}
+                                                    className="p-1 rounded text-slate-400 hover:text-slate-600"
+                                                >
+                                                    <X size={13} />
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        {/* Select all checkbox row */}
+                                        {filteredApps.length > 0 && (
+                                            <label className="flex items-center gap-2 mb-2 cursor-pointer text-[10px] text-slate-400 font-semibold">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={allSelected}
+                                                    onChange={toggleAll}
+                                                    className="accent-violet-500 w-3.5 h-3.5"
+                                                />
+                                                Tümünü Seç
+                                            </label>
+                                        )}
+
                                         {filteredApps.map(app => {
                                             const sc = getSourceColor(app.source);
                                             const stCfg = APP_STATUS_CONFIG[app.status] || APP_STATUS_CONFIG.new;
                                             const scoreColor = app.aiScore >= 75 ? 'text-emerald-500' : app.aiScore >= 50 ? 'text-amber-500' : 'text-red-400';
-                                            const slv = getScreeningLevel(app.screeningScore);
+                                            const slv = getScreeningLevel(app);
+                                            const isSelected = selectedAppIds.has(app.id);
+                                            const toggleSelect = () => setSelectedAppIds(prev => {
+                                                const next = new Set(prev);
+                                                if (next.has(app.id)) next.delete(app.id);
+                                                else next.add(app.id);
+                                                return next;
+                                            });
                                             return (
-                                        <div key={app.id} className="bg-white border border-slate-200 rounded-2xl p-4 hover:border-violet-200 transition-colors">
+                                        <div key={app.id} className={`bg-white border rounded-2xl p-4 hover:border-violet-200 transition-colors ${isSelected ? 'border-violet-400 bg-violet-50/30' : 'border-slate-200'}`}>
                                             <div className="flex items-start gap-3">
-                                                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-400 to-violet-600 flex items-center justify-center text-white text-xs font-black shrink-0">
-                                                    {app.name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() || '??'}
+                                                <div className="flex flex-col items-center gap-2 shrink-0">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isSelected}
+                                                        onChange={toggleSelect}
+                                                        className="accent-violet-500 w-3.5 h-3.5 mt-0.5 cursor-pointer"
+                                                    />
+                                                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-400 to-violet-600 flex items-center justify-center text-white text-xs font-black">
+                                                        {app.name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() || '??'}
+                                                    </div>
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2 flex-wrap">
@@ -366,9 +478,16 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                                                     <div className="text-[11px] text-slate-400 truncate">{app.email}</div>
                                                     <div className="flex items-center gap-2 mt-2 flex-wrap">
                                                         <span className={`inline-flex px-2.5 py-0.5 rounded-full border text-[9px] font-black ${stCfg.pill}`}>{stCfg.label}</span>
-                                                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] font-black ${slv.cls}`}>
-                                                            {app.screeningScore != null ? `${Math.round(app.screeningScore)}p` : ''} {slv.label}
-                                                        </span>
+                                                        {(app.screeningLevel || app.screeningScore != null) && (
+                                                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] font-black ${slv.cls}`}>
+                                                                {slv.label}
+                                                            </span>
+                                                        )}
+                                                        {syncedAppIds.has(app.id) && (
+                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] font-black bg-emerald-50 text-emerald-600 border-emerald-200">
+                                                                <Check size={9} /> Kısa listede
+                                                            </span>
+                                                        )}
                                                         {app.cvFileName && (
                                                             <span className="inline-flex items-center gap-1 text-[10px] text-slate-400">
                                                                 <FileText size={10} />{app.cvFileName}
@@ -406,26 +525,6 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                                                         {cfg.label}
                                                     </button>
                                                 ))}
-                                            </div>
-                                            {/* Sync to candidates */}
-                                            <div className="mt-2">
-                                                {syncedAppIds.has(app.id) ? (
-                                                    <div className="flex items-center justify-center gap-1.5 py-1.5 rounded-xl text-[10px] font-black text-emerald-600 bg-emerald-50 border border-emerald-200">
-                                                        <Check size={11} /> Adaylar listesine eklendi
-                                                    </div>
-                                                ) : (
-                                                    <button
-                                                        onClick={() => syncApplicationToCandidate(app)}
-                                                        disabled={syncingAppId === app.id}
-                                                        className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-xl text-[10px] font-black text-violet-600 bg-violet-50 border border-violet-200 hover:bg-violet-100 transition-colors disabled:opacity-50"
-                                                    >
-                                                        {syncingAppId === app.id ? (
-                                                            <><Loader2 size={11} className="animate-spin" /> Ekleniyor...</>
-                                                        ) : (
-                                                            <><Users size={11} /> Adaylar Listesine Ekle</>
-                                                        )}
-                                                    </button>
-                                                )}
                                             </div>
                                         </div>
                                             );
@@ -810,7 +909,7 @@ function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser,
                             )}
                             <div className="mt-2 bg-amber-50 border border-amber-100 rounded-xl p-3">
                                 <p className="text-[10px] text-amber-700 font-bold mb-1">AI Skorlama Aktif</p>
-                                <p className="text-[10px] text-amber-600 leading-relaxed">Adayların yanıtları Çok İyi / İyi / Orta / Zayıf olarak otomatik skorlanır.</p>
+                                <p className="text-[10px] text-amber-600 leading-relaxed">Adayların yanıtları Çok İyi / İyi / Fena Değil / Yetersiz olarak otomatik skorlanır.</p>
                             </div>
                         </div>
                     )}

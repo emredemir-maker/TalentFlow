@@ -1,7 +1,7 @@
 // src/pages/ApplyPage.jsx — Public job application page (no auth required)
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { doc, getDoc, collection, addDoc, getDocs, query, where, updateDoc, serverTimestamp, onSnapshot, orderBy } from 'firebase/firestore';
+import { doc, getDoc, collection, addDoc, getDocs, query, where, serverTimestamp, onSnapshot, orderBy } from 'firebase/firestore';
 import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { db, auth } from '../config/firebase';
 import { extractTextFromFile } from '../services/cvParser';
@@ -23,7 +23,6 @@ const SOURCE_ICONS = {
 
 const POSITIONS_COLLECTION = 'artifacts/talent-flow/public/data/positions';
 const APPLICATIONS_COLLECTION = 'artifacts/talent-flow/public/data/applications';
-const CANDIDATES_COLLECTION = 'artifacts/talent-flow/public/data/candidates';
 
 // ──────────────────────────────────────────────
 // Helpers
@@ -362,8 +361,14 @@ export default function ApplyPage() {
             };
             if (rawScreeningAnswers) appData.screeningAnswers = rawScreeningAnswers;
             if (screeningResult) {
+                const agg = screeningResult.aggregateScore ?? null;
                 appData.screeningResult = screeningResult;
-                appData.screeningScore = screeningResult.aggregateScore ?? null;
+                appData.screeningScore = agg;
+                appData.screeningLevel = agg == null ? null
+                    : agg >= 75 ? 'Çok İyi'
+                    : agg >= 50 ? 'İyi'
+                    : agg >= 25 ? 'Fena Değil'
+                    : 'Yetersiz';
             }
             if (parsedCandidate) appData.parsedCandidate = parsedCandidate;
             if (scoreBreakdown) appData.aiScoreBreakdown = scoreBreakdown;
@@ -386,97 +391,12 @@ export default function ApplyPage() {
                 console.warn('Duplicate application check failed (non-blocking):', dupCheckErr.message);
             }
 
-            // Save application
-            const appRef = await addDoc(collection(db, APPLICATIONS_COLLECTION), appData);
+            // Save application — candidate creation is done manually by recruiter/super admin
+            await addDoc(collection(db, APPLICATIONS_COLLECTION), appData);
 
-            // Also create a candidate entry so it appears in the HR dashboard
-            // First: check for duplicates by email or phone
-            const emailNorm = form.email.trim().toLowerCase();
-            const phoneNorm = form.phone.trim();
-            let existingCandidateId = null;
-            try {
-                const emailQuery = await getDocs(
-                    query(collection(db, CANDIDATES_COLLECTION), where('email', '==', emailNorm))
-                );
-                if (!emailQuery.empty) {
-                    existingCandidateId = emailQuery.docs[0].id;
-                } else if (phoneNorm) {
-                    const phoneQuery = await getDocs(
-                        query(collection(db, CANDIDATES_COLLECTION), where('phone', '==', phoneNorm))
-                    );
-                    if (!phoneQuery.empty) {
-                        existingCandidateId = phoneQuery.docs[0].id;
-                    }
-                }
-            } catch (dupErr) {
-                console.warn('Duplicate check failed (non-blocking):', dupErr.message);
-            }
-
-            if (existingCandidateId) {
-                // Duplicate found — link new application to existing candidate record
-                try {
-                    await updateDoc(doc(db, CANDIDATES_COLLECTION, existingCandidateId), {
-                        applicationId: appRef.id,
-                        positionId: position.id,
-                        position: position.title || '',
-                        appliedDate: new Date().toISOString().split('T')[0],
-                        matchScore: score,
-                        combinedScore: score,
-                        status: 'ai_analysis',
-                        source: effectiveSource,
-                        sourceCategory: effectiveCategory,
-                        ...(starAiAnalysis ? { aiAnalysis: starAiAnalysis } : {}),
-                        ...(rawScreeningAnswers ? { screeningAnswers: rawScreeningAnswers } : {}),
-                        ...(screeningResult ? { screeningScore: screeningResult.aggregateScore ?? null, screeningResult } : {}),
-                        updatedAt: serverTimestamp(),
-                    });
-                } catch (updErr) {
-                    console.warn('Existing candidate update failed:', updErr.message);
-                }
-                setAiScore(score);
-                setStep('duplicate');
-            } else {
-                // Brand-new candidate
-                const candidateData = {
-                    name: form.name.trim(),
-                    email: emailNorm,
-                    phone: phoneNorm,
-                    linkedinUrl: form.linkedin?.trim() || '',
-                    position: position.title || '',
-                    company: parsedCandidate?.company || '',
-                    location: parsedCandidate?.location || '',
-                    skills: parsedCandidate?.skills || [],
-                    experience: parsedCandidate?.experience || 0,
-                    education: parsedCandidate?.education || '',
-                    summary: parsedCandidate?.summary || '',
-                    cvData: parsedCandidate?.cvData || '',
-                    experiences: parsedCandidate?.experiences || [],
-                    cvText: cvText ? cvText.slice(0, 6000) : '',
-                    cvFileName: cvFile.name,
-                    source: effectiveSource,
-                    sourceCategory: effectiveCategory,
-                    status: 'ai_analysis',
-                    matchScore: score,
-                    combinedScore: score,
-                    aiAnalysis: starAiAnalysis || (score > 0 ? { score, summary: parsedCandidate?.summary || '' } : null),
-                    applicationId: appRef.id,
-                    positionId: position.id,
-                    appliedDate: new Date().toISOString().split('T')[0],
-                    interviewSessions: [],
-                    ...(rawScreeningAnswers ? { screeningAnswers: rawScreeningAnswers } : {}),
-                    ...(screeningResult ? { screeningScore: screeningResult.aggregateScore ?? null, screeningResult } : {}),
-                    createdAt: serverTimestamp(),
-                    updatedAt: serverTimestamp(),
-                };
-                try {
-                    await addDoc(collection(db, CANDIDATES_COLLECTION), candidateData);
-                } catch (candErr) {
-                    console.warn('Candidate creation failed (rules not deployed?):', candErr.message);
-                }
-                setAiScore(score);
-                setStep('success');
-            }
-            return; // avoid double setStep below
+            setAiScore(score);
+            setStep('success');
+            return;
         } catch (err) {
             console.error('Application submit error:', err);
             setSubmitError(err.message || 'Bir hata oluştu.');
