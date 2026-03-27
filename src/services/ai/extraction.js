@@ -56,7 +56,8 @@ export async function extractCandidateEvidence(jobDescription, candidateProfile,
 export async function extractPositionFromJD(jdText) {
     const instruction = `Lütfen aşağıdaki iş tanımı metnini analiz et ve bilgileri ayıkla.
     Sadece JSON olarak dön:
-    { "title": "Pozisyon Adı", "requirements": ["şart1", "şart2"], "description": "Kısa özet" }`;
+    { "title": "Pozisyon Adı", "requirements": ["şart1", "şart2"], "description": "Pozisyonu 1-2 cümleyle özetleyen kısa açıklama (max 280 karakter, iş ilanı metni değil, özet)" }
+    ÖNEMLİ: description alanı kesinlikle 280 karakteri geçmemeli ve iş ilanının ham metni olmamalı.`;
 
     const prompt = buildStructuredPrompt(instruction, { "JD_METNI": sanitizeForPrompt(jdText) });
 

@@ -1039,7 +1039,7 @@ export default function PositionsPage() {
                 department: isDepartmentUser ? (userDepartments?.[0] || '') : (result.department || p.department),
                 minExperience: result.minExperience?.toString() || p.minExperience,
                 requirements: result.requirements?.join(', ') || p.requirements,
-                description: jdText,
+                description: result.description ? result.description.slice(0, 320) : p.description,
             }));
         } catch (err) {
             console.error('Extraction error:', err);
@@ -1065,7 +1065,7 @@ export default function PositionsPage() {
         const cleanedQuestions = (formData.screeningQuestions || []).map(q => q.trim()).filter(Boolean);
         const newPos = {
             title: formData.title, department: formData.department,
-            description: formData.description || jdText || '',
+            description: formData.description || '',
             minExperience: parseInt(formData.minExperience) || 0,
             requirements: reqs, matchedCandidates,
             screeningEnabled: formData.screeningEnabled && cleanedQuestions.length > 0,
