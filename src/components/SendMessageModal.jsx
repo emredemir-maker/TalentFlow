@@ -450,57 +450,65 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
                             {/* INFO REQUEST FORM */}
                             {purpose === 'info-request' && (
                                 <div className="space-y-4 animate-fade-in">
-                                    <div className="p-4 rounded-2xl bg-cyan-500/5 border border-cyan-500/20">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <FileQuestion className="w-4 h-4 text-cyan-500" />
-                                            <span className="text-[10px] font-black text-text-primary uppercase tracking-widest">Bilgi Talebi</span>
+
+                                    {/* Header row — same style as Message Script header */}
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <FileQuestion className="w-3.5 h-3.5 text-cyan-500" />
+                                            <span className="text-[10px] font-black text-text-primary uppercase tracking-widest">Adaya Mesaj Gönder</span>
                                         </div>
-                                        <p className="text-[11px] text-text-muted">Adaya SMTP üzerinden email gönderilecektir. Google bağlantısı gerekmez.</p>
+                                        <span className="text-[9px] font-black text-text-muted opacity-50 uppercase tracking-wider">SMTP · Google gerekmez</span>
                                     </div>
-                                    <div>
-                                        <label className="block text-[10px] font-black text-text-muted uppercase tracking-wider mb-2">Mesajınız</label>
-                                        <textarea
-                                            value={infoMessage}
-                                            onChange={e => setInfoMessage(e.target.value)}
-                                            rows={4}
-                                            placeholder="Adaya iletmek istediğiniz mesaj veya açıklama..."
-                                            className="w-full bg-bg-primary border border-border-subtle rounded-2xl py-3 px-4 text-sm text-text-secondary outline-none focus:border-cyan-500/40 resize-none custom-scrollbar"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] font-black text-text-muted uppercase tracking-wider mb-2">Talep Edilen Belgeler / Bilgiler</label>
-                                        <div className="flex gap-2 mb-2">
-                                            <input
-                                                value={newInfoItem}
-                                                onChange={e => setNewInfoItem(e.target.value)}
-                                                onKeyDown={e => {
-                                                    if (e.key === 'Enter' && newInfoItem.trim()) {
-                                                        setInfoItems(p => [...p, newInfoItem.trim()]);
-                                                        setNewInfoItem('');
-                                                    }
-                                                }}
-                                                placeholder="Örn: CV, Diploma fotokopisi, Referans mektubu..."
-                                                className="flex-1 bg-bg-primary border border-border-subtle rounded-2xl py-2.5 px-4 text-sm text-text-secondary outline-none focus:border-cyan-500/40"
+
+                                    {/* Message body — same card style as AI message area */}
+                                    <div className="p-6 rounded-[32px] bg-bg-primary border border-border-subtle shadow-inner space-y-4">
+                                        <div>
+                                            <label className="block text-[9px] font-black text-text-muted uppercase tracking-[0.15em] mb-2 opacity-70">Mesajınız</label>
+                                            <textarea
+                                                value={infoMessage}
+                                                onChange={e => setInfoMessage(e.target.value)}
+                                                rows={4}
+                                                placeholder="Adaya iletmek istediğiniz mesaj veya açıklama..."
+                                                className="w-full bg-bg-secondary border border-border-subtle rounded-2xl py-3 px-4 text-[13px] text-text-secondary outline-none focus:border-cyan-500/40 resize-none custom-scrollbar font-bold leading-relaxed"
                                             />
-                                            <button
-                                                onClick={() => { if (newInfoItem.trim()) { setInfoItems(p => [...p, newInfoItem.trim()]); setNewInfoItem(''); } }}
-                                                className="p-2.5 rounded-2xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-500 transition-colors"
-                                            >
-                                                <Plus className="w-4 h-4" />
-                                            </button>
                                         </div>
-                                        {infoItems.length > 0 && (
-                                            <ul className="space-y-1.5">
-                                                {infoItems.map((item, i) => (
-                                                    <li key={i} className="flex items-center gap-2 bg-bg-primary border border-border-subtle rounded-xl px-3 py-2 text-xs text-text-secondary">
-                                                        <span className="flex-1">📎 {item}</span>
-                                                        <button onClick={() => setInfoItems(p => p.filter((_, j) => j !== i))} className="text-text-muted hover:text-red-400 transition-colors">
-                                                            <Trash2 className="w-3 h-3" />
-                                                        </button>
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        )}
+
+                                        <div className="border-t border-border-subtle pt-4">
+                                            <label className="block text-[9px] font-black text-text-muted uppercase tracking-[0.15em] mb-2 opacity-70">Talep Edilen Belgeler / Bilgiler</label>
+                                            <div className="flex gap-2 mb-2">
+                                                <input
+                                                    value={newInfoItem}
+                                                    onChange={e => setNewInfoItem(e.target.value)}
+                                                    onKeyDown={e => {
+                                                        if (e.key === 'Enter' && newInfoItem.trim()) {
+                                                            setInfoItems(p => [...p, newInfoItem.trim()]);
+                                                            setNewInfoItem('');
+                                                        }
+                                                    }}
+                                                    placeholder="Örn: CV, Diploma fotokopisi, Referans mektubu..."
+                                                    className="flex-1 bg-bg-secondary border border-border-subtle rounded-2xl py-2.5 px-4 text-[13px] text-text-secondary outline-none focus:border-cyan-500/40 font-bold"
+                                                />
+                                                <button
+                                                    onClick={() => { if (newInfoItem.trim()) { setInfoItems(p => [...p, newInfoItem.trim()]); setNewInfoItem(''); } }}
+                                                    className="w-10 h-10 rounded-2xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/20 text-cyan-500 transition-colors flex items-center justify-center shrink-0"
+                                                >
+                                                    <Plus className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                            {infoItems.length > 0 && (
+                                                <ul className="space-y-1.5 mt-2">
+                                                    {infoItems.map((item, i) => (
+                                                        <li key={i} className="flex items-center gap-2 bg-bg-secondary border border-border-subtle rounded-xl px-3 py-2 text-xs text-text-secondary font-bold">
+                                                            <FileQuestion className="w-3 h-3 text-cyan-500 shrink-0" />
+                                                            <span className="flex-1">{item}</span>
+                                                            <button onClick={() => setInfoItems(p => p.filter((_, j) => j !== i))} className="text-text-muted hover:text-red-400 transition-colors">
+                                                                <Trash2 className="w-3 h-3" />
+                                                            </button>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             )}
@@ -613,20 +621,27 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
                             </div>
                         )}
 
-                        <div className="grid grid-cols-3 gap-3">
-                            <button onClick={handleCopy} className="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl bg-bg-primary border border-border-subtle hover:bg-bg-secondary transition-all group shadow-inner">
-                                {copied ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4 text-text-muted group-hover:text-text-primary" />}
-                                <span className="text-[9px] font-black text-text-muted group-hover:text-text-primary uppercase tracking-tight">Kopyala</span>
-                            </button>
-                            <button onClick={() => handleOpenFallback('gmail')} className="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl bg-bg-primary border border-border-subtle hover:bg-bg-secondary transition-all group shadow-inner">
-                                <Mail className="w-4 h-4 text-rose-500 group-hover:text-rose-400" />
-                                <span className="text-[9px] font-black text-text-muted group-hover:text-text-primary uppercase tracking-tight">Gmail Web</span>
-                            </button>
-                            <button onClick={onClose} className="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl bg-bg-primary border border-border-subtle hover:bg-bg-secondary transition-all group shadow-inner">
+                        {purpose === 'info-request' ? (
+                            <button onClick={onClose} className="flex items-center justify-center gap-2 p-3 rounded-2xl bg-bg-primary border border-border-subtle hover:bg-bg-secondary transition-all group shadow-inner w-full">
                                 <X className="w-4 h-4 text-text-muted group-hover:text-text-primary" />
                                 <span className="text-[9px] font-black text-text-muted group-hover:text-text-primary uppercase tracking-tight">Vazgeç</span>
                             </button>
-                        </div>
+                        ) : (
+                            <div className="grid grid-cols-3 gap-3">
+                                <button onClick={handleCopy} className="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl bg-bg-primary border border-border-subtle hover:bg-bg-secondary transition-all group shadow-inner">
+                                    {copied ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4 text-text-muted group-hover:text-text-primary" />}
+                                    <span className="text-[9px] font-black text-text-muted group-hover:text-text-primary uppercase tracking-tight">Kopyala</span>
+                                </button>
+                                <button onClick={() => handleOpenFallback('gmail')} className="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl bg-bg-primary border border-border-subtle hover:bg-bg-secondary transition-all group shadow-inner">
+                                    <Mail className="w-4 h-4 text-rose-500 group-hover:text-rose-400" />
+                                    <span className="text-[9px] font-black text-text-muted group-hover:text-text-primary uppercase tracking-tight">Gmail Web</span>
+                                </button>
+                                <button onClick={onClose} className="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl bg-bg-primary border border-border-subtle hover:bg-bg-secondary transition-all group shadow-inner">
+                                    <X className="w-4 h-4 text-text-muted group-hover:text-text-primary" />
+                                    <span className="text-[9px] font-black text-text-muted group-hover:text-text-primary uppercase tracking-tight">Vazgeç</span>
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
