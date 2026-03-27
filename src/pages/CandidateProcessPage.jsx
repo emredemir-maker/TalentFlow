@@ -117,23 +117,6 @@ export default function CandidateProcessPage() {
             .catch(() => {});
     }, []);
 
-    // Load info requests for the selected candidate
-    useEffect(() => {
-        if (!candidate?.id) { setCandidateInfoReqs([]); return; }
-        setInfoReqsLoading(true);
-        const q = query(
-            collection(db, 'artifacts/talent-flow/public/data/infoRequests'),
-            where('candidateId', '==', candidate.id)
-        );
-        const unsub = onSnapshot(q, snap => {
-            const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            docs.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
-            setCandidateInfoReqs(docs);
-            setInfoReqsLoading(false);
-        }, () => setInfoReqsLoading(false));
-        return unsub;
-    }, [candidate?.id]);
-
     // Real-time Firestore subscription for active bulk import job
     useEffect(() => {
         if (!bulkJobId || !db) return;
@@ -556,6 +539,23 @@ export default function CandidateProcessPage() {
             : candidates.find(c => c.id === viewCandidateId) || (candidates.length > 0 ? candidates[0] : null);
         return applyPiiMask(raw, role);
     }, [candidates, viewCandidateId, role]);
+
+    // Load info requests for the active candidate card
+    useEffect(() => {
+        if (!candidate?.id) { setCandidateInfoReqs([]); return; }
+        setInfoReqsLoading(true);
+        const q = query(
+            collection(db, 'artifacts/talent-flow/public/data/infoRequests'),
+            where('candidateId', '==', candidate.id)
+        );
+        const unsub = onSnapshot(q, snap => {
+            const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            docs.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+            setCandidateInfoReqs(docs);
+            setInfoReqsLoading(false);
+        }, () => setInfoReqsLoading(false));
+        return unsub;
+    }, [candidate?.id]);
 
     const filterOptions = useMemo(() => {
         const sources = [...new Set(candidates.map(c => c.source).filter(Boolean))];
