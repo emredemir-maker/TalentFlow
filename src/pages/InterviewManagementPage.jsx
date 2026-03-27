@@ -1373,19 +1373,29 @@ export default function InterviewManagementPage() {
                                         ))}
                                     </div>
                                 )}
-                                {selectedCandidate && openPositions.length > 0 && (
+                                {selectedCandidate && (
                                     <div className="mt-4 pt-4 border-t border-[#E2E8F0]">
                                         <p className="text-[10px] font-black text-[#64748B] uppercase tracking-widest mb-2">Pozisyon Seç</p>
-                                        <select
-                                            value={wizardPosition?.id || ''}
-                                            onChange={e => setWizardPosition(openPositions.find(p => p.id === e.target.value) || null)}
-                                            className="w-full border border-[#E2E8F0] rounded-xl px-3 py-2.5 text-[12px] text-[#0F172A] outline-none focus:border-[#1E3A8A] focus:ring-2 focus:ring-[#1E3A8A]/10 bg-white"
-                                        >
-                                            <option value="">Adayın mevcut pozisyonu ({selectedCandidate.position || '—'})</option>
-                                            {openPositions.map(p => (
-                                                <option key={p.id} value={p.id}>{p.title}{p.department ? ` — ${p.department}` : ''}</option>
-                                            ))}
-                                        </select>
+                                        {openPositions.length > 0 ? (
+                                            <select
+                                                value={wizardPosition?.id || ''}
+                                                onChange={e => setWizardPosition(openPositions.find(p => p.id === e.target.value) || null)}
+                                                className="w-full border border-[#E2E8F0] rounded-xl px-3 py-2.5 text-[12px] text-[#0F172A] outline-none focus:border-[#1E3A8A] focus:ring-2 focus:ring-[#1E3A8A]/10 bg-white"
+                                            >
+                                                <option value="">Adayın mevcut pozisyonu ({selectedCandidate.position || '—'})</option>
+                                                {openPositions.map(p => (
+                                                    <option key={p.id} value={p.id}>{p.title}{p.department ? ` — ${p.department}` : ''}</option>
+                                                ))}
+                                            </select>
+                                        ) : (
+                                            <input
+                                                type="text"
+                                                placeholder={`Pozisyon adı girin (mevcut: ${selectedCandidate.position || '—'})`}
+                                                value={wizardPosition?.title || ''}
+                                                onChange={e => setWizardPosition(e.target.value ? { title: e.target.value } : null)}
+                                                className="w-full border border-[#E2E8F0] rounded-xl px-3 py-2.5 text-[12px] text-[#0F172A] outline-none focus:border-[#1E3A8A] focus:ring-2 focus:ring-[#1E3A8A]/10 bg-white placeholder:text-[#94A3B8]"
+                                            />
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -2570,9 +2580,9 @@ export default function InterviewManagementPage() {
                             </div>
 
                             {/* Position selection */}
-                            {openPositions.length > 0 && (
-                                <div>
-                                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Pozisyon (İsteğe Bağlı)</label>
+                            <div>
+                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Pozisyon (İsteğe Bağlı)</label>
+                                {openPositions.length > 0 ? (
                                     <select
                                         value={quickPosition?.id || ''}
                                         onChange={e => setQuickPosition(openPositions.find(p => p.id === e.target.value) || null)}
@@ -2583,8 +2593,16 @@ export default function InterviewManagementPage() {
                                             <option key={p.id} value={p.id}>{p.title}{p.department ? ` — ${p.department}` : ''}</option>
                                         ))}
                                     </select>
-                                </div>
-                            )}
+                                ) : (
+                                    <input
+                                        type="text"
+                                        placeholder="Pozisyon adı girin..."
+                                        value={quickPosition?.title || ''}
+                                        onChange={e => setQuickPosition(e.target.value ? { title: e.target.value } : null)}
+                                        className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-[12px] text-slate-700 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 bg-white placeholder:text-slate-400"
+                                    />
+                                )}
+                            </div>
 
                             {/* Action buttons */}
                             <div className="flex gap-2 pt-1">
