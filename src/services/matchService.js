@@ -126,11 +126,15 @@ const JOB_DOMAINS = [
         ],
     },
     {
-        id: 'legal', label: 'Hukuk',
+        id: 'legal', label: 'Hukuk / Uyum',
         keywords: [
             'avukat', 'hukuk müşaviri', 'lawyer', 'attorney', 'legal counsel',
-            'compliance officer', 'uyum uzmanı', 'hukuk uzmanı',
+            'compliance officer', 'compliance manager', 'compliance director', 'compliance specialist', 'compliance analyst',
+            'uyum uzmanı', 'uyum müdürü', 'uyum direktörü', 'uyum yöneticisi', 'uyum sorumlusu',
+            'hukuk uzmanı', 'hukuk müdürü', 'legal manager', 'legal specialist',
             'sözleşme yönetimi', 'contract management', 'gdpr', 'kvkk',
+            'regülasyon', 'regulatory', 'düzenleyici kurum', 'risk ve uyum',
+            'iç denetim', 'internal audit', 'kurumsal uyum',
         ],
     },
     {
@@ -168,6 +172,27 @@ export function detectJobDomain(text) {
 }
 
 /**
+ * Detect domain from a short title/position field specifically.
+ * Returns the domain if unambiguous, else 'general'.
+ * Title-based detection is more reliable than full-text because job titles
+ * are dense with role signals and rarely contain noise from company context.
+ */
+function detectDomainFromTitle(title) {
+    if (!title) return 'general';
+    const lower = title.toLowerCase();
+    let best = 'general';
+    let bestCount = 0;
+    for (const domain of JOB_DOMAINS) {
+        const count = domain.keywords.reduce((acc, kw) => acc + (lower.includes(kw) ? 1 : 0), 0);
+        if (count > bestCount) {
+            bestCount = count;
+            best = domain.id;
+        }
+    }
+    return best;
+}
+
+/**
  * Returns the human-readable label for a domain id.
  */
 export function domainLabel(domainId) {
@@ -187,8 +212,50 @@ export function areDomainsCompatible(d1, d2) {
 }
 
 /**
- * Build a single text blob for domain detection from a candidate object.
+ * Detect the job domain for a candidate.
+ * Strategy: check job title/position first (title signals are more reliable
+ * than CV body which may contain incidental context from the employer's industry).
+ * Only fall back to full-text if the title gives no clear domain.
  */
+export function detectCandidateDomain(candidate) {
+    // 1. Try title/position — the most reliable signal
+    const titleDomain = detectDomainFromTitle(
+        `${candidate.position || ''} ${candidate.title || ''}`
+    );
+    if (titleDomain !== 'general') return titleDomain;
+
+    // 2. Fall back to full profile text
+    const fullText = [
+        candidate.about || '',
+        candidate.description || '',
+        (candidate.skills || []).join(' '),
+        Array.isArray(candidate.experiences)
+            ? candidate.experiences.map(e => `${e.title || ''} ${e.company || ''}`).join(' ')
+            : '',
+        candidate.cvData || '',
+    ].join(' ');
+    return detectJobDomain(fullText);
+}
+
+/**
+ * Detect the job domain for a position.
+ * Title + department are the canonical signals; description is a fallback.
+ */
+export function detectPositionDomain(position) {
+    const titleDomain = detectDomainFromTitle(
+        `${position.title || ''} ${position.department || ''}`
+    );
+    if (titleDomain !== 'general') return titleDomain;
+
+    const fullText = [
+        (position.requirements || []).join(' '),
+        position.description || '',
+        position.jobDescription || '',
+    ].join(' ');
+    return detectJobDomain(fullText);
+}
+
+// Keep old text-blob helpers for backward compat (used externally via detectJobDomain)
 function candidateDomainText(candidate) {
     return [
         candidate.position || '',
@@ -203,9 +270,6 @@ function candidateDomainText(candidate) {
     ].join(' ');
 }
 
-/**
- * Build a single text blob for domain detection from a position object.
- */
 function positionDomainText(position) {
     return [
         position.title || '',
@@ -222,10 +286,10 @@ function positionDomainText(position) {
  */
 export function filterPositionsByDomain(candidate, positions) {
     if (!positions || positions.length === 0) return [];
-    const candidateDomain = detectJobDomain(candidateDomainText(candidate));
+    const candidateDomain = detectCandidateDomain(candidate);
     if (candidateDomain === 'general') return positions;
     return positions.filter(pos => {
-        const posDomain = detectJobDomain(positionDomainText(pos));
+        const posDomain = detectPositionDomain(pos);
         return areDomainsCompatible(candidateDomain, posDomain);
     });
 }
@@ -236,10 +300,10 @@ export function filterPositionsByDomain(candidate, positions) {
  */
 export function filterCandidatesByDomain(position, candidates) {
     if (!candidates || candidates.length === 0) return [];
-    const posDomain = detectJobDomain(positionDomainText(position));
+    const posDomain = detectPositionDomain(position);
     if (posDomain === 'general') return candidates;
     return candidates.filter(c => {
-        const cDomain = detectJobDomain(candidateDomainText(c));
+        const cDomain = detectCandidateDomain(c);
         return areDomainsCompatible(cDomain, posDomain);
     });
 }

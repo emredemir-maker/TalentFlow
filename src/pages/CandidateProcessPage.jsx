@@ -6,7 +6,7 @@ import { usePositions } from '../context/PositionsContext';
 import { useAuth } from '../context/AuthContext';
 import { analyzeCandidateMatch, parseExperiencesFromText, parseCandidateFromText } from '../services/geminiService';
 import { extractTextFromFile } from '../services/cvParser';
-import { calculateMatchScore, filterPositionsByDomain, detectJobDomain, domainLabel } from '../services/matchService';
+import { calculateMatchScore, filterPositionsByDomain, domainLabel, detectCandidateDomain, detectPositionDomain } from '../services/matchService';
 import { applyPiiMask, stripPiiForAI } from '../utils/pii';
 import { getFeedbackEmail } from '../utils/templateService';
 import { db } from '../config/firebase';
@@ -577,21 +577,17 @@ export default function CandidateProcessPage() {
         return (candidate.bestScore || 0) >= threshold && threshold > 0;
     }, [candidate, candidates]);
 
-    // ── POSITION MATCHES (domain-filtered) ─────────────────────────────────────
+    // ── POSITION MATCHES (domain-filtered, title-first domain detection) ───────
     const positionMatches = useMemo(() => {
         if (!candidate || !positions) return { candidateDomain: 'general', compatible: [], incompatible: [] };
-        const candidateText = [
-            candidate.position || '', candidate.title || '',
-            (candidate.skills || []).join(' '), candidate.about || '',
-            candidate.description || '', candidate.cvData || '',
-        ].join(' ');
-        const cDomain = detectJobDomain(candidateText);
+        // Use title-first domain detection: job title/position is more reliable
+        // than CV body which may contain incidental keywords from the employer's sector
+        const cDomain = detectCandidateDomain(candidate);
         const openPositions = positions.filter(p => p.status === 'open');
         const compatible = [];
         const incompatible = [];
         openPositions.forEach(pos => {
-            const posText = [pos.title || '', (pos.requirements || []).join(' '), pos.description || ''].join(' ');
-            const pDomain = detectJobDomain(posText);
+            const pDomain = detectPositionDomain(pos);
             const isCompat = cDomain === 'general' || pDomain === 'general' || pDomain === 'management' || cDomain === 'management' || cDomain === pDomain;
             const savedAnalysis = candidate.positionAnalyses?.[pos.title];
             const staticMatch = calculateMatchScore(candidate, pos);
