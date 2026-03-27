@@ -56,6 +56,22 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
     const [shortlistDept, setShortlistDept] = useState('');
     const [showShortlistBar, setShowShortlistBar] = useState(false);
 
+    // Compute live matches from current candidates — never stale
+    const liveMatchedCandidates = useMemo(() => {
+        if (!candidates || candidates.length === 0) return [];
+        const domainFiltered = filterCandidatesByDomain(pos, candidates);
+        return domainFiltered
+            .map(c => {
+                const savedScore = c.positionAnalyses?.[pos.title]?.score || 0;
+                const staticScore = calculateMatchScore(c, pos).score;
+                const score = Math.max(savedScore, staticScore);
+                return { id: c.id, name: c.name || '—', score, reason: c.positionAnalyses?.[pos.title]?.summary || (score >= 70 ? 'Yüksek Uyumluluk' : 'Potansiyel Eşleşme') };
+            })
+            .filter(m => m.score >= 50)
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 10);
+    }, [pos, candidates]);
+
     // Build the apply URL
     const baseUrl = typeof window !== 'undefined' ? `${window.location.origin}/apply/${pos.id}` : `/apply/${pos.id}`;
     const applyUrl = `${baseUrl}?ref=${encodeURIComponent(linkSource.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`;
@@ -276,13 +292,13 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                             </div>
                         )}
 
-                        {/* Matched Candidates */}
+                        {/* Matched Candidates — computed live from current candidate pool */}
                         {pos.status === 'open' && (
                             <div>
                                 <h3 className="text-[9px] font-black text-slate-400 tracking-widest uppercase mb-2">EŞLEŞEN ADAYLAR</h3>
-                                {pos.matchedCandidates?.length > 0 ? (
+                                {liveMatchedCandidates.length > 0 ? (
                                     <div className="space-y-2">
-                                        {pos.matchedCandidates.slice(0, 5).map((mc, idx) => {
+                                        {liveMatchedCandidates.slice(0, 5).map((mc, idx) => {
                                             const fullCandidate = candidates.find(c => c.id === mc.id);
                                             const initials = mc.name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() || '??';
                                             return (
