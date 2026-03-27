@@ -57,7 +57,7 @@ export default function CandidateProcessPage() {
     const navigate = useNavigate();
     const { enrichedCandidates, viewCandidateId, setViewCandidateId, sourceColors, setPreselectedInterviewData, updateCandidate, deleteCandidate, addCandidate } = useCandidates();
     const { positions } = usePositions();
-    const { user, isSuperAdmin, role } = useAuth();
+    const { user, userProfile, isSuperAdmin, role } = useAuth();
     const candidates = enrichedCandidates || [];
     const [searchQuery, setSearchQuery]   = useState('');
     const [activeTab, setActiveTab]       = useState('ai_analysis');
