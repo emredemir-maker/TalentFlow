@@ -7,7 +7,7 @@ import {
     X, Send, Edit3, Sparkles, Copy, Check, AlertCircle, Mail,
     Linkedin, MessageSquare, Loader2, User, Briefcase, Target,
     Calendar, Clock, Video, Globe, Zap, CheckCircle2, RefreshCcw, Bell,
-    Layers, FileQuestion, Plus, Trash2
+    Layers
 } from 'lucide-react';
 import { generatePersonalizedDM } from '../services/geminiService';
 import { useAuth } from '../context/AuthContext';
@@ -45,17 +45,9 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
 
     const [trackingId] = useState(() => 'TF-' + Math.random().toString(36).substring(2, 7).toUpperCase());
 
-    // Info Request state
-    const [infoMessage, setInfoMessage] = useState('');
-    const [infoItems, setInfoItems] = useState([]);
-    const [newInfoItem, setNewInfoItem] = useState('');
-    const [infoSending, setInfoSending] = useState(false);
-
     // Initialize
     useEffect(() => {
-        if (initialPurpose !== 'info-request') {
-            generateDM(initialPurpose, interviewType);
-        }
+        generateDM(initialPurpose, interviewType);
     }, [initialPurpose]);
 
     async function generateDM(selectedPurpose, type = interviewType) {
@@ -186,51 +178,6 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
         }
     }
 
-    async function handleInfoRequestSend() {
-        if (!infoMessage.trim() && infoItems.length === 0) {
-            setError('Lütfen bir mesaj yazın veya talep edilecek bilgileri ekleyin.');
-            return;
-        }
-        if (!candidate.email) {
-            setError('Adayın email adresi bulunamadı.');
-            return;
-        }
-        setInfoSending(true);
-        setError(null);
-        try {
-            const API_BASE = import.meta.env.VITE_SERVER_URL || '';
-            const { getAuth } = await import('firebase/auth');
-            const token = await getAuth().currentUser?.getIdToken();
-            const res = await fetch(`${API_BASE}/api/send-info-request`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                },
-                body: JSON.stringify({
-                    to: candidate.email,
-                    candidateName: candidate.name,
-                    recruiterName: userProfile?.displayName || userProfile?.name || '',
-                    position: candidate.matchedPositionTitle || candidate.position || '',
-                    requestMessage: infoMessage,
-                    requestedItems: infoItems,
-                    candidateId: candidate.id || null,
-                    sessionId: candidate.sessionId || null,
-                }),
-            });
-            if (!res.ok) {
-                const err = await res.json();
-                throw new Error(err.error || 'Bilgi talebi gönderilemedi.');
-            }
-            onSent?.({ candidateId: candidate.id, candidateName: candidate.name, status: 'info-request-sent', timestamp: new Date().toISOString() });
-            onClose();
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setInfoSending(false);
-        }
-    }
-
     async function handleReconnect() {
         setSending(true);
         setError(null);
@@ -329,11 +276,10 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
                                 { id: 'interview', label: 'Mülakat', icon: Calendar },
                                 { id: 'general', label: 'Genel Mesaj', icon: MessageSquare },
                                 { id: 'reject', label: 'Reddet', icon: X },
-                                { id: 'info-request', label: 'Bilgi İste', icon: FileQuestion },
                             ].map((t) => (
                                 <button
                                     key={t.id}
-                                    onClick={() => t.id === 'info-request' ? setPurpose('info-request') : generateDM(t.id)}
+                                    onClick={() => generateDM(t.id)}
                                     disabled={generating}
                                     className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-tight transition-all duration-300 ${purpose === t.id ? 'bg-bg-secondary text-text-primary shadow-lg border border-border-subtle' : 'text-text-muted hover:text-text-primary hover:bg-bg-secondary/40'}`}
                                 >
@@ -447,74 +393,8 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
                                 </div>
                             )}
 
-                            {/* INFO REQUEST FORM */}
-                            {purpose === 'info-request' && (
-                                <div className="space-y-4 animate-fade-in">
-
-                                    {/* Header row — same style as Message Script header */}
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <FileQuestion className="w-3.5 h-3.5 text-cyan-500" />
-                                            <span className="text-[10px] font-black text-text-primary uppercase tracking-widest">Adaya Mesaj Gönder</span>
-                                        </div>
-                                        <span className="text-[9px] font-black text-text-muted opacity-50 uppercase tracking-wider">SMTP · Google gerekmez</span>
-                                    </div>
-
-                                    {/* Message body — same card style as AI message area */}
-                                    <div className="p-6 rounded-[32px] bg-bg-primary border border-border-subtle shadow-inner space-y-4">
-                                        <div>
-                                            <label className="block text-[9px] font-black text-text-muted uppercase tracking-[0.15em] mb-2 opacity-70">Mesajınız</label>
-                                            <textarea
-                                                value={infoMessage}
-                                                onChange={e => setInfoMessage(e.target.value)}
-                                                rows={4}
-                                                placeholder="Adaya iletmek istediğiniz mesaj veya açıklama..."
-                                                className="w-full bg-bg-secondary border border-border-subtle rounded-2xl py-3 px-4 text-[13px] text-text-secondary outline-none focus:border-cyan-500/40 resize-none custom-scrollbar font-bold leading-relaxed"
-                                            />
-                                        </div>
-
-                                        <div className="border-t border-border-subtle pt-4">
-                                            <label className="block text-[9px] font-black text-text-muted uppercase tracking-[0.15em] mb-2 opacity-70">Talep Edilen Belgeler / Bilgiler</label>
-                                            <div className="flex gap-2 mb-2">
-                                                <input
-                                                    value={newInfoItem}
-                                                    onChange={e => setNewInfoItem(e.target.value)}
-                                                    onKeyDown={e => {
-                                                        if (e.key === 'Enter' && newInfoItem.trim()) {
-                                                            setInfoItems(p => [...p, newInfoItem.trim()]);
-                                                            setNewInfoItem('');
-                                                        }
-                                                    }}
-                                                    placeholder="Örn: CV, Diploma fotokopisi, Referans mektubu..."
-                                                    className="flex-1 bg-bg-secondary border border-border-subtle rounded-2xl py-2.5 px-4 text-[13px] text-text-secondary outline-none focus:border-cyan-500/40 font-bold"
-                                                />
-                                                <button
-                                                    onClick={() => { if (newInfoItem.trim()) { setInfoItems(p => [...p, newInfoItem.trim()]); setNewInfoItem(''); } }}
-                                                    className="w-10 h-10 rounded-2xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/20 text-cyan-500 transition-colors flex items-center justify-center shrink-0"
-                                                >
-                                                    <Plus className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                            {infoItems.length > 0 && (
-                                                <ul className="space-y-1.5 mt-2">
-                                                    {infoItems.map((item, i) => (
-                                                        <li key={i} className="flex items-center gap-2 bg-bg-secondary border border-border-subtle rounded-xl px-3 py-2 text-xs text-text-secondary font-bold">
-                                                            <FileQuestion className="w-3 h-3 text-cyan-500 shrink-0" />
-                                                            <span className="flex-1">{item}</span>
-                                                            <button onClick={() => setInfoItems(p => p.filter((_, j) => j !== i))} className="text-text-muted hover:text-red-400 transition-colors">
-                                                                <Trash2 className="w-3 h-3" />
-                                                            </button>
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
                             {/* MESSAGE AREA */}
-                            {purpose !== 'info-request' && <div className="space-y-4">
+                            <div className="space-y-4">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
                                         {generating ? <RefreshCcw className="w-3.5 h-3.5 text-cyan-500 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 text-cyan-500" />}
@@ -563,7 +443,7 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
                                         </div>
                                     )}
                                 </div>
-                            </div>}
+                            </div>
 
                             {error && (
                                 <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 flex flex-col gap-3 animate-shake">
@@ -588,17 +468,7 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
 
                     {/* FOOTER ACTIONS */}
                     <div className="p-8 space-y-4 bg-bg-primary/50 backdrop-blur-xl border-t border-border-subtle">
-                        {purpose === 'info-request' ? (
-                            <button
-                                onClick={handleInfoRequestSend}
-                                disabled={infoSending}
-                                className="w-full py-4 rounded-[20px] bg-gradient-to-r from-cyan-600 to-cyan-500 shadow-cyan-500/20 font-black text-sm text-white shadow-2xl hover:translate-y-[-2px] active:translate-y-0 transition-all duration-300 flex items-center justify-center gap-3 disabled:opacity-50 disabled:translate-y-0 group relative overflow-hidden"
-                            >
-                                <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                {infoSending ? <Loader2 className="w-5 h-5 animate-spin" /> : <FileQuestion className="w-5 h-5" />}
-                                BİLGİ TALEBİ GÖNDER
-                            </button>
-                        ) : googleConnected ? (
+                        {googleConnected ? (
                             <button
                                 onClick={handleDirectSend}
                                 disabled={sending || generating || (!sendCandidateEmail && purpose !== 'interview') || (purpose === 'interview' && !syncToCalendar && !sendCandidateEmail) || (purpose === 'interview' && (syncToCalendar || sendCandidateEmail) && (!interviewDate || !interviewTime))}
@@ -621,27 +491,20 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
                             </div>
                         )}
 
-                        {purpose === 'info-request' ? (
-                            <button onClick={onClose} className="flex items-center justify-center gap-2 p-3 rounded-2xl bg-bg-primary border border-border-subtle hover:bg-bg-secondary transition-all group shadow-inner w-full">
+                        <div className="grid grid-cols-3 gap-3">
+                            <button onClick={handleCopy} className="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl bg-bg-primary border border-border-subtle hover:bg-bg-secondary transition-all group shadow-inner">
+                                {copied ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4 text-text-muted group-hover:text-text-primary" />}
+                                <span className="text-[9px] font-black text-text-muted group-hover:text-text-primary uppercase tracking-tight">Kopyala</span>
+                            </button>
+                            <button onClick={() => handleOpenFallback('gmail')} className="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl bg-bg-primary border border-border-subtle hover:bg-bg-secondary transition-all group shadow-inner">
+                                <Mail className="w-4 h-4 text-rose-500 group-hover:text-rose-400" />
+                                <span className="text-[9px] font-black text-text-muted group-hover:text-text-primary uppercase tracking-tight">Gmail Web</span>
+                            </button>
+                            <button onClick={onClose} className="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl bg-bg-primary border border-border-subtle hover:bg-bg-secondary transition-all group shadow-inner">
                                 <X className="w-4 h-4 text-text-muted group-hover:text-text-primary" />
                                 <span className="text-[9px] font-black text-text-muted group-hover:text-text-primary uppercase tracking-tight">Vazgeç</span>
                             </button>
-                        ) : (
-                            <div className="grid grid-cols-3 gap-3">
-                                <button onClick={handleCopy} className="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl bg-bg-primary border border-border-subtle hover:bg-bg-secondary transition-all group shadow-inner">
-                                    {copied ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4 text-text-muted group-hover:text-text-primary" />}
-                                    <span className="text-[9px] font-black text-text-muted group-hover:text-text-primary uppercase tracking-tight">Kopyala</span>
-                                </button>
-                                <button onClick={() => handleOpenFallback('gmail')} className="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl bg-bg-primary border border-border-subtle hover:bg-bg-secondary transition-all group shadow-inner">
-                                    <Mail className="w-4 h-4 text-rose-500 group-hover:text-rose-400" />
-                                    <span className="text-[9px] font-black text-text-muted group-hover:text-text-primary uppercase tracking-tight">Gmail Web</span>
-                                </button>
-                                <button onClick={onClose} className="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl bg-bg-primary border border-border-subtle hover:bg-bg-secondary transition-all group shadow-inner">
-                                    <X className="w-4 h-4 text-text-muted group-hover:text-text-primary" />
-                                    <span className="text-[9px] font-black text-text-muted group-hover:text-text-primary uppercase tracking-tight">Vazgeç</span>
-                                </button>
-                            </div>
-                        )}
+                        </div>
                     </div>
                 </div>
             </div>

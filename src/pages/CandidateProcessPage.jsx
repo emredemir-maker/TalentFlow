@@ -13,7 +13,6 @@ import { db } from '../config/firebase';
 import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import SystemScanner from '../components/SystemScanner';
 import AddCandidateModal from '../components/AddCandidateModal';
-import SendMessageModal from '../components/SendMessageModal';
 import {
     Plus, Search, Zap, Brain, X,
     Target, ShieldCheck, ArrowRight, FileText, Clock,
@@ -95,14 +94,18 @@ export default function CandidateProcessPage() {
     const [bulkTab, setBulkTab]                 = useState('files');
     const [bulkJsonText, setBulkJsonText]       = useState('');
 
-    // Feedback email modal
-    const [infoRequestModal, setInfoRequestModal] = useState(false);
-    const [feedbackModal, setFeedbackModal]     = useState(false);
-    const [feedbackOutcome, setFeedbackOutcome] = useState('positive');
-    const [feedbackText, setFeedbackText]       = useState('');
-    const [feedbackLoading, setFeedbackLoading] = useState(false);
+    // Unified "Adaya Mesaj Gönder" modal (Geri Bildirim + Bilgi İste)
+    const [feedbackModal, setFeedbackModal]         = useState(false);
+    const [msgTab, setMsgTab]                       = useState('feedback'); // 'feedback' | 'info'
+    const [feedbackOutcome, setFeedbackOutcome]     = useState('positive');
+    const [feedbackText, setFeedbackText]           = useState('');
+    const [feedbackLoading, setFeedbackLoading]     = useState(false);
     const [feedbackAiLoading, setFeedbackAiLoading] = useState(false);
-    const [feedbackSuccess, setFeedbackSuccess] = useState(false);
+    const [feedbackSuccess, setFeedbackSuccess]     = useState(false);
+    const [infoMessage, setInfoMessage]             = useState('');
+    const [infoItems, setInfoItems]                 = useState([]);
+    const [newInfoItem, setNewInfoItem]             = useState('');
+    const [infoSending, setInfoSending]             = useState(false);
 
     // Branding — loaded once from Firestore for email template generation
     const [branding, setBranding] = useState({ companyName: 'Talent-Inn', primaryColor: '#1E3A8A' });
@@ -270,7 +273,6 @@ export default function CandidateProcessPage() {
             const position = candidate.position || candidate.bestTitle || '';
             const trimmedText = feedbackText.trim();
 
-            // Build branded HTML via the template service (supports Firestore-saved overrides)
             let emailHtml = null;
             try {
                 const { html } = await getFeedbackEmail(branding, {
@@ -312,6 +314,47 @@ export default function CandidateProcessPage() {
             }
         } finally {
             setFeedbackLoading(false);
+        }
+    };
+
+    const handleInfoRequestSend = async () => {
+        if (!infoMessage.trim() && infoItems.length === 0) {
+            alert('Lütfen bir mesaj yazın veya talep edilecek bilgileri ekleyin.');
+            return;
+        }
+        if (!candidate?.email) { alert('Adayın email adresi bulunamadı.'); return; }
+        setInfoSending(true);
+        try {
+            const API_BASE = import.meta.env.VITE_SERVER_URL || '';
+            const token = await user?.getIdToken?.() || '';
+            const res = await fetch(`${API_BASE}/api/send-info-request`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                body: JSON.stringify({
+                    to: candidate.email,
+                    candidateName: candidate.name,
+                    recruiterName: userProfile?.displayName || userProfile?.name || user?.email || '',
+                    position: candidate.matchedPositionTitle || candidate.position || '',
+                    requestMessage: infoMessage,
+                    requestedItems: infoItems,
+                    candidateId: candidate.id || null,
+                    sessionId: candidate.sessionId || null,
+                }),
+            });
+            if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Bilgi talebi gönderilemedi.'); }
+            setFeedbackSuccess(true);
+            setTimeout(() => {
+                setFeedbackModal(false);
+                setFeedbackSuccess(false);
+                setInfoMessage('');
+                setInfoItems([]);
+                setNewInfoItem('');
+                setMsgTab('feedback');
+            }, 2000);
+        } catch (err) {
+            alert(err.message);
+        } finally {
+            setInfoSending(false);
         }
     };
 
@@ -1619,20 +1662,11 @@ export default function CandidateProcessPage() {
                                     </button>
                                     {candidate?.email && (
                                         <button
-                                            onClick={() => setInfoRequestModal(true)}
-                                            className="h-8 px-3 bg-cyan-50 text-cyan-600 rounded-lg text-[9px] font-black uppercase border border-cyan-200 hover:bg-cyan-100 transition-all flex items-center gap-1.5"
-                                            title="Adaydan Bilgi / Belge İste"
-                                        >
-                                            <FileQuestion className="w-3 h-3" /> Bilgi İste
-                                        </button>
-                                    )}
-                                    {candidate?.email && (
-                                        <button
-                                            onClick={() => { setFeedbackText(''); setFeedbackOutcome('positive'); setFeedbackModal(true); }}
+                                            onClick={() => { setFeedbackText(''); setFeedbackOutcome('positive'); setInfoMessage(''); setInfoItems([]); setMsgTab('feedback'); setFeedbackModal(true); }}
                                             className="h-8 px-3 bg-emerald-50 text-emerald-600 rounded-lg text-[9px] font-black uppercase border border-emerald-200 hover:bg-emerald-100 transition-all flex items-center gap-1.5"
-                                            title="Aday Geri Bildirim E-postası Gönder"
+                                            title="Adaya Mesaj Gönder"
                                         >
-                                            <Mail className="w-3 h-3" /> Geri Bildirim
+                                            <Mail className="w-3 h-3" /> Mesaj Gönder
                                         </button>
                                     )}
                                     <button
@@ -1885,11 +1919,13 @@ export default function CandidateProcessPage() {
             {/* ── GERİ BİLDİRİM MAİLİ MODALI ──────────────────────────────── */}
             {feedbackModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md animate-in zoom-in-95 duration-200">
+                    <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg animate-in zoom-in-95 duration-200">
+
+                        {/* Header */}
                         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
                             <div className="flex items-center gap-2">
                                 <Mail className="w-4 h-4 text-emerald-500" />
-                                <h3 className="text-[13px] font-black text-slate-800">Aday Geri Bildirim Maili</h3>
+                                <h3 className="text-[13px] font-black text-slate-800">Adaya Mesaj Gönder</h3>
                             </div>
                             <button onClick={() => setFeedbackModal(false)} className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-50">
                                 <X className="w-4 h-4" />
@@ -1904,66 +1940,123 @@ export default function CandidateProcessPage() {
                             </div>
                         ) : (
                             <div className="px-6 py-4 space-y-4">
-                                {/* Recipient */}
+
+                                {/* Alıcı */}
                                 <div>
                                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Alıcı</label>
                                     <div className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[12px] text-slate-600 font-medium">{candidate?.email}</div>
                                 </div>
 
-                                {/* Outcome */}
-                                <div>
-                                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Sonuç</label>
-                                    <div className="flex gap-2">
-                                        {[
-                                            { v: 'positive', label: 'Olumlu', active: 'bg-emerald-500 text-white border-emerald-500', inactive: 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100' },
-                                            { v: 'hold', label: 'Beklemede', active: 'bg-amber-500 text-white border-amber-500', inactive: 'bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100' },
-                                            { v: 'negative', label: 'Olumsuz', active: 'bg-red-500 text-white border-red-500', inactive: 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100' },
-                                        ].map(({ v, label, active, inactive }) => (
-                                            <button
-                                                key={v}
-                                                onClick={() => setFeedbackOutcome(v)}
-                                                className={`flex-1 h-8 rounded-lg text-[9px] font-black uppercase tracking-wide border transition-all ${feedbackOutcome === v ? active : inactive}`}
-                                            >{label}</button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Feedback text */}
-                                <div>
-                                    <div className="flex items-center justify-between mb-1.5">
-                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Geri Bildirim Metni</label>
-                                        <button
-                                            onClick={handleGenerateFeedbackText}
-                                            disabled={feedbackAiLoading}
-                                            className="flex items-center gap-1 px-2.5 py-1 bg-violet-50 text-violet-600 border border-violet-200 rounded-lg text-[9px] font-black hover:bg-violet-100 transition-all disabled:opacity-60"
-                                        >
-                                            {feedbackAiLoading
-                                                ? <Loader2 className="w-3 h-3 animate-spin" />
-                                                : <Brain className="w-3 h-3" />
-                                            }
-                                            AI ile Oluştur
-                                        </button>
-                                    </div>
-                                    <textarea
-                                        value={feedbackText}
-                                        onChange={e => setFeedbackText(e.target.value)}
-                                        placeholder="Adaya iletmek istediğiniz geri bildirimi yazın..."
-                                        rows={5}
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-[12px] text-slate-700 placeholder-slate-400 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-50 resize-none transition-all"
-                                    />
-                                </div>
-
-                                <div className="flex gap-2 justify-end pt-1">
-                                    <button onClick={() => setFeedbackModal(false)} className="h-9 px-4 rounded-xl text-[10px] font-black text-slate-500 border border-slate-200 hover:bg-slate-50 transition-all">İptal</button>
+                                {/* Tab switcher */}
+                                <div className="flex rounded-xl overflow-hidden border border-slate-200 bg-slate-50 p-0.5 gap-0.5">
                                     <button
-                                        onClick={handleSendFeedback}
-                                        disabled={!feedbackText.trim() || feedbackLoading}
-                                        className="h-9 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm transition-all disabled:opacity-60"
+                                        onClick={() => setMsgTab('feedback')}
+                                        className={`flex-1 h-8 flex items-center justify-center gap-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${msgTab === 'feedback' ? 'bg-white text-emerald-600 shadow-sm border border-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
                                     >
-                                        {feedbackLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                                        Gönder
+                                        <Send className="w-3 h-3" /> Geri Bildirim
+                                    </button>
+                                    <button
+                                        onClick={() => setMsgTab('info')}
+                                        className={`flex-1 h-8 flex items-center justify-center gap-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${msgTab === 'info' ? 'bg-white text-cyan-600 shadow-sm border border-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
+                                    >
+                                        <FileQuestion className="w-3 h-3" /> Bilgi İste
                                     </button>
                                 </div>
+
+                                {/* ── Geri Bildirim tab ── */}
+                                {msgTab === 'feedback' && (
+                                    <div className="space-y-4 animate-in fade-in duration-200">
+                                        {/* Sonuç */}
+                                        <div>
+                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Sonuç</label>
+                                            <div className="flex gap-2">
+                                                {[
+                                                    { v: 'positive', label: 'Olumlu',    active: 'bg-emerald-500 text-white border-emerald-500', inactive: 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100' },
+                                                    { v: 'hold',     label: 'Beklemede', active: 'bg-amber-500 text-white border-amber-500',   inactive: 'bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100' },
+                                                    { v: 'negative', label: 'Olumsuz',   active: 'bg-red-500 text-white border-red-500',       inactive: 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100' },
+                                                ].map(({ v, label, active, inactive }) => (
+                                                    <button key={v} onClick={() => setFeedbackOutcome(v)}
+                                                        className={`flex-1 h-8 rounded-lg text-[9px] font-black uppercase tracking-wide border transition-all ${feedbackOutcome === v ? active : inactive}`}
+                                                    >{label}</button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        {/* Feedback text */}
+                                        <div>
+                                            <div className="flex items-center justify-between mb-1.5">
+                                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Geri Bildirim Metni</label>
+                                                <button onClick={handleGenerateFeedbackText} disabled={feedbackAiLoading}
+                                                    className="flex items-center gap-1 px-2.5 py-1 bg-violet-50 text-violet-600 border border-violet-200 rounded-lg text-[9px] font-black hover:bg-violet-100 transition-all disabled:opacity-60"
+                                                >
+                                                    {feedbackAiLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Brain className="w-3 h-3" />}
+                                                    AI ile Oluştur
+                                                </button>
+                                            </div>
+                                            <textarea value={feedbackText} onChange={e => setFeedbackText(e.target.value)}
+                                                placeholder="Adaya iletmek istediğiniz geri bildirimi yazın..."
+                                                rows={5}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-[12px] text-slate-700 placeholder-slate-400 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-50 resize-none transition-all"
+                                            />
+                                        </div>
+                                        <div className="flex gap-2 justify-end pt-1">
+                                            <button onClick={() => setFeedbackModal(false)} className="h-9 px-4 rounded-xl text-[10px] font-black text-slate-500 border border-slate-200 hover:bg-slate-50 transition-all">İptal</button>
+                                            <button onClick={handleSendFeedback} disabled={!feedbackText.trim() || feedbackLoading}
+                                                className="h-9 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm transition-all disabled:opacity-60"
+                                            >
+                                                {feedbackLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                                                Gönder
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* ── Bilgi İste tab ── */}
+                                {msgTab === 'info' && (
+                                    <div className="space-y-4 animate-in fade-in duration-200">
+                                        <div>
+                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Mesajınız</label>
+                                            <textarea value={infoMessage} onChange={e => setInfoMessage(e.target.value)}
+                                                placeholder="Adaya iletmek istediğiniz mesaj veya açıklama..."
+                                                rows={4}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-[12px] text-slate-700 placeholder-slate-400 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-50 resize-none transition-all"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Talep Edilen Belgeler / Bilgiler</label>
+                                            <div className="flex gap-2 mb-2">
+                                                <input value={newInfoItem} onChange={e => setNewInfoItem(e.target.value)}
+                                                    onKeyDown={e => { if (e.key === 'Enter' && newInfoItem.trim()) { setInfoItems(p => [...p, newInfoItem.trim()]); setNewInfoItem(''); } }}
+                                                    placeholder="Örn: CV, Diploma fotokopisi, Referans mektubu..."
+                                                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[12px] text-slate-700 outline-none focus:border-cyan-400 transition-all"
+                                                />
+                                                <button onClick={() => { if (newInfoItem.trim()) { setInfoItems(p => [...p, newInfoItem.trim()]); setNewInfoItem(''); } }}
+                                                    className="w-9 h-9 rounded-xl bg-cyan-50 border border-cyan-200 text-cyan-600 hover:bg-cyan-100 transition-all flex items-center justify-center shrink-0"
+                                                ><Plus className="w-4 h-4" /></button>
+                                            </div>
+                                            {infoItems.length > 0 && (
+                                                <ul className="space-y-1.5">
+                                                    {infoItems.map((item, i) => (
+                                                        <li key={i} className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-[11px] text-slate-600 font-medium">
+                                                            <FileQuestion className="w-3 h-3 text-cyan-500 shrink-0" />
+                                                            <span className="flex-1">{item}</span>
+                                                            <button onClick={() => setInfoItems(p => p.filter((_, j) => j !== i))} className="text-slate-300 hover:text-red-400 transition-colors"><Trash2 className="w-3 h-3" /></button>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            )}
+                                        </div>
+                                        <div className="flex gap-2 justify-end pt-1">
+                                            <button onClick={() => setFeedbackModal(false)} className="h-9 px-4 rounded-xl text-[10px] font-black text-slate-500 border border-slate-200 hover:bg-slate-50 transition-all">İptal</button>
+                                            <button onClick={handleInfoRequestSend} disabled={infoSending || (!infoMessage.trim() && infoItems.length === 0)}
+                                                className="h-9 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 bg-cyan-500 hover:bg-cyan-600 text-white shadow-sm transition-all disabled:opacity-60"
+                                            >
+                                                {infoSending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                                                Gönder
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
                             </div>
                         )}
                     </div>
@@ -2208,14 +2301,6 @@ export default function CandidateProcessPage() {
 
             <AddCandidateModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
 
-            {infoRequestModal && candidate && (
-                <SendMessageModal
-                    candidate={candidate}
-                    initialPurpose="info-request"
-                    onClose={() => setInfoRequestModal(false)}
-                    onSent={() => setInfoRequestModal(false)}
-                />
-            )}
         </div>
     );
 }
