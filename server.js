@@ -2388,11 +2388,17 @@ function fetchImapInfoReplies() {
                 // Search last 90 days instead of filtering by subject
                 const since = new Date();
                 since.setDate(since.getDate() - 90);
+                const sinceStr = since.toISOString().slice(0, 10);
+                console.log(`📬 IMAP SINCE arama tarihi: ${sinceStr}`);
                 imap.search([['SINCE', since]], (err, uids) => {
-                    if (err || !uids || uids.length === 0) return finish();
+                    if (err) { console.error('❌ IMAP search error:', err); return finish(); }
+                    console.log(`📬 IMAP SINCE araması: ${uids ? uids.length : 0} UID bulundu`);
+                    if (!uids || uids.length === 0) return finish();
                     const slice = uids.slice(-200); // check up to 200 recent emails
+                    console.log(`📬 İlk birkaç UID: ${slice.slice(0, 5).join(', ')}...`);
                     const f = imap.fetch(slice, { bodies: 'HEADER.FIELDS (FROM SUBJECT)', struct: false });
                     let pending = 0;
+                    let totalParsed = 0;
                     f.on('message', (msg) => {
                         pending++;
                         let raw = '';
@@ -2403,6 +2409,7 @@ function fetchImapInfoReplies() {
                         });
                         msg.once('end', () => {
                             pending--;
+                            totalParsed++;
                             // Unfold and decode subject
                             const rawSubj = (raw.match(/^Subject:[ \t]*([\s\S]*?)(?=\r?\n\S|\r?\n\r?\n|$)/im) || [])[1] || '';
                             const subject = decodeEncodedWords(rawSubj.replace(/\r?\n[ \t]+/g, ' ').trim());
@@ -2411,18 +2418,21 @@ function fetchImapInfoReplies() {
                             const fromRaw = (raw.match(/^From:[ \t]*(.+)/im) || [])[1] || '';
                             const fromDecoded = decodeEncodedWords(fromRaw.trim());
                             const emailMatch = fromDecoded.match(/<([^>]+@[^>]+)>/) || fromDecoded.match(/([^\s<>]+@[^\s<>]+)/);
+                            // Log first 5 subjects for diagnostics
+                            if (totalParsed <= 5) console.log(`  [${totalParsed}] subj="${subject.slice(0, 80)}" idMatch=${idMatch ? idMatch[1] : 'null'}`);
                             if (idMatch && emailMatch) {
+                                console.log(`  ✅ Match: requestId=${idMatch[1]} from=${emailMatch[1]}`);
                                 replies.push({
                                     requestId: idMatch[1].trim(),
                                     from: emailMatch[1].trim().toLowerCase(),
                                     subject,
                                 });
                             }
-                            if (pending === 0) finish();
+                            if (pending === 0) { console.log(`📬 Tüm mesajlar işlendi: ${totalParsed} mesaj, ${replies.length} eşleşme`); finish(); }
                         });
                     });
-                    f.once('error', () => finish());
-                    f.once('end', () => { if (pending === 0) finish(); });
+                    f.once('error', (e) => { console.error('❌ fetch error:', e); finish(); });
+                    f.once('end', () => { console.log(`📬 fetch end: pending=${pending}`); if (pending === 0) finish(); });
                 });
             });
         });
