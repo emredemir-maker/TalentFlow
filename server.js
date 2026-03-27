@@ -2233,7 +2233,7 @@ app.post('/api/send-info-request', generalLimiter, verifyFirebaseToken, async (r
             from: `"${fromName}" <${process.env.EMAIL_USER}>`,
             replyTo: recruiterEmail || process.env.EMAIL_USER,
             to,
-            subject: `Bilgi Talebi: ${position || 'Başvurunuz'} — ${b.companyName || 'Talent-Inn'}`,
+            subject: `Bilgi Talebi — ${position || 'Başvurunuz'} [#${requestId}]`,
             html,
         });
         console.log(`✉️ Info request sent to: ${to} | requestId: ${requestId}`);
@@ -2332,10 +2332,14 @@ function fetchImapInfoReplies() {
                             pending--;
                             const fromMatch = header.match(/^From:\s*.+?[<\s]([^\s<>]+@[^\s<>]+)[>\s]?/im);
                             const subjMatch = header.match(/^Subject:\s*(.+)/im);
-                            if (fromMatch) {
+                            const subject = subjMatch ? subjMatch[1].trim() : '';
+                            // Extract requestId embedded as [#ir-...] in the subject
+                            const idMatch = subject.match(/\[#([^\]]+)\]/);
+                            if (fromMatch && idMatch) {
                                 replies.push({
                                     from: fromMatch[1].trim().toLowerCase(),
-                                    subject: subjMatch ? subjMatch[1].trim() : '',
+                                    subject,
+                                    requestId: idMatch[1].trim(),
                                 });
                             }
                             if (pending === 0) finish();
@@ -2357,12 +2361,13 @@ app.post('/api/check-info-replies', generalLimiter, verifyFirebaseToken, async (
         let updated = 0;
         const now = admin.firestore.FieldValue.serverTimestamp();
         for (const reply of replies) {
-            const snap = await db.collection('artifacts/talent-flow/public/data/infoRequests')
-                .where('candidateEmail', '==', reply.from)
-                .where('status', '==', 'pending')
-                .get();
-            for (const docSnap of snap.docs) {
-                await docSnap.ref.update({ status: 'responded', respondedAt: now, replySubject: reply.subject });
+            // Use direct doc lookup via requestId extracted from subject — avoids compound where() query
+            const ref = db.doc(`artifacts/talent-flow/public/data/infoRequests/${reply.requestId}`);
+            const docSnap = await ref.get();
+            if (!docSnap.exists) continue;
+            const data = docSnap.data();
+            if (data.status === 'pending') {
+                await ref.update({ status: 'responded', respondedAt: now, replySubject: reply.subject });
                 updated++;
             }
         }

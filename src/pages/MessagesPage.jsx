@@ -13,7 +13,7 @@ import {
     deleteMessage,
     MESSAGE_STATUS,
 } from '../services/messageQueueService';
-import { fetchEmailThread, ensureValidGoogleToken } from '../services/integrationService';
+import { fetchEmailThread, ensureValidGoogleToken, connectGoogleWorkspace } from '../services/integrationService';
 import {
     Send,
     Clock,
@@ -84,6 +84,7 @@ export default function MessagesPage() {
     const [checkingInfoReplies, setCheckingInfoReplies] = useState(false);
     const [checkInfoResult, setCheckInfoResult] = useState(null);
     const [markingReplied, setMarkingReplied] = useState(null);
+    const [connectingGoogle, setConnectingGoogle] = useState(false);
 
     const filtered = filter === 'all'
         ? messages
@@ -402,13 +403,27 @@ export default function MessagesPage() {
                     </div>
 
                     {/* Info banner */}
-                    {!userProfile?.googleAccessToken && (
-                        <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-500/5 border border-amber-500/20">
-                            <AlertCircle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-                            <div>
-                                <p className="text-[13px] text-amber-300 font-semibold">Google bağlantısı gerekli</p>
-                                <p className="text-[12px] text-amber-400/70 mt-0.5">Yanıtları görmek için Ayarlar → Sistem → Google Workspace bağlantısını kurun.</p>
+                    {!userProfile?.integrations?.google?.connected && (
+                        <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-500/5 border border-amber-500/20">
+                            <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                            <div className="flex-1">
+                                <p className="text-[13px] text-amber-300 font-semibold">Gmail bağlantısı gerekli</p>
+                                <p className="text-[12px] text-amber-400/70 mt-0.5">E-posta yazışmalarını görmek için Gmail API erişimine izin verin.</p>
                             </div>
+                            <button
+                                onClick={async () => {
+                                    setConnectingGoogle(true);
+                                    const result = await connectGoogleWorkspace(userId, false);
+                                    setConnectingGoogle(false);
+                                    if (!result.success) addNotification('error', result.error || 'Bağlantı başarısız.');
+                                    else addNotification('success', 'Gmail başarıyla bağlandı.');
+                                }}
+                                disabled={connectingGoogle}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 text-[11px] font-semibold border border-amber-500/30 transition-all disabled:opacity-50 shrink-0"
+                            >
+                                {connectingGoogle ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />}
+                                {connectingGoogle ? 'Bağlanıyor…' : 'Gmail\'e Bağlan'}
+                            </button>
                         </div>
                     )}
 
