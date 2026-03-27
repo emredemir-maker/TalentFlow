@@ -4,8 +4,7 @@
 
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, where, getDoc } from 'firebase/firestore';
-import { signInAnonymously } from 'firebase/auth';
-import { db, auth } from '../config/firebase';
+import { db } from '../config/firebase';
 import { useAuth } from './AuthContext';
 
 const CandidatesContext = createContext(null);
@@ -110,31 +109,20 @@ export function CandidatesProvider({ children }) {
         // onSnapshot for real-time listening for candidates
         const candidatesRef = collection(db, CANDIDATES_COLLECTION);
 
-        // IF UNAUTHENTICATED candidate joining, DO NOT listen to the whole collection automatically
+        // IF UNAUTHENTICATED on a public route — wait for AuthContext to complete anonymous sign-in.
+        // Never call signInAnonymously here; AuthContext is the single authority for that.
         if (!isAuthenticated && isPublicAccessRoute) {
             console.warn('[TalentFlow] Public access detected. Waiting for anonymous auth before starting listener...');
-            // If we are on a public route and not authenticated, and user is null (not even anonymous yet)
-            // then trigger anonymous sign-in. This ensures Firestore rules can be evaluated.
-            if (!user) {
-                console.log("[TalentFlow] Public route & unauthenticated. Triggering anonymous sign-in from CandidatesContext...");
-                signInAnonymously(auth).then(cred => {
-                    console.log("[TalentFlow] Anonymous sign-in success:", cred.user.uid);
-                }).catch(err => {
-                    console.error("[TalentFlow] Anonymous Sign-In Error:", err);
-                });
-            }
-            // Still set candidates to empty and loading false, as the actual listener will start
-            // once the 'user' object is populated by the anonymous sign-in (triggering re-run of useEffect)
+            // Just wait — AuthContext's useEffect already handles signInAnonymously.
+            // Once auth settles, isAuthenticated or user will change and this effect re-runs.
             setCandidates([]);
             setLoading(false);
             setError(null);
             return;
         }
 
-        // IF Anonymous user on a live-interview join route, look up the candidate
-        // by reading the public session document (/interviews/{sessionId}) which
-        // contains the actual candidateId.  Session IDs are now iv-{uuid}, so
-        // we can no longer extract the candidateId from the URL directly.
+        // IF Anonymous user, only start a targeted listener on /join/ routes.
+        // On /apply/ and other public pages there is no candidate doc to watch.
         if (user?.isAnonymous) {
             const pathParts = window.location.pathname.split('/');
             const sessionIdFromUrl = pathParts.find(p => p.startsWith('iv-'));

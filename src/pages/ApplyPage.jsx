@@ -92,15 +92,15 @@ export default function ApplyPage() {
 
     const fileInputRef = useRef(null);
 
-    // Fetch position — sign in anonymously first so isAuthenticated() rule passes
+    // Fetch position — AuthContext handles anonymous sign-in for public routes.
+    // We use onAuthStateChanged to wait until auth is settled before reading Firestore.
     useEffect(() => {
         if (!positionId) { setPosError('Geçersiz başvuru linki.'); setPosLoading(false); return; }
-        (async () => {
+        let cancelled = false;
+        const unsubAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+            if (!firebaseUser) return; // wait for AuthContext to sign in anonymously
+            if (cancelled) return;
             try {
-                // Anonymous sign-in satisfies isAuthenticated() Firestore rule
-                if (auth && !auth.currentUser) {
-                    await signInAnonymously(auth);
-                }
                 const snap = await getDoc(doc(db, POSITIONS_COLLECTION, positionId));
                 if (!snap.exists()) { setPosError('Pozisyon bulunamadı.'); return; }
                 const data = snap.data();
@@ -110,9 +110,11 @@ export default function ApplyPage() {
                 console.error('Position fetch error:', err);
                 setPosError('Pozisyon yüklenirken hata oluştu.');
             } finally {
-                setPosLoading(false);
+                if (!cancelled) setPosLoading(false);
             }
-        })();
+            unsubAuth(); // unsubscribe after first fetch attempt
+        });
+        return () => { cancelled = true; unsubAuth(); };
     }, [positionId]);
 
     // ── Load sources from Firestore — wait for auth before subscribing ───
