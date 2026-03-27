@@ -139,6 +139,15 @@ service cloud.firestore {
       allow write: if isSuperAdmin();
     }
 
+    // ── Info Requests (candidate respond link) ────────────────────────────────
+    // requestId is an unguessable random ID — acts as a capability token.
+    // Candidates need public read so they can view the request and respond.
+    // Writes go through the backend API (Admin SDK), so client writes are denied.
+    match /artifacts/talent-flow/public/data/infoRequests/{requestId} {
+      allow read:  if true;
+      allow write: if isRecruiter();
+    }
+
     // ── Broad catch-all for any other talent-flow collections ─────────────────
     match /artifacts/talent-flow/public/data/{collectionName}/{docId} {
       allow read:  if isStrictAuthenticated();
