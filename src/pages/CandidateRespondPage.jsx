@@ -185,7 +185,7 @@ export default function CandidateRespondPage() {
                             </div>
                         )}
 
-                        {/* ── INFO REQUEST FORM ─────────────────────────────── */}
+                        {/* ── INFO REQUEST — Reply via Email ────────────────── */}
                         {!done && type === 'info' && data && (
                             <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-400">
 
@@ -228,34 +228,22 @@ export default function CandidateRespondPage() {
                                     </div>
                                 )}
 
-                                {/* Response textarea */}
-                                <div className="space-y-2">
-                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Yanıtınız</span>
-                                    <textarea
-                                        value={responseText}
-                                        onChange={e => setResponseText(e.target.value)}
-                                        rows={5}
-                                        placeholder="Talep edilen bilgileri buraya yazabilirsiniz..."
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-[12px] text-slate-700 placeholder-slate-400 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-50 transition-all resize-none"
-                                    />
+                                {/* Instruction */}
+                                <div className="bg-cyan-50 border border-cyan-100 rounded-2xl p-4 text-center space-y-1">
+                                    <p className="text-[11px] font-black text-cyan-700 uppercase tracking-widest">Nasıl yanıtlarsınız?</p>
+                                    <p className="text-[12px] text-slate-500 leading-relaxed">
+                                        Aldığınız e-postayı <span className="font-bold text-slate-700">doğrudan yanıtlayarak</span> belge veya bilgilerinizi ekleyebilirsiniz.
+                                    </p>
                                 </div>
 
-                                {/* Error */}
-                                {error && (
-                                    <div className="flex items-center gap-2 text-red-500 text-xs bg-red-50 border border-red-100 rounded-xl px-3 py-2">
-                                        <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {error}
-                                    </div>
-                                )}
-
-                                {/* Submit */}
-                                <button
-                                    onClick={handleInfoSubmit}
-                                    disabled={submitting || !responseText.trim()}
-                                    className="w-full h-12 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 bg-cyan-500 hover:bg-cyan-600 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed text-white shadow-sm shadow-cyan-200"
+                                {/* mailto reply button */}
+                                <a
+                                    href={`mailto:${data.recruiterEmail || 'emre.demir@infoset.app'}?subject=${encodeURIComponent(`Re: Bilgi Talebi — ${data.position || 'Başvurunuz'}`)}&body=${encodeURIComponent(`Sayın ${data.recruiterName || 'İK Ekibi'},\n\nAşağıda talep ettiğiniz bilgileri iletiyorum:\n\n`)}`}
+                                    className="w-full h-12 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 bg-cyan-500 hover:bg-cyan-600 text-white shadow-sm shadow-cyan-200"
                                 >
-                                    {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                                    Bilgileri Gönder
-                                </button>
+                                    <Send className="w-3.5 h-3.5" />
+                                    E-posta ile Yanıtla
+                                </a>
                             </div>
                         )}
 

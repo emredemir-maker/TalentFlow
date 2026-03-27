@@ -2185,7 +2185,7 @@ app.post('/api/users/availability', requireAuth, async (req, res) => {
 
 // ─── Send Info Request Email ──────────────────────────────────────────────────
 app.post('/api/send-info-request', generalLimiter, verifyFirebaseToken, async (req, res) => {
-    const { to, candidateName, recruiterName, position, requestMessage, requestedItems, sessionId, candidateId, branding, requestId: clientRequestId, respondUrl: clientRespondUrl } = req.body;
+    const { to, candidateName, recruiterName, recruiterEmail, position, requestMessage, requestedItems, sessionId, candidateId, branding, requestId: clientRequestId, respondUrl: clientRespondUrl } = req.body;
     if (!to || !candidateName) return res.status(400).json({ error: 'Email ve aday adı gereklidir.' });
     if (!EMAIL_RE.test(to)) return res.status(400).json({ error: 'Geçersiz email adresi.' });
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
@@ -2230,6 +2230,7 @@ app.post('/api/send-info-request', generalLimiter, verifyFirebaseToken, async (r
         });
         await transporter.sendMail({
             from: `"${fromName}" <${process.env.EMAIL_USER}>`,
+            replyTo: recruiterEmail || process.env.EMAIL_USER,
             to,
             subject: `Bilgi Talebi: ${position || 'Başvurunuz'} — ${b.companyName || 'Talent-Inn'}`,
             html,
