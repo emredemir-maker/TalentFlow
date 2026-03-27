@@ -4,6 +4,7 @@ import cors from 'cors';
 import puppeteer from 'puppeteer';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import nodemailer from 'nodemailer';
+import Imap from 'imap';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -2182,6 +2183,91 @@ app.post('/api/candidate-respond', generalLimiter, async (req, res) => {
     } catch (error) {
         console.error('❌ Candidate respond error:', error);
         res.status(500).json({ error: 'Yanıt kaydedilemedi: ' + error.message });
+    }
+});
+
+// ── Check for email replies to info requests via IMAP ─────────────────────────
+function fetchImapInfoReplies() {
+    return new Promise((resolve, reject) => {
+        if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+            return reject(new Error('EMAIL_USER veya EMAIL_PASS tanımlanmamış.'));
+        }
+        const imap = new Imap({
+            user: process.env.EMAIL_USER,
+            password: process.env.EMAIL_PASS,
+            host: 'imap.gmail.com',
+            port: 993,
+            tls: true,
+            tlsOptions: { rejectUnauthorized: false },
+            connTimeout: 15000,
+            authTimeout: 10000,
+        });
+
+        const replies = [];
+
+        function finish() { try { imap.end(); } catch (_) {} resolve(replies); }
+
+        imap.once('error', err => { try { imap.end(); } catch (_) {} reject(err); });
+
+        imap.once('ready', () => {
+            imap.openBox('INBOX', true, (err) => {
+                if (err) return reject(err);
+                imap.search(['ALL', ['SUBJECT', 'Re: Bilgi Talebi']], (err, uids) => {
+                    if (err || !uids || uids.length === 0) return finish();
+                    const slice = uids.slice(-50);
+                    const f = imap.fetch(slice, { bodies: 'HEADER.FIELDS (FROM SUBJECT DATE)', struct: false });
+                    let pending = 0;
+                    f.on('message', (msg) => {
+                        pending++;
+                        let header = '';
+                        msg.on('body', (stream) => {
+                            let buf = '';
+                            stream.on('data', chunk => buf += chunk.toString('utf8'));
+                            stream.once('end', () => { header = buf; });
+                        });
+                        msg.once('end', () => {
+                            pending--;
+                            const fromMatch = header.match(/^From:\s*.+?[<\s]([^\s<>]+@[^\s<>]+)[>\s]?/im);
+                            const subjMatch = header.match(/^Subject:\s*(.+)/im);
+                            if (fromMatch) {
+                                replies.push({
+                                    from: fromMatch[1].trim().toLowerCase(),
+                                    subject: subjMatch ? subjMatch[1].trim() : '',
+                                });
+                            }
+                            if (pending === 0) finish();
+                        });
+                    });
+                    f.once('error', () => finish());
+                    f.once('end', () => { if (pending === 0) finish(); });
+                });
+            });
+        });
+
+        imap.connect();
+    });
+}
+
+app.post('/api/check-info-replies', generalLimiter, verifyFirebaseToken, async (req, res) => {
+    try {
+        const replies = await fetchImapInfoReplies();
+        let updated = 0;
+        const now = admin.firestore.FieldValue.serverTimestamp();
+        for (const reply of replies) {
+            const snap = await db.collection('artifacts/talent-flow/public/data/infoRequests')
+                .where('candidateEmail', '==', reply.from)
+                .where('status', '==', 'pending')
+                .get();
+            for (const docSnap of snap.docs) {
+                await docSnap.ref.update({ status: 'responded', respondedAt: now, replySubject: reply.subject });
+                updated++;
+            }
+        }
+        console.log(`📬 Info reply check: ${replies.length} e-posta tarandı, ${updated} talep güncellendi.`);
+        res.json({ success: true, scanned: replies.length, updated });
+    } catch (error) {
+        console.error('❌ IMAP check-info-replies error:', error);
+        res.status(500).json({ error: 'IMAP kontrolü başarısız: ' + (error.message || error) });
     }
 });
 

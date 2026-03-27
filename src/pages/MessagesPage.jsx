@@ -81,6 +81,9 @@ export default function MessagesPage() {
     const [infoRequests, setInfoRequests] = useState([]);
     const [infoReqLoading, setInfoReqLoading] = useState(true);
     const [expandedInfoReq, setExpandedInfoReq] = useState(null);
+    const [checkingInfoReplies, setCheckingInfoReplies] = useState(false);
+    const [checkInfoResult, setCheckInfoResult] = useState(null);
+    const [markingReplied, setMarkingReplied] = useState(null);
 
     const filtered = filter === 'all'
         ? messages
@@ -101,6 +104,45 @@ export default function MessagesPage() {
         }, () => setInfoReqLoading(false));
         return unsub;
     }, [currentUser?.email]);
+
+    // Check Gmail inbox for replies to info request emails (IMAP)
+    const handleCheckInfoReplies = useCallback(async () => {
+        if (!currentUser) return;
+        setCheckingInfoReplies(true);
+        setCheckInfoResult(null);
+        try {
+            const token = await currentUser.getIdToken();
+            const res = await fetch('/api/check-info-replies', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Hata oluştu');
+            setCheckInfoResult({ scanned: data.scanned, updated: data.updated });
+            if (data.updated > 0) addNotification('success', `${data.updated} talep otomatik olarak yanıtlandı olarak işaretlendi.`);
+            else addNotification('info', `${data.scanned} e-posta tarandı, yeni yanıt bulunamadı.`);
+        } catch (err) {
+            addNotification('error', 'Yanıt kontrolü başarısız: ' + err.message);
+        } finally {
+            setCheckingInfoReplies(false);
+        }
+    }, [currentUser, addNotification]);
+
+    // Manually mark an info request as replied
+    const handleMarkReplied = useCallback(async (reqId) => {
+        setMarkingReplied(reqId);
+        try {
+            await updateDoc(doc(db, 'artifacts/talent-flow/public/data/infoRequests', reqId), {
+                status: 'responded',
+                respondedAt: new Date(),
+            });
+            addNotification('success', 'Talep yanıtlandı olarak işaretlendi.');
+        } catch (err) {
+            addNotification('error', 'İşaretleme başarısız: ' + err.message);
+        } finally {
+            setMarkingReplied(null);
+        }
+    }, [addNotification]);
 
     // Load email threads from Firestore
     useEffect(() => {
@@ -496,11 +538,29 @@ export default function MessagesPage() {
             {/* ── INFO REQUESTS TAB ─────────────────────────────────────── */}
             {pageTab === 'info_requests' && (
                 <div className="px-6 lg:px-8 py-5 pb-24 md:pb-8 space-y-4">
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                        <StatMini icon={ClipboardList} label="Toplam Talep" value={infoRequests.length} color="text-cyan-400" bg="bg-cyan-500/5" />
-                        <StatMini icon={Clock} label="Yanıt Bekleniyor" value={infoRequests.filter(r => r.status === 'pending').length} color="text-amber-400" bg="bg-amber-500/5" />
-                        <StatMini icon={CheckCircle} label="Yanıtlandı" value={infoRequests.filter(r => r.status === 'responded').length} color="text-emerald-400" bg="bg-emerald-500/5" />
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                        <div className="grid grid-cols-3 gap-3 flex-1">
+                            <StatMini icon={ClipboardList} label="Toplam Talep" value={infoRequests.length} color="text-cyan-400" bg="bg-cyan-500/5" />
+                            <StatMini icon={Clock} label="Bekleniyor" value={infoRequests.filter(r => r.status === 'pending').length} color="text-amber-400" bg="bg-amber-500/5" />
+                            <StatMini icon={CheckCircle} label="Yanıtlandı" value={infoRequests.filter(r => r.status === 'responded').length} color="text-emerald-400" bg="bg-emerald-500/5" />
+                        </div>
+                        <button
+                            onClick={handleCheckInfoReplies}
+                            disabled={checkingInfoReplies}
+                            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 text-[12px] font-semibold border border-cyan-500/20 transition-all disabled:opacity-50 shrink-0"
+                        >
+                            {checkingInfoReplies
+                                ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Kontrol ediliyor…</>
+                                : <><RefreshCw className="w-3.5 h-3.5" /> Yanıtları Kontrol Et</>
+                            }
+                        </button>
                     </div>
+                    {checkInfoResult && (
+                        <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/5 border border-emerald-500/15 text-[11px] text-emerald-400">
+                            <CheckCircle className="w-3.5 h-3.5 shrink-0" />
+                            {checkInfoResult.scanned} e-posta tarandı — {checkInfoResult.updated > 0 ? `${checkInfoResult.updated} yeni yanıt bulundu ve işaretlendi.` : 'yeni yanıt bulunamadı.'}
+                        </div>
+                    )}
 
                     {infoReqLoading && (
                         <div className="space-y-3">
@@ -582,6 +642,22 @@ export default function MessagesPage() {
                                                         </li>
                                                     ))}
                                                 </ul>
+                                            </div>
+                                        )}
+                                        {isPending && (
+                                            <div className="flex items-center gap-3 pt-1">
+                                                <button
+                                                    onClick={e => { e.stopPropagation(); handleMarkReplied(req.id); }}
+                                                    disabled={markingReplied === req.id}
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-[11px] font-semibold border border-emerald-500/20 transition-all disabled:opacity-50"
+                                                >
+                                                    {markingReplied === req.id
+                                                        ? <Loader2 className="w-3 h-3 animate-spin" />
+                                                        : <CheckCircle className="w-3 h-3" />
+                                                    }
+                                                    Yanıt Alındı
+                                                </button>
+                                                <span className="text-[10px] text-navy-600">Gelen kutunuzda yanıt gördüyseniz manuel olarak işaretleyebilirsiniz.</span>
                                             </div>
                                         )}
                                     </div>
