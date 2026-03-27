@@ -367,6 +367,7 @@ function DataModelSection() {
 ├── sources/         {sourceId}
 ├── interviews/      {sessionId}
 ├── emailThreads/    {autoId}       ← Gmail thread takibi
+├── bulkImportJobs/  {jobId}        ← Toplu CV yükleme iş kuyruğu
 └── settings/
     ├── branding     (tek belge)    ← Kurumsal kimlik
     └── system       (tek belge)   ← Domain beyaz listesi`}</CodeBlock>
@@ -378,6 +379,7 @@ function DataModelSection() {
   email: string,
   phone: string,
   position: string,
+  positionId: string,       // Bağlı pozisyon Firestore ID (opsiyonel)
   department: string,
   status: 'new' | 'reviewing' | 'shortlisted' | 'hired' | 'rejected',
   matchScore: number,       // 0-100, AI hesaplar
@@ -394,6 +396,8 @@ function DataModelSection() {
     time: string,           // 'HH:MM'
     type: 'technical' | 'hr' | 'product',
     status: 'scheduled' | 'live' | 'completed' | 'postponed' | 'cancelled',
+    positionId: string,     // Mülakat için seçilen pozisyon ID (opsiyonel)
+    positionTitle: string,  // Mülakat için seçilen pozisyon başlığı
     interviewerName: string,
     interviewerId: string,
     meetLink: string,
@@ -417,6 +421,43 @@ function DataModelSection() {
   googleAccessToken: string,
   googleRefreshToken: string,
   createdAt: Timestamp,
+}`}</CodeBlock>
+
+            <SectionTitle>Pozisyon Belgesi Şeması (Ek Alanlar)</SectionTitle>
+            <CodeBlock lang="javascript">{`// artifacts/talent-flow/public/data/positions/{positionId}
+{
+  title: string,
+  department: string,
+  description: string,       // AI tarafından üretilen kısa özet (max 320 karakter)
+  requirements: string[],
+  minExperience: number,
+  status: 'open' | 'closed',
+  screeningEnabled: boolean, // true → başvuru formunda ön eleme soruları gösterilir
+  screeningQuestions: string[],  // Ön eleme soru metinleri
+  matchedCandidates: [{id, name, score, reason}],
+  createdAt: Timestamp,
+}`}</CodeBlock>
+            <InfoBox type="info">
+                description alanı artık extractPositionFromJD() tarafından üretilen kısa özettir — iş ilanının ham metni değil. İş akışı: Pozisyon formu → "AI Doldur" → Gemini max 280 karakter özet üretir → description alanına yazılır.
+            </InfoBox>
+
+            <SectionTitle>bulkImportJobs Belgesi Şeması</SectionTitle>
+            <CodeBlock lang="javascript">{`// artifacts/talent-flow/public/data/bulkImportJobs/{jobId}
+{
+  status: 'queued' | 'processing' | 'done' | 'error',
+  total: number,          // Toplam dosya sayısı
+  completed: number,      // Başarıyla işlenen
+  failed: number,         // Hata veren
+  items: [{
+    originalName: string, // Orijinal dosya adı
+    status: 'queued' | 'processing' | 'done' | 'error',
+    candidateId: string,  // Oluşturulan aday Firestore ID
+    score: number,        // AI uyum skoru
+    error: string,        // Hata mesajı (varsa)
+  }],
+  positionId: string,     // Tüm adaylar için ortak pozisyon (opsiyonel)
+  createdAt: Timestamp,
+  updatedAt: Timestamp,
 }`}</CodeBlock>
 
             <SectionTitle>settings/branding Belgesi Şeması</SectionTitle>
@@ -496,6 +537,26 @@ function ApiSection() {
                     ['GET', '`/api/positions/:positionId`', 'Pozisyon detayı (genel erişim)'],
                     ['POST', '`/api/applications`', 'Başvuru formu gönderimi'],
                     ['POST', '`/api/send-invite`', 'Mülakat davet e-postası gönderimi'],
+                ]}
+            />
+
+            <SectionTitle>Toplu CV Yükleme</SectionTitle>
+            <Table
+                headers={['Method', 'Endpoint', 'Rate Limit', 'Açıklama']}
+                rows={[
+                    ['POST', '`/api/bulk-import`', 'requireAuth', 'Çoklu CV yükleme (max 20 dosya) — Multer bulkUpload middleware; job ID döner'],
+                    ['GET', '`/api/bulk-import/:jobId`', 'requireAuth', 'İş kuyruğu durumu sorgulama (Firestore bulkImportJobs belgesi)'],
+                ]}
+            />
+            <InfoBox type="info">
+                Dosyalar sunucuya yüklenir, sırayla işlenir ve her biri için ayrı Gemini AI çağrısı yapılır. İlerleme durumu Firestore bulkImportJobs koleksiyonu üzerinden onSnapshot ile canlı takip edilir.
+            </InfoBox>
+
+            <SectionTitle>Ön Eleme Sorusu İyileştirme</SectionTitle>
+            <Table
+                headers={['Method', 'Endpoint', 'Rate Limit', 'Açıklama']}
+                rows={[
+                    ['POST', '`/api/improve-screening-question`', 'aiLimiter', 'Verilen soruyu STAR-uyumlu davranışsal formata dönüştürür; { question } → { improved }'],
                 ]}
             />
         </div>
@@ -829,7 +890,7 @@ export default function TechDocsPage() {
                         Mimari, güvenlik prensipleri, API referansı, veri modeli ve deploy notları — geliştiriciler için kapsamlı teknik başvuru kaynağı.
                     </p>
                     <div className="flex items-center justify-center gap-8 pt-2">
-                        {[['9', 'Bölüm'], ['8', 'Güvenlik Katmanı'], ['18', 'API Endpoint']].map(([v, l]) => (
+                        {[['10', 'Bölüm'], ['8', 'Güvenlik Katmanı'], ['21', 'API Endpoint']].map(([v, l]) => (
                             <div key={l} className="text-center">
                                 <div className="text-xl font-bold text-slate-800">{v}</div>
                                 <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">{l}</div>

@@ -10,7 +10,7 @@ import {
     Zap, Globe, Mail, Bell, Mic, Activity, UserPlus,
     CheckCircle, ArrowRight, Lightbulb, Play,
     FileText, Filter, RefreshCw, Plus, Eye,
-    Clock, Target, Layers, AlertCircle
+    Clock, Target, Layers, AlertCircle, FileQuestion
 } from 'lucide-react';
 
 // ─── FEATURE DATA ──────────────────────────────────────────────────────────────
@@ -141,15 +141,16 @@ const FEATURES = [
         description: 'Mülakatları planlayın, adaylara kurumsal markalı HTML davetiyeler gönderin ve Google Calendar entegrasyonu ile takviminize ekleyin. Katılımcı listesine sistem dışı harici e-posta adresleri de ekleyebilirsiniz. Her mülakat için benzersiz bir katılım bağlantısı otomatik oluşturulur.',
         steps: [
             '"Mülakatlar" menüsünden "Yeni Mülakat Planla" butonuna tıklayın.',
-            'Aday, pozisyon, tarih ve saat seçin. Mülakat türünü belirleyin (Teknik / İK / Ürün).',
+            'Adım 1\'in üstündeki "Mülakat Pozisyonu" alanından hangi pozisyon için görüşme yapıldığını seçin (açık ilanlar listelenir) veya elle yazın.',
+            'Adayı seçin; pozisyon seçimi aday değiştiğinde sıfırlanmaz, aynı pozisyona birden fazla aday görüşmesi planlanabilir.',
             'Katılımcı adımında sistem kullanıcılarını seçin; "Harici Katılımcı Ekle" alanından sistemde kayıtlı olmayan kişilerin e-posta adreslerini ekleyin.',
             '"E-posta Gönder" seçeneği ile adaya kurumsal markalı HTML davetiye ve mülakat bağlantısı gönderilir.',
             'Google Calendar bağlantısı varsa etkinlik otomatik takviminize eklenir; tüm katılımcılara davet gönderilir.',
             'Gönderilen e-postalar "Mesajlar → E-posta Yazışmaları" sekmesinden takip edilir. Yanıtları kontrol etmek için Gmail API\'si kullanılır.',
             'Mülakat günü, "Mülakatı Başlat" butonuyla Canlı Mülakat ekranına geçin.',
         ],
-        tip: 'Harici katılımcılar (@ rozetiyle gösterilir) Google Takvim\'e eklenmez; sadece e-posta bildirimi alır. Kurumsal markayı "Kurumsal Kimlik" ayarlarından özelleştirebilirsiniz.',
-        tags: ['mülakat', 'planlama', 'takvim', 'google calendar', 'davet', 'email', 'link', 'zamanlama', 'harici katılımcı', 'html email', 'marka', 'e-posta takibi'],
+        tip: '"Hızlı Mülakat Başlat" modalında da pozisyon alanı mevcuttur — anlık görüşmelerde de doğru pozisyonu kaydedin. Harici katılımcılar (@ rozetiyle gösterilir) Google Takvim\'e eklenmez; sadece e-posta bildirimi alır.',
+        tags: ['mülakat', 'planlama', 'takvim', 'google calendar', 'davet', 'email', 'link', 'zamanlama', 'harici katılımcı', 'html email', 'marka', 'e-posta takibi', 'pozisyon seçimi'],
         mockup: (
             <div className="space-y-2.5">
                 <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
@@ -256,6 +257,99 @@ const FEATURES = [
                                 <div className="h-full bg-violet-400 rounded-full" style={{ width: v + '%' }} />
                             </div>
                             <span className="text-[9px] font-bold text-violet-600">{v}</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        )
+    },
+    {
+        id: 'bulk-cv-upload',
+        category: 'aday',
+        icon: Upload,
+        color: '#3b82f6',
+        title: 'Toplu CV Yükleme & Sıralı İşleme',
+        subtitle: 'Adaylar sayfası — Toplu Yükle',
+        description: 'Birden fazla PDF veya DOCX CV dosyasını tek seferde sisteme yükleyin. Her dosya sırayla işlenir: AI ayrıştırma, beceri çıkarımı ve uyum skoru hesaplaması arka planda gerçekleşir. İşlem ilerleme durumu anlık takip edilebilir.',
+        steps: [
+            '"Adaylar" menüsüne gidin ve "Toplu Yükle" butonuna tıklayın.',
+            'Açılan modalda "Dosya Seç" ile birden fazla CV dosyası seçin (maksimum 20 dosya, PDF/DOCX).',
+            'İsteğe bağlı olarak tüm adaylar için ortak bir pozisyon atayın.',
+            '"Yüklemeyi Başlat" butonuna tıklayın — dosyalar sıraya alınır ve işlem başlar.',
+            'Ekranın sağında her dosya için ilerleme durumu anlık güncellenir: Bekliyor → İşleniyor → Tamamlandı / Hata.',
+            'İşlem tamamlandığında özet gösterilir: kaç aday başarıyla eklendi, kaçında hata oluştu ve ortalama skor.',
+        ],
+        tip: 'Büyük dosyalarda veya birden fazla CV yüklenirken sabırlı olun — AI her CV için ayrı analiz yapar. Hata veren dosyalar listeye eklenmez ve yeniden denenebilir.',
+        tags: ['toplu', 'batch', 'cv', 'yükleme', 'upload', 'sıralı', 'kuyruğu', 'işleme', 'pdf', 'docx', 'çoklu', 'aday ekle'],
+        mockup: (
+            <div className="space-y-2">
+                <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] font-semibold text-blue-700">Yükleme Kuyruğu</span>
+                        <span className="text-[9px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full">3/5</span>
+                    </div>
+                    {[
+                        { name: 'ahmet_yilmaz.pdf', status: 'Tamamlandı', color: '#10b981' },
+                        { name: 'zeynep_k.docx', status: 'İşleniyor...', color: '#f59e0b' },
+                        { name: 'mert_a.pdf', status: 'Bekliyor', color: '#94a3b8' },
+                    ].map((f, i) => (
+                        <div key={i} className="flex items-center gap-2 mb-1">
+                            <FileText className="w-3 h-3 text-blue-400 shrink-0" />
+                            <span className="text-[9px] text-slate-600 flex-1 truncate">{f.name}</span>
+                            <span className="text-[8px] font-medium" style={{ color: f.color }}>{f.status}</span>
+                        </div>
+                    ))}
+                </div>
+                <div className="flex gap-2 text-center">
+                    <div className="flex-1 bg-emerald-50 border border-emerald-100 rounded-lg p-1.5">
+                        <div className="text-xs font-bold text-emerald-600">3</div>
+                        <div className="text-[8px] text-emerald-500">Eklendi</div>
+                    </div>
+                    <div className="flex-1 bg-amber-50 border border-amber-100 rounded-lg p-1.5">
+                        <div className="text-xs font-bold text-amber-600">%78</div>
+                        <div className="text-[8px] text-amber-500">Ort. Skor</div>
+                    </div>
+                </div>
+            </div>
+        )
+    },
+    {
+        id: 'screening-questions',
+        category: 'aday',
+        icon: FileQuestion,
+        color: '#8b5cf6',
+        title: 'Ön Eleme Soruları & AI Skor Değerlendirmesi',
+        subtitle: 'Pozisyon başvuru formu & skor filtresi',
+        description: 'Pozisyonlarınıza ön eleme soruları ekleyin. Adaylar başvururken bu soruları yanıtlar; AI her yanıtı değerlendirerek 0-100 arasında bir skor üretir. Recruiter panelinde adayları Çok İyi / İyi / Orta / Zayıf filtresiyle listeleyin.',
+        steps: [
+            '"Açık İlanlar" menüsünden yeni pozisyon oluşturun veya mevcut bir pozisyonu düzenleyin.',
+            'Pozisyon formunun sağ panelinde "Ön Eleme Soruları" bölümüne gidin.',
+            '"Soru Ekle" butonuyla sorularınızı yazın. Her sorunun yanındaki "AI Düzenle" butonu, soruyu daha etkili hale getirir.',
+            '"AI ile Otomatik Oluştur" butonuyla pozisyona özel soru seti saniyeler içinde üretilir.',
+            'Ön eleme etkin olan pozisyonun başvuru sayfasını adayla paylaşın.',
+            'Başvurular panelinde "Ön Eleme Skoru" sütununu göreceksiniz — renkli rozetler skora göre otomatik atanır.',
+            '"Filtrele" menüsünden Çok İyi (≥85) / İyi (65-84) / Orta (40-64) / Zayıf (<40) filtresi uygulayın.',
+        ],
+        tip: 'AI Düzenle butonu sorunuzu STAR metodolojisine uygun, davranışsal bir yapıya dönüştürür. "Neden X?" yerine "Bir durumu anlatın..." formatına çevirir.',
+        tags: ['ön eleme', 'screening', 'soru', 'başvuru', 'skor', 'filtre', 'ai', 'değerlendirme', 'çok iyi', 'zayıf', 'pozisyon', 'form'],
+        mockup: (
+            <div className="space-y-2">
+                <div className="space-y-1">
+                    {[
+                        { q: 'Takım çalışmasında zorlandığınız bir durumu anlatın.', badge: 'AI ✓' },
+                        { q: 'En büyük teknik başarınız neydi?', badge: 'Düzenlendi' },
+                    ].map((q, i) => (
+                        <div key={i} className="flex items-start gap-2 bg-violet-50 border border-violet-100 rounded-xl p-2">
+                            <FileQuestion className="w-3 h-3 text-violet-400 mt-0.5 shrink-0" />
+                            <span className="text-[9px] text-slate-600 flex-1 leading-relaxed">{q.q}</span>
+                            <span className="text-[7px] bg-violet-200 text-violet-700 px-1.5 rounded-full shrink-0">{q.badge}</span>
+                        </div>
+                    ))}
+                </div>
+                <div className="flex gap-1 flex-wrap">
+                    {[{ l: 'Çok İyi', c: '#10b981', v: 3 }, { l: 'İyi', c: '#3b82f6', v: 5 }, { l: 'Orta', c: '#f59e0b', v: 2 }, { l: 'Zayıf', c: '#ef4444', v: 1 }].map(b => (
+                        <div key={b.l} className="flex items-center gap-1 px-2 py-0.5 rounded-full border text-[8px]" style={{ borderColor: b.c + '40', background: b.c + '10', color: b.c }}>
+                            {b.l} <span className="font-bold">{b.v}</span>
                         </div>
                     ))}
                 </div>
@@ -721,7 +815,7 @@ export default function GuidePage() {
                     </div>
                     {/* Stats */}
                     <div className="flex items-center justify-center gap-8 pt-2">
-                        {[['11', 'Özellik'], ['6', 'Kategori'], ['60+', 'Adım']].map(([v, l]) => (
+                        {[['13', 'Özellik'], ['6', 'Kategori'], ['75+', 'Adım']].map(([v, l]) => (
                             <div key={l} className="text-center">
                                 <div className="text-xl font-bold text-slate-800">{v}</div>
                                 <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">{l}</div>
