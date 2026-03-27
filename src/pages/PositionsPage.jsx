@@ -15,7 +15,7 @@ import {
     ExternalLink, FileText, ChevronRight, TrendingUp, RefreshCw,
 } from 'lucide-react';
 import {
-    subscribeToApplications, getSourceColor, APP_STATUS_CONFIG, updateApplicationStatus
+    subscribeToApplications, getSourceColor, APP_STATUS_CONFIG, updateApplicationStatus, deleteApplication
 } from '../services/applicationService';
 
 import PotentialCandidatesTab from '../components/PotentialCandidatesTab';
@@ -48,6 +48,7 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
     const [copied, setCopied] = useState(false);
     const [syncingAppId, setSyncingAppId] = useState(null);
     const [syncedAppIds, setSyncedAppIds] = useState(new Set());
+    const [deletingAppId, setDeletingAppId] = useState(null);
 
     // Build the apply URL
     const baseUrl = typeof window !== 'undefined' ? `${window.location.origin}/apply/${pos.id}` : `/apply/${pos.id}`;
@@ -117,6 +118,19 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
             console.error('Sync error:', err);
         } finally {
             setSyncingAppId(null);
+        }
+    }
+
+    async function handleDeleteApp(appId) {
+        if (!window.confirm('Bu başvuruyu silmek istediğinizden emin misiniz?')) return;
+        setDeletingAppId(appId);
+        try {
+            await deleteApplication(appId);
+        } catch (err) {
+            console.error('Delete application failed:', err);
+            alert('Başvuru silinemedi. Lütfen tekrar deneyin.');
+        } finally {
+            setDeletingAppId(null);
         }
     }
 
@@ -325,12 +339,23 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                                                         )}
                                                     </div>
                                                 </div>
-                                                <div className="shrink-0 text-right">
+                                                <div className="shrink-0 text-right flex flex-col items-end gap-2">
                                                     <div className={`text-[18px] font-black leading-none ${scoreColor}`}>{app.aiScore || 0}%</div>
-                                                    <div className="text-[8px] text-slate-300 uppercase tracking-widest mt-0.5">AI Uyum</div>
-                                                    <div className="h-1 w-12 bg-slate-100 rounded-full mt-1 overflow-hidden">
+                                                    <div className="text-[8px] text-slate-300 uppercase tracking-widest">AI Uyum</div>
+                                                    <div className="h-1 w-12 bg-slate-100 rounded-full overflow-hidden">
                                                         <div className={`h-full rounded-full ${app.aiScore >= 75 ? 'bg-emerald-400' : app.aiScore >= 50 ? 'bg-amber-400' : 'bg-red-400'}`} style={{ width: `${app.aiScore || 0}%` }} />
                                                     </div>
+                                                    <button
+                                                        onClick={() => handleDeleteApp(app.id)}
+                                                        disabled={deletingAppId === app.id}
+                                                        className="mt-1 p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 border border-transparent hover:border-red-200 transition-all disabled:opacity-40"
+                                                        title="Başvuruyu sil"
+                                                    >
+                                                        {deletingAppId === app.id
+                                                            ? <Loader2 size={12} className="animate-spin" />
+                                                            : <Trash2 size={12} />
+                                                        }
+                                                    </button>
                                                 </div>
                                             </div>
                                             {/* Status changer */}

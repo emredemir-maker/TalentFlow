@@ -1,7 +1,7 @@
 // src/services/applicationService.js
 import { db } from '../config/firebase';
 import {
-    collection, addDoc, getDocs, updateDoc, doc,
+    collection, addDoc, getDocs, updateDoc, deleteDoc, doc,
     query, where, serverTimestamp, onSnapshot
 } from 'firebase/firestore';
 
@@ -97,6 +97,23 @@ export function subscribeToApplications(positionId, callback) {
 // Update application status
 export async function updateApplicationStatus(applicationId, status) {
     await updateDoc(doc(db, APPLICATIONS_COLLECTION, applicationId), { status });
+}
+
+// Delete an application
+export async function deleteApplication(applicationId) {
+    await deleteDoc(doc(db, APPLICATIONS_COLLECTION, applicationId));
+}
+
+// Check if an application already exists for this email+position combination
+export async function checkDuplicateApplication(positionId, email) {
+    const emailNorm = email.trim().toLowerCase();
+    const q = query(
+        collection(db, APPLICATIONS_COLLECTION),
+        where('positionId', '==', positionId),
+        where('email', '==', emailNorm)
+    );
+    const snap = await getDocs(q);
+    return !snap.empty;
 }
 
 // Source → badge colour mapping

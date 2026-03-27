@@ -366,6 +366,24 @@ export default function ApplyPage() {
             if (parsedCandidate) appData.parsedCandidate = parsedCandidate;
             if (scoreBreakdown) appData.aiScoreBreakdown = scoreBreakdown;
 
+            // Guard: block duplicate applications (same email + same position)
+            const emailForDupCheck = form.email.trim().toLowerCase();
+            try {
+                const dupAppSnap = await getDocs(
+                    query(
+                        collection(db, APPLICATIONS_COLLECTION),
+                        where('positionId', '==', position.id),
+                        where('email', '==', emailForDupCheck)
+                    )
+                );
+                if (!dupAppSnap.empty) {
+                    setStep('duplicate');
+                    return;
+                }
+            } catch (dupCheckErr) {
+                console.warn('Duplicate application check failed (non-blocking):', dupCheckErr.message);
+            }
+
             // Save application
             const appRef = await addDoc(collection(db, APPLICATIONS_COLLECTION), appData);
 
