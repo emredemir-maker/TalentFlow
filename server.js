@@ -737,37 +737,106 @@ Kurallar:
 });
 
 // ─── Email HTML Template Builder ─────────────────────────────────────────────
-function buildInviteEmailHtml({ companyName = 'Talent-Inn', logoUrl = '', primaryColor = '#1E3A8A', tagline = '', website = '' }, { inviteLink, role, invitedByName = '' }) {
+function buildInviteEmailHtml({ companyName = 'Talent-Inn', primaryColor = '#1E3A8A' }, { inviteLink, role, invitedByName = '' }) {
     const roleLabel = role === 'super_admin' ? 'Süper Admin' : role === 'department_user' ? 'Departman Kullanıcısı' : 'Recruiter';
+    const TI_COLOR = '#1E3A8A';
+    const TI_LIGHT = '#EEF2FF';
     return `<!DOCTYPE html>
-<html lang="tr"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>${companyName}</title></head>
+<html lang="tr"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Talent-Inn Daveti</title></head>
 <body style="margin:0;padding:0;background:#F1F5F9;font-family:'Segoe UI',Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#F1F5F9;padding:32px 0;"><tr><td align="center">
-<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
-<tr><td style="background:${primaryColor};padding:32px 40px;text-align:center;">
-${logoUrl ? `<img src="${logoUrl}" alt="${companyName}" style="max-height:56px;max-width:200px;object-fit:contain;margin-bottom:12px;display:block;margin-left:auto;margin-right:auto;"/>` : `<div style="display:inline-block;background:rgba(255,255,255,0.15);border-radius:12px;padding:10px 20px;margin-bottom:12px;"><span style="color:#ffffff;font-size:22px;font-weight:700;">${companyName}</span></div>`}
-${tagline ? `<p style="color:rgba(255,255,255,0.75);font-size:13px;margin:0;">${tagline}</p>` : ''}
-</td></tr>
-<tr><td style="padding:40px 40px 32px 40px;">
-<h2 style="color:#0F172A;font-size:22px;font-weight:700;margin:0 0 8px 0;">Hoş Geldiniz! 🎉</h2>
-<p style="color:#475569;font-size:15px;margin:0 0 24px 0;">${invitedByName ? `<strong>${invitedByName}</strong> tarafından ` : ''}<strong>${companyName}</strong>'a <span style="color:${primaryColor};font-weight:600;">${roleLabel}</span> olarak davet edildiniz.</p>
-<div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;padding:20px 24px;margin-bottom:28px;">
-<p style="color:#64748B;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin:0 0 12px 0;">Erişim Bilgileriniz</p>
-<table cellpadding="0" cellspacing="0" width="100%">
-<tr><td style="color:#64748B;font-size:14px;padding:4px 0;width:120px;">Platform</td><td style="color:#0F172A;font-size:14px;font-weight:600;padding:4px 0;">${companyName}</td></tr>
-<tr><td style="color:#64748B;font-size:14px;padding:4px 0;">Rol</td><td style="color:#0F172A;font-size:14px;font-weight:600;padding:4px 0;">${roleLabel}</td></tr>
-</table></div>
-<div style="text-align:center;margin-bottom:28px;">
-<a href="${inviteLink}" style="background:${primaryColor};color:#ffffff;padding:15px 36px;text-decoration:none;border-radius:10px;font-weight:700;font-size:15px;display:inline-block;">Daveti Kabul Et →</a>
-</div>
-<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:14px 18px;">
-<p style="color:#92400E;font-size:12px;margin:0;"><strong>Not:</strong> Bu davet linki kişiseldir ve yalnızca bir kez kullanılabilir.</p>
-</div>
-<p style="color:#94A3B8;font-size:12px;margin:24px 0 0 0;">Butona tıklayamıyorsanız: <a href="${inviteLink}" style="color:${primaryColor};word-break:break-all;">${inviteLink}</a></p>
-</td></tr>
-<tr><td style="background:#F8FAFC;padding:24px 40px;border-top:1px solid #E2E8F0;text-align:center;">
-<p style="color:#94A3B8;font-size:12px;margin:0;">Bu e-posta <strong style="color:${primaryColor};">${companyName}</strong> tarafından ${website ? `<a href="${website}" style="color:${primaryColor};text-decoration:none;">${website}</a>` : 'Talent-Inn platformu'} üzerinden gönderilmiştir.</p>
-</td></tr>
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#F1F5F9;padding:32px 16px;"><tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 8px 32px rgba(30,58,138,0.10);">
+
+  <!-- TALENT-INN HEADER — always platform branded -->
+  <tr><td style="background:linear-gradient(135deg,${TI_COLOR} 0%,#3B5FD9 100%);padding:36px 40px 28px 40px;text-align:center;">
+    <div style="display:inline-block;background:rgba(255,255,255,0.12);border-radius:14px;padding:10px 22px;margin-bottom:14px;">
+      <span style="color:#ffffff;font-size:26px;font-weight:800;letter-spacing:-0.5px;">Talent</span><span style="color:#93C5FD;font-size:26px;font-weight:800;letter-spacing:-0.5px;">-Inn</span>
+    </div>
+    <p style="color:rgba(255,255,255,0.80);font-size:13px;margin:0;letter-spacing:0.02em;">AI Destekli İK Yönetimi &amp; Otonom Mülakat Koçu</p>
+  </td></tr>
+
+  <!-- BODY -->
+  <tr><td style="padding:36px 40px 28px 40px;">
+    <h2 style="color:#0F172A;font-size:22px;font-weight:800;margin:0 0 6px 0;">Platforma Davet Edildiniz! 🎉</h2>
+    <p style="color:#475569;font-size:15px;line-height:1.6;margin:0 0 28px 0;">
+      ${invitedByName ? `<strong style="color:#0F172A;">${invitedByName}</strong> sizi ` : 'Siz '}
+      <strong style="color:#0F172A;">${companyName}</strong> adına
+      <strong>Talent-Inn</strong> platformuna
+      <span style="display:inline-block;background:${TI_LIGHT};color:${TI_COLOR};font-weight:700;font-size:13px;padding:2px 10px;border-radius:6px;border:1px solid #C7D2FE;">${roleLabel}</span>
+      olarak davet etti.
+    </p>
+
+    <!-- WHAT IS TALENT-INN -->
+    <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:14px;padding:22px 26px;margin-bottom:28px;">
+      <p style="color:#64748B;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;margin:0 0 14px 0;">Talent-Inn nedir?</p>
+      <p style="color:#334155;font-size:14px;line-height:1.65;margin:0 0 16px 0;">
+        Talent-Inn; yapay zeka destekli bir <strong>İnsan Kaynakları yönetimi ve işe alım platformudur</strong>.
+        CV analizi, aday pipeline takibi ve <strong>otonom mülakat koçu</strong> sayesinde işe alım süreçlerinizi uçtan uca dijitalleştirir.
+      </p>
+      <table cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+          <td style="width:50%;vertical-align:top;padding:4px 8px 4px 0;">
+            <span style="color:${TI_COLOR};font-size:15px;">&#10003;</span>
+            <span style="color:#334155;font-size:13px;"> AI CV Analizi &amp; Skorlama</span>
+          </td>
+          <td style="width:50%;vertical-align:top;padding:4px 0 4px 8px;">
+            <span style="color:${TI_COLOR};font-size:15px;">&#10003;</span>
+            <span style="color:#334155;font-size:13px;"> Otonom Mülakat Koçu</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="width:50%;vertical-align:top;padding:4px 8px 4px 0;">
+            <span style="color:${TI_COLOR};font-size:15px;">&#10003;</span>
+            <span style="color:#334155;font-size:13px;"> Aday Pipeline Yönetimi</span>
+          </td>
+          <td style="width:50%;vertical-align:top;padding:4px 0 4px 8px;">
+            <span style="color:${TI_COLOR};font-size:15px;">&#10003;</span>
+            <span style="color:#334155;font-size:13px;"> Gerçek Zamanlı Raporlama</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="width:50%;vertical-align:top;padding:4px 8px 4px 0;">
+            <span style="color:${TI_COLOR};font-size:15px;">&#10003;</span>
+            <span style="color:#334155;font-size:13px;"> STAR Yetkinlik Değerlendirmesi</span>
+          </td>
+          <td style="width:50%;vertical-align:top;padding:4px 0 4px 8px;">
+            <span style="color:${TI_COLOR};font-size:15px;">&#10003;</span>
+            <span style="color:#334155;font-size:13px;"> Departman Bazlı Erişim</span>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- INVITE DETAILS BOX -->
+    <div style="background:${TI_LIGHT};border:1px solid #C7D2FE;border-radius:12px;padding:18px 22px;margin-bottom:28px;">
+      <p style="color:#3730A3;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;margin:0 0 10px 0;">Davet Detayları</p>
+      <table cellpadding="0" cellspacing="0" width="100%">
+        <tr><td style="color:#6366F1;font-size:13px;padding:3px 0;width:110px;">Şirket</td><td style="color:#1E1B4B;font-size:13px;font-weight:700;padding:3px 0;">${companyName}</td></tr>
+        <tr><td style="color:#6366F1;font-size:13px;padding:3px 0;">Rol</td><td style="color:#1E1B4B;font-size:13px;font-weight:700;padding:3px 0;">${roleLabel}</td></tr>
+        ${invitedByName ? `<tr><td style="color:#6366F1;font-size:13px;padding:3px 0;">Davet Eden</td><td style="color:#1E1B4B;font-size:13px;font-weight:700;padding:3px 0;">${invitedByName}</td></tr>` : ''}
+        <tr><td style="color:#6366F1;font-size:13px;padding:3px 0;">Platform</td><td style="color:#1E1B4B;font-size:13px;font-weight:700;padding:3px 0;">Talent-Inn</td></tr>
+      </table>
+    </div>
+
+    <!-- CTA -->
+    <div style="text-align:center;margin-bottom:28px;">
+      <a href="${inviteLink}" style="background:linear-gradient(135deg,${TI_COLOR} 0%,#3B5FD9 100%);color:#ffffff;padding:16px 40px;text-decoration:none;border-radius:12px;font-weight:800;font-size:15px;display:inline-block;letter-spacing:0.01em;">Daveti Kabul Et &amp; Başla →</a>
+    </div>
+
+    <!-- ONE-TIME LINK WARNING -->
+    <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:12px 16px;margin-bottom:20px;">
+      <p style="color:#92400E;font-size:12px;margin:0;"><strong>&#9888; Not:</strong> Bu davet linki kişiseldir ve yalnızca bir kez kullanılabilir. Başkasıyla paylaşmayın.</p>
+    </div>
+
+    <p style="color:#94A3B8;font-size:11px;margin:0;">Butona tıklayamıyorsanız bu bağlantıyı kopyalayın:<br/><a href="${inviteLink}" style="color:${TI_COLOR};word-break:break-all;font-size:11px;">${inviteLink}</a></p>
+  </td></tr>
+
+  <!-- FOOTER -->
+  <tr><td style="background:#F8FAFC;padding:20px 40px;border-top:1px solid #E2E8F0;text-align:center;">
+    <p style="color:#64748B;font-size:12px;font-weight:700;margin:0 0 4px 0;">Talent-Inn &mdash; AI Destekli İK &amp; Mülakat Platformu</p>
+    <p style="color:#94A3B8;font-size:11px;margin:0;">Bu e-posta <strong>${companyName}</strong> adına Talent-Inn tarafından gönderilmiştir.</p>
+  </td></tr>
+
 </table>
 </td></tr></table>
 </body></html>`;
@@ -802,15 +871,15 @@ app.post('/api/send-invite', async (req, res) => {
             socketTimeout: 20000
         });
 
-        const brandingData = branding || { companyName: 'Talent-Inn', primaryColor: '#1E3A8A' };
+        const brandingData = branding || {};
+        const companyName = brandingData.companyName || 'Talent-Inn';
         const roleLabel = role === 'super_admin' ? 'Süper Admin' : role === 'department_user' ? 'Departman Kullanıcısı' : 'Recruiter';
-        const fromName = brandingData.companyName || 'Talent-Inn';
 
         const mailOptions = {
-            from: `"${fromName}" <${process.env.EMAIL_USER}>`,
+            from: `"Talent-Inn" <${process.env.EMAIL_USER}>`,
             to: email,
-            subject: `${fromName}'a Davet Edildiniz — ${roleLabel}`,
-            html: buildInviteEmailHtml(brandingData, { inviteLink, role, invitedByName })
+            subject: `Talent-Inn'e Davet Edildiniz — ${roleLabel} | ${companyName}`,
+            html: buildInviteEmailHtml({ companyName }, { inviteLink, role, invitedByName })
         };
 
         await transporter.sendMail(mailOptions);
