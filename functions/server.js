@@ -2060,6 +2060,27 @@ app.post('/api/suggest-screening-questions', aiLimiter, async (req, res) => {
     }
 });
 
+app.post('/api/improve-screening-question', aiLimiter, async (req, res) => {
+    const { question, positionTitle, requirements } = req.body || {};
+    if (!question?.trim()) return res.status(400).json({ error: 'question is required.' });
+    const apiKey = await getApiKey();
+    if (!apiKey) return res.status(503).json({ error: 'AI service unavailable.' });
+    const prompt = `Sen bir kıdemli İK uzmanısın. Aşağıdaki ön eleme sorusunu daha net, profesyonel ve ölçülebilir hale getir. Soruyu kısalt, anlaşılırlığını artır ve pozisyonla ilişkisini güçlendir.\n\nPozisyon: ${positionTitle || 'Genel Pozisyon'}\nGereksinimler: ${requirements || ''}\nMevcut soru: ${question}\n\nYalnızca şu JSON formatında yanıt ver (başka hiçbir şey yazma):\n{"improved": "Düzenlenmiş soru metni"}`;
+    try {
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        const result = await model.generateContent(prompt);
+        const rawText = result.response.text().replace(/```json|```/gi, '').trim();
+        const match = rawText.match(/\{[\s\S]*\}/);
+        if (!match) return res.status(500).json({ error: 'AI response could not be parsed.' });
+        const parsed = JSON.parse(match[0]);
+        res.json({ improved: parsed.improved || question });
+    } catch (err) {
+        console.error('[improve-screening-question] Error:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // ─── Send Info Request Email ──────────────────────────────────────────────────
 app.post('/api/send-info-request', generalLimiter, verifyFirebaseToken, async (req, res) => {
     const { to, candidateName, recruiterName, position, requestMessage, requestedItems, sessionId, candidateId, branding } = req.body;

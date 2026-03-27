@@ -49,6 +49,7 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
     const [syncingAppId, setSyncingAppId] = useState(null);
     const [syncedAppIds, setSyncedAppIds] = useState(new Set());
     const [deletingAppId, setDeletingAppId] = useState(null);
+    const [screeningFilter, setScreeningFilter] = useState('all');
 
     // Build the apply URL
     const baseUrl = typeof window !== 'undefined' ? `${window.location.origin}/apply/${pos.id}` : `/apply/${pos.id}`;
@@ -314,11 +315,44 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                                     })}
                                 </div>
 
-                                {applications.map(app => {
-                                    const sc = getSourceColor(app.source);
-                                    const stCfg = APP_STATUS_CONFIG[app.status] || APP_STATUS_CONFIG.new;
-                                    const scoreColor = app.aiScore >= 75 ? 'text-emerald-500' : app.aiScore >= 50 ? 'text-amber-500' : 'text-red-400';
-                                    return (
+                                {/* Screening Score Filter */}
+                                {(() => {
+                                    const getScreeningLevel = (score) => {
+                                        if (score == null) return { key: 'none', label: 'Taranmadı', cls: 'bg-slate-100 text-slate-400 border-slate-200' };
+                                        if (score >= 85) return { key: 'best', label: 'Çok İyi', cls: 'bg-emerald-50 text-emerald-600 border-emerald-200' };
+                                        if (score >= 65) return { key: 'good', label: 'İyi', cls: 'bg-blue-50 text-blue-600 border-blue-200' };
+                                        if (score >= 40) return { key: 'medium', label: 'Orta', cls: 'bg-amber-50 text-amber-600 border-amber-200' };
+                                        return { key: 'weak', label: 'Zayıf', cls: 'bg-red-50 text-red-500 border-red-200' };
+                                    };
+                                    const FILTER_OPTS = [
+                                        { key: 'all', label: 'Tümü' },
+                                        { key: 'best', label: 'Çok İyi ≥85' },
+                                        { key: 'good', label: 'İyi 65–84' },
+                                        { key: 'medium', label: 'Orta 40–64' },
+                                        { key: 'weak', label: 'Zayıf <40' },
+                                        { key: 'none', label: 'Taranmadı' },
+                                    ];
+                                    const filteredApps = screeningFilter === 'all'
+                                        ? applications
+                                        : applications.filter(a => getScreeningLevel(a.screeningScore).key === screeningFilter);
+                                    return (<>
+                                        <div className="flex gap-1.5 flex-wrap mb-3 pt-1">
+                                            {FILTER_OPTS.map(o => (
+                                                <button
+                                                    key={o.key}
+                                                    onClick={() => setScreeningFilter(o.key)}
+                                                    className={`px-2.5 py-1 rounded-lg border text-[9px] font-black uppercase tracking-wide transition-all ${screeningFilter === o.key ? 'bg-violet-500 text-white border-violet-500' : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300'}`}
+                                                >
+                                                    {o.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        {filteredApps.map(app => {
+                                            const sc = getSourceColor(app.source);
+                                            const stCfg = APP_STATUS_CONFIG[app.status] || APP_STATUS_CONFIG.new;
+                                            const scoreColor = app.aiScore >= 75 ? 'text-emerald-500' : app.aiScore >= 50 ? 'text-amber-500' : 'text-red-400';
+                                            const slv = getScreeningLevel(app.screeningScore);
+                                            return (
                                         <div key={app.id} className="bg-white border border-slate-200 rounded-2xl p-4 hover:border-violet-200 transition-colors">
                                             <div className="flex items-start gap-3">
                                                 <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-400 to-violet-600 flex items-center justify-center text-white text-xs font-black shrink-0">
@@ -332,6 +366,9 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                                                     <div className="text-[11px] text-slate-400 truncate">{app.email}</div>
                                                     <div className="flex items-center gap-2 mt-2 flex-wrap">
                                                         <span className={`inline-flex px-2.5 py-0.5 rounded-full border text-[9px] font-black ${stCfg.pill}`}>{stCfg.label}</span>
+                                                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] font-black ${slv.cls}`}>
+                                                            {app.screeningScore != null ? `${Math.round(app.screeningScore)}p` : ''} {slv.label}
+                                                        </span>
                                                         {app.cvFileName && (
                                                             <span className="inline-flex items-center gap-1 text-[10px] text-slate-400">
                                                                 <FileText size={10} />{app.cvFileName}
@@ -391,8 +428,10 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                                                 )}
                                             </div>
                                         </div>
-                                    );
-                                })}
+                                            );
+                                        })}
+                                    </>);
+                                })()}
                             </div>
                         )}
                     </div>
@@ -503,8 +542,7 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
     );
 }
 
-// ─────────────────────────────────────────────────────────────
-// CREATE MODAL
+// CREATE MODAL — Full Screen
 // ─────────────────────────────────────────────────────────────
 function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser, userDepartments, isExtracting, onExtract, jdText, setJdText }) {
     const [formData, setFormData] = useState({
@@ -512,6 +550,7 @@ function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser,
         screeningEnabled: false, screeningQuestions: [''],
     });
     const [suggestingQuestions, setSuggestingQuestions] = useState(false);
+    const [improvingIdx, setImprovingIdx] = useState(null);
 
     const handleSuggestQuestions = async () => {
         if (suggestingQuestions) return;
@@ -527,13 +566,38 @@ function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser,
             });
             const data = await res.json();
             const qs = (data.questions || []).filter(q => q && q.trim());
-            if (qs.length > 0) {
-                setFormData(p => ({ ...p, screeningEnabled: true, screeningQuestions: qs }));
-            }
+            if (qs.length > 0) setFormData(p => ({ ...p, screeningEnabled: true, screeningQuestions: qs }));
         } catch (err) {
             console.error('Screening question suggestion error:', err);
         } finally {
             setSuggestingQuestions(false);
+        }
+    };
+
+    const handleImproveQuestion = async (idx) => {
+        const q = formData.screeningQuestions[idx]?.trim();
+        if (!q || improvingIdx !== null) return;
+        setImprovingIdx(idx);
+        try {
+            const res = await fetch('/api/improve-screening-question', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    question: q,
+                    positionTitle: formData.title.trim() || 'Genel Pozisyon',
+                    requirements: formData.requirements.trim() || '',
+                }),
+            });
+            const data = await res.json();
+            if (data.improved) {
+                const next = [...formData.screeningQuestions];
+                next[idx] = data.improved;
+                setFormData(p => ({ ...p, screeningQuestions: next }));
+            }
+        } catch (err) {
+            console.error('Improve question error:', err);
+        } finally {
+            setImprovingIdx(null);
         }
     };
 
@@ -542,164 +606,229 @@ function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser,
         onSubmit(formData);
     };
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
-            <div className="absolute inset-0 bg-slate-900/25 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
+    const descLen = formData.description.length;
 
-                {/* Header */}
-                <div className="px-8 py-5 border-b border-slate-100 flex items-center justify-between shrink-0">
-                    <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-teal-50 border border-teal-100 flex items-center justify-center">
-                            <Briefcase size={16} className="text-teal-600" />
-                        </div>
-                        <div>
-                            <h2 className="text-[16px] font-black text-slate-900 leading-tight">Yeni Pozisyon Oluştur</h2>
-                            <p className="text-[11px] text-slate-400 font-medium">Stratejik işe alım planlaması</p>
-                        </div>
+    return (
+        <div className="fixed inset-0 z-50 bg-white flex flex-col overflow-hidden">
+            {/* HEADER */}
+            <div className="px-8 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white shadow-sm">
+                <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-teal-50 border border-teal-100 flex items-center justify-center">
+                        <Briefcase size={18} className="text-teal-600" />
                     </div>
-                    <button onClick={onClose} className="p-2 rounded-xl hover:bg-slate-100 transition-colors">
-                        <XCircle size={20} className="text-slate-400" />
+                    <div>
+                        <h2 className="text-[17px] font-black text-slate-900 leading-tight">Yeni Pozisyon Oluştur</h2>
+                        <p className="text-[11px] text-slate-400 font-medium">Stratejik işe alım planlaması</p>
+                    </div>
+                </div>
+                <button onClick={onClose} className="p-2.5 rounded-xl hover:bg-slate-100 transition-colors text-slate-400 hover:text-slate-600">
+                    <XCircle size={22} />
+                </button>
+            </div>
+
+            {/* BODY: 3-column */}
+            <div className="flex flex-1 overflow-hidden divide-x divide-slate-100">
+
+                {/* COLUMN 1: AI Auto-fill */}
+                <div className="w-80 shrink-0 flex flex-col bg-gradient-to-b from-cyan-50/60 to-white overflow-y-auto p-6">
+                    <div className="flex items-center gap-2 mb-3">
+                        <Sparkles size={14} className="text-cyan-500" />
+                        <h3 className="text-[11px] font-black text-cyan-700 uppercase tracking-widest">AI ile Otomatik Doldur</h3>
+                    </div>
+                    <p className="text-[12px] text-slate-500 mb-3 leading-relaxed">İş ilanı metnini yapıştırın, AI tüm alanları otomatik dolduracak.</p>
+                    <textarea
+                        className="flex-1 min-h-[180px] bg-white border border-cyan-200 rounded-2xl p-4 text-sm text-slate-600 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-100 resize-none transition-all"
+                        placeholder="İş ilanı metnini buraya yapıştırın... (en az 50 karakter)"
+                        value={jdText}
+                        onChange={(e) => setJdText(e.target.value)}
+                    />
+                    <div className="flex items-center justify-between mt-1 mb-3">
+                        <p className="text-[10px] text-slate-400">{jdText.length} karakter</p>
+                        {jdText.length >= 50 && <p className="text-[10px] text-emerald-500 font-bold">Hazır ✓</p>}
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => onExtract(formData, setFormData)}
+                        disabled={isExtracting || jdText.length < 50}
+                        className="w-full bg-cyan-500 hover:bg-cyan-600 text-white font-bold text-xs py-3 rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm shadow-cyan-200"
+                    >
+                        {isExtracting ? <><Loader2 size={14} className="animate-spin" />Analiz ediliyor...</> : <><Sparkles size={14} />Otomatik Doldur</>}
                     </button>
+                    <div className="mt-5 space-y-2">
+                        {['Pozisyon başlığı otomatik belirlenir', 'Gereksinimler listeye dönüştürülür', 'Departman tahmini yapılır', 'Kısa pozisyon özeti oluşturulur'].map(t => (
+                            <div key={t} className="flex items-center gap-2">
+                                <CheckCircle2 size={12} className="text-emerald-500 shrink-0" />
+                                <span className="text-[12px] text-slate-500">{t}</span>
+                            </div>
+                        ))}
+                    </div>
                 </div>
 
-                {/* Body */}
-                <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-100 overflow-y-auto">
-
-                    {/* Left: AI */}
-                    <div className="p-6 bg-gradient-to-b from-cyan-50/50 to-white flex flex-col">
-                        <div className="flex items-center gap-2 mb-4">
-                            <Sparkles size={14} className="text-cyan-500" />
-                            <h3 className="text-[11px] font-black text-cyan-700 uppercase tracking-widest">AI ile Otomatik Doldur</h3>
+                {/* COLUMN 2: Position Details */}
+                <form id="create-pos-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-8">
+                    <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-5">Pozisyon Bilgileri</h3>
+                    <div className="space-y-5">
+                        <Field label="Pozisyon Adı *">
+                            <input
+                                type="text" required
+                                placeholder="ör. Senior React Developer, Ürün Müdürü..."
+                                value={formData.title}
+                                onChange={e => setFormData(p => ({ ...p, title: e.target.value }))}
+                                className={INPUT_CLS}
+                            />
+                        </Field>
+                        <div className="grid grid-cols-2 gap-4">
+                            <Field label="Departman *">
+                                {isDepartmentUser ? (
+                                    <input type="text" disabled value={userDepartments?.[0] || ''} className={INPUT_CLS + ' opacity-60 cursor-not-allowed'} />
+                                ) : (
+                                    <select required value={formData.department} onChange={e => setFormData(p => ({ ...p, department: e.target.value }))} className={INPUT_CLS + ' appearance-none cursor-pointer'}>
+                                        <option value="" disabled>Departman seç...</option>
+                                        {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+                                    </select>
+                                )}
+                            </Field>
+                            <Field label="Min. Tecrübe (yıl)">
+                                <input
+                                    type="number" min="0" placeholder="0"
+                                    value={formData.minExperience}
+                                    onChange={e => setFormData(p => ({ ...p, minExperience: e.target.value }))}
+                                    className={INPUT_CLS}
+                                />
+                            </Field>
                         </div>
-                        <textarea
-                            className="h-40 bg-white border border-cyan-200 rounded-2xl p-4 text-sm text-slate-600 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-100 resize-none transition-all"
-                            placeholder="İş ilanı metnini buraya yapıştırın..."
-                            value={jdText}
-                            onChange={(e) => setJdText(e.target.value)}
-                        />
-                        <p className="text-[10px] text-slate-400 mt-2 px-1">Min. 50 karakter</p>
+                        <Field label="Teknik Gereksinimler">
+                            <input
+                                type="text"
+                                placeholder="React, TypeScript, Node.js, SQL... (virgülle ayırın)"
+                                value={formData.requirements}
+                                onChange={e => setFormData(p => ({ ...p, requirements: e.target.value }))}
+                                className={INPUT_CLS}
+                            />
+                            <p className="text-[10px] text-slate-400 mt-1">Beceriler, teknolojiler veya sertifikalar</p>
+                        </Field>
+                        <Field label="Pozisyon Açıklaması">
+                            <textarea
+                                placeholder="Bu pozisyon neden açıldı? Ekibe nasıl katkı sağlayacak? (2-3 cümle)"
+                                value={formData.description}
+                                maxLength={320}
+                                onChange={e => setFormData(p => ({ ...p, description: e.target.value }))}
+                                className={INPUT_CLS + ' h-28 resize-none'}
+                            />
+                            <div className="flex items-center justify-between mt-1">
+                                <p className="text-[10px] text-slate-400">Kısa genel özet — tam iş ilanı değil</p>
+                                <p className={`text-[10px] font-bold ${descLen > 280 ? 'text-amber-500' : 'text-slate-400'}`}>{descLen}/320</p>
+                            </div>
+                        </Field>
+                    </div>
+                </form>
+
+                {/* COLUMN 3: Screening Questions */}
+                <div className="w-[400px] shrink-0 flex flex-col overflow-y-auto p-6 bg-slate-50/40">
+                    <div className="flex items-center justify-between mb-1">
+                        <div>
+                            <h3 className="text-[11px] font-black text-slate-700 uppercase tracking-widest">Ön Eleme Soruları</h3>
+                            <p className="text-[10px] text-slate-400 mt-0.5">Adaylar yanıtlar — AI otomatik skorlar</p>
+                        </div>
                         <button
                             type="button"
-                            onClick={() => onExtract(formData, setFormData)}
-                            disabled={isExtracting || jdText.length < 50}
-                            className="w-full mt-3 bg-cyan-500 hover:bg-cyan-600 text-white font-bold text-xs py-3 rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            onClick={() => setFormData(p => ({ ...p, screeningEnabled: !p.screeningEnabled }))}
+                            className={`relative w-10 h-5 rounded-full transition-colors shrink-0 ${formData.screeningEnabled ? 'bg-cyan-500' : 'bg-slate-200'}`}
                         >
-                            {isExtracting ? <><Loader2 size={14} className="animate-spin" />Analiz ediliyor...</> : <><Sparkles size={14} />Otomatik Doldur</>}
+                            <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${formData.screeningEnabled ? 'left-5' : 'left-0.5'}`} />
                         </button>
-                        <div className="flex items-center mt-6 mb-4">
-                            <div className="flex-1 h-px bg-slate-100" />
-                            <span className="px-3 text-xs text-slate-400 font-medium">veya manuel doldurun</span>
-                            <div className="flex-1 h-px bg-slate-100" />
-                        </div>
-                        <div className="flex flex-col gap-2">
-                            {['Pozisyon başlığı otomatik belirlenir', 'Gereksinimler listeye dönüştürülür', 'Departman tahmini yapılır'].map(t => (
-                                <div key={t} className="flex items-center gap-2">
-                                    <CheckCircle2 size={12} className="text-emerald-500 shrink-0" />
-                                    <span className="text-xs text-slate-500">{t}</span>
-                                </div>
-                            ))}
-                        </div>
                     </div>
 
-                    {/* Right: Form */}
-                    <form onSubmit={handleSubmit} className="p-6 flex flex-col space-y-4">
-                        <Field label="Pozisyon Adı *">
-                            <input type="text" required placeholder="ör. Senior React Developer" value={formData.title} onChange={e => setFormData(p => ({ ...p, title: e.target.value }))} className={INPUT_CLS} />
-                        </Field>
-                        <Field label="Departman *">
-                            {isDepartmentUser ? (
-                                <input type="text" disabled value={userDepartments?.[0] || ''} className={INPUT_CLS + ' opacity-60 cursor-not-allowed'} />
-                            ) : (
-                                <select required value={formData.department} onChange={e => setFormData(p => ({ ...p, department: e.target.value }))} className={INPUT_CLS + ' appearance-none cursor-pointer'}>
-                                    <option value="" disabled>Departman seç...</option>
-                                    {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
-                                </select>
-                            )}
-                        </Field>
-                        <Field label="Min. Tecrübe (yıl)">
-                            <input type="number" min="0" placeholder="0" value={formData.minExperience} onChange={e => setFormData(p => ({ ...p, minExperience: e.target.value }))} className={INPUT_CLS} />
-                        </Field>
-                        <Field label="Gereksinimler">
-                            <input type="text" placeholder="React, TypeScript, Node.js (virgülle ayırın)" value={formData.requirements} onChange={e => setFormData(p => ({ ...p, requirements: e.target.value }))} className={INPUT_CLS} />
-                        </Field>
-                        <Field label="Açıklama">
-                            <textarea placeholder="Pozisyon hakkında kısa açıklama..." value={formData.description} onChange={e => setFormData(p => ({ ...p, description: e.target.value }))} className={INPUT_CLS + ' h-20 resize-none'} />
-                        </Field>
-                        {/* Screening Questions Toggle */}
-                        <div className="border border-slate-200 rounded-xl p-3 space-y-2">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-[11px] font-black text-slate-700">Ön Eleme Soruları</p>
-                                    <p className="text-[10px] text-slate-400">Başvuruculardan cevaplamaları isteniyor</p>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={handleSuggestQuestions}
-                                        disabled={suggestingQuestions}
-                                        title="AI ile otomatik soru öner"
-                                        className="flex items-center gap-1 px-2 py-1 rounded-lg bg-violet-50 border border-violet-200 text-[9px] font-black text-violet-600 hover:bg-violet-100 transition-colors disabled:opacity-50"
-                                    >
-                                        {suggestingQuestions ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />}
-                                        AI Öner
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setFormData(p => ({ ...p, screeningEnabled: !p.screeningEnabled }))}
-                                        className={`relative w-9 h-5 rounded-full transition-colors ${formData.screeningEnabled ? 'bg-cyan-500' : 'bg-slate-200'}`}
-                                    >
-                                        <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${formData.screeningEnabled ? 'left-4' : 'left-0.5'}`} />
-                                    </button>
-                                </div>
+                    {!formData.screeningEnabled ? (
+                        <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center py-10">
+                            <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center">
+                                <CheckCircle2 size={24} className="text-slate-300" />
                             </div>
-                            {formData.screeningEnabled && (
-                                <div className="space-y-2 pt-1">
-                                    {formData.screeningQuestions.map((q, i) => (
-                                        <div key={i} className="flex gap-2 items-start">
-                                            <span className="mt-2 text-[9px] font-black text-slate-400 w-4 shrink-0">{i + 1}.</span>
-                                            <input
-                                                type="text"
-                                                placeholder={`Soru ${i + 1}...`}
-                                                value={q}
-                                                onChange={e => {
-                                                    const next = [...formData.screeningQuestions];
-                                                    next[i] = e.target.value;
-                                                    setFormData(p => ({ ...p, screeningQuestions: next }));
-                                                }}
-                                                className={INPUT_CLS + ' flex-1'}
-                                            />
-                                            {formData.screeningQuestions.length > 1 && (
+                            <p className="text-[13px] text-slate-400 font-medium">Ön eleme kapalı</p>
+                            <p className="text-[11px] text-slate-300 max-w-[180px]">Açmak için yukarıdaki anahtarı kullanın</p>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col gap-3 mt-4">
+                            <button
+                                type="button"
+                                onClick={handleSuggestQuestions}
+                                disabled={suggestingQuestions}
+                                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-violet-50 border border-violet-200 text-[11px] font-black text-violet-600 hover:bg-violet-100 transition-colors disabled:opacity-50"
+                            >
+                                {suggestingQuestions ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
+                                {suggestingQuestions ? 'AI sorular oluşturuyor...' : 'AI ile 5 Soru Öner'}
+                            </button>
+                            <div className="space-y-3">
+                                {formData.screeningQuestions.map((q, i) => (
+                                    <div key={i} className="bg-white rounded-xl border border-slate-200 p-3 space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Soru {i + 1}</span>
+                                            <div className="flex items-center gap-1.5">
                                                 <button
                                                     type="button"
-                                                    onClick={() => setFormData(p => ({ ...p, screeningQuestions: p.screeningQuestions.filter((_, j) => j !== i) }))}
-                                                    className="mt-2 p-0.5 text-red-400 hover:text-red-600 transition-colors"
+                                                    onClick={() => handleImproveQuestion(i)}
+                                                    disabled={!q.trim() || improvingIdx !== null}
+                                                    title="AI ile soruyu düzelt ve geliştir"
+                                                    className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 border border-emerald-200 text-[9px] font-black text-emerald-600 hover:bg-emerald-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                                                 >
-                                                    <XCircle size={12} />
+                                                    {improvingIdx === i ? <Loader2 size={9} className="animate-spin" /> : <Sparkles size={9} />}
+                                                    AI Düzenle
                                                 </button>
-                                            )}
+                                                {formData.screeningQuestions.length > 1 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setFormData(p => ({ ...p, screeningQuestions: p.screeningQuestions.filter((_, j) => j !== i) }))}
+                                                        className="p-0.5 text-red-300 hover:text-red-500 transition-colors"
+                                                    >
+                                                        <XCircle size={13} />
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
-                                    ))}
-                                    {formData.screeningQuestions.length < 5 && (
-                                        <button
-                                            type="button"
-                                            onClick={() => setFormData(p => ({ ...p, screeningQuestions: [...p.screeningQuestions, ''] }))}
-                                            className="text-[10px] font-black text-cyan-600 hover:text-cyan-700 flex items-center gap-1 transition-colors"
-                                        >
-                                            <Plus size={11} /> Soru Ekle
-                                        </button>
-                                    )}
-                                </div>
+                                        <input
+                                            type="text"
+                                            placeholder="Sorunuzu buraya yazın veya AI önerisi ekleyin..."
+                                            value={q}
+                                            onChange={e => {
+                                                const next = [...formData.screeningQuestions];
+                                                next[i] = e.target.value;
+                                                setFormData(p => ({ ...p, screeningQuestions: next }));
+                                            }}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-[13px] text-slate-700 outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-100 transition-all"
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                            {formData.screeningQuestions.length < 8 && (
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData(p => ({ ...p, screeningQuestions: [...p.screeningQuestions, ''] }))}
+                                    className="w-full py-2.5 rounded-xl border-2 border-dashed border-slate-200 text-[11px] font-black text-slate-400 hover:border-cyan-300 hover:text-cyan-500 transition-colors flex items-center justify-center gap-1.5"
+                                >
+                                    <Plus size={12} /> Soru Ekle
+                                </button>
                             )}
+                            <div className="mt-2 bg-amber-50 border border-amber-100 rounded-xl p-3">
+                                <p className="text-[10px] text-amber-700 font-bold mb-1">AI Skorlama Aktif</p>
+                                <p className="text-[10px] text-amber-600 leading-relaxed">Adayların yanıtları Çok İyi / İyi / Orta / Zayıf olarak otomatik skorlanır.</p>
+                            </div>
                         </div>
-
-                        <div className="mt-auto pt-2">
-                            <button type="submit" className="w-full bg-cyan-500 hover:bg-cyan-600 text-white font-black text-xs uppercase tracking-widest py-3.5 rounded-xl flex items-center justify-center gap-2 shadow-sm shadow-cyan-200 transition-colors">
-                                <Send size={14} />{isDepartmentUser ? 'Talep Gönder' : 'Pozisyon Oluştur'}
-                            </button>
-                        </div>
-                    </form>
+                    )}
                 </div>
+            </div>
+
+            {/* FOOTER */}
+            <div className="px-8 py-4 border-t border-slate-100 bg-white flex items-center justify-between shrink-0">
+                <button type="button" onClick={onClose} className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-sm transition-colors">
+                    İptal
+                </button>
+                <button
+                    type="submit"
+                    form="create-pos-form"
+                    className="px-8 py-2.5 bg-cyan-500 hover:bg-cyan-600 text-white font-black text-sm uppercase tracking-widest rounded-xl flex items-center gap-2 shadow-sm shadow-cyan-200 transition-colors"
+                >
+                    <Send size={15} />{isDepartmentUser ? 'Talep Gönder' : 'Pozisyon Oluştur'}
+                </button>
             </div>
         </div>
     );
