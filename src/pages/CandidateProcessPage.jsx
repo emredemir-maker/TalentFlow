@@ -10,7 +10,7 @@ import { calculateMatchScore, filterPositionsByDomain, domainLabel, detectCandid
 import { applyPiiMask, stripPiiForAI } from '../utils/pii';
 import { getFeedbackEmail } from '../utils/templateService';
 import { db } from '../config/firebase';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore';
 import SystemScanner from '../components/SystemScanner';
 import AddCandidateModal from '../components/AddCandidateModal';
 import {
@@ -330,7 +330,6 @@ export default function CandidateProcessPage() {
             const respondUrl = `${APP_URL}/respond/${requestId}?type=info`;
 
             // Write the record from the client (Firebase client SDK always has auth)
-            const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
             await setDoc(doc(db, `artifacts/talent-flow/public/data/infoRequests/${requestId}`), {
                 requestId,
                 candidateId: candidate.id || null,
