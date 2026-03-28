@@ -2246,6 +2246,71 @@ function decodeEncodedWords(str) {
     });
 }
 
+// ── Extract only the "new" part of a reply email (strip quoted content) ───────
+function extractReplyText(rawBodyText, rawHeaders) {
+    const ctLine = (rawHeaders || '').match(/^Content-Type:\s*(.+?)(?:\r?\n(?!\s)|\r?\n\r?\n|$)/im)?.[1] || '';
+    const ct = ctLine.toLowerCase();
+    const isMultipart = ct.includes('multipart/');
+    const boundaryMatch = ctLine.match(/boundary=(?:"([^"]+)"|([^\s;]+))/i);
+    const boundary = boundaryMatch ? (boundaryMatch[1] || boundaryMatch[2]) : null;
+    const hdrs = (rawHeaders || '').toLowerCase();
+
+    function decodeQP(str) {
+        return str.replace(/=\r?\n/g, '').replace(/=([0-9A-Fa-f]{2})/g, (_, h) => {
+            try { return String.fromCharCode(parseInt(h, 16)); } catch { return ''; }
+        });
+    }
+    function decodeB64(str) {
+        try { return Buffer.from(str.replace(/\s+/g, ''), 'base64').toString('utf8'); } catch { return str; }
+    }
+    function decodePartBody(body, partHeaders) {
+        const ph = partHeaders.toLowerCase();
+        if (ph.includes('quoted-printable')) return decodeQP(body);
+        if (ph.includes('base64')) return decodeB64(body);
+        return body;
+    }
+    function stripHtmlReply(html) {
+        return html
+            .replace(/<div[^>]*class="[^"]*gmail_quote[^"]*"[\s\S]*?<\/div\s*>/gi, '')
+            .replace(/<div[^>]*class="[^"]*gmail_attr[^"]*"[\s\S]*?<\/div\s*>/gi, '')
+            .replace(/<blockquote[\s\S]*?<\/blockquote\s*>/gi, '')
+            .replace(/<\/?(p|div|br|h[1-6]|li|tr)[^>]*>/gi, '\n')
+            .replace(/<[^>]+>/g, '')
+            .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+            .replace(/[ \t]+/g, ' ').replace(/\n[ \t]*/g, '\n').replace(/\n{3,}/g, '\n\n')
+            .trim();
+    }
+    function stripPlainReply(str) {
+        const onWroteIdx = str.search(/^On .{0,200}wrote:\s*$/m);
+        if (onWroteIdx > 10) str = str.slice(0, onWroteIdx);
+        return str.split('\n').filter(ln => !ln.trimStart().startsWith('>')).join('\n').replace(/\n{3,}/g, '\n\n').trim();
+    }
+
+    if (isMultipart && boundary) {
+        const esc = boundary.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const parts = rawBodyText.split(new RegExp(`--${esc}(?:--)?`));
+        let plainPart = '', htmlPart = '';
+        for (const part of parts) {
+            const sep = part.search(/\r?\n\r?\n/);
+            if (sep === -1) continue;
+            const ph = part.slice(0, sep);
+            const pb = part.slice(sep).replace(/^\r?\n/, '');
+            const decoded = decodePartBody(pb, ph);
+            if (/content-type:\s*text\/plain/i.test(ph)) plainPart = decoded;
+            else if (/content-type:\s*text\/html/i.test(ph)) htmlPart = decoded;
+        }
+        if (plainPart) return stripPlainReply(plainPart);
+        if (htmlPart) return stripHtmlReply(htmlPart);
+        return '';
+    }
+
+    const enc = hdrs.includes('quoted-printable') ? 'qp' : hdrs.includes('base64') ? 'b64' : 'raw';
+    const decoded = enc === 'qp' ? decodeQP(rawBodyText) : enc === 'b64' ? decodeB64(rawBodyText) : rawBodyText;
+    const looksHtml = /<html|<div|<p[ >]|<br/i.test(decoded.slice(0, 500));
+    return looksHtml ? stripHtmlReply(decoded) : stripPlainReply(decoded);
+}
+
 // ── Check for email replies to info requests via IMAP ─────────────────────────
 function fetchImapInfoReplies() {
     return new Promise((resolve, reject) => {
@@ -2277,7 +2342,7 @@ function fetchImapInfoReplies() {
                 }
                 console.log(`📬 SINCE araması: ${uids.length} UID bulundu`);
                 const slice = uids.slice(-200);
-                const f = imap.fetch(slice, { bodies: ['HEADER.FIELDS (FROM SUBJECT DATE)', 'TEXT'], struct: false });
+                const f = imap.fetch(slice, { bodies: ['HEADER.FIELDS (FROM SUBJECT DATE CONTENT-TYPE CONTENT-TRANSFER-ENCODING MIME-VERSION)', 'TEXT'], struct: false });
                 let pending = 0;
                 let fetchEnded = false;
                 const tryFinish = () => { if (fetchEnded && pending === 0) finish(); };
@@ -2311,14 +2376,7 @@ function fetchImapInfoReplies() {
                         const emailMatch = fromDecoded.match(/<([^>]+@[^>]+)>/) || fromDecoded.match(/([^\s<>]+@[^\s<>]+)/);
                         if (idMatch && emailMatch) {
                             console.log(`  ✅ Match: requestId=${idMatch[1]} from=${emailMatch[1]}`);
-                            const cleanBody = bodyText
-                                .replace(/<[^>]+>/g, ' ')
-                                .replace(/&nbsp;/g, ' ')
-                                .replace(/\r\n/g, '\n')
-                                .replace(/On .+wrote:/gs, '')
-                                .replace(/^>.*$/gm, '')
-                                .replace(/\n{3,}/g, '\n\n')
-                                .trim();
+                            const cleanBody = extractReplyText(bodyText, raw);
                             replies.push({ requestId: idMatch[1].trim(), from: emailMatch[1].trim().toLowerCase(), subject, replyBody: cleanBody });
                         }
                         tryFinish();
