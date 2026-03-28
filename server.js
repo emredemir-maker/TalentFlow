@@ -2390,7 +2390,7 @@ function fetchImapInfoReplies() {
                 if (!uids || uids.length === 0) return finish();
                 const slice = uids.slice(-200);
                 console.log(`📬 Son ${slice.length} UID işlenecek (max 200)`);
-                const f = imap.fetch(slice, { bodies: 'HEADER.FIELDS (FROM SUBJECT DATE)', struct: false });
+                const f = imap.fetch(slice, { bodies: ['HEADER.FIELDS (FROM SUBJECT DATE)', 'TEXT'], struct: false });
                 let pending = 0;
                 let fetchEnded = false;
                 let totalParsed = 0;
@@ -2403,10 +2403,14 @@ function fetchImapInfoReplies() {
                 f.on('message', (msg) => {
                     pending++;
                     let raw = '';
-                    msg.on('body', (stream) => {
+                    let bodyText = '';
+                    msg.on('body', (stream, info) => {
                         let buf = '';
                         stream.on('data', c => buf += c.toString('utf8'));
-                        stream.once('end', () => { raw = buf; });
+                        stream.once('end', () => {
+                            if (info.which === 'TEXT') bodyText = buf;
+                            else raw = buf;
+                        });
                     });
                     msg.once('end', () => {
                         pending--;
@@ -2435,7 +2439,16 @@ function fetchImapInfoReplies() {
                         }
                         if (idMatch && emailMatch) {
                             console.log(`  ✅ Match: requestId=${idMatch[1]} from=${emailMatch[1]}`);
-                            replies.push({ requestId: idMatch[1].trim(), from: emailMatch[1].trim().toLowerCase(), subject });
+                            // Strip quoted reply and HTML tags from body
+                            const cleanBody = bodyText
+                                .replace(/<[^>]+>/g, ' ')        // strip HTML tags
+                                .replace(/&nbsp;/g, ' ')
+                                .replace(/\r\n/g, '\n')
+                                .replace(/On .+wrote:/gs, '')     // strip quoted preface
+                                .replace(/^>.*$/gm, '')           // strip quoted lines
+                                .replace(/\n{3,}/g, '\n\n')       // normalize whitespace
+                                .trim();
+                            replies.push({ requestId: idMatch[1].trim(), from: emailMatch[1].trim().toLowerCase(), subject, replyBody: cleanBody });
                         }
                         tryFinish();
                     });
@@ -2476,8 +2489,12 @@ app.post('/api/check-info-replies', generalLimiter, verifyFirebaseToken, async (
                 if (!existing) { console.warn(`⚠️ requestId ${reply.requestId} Firestore'da bulunamadı`); continue; }
                 // Parse status field from Firestore REST response
                 const status = existing.fields?.status?.stringValue;
-                if (status !== 'pending') continue;
-                await fsPatch(docPath, { status: 'responded', respondedAt: new Date(), replySubject: reply.subject }, token);
+                const existingReplyBody = existing.fields?.replyBody?.stringValue || '';
+                // Skip if already responded AND we already have the reply body
+                if (status !== 'pending' && existingReplyBody) continue;
+                const patch = { replySubject: reply.subject, replyBody: reply.replyBody || '' };
+                if (status === 'pending') { patch.status = 'responded'; patch.respondedAt = new Date(); }
+                await fsPatch(docPath, patch, token);
                 updated++;
                 console.log(`✅ Yanıt işaretlendi: ${reply.requestId}`);
             } catch (err) {

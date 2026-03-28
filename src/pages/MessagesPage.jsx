@@ -659,6 +659,22 @@ export default function MessagesPage() {
                                                 </ul>
                                             </div>
                                         )}
+                                        {!isPending && req.replyBody && (
+                                            <div className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/15">
+                                                <p className="text-[10px] uppercase tracking-wider text-emerald-400 font-semibold mb-1.5 flex items-center gap-1.5">
+                                                    <CheckCircle className="w-3 h-3" /> Adayın Yanıtı
+                                                </p>
+                                                <p className="text-[12px] text-navy-300 leading-relaxed whitespace-pre-wrap">{req.replyBody}</p>
+                                            </div>
+                                        )}
+                                        {!isPending && !req.replyBody && (
+                                            <div className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/15">
+                                                <p className="text-[10px] uppercase tracking-wider text-emerald-400 font-semibold mb-1 flex items-center gap-1.5">
+                                                    <CheckCircle className="w-3 h-3" /> Yanıt Alındı
+                                                </p>
+                                                <p className="text-[11px] text-navy-500">Yanıt içeriği kaydedilmemiş. Bir sonraki "Yanıtları Kontrol Et" taramasında otomatik güncellenir.</p>
+                                            </div>
+                                        )}
                                         {isPending && (
                                             <div className="flex items-center gap-3 pt-1">
                                                 <button

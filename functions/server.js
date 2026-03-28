@@ -2277,17 +2277,21 @@ function fetchImapInfoReplies() {
                 }
                 console.log(`📬 SINCE araması: ${uids.length} UID bulundu`);
                 const slice = uids.slice(-200);
-                const f = imap.fetch(slice, { bodies: 'HEADER.FIELDS (FROM SUBJECT)', struct: false });
+                const f = imap.fetch(slice, { bodies: ['HEADER.FIELDS (FROM SUBJECT DATE)', 'TEXT'], struct: false });
                 let pending = 0;
                 let fetchEnded = false;
                 const tryFinish = () => { if (fetchEnded && pending === 0) finish(); };
                 f.on('message', (msg) => {
                     pending++;
                     let raw = '';
-                    msg.on('body', (stream) => {
+                    let bodyText = '';
+                    msg.on('body', (stream, info) => {
                         let buf = '';
                         stream.on('data', c => buf += c.toString('utf8'));
-                        stream.once('end', () => { raw = buf; });
+                        stream.once('end', () => {
+                            if (info.which === 'TEXT') bodyText = buf;
+                            else raw = buf;
+                        });
                     });
                     msg.once('end', () => {
                         pending--;
@@ -2307,7 +2311,15 @@ function fetchImapInfoReplies() {
                         const emailMatch = fromDecoded.match(/<([^>]+@[^>]+)>/) || fromDecoded.match(/([^\s<>]+@[^\s<>]+)/);
                         if (idMatch && emailMatch) {
                             console.log(`  ✅ Match: requestId=${idMatch[1]} from=${emailMatch[1]}`);
-                            replies.push({ requestId: idMatch[1].trim(), from: emailMatch[1].trim().toLowerCase(), subject });
+                            const cleanBody = bodyText
+                                .replace(/<[^>]+>/g, ' ')
+                                .replace(/&nbsp;/g, ' ')
+                                .replace(/\r\n/g, '\n')
+                                .replace(/On .+wrote:/gs, '')
+                                .replace(/^>.*$/gm, '')
+                                .replace(/\n{3,}/g, '\n\n')
+                                .trim();
+                            replies.push({ requestId: idMatch[1].trim(), from: emailMatch[1].trim().toLowerCase(), subject, replyBody: cleanBody });
                         }
                         tryFinish();
                     });
@@ -2346,8 +2358,11 @@ app.post('/api/check-info-replies', generalLimiter, verifyFirebaseToken, async (
                 const existing = await fsGet(docPath, token);
                 if (!existing) { console.warn(`⚠️ requestId ${reply.requestId} bulunamadı`); continue; }
                 const status = existing.fields?.status?.stringValue;
-                if (status !== 'pending') continue;
-                await fsPatch(docPath, { status: 'responded', respondedAt: new Date(), replySubject: reply.subject }, token);
+                const existingReplyBody = existing.fields?.replyBody?.stringValue || '';
+                if (status !== 'pending' && existingReplyBody) continue;
+                const patch = { replySubject: reply.subject, replyBody: reply.replyBody || '' };
+                if (status === 'pending') { patch.status = 'responded'; patch.respondedAt = new Date(); }
+                await fsPatch(docPath, patch, token);
                 updated++;
                 console.log(`✅ Yanıt işaretlendi: ${reply.requestId}`);
             } catch (err) {
