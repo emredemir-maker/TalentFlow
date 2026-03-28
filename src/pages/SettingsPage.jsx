@@ -6,7 +6,7 @@ import {
     Settings, Palette, Bell, Mail,
     CheckCircle, Loader2, Mic, MicOff, Zap, Activity,
     Share2, Building2, BookOpen, Shield, Key, Eye, EyeOff,
-    ShieldCheck, Link2, ChevronRight
+    ShieldCheck, ChevronRight
 } from 'lucide-react';
 import { connectGoogleWorkspace, disconnectGoogleWorkspace } from '../services/integrationService';
 import { GoogleGenerativeAI } from '@google/generative-ai';
@@ -25,9 +25,8 @@ const NAV_GROUPS = [
     {
         group: 'Hesabım',
         items: [
-            { id: 'preferences',   label: 'Tercihler',          icon: Settings,  adminOnly: false },
-            { id: 'integrations',  label: 'Entegrasyonlar',      icon: Link2,     adminOnly: false },
-            { id: 'api_keys',      label: 'API & Ses Motoru',    icon: Key,       adminOnly: false },
+            { id: 'account',   label: 'Hesabım',          icon: Settings,  adminOnly: false },
+            { id: 'api_keys',  label: 'API & Ses Motoru', icon: Key,       adminOnly: false },
         ],
     },
     {
@@ -40,16 +39,10 @@ const NAV_GROUPS = [
         ],
     },
     {
-        group: 'Yardım',
+        group: 'Araçlar',
         items: [
-            { id: 'guide', label: 'Platform Kılavuzu', icon: BookOpen, adminOnly: false },
-        ],
-    },
-    {
-        group: 'Yönetim',
-        adminOnly: true,
-        items: [
-            { id: 'system', label: 'Sistem Yönetimi', icon: Shield, adminOnly: true },
+            { id: 'guide',  label: 'Platform Kılavuzu', icon: BookOpen, adminOnly: false },
+            { id: 'system', label: 'Sistem Yönetimi',   icon: Shield,   adminOnly: true  },
         ],
     },
 ];
@@ -57,7 +50,7 @@ const NAV_GROUPS = [
 export default function SettingsPage({ initialTab }) {
     const { settings, loading, updateSettings } = useUserSettings();
     const { userProfile, userId } = useAuth();
-    const [activeSection, setActiveSection] = useState(initialTab || 'preferences');
+    const [activeSection, setActiveSection] = useState(initialTab || 'account');
     const [isConnectingGoogle, setIsConnectingGoogle] = useState(false);
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
@@ -275,11 +268,14 @@ export default function SettingsPage({ initialTab }) {
                 {/* Main content */}
                 <main className="flex-1 overflow-y-auto min-w-0">
 
-                    {/* ── Tercihler ───────────────────────────────── */}
-                    {activeSection === 'preferences' && (
+                    {/* ── Hesabım (Tercihler + Entegrasyonlar) ────── */}
+                    {activeSection === 'account' && (
                         <div className="px-6 lg:px-8 py-8 max-w-2xl mx-auto space-y-6">
-                            <SectionHeader icon={Settings} title="Tercihler" desc="Uygulama görünümü ve bildirim ayarları" />
+                            <SectionHeader icon={Settings} title="Hesabım" desc="Görünüm, bildirimler ve bağlı hesaplar" />
+
+                            {/* Tercihler */}
                             <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-0">
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Tercihler</p>
                                 <SettingRow icon={Palette} label="Tema" description="Arayüz temasını seçin">
                                     <Select value={settings.theme} onChange={(v) => updateSettings({ theme: v })}
                                         options={[{ value: 'dark', label: '🌙 Koyu' }, { value: 'light', label: '☀️ Açık' }]} />
@@ -288,15 +284,11 @@ export default function SettingsPage({ initialTab }) {
                                     <Toggle checked={settings.notifications !== false} onChange={(v) => updateSettings({ notifications: v })} />
                                 </SettingRow>
                             </div>
-                        </div>
-                    )}
 
-                    {/* ── Entegrasyonlar ──────────────────────────── */}
-                    {activeSection === 'integrations' && (
-                        <div className="px-6 lg:px-8 py-8 max-w-2xl mx-auto space-y-6">
-                            <SectionHeader icon={Link2} title="Entegrasyonlar" desc="Takvim ve e-posta hesaplarınızı bağlayın" />
+                            {/* Entegrasyonlar */}
                             <div className="bg-white rounded-2xl border border-slate-200 p-6">
-                                <div className="flex items-center justify-between py-3">
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-4">Entegrasyonlar</p>
+                                <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-4">
                                         <div className="w-11 h-11 rounded-full bg-white flex items-center justify-center shadow-sm shrink-0 overflow-hidden p-2 border border-slate-100">
                                             <svg viewBox="0 0 24 24" className="w-full h-full">
