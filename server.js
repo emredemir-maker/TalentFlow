@@ -2411,8 +2411,16 @@ function fetchImapInfoReplies() {
                     msg.once('end', () => {
                         pending--;
                         totalParsed++;
-                        const rawSubj = (raw.match(/^Subject:[ \t]*([\s\S]*?)(?=\r?\n\S|\r?\n\r?\n|$)/im) || [])[1] || '';
-                        const subject = decodeEncodedWords(rawSubj.replace(/\r?\n[ \t]+/g, ' ').trim());
+                        // Unfold multi-line (folded) Subject header reliably
+                        const rawLines = raw.split(/\r?\n/);
+                        const subjLines = [];
+                        let inSubj = false;
+                        for (const ln of rawLines) {
+                            if (/^Subject:/i.test(ln)) { inSubj = true; subjLines.push(ln.replace(/^Subject:\s*/i, '')); }
+                            else if (inSubj && /^[ \t]/.test(ln)) { subjLines.push(ln.trim()); }
+                            else if (inSubj) break;
+                        }
+                        const subject = decodeEncodedWords(subjLines.join(' '));
                         const idMatch = subject.match(/\[#(ir-[^\]]+)\]/);
                         const fromRaw = (raw.match(/^From:[ \t]*(.+)/im) || [])[1] || '';
                         const fromDecoded = decodeEncodedWords(fromRaw.trim());
