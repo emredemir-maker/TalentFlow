@@ -2376,72 +2376,81 @@ function fetchImapInfoReplies() {
             connTimeout: 20000,
             authTimeout: 15000,
         });
-
         const replies = [];
-
         function finish() { try { imap.end(); } catch (_) {} resolve(replies); }
         imap.once('error', err => { try { imap.end(); } catch (_) {} reject(err); });
 
-        imap.once('ready', () => {
-            imap.openBox('INBOX', true, (err) => {
-                if (err) return reject(err);
-                // Search last 90 days instead of filtering by subject
-                const since = new Date();
-                since.setDate(since.getDate() - 7);
-                const sinceStr = since.toISOString().slice(0, 10);
-                console.log(`📬 IMAP SINCE arama tarihi: ${sinceStr}`);
-                imap.search([['SINCE', since]], (err, uids) => {
-                    if (err) { console.error('❌ IMAP search error:', err); return finish(); }
-                    console.log(`📬 IMAP SINCE araması: ${uids ? uids.length : 0} UID bulundu`);
-                    if (!uids || uids.length === 0) return finish();
-                    const slice = uids.slice(-200); // check up to 200 recent emails
-                    console.log(`📬 İlk birkaç UID: ${slice.slice(0, 5).join(', ')}...`);
-                    const f = imap.fetch(slice, { bodies: 'HEADER.FIELDS (FROM SUBJECT)', struct: false });
-                    let pending = 0;
-                    let fetchEnded = false;
-                    let totalParsed = 0;
-                    const tryFinish = () => {
-                        if (fetchEnded && pending === 0) {
-                            console.log(`📬 Tüm mesajlar işlendi: ${totalParsed} mesaj, ${replies.length} eşleşme`);
-                            finish();
-                        }
-                    };
-                    f.on('message', (msg) => {
-                        pending++;
-                        let raw = '';
-                        msg.on('body', (stream) => {
-                            let buf = '';
-                            stream.on('data', c => buf += c.toString('utf8'));
-                            stream.once('end', () => { raw = buf; });
-                        });
-                        msg.once('end', () => {
-                            pending--;
-                            totalParsed++;
-                            // Unfold and decode subject
-                            const rawSubj = (raw.match(/^Subject:[ \t]*([\s\S]*?)(?=\r?\n\S|\r?\n\r?\n|$)/im) || [])[1] || '';
-                            const subject = decodeEncodedWords(rawSubj.replace(/\r?\n[ \t]+/g, ' ').trim());
-                            // Extract embedded requestId: [#ir-...]
-                            const idMatch = subject.match(/\[#(ir-[^\]]+)\]/);
-                            const fromRaw = (raw.match(/^From:[ \t]*(.+)/im) || [])[1] || '';
-                            const fromDecoded = decodeEncodedWords(fromRaw.trim());
-                            const emailMatch = fromDecoded.match(/<([^>]+@[^>]+)>/) || fromDecoded.match(/([^\s<>]+@[^\s<>]+)/);
-                            if (idMatch && emailMatch) {
-                                console.log(`  ✅ Match: requestId=${idMatch[1]} from=${emailMatch[1]}`);
-                                replies.push({
-                                    requestId: idMatch[1].trim(),
-                                    from: emailMatch[1].trim().toLowerCase(),
-                                    subject,
-                                });
-                            }
-                            tryFinish();
-                        });
+        function runSearch() {
+            const since = new Date();
+            since.setDate(since.getDate() - 7);
+            console.log(`📬 IMAP SINCE arama tarihi: ${since.toISOString().slice(0, 10)}`);
+            imap.search([['SINCE', since]], (err, uids) => {
+                if (err) { console.error('❌ IMAP search error:', err); return finish(); }
+                console.log(`📬 IMAP SINCE araması: ${uids ? uids.length : 0} UID bulundu`);
+                if (!uids || uids.length === 0) return finish();
+                const slice = uids.slice(-200);
+                console.log(`📬 Son ${slice.length} UID işlenecek (max 200)`);
+                const f = imap.fetch(slice, { bodies: 'HEADER.FIELDS (FROM SUBJECT DATE)', struct: false });
+                let pending = 0;
+                let fetchEnded = false;
+                let totalParsed = 0;
+                const tryFinish = () => {
+                    if (fetchEnded && pending === 0) {
+                        console.log(`📬 Tüm mesajlar işlendi: ${totalParsed} mesaj, ${replies.length} eşleşme`);
+                        finish();
+                    }
+                };
+                f.on('message', (msg) => {
+                    pending++;
+                    let raw = '';
+                    msg.on('body', (stream) => {
+                        let buf = '';
+                        stream.on('data', c => buf += c.toString('utf8'));
+                        stream.once('end', () => { raw = buf; });
                     });
-                    f.once('error', (e) => { console.error('❌ fetch error:', e); finish(); });
-                    f.once('end', () => { fetchEnded = true; console.log(`📬 fetch end: ${totalParsed}/${slice.length} mesaj işlendi`); tryFinish(); });
+                    msg.once('end', () => {
+                        pending--;
+                        totalParsed++;
+                        const rawSubj = (raw.match(/^Subject:[ \t]*([\s\S]*?)(?=\r?\n\S|\r?\n\r?\n|$)/im) || [])[1] || '';
+                        const subject = decodeEncodedWords(rawSubj.replace(/\r?\n[ \t]+/g, ' ').trim());
+                        const idMatch = subject.match(/\[#(ir-[^\]]+)\]/);
+                        const fromRaw = (raw.match(/^From:[ \t]*(.+)/im) || [])[1] || '';
+                        const fromDecoded = decodeEncodedWords(fromRaw.trim());
+                        const emailMatch = fromDecoded.match(/<([^>]+@[^>]+)>/) || fromDecoded.match(/([^\s<>]+@[^\s<>]+)/);
+                        // Log last 10 entries for diagnostics
+                        if (totalParsed >= slice.length - 10) {
+                            const dateRaw = (raw.match(/^Date:\s*(.+)/im) || [])[1] || '';
+                            console.log(`  [${totalParsed}] date="${dateRaw.slice(0, 30)}" subj="${subject.slice(0, 70)}"`);
+                        }
+                        if (subject.toLowerCase().includes('bilgi') || subject.includes('ir-') || subject.includes('#')) {
+                            console.log(`  🔎 BilgiTalebi subj: "${subject}"`);
+                        }
+                        if (idMatch && emailMatch) {
+                            console.log(`  ✅ Match: requestId=${idMatch[1]} from=${emailMatch[1]}`);
+                            replies.push({ requestId: idMatch[1].trim(), from: emailMatch[1].trim().toLowerCase(), subject });
+                        }
+                        tryFinish();
+                    });
                 });
+                f.once('error', (e) => { console.error('❌ fetch error:', e); finish(); });
+                f.once('end', () => { fetchEnded = true; console.log(`📬 fetch end: ${totalParsed}/${slice.length}`); tryFinish(); });
+            });
+        }
+
+        imap.once('ready', () => {
+            // Gmail Workspace: use [Gmail]/All Mail to catch replies regardless of category tab
+            imap.openBox('[Gmail]/All Mail', true, (err) => {
+                if (err) {
+                    console.warn('⚠️ [Gmail]/All Mail açılamadı, INBOX deneniyor:', err.message);
+                    imap.openBox('INBOX', true, (err2) => {
+                        if (err2) return reject(err2);
+                        runSearch();
+                    });
+                } else {
+                    runSearch();
+                }
             });
         });
-
         imap.connect();
     });
 }

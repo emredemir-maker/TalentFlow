@@ -1314,7 +1314,6 @@ Kurallar:
 // ─────────────────────────────────────────────────────────────
 const FS_PROJECT = process.env.VITE_FIREBASE_PROJECT_ID;
 const FS_API_KEY = process.env.VITE_FIREBASE_API_KEY;
-const FS_BASE = `https://firestore.googleapis.com/v1/projects/${FS_PROJECT}/databases/(default)/documents`;
 
 function fsVal(v) {
     if (v === null || v === undefined) return { nullValue: null };
@@ -1348,7 +1347,7 @@ function fsToJs(fields) {
 
 app.get('/api/positions/:positionId', async (req, res) => {
     try {
-        const url = `${FS_BASE}/artifacts%2Ftalent-flow%2Fpublic%2Fdata%2Fpositions/${req.params.positionId}?key=${FS_API_KEY}`;
+        const url = `${FS_BASE()}/artifacts%2Ftalent-flow%2Fpublic%2Fdata%2Fpositions/${req.params.positionId}?key=${FS_API_KEY}`;
         const r = await fetch(url);
         if (r.status === 404) return res.status(404).json({ error: 'Pozisyon bulunamadı.' });
         if (!r.ok) {
@@ -1396,7 +1395,7 @@ app.post('/api/applications', async (req, res) => {
         if (parsedCandidate) fields.parsedCandidate = fsVal(parsedCandidate);
         if (aiScoreBreakdown) fields.aiScoreBreakdown = fsVal(aiScoreBreakdown);
 
-        const url = `${FS_BASE}/artifacts%2Ftalent-flow%2Fpublic%2Fdata%2Fapplications?key=${FS_API_KEY}`;
+        const url = `${FS_BASE()}/artifacts%2Ftalent-flow%2Fpublic%2Fdata%2Fapplications?key=${FS_API_KEY}`;
         const r = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -2266,44 +2265,61 @@ function fetchImapInfoReplies() {
         const replies = [];
         function finish() { try { imap.end(); } catch (_) {} resolve(replies); }
         imap.once('error', err => { try { imap.end(); } catch (_) {} reject(err); });
-        imap.once('ready', () => {
-            imap.openBox('INBOX', true, (err) => {
-                if (err) return reject(err);
-                const since = new Date();
-                since.setDate(since.getDate() - 7);
-                imap.search([['SINCE', since]], (err, uids) => {
-                    if (err || !uids || uids.length === 0) return finish();
-                    const slice = uids.slice(-200);
-                    const f = imap.fetch(slice, { bodies: 'HEADER.FIELDS (FROM SUBJECT)', struct: false });
-                    let pending = 0;
-                    let fetchEnded = false;
-                    const tryFinish = () => { if (fetchEnded && pending === 0) finish(); };
-                    f.on('message', (msg) => {
-                        pending++;
-                        let raw = '';
-                        msg.on('body', (stream) => {
-                            let buf = '';
-                            stream.on('data', c => buf += c.toString('utf8'));
-                            stream.once('end', () => { raw = buf; });
-                        });
-                        msg.once('end', () => {
-                            pending--;
-                            const rawSubj = (raw.match(/^Subject:[ \t]*([\s\S]*?)(?=\r?\n\S|\r?\n\r?\n|$)/im) || [])[1] || '';
-                            const subject = decodeEncodedWords(rawSubj.replace(/\r?\n[ \t]+/g, ' ').trim());
-                            const idMatch = subject.match(/\[#(ir-[^\]]+)\]/);
-                            const fromRaw = (raw.match(/^From:[ \t]*(.+)/im) || [])[1] || '';
-                            const fromDecoded = decodeEncodedWords(fromRaw.trim());
-                            const emailMatch = fromDecoded.match(/<([^>]+@[^>]+)>/) || fromDecoded.match(/([^\s<>]+@[^\s<>]+)/);
-                            if (idMatch && emailMatch) {
-                                console.log(`  ✅ Match: requestId=${idMatch[1]} from=${emailMatch[1]}`);
-                                replies.push({ requestId: idMatch[1].trim(), from: emailMatch[1].trim().toLowerCase(), subject });
-                            }
-                            tryFinish();
-                        });
+
+        function runSearch() {
+            const since = new Date();
+            since.setDate(since.getDate() - 7);
+            console.log(`📬 IMAP SINCE: ${since.toISOString().slice(0, 10)}`);
+            imap.search([['SINCE', since]], (err, uids) => {
+                if (err || !uids || uids.length === 0) {
+                    console.log(`📬 SINCE sonuç: ${err ? err.message : 0} UID`);
+                    return finish();
+                }
+                console.log(`📬 SINCE araması: ${uids.length} UID bulundu`);
+                const slice = uids.slice(-200);
+                const f = imap.fetch(slice, { bodies: 'HEADER.FIELDS (FROM SUBJECT)', struct: false });
+                let pending = 0;
+                let fetchEnded = false;
+                const tryFinish = () => { if (fetchEnded && pending === 0) finish(); };
+                f.on('message', (msg) => {
+                    pending++;
+                    let raw = '';
+                    msg.on('body', (stream) => {
+                        let buf = '';
+                        stream.on('data', c => buf += c.toString('utf8'));
+                        stream.once('end', () => { raw = buf; });
                     });
-                    f.once('error', (e) => { console.error('❌ fetch error:', e); finish(); });
-                    f.once('end', () => { fetchEnded = true; tryFinish(); });
+                    msg.once('end', () => {
+                        pending--;
+                        const rawSubj = (raw.match(/^Subject:[ \t]*([\s\S]*?)(?=\r?\n\S|\r?\n\r?\n|$)/im) || [])[1] || '';
+                        const subject = decodeEncodedWords(rawSubj.replace(/\r?\n[ \t]+/g, ' ').trim());
+                        const idMatch = subject.match(/\[#(ir-[^\]]+)\]/);
+                        const fromRaw = (raw.match(/^From:[ \t]*(.+)/im) || [])[1] || '';
+                        const fromDecoded = decodeEncodedWords(fromRaw.trim());
+                        const emailMatch = fromDecoded.match(/<([^>]+@[^>]+)>/) || fromDecoded.match(/([^\s<>]+@[^\s<>]+)/);
+                        if (idMatch && emailMatch) {
+                            console.log(`  ✅ Match: requestId=${idMatch[1]} from=${emailMatch[1]}`);
+                            replies.push({ requestId: idMatch[1].trim(), from: emailMatch[1].trim().toLowerCase(), subject });
+                        }
+                        tryFinish();
+                    });
                 });
+                f.once('error', (e) => { console.error('❌ fetch error:', e); finish(); });
+                f.once('end', () => { fetchEnded = true; tryFinish(); });
+            });
+        }
+
+        imap.once('ready', () => {
+            imap.openBox('[Gmail]/All Mail', true, (err) => {
+                if (err) {
+                    console.warn('⚠️ [Gmail]/All Mail açılamadı, INBOX deneniyor:', err.message);
+                    imap.openBox('INBOX', true, (err2) => {
+                        if (err2) return reject(err2);
+                        runSearch();
+                    });
+                } else {
+                    runSearch();
+                }
             });
         });
         imap.connect();
