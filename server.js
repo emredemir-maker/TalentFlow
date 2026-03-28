@@ -2387,7 +2387,7 @@ function fetchImapInfoReplies() {
                 if (err) return reject(err);
                 // Search last 90 days instead of filtering by subject
                 const since = new Date();
-                since.setDate(since.getDate() - 90);
+                since.setDate(since.getDate() - 7);
                 const sinceStr = since.toISOString().slice(0, 10);
                 console.log(`📬 IMAP SINCE arama tarihi: ${sinceStr}`);
                 imap.search([['SINCE', since]], (err, uids) => {

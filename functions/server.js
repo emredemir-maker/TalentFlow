@@ -2270,7 +2270,7 @@ function fetchImapInfoReplies() {
             imap.openBox('INBOX', true, (err) => {
                 if (err) return reject(err);
                 const since = new Date();
-                since.setDate(since.getDate() - 90);
+                since.setDate(since.getDate() - 7);
                 imap.search([['SINCE', since]], (err, uids) => {
                     if (err || !uids || uids.length === 0) return finish();
                     const slice = uids.slice(-200);
