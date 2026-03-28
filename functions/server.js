@@ -2276,6 +2276,8 @@ function fetchImapInfoReplies() {
                     const slice = uids.slice(-200);
                     const f = imap.fetch(slice, { bodies: 'HEADER.FIELDS (FROM SUBJECT)', struct: false });
                     let pending = 0;
+                    let fetchEnded = false;
+                    const tryFinish = () => { if (fetchEnded && pending === 0) finish(); };
                     f.on('message', (msg) => {
                         pending++;
                         let raw = '';
@@ -2293,13 +2295,14 @@ function fetchImapInfoReplies() {
                             const fromDecoded = decodeEncodedWords(fromRaw.trim());
                             const emailMatch = fromDecoded.match(/<([^>]+@[^>]+)>/) || fromDecoded.match(/([^\s<>]+@[^\s<>]+)/);
                             if (idMatch && emailMatch) {
+                                console.log(`  ✅ Match: requestId=${idMatch[1]} from=${emailMatch[1]}`);
                                 replies.push({ requestId: idMatch[1].trim(), from: emailMatch[1].trim().toLowerCase(), subject });
                             }
-                            if (pending === 0) finish();
+                            tryFinish();
                         });
                     });
-                    f.once('error', () => finish());
-                    f.once('end', () => { if (pending === 0) finish(); });
+                    f.once('error', (e) => { console.error('❌ fetch error:', e); finish(); });
+                    f.once('end', () => { fetchEnded = true; tryFinish(); });
                 });
             });
         });

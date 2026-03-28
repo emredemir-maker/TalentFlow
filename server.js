@@ -2398,7 +2398,14 @@ function fetchImapInfoReplies() {
                     console.log(`📬 İlk birkaç UID: ${slice.slice(0, 5).join(', ')}...`);
                     const f = imap.fetch(slice, { bodies: 'HEADER.FIELDS (FROM SUBJECT)', struct: false });
                     let pending = 0;
+                    let fetchEnded = false;
                     let totalParsed = 0;
+                    const tryFinish = () => {
+                        if (fetchEnded && pending === 0) {
+                            console.log(`📬 Tüm mesajlar işlendi: ${totalParsed} mesaj, ${replies.length} eşleşme`);
+                            finish();
+                        }
+                    };
                     f.on('message', (msg) => {
                         pending++;
                         let raw = '';
@@ -2418,8 +2425,6 @@ function fetchImapInfoReplies() {
                             const fromRaw = (raw.match(/^From:[ \t]*(.+)/im) || [])[1] || '';
                             const fromDecoded = decodeEncodedWords(fromRaw.trim());
                             const emailMatch = fromDecoded.match(/<([^>]+@[^>]+)>/) || fromDecoded.match(/([^\s<>]+@[^\s<>]+)/);
-                            // Log first 5 subjects for diagnostics
-                            if (totalParsed <= 5) console.log(`  [${totalParsed}] subj="${subject.slice(0, 80)}" idMatch=${idMatch ? idMatch[1] : 'null'}`);
                             if (idMatch && emailMatch) {
                                 console.log(`  ✅ Match: requestId=${idMatch[1]} from=${emailMatch[1]}`);
                                 replies.push({
@@ -2428,11 +2433,11 @@ function fetchImapInfoReplies() {
                                     subject,
                                 });
                             }
-                            if (pending === 0) { console.log(`📬 Tüm mesajlar işlendi: ${totalParsed} mesaj, ${replies.length} eşleşme`); finish(); }
+                            tryFinish();
                         });
                     });
                     f.once('error', (e) => { console.error('❌ fetch error:', e); finish(); });
-                    f.once('end', () => { console.log(`📬 fetch end: pending=${pending}`); if (pending === 0) finish(); });
+                    f.once('end', () => { fetchEnded = true; console.log(`📬 fetch end: ${totalParsed}/${slice.length} mesaj işlendi`); tryFinish(); });
                 });
             });
         });
