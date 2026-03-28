@@ -13,6 +13,7 @@ import { db } from '../config/firebase';
 import { doc, getDoc, onSnapshot, setDoc, serverTimestamp, collection, query, where } from 'firebase/firestore';
 import SystemScanner from '../components/SystemScanner';
 import AddCandidateModal from '../components/AddCandidateModal';
+import CandidateAvatar from '../components/CandidateAvatar';
 import {
     Plus, Search, Zap, Brain, X,
     Target, ShieldCheck, ArrowRight, FileText, Clock,
@@ -882,12 +883,14 @@ export default function CandidateProcessPage() {
                                     }`}
                                 >
                                     {isActive && <div className="w-[6px] h-[6px] rounded-full bg-cyan-500 shrink-0" />}
-                                    <div className="w-8 h-8 rounded-lg bg-slate-100 overflow-hidden shrink-0 border border-black/5 flex items-center justify-center">
-                                        {c.photo || c.photoUrl || c.profileImage
-                                            ? <img src={c.photo || c.photoUrl || c.profileImage} className="w-full h-full object-cover" alt="" onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
-                                            : null}
-                                        <span className={`text-[11px] font-black text-slate-500 ${c.photo || c.photoUrl || c.profileImage ? 'hidden' : 'flex'}`}>{mc.name?.charAt(0)?.toUpperCase() || '?'}</span>
-                                    </div>
+                                    <CandidateAvatar
+                                        name={mc.name}
+                                        photo={c.photo}
+                                        photoUrl={c.photoUrl}
+                                        profileImage={c.profileImage}
+                                        size="sm"
+                                        rounded="rounded-lg"
+                                    />
                                     <div className="flex-1 min-w-0">
                                         <p className={`text-[12px] font-bold truncate leading-tight ${isActive ? 'text-cyan-700' : 'text-slate-700'}`}>{mc.name}</p>
                                         <div className="flex items-center gap-1 mt-0.5 flex-wrap">
@@ -933,12 +936,15 @@ export default function CandidateProcessPage() {
                             {/* Candidate header */}
                             <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-xl border-2 border-white shadow-md overflow-hidden shrink-0 ring-2 ring-cyan-100 bg-cyan-50 flex items-center justify-center">
-                                        {candidate.photo || candidate.photoUrl || candidate.profileImage
-                                            ? <img src={candidate.photo || candidate.photoUrl || candidate.profileImage} className="w-full h-full object-cover" alt="" onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
-                                            : null}
-                                        <span className={`text-sm font-black text-cyan-700 ${candidate.photo || candidate.photoUrl || candidate.profileImage ? 'hidden' : 'flex'}`}>{candidate.name?.charAt(0)?.toUpperCase() || '?'}</span>
-                                    </div>
+                                    <CandidateAvatar
+                                        name={candidate.name}
+                                        photo={candidate.photo}
+                                        photoUrl={candidate.photoUrl}
+                                        profileImage={candidate.profileImage}
+                                        size="md"
+                                        rounded="rounded-xl"
+                                        className="border-2 border-white shadow-md ring-2 ring-cyan-100"
+                                    />
                                     <div>
                                         <div className="flex items-center gap-2">
                                             <h2 className="text-[15px] font-black text-slate-900 tracking-tight leading-none">{candidate.name}</h2>

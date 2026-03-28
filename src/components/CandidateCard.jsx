@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import MatchScoreRing from './MatchScoreRing';
+import CandidateAvatar from './CandidateAvatar';
 import { MapPin, Briefcase, Clock, ArrowUpRight, Sparkles, Brain, Zap, GraduationCap, Columns3, ChevronDown, CheckCircle2 } from 'lucide-react';
 import { useCandidates } from '../context/CandidatesContext';
 import { useAuth } from '../context/AuthContext';
@@ -25,16 +26,11 @@ const PIPELINE_STAGES = [
 
 const normalizePipelineStatus = (s) => (s === 'new' ? 'ai_analysis' : s);
 
-const AVATAR_GRADIENTS = [
-    'from-electric via-blue-500 to-indigo-600',
-    'from-violet-500 via-purple-500 to-fuchsia-600',
-    'from-cyan-500 via-teal-500 to-emerald-600',
-    'from-amber-500 via-orange-500 to-rose-600',
-];
-
 function getInitials(name) {
     if (!name) return '?';
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
 }
 
 export default function CandidateCard({ candidate: rawCandidate, index = 0, onClick, isSelected, onSelect, draggable, onDragStart }) {
@@ -48,7 +44,6 @@ export default function CandidateCard({ candidate: rawCandidate, index = 0, onCl
     const isComparing = compareIds.includes(rawCandidate.id);
     const currentStatus = normalizePipelineStatus(rawCandidate.status);
     const status = STATUS_CONFIG[currentStatus] || STATUS_CONFIG.ai_analysis;
-    const gradient = AVATAR_GRADIENTS[index % AVATAR_GRADIENTS.length];
 
     const sourceName = (candidate.source || '').toLowerCase();
     const scColor = sourceColors[sourceName] || '#3b82f6';
@@ -110,11 +105,15 @@ export default function CandidateCard({ candidate: rawCandidate, index = 0, onCl
             {/* Top Section */}
             <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3 min-w-0">
-                    <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${gradient} p-[2px] shadow-lg group-hover:rotate-3 transition-transform duration-500 shrink-0`}>
-                        <div className="w-full h-full rounded-[10px] bg-bg-secondary border border-border-subtle/10 flex items-center justify-center text-sm font-black text-white dark:text-white">
-                            {getInitials(candidate.name)}
-                        </div>
-                    </div>
+                    <CandidateAvatar
+                        name={candidate.name}
+                        photo={candidate.photo}
+                        photoUrl={candidate.photoUrl}
+                        profileImage={candidate.profileImage}
+                        size="lg"
+                        rounded="rounded-xl"
+                        className="shadow-md"
+                    />
                     <div className="min-w-0 flex-1">
                         <h3 className="text-[13px] font-black text-text-primary uppercase tracking-tight group-hover:text-cyan-400 transition-colors leading-tight break-words line-clamp-2">
                             {candidate.name}

@@ -192,11 +192,13 @@ export default function InterviewReportPage() {
                     {/* CANDIDATE HEADER SECTION */}
                     <div className="flex items-center justify-between bg-white p-6 rounded-[24px] border border-[#E2E8F0] shadow-sm">
                         <div className="flex items-center gap-5">
-                            <div className="w-20 h-20 rounded-2xl border-[3px] border-white shadow-xl overflow-hidden bg-cyan-50 flex items-center justify-center">
+                            <div className="w-20 h-20 rounded-2xl border-[3px] border-white shadow-xl overflow-hidden bg-slate-100 flex items-center justify-center shrink-0">
                                 {candidate.photo || candidate.photoUrl || candidate.profileImage
-                                    ? <img src={candidate.photo || candidate.photoUrl || candidate.profileImage} alt={candidate.name} className="w-full h-full object-cover" />
-                                    : <span className="text-3xl font-black text-cyan-700">{candidate.name?.charAt(0)?.toUpperCase() || '?'}</span>
-                                }
+                                    ? <img src={candidate.photo || candidate.photoUrl || candidate.profileImage} alt={candidate.name} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display='none'; e.currentTarget.nextSibling.style.display='flex'; }} />
+                                    : null}
+                                <span className="text-3xl font-black text-slate-500" style={{ display: (candidate.photo || candidate.photoUrl || candidate.profileImage) ? 'none' : 'flex' }}>
+                                    {candidate.name ? candidate.name.trim().split(/\s+/).filter(Boolean).map((p,i,a) => i===0||i===a.length-1 ? p[0] : '').join('').toUpperCase().slice(0,2) : '?'}
+                                </span>
                             </div>
                             <div className="space-y-1.5">
                                 <div className="flex items-center gap-3">
