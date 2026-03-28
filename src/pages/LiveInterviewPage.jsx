@@ -203,7 +203,8 @@ export default function LiveInterviewPage() {
         if (questions.length > 0) return;
 
         // GUARD 2: Firestore session already has questions — sync once, then lock
-        if (session?.questions && session.questions.length > 0) {
+        // Only trust session questions if they belong to the currently selected strategy
+        if (session?.questions && session.questions.length > 0 && session.activeStrategy === activeStrategy) {
             if (!questionsSyncedRef.current) {
                 console.log("[LiveInterview] One-time sync of questions from session");
                 questionsSyncedRef.current = true;
@@ -2089,15 +2090,18 @@ export default function LiveInterviewPage() {
                                                 key={p.id}
                                                 onClick={() => {
                                                     if (activeStrategy === p.id) return;
-                                                    if (questions.length > 0) {
-                                                        // Clear current questions and switch strategy
-                                                        setQuestions([]);
-                                                        setCurrentQuestionIndex(0);
-                                                        setSuggestedQuestion(null);
-                                                    }
+                                                    // Clear local state
+                                                    setQuestions([]);
+                                                    setCurrentQuestionIndex(0);
+                                                    setSuggestedQuestion(null);
+                                                    setAvailablePaths([]);
+                                                    setSelectedPathId(null);
+                                                    // Reset one-time sync guard so new questions can be fetched
+                                                    questionsSyncedRef.current = false;
                                                     setActiveStrategy(p.id);
                                                     setIsTypeSelected(true);
-                                                    persistSessionData({ activeStrategy: p.id });
+                                                    // Clear session questions so Guard 2 won't block new fetch
+                                                    persistSessionData({ activeStrategy: p.id, questions: [], selectedPathId: null });
                                                 }}
                                                 title={p.label + (questions.length > 0 && activeStrategy !== p.id ? ' — soru seti sıfırlanacak' : '')}
                                                 className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${activeStrategy === p.id ? 'bg-blue-600 text-white border border-blue-400' : 'bg-white/5 text-white/30 hover:bg-blue-600/40 hover:text-white cursor-pointer'}`}
@@ -2515,14 +2519,14 @@ export default function LiveInterviewPage() {
                                         {aiInsights.slice(0, 5).map(ins => (
                                             <div
                                                 key={ins.id}
-                                                className={`rounded-lg p-2 border text-[11px] leading-snug ${
+                                                className={`rounded-lg p-2.5 border text-[12px] leading-relaxed ${
                                                     ins.type === 'warning'
-                                                        ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-300/90'
-                                                        : 'bg-white/5 border-white/5 text-white/70'
+                                                        ? 'bg-yellow-500/10 border-yellow-500/25 text-yellow-200'
+                                                        : 'bg-white/10 border-white/10 text-white/90'
                                                 }`}
                                             >
                                                 {ins.text}
-                                                {ins.hint && <p className="mt-1 text-blue-400/80 italic text-[10px]">→ {ins.hint}</p>}
+                                                {ins.hint && <p className="mt-1.5 text-cyan-300 italic text-[11px] font-medium">→ {ins.hint}</p>}
                                             </div>
                                         ))}
                                     </div>
