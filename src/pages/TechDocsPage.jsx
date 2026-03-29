@@ -966,8 +966,7 @@ function DeploySection() {
 bash -c "node server.js & npx vite preview --port 5000 --host 0.0.0.0"`}</CodeBlock>
 
             <SectionTitle>GitHub Sync</SectionTitle>
-            <CodeBlock lang="bash">{`TOKEN=$(printenv GITHUB_PERSONAL_ACCESS_TOKEN_NEW)
-git push https://emredemir-maker:${TOKEN}@github.com/emredemir-maker/TalentFlow.git main`}</CodeBlock>
+            <CodeBlock lang="bash">{`TOKEN=$(printenv GITHUB_PERSONAL_ACCESS_TOKEN_NEW)\ngit push https://emredemir-maker:\${TOKEN}@github.com/emredemir-maker/TalentFlow.git main`}</CodeBlock>
 
             <SectionTitle>Kritik Notlar</SectionTitle>
             <div className="space-y-2">
