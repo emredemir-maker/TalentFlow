@@ -7,7 +7,7 @@ import {
     Zap, Lock, Users, GitBranch, Terminal, FileText,
     ChevronDown, ChevronRight, ExternalLink, Copy,
     CheckCircle, AlertTriangle, Info, Layers, Cpu,
-    Network, Activity, BookOpen, Hash, Mail
+    Network, Activity, BookOpen, Hash, Mail, Video
 } from 'lucide-react';
 
 // ─── SECTION DATA ───────────────────────────────────────────────────────────
@@ -66,8 +66,16 @@ const SECTIONS = [
         icon: Activity,
         color: '#ec4899',
         title: 'Canlı Mülakat Sistemi',
-        summary: 'Anonim aday akışı, gerçek zamanlı transkripsiyon, soru görünürlük kuralları',
+        summary: 'Anonim aday akışı, gerçek zamanlı transkripsiyon, soru görünürlük kuralları, oturum yaşam döngüsü',
         content: <LiveInterviewSection />,
+    },
+    {
+        id: 'face-interview',
+        icon: Video,
+        color: '#f59e0b',
+        title: 'Yüz Yüze Mülakat & Oturum Yönetimi',
+        summary: 'Tek mikrofon STT, 3 yollu soru setleri, STAR soru bağlamı, oturum iptal/askıya alma',
+        content: <FaceInterviewSection />,
     },
     {
         id: 'state',
@@ -654,6 +662,116 @@ const effectiveSession = session || apiSession;`}</CodeBlock>
   → Transkript + duygu analizi
   → Firestore'a yazılır
   → Recruiter ekranında onSnapshot ile anlık güncellenir`}</CodeBlock>
+
+            <SectionTitle>Oturum Yaşam Döngüsü</SectionTitle>
+            <Table
+                headers={['Durum', 'Anlamı', 'Görünürlük']}
+                rows={[
+                    ['`scheduled`', 'Planlandı, henüz başlamadı', 'Aktif listede görünür'],
+                    ['`live`', 'Hazırlık/mülakat devam ediyor', 'Aktif listede, takvimde görünür'],
+                    ['`completed`', 'Mülakat tamamlandı', 'Geçmiş listede görünür'],
+                    ['`cancelled`', 'İptal edildi', 'Hiçbir listede gösterilmez'],
+                ]}
+            />
+            <InfoBox type="warning">
+                İptal edilen oturumlar <code className="font-mono text-[11px] bg-amber-100 text-amber-800 px-1 rounded">InterviewManagementPage</code>, <code className="font-mono text-[11px] bg-amber-100 text-amber-800 px-1 rounded">Dashboard</code> ve takvim görünümünden tamamen filtrelenir. Firestore belgesi silinmez — durum <code className="font-mono text-[11px] bg-amber-100 text-amber-800 px-1 rounded">status: 'cancelled'</code> olarak kalır.
+            </InfoBox>
+            <SectionTitle>persistSessionData — Kanonik Yazma Fonksiyonu</SectionTitle>
+            <p className="text-xs text-slate-600 leading-relaxed mb-2">
+                Tüm oturum durumu değişiklikleri doğrudan <code className="font-mono text-[11px] bg-slate-100 text-violet-700 px-1.5 py-0.5 rounded">updateDoc</code> yerine bu fonksiyon üzerinden yapılır. İki belgeyi atomik olarak günceller: <code className="font-mono text-[11px] bg-slate-100 text-violet-700 px-1.5 py-0.5 rounded">interviews/{'{'}sessionId{'}'}</code> kök belgesi ve aday üzerindeki <code className="font-mono text-[11px] bg-slate-100 text-violet-700 px-1.5 py-0.5 rounded">interviewSessions</code> dizisi.
+            </p>
+            <CodeBlock lang="javascript">{`// LiveInterviewPage.jsx — handleCancelSession
+const handleCancelSession = async () => {
+    await persistSessionData({ status: 'cancelled' });
+    // Artık tüm listeler bu oturumu otomatik filtreler
+};
+
+// "Askıya Al" — durum değiştirmez, sadece yönlendirir
+const handleSuspendSession = () => {
+    navigate('/dashboard');  // Oturum 'live' kalır
+};`}</CodeBlock>
+        </div>
+    );
+}
+
+function FaceInterviewSection() {
+    return (
+        <div>
+            <SectionTitle>Genel Bakış</SectionTitle>
+            <p className="text-xs text-slate-600 leading-relaxed mb-3">
+                Yüz yüze mülakat modu, recruiter ve adayın aynı fiziksel ortamda bulunduğu senaryolar için tasarlanmıştır. Tek bir cihaz ve mikrofon kullanılarak her iki tarafın sesi kaydedilir; WebRTC bağlantısı gerekmez.
+            </p>
+            <Table
+                headers={['Özellik', 'Canlı Mülakat (Remote)', 'Yüz Yüze Mülakat']}
+                rows={[
+                    ['Bağlantı', 'WebRTC (2 cihaz)', 'Tek cihaz, tek mikrofon'],
+                    ['Rota', '`/live-interview/:id`', '`/face-interview/:id`'],
+                    ['Aday erişimi', 'Benzersiz join linki', 'Gerekmiyor'],
+                    ['Soru setleri', 'Tek set', '3 paralel set (aynı strateji)'],
+                    ['Strateji', 'Dinamik mod seçimi', 'Davranışsal / Teknik / Karma'],
+                ]}
+            />
+
+            <SectionTitle>Çok Yollu Soru Setleri (Multi-Path)</SectionTitle>
+            <p className="text-xs text-slate-600 leading-relaxed mb-2">
+                AI, hazırlık ekranında seçilen stratejiye göre tek bir Gemini çağrısıyla 3 farklı soru seti üretir. Setler <code className="font-mono text-[11px] bg-slate-100 text-violet-700 px-1.5 py-0.5 rounded">paths</code> state'inde tutulur; geçiş anlıktır ve yeniden API çağrısı gerektirmez.
+            </p>
+            <CodeBlock lang="javascript">{`// FaceToFacePage.jsx — generateInterviewPaths
+const generateInterviewPaths = async (strategy) => {
+    const result = await callGemini(prompt);
+    // Gemini yanıtı 3 ayrı soru seti içerir
+    setPaths([set1, set2, set3]);   // paths[0..2]
+    setActivePathIdx(0);            // her zaman Set 1'den başlar
+};
+
+// Set değiştirme — AI çağrısı YOK
+const handlePathSwitch = (idx) => {
+    setActivePathIdx(idx);          // paths[idx] anında aktif olur
+};
+
+// Strateji değiştirme — yeni AI çağrısı başlatır
+const handleStrategyChange = (newStrategy) => {
+    setStrategy(newStrategy);
+    generateInterviewPaths(newStrategy);  // 3 yeni set
+};`}</CodeBlock>
+            <InfoBox type="info">
+                Strateji değiştirildiğinde <code className="font-mono text-[11px] bg-blue-100 text-blue-800 px-1 rounded">generateInterviewPaths</code> yeniden çağrılır ve <code className="font-mono text-[11px] bg-blue-100 text-blue-800 px-1 rounded">activePathIdx</code> 0'a döner. Salt set değiştirme hiçbir zaman Gemini çağrısı yapmaz.
+            </InfoBox>
+
+            <SectionTitle>STAR Analizi — Soru Bağlamı</SectionTitle>
+            <p className="text-xs text-slate-600 leading-relaxed mb-2">
+                Gerçek zamanlı STAR skorlaması, aktif soruyu Gemini prompt'una ekler. Bu sayede AI adayın cevabını soruya özgü bağlamda değerlendirir.
+            </p>
+            <CodeBlock lang="javascript">{`// FaceToFacePage.jsx — analyzeSTARRealTime
+await analyzeSTARRealTime(
+    transcript,
+    questions[currentQIndex]?.text   // ← soru bağlamı (daha önce null'dı)
+);
+
+// Prompt içinde kullanımı (server.js)
+// "Soru: ${currentQuestion}\\nAday cevabı: ${transcript}\\nSTAR..."
+`}</CodeBlock>
+            <InfoBox type="success">
+                Soru bağlamı eklenmeden önce tüm cevaplar aynı genel prompt'a gönderiliyordu. Şimdi her STAR skoru o soruya özgü kriterlere göre hesaplanır.
+            </InfoBox>
+
+            <SectionTitle>Oturum İptal & Askıya Alma Akışı</SectionTitle>
+            <p className="text-xs text-slate-600 leading-relaxed mb-2">
+                Hazırlık (lobby) ekranında recruiter iki farklı kontrol eylemine sahiptir:
+            </p>
+            <CodeBlock lang="akış">{`"Mülakatı İptal Et" butonu (kırmızı)
+  → Onay penceresi açılır
+  → Onaylanırsa: persistSessionData({ status: 'cancelled' })
+  → interviews/{sessionId}.status = 'cancelled'
+  → candidate.interviewSessions[n].status = 'cancelled'
+  → InterviewManagementPage: isCancelled → aktif + geçmiş listeden atlar
+  → Dashboard: cancelled filtresiyle zaten görünmüyor
+  → Takvim: allCalSessions useMemo sessionStatuses'dan filtreler
+
+"Askıya Al" butonu (gri)
+  → Oturum durumu değişmez (status: 'live' kalır)
+  → navigate('/dashboard') — recruiter ana sayfaya yönlenir
+  → Mülakatlar sayfasından "Devam Et" ile geri dönülebilir`}</CodeBlock>
         </div>
     );
 }

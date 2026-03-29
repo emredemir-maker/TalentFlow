@@ -231,6 +231,103 @@ const FEATURES = [
         )
     },
     {
+        id: 'face-interview',
+        category: 'mulakat',
+        icon: Mic,
+        color: '#f59e0b',
+        title: 'Yüz Yüze AI Mülakat',
+        subtitle: 'Tek cihaz · gerçek zamanlı STT & STAR analizi',
+        description: 'Recruiter ve aday aynı odada buluştuğunda kullanılan tek cihazlı mülakat modudur. Tek mikrofon üzerinden konuşmaları dinler, STT motoru ile gerçek zamanlı yazıya döker ve STAR metodolojisiyle anlık değerlendirir. AI, seçilen stratejiye göre 3 farklı soru seti üretir; mülakat sırasında setler arasında anında geçiş yapılabilir.',
+        steps: [
+            'Mülakatlar sayfasından bir oturum açın ve "Yüz Yüze Mülakat Başlat" butonunu tıklayın.',
+            'Hazırlık ekranında mülakat stratejisini seçin: Davranışsal, Teknik veya Karma.',
+            'AI seçilen strateji için 3 farklı soru seti oluşturur; her set 5-7 soru içerir.',
+            'İstediğiniz soru setine geçmek için "Set 1 / Set 2 / Set 3" butonlarını kullanın — yeniden AI çağrısı yapılmaz, anlık değişir.',
+            '"Mülakatı Başlat" butonuna basın. Mikrofon her iki tarafın sesini kaydeder.',
+            'AI, her cevabı aktif sorunun bağlamında değerlendirerek STAR skorları üretir.',
+            'Mülakat sonunda tam STAR değerlendirme raporu otomatik oluşturulur ve adayın dosyasına eklenir.',
+        ],
+        tip: 'Strateji değiştirirseniz AI 3 yeni set üretir ve Set 1\'e döner. Yalnızca strateji değiştirmek yeni bir AI çağrısı başlatır; set değiştirmek tamamen anlık ve ücretsizdir.',
+        tags: ['yüz yüze', 'face to face', 'tek cihaz', 'mikrofon', 'stt', 'star', 'soru seti', 'strateji', 'ai coach', 'gerçek zamanlı', 'face interview'],
+        mockup: (
+            <div className="space-y-2.5">
+                <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
+                    <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-1.5">
+                            <Mic className="w-3.5 h-3.5 text-amber-600" />
+                            <span className="text-[10px] font-semibold text-amber-700">Yüz Yüze Mülakat</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <div className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+                            <span className="text-[9px] text-red-500">Canlı</span>
+                        </div>
+                    </div>
+                    <div className="flex gap-1 mb-2">
+                        {['Set 1', 'Set 2', 'Set 3'].map((s, i) => (
+                            <div key={s} className={`text-[9px] px-2 py-0.5 rounded-full border font-medium ${i === 0 ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-amber-600 border-amber-200'}`}>{s}</div>
+                        ))}
+                    </div>
+                    <div className="text-[10px] text-slate-600 bg-white rounded-lg p-1.5 border border-slate-100">
+                        "Karmaşık bir teknik problemi ekiple nasıl çözdüğünüzü anlatın."
+                    </div>
+                </div>
+                <div className="grid grid-cols-4 gap-1">
+                    {['S', 'T', 'A', 'R'].map((s, i) => (
+                        <div key={s} className="bg-white border border-slate-100 rounded-lg p-1.5 text-center">
+                            <div className="text-[8px] font-bold text-slate-500">{s}</div>
+                            <div className="mt-1 h-1 bg-slate-100 rounded-full overflow-hidden">
+                                <div className="h-full rounded-full bg-amber-400" style={{ width: `${[75, 65, 88, 72][i]}%` }} />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        )
+    },
+    {
+        id: 'session-control',
+        category: 'mulakat',
+        icon: AlertCircle,
+        color: '#ef4444',
+        title: 'Oturum Denetimi — İptal & Askıya Alma',
+        subtitle: 'Hazırlık ekranı üst bar',
+        description: 'Mülakat hazırlık aşamasında oturumu tamamen iptal edebilir ya da geçici olarak askıya alabilirsiniz. İptal işlemi kalıcıdır: oturum tüm listelerden ve takvimden gizlenir. Askıya alma ise oturumu canlı tutar — istediğiniz zaman geri dönüp kaldığınız yerden devam edebilirsiniz.',
+        steps: [
+            'Hazırlık ekranı üst barında iki kontrol butonu bulunur: "Mülakatı İptal Et" (kırmızı) ve "Askıya Al" (gri).',
+            '"Mülakatı İptal Et" butonuna tıkladığınızda onay penceresi açılır. Onaylanırsa oturum durumu "iptal edildi" olarak işaretlenir.',
+            'İptal edilen oturumlar aktif mülakat listesinden, geçmiş listesinden ve takvim görünümünden kalıcı olarak kaldırılır.',
+            '"Askıya Al" butonu oturumun durumunu değiştirmez — sizi ana sayfaya yönlendirir ve oturum canlı kalır.',
+            'Askıya alınan oturuma Mülakatlar sayfasından "Devam Et" butonuyla geri dönebilirsiniz.',
+        ],
+        tip: 'İptal ile askıya almanın farkı kritiktir: İptal kalıcıdır, oturum bir daha görünmez. Askıya alma sadece sizi ekrandan uzaklaştırır; oturum ve tüm verileri güvende kalır.',
+        tags: ['iptal', 'askıya al', 'oturum', 'kontrol', 'durdur', 'devam et', 'cancel', 'suspend', 'hazırlık', 'lobby', 'iptal et'],
+        mockup: (
+            <div className="space-y-2">
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                    <div className="text-[9px] text-slate-400 mb-2 font-medium uppercase tracking-wider">Hazırlık Ekranı</div>
+                    <div className="space-y-1.5">
+                        <div className="w-full flex items-center justify-center gap-1.5 bg-red-50 border border-red-200 text-red-600 rounded-lg py-1.5 text-[10px] font-semibold">
+                            <AlertCircle className="w-3 h-3" /> Mülakatı İptal Et
+                        </div>
+                        <div className="w-full flex items-center justify-center gap-1.5 bg-slate-100 border border-slate-200 text-slate-500 rounded-lg py-1.5 text-[10px] font-semibold">
+                            <Clock className="w-3 h-3" /> Askıya Al
+                        </div>
+                    </div>
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
+                    <div className="bg-red-50 border border-red-100 rounded-lg p-2 text-center">
+                        <div className="text-[9px] font-bold text-red-600 mb-0.5">İptal</div>
+                        <div className="text-[8px] text-red-500">Kalıcı · Geri alınamaz</div>
+                    </div>
+                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2 text-center">
+                        <div className="text-[9px] font-bold text-slate-600 mb-0.5">Askıya Al</div>
+                        <div className="text-[8px] text-slate-400">Geçici · Devam edilebilir</div>
+                    </div>
+                </div>
+            </div>
+        )
+    },
+    {
         id: 'interview-report',
         category: 'mulakat',
         icon: FileText,
