@@ -1270,6 +1270,13 @@ export default function LiveInterviewPage() {
                     {/* COMPACT HEADER */}
                     <header className="h-[48px] bg-white border-b border-slate-200 flex items-center justify-between px-5 shrink-0 z-20">
                         <div className="flex items-center gap-2.5">
+                            <button
+                                onClick={() => navigate('/interviews')}
+                                title="Mülakat listesine dön (seans aktif kalır)"
+                                className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-all cursor-pointer"
+                            >
+                                <ChevronLeft className="w-4 h-4" />
+                            </button>
                             <div className="w-8 h-8 rounded-lg bg-[#0F172A] flex items-center justify-center">
                                 <Video className="w-4 h-4 text-white" />
                             </div>
@@ -1280,7 +1287,11 @@ export default function LiveInterviewPage() {
                         </div>
                         <div className="flex items-center gap-3">
                             <button
-                                onClick={() => navigate('/')}
+                                onClick={() => {
+                                    if (window.confirm('Mülakatı tamamen kapatmak istiyor musunuz? Seans CANLI kalmaya devam edecek, daha sonra tekrar katılabilirsiniz.')) {
+                                        navigate('/interviews');
+                                    }
+                                }}
                                 className="px-3 py-1 rounded-lg bg-white text-red-600 border border-red-100 text-[8px] font-black uppercase tracking-wider hover:bg-red-600 hover:text-white transition-all cursor-pointer"
                             >
                                 Mülakatı Kapat
