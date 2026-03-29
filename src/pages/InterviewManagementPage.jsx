@@ -2070,6 +2070,12 @@ export default function InterviewManagementPage() {
                             </div>
                             <button
                                 onClick={() => { setQuickCandidate(null); setQuickSearch(''); setQuickType('technical'); setQuickModal(true); }}
+                                className="flex items-center gap-2 bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition-all shadow-md shadow-indigo-900/10"
+                            >
+                                <User className="w-4 h-4" /> Yüz Yüze
+                            </button>
+                            <button
+                                onClick={() => { setQuickCandidate(null); setQuickSearch(''); setQuickType('technical'); setQuickModal(true); }}
                                 className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-all shadow-md shadow-emerald-900/10"
                             >
                                 <Play className="w-4 h-4 fill-current" /> Hızlı Mülakat Başlat
