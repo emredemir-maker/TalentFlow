@@ -53,6 +53,7 @@ talent-inn/
 │   │   ├── Dashboard.jsx
 │   │   ├── InterviewManagementPage.jsx   # Takvim-odaklı mülakat yönetimi
 │   │   ├── LiveInterviewPage.jsx
+│   │   ├── FaceToFacePage.jsx
 │   │   ├── AnalyticsPage.jsx
 │   │   ├── AIMatchPage.jsx
 │   │   ├── SuperAdminPage.jsx
@@ -154,6 +155,7 @@ bash -c "node server.js & npx vite preview --port 5000 --host 0.0.0.0"
 | Dashboard | `/` | Genel KPI paneli |
 | Mülakat Yönetimi | `/interviews` | Takvim-odaklı mülakat planlama ve takip (çok katılımcılı, 4-adım wizard) |
 | Canlı Mülakat | `/live-interview/:id` | Gerçek zamanlı mülakat + transkripsiyon |
+| Yüz Yüze Mülakat | `/face-interview/:id` | Tek mikrofon · STT · gerçek zamanlı STAR analizi · AI Coach |
 | Aday Katılım | `/join/:sessionId` | Anonim aday girişi |
 | AI Eşleştirme | `/ai-match` | Aday-pozisyon uyum analizi |
 | Analitik | `/analytics` | Grafik ve raporlar |

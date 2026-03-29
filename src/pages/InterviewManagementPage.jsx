@@ -88,6 +88,7 @@ export default function InterviewManagementPage() {
     const [quickCandidate, setQuickCandidate]   = useState(null);
     const [quickType, setQuickType]             = useState('technical');
     const [quickLoading, setQuickLoading]       = useState(false);
+    const [faceToFaceLoading, setFaceToFaceLoading] = useState(false);
     const [quickPosition, setQuickPosition]     = useState(null);
     // Wizard position state
     const [wizardPosition, setWizardPosition]   = useState(null);
@@ -1094,6 +1095,69 @@ export default function InterviewManagementPage() {
             alert('Mülakat başlatılamadı: ' + err.message);
         } finally {
             setQuickLoading(false);
+        }
+    };
+
+    const handleFaceToFaceStart = async () => {
+        if (!quickCandidate || faceToFaceLoading) return;
+        setFaceToFaceLoading(true);
+        try {
+            const interviewerName = currentUser?.displayName || 'Değerlendirici';
+            const sessionId = `iv-${crypto.randomUUID()}`;
+            const typeLabel = quickType === 'technical' ? 'Teknik Mülakat' : quickType === 'hr' ? 'İK Filtre' : 'Product Mülakatı';
+            const now = new Date();
+            const newSession = {
+                id: sessionId,
+                title: typeLabel + ' (Yüz Yüze)',
+                date: now.toISOString().split('T')[0],
+                time: now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+                type: quickType,
+                mode: 'face_to_face',
+                interviewer: interviewerName,
+                interviewerId: userId,
+                status: 'live',
+                meetLink: `${window.location.origin}/face-interview/${sessionId}`,
+                positionId:    quickPosition?.id    || quickCandidate.positionId    || null,
+                positionTitle: quickPosition?.title || quickCandidate.position || quickCandidate.bestTitle || null,
+                participants: [],
+            };
+
+            await updateCandidate(quickCandidate.id, {
+                interviewSessions: [...(quickCandidate.interviewSessions || []), newSession],
+                hasInterview: true,
+                status: 'Interview',
+            });
+
+            try {
+                await fetch('/api/init-interview-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sessionId,
+                        initialData: {
+                            status: 'live',
+                            mode: 'face_to_face',
+                            candidateId:   quickCandidate.id,
+                            candidateName: quickCandidate.name,
+                            positionId:    newSession.positionId,
+                            positionTitle: newSession.positionTitle,
+                            createdAt: new Date().toISOString(),
+                        },
+                    }),
+                });
+            } catch (docErr) {
+                console.warn('[handleFaceToFaceStart] Pre-create failed (non-blocking):', docErr.message);
+            }
+
+            setQuickModal(false);
+            setQuickCandidate(null);
+            setQuickSearch('');
+            navigate(`/face-interview/${sessionId}`);
+        } catch (err) {
+            console.error('[handleFaceToFaceStart] Error:', err);
+            alert('Yüz yüze mülakat başlatılamadı: ' + err.message);
+        } finally {
+            setFaceToFaceLoading(false);
         }
     };
 
@@ -2608,19 +2672,30 @@ export default function InterviewManagementPage() {
                             <div className="flex gap-2 pt-1">
                                 <button
                                     onClick={() => { setQuickModal(false); setQuickPosition(null); }}
-                                    className="flex-1 h-10 rounded-xl text-[11px] font-black text-slate-500 border border-slate-200 hover:bg-slate-50 transition-all"
+                                    className="h-10 px-3 rounded-xl text-[11px] font-black text-slate-500 border border-slate-200 hover:bg-slate-50 transition-all"
                                 >
                                     İptal
                                 </button>
                                 <button
+                                    onClick={handleFaceToFaceStart}
+                                    disabled={!quickCandidate || faceToFaceLoading || quickLoading}
+                                    className="flex-1 h-10 rounded-xl text-[11px] font-black text-white bg-indigo-500 hover:bg-indigo-600 flex items-center justify-center gap-1.5 shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {faceToFaceLoading ? (
+                                        <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Başlatılıyor...</>
+                                    ) : (
+                                        <><User className="w-3.5 h-3.5" /> Yüz Yüze</>
+                                    )}
+                                </button>
+                                <button
                                     onClick={handleQuickStart}
-                                    disabled={!quickCandidate || quickLoading}
+                                    disabled={!quickCandidate || quickLoading || faceToFaceLoading}
                                     className="flex-1 h-10 rounded-xl text-[11px] font-black text-white bg-emerald-500 hover:bg-emerald-600 flex items-center justify-center gap-2 shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {quickLoading ? (
                                         <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Başlatılıyor...</>
                                     ) : (
-                                        <><Play className="w-3.5 h-3.5 fill-current" /> Hemen Başlat</>
+                                        <><Play className="w-3.5 h-3.5 fill-current" /> Video Mülakat</>
                                     )}
                                 </button>
                             </div>

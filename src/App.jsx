@@ -19,6 +19,7 @@ import LoginPage from './pages/LoginPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import InterviewManagementPage from './pages/InterviewManagementPage';
 import LiveInterviewPage from './pages/LiveInterviewPage';
+import FaceToFacePage from './pages/FaceToFacePage';
 import InterviewReportPage from './pages/InterviewReportPage';
 import CandidateExitPage from './pages/CandidateExitPage';
 import ApplyPage from './pages/ApplyPage';
@@ -35,6 +36,7 @@ export default function App() {
             <MessageQueueProvider>
               <Routes>
                 <Route path="/live-interview/:sessionId" element={<LiveInterviewPage />} />
+                <Route path="/face-interview/:sessionId" element={<FaceToFacePage />} />
                 <Route path="/join/:sessionId" element={<LiveInterviewPage />} />
                 <Route path="/interview-report/:sessionId" element={<InterviewReportPage />} />
                 <Route path="/exit" element={<CandidateExitPage />} />
