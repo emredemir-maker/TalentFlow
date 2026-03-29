@@ -24,13 +24,17 @@ if (!admin.apps.length) {
 const db = admin.firestore();
 
 // ── Integration configs (in-memory cache) ─────────────────────────────────────
-const integrationConfigs = { microsoft365: null };
+const integrationConfigs = { google: null, microsoft365: null };
 
 async function loadIntegrationConfigs() {
     try {
         const snap = await db.doc('artifacts/talent-flow/public/data/settings/integrations').get();
         if (snap.exists) {
             const data = snap.data();
+            if (data.google) {
+                integrationConfigs.google = data.google;
+                console.log('[integrations] Google config loaded from Firestore');
+            }
             if (data.microsoft365) {
                 integrationConfigs.microsoft365 = data.microsoft365;
                 console.log('[integrations] Microsoft 365 config loaded from Firestore');
@@ -1172,6 +1176,10 @@ app.post('/api/admin/integrations', verifyFirebaseToken, async (req, res) => {
     try {
         const { provider, config } = req.body;
         if (!provider || !config) return res.status(400).json({ error: 'provider and config required' });
+        if (provider === 'google') {
+            integrationConfigs.google = config;
+            console.log('[integrations] Google config updated in-memory');
+        }
         if (provider === 'microsoft365') {
             integrationConfigs.microsoft365 = config;
             console.log('[integrations] Microsoft 365 config updated in-memory');
@@ -1340,6 +1348,153 @@ app.post('/api/auth/microsoft/refresh', verifyFirebaseToken, async (req, res) =>
         res.json({ success: true, accessToken: access_token });
     } catch (err) {
         console.error('[microsoft/refresh]', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ─── Google OAuth 2.0 ─────────────────────────────────────────────────────────
+
+const GOOGLE_SCOPES = [
+    'openid', 'profile', 'email',
+    'https://www.googleapis.com/auth/gmail.modify',
+    'https://www.googleapis.com/auth/calendar.events'
+].join(' ');
+
+app.get('/api/auth/google/url', async (req, res) => {
+    try {
+        const cfg = integrationConfigs.google;
+        if (!cfg?.clientId || !cfg?.clientSecret) {
+            return res.status(400).json({ error: 'Google entegrasyonu henüz yapılandırılmamış. Lütfen Entegrasyon Merkezi\'nden yapılandırın.' });
+        }
+        const { userId, force } = req.query;
+        const state = Buffer.from(JSON.stringify({ userId, ts: Date.now() })).toString('base64url');
+        const redirectUri = cfg.redirectUri || `${req.protocol}://${req.get('host')}/auth/google/callback`;
+        const params = new URLSearchParams({
+            client_id: cfg.clientId,
+            response_type: 'code',
+            redirect_uri: redirectUri,
+            scope: GOOGLE_SCOPES,
+            state,
+            access_type: 'offline',
+            include_granted_scopes: 'true',
+            ...(force === '1' ? { prompt: 'consent' } : {})
+        });
+        res.json({ url: `https://accounts.google.com/o/oauth2/v2/auth?${params}` });
+    } catch (err) {
+        console.error('[google/url]', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/auth/google/exchange', verifyFirebaseToken, async (req, res) => {
+    try {
+        const cfg = integrationConfigs.google;
+        if (!cfg?.clientId || !cfg?.clientSecret) {
+            return res.status(400).json({ error: 'Google yapılandırması eksik.' });
+        }
+        const { code, state, redirectUri } = req.body;
+        if (!code) return res.status(400).json({ error: 'OAuth kodu eksik.' });
+
+        let userId;
+        try {
+            const decoded = JSON.parse(Buffer.from(state || '', 'base64url').toString());
+            userId = decoded.userId;
+        } catch {
+            return res.status(400).json({ error: 'Geçersiz state.' });
+        }
+        if (!userId) return res.status(400).json({ error: 'userId eksik.' });
+
+        const redirect = redirectUri || cfg.redirectUri || `${req.protocol}://${req.get('host')}/auth/google/callback`;
+
+        const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+                client_id: cfg.clientId,
+                client_secret: cfg.clientSecret,
+                code,
+                redirect_uri: redirect,
+                grant_type: 'authorization_code',
+            }),
+        });
+
+        const tokenData = await tokenRes.json();
+        if (!tokenRes.ok || tokenData.error) {
+            return res.status(400).json({ error: tokenData.error_description || 'Token değişimi başarısız.' });
+        }
+
+        const { access_token, refresh_token, expires_in } = tokenData;
+        let email = '';
+        try {
+            const profileRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+                headers: { 'Authorization': `Bearer ${access_token}` }
+            });
+            const profile = await profileRes.json();
+            email = profile.email || '';
+        } catch { /* non-fatal */ }
+
+        const tokenExpiresAt = Date.now() + ((expires_in || 3600) - 60) * 1000;
+        const integrationData = {
+            connected: true, email, accessToken: access_token,
+            refreshToken: refresh_token, tokenExpiresAt,
+            connectedAt: new Date().toISOString(),
+        };
+
+        try {
+            await db.doc(`artifacts/talent-flow/public/data/users/${userId}`).update({
+                'integrations.google': integrationData
+            });
+        } catch {
+            await fsPatch(`artifacts/talent-flow/public/data/users/${userId}`,
+                { 'integrations.google': integrationData }, req.firebaseToken);
+        }
+
+        console.log(`[google/exchange] User ${userId} connected: ${email}`);
+        res.json({ success: true, email });
+    } catch (err) {
+        console.error('[google/exchange]', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/auth/google/refresh', verifyFirebaseToken, async (req, res) => {
+    try {
+        const cfg = integrationConfigs.google;
+        if (!cfg?.clientId || !cfg?.clientSecret) {
+            return res.status(400).json({ error: 'Google yapılandırması eksik.' });
+        }
+        const { userId, refreshToken } = req.body;
+        if (!refreshToken) return res.status(400).json({ error: 'refreshToken gerekli.' });
+
+        const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+                client_id: cfg.clientId,
+                client_secret: cfg.clientSecret,
+                refresh_token: refreshToken,
+                grant_type: 'refresh_token',
+            }),
+        });
+
+        const tokenData = await tokenRes.json();
+        if (!tokenRes.ok || tokenData.error) {
+            return res.status(400).json({ error: tokenData.error_description || 'Token yenileme başarısız.' });
+        }
+
+        const { access_token, expires_in } = tokenData;
+        const tokenExpiresAt = Date.now() + ((expires_in || 3600) - 60) * 1000;
+
+        try {
+            await db.doc(`artifacts/talent-flow/public/data/users/${userId}`).update({
+                'integrations.google.accessToken': access_token,
+                'integrations.google.tokenExpiresAt': tokenExpiresAt,
+            });
+        } catch { /* non-fatal */ }
+
+        res.json({ success: true, accessToken: access_token });
+    } catch (err) {
+        console.error('[google/refresh]', err.message);
         res.status(500).json({ error: err.message });
     }
 });

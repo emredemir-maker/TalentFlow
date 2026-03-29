@@ -28,6 +28,7 @@ import PipelinePage from './pages/PipelinePage';
 import CandidateRespondPage from './pages/CandidateRespondPage';
 import IntegrationsPage from './pages/IntegrationsPage';
 import MicrosoftCallbackPage from './pages/MicrosoftCallbackPage';
+import GoogleCallbackPage from './pages/GoogleCallbackPage';
 
 export default function App() {
   return (
@@ -45,6 +46,7 @@ export default function App() {
                 <Route path="/apply/:positionId" element={<ApplyPage />} />
                 <Route path="/respond/:id" element={<CandidateRespondPage />} />
                 <Route path="/auth/microsoft/callback" element={<MicrosoftCallbackPage />} />
+                <Route path="/auth/google/callback" element={<GoogleCallbackPage />} />
                 <Route path="/*" element={<AuthenticatedApp />} />
               </Routes>
             </MessageQueueProvider>

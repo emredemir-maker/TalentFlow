@@ -1,118 +1,63 @@
 // src/services/integrationService.js
-// Google Workspace (Gmail + Calendar) integration with automatic token refresh.
+// Google Workspace (Gmail + Calendar) integration.
+// Uses admin-configurable OAuth credentials via the server — NOT tied to Firebase project.
+// sendDirectEmail, createDirectCalendarEvent, etc. remain unchanged (token-based).
 
-import { getAuth, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
 const USERS_PATH = 'artifacts/talent-flow/public/data/users';
+const TOKEN_TTL_MS = 55 * 60 * 1000;
 
-// Access tokens live ~1 hour. We treat them stale after 55 minutes so we
-// always have a comfortable buffer before expiry.
-const TOKEN_TTL_MS = 55 * 60 * 1000; // 55 minutes
-
-// ─── PROVIDER FACTORY ─────────────────────────────────────────────────────────
-// Builds a Google provider with the required API scopes.
-// forceConsent=true adds prompt:'consent' so the user can switch accounts
-// or re-grant scopes (only used when something goes wrong, not for silent refresh).
-const buildGoogleProvider = (forceConsent = false) => {
-    const provider = new GoogleAuthProvider();
-    provider.addScope('https://www.googleapis.com/auth/gmail.modify');
-    provider.addScope('https://www.googleapis.com/auth/calendar.events');
-    provider.setCustomParameters({
-        access_type: 'offline',
-        include_granted_scopes: 'true',
-        ...(forceConsent ? { prompt: 'consent' } : {})
-    });
-    return provider;
-};
-
-// ─── CONNECT (first time / manual reconnect) ──────────────────────────────────
+// ─── CONNECT (popup OAuth, server-side) ───────────────────────────────────────
 export const connectGoogleWorkspace = async (userId, forceConsent = false) => {
     try {
-        const provider = buildGoogleProvider(forceConsent);
-        const auth = getAuth();
-        const result = await signInWithPopup(auth, provider);
+        const urlRes = await fetch(
+            `/api/auth/google/url?userId=${encodeURIComponent(userId)}&force=${forceConsent ? '1' : '0'}`,
+            { headers: { 'Content-Type': 'application/json' } }
+        );
+        if (!urlRes.ok) {
+            const errData = await urlRes.json().catch(() => ({}));
+            throw new Error(errData.error || 'Google entegrasyonu yapılandırılmamış. Lütfen Entegrasyon Merkezi\'nden yapılandırın.');
+        }
+        const { url } = await urlRes.json();
 
-        const credential = GoogleAuthProvider.credentialFromResult(result);
-        const token = credential?.accessToken;
-        if (!token) throw new Error('Erişim belirteci (Access Token) alınamadı.');
+        return new Promise((resolve, reject) => {
+            const w = 500, h = 650;
+            const left = window.screenLeft + (window.outerWidth - w) / 2;
+            const top = window.screenTop + (window.outerHeight - h) / 2;
+            const popup = window.open(url, 'google-oauth', `width=${w},height=${h},left=${left},top=${top},resizable=yes,scrollbars=yes`);
 
-        const expiresAt = Date.now() + TOKEN_TTL_MS;
-
-        await updateDoc(doc(db, USERS_PATH, userId), {
-            'integrations.google': {
-                connected: true,
-                email: result.user.email,
-                accessToken: token,
-                tokenExpiresAt: expiresAt,
-                connectedAt: new Date().toISOString()
+            if (!popup) {
+                reject(new Error('Popup engellendi. Lütfen tarayıcı popup engelleyicisini devre dışı bırakın.'));
+                return;
             }
-        });
 
-        return { success: true, email: result.user.email, token };
+            const handleMessage = (event) => {
+                if (event.origin !== window.location.origin) return;
+                if (event.data?.type !== 'GOOGLE_OAUTH_CALLBACK') return;
+                window.removeEventListener('message', handleMessage);
+                clearInterval(checkClosed);
+                if (event.data.error) {
+                    reject(new Error(event.data.error));
+                } else {
+                    resolve({ success: true, email: event.data.email });
+                }
+            };
+            window.addEventListener('message', handleMessage);
+
+            const checkClosed = setInterval(() => {
+                if (popup.closed) {
+                    clearInterval(checkClosed);
+                    window.removeEventListener('message', handleMessage);
+                    reject(new Error('Bağlantı penceresi kapatıldı.'));
+                }
+            }, 500);
+        });
     } catch (error) {
         console.error('[Google] Connect error:', error);
-        let errorMessage = error.message;
-        if (error.code === 'auth/popup-closed-by-user') errorMessage = 'Bağlantı penceresi kapatıldı.';
-        if (error.code === 'auth/popup-blocked') errorMessage = 'Tarayıcı popup\'ı engelledi. Lütfen popup engelleyiciyi devre dışı bırakın.';
-        return { success: false, error: errorMessage };
+        return { success: false, error: error.message };
     }
-};
-
-// ─── SILENT TOKEN REFRESH ─────────────────────────────────────────────────────
-// Called automatically when the stored token is near/past expiry.
-// Does NOT use forceConsent so it reuses the already-granted session — the user
-// sees a brief account-picker popup and just clicks their account (or nothing,
-// if Firebase has cached their session).
-const _silentRefresh = async (userId, integration) => {
-    try {
-        const provider = buildGoogleProvider(false);
-        const auth = getAuth();
-        const result = await signInWithPopup(auth, provider);
-
-        const credential = GoogleAuthProvider.credentialFromResult(result);
-        const token = credential?.accessToken;
-        if (!token) throw new Error('Token alınamadı');
-
-        const expiresAt = Date.now() + TOKEN_TTL_MS;
-
-        await updateDoc(doc(db, USERS_PATH, userId), {
-            'integrations.google': {
-                ...integration,
-                accessToken: token,
-                tokenExpiresAt: expiresAt,
-                email: result.user.email,
-                connected: true
-            }
-        });
-
-        console.log('[Google] Token silently refreshed, valid until', new Date(expiresAt).toLocaleTimeString());
-        return token;
-    } catch (err) {
-        console.error('[Google] Silent refresh failed:', err);
-        return null;
-    }
-};
-
-// ─── ENSURE VALID TOKEN (call this before every Google API request) ────────────
-// Returns a valid access token, refreshing it silently if needed.
-// Returns null if the user is not connected or refresh fails.
-export const ensureValidGoogleToken = async (userId, userProfile) => {
-    const integration = userProfile?.integrations?.google;
-    if (!integration?.connected || !integration?.accessToken) return null;
-
-    const now = Date.now();
-    const expiresAt = integration.tokenExpiresAt ?? 0;
-
-    // Token still fresh (or we have no expiry record for legacy tokens — refresh those too)
-    if (expiresAt && now < expiresAt) {
-        return integration.accessToken;
-    }
-
-    // Token expired or no expiry stored → refresh silently
-    console.log('[Google] Token expired or missing expiry — refreshing silently...');
-    return _silentRefresh(userId, integration);
 };
 
 // ─── DISCONNECT ───────────────────────────────────────────────────────────────
@@ -131,9 +76,35 @@ export const disconnectGoogleWorkspace = async (userId) => {
     }
 };
 
-// ─── SEND EMAIL ───────────────────────────────────────────────────────────────
-// emailData: { to, subject, body (plain text), html (optional HTML body) }
-// Returns: { success, messageId, threadId }
+// ─── ENSURE VALID TOKEN ────────────────────────────────────────────────────────
+export const ensureValidGoogleToken = async (userId, userProfile, idToken) => {
+    const integration = userProfile?.integrations?.google;
+    if (!integration?.connected || !integration?.accessToken) return null;
+
+    const now = Date.now();
+    const expiresAt = integration.tokenExpiresAt ?? 0;
+
+    if (expiresAt && now < expiresAt) return integration.accessToken;
+
+    // Silent refresh via server
+    try {
+        const res = await fetch('/api/auth/google/refresh', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${idToken}`
+            },
+            body: JSON.stringify({ userId, refreshToken: integration.refreshToken })
+        });
+        if (!res.ok) return null;
+        const data = await res.json();
+        return data.accessToken || null;
+    } catch {
+        return null;
+    }
+};
+
+// ─── SEND EMAIL (unchanged — token-based) ────────────────────────────────────
 export const sendDirectEmail = async (userId, token, emailData) => {
     try {
         const { to, subject, body, html, replyTo, ics } = emailData;
@@ -142,7 +113,6 @@ export const sendDirectEmail = async (userId, token, emailData) => {
 
         let rawMessage;
         if (html && ics) {
-            // multipart/mixed → (multipart/alternative + text/calendar)
             const outer = `outer_${Date.now()}_${Math.random().toString(36).slice(2)}`;
             const inner = `inner_${Date.now()}_${Math.random().toString(36).slice(2)}`;
             const parts = [
@@ -177,7 +147,6 @@ export const sendDirectEmail = async (userId, token, emailData) => {
             ];
             rawMessage = parts.join('\r\n');
         } else if (html) {
-            // Multipart: plain text fallback + HTML body
             const boundary = `boundary_${Date.now()}_${Math.random().toString(36).slice(2)}`;
             const parts = [
                 `To: ${to}`,
@@ -200,7 +169,7 @@ export const sendDirectEmail = async (userId, token, emailData) => {
             ];
             rawMessage = parts.join('\r\n');
         } else {
-            const messageParts = [
+            rawMessage = [
                 `To: ${to}`,
                 `Subject: ${utf8Subject}`,
                 ...(replyTo ? [`Reply-To: ${replyTo}`] : []),
@@ -208,8 +177,7 @@ export const sendDirectEmail = async (userId, token, emailData) => {
                 'MIME-Version: 1.0',
                 '',
                 body
-            ];
-            rawMessage = messageParts.join('\n');
+            ].join('\n');
         }
 
         const encodedMessage = btoa(unescape(encodeURIComponent(rawMessage)))
@@ -217,10 +185,7 @@ export const sendDirectEmail = async (userId, token, emailData) => {
 
         const response = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
             method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({ raw: encodedMessage })
         });
 
@@ -238,8 +203,7 @@ export const sendDirectEmail = async (userId, token, emailData) => {
     }
 };
 
-// ─── FETCH EMAIL THREAD REPLIES ───────────────────────────────────────────────
-// Returns messages in a thread (to detect replies from candidates)
+// ─── FETCH EMAIL THREAD ───────────────────────────────────────────────────────
 export const fetchEmailThread = async (token, threadId) => {
     try {
         const response = await fetch(
@@ -252,14 +216,10 @@ export const fetchEmailThread = async (token, threadId) => {
             const headers = msg.payload?.headers || [];
             const get = (name) => headers.find(h => h.name.toLowerCase() === name.toLowerCase())?.value || '';
             return {
-                id: msg.id,
-                threadId: msg.threadId,
-                from: get('From'),
-                to: get('To'),
-                subject: get('Subject'),
-                date: get('Date'),
-                snippet: msg.snippet || '',
-                labelIds: msg.labelIds || []
+                id: msg.id, threadId: msg.threadId,
+                from: get('From'), to: get('To'),
+                subject: get('Subject'), date: get('Date'),
+                snippet: msg.snippet || '', labelIds: msg.labelIds || []
             };
         });
         return { success: true, messages };
@@ -272,9 +232,6 @@ export const fetchEmailThread = async (token, threadId) => {
 export const createDirectCalendarEvent = async (userId, token, eventData) => {
     try {
         const { summary, description, startDateTime, endDateTime, guestEmail, guestEmails, timeZone } = eventData;
-
-        // startDateTime / endDateTime should be LOCAL time strings (no trailing Z)
-        // when timeZone is supplied — e.g. "2026-03-19T09:00:00"
         const tz = timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
         const event = {
@@ -299,9 +256,7 @@ export const createDirectCalendarEvent = async (userId, token, eventData) => {
 
         const allGuests = [];
         if (guestEmail) allGuests.push(guestEmail);
-        if (Array.isArray(guestEmails)) {
-            guestEmails.forEach(e => { if (e && !allGuests.includes(e)) allGuests.push(e); });
-        }
+        if (Array.isArray(guestEmails)) guestEmails.forEach(e => { if (e && !allGuests.includes(e)) allGuests.push(e); });
         if (allGuests.length > 0) {
             event.attendees = allGuests.map(email => ({ email }));
             event.guestsCanModify = false;
@@ -311,16 +266,12 @@ export const createDirectCalendarEvent = async (userId, token, eventData) => {
             'https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1&sendUpdates=none',
             {
                 method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify(event)
             }
         );
 
         const data = await response.json();
-
         if (!response.ok) {
             if (response.status === 401) throw new Error('TOKEN_EXPIRED: Oturum süresi dolmuş.');
             if (response.status === 403) throw new Error('AUTH_SCOPE: Takvim erişim yetkisi yetersiz (403).');
@@ -331,12 +282,7 @@ export const createDirectCalendarEvent = async (userId, token, eventData) => {
             || data.conferenceData?.entryPoints?.[0]?.uri
             || null;
 
-        return {
-            success: true,
-            htmlLink: data.htmlLink,
-            meetLink,
-            eventId: data.id
-        };
+        return { success: true, htmlLink: data.htmlLink, meetLink, eventId: data.id };
     } catch (error) {
         console.error('[Google] Calendar event error:', error);
         return { success: false, error: error.message };
@@ -347,16 +293,12 @@ export const createDirectCalendarEvent = async (userId, token, eventData) => {
 export const getCalendarEvents = async (token, timeMin, timeMax) => {
     try {
         const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}&singleEvents=true&orderBy=startTime`;
-        const response = await fetch(url, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-
+        const response = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
         const data = await response.json();
         if (!response.ok) {
             if (response.status === 401) throw new Error('TOKEN_EXPIRED: Oturum süresi dolmuş.');
             throw new Error(data.error?.message || 'Takvim verileri alınamadı.');
         }
-
         return { success: true, events: data.items || [] };
     } catch (error) {
         console.error('[Google] Get calendar events error:', error);
@@ -395,7 +337,6 @@ export const checkGmailMessages = async (token, query) => {
         }
 
         const msgData = await msgResponse.json();
-
         const decodeBase64 = (str) => {
             const base64 = str.replace(/-/g, '+').replace(/_/g, '/');
             try { return decodeURIComponent(escape(atob(base64))); }
@@ -413,9 +354,7 @@ export const checkGmailMessages = async (token, query) => {
         return {
             success: true, found: true,
             message: {
-                id: msgId,
-                snippet: msgData.snippet,
-                body,
+                id: msgId, snippet: msgData.snippet, body,
                 from: msgData.payload.headers.find(h => h.name === 'From')?.value,
                 date: msgData.payload.headers.find(h => h.name === 'Date')?.value
             }

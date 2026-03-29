@@ -1,12 +1,12 @@
 // src/pages/IntegrationsPage.jsx
 // Admin Integration Hub — super_admin only
-// Manage credentials for Google Workspace, Microsoft 365, and future providers.
+// Google Workspace ve Microsoft 365 için tam OAuth yapılandırma paneli.
 
 import { useState, useEffect, useCallback } from 'react';
 import {
     Plug, CheckCircle, AlertTriangle, Info, ChevronDown, ChevronRight,
-    Eye, EyeOff, Save, Trash2, RefreshCw, ExternalLink, Copy, Shield,
-    Users, Loader2, X, Zap, Mail, Calendar, Video, Globe
+    Eye, EyeOff, Save, Trash2, Copy, Shield,
+    Users, Loader2, ExternalLink, Zap, Mail, Calendar, Video, Globe
 } from 'lucide-react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -14,8 +14,8 @@ import { useAuth } from '../context/AuthContext';
 
 const INTEGRATIONS_PATH = 'artifacts/talent-flow/public/data/settings/integrations';
 
-// ─── PROVIDER ICONS ───────────────────────────────────────────────────────────
-function GoogleIcon({ size = 20 }) {
+// ─── ICONS ────────────────────────────────────────────────────────────────────
+function GoogleIcon({ size = 22 }) {
     return (
         <svg width={size} height={size} viewBox="0 0 24 24">
             <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
@@ -55,11 +55,10 @@ function SlackIcon({ size = 20 }) {
 // ─── STATUS BADGE ─────────────────────────────────────────────────────────────
 function StatusBadge({ status }) {
     const cfg = {
-        configured: { label: 'Yapılandırıldı', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', dot: 'bg-emerald-400' },
-        partial:    { label: 'Eksik Bilgi',    bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-200',   dot: 'bg-amber-400' },
-        unconfigured: { label: 'Yapılandırılmamış', bg: 'bg-slate-50', text: 'text-slate-500', border: 'border-slate-200', dot: 'bg-slate-300' },
-        builtin:    { label: 'Yerleşik',       bg: 'bg-blue-50',    text: 'text-blue-700',    border: 'border-blue-200',    dot: 'bg-blue-400' },
-        soon:       { label: 'Yakında',        bg: 'bg-violet-50',  text: 'text-violet-600',  border: 'border-violet-200',  dot: 'bg-violet-400' },
+        configured:   { label: 'Yapılandırıldı',      bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', dot: 'bg-emerald-400' },
+        partial:      { label: 'Eksik Bilgi',          bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-200',   dot: 'bg-amber-400' },
+        unconfigured: { label: 'Yapılandırılmamış',    bg: 'bg-slate-50',   text: 'text-slate-500',   border: 'border-slate-200',   dot: 'bg-slate-300' },
+        soon:         { label: 'Yakında',              bg: 'bg-violet-50',  text: 'text-violet-600',  border: 'border-violet-200',  dot: 'bg-violet-400' },
     };
     const c = cfg[status] || cfg.unconfigured;
     return (
@@ -70,7 +69,7 @@ function StatusBadge({ status }) {
     );
 }
 
-// ─── FIELD INPUT ──────────────────────────────────────────────────────────────
+// ─── CONFIG FIELD ─────────────────────────────────────────────────────────────
 function ConfigField({ label, hint, value, onChange, type = 'text', mono = false, readOnly = false, copyable = false }) {
     const [visible, setVisible] = useState(false);
     const [copied, setCopied] = useState(false);
@@ -119,8 +118,8 @@ function ConfigField({ label, hint, value, onChange, type = 'text', mono = false
 // ─── INFO BOX ─────────────────────────────────────────────────────────────────
 function InfoBox({ type = 'info', children }) {
     const s = {
-        info:    { bg: 'bg-blue-50 border-blue-200', icon: Info, ic: 'text-blue-500', tc: 'text-blue-800' },
-        warning: { bg: 'bg-amber-50 border-amber-200', icon: AlertTriangle, ic: 'text-amber-500', tc: 'text-amber-800' },
+        info:    { bg: 'bg-blue-50 border-blue-200',    icon: Info,          ic: 'text-blue-500',    tc: 'text-blue-800' },
+        warning: { bg: 'bg-amber-50 border-amber-200',  icon: AlertTriangle, ic: 'text-amber-500',   tc: 'text-amber-800' },
         success: { bg: 'bg-emerald-50 border-emerald-200', icon: CheckCircle, ic: 'text-emerald-500', tc: 'text-emerald-800' },
     }[type];
     const Icon = s.icon;
@@ -133,13 +132,12 @@ function InfoBox({ type = 'info', children }) {
 }
 
 // ─── INTEGRATION CARD ─────────────────────────────────────────────────────────
-function IntegrationCard({ provider, icon, name, subtitle, status, features, configContent, onSave, onRemove, saving, saved }) {
+function IntegrationCard({ icon, name, subtitle, status, features, configContent, onSave, onRemove, saving, saved }) {
     const [expanded, setExpanded] = useState(false);
     const isComingSoon = status === 'soon';
 
     return (
         <div className={`bg-white rounded-2xl border transition-all duration-200 ${expanded ? 'border-slate-300 shadow-md' : 'border-slate-200 hover:border-slate-300 hover:shadow-sm'}`}>
-            {/* Card Header */}
             <div
                 className={`flex items-center gap-4 p-5 ${!isComingSoon ? 'cursor-pointer' : ''}`}
                 onClick={() => !isComingSoon && setExpanded(v => !v)}
@@ -170,12 +168,9 @@ function IntegrationCard({ provider, icon, name, subtitle, status, features, con
                 )}
             </div>
 
-            {/* Config Panel */}
             {expanded && !isComingSoon && (
                 <div className="border-t border-slate-100 px-5 pb-5 pt-4">
                     {configContent}
-
-                    {/* Action Buttons */}
                     {onSave && (
                         <div className="flex items-center gap-2 mt-5 pt-4 border-t border-slate-100">
                             <button
@@ -207,21 +202,58 @@ function IntegrationCard({ provider, icon, name, subtitle, status, features, con
     );
 }
 
+// ─── SETUP STEPS ─────────────────────────────────────────────────────────────
+function SetupSteps({ steps, accent = 'bg-slate-200 text-slate-600' }) {
+    return (
+        <ol className="space-y-2">
+            {steps.map((step, i) => (
+                <li key={i} className="flex items-start gap-2">
+                    <span className={`w-4 h-4 rounded-full ${accent} flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5`}>{i + 1}</span>
+                    <span className="text-[11px] text-slate-600 leading-relaxed">{step}</span>
+                </li>
+            ))}
+        </ol>
+    );
+}
+
+// ─── SCOPE TABLE ─────────────────────────────────────────────────────────────
+function ScopeTable({ scopes }) {
+    return (
+        <div className="grid grid-cols-2 gap-1.5">
+            {scopes.map(s => (
+                <div key={s.scope} className="flex items-start gap-2 bg-white border border-slate-100 rounded-lg p-2">
+                    <CheckCircle className="w-3 h-3 text-emerald-400 shrink-0 mt-0.5" />
+                    <div>
+                        <code className="text-[10px] font-mono text-violet-700 font-bold">{s.scope}</code>
+                        <p className="text-[9px] text-slate-400">{s.desc}</p>
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+}
+
 // ─── MAIN PAGE ─────────────────────────────────────────────────────────────────
 export default function IntegrationsPage() {
     const { user, userProfile } = useAuth();
     const [loading, setLoading] = useState(true);
     const [configs, setConfigs] = useState({});
 
+    // Google Workspace form state
+    const [goog, setGoog] = useState({ clientId: '', clientSecret: '', enabled: true });
+    const [googSaving, setGoogSaving] = useState(false);
+    const [googSaved, setGoogSaved] = useState(false);
+
     // Microsoft 365 form state
     const [ms, setMs] = useState({ clientId: '', tenantId: '', clientSecret: '', enabled: true });
     const [msSaving, setMsSaving] = useState(false);
     const [msSaved, setMsSaved] = useState(false);
 
-    // Redirect URI auto-calculated
-    const redirectUri = `${window.location.origin}/auth/microsoft/callback`;
+    // Redirect URIs auto-calculated
+    const googleRedirectUri = `${window.location.origin}/auth/google/callback`;
+    const msRedirectUri = `${window.location.origin}/auth/microsoft/callback`;
 
-    // ── Load configs from Firestore ─────────────────────────────────────────
+    // ── Load from Firestore ─────────────────────────────────────────────────
     const loadConfigs = useCallback(async () => {
         try {
             setLoading(true);
@@ -229,6 +261,13 @@ export default function IntegrationsPage() {
             if (snap.exists()) {
                 const data = snap.data();
                 setConfigs(data);
+                if (data.google) {
+                    setGoog({
+                        clientId: data.google.clientId || '',
+                        clientSecret: data.google.clientSecret || '',
+                        enabled: data.google.enabled !== false,
+                    });
+                }
                 if (data.microsoft365) {
                     setMs({
                         clientId: data.microsoft365.clientId || '',
@@ -247,10 +286,59 @@ export default function IntegrationsPage() {
 
     useEffect(() => { loadConfigs(); }, [loadConfigs]);
 
-    // ── Save Microsoft 365 config ───────────────────────────────────────────
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    const notifyServer = async (provider, config) => {
+        try {
+            const idToken = await user.getIdToken();
+            await fetch('/api/admin/integrations', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+                body: JSON.stringify({ provider, config })
+            });
+        } catch { /* non-fatal */ }
+    };
+
+    // ── Save Google ───────────────────────────────────────────────────────────
+    const saveGoogle = async () => {
+        if (!goog.clientId || !goog.clientSecret) {
+            alert('Client ID ve Client Secret zorunludur.');
+            return;
+        }
+        try {
+            setGoogSaving(true);
+            const payload = {
+                google: {
+                    clientId: goog.clientId.trim(),
+                    clientSecret: goog.clientSecret.trim(),
+                    redirectUri: googleRedirectUri,
+                    enabled: goog.enabled,
+                    configuredAt: new Date().toISOString(),
+                    configuredBy: userProfile?.displayName || user?.email || 'admin',
+                }
+            };
+            await setDoc(doc(db, INTEGRATIONS_PATH), payload, { merge: true });
+            await notifyServer('google', payload.google);
+            setConfigs(prev => ({ ...prev, ...payload }));
+            setGoogSaved(true);
+            setTimeout(() => setGoogSaved(false), 3000);
+        } catch (err) {
+            alert('Kayıt hatası: ' + err.message);
+        } finally {
+            setGoogSaving(false);
+        }
+    };
+
+    const removeGoogle = async () => {
+        if (!window.confirm('Google Workspace yapılandırmasını silmek istediğinizden emin misiniz?')) return;
+        await setDoc(doc(db, INTEGRATIONS_PATH), { google: null }, { merge: true });
+        setGoog({ clientId: '', clientSecret: '', enabled: true });
+        setConfigs(prev => { const n = { ...prev }; delete n.google; return n; });
+    };
+
+    // ── Save Microsoft ────────────────────────────────────────────────────────
     const saveMicrosoft = async () => {
         if (!ms.clientId || !ms.tenantId || !ms.clientSecret) {
-            alert('Client ID, Tenant ID ve Client Secret alanlarının tümü zorunludur.');
+            alert('Client ID, Tenant ID ve Client Secret zorunludur.');
             return;
         }
         try {
@@ -260,51 +348,37 @@ export default function IntegrationsPage() {
                     clientId: ms.clientId.trim(),
                     tenantId: ms.tenantId.trim(),
                     clientSecret: ms.clientSecret.trim(),
-                    redirectUri,
+                    redirectUri: msRedirectUri,
                     enabled: ms.enabled,
                     configuredAt: new Date().toISOString(),
                     configuredBy: userProfile?.displayName || user?.email || 'admin',
                 }
             };
             await setDoc(doc(db, INTEGRATIONS_PATH), payload, { merge: true });
-
-            // Notify server to refresh its in-memory cache
-            try {
-                const idToken = await user.getIdToken();
-                await fetch('/api/admin/integrations', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
-                    body: JSON.stringify({ provider: 'microsoft365', config: payload.microsoft365 })
-                });
-            } catch {
-                // Non-fatal — server will load on next restart from Firestore
-            }
-
+            await notifyServer('microsoft365', payload.microsoft365);
             setConfigs(prev => ({ ...prev, ...payload }));
             setMsSaved(true);
             setTimeout(() => setMsSaved(false), 3000);
         } catch (err) {
-            console.error('[IntegrationsPage] Save error:', err);
-            alert('Kayıt sırasında hata: ' + err.message);
+            alert('Kayıt hatası: ' + err.message);
         } finally {
             setMsSaving(false);
         }
     };
 
-    // ── Remove Microsoft config ─────────────────────────────────────────────
     const removeMicrosoft = async () => {
-        if (!window.confirm('Microsoft 365 yapılandırmasını silmek istediğinize emin misiniz? Bağlı tüm kullanıcıların oturumu kesilir.')) return;
-        try {
-            await setDoc(doc(db, INTEGRATIONS_PATH), { microsoft365: null }, { merge: true });
-            setMs({ clientId: '', tenantId: '', clientSecret: '', enabled: true });
-            setConfigs(prev => { const n = { ...prev }; delete n.microsoft365; return n; });
-        } catch (err) {
-            alert('Silme hatası: ' + err.message);
-        }
+        if (!window.confirm('Microsoft 365 yapılandırmasını silmek istediğinizden emin misiniz?')) return;
+        await setDoc(doc(db, INTEGRATIONS_PATH), { microsoft365: null }, { merge: true });
+        setMs({ clientId: '', tenantId: '', clientSecret: '', enabled: true });
+        setConfigs(prev => { const n = { ...prev }; delete n.microsoft365; return n; });
     };
 
+    const googStatus = configs.google?.clientId
+        ? (configs.google?.clientSecret ? 'configured' : 'partial')
+        : 'unconfigured';
+
     const msStatus = configs.microsoft365?.clientId
-        ? (configs.microsoft365?.clientId && configs.microsoft365?.tenantId && configs.microsoft365?.clientSecret ? 'configured' : 'partial')
+        ? (configs.microsoft365?.tenantId && configs.microsoft365?.clientSecret ? 'configured' : 'partial')
         : 'unconfigured';
 
     if (loading) {
@@ -338,75 +412,136 @@ export default function IntegrationsPage() {
 
             <div className="max-w-3xl mx-auto px-6 py-8 space-y-6">
 
-                {/* Security Notice */}
-                <div className="flex gap-3 p-4 bg-amber-50 border border-amber-200 rounded-2xl">
-                    <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                {/* Taşınabilirlik Notu */}
+                <div className="flex gap-3 p-4 bg-blue-50 border border-blue-200 rounded-2xl">
+                    <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
                     <div>
-                        <p className="text-xs font-bold text-amber-800 mb-0.5">Güvenlik Bildirimi</p>
-                        <p className="text-xs text-amber-700 leading-relaxed">
-                            Girdiğiniz OAuth credentials (Client Secret dahil) Firestore'da şifrelenmiş olmadan saklanır. Bu verilere yalnızca Süper Admin erişebilir. Üretim ortamı için ek şifreleme katmanı eklemeniz önerilir.
+                        <p className="text-xs font-bold text-blue-800 mb-0.5">Platform Bağımsız Yapılandırma</p>
+                        <p className="text-xs text-blue-700 leading-relaxed">
+                            Her iki entegrasyon da kendi OAuth credentials'larınızla yapılandırılır. Bu sayede uygulamayı farklı bir sunucuya veya kuruluşa deploy ettiğinizde sadece bu panelden kimlik bilgilerini güncelleyerek çalışmaya devam eder.
                         </p>
                     </div>
                 </div>
 
-                {/* Section Title */}
+                {/* Güvenlik Uyarısı */}
+                <div className="flex gap-3 p-4 bg-amber-50 border border-amber-200 rounded-2xl">
+                    <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                    <p className="text-xs text-amber-700 leading-relaxed">
+                        <strong>Güvenlik:</strong> Client Secret değerleri Firestore'da saklanır. Yalnızca Süper Admin erişebilir. Üretim ortamında ek şifreleme katmanı önerilir.
+                    </p>
+                </div>
+
+                {/* Aktif Entegrasyonlar */}
                 <div>
-                    <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4">Aktif Entegrasyonlar</h2>
+                    <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4">Yapılandırılabilir Entegrasyonlar</h2>
                     <div className="space-y-3">
 
                         {/* ── Google Workspace ─── */}
                         <IntegrationCard
-                            provider="google"
                             icon={<GoogleIcon size={24} />}
                             name="Google Workspace"
                             subtitle="Gmail, Google Calendar & Google Meet"
-                            status="builtin"
+                            status={googStatus}
                             features={[
                                 { icon: <Mail className="w-3 h-3" />, label: 'Gmail' },
                                 { icon: <Calendar className="w-3 h-3" />, label: 'Takvim' },
                                 { icon: <Video className="w-3 h-3" />, label: 'Meet' },
                             ]}
+                            onSave={saveGoogle}
+                            onRemove={googStatus !== 'unconfigured' ? removeGoogle : undefined}
+                            saving={googSaving}
+                            saved={googSaved}
                             configContent={
                                 <div className="space-y-4">
-                                    <InfoBox type="success">
-                                        Google Workspace entegrasyonu Firebase OAuth 2.0 ile yerleşik olarak çalışmaktadır. Herhangi bir ek yapılandırma gerekmez — kullanıcılar <strong>Ayarlar → Hesabım</strong> bölümünden kendi Google hesaplarını bağlayabilir.
+                                    <InfoBox type="info">
+                                        Google Cloud Console'da bir OAuth 2.0 istemci oluşturun ve aşağıdaki Redirect URI'yi "Yetkili yönlendirme URI'leri" listesine ekleyin.
                                     </InfoBox>
 
-                                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2.5">
-                                        <p className="text-xs font-semibold text-slate-600 mb-2">Etkin Özellikler</p>
-                                        {[
-                                            { icon: <Mail className="w-3.5 h-3.5 text-blue-500" />, label: 'Gmail API', desc: 'Mülakat davetleri ve e-posta takibi' },
-                                            { icon: <Calendar className="w-3.5 h-3.5 text-emerald-500" />, label: 'Google Calendar', desc: 'Otomatik etkinlik oluşturma ve müsaitlik kontrolü' },
-                                            { icon: <Video className="w-3.5 h-3.5 text-red-500" />, label: 'Google Meet', desc: 'Mülakat davetlerinde otomatik Meet linki üretimi' },
-                                        ].map((f, i) => (
-                                            <div key={i} className="flex items-center gap-3">
-                                                <div className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center shrink-0">{f.icon}</div>
-                                                <div>
-                                                    <p className="text-xs font-medium text-slate-700">{f.label}</p>
-                                                    <p className="text-[10px] text-slate-400">{f.desc}</p>
-                                                </div>
-                                                <CheckCircle className="w-4 h-4 text-emerald-400 ml-auto shrink-0" />
-                                            </div>
-                                        ))}
+                                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                                        <p className="text-xs font-bold text-slate-600 mb-3 flex items-center gap-1.5">
+                                            <Zap className="w-3.5 h-3.5 text-amber-500" /> Google Cloud Console Kurulum Adımları
+                                        </p>
+                                        <SetupSteps
+                                            accent="bg-blue-100 text-blue-700"
+                                            steps={[
+                                                'Google Cloud Console → APIs & Services → Credentials',
+                                                '"Create Credentials" → "OAuth client ID" seçin',
+                                                'Application type: "Web application" seçin',
+                                                'Authorized redirect URIs bölümüne aşağıdaki URL\'yi ekleyin',
+                                                'Gmail API ve Google Calendar API\'yi etkinleştirin',
+                                                'OAuth consent screen\'i "External" veya "Internal" olarak yapılandırın',
+                                            ]}
+                                        />
                                     </div>
 
-                                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-3.5">
-                                        <p className="text-xs font-semibold text-blue-800 mb-1">Firebase Projesi OAuth Yapılandırması</p>
-                                        <p className="text-xs text-blue-700 leading-relaxed">
-                                            Google Cloud Console'da OAuth izinleri için <strong>Gmail API</strong> ve <strong>Google Calendar API</strong>'nin etkinleştirildiğinden emin olun. Yetkili redirect URI olarak Firebase Authentication Console'daki domain'inizi ekleyin.
-                                        </p>
-                                        <a href="https://console.cloud.google.com/apis/dashboard" target="_blank" rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-1 text-[11px] text-blue-600 font-semibold mt-2 hover:underline">
+                                    <ConfigField
+                                        label="Redirect URI (Google Console'a kaydedin)"
+                                        hint="Bu URL'yi Google Cloud Console → OAuth client → Authorized redirect URIs bölümüne ekleyin."
+                                        value={googleRedirectUri}
+                                        readOnly={true}
+                                        mono={true}
+                                        copyable={true}
+                                    />
+
+                                    <div className="grid grid-cols-1 gap-3">
+                                        <ConfigField
+                                            label="Client ID"
+                                            hint="Google Cloud Console → Credentials → OAuth 2.0 Client IDs → Client ID"
+                                            value={goog.clientId}
+                                            onChange={v => setGoog(p => ({ ...p, clientId: v }))}
+                                            mono={true}
+                                        />
+                                        <ConfigField
+                                            label="Client Secret"
+                                            hint="Google Cloud Console → Credentials → OAuth 2.0 Client IDs → Client Secret"
+                                            value={goog.clientSecret}
+                                            onChange={v => setGoog(p => ({ ...p, clientSecret: v }))}
+                                            type="password"
+                                            mono={true}
+                                        />
+                                    </div>
+
+                                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                                        <p className="text-xs font-bold text-slate-600 mb-3">Gerekli OAuth Scopes</p>
+                                        <ScopeTable scopes={[
+                                            { scope: 'gmail.modify',     desc: 'Gmail okuma & gönderme' },
+                                            { scope: 'calendar.events',  desc: 'Etkinlik oluşturma/okuma' },
+                                            { scope: 'userinfo.email',   desc: 'Kullanıcı e-postası' },
+                                            { scope: 'userinfo.profile', desc: 'Kullanıcı profili' },
+                                            { scope: 'offline_access',   desc: 'Refresh token (openid)' },
+                                            { scope: 'openid',           desc: 'Kimlik doğrulama' },
+                                        ]} />
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                        <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 text-[11px] text-blue-600 font-semibold hover:underline">
                                             Google Cloud Console <ExternalLink className="w-3 h-3" />
                                         </a>
+                                        <span className="text-slate-300">·</span>
+                                        <a href="https://console.cloud.google.com/apis/library/gmail.googleapis.com" target="_blank" rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 text-[11px] text-blue-600 font-semibold hover:underline">
+                                            Gmail API <ExternalLink className="w-3 h-3" />
+                                        </a>
                                     </div>
+
+                                    {googStatus === 'configured' && (
+                                        <InfoBox type="success">
+                                            Google Workspace yapılandırması tamamlandı. Kullanıcılar <strong>Ayarlar → Hesabım</strong> bölümünden Google hesaplarını bağlayabilir.
+                                        </InfoBox>
+                                    )}
+
+                                    {configs.google?.configuredAt && (
+                                        <p className="text-[10px] text-slate-400">
+                                            Son güncelleme: {new Date(configs.google.configuredAt).toLocaleString('tr-TR')} · {configs.google.configuredBy}
+                                        </p>
+                                    )}
                                 </div>
                             }
                         />
 
                         {/* ── Microsoft 365 ─── */}
                         <IntegrationCard
-                            provider="microsoft365"
                             icon={<MicrosoftIcon size={22} />}
                             name="Microsoft 365"
                             subtitle="Outlook Mail, Outlook Calendar & Microsoft Teams"
@@ -423,42 +558,35 @@ export default function IntegrationsPage() {
                             configContent={
                                 <div className="space-y-4">
                                     <InfoBox type="info">
-                                        Microsoft Azure AD'de bir uygulama kaydı oluşturmanız gerekmektedir. Aşağıdaki <strong>Redirect URI</strong>'yi Azure AD'deki uygulamanıza ekleyin, ardından Client ID, Tenant ID ve Client Secret bilgilerini girin.
+                                        Microsoft Azure AD'de bir uygulama kaydı oluşturun ve aşağıdaki Redirect URI'yi "Yetkilendirme redirect URI'leri" listesine ekleyin.
                                     </InfoBox>
 
-                                    {/* Setup Steps */}
                                     <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
                                         <p className="text-xs font-bold text-slate-600 mb-3 flex items-center gap-1.5">
                                             <Zap className="w-3.5 h-3.5 text-amber-500" /> Azure AD Kurulum Adımları
                                         </p>
-                                        <ol className="space-y-2">
-                                            {[
+                                        <SetupSteps
+                                            accent="bg-slate-200 text-slate-600"
+                                            steps={[
                                                 'Azure Portal → Microsoft Entra ID → Uygulama kayıtları',
                                                 '"Yeni kayıt" ile yeni bir uygulama oluşturun',
-                                                'Desteklenen hesap türleri: "Herhangi bir kuruluş dizini ve kişisel Microsoft hesapları"',
+                                                'Desteklenen hesap türleri: Herhangi bir kuruluş + kişisel hesaplar',
                                                 'Redirect URI olarak aşağıdaki URL\'yi Web türünde ekleyin',
                                                 'Gerekli API izinlerini ekleyin: User.Read, Calendars.ReadWrite, Mail.Send',
                                                 '"Sertifikalar ve Gizlilikler" bölümünden yeni bir Client Secret oluşturun',
-                                            ].map((step, i) => (
-                                                <li key={i} className="flex items-start gap-2">
-                                                    <span className="w-4 h-4 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">{i + 1}</span>
-                                                    <span className="text-[11px] text-slate-600 leading-relaxed">{step}</span>
-                                                </li>
-                                            ))}
-                                        </ol>
+                                            ]}
+                                        />
                                     </div>
 
-                                    {/* Redirect URI */}
                                     <ConfigField
                                         label="Redirect URI (Azure'a kaydedin)"
-                                        hint="Bu URL'yi Azure AD uygulamanızın 'Yetkilendirme redirect URI'leri' bölümüne ekleyin."
-                                        value={redirectUri}
+                                        hint="Bu URL'yi Azure AD → Uygulamanız → Kimlik Doğrulama → Redirect URIs bölümüne ekleyin."
+                                        value={msRedirectUri}
                                         readOnly={true}
                                         mono={true}
                                         copyable={true}
                                     />
 
-                                    {/* Credentials */}
                                     <div className="grid grid-cols-1 gap-3">
                                         <ConfigField
                                             label="Application (Client) ID"
@@ -469,7 +597,7 @@ export default function IntegrationsPage() {
                                         />
                                         <ConfigField
                                             label="Directory (Tenant) ID"
-                                            hint="'common' yazabilirsiniz (tüm Microsoft hesapları) veya kuruluşunuza özgü Tenant ID girin."
+                                            hint="'common' yazabilirsiniz (tüm hesaplar) veya kuruluşunuza özgü Tenant ID girin."
                                             value={ms.tenantId}
                                             onChange={v => setMs(p => ({ ...p, tenantId: v }))}
                                             mono={true}
@@ -484,32 +612,21 @@ export default function IntegrationsPage() {
                                         />
                                     </div>
 
-                                    {/* Required Permissions */}
                                     <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
                                         <p className="text-xs font-bold text-slate-600 mb-3">Gerekli API İzinleri (Delegated)</p>
-                                        <div className="grid grid-cols-2 gap-1.5">
-                                            {[
-                                                { scope: 'User.Read', desc: 'Kullanıcı profili' },
-                                                { scope: 'Mail.Send', desc: 'Outlook e-posta gönderme' },
-                                                { scope: 'Calendars.ReadWrite', desc: 'Takvim oluşturma/okuma' },
-                                                { scope: 'OnlineMeetings.ReadWrite', desc: 'Teams toplantısı oluşturma' },
-                                                { scope: 'offline_access', desc: 'Refresh token alımı' },
-                                                { scope: 'openid + profile', desc: 'Kimlik doğrulama' },
-                                            ].map(p => (
-                                                <div key={p.scope} className="flex items-start gap-2 bg-white border border-slate-100 rounded-lg p-2">
-                                                    <CheckCircle className="w-3 h-3 text-emerald-400 shrink-0 mt-0.5" />
-                                                    <div>
-                                                        <code className="text-[10px] font-mono text-violet-700 font-bold">{p.scope}</code>
-                                                        <p className="text-[9px] text-slate-400">{p.desc}</p>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
+                                        <ScopeTable scopes={[
+                                            { scope: 'User.Read',                desc: 'Kullanıcı profili' },
+                                            { scope: 'Mail.Send',                desc: 'Outlook e-posta gönderme' },
+                                            { scope: 'Calendars.ReadWrite',      desc: 'Takvim oluşturma/okuma' },
+                                            { scope: 'OnlineMeetings.ReadWrite', desc: 'Teams toplantısı oluşturma' },
+                                            { scope: 'offline_access',           desc: 'Refresh token alımı' },
+                                            { scope: 'openid + profile',         desc: 'Kimlik doğrulama' },
+                                        ]} />
                                     </div>
 
                                     {msStatus === 'configured' && (
                                         <InfoBox type="success">
-                                            Microsoft 365 yapılandırması tamamlandı. Kullanıcılar artık <strong>Ayarlar → Hesabım</strong> bölümünden Microsoft hesaplarını bağlayabilir.
+                                            Microsoft 365 yapılandırması tamamlandı. Kullanıcılar <strong>Ayarlar → Hesabım</strong> bölümünden Microsoft hesaplarını bağlayabilir.
                                         </InfoBox>
                                     )}
 
@@ -524,7 +641,7 @@ export default function IntegrationsPage() {
                     </div>
                 </div>
 
-                {/* Coming Soon Integrations */}
+                {/* Yakında */}
                 <div>
                     <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4">Yakında</h2>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -548,7 +665,7 @@ export default function IntegrationsPage() {
                                 chips: ['ATS Sync', 'Webhook'],
                             },
                         ].map((item, i) => (
-                            <div key={i} className="bg-white border border-slate-200 rounded-2xl p-4 opacity-75">
+                            <div key={i} className="bg-white border border-slate-200 rounded-2xl p-4 opacity-70">
                                 <div className="flex items-center gap-3 mb-3">
                                     <div className="w-9 h-9 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center">{item.icon}</div>
                                     <div>
@@ -567,7 +684,6 @@ export default function IntegrationsPage() {
                     </div>
                 </div>
 
-                {/* Footer note */}
                 <p className="text-center text-[10px] text-slate-400 pb-6">
                     Entegrasyon Merkezi · Talent-Inn v2 · Yalnızca Süper Admin erişimi
                 </p>
