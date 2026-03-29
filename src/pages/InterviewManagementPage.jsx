@@ -450,8 +450,11 @@ export default function InterviewManagementPage() {
                         _effectiveStatus: effectiveStatus, // authoritative status for badge
                     };
 
-                    // Filtering logic: Live or Pending/Future goes to Active. Completed/Cancelled/Past goes to History.
-                    if (isLive || (isFutureOrToday && !isCompleted && !isCancelled)) {
+                    // Cancelled sessions are completely hidden — not in active, not in history.
+                    if (isCancelled) return;
+
+                    // Filtering logic: Live or Pending/Future goes to Active. Completed/Past goes to History.
+                    if (isLive || (isFutureOrToday && !isCompleted)) {
                         active.push(sessionData);
                     } else {
                         past.push(sessionData);
@@ -1285,11 +1288,13 @@ export default function InterviewManagementPage() {
         const all = [];
         enrichedCandidates.forEach(c => {
             (c.interviewSessions || []).forEach(s => {
+                const effectiveStatus = sessionStatuses[s.id] || s.status;
+                if (effectiveStatus === 'cancelled') return; // hide cancelled from calendar
                 all.push({ ...s, candidateName: c.name, position: c.position, matchScore: c.matchScore, _candidateId: c.id });
             });
         });
         return all;
-    }, [enrichedCandidates]);
+    }, [enrichedCandidates, sessionStatuses]);
 
     const calDaysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
     const calFirstDow = (() => {
