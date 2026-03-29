@@ -1270,6 +1270,24 @@ app.get('/api/admin/integrations', verifyFirebaseToken, async (req, res) => {
     }
 });
 
+// DELETE /api/admin/auth-user/:uid — Firebase Auth kullanıcısını siler (super_admin only)
+app.delete('/api/admin/auth-user/:uid', verifyFirebaseToken, async (req, res) => {
+    try {
+        const { uid } = req.params;
+        if (!uid) return res.status(400).json({ error: 'uid gerekli' });
+        // Kendi hesabını silmeyi engelle
+        if (uid === req.user?.uid) return res.status(403).json({ error: 'Kendi hesabınızı silemezsiniz.' });
+        await admin.auth().deleteUser(uid);
+        console.log(`[admin] Firebase Auth kullanıcısı silindi: ${uid}`);
+        res.json({ success: true });
+    } catch (err) {
+        // Kullanıcı zaten yoksa başarılı say
+        if (err.code === 'auth/user-not-found') return res.json({ success: true, note: 'Zaten silinmiş' });
+        console.error('[admin/delete-auth-user]', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // POST /api/admin/integrations — save/update an integration config
 app.post('/api/admin/integrations', verifyFirebaseToken, async (req, res) => {
     try {

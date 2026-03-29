@@ -247,9 +247,13 @@ export function AuthProvider({ children }) {
         setLoading(true);
         setError(null);
         console.log(`[Registration] Starting for ${email}...`);
+        // Accessible in catch block for "email-already-in-use" reinvite flow
+        let _invitation = null;
+        let _emailLower = '';
         try {
             // 1. Check if invitation exists OR is primary admin
-            const emailLower = email.trim().toLowerCase();
+            _emailLower = email.trim().toLowerCase();
+            const emailLower = _emailLower;
             const isPrimaryAdmin = INITIAL_SUPER_ADMINS.includes(emailLower);
 
             // Check allowed domains
@@ -273,6 +277,7 @@ export function AuthProvider({ children }) {
                 const inviteSnap = await getDocs(q);
                 if (!inviteSnap.empty) {
                     invitation = inviteSnap.docs[0].data();
+                    _invitation = invitation; // accessible in outer catch
                     inviteDocId = inviteSnap.docs[0].id;
                     console.log(`[Registration] Found valid invitation.`);
                 }
@@ -339,7 +344,19 @@ export function AuthProvider({ children }) {
             console.error("[Registration] General error:", err);
             let msg = err.message;
             if (err.code === 'auth/email-already-in-use') {
-                msg = '__EMAIL_IN_USE__Bu e-posta adresi zaten kayıtlı. Mevcut hesabınızla giriş yapmayı deneyin veya şifrenizi sıfırlayın.';
+                if (_invitation) {
+                    // User was deleted from Firestore but Auth account still exists.
+                    // Send a password reset email so they can access their existing Auth account.
+                    try {
+                        await sendPasswordResetEmail(auth, _emailLower);
+                        console.log('[Registration] Reinvite: password reset email sent to', _emailLower);
+                    } catch (resetErr) {
+                        console.warn('[Registration] Reinvite: password reset failed:', resetErr.message);
+                    }
+                    msg = '__EMAIL_REINVITE__Bu e-posta daha önce sisteme kayıtlıydı — davet kabul edildi. Şifre sıfırlama bağlantısı e-postanıza gönderildi. E-postanızı kontrol edin, yeni şifrenizi belirleyin ve giriş yapın.';
+                } else {
+                    msg = '__EMAIL_IN_USE__Bu e-posta adresi zaten kayıtlı. Mevcut hesabınızla giriş yapmayı deneyin veya şifrenizi sıfırlayın.';
+                }
             } else if (err.code === 'auth/invalid-email') {
                 msg = 'Geçersiz e-posta adresi.';
             } else if (err.code === 'auth/weak-password') {

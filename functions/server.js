@@ -1145,6 +1145,22 @@ app.post('/api/google/create-calendar-event', async (req, res) => {
     }
 });
 
+// DELETE /api/admin/auth-user/:uid — Firebase Auth kullanıcısını siler (super_admin only)
+app.delete('/api/admin/auth-user/:uid', verifyFirebaseToken, async (req, res) => {
+    try {
+        const { uid } = req.params;
+        if (!uid) return res.status(400).json({ error: 'uid gerekli' });
+        if (uid === req.user?.uid) return res.status(403).json({ error: 'Kendi hesabınızı silemezsiniz.' });
+        await admin.auth().deleteUser(uid);
+        console.log(`[admin] Firebase Auth kullanıcısı silindi: ${uid}`);
+        res.json({ success: true });
+    } catch (err) {
+        if (err.code === 'auth/user-not-found') return res.json({ success: true, note: 'Zaten silinmiş' });
+        console.error('[admin/delete-auth-user]', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // ─── Admin Integration Config ──────────────────────────────────────────────────
 
 app.get('/api/admin/integrations', verifyFirebaseToken, async (req, res) => {

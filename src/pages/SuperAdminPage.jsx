@@ -96,10 +96,22 @@ export default function SuperAdminPage() {
         if (userToDelete.id === user.uid) return alert("Kendi hesabınızı silemezsiniz.");
         if (!window.confirm(`${userToDelete.displayName} kullanıcısını silmek istediğinize emin misiniz?`)) return;
         try {
+            // 1. Firestore profilini sil
             await deleteDoc(doc(db, USERS_PATH, userToDelete.id));
+            // 2. Bekleyen davetiyelerini sil
             const q = query(collection(db, INVITATIONS_PATH), where("email", "==", userToDelete.email.toLowerCase()));
             const inviteSnap = await getDocs(q);
             for (const d of inviteSnap.docs) await deleteDoc(doc(db, INVITATIONS_PATH, d.id));
+            // 3. Firebase Auth hesabını sil (sunucu tarafı, prod'da çalışır)
+            try {
+                const token = await user.getIdToken();
+                await fetch(`/api/admin/auth-user/${userToDelete.id}`, {
+                    method: 'DELETE',
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+            } catch (authDelErr) {
+                console.warn('[handleDeleteUser] Auth hesabı silinemedi (geliştirme ortamında normal):', authDelErr.message);
+            }
         } catch (err) { alert("Kullanıcı silinirken bir hata oluştu."); }
     };
 
