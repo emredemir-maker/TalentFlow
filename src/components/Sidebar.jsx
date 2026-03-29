@@ -12,6 +12,7 @@ import {
     ChevronLeft,
     ChevronRight,
     Code2,
+    Plug,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import TalentInnLogo, { TIIconMark } from './TalentInnLogo';
@@ -34,6 +35,7 @@ export default function Sidebar({ activeView, onNavigate, collapsed, onToggleCol
 
     const docsItems = [
         { id: 'tech-docs', label: 'Teknik Dokümantasyon', icon: Code2 },
+        { id: 'integrations', label: 'Entegrasyonlar', icon: Plug },
     ];
 
     const isSettingsGroup = ['settings', 'sources', 'departments', 'guide', 'super-admin'].includes(activeView);

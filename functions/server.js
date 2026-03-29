@@ -23,6 +23,25 @@ if (!admin.apps.length) {
 
 const db = admin.firestore();
 
+// ── Integration configs (in-memory cache) ─────────────────────────────────────
+const integrationConfigs = { microsoft365: null };
+
+async function loadIntegrationConfigs() {
+    try {
+        const snap = await db.doc('artifacts/talent-flow/public/data/settings/integrations').get();
+        if (snap.exists) {
+            const data = snap.data();
+            if (data.microsoft365) {
+                integrationConfigs.microsoft365 = data.microsoft365;
+                console.log('[integrations] Microsoft 365 config loaded from Firestore');
+            }
+        }
+    } catch (err) {
+        console.warn('[integrations] Could not load integration configs:', err.message);
+    }
+}
+setTimeout(loadIntegrationConfigs, 3000);
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -1119,6 +1138,209 @@ app.post('/api/google/create-calendar-event', async (req, res) => {
         res.status(response.status).json({ success: false, error: data.error?.message || 'Calendar Create Error' });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ─── Admin Integration Config ──────────────────────────────────────────────────
+
+app.get('/api/admin/integrations', verifyFirebaseToken, async (req, res) => {
+    try {
+        const snap = await fsGet('artifacts/talent-flow/public/data/settings/integrations', req.firebaseToken);
+        if (!snap) return res.json({ microsoft365: null });
+        const data = {};
+        const fields = snap.fields || {};
+        if (fields.microsoft365?.mapValue?.fields) {
+            const ms = fields.microsoft365.mapValue.fields;
+            data.microsoft365 = {
+                clientId: ms.clientId?.stringValue || '',
+                tenantId: ms.tenantId?.stringValue || '',
+                clientSecretSet: !!(ms.clientSecret?.stringValue),
+                redirectUri: ms.redirectUri?.stringValue || '',
+                enabled: ms.enabled?.booleanValue !== false,
+                configuredAt: ms.configuredAt?.stringValue || null,
+                configuredBy: ms.configuredBy?.stringValue || null,
+            };
+        }
+        res.json(data);
+    } catch (err) {
+        console.error('[admin/integrations GET]', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/admin/integrations', verifyFirebaseToken, async (req, res) => {
+    try {
+        const { provider, config } = req.body;
+        if (!provider || !config) return res.status(400).json({ error: 'provider and config required' });
+        if (provider === 'microsoft365') {
+            integrationConfigs.microsoft365 = config;
+            console.log('[integrations] Microsoft 365 config updated in-memory');
+        }
+        const docPath = 'artifacts/talent-flow/public/data/settings/integrations';
+        await fsPatch(docPath, { [provider]: config }, req.firebaseToken);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('[admin/integrations POST]', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ─── Microsoft OAuth 2.0 ───────────────────────────────────────────────────────
+
+const MS_SCOPES = 'openid profile email offline_access User.Read Mail.Send Calendars.ReadWrite OnlineMeetings.ReadWrite';
+
+app.get('/api/auth/microsoft/url', async (req, res) => {
+    try {
+        const cfg = integrationConfigs.microsoft365;
+        if (!cfg?.clientId || !cfg?.tenantId) {
+            return res.status(400).json({ error: 'Microsoft 365 entegrasyonu henüz yapılandırılmamış. Lütfen Entegrasyon Merkezi\'nden yapılandırın.' });
+        }
+        const { userId } = req.query;
+        const state = Buffer.from(JSON.stringify({ userId, ts: Date.now() })).toString('base64url');
+        const redirectUri = cfg.redirectUri || `${req.protocol}://${req.get('host')}/auth/microsoft/callback`;
+        const params = new URLSearchParams({
+            client_id: cfg.clientId,
+            response_type: 'code',
+            redirect_uri: redirectUri,
+            scope: MS_SCOPES,
+            state,
+            response_mode: 'query',
+            prompt: 'select_account',
+        });
+        const url = `https://login.microsoftonline.com/${cfg.tenantId}/oauth2/v2.0/authorize?${params}`;
+        res.json({ url });
+    } catch (err) {
+        console.error('[microsoft/url]', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/auth/microsoft/exchange', verifyFirebaseToken, async (req, res) => {
+    try {
+        const cfg = integrationConfigs.microsoft365;
+        if (!cfg?.clientId || !cfg?.tenantId || !cfg?.clientSecret) {
+            return res.status(400).json({ error: 'Microsoft 365 yapılandırması eksik.' });
+        }
+        const { code, state, redirectUri } = req.body;
+        if (!code) return res.status(400).json({ error: 'OAuth kodu eksik.' });
+
+        let userId;
+        try {
+            const decoded = JSON.parse(Buffer.from(state || '', 'base64url').toString());
+            userId = decoded.userId;
+        } catch {
+            return res.status(400).json({ error: 'Geçersiz state parametresi.' });
+        }
+        if (!userId) return res.status(400).json({ error: 'userId eksik.' });
+
+        const redirect = redirectUri || cfg.redirectUri || `${req.protocol}://${req.get('host')}/auth/microsoft/callback`;
+
+        const tokenRes = await fetch(
+            `https://login.microsoftonline.com/${cfg.tenantId}/oauth2/v2.0/token`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({
+                    client_id: cfg.clientId,
+                    client_secret: cfg.clientSecret,
+                    code,
+                    redirect_uri: redirect,
+                    grant_type: 'authorization_code',
+                    scope: MS_SCOPES,
+                }),
+            }
+        );
+
+        const tokenData = await tokenRes.json();
+        if (!tokenRes.ok || tokenData.error) {
+            return res.status(400).json({ error: tokenData.error_description || 'Token değişimi başarısız.' });
+        }
+
+        const { access_token, refresh_token, expires_in } = tokenData;
+
+        let email = '';
+        try {
+            const profileRes = await fetch('https://graph.microsoft.com/v1.0/me', {
+                headers: { 'Authorization': `Bearer ${access_token}` }
+            });
+            const profile = await profileRes.json();
+            email = profile.mail || profile.userPrincipalName || '';
+        } catch { /* non-fatal */ }
+
+        const tokenExpiresAt = Date.now() + (expires_in - 60) * 1000;
+        const integrationData = {
+            connected: true,
+            email,
+            accessToken: access_token,
+            refreshToken: refresh_token,
+            tokenExpiresAt,
+            connectedAt: new Date().toISOString(),
+        };
+
+        try {
+            await db.doc(`artifacts/talent-flow/public/data/users/${userId}`).update({
+                'integrations.microsoft': integrationData
+            });
+        } catch {
+            await fsPatch(
+                `artifacts/talent-flow/public/data/users/${userId}`,
+                { 'integrations.microsoft': integrationData },
+                req.firebaseToken
+            );
+        }
+
+        console.log(`[microsoft/exchange] User ${userId} connected Microsoft: ${email}`);
+        res.json({ success: true, email });
+    } catch (err) {
+        console.error('[microsoft/exchange]', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/auth/microsoft/refresh', verifyFirebaseToken, async (req, res) => {
+    try {
+        const cfg = integrationConfigs.microsoft365;
+        if (!cfg?.clientId || !cfg?.tenantId || !cfg?.clientSecret) {
+            return res.status(400).json({ error: 'Microsoft 365 yapılandırması eksik.' });
+        }
+        const { userId, refreshToken } = req.body;
+        if (!refreshToken) return res.status(400).json({ error: 'refreshToken gerekli.' });
+
+        const tokenRes = await fetch(
+            `https://login.microsoftonline.com/${cfg.tenantId}/oauth2/v2.0/token`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({
+                    client_id: cfg.clientId,
+                    client_secret: cfg.clientSecret,
+                    refresh_token: refreshToken,
+                    grant_type: 'refresh_token',
+                    scope: MS_SCOPES,
+                }),
+            }
+        );
+
+        const tokenData = await tokenRes.json();
+        if (!tokenRes.ok || tokenData.error) {
+            return res.status(400).json({ error: tokenData.error_description || 'Token yenileme başarısız.' });
+        }
+
+        const { access_token, refresh_token: new_refresh, expires_in } = tokenData;
+        const tokenExpiresAt = Date.now() + (expires_in - 60) * 1000;
+
+        try {
+            await db.doc(`artifacts/talent-flow/public/data/users/${userId}`).update({
+                'integrations.microsoft.accessToken': access_token,
+                'integrations.microsoft.refreshToken': new_refresh || refreshToken,
+                'integrations.microsoft.tokenExpiresAt': tokenExpiresAt,
+            });
+        } catch { /* non-fatal */ }
+
+        res.json({ success: true, accessToken: access_token });
+    } catch (err) {
+        console.error('[microsoft/refresh]', err.message);
+        res.status(500).json({ error: err.message });
     }
 });
 

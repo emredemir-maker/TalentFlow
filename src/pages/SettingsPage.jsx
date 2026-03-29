@@ -9,6 +9,7 @@ import {
     ShieldCheck, ChevronRight
 } from 'lucide-react';
 import { connectGoogleWorkspace, disconnectGoogleWorkspace } from '../services/integrationService';
+import { connectMicrosoftWorkspace, disconnectMicrosoftWorkspace } from '../services/microsoftIntegrationService';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getGlobalGeminiKey } from '../services/ai/config.js';
 import { db } from '../config/firebase';
@@ -52,6 +53,7 @@ export default function SettingsPage({ initialTab }) {
     const { userProfile, userId } = useAuth();
     const [activeSection, setActiveSection] = useState(initialTab || 'account');
     const [isConnectingGoogle, setIsConnectingGoogle] = useState(false);
+    const [isConnectingMicrosoft, setIsConnectingMicrosoft] = useState(false);
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
     // STT Test States
@@ -189,7 +191,33 @@ export default function SettingsPage({ initialTab }) {
         finally { setIsConnectingGoogle(false); }
     };
 
+    const handleMicrosoftConnect = async () => {
+        setIsConnectingMicrosoft(true);
+        try {
+            const res = await connectMicrosoftWorkspace(userId);
+            if (res.success) {
+                alert(`Microsoft hesabı (${res.email}) başarıyla bağlandı!`);
+                window.location.reload();
+            } else {
+                alert(`Bağlantı hatası: ${res.error}`);
+            }
+        } catch (err) { console.error(err); }
+        finally { setIsConnectingMicrosoft(false); }
+    };
+
+    const handleMicrosoftDisconnect = async () => {
+        if (!window.confirm("Microsoft bağlantısını kesmek istediğinizden emin misiniz?")) return;
+        setIsConnectingMicrosoft(true);
+        try {
+            const res = await disconnectMicrosoftWorkspace(userId);
+            if (res.success) { window.location.reload(); }
+            else { alert(`Bağlantı kesme hatası: ${res.error}`); }
+        } catch (err) { console.error(err); }
+        finally { setIsConnectingMicrosoft(false); }
+    };
+
     const isGoogleConnected = userProfile?.integrations?.google?.connected;
+    const isMicrosoftConnected = userProfile?.integrations?.microsoft?.connected;
     const isSuperAdmin = userProfile?.role === 'super_admin';
 
     if (loading || !userProfile) {
@@ -320,6 +348,42 @@ export default function SettingsPage({ initialTab }) {
                                         <button onClick={handleGoogleConnect} disabled={isConnectingGoogle}
                                             className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-cyan-500 hover:bg-cyan-600 transition-all flex items-center gap-2 disabled:opacity-50">
                                             {isConnectingGoogle ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Bağlan'}
+                                        </button>
+                                    )}
+                                </div>
+
+                                {/* Microsoft 365 */}
+                                <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-11 h-11 rounded-full bg-white flex items-center justify-center shadow-sm shrink-0 overflow-hidden p-2 border border-slate-100">
+                                            <svg viewBox="0 0 23 23" className="w-full h-full">
+                                                <path fill="#f25022" d="M0 0h11v11H0z" />
+                                                <path fill="#00a4ef" d="M12 0h11v11H12z" />
+                                                <path fill="#7fba00" d="M0 12h11v11H0z" />
+                                                <path fill="#ffb900" d="M12 12h11v11H12z" />
+                                            </svg>
+                                        </div>
+                                        <div className="min-w-0">
+                                            <div className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                                                Microsoft 365
+                                                {isMicrosoftConnected && <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />}
+                                            </div>
+                                            <div className="text-xs text-slate-400 mt-0.5">
+                                                {isMicrosoftConnected
+                                                    ? <span>Bağlı: <span className="text-emerald-600 font-medium">{userProfile.integrations.microsoft.email}</span></span>
+                                                    : 'Outlook ve Microsoft Teams ile entegre edin.'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {isMicrosoftConnected ? (
+                                        <button onClick={handleMicrosoftDisconnect} disabled={isConnectingMicrosoft}
+                                            className="px-4 py-2 rounded-xl text-xs font-bold text-red-500 bg-red-50 hover:bg-red-100 transition-all border border-red-100 disabled:opacity-50">
+                                            {isConnectingMicrosoft ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Bağlantıyı Kes'}
+                                        </button>
+                                    ) : (
+                                        <button onClick={handleMicrosoftConnect} disabled={isConnectingMicrosoft}
+                                            className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 transition-all flex items-center gap-2 disabled:opacity-50">
+                                            {isConnectingMicrosoft ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Bağlan'}
                                         </button>
                                     )}
                                 </div>

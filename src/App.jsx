@@ -26,6 +26,8 @@ import ApplyPage from './pages/ApplyPage';
 import TechDocsPage from './pages/TechDocsPage';
 import PipelinePage from './pages/PipelinePage';
 import CandidateRespondPage from './pages/CandidateRespondPage';
+import IntegrationsPage from './pages/IntegrationsPage';
+import MicrosoftCallbackPage from './pages/MicrosoftCallbackPage';
 
 export default function App() {
   return (
@@ -42,6 +44,7 @@ export default function App() {
                 <Route path="/exit" element={<CandidateExitPage />} />
                 <Route path="/apply/:positionId" element={<ApplyPage />} />
                 <Route path="/respond/:id" element={<CandidateRespondPage />} />
+                <Route path="/auth/microsoft/callback" element={<MicrosoftCallbackPage />} />
                 <Route path="/*" element={<AuthenticatedApp />} />
               </Routes>
             </MessageQueueProvider>
@@ -113,6 +116,7 @@ function AuthenticatedApp() {
       case 'guide': return <SettingsPage initialTab="guide" />;
       case 'super-admin': return <SettingsPage initialTab="system" />;
       case 'tech-docs': return userProfile?.role === 'super_admin' ? <TechDocsPage /> : <Dashboard />;
+      case 'integrations': return userProfile?.role === 'super_admin' ? <IntegrationsPage /> : <Dashboard />;
       case 'live-interview': return <LiveInterviewPage />;
       case 'interview-report': return <InterviewReportPage />;
       default: return <Dashboard />;
