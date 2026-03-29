@@ -1,5 +1,11 @@
 // src/services/integrationService.js
-// Google Workspace (Gmail + Calendar) integration with automatic token refresh.
+// Google Workspace (Gmail + Calendar) integration.
+//
+// HYBRID MODE:
+//   - Admin Entegrasyon Merkezi'nden özel credentials girdiyse → server-side OAuth popup
+//     (yeni Firebase projesine deploy için, refresh_token ile kalıcı bağlantı)
+//   - Admin credentials girmemişse → Firebase signInWithPopup fallback
+//     (mevcut test ortamı, hemen çalışır, yapılandırma gerekmez)
 
 import { getAuth, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
@@ -8,7 +14,12 @@ import { db } from '../config/firebase';
 const USERS_PATH = 'artifacts/talent-flow/public/data/users';
 const TOKEN_TTL_MS = 55 * 60 * 1000;
 
-// ─── PROVIDER FACTORY ─────────────────────────────────────────────────────────
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+const getIdToken = async () => {
+    const user = getAuth().currentUser;
+    return user ? user.getIdToken() : null;
+};
+
 const buildGoogleProvider = (forceConsent = false) => {
     const provider = new GoogleAuthProvider();
     provider.addScope('https://www.googleapis.com/auth/gmail.modify');
@@ -21,30 +32,84 @@ const buildGoogleProvider = (forceConsent = false) => {
     return provider;
 };
 
-// ─── CONNECT (Firebase popup — yerleşik, yapılandırma gerekmez) ───────────────
+// ─── CONNECT VIA SERVER-SIDE OAUTH (admin credentials yapılandırılmışsa) ──────
+const _connectViaServer = (userId, oauthUrl) => {
+    return new Promise((resolve, reject) => {
+        const w = 500, h = 650;
+        const left = window.screenLeft + (window.outerWidth - w) / 2;
+        const top  = window.screenTop  + (window.outerHeight - h) / 2;
+        const popup = window.open(oauthUrl, 'google-oauth', `width=${w},height=${h},left=${left},top=${top},resizable=yes,scrollbars=yes`);
+
+        if (!popup) {
+            reject(new Error('Popup engellendi. Lütfen tarayıcı popup engelleyicisini devre dışı bırakın.'));
+            return;
+        }
+
+        const handleMessage = (event) => {
+            if (event.origin !== window.location.origin) return;
+            if (event.data?.type !== 'GOOGLE_OAUTH_CALLBACK') return;
+            window.removeEventListener('message', handleMessage);
+            clearInterval(checkClosed);
+            if (event.data.error) reject(new Error(event.data.error));
+            else resolve({ success: true, email: event.data.email });
+        };
+        window.addEventListener('message', handleMessage);
+
+        const checkClosed = setInterval(() => {
+            if (popup.closed) {
+                clearInterval(checkClosed);
+                window.removeEventListener('message', handleMessage);
+                reject(new Error('Bağlantı penceresi kapatıldı.'));
+            }
+        }, 500);
+    });
+};
+
+// ─── CONNECT VIA FIREBASE (fallback — özel credentials yoksa) ─────────────────
+const _connectViaFirebase = async (userId, forceConsent) => {
+    const provider = buildGoogleProvider(forceConsent);
+    const result = await signInWithPopup(getAuth(), provider);
+
+    const credential = GoogleAuthProvider.credentialFromResult(result);
+    const token = credential?.accessToken;
+    if (!token) throw new Error('Erişim belirteci (Access Token) alınamadı.');
+
+    const expiresAt = Date.now() + TOKEN_TTL_MS;
+    await updateDoc(doc(db, USERS_PATH, userId), {
+        'integrations.google': {
+            connected: true,
+            email: result.user.email,
+            accessToken: token,
+            tokenExpiresAt: expiresAt,
+            connectedAt: new Date().toISOString(),
+            authMode: 'firebase'
+        }
+    });
+
+    return { success: true, email: result.user.email, token };
+};
+
+// ─── CONNECT — HİBRİT GİRİŞ NOKTASI ─────────────────────────────────────────
 export const connectGoogleWorkspace = async (userId, forceConsent = false) => {
     try {
-        const provider = buildGoogleProvider(forceConsent);
-        const auth = getAuth();
-        const result = await signInWithPopup(auth, provider);
+        const idToken = await getIdToken();
 
-        const credential = GoogleAuthProvider.credentialFromResult(result);
-        const token = credential?.accessToken;
-        if (!token) throw new Error('Erişim belirteci (Access Token) alınamadı.');
+        // Admin credentials yapılandırılmış mı? Server'a sor.
+        const urlRes = await fetch(
+            `/api/auth/google/url?userId=${encodeURIComponent(userId)}&force=${forceConsent ? '1' : '0'}`,
+            idToken ? { headers: { 'Authorization': `Bearer ${idToken}` } } : {}
+        );
 
-        const expiresAt = Date.now() + TOKEN_TTL_MS;
-
-        await updateDoc(doc(db, USERS_PATH, userId), {
-            'integrations.google': {
-                connected: true,
-                email: result.user.email,
-                accessToken: token,
-                tokenExpiresAt: expiresAt,
-                connectedAt: new Date().toISOString()
-            }
-        });
-
-        return { success: true, email: result.user.email, token };
+        if (urlRes.ok) {
+            // ✅ Admin credentials var → server-side OAuth (deploy-taşınabilir)
+            console.log('[Google] Admin credentials mevcut, server-side OAuth kullanılıyor');
+            const { url } = await urlRes.json();
+            return await _connectViaServer(userId, url);
+        } else {
+            // ⬇️ Credentials yok → Firebase OAuth fallback (test ortamı)
+            console.log('[Google] Admin credentials yok, Firebase OAuth fallback kullanılıyor');
+            return await _connectViaFirebase(userId, forceConsent);
+        }
     } catch (error) {
         console.error('[Google] Connect error:', error);
         let errorMessage = error.message;
@@ -55,18 +120,30 @@ export const connectGoogleWorkspace = async (userId, forceConsent = false) => {
 };
 
 // ─── SILENT TOKEN REFRESH ─────────────────────────────────────────────────────
-const _silentRefresh = async (userId, integration) => {
+const _silentRefreshViaServer = async (userId, integration, idToken) => {
+    try {
+        const res = await fetch('/api/auth/google/refresh', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+            body: JSON.stringify({ userId, refreshToken: integration.refreshToken })
+        });
+        if (!res.ok) return null;
+        const data = await res.json();
+        return data.accessToken || null;
+    } catch {
+        return null;
+    }
+};
+
+const _silentRefreshViaFirebase = async (userId, integration) => {
     try {
         const provider = buildGoogleProvider(false);
-        const auth = getAuth();
-        const result = await signInWithPopup(auth, provider);
-
+        const result = await signInWithPopup(getAuth(), provider);
         const credential = GoogleAuthProvider.credentialFromResult(result);
         const token = credential?.accessToken;
         if (!token) throw new Error('Token alınamadı');
 
         const expiresAt = Date.now() + TOKEN_TTL_MS;
-
         await updateDoc(doc(db, USERS_PATH, userId), {
             'integrations.google': {
                 ...integration,
@@ -77,10 +154,10 @@ const _silentRefresh = async (userId, integration) => {
             }
         });
 
-        console.log('[Google] Token silently refreshed, valid until', new Date(expiresAt).toLocaleTimeString());
+        console.log('[Google] Firebase token yenilendi, geçerli:', new Date(expiresAt).toLocaleTimeString());
         return token;
     } catch (err) {
-        console.error('[Google] Silent refresh failed:', err);
+        console.error('[Google] Firebase refresh başarısız:', err);
         return null;
     }
 };
@@ -92,11 +169,18 @@ export const ensureValidGoogleToken = async (userId, userProfile) => {
 
     const now = Date.now();
     const expiresAt = integration.tokenExpiresAt ?? 0;
-
     if (expiresAt && now < expiresAt) return integration.accessToken;
 
-    console.log('[Google] Token expired or missing expiry — refreshing silently...');
-    return _silentRefresh(userId, integration);
+    console.log('[Google] Token süresi dolmuş, yenileniyor...');
+
+    // Server-side OAuth ile bağlandıysa (refreshToken var) → API ile yenile
+    if (integration.refreshToken && integration.authMode !== 'firebase') {
+        const idToken = await getIdToken();
+        if (idToken) return _silentRefreshViaServer(userId, integration, idToken);
+    }
+
+    // Firebase OAuth ile bağlandıysa → signInWithPopup ile yenile
+    return _silentRefreshViaFirebase(userId, integration);
 };
 
 // ─── DISCONNECT ───────────────────────────────────────────────────────────────
