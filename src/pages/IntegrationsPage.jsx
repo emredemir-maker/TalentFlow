@@ -56,6 +56,7 @@ function SlackIcon({ size = 20 }) {
 function StatusBadge({ status }) {
     const cfg = {
         configured:   { label: 'Yapılandırıldı',      bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', dot: 'bg-emerald-400' },
+        builtin:      { label: 'Aktif',                bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', dot: 'bg-emerald-400' },
         partial:      { label: 'Eksik Bilgi',          bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-200',   dot: 'bg-amber-400' },
         unconfigured: { label: 'Yapılandırılmamış',    bg: 'bg-slate-50',   text: 'text-slate-500',   border: 'border-slate-200',   dot: 'bg-slate-300' },
         soon:         { label: 'Yakında',              bg: 'bg-violet-50',  text: 'text-violet-600',  border: 'border-violet-200',  dot: 'bg-violet-400' },
