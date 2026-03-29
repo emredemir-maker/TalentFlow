@@ -617,6 +617,36 @@ export default function LiveInterviewPage() {
         navigate('/exit');
     };
 
+    // Cancel the session from lobby — marks as cancelled without generating a report
+    const handleCancelSession = async () => {
+        if (!candidateData?.id || !sessionId) return;
+        try {
+            // Stop any running media
+            if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
+            if (stream) { stream.getTracks().forEach(t => t.stop()); setStream(null); }
+
+            // Mark session as cancelled in candidate array
+            const cancelledAt = new Date().toISOString();
+            const updatedSessions = (candidateData.interviewSessions || []).map(s =>
+                s.id === sessionId
+                    ? { ...s, status: 'cancelled', cancelledAt, cancellationReason: 'Hazırlık aşamasında iptal edildi' }
+                    : s
+            );
+            await updateCandidate(candidateData.id, { interviewSessions: updatedSessions });
+
+            // Mark public Firestore doc as cancelled
+            try {
+                await updateDoc(doc(db, 'interviews', sessionId), { status: 'cancelled', cancelledAt });
+            } catch {
+                await setDoc(doc(db, 'interviews', sessionId), { status: 'cancelled', cancelledAt }, { merge: true });
+            }
+        } catch (err) {
+            console.error('[handleCancelSession]', err);
+        } finally {
+            navigate('/interviews');
+        }
+    };
+
     const handleFinishInterview = async () => {
         // STOP MEDIA TRACKS IMMEDIATELY
         if (streamRef.current) {
@@ -1270,13 +1300,6 @@ export default function LiveInterviewPage() {
                     {/* COMPACT HEADER */}
                     <header className="h-[48px] bg-white border-b border-slate-200 flex items-center justify-between px-5 shrink-0 z-20">
                         <div className="flex items-center gap-2.5">
-                            <button
-                                onClick={() => navigate('/interviews')}
-                                title="Mülakat listesine dön (seans aktif kalır)"
-                                className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-all cursor-pointer"
-                            >
-                                <ChevronLeft className="w-4 h-4" />
-                            </button>
                             <div className="w-8 h-8 rounded-lg bg-[#0F172A] flex items-center justify-center">
                                 <Video className="w-4 h-4 text-white" />
                             </div>
@@ -1287,14 +1310,20 @@ export default function LiveInterviewPage() {
                         </div>
                         <div className="flex items-center gap-3">
                             <button
-                                onClick={() => {
-                                    if (window.confirm('Mülakatı tamamen kapatmak istiyor musunuz? Seans CANLI kalmaya devam edecek, daha sonra tekrar katılabilirsiniz.')) {
-                                        navigate('/interviews');
+                                onClick={async () => {
+                                    if (window.confirm('Mülakatı kalıcı olarak iptal etmek istiyor musunuz?\n\nBu işlem geri alınamaz — seans "İptal Edildi" olarak işaretlenecek.')) {
+                                        await handleCancelSession();
                                     }
                                 }}
-                                className="px-3 py-1 rounded-lg bg-white text-red-600 border border-red-100 text-[8px] font-black uppercase tracking-wider hover:bg-red-600 hover:text-white transition-all cursor-pointer"
+                                className="px-3 py-1 rounded-lg bg-red-600 text-white border border-red-700 text-[8px] font-black uppercase tracking-wider hover:bg-red-700 transition-all cursor-pointer"
                             >
-                                Mülakatı Kapat
+                                Mülakatı İptal Et
+                            </button>
+                            <button
+                                onClick={() => navigate('/interviews')}
+                                className="px-3 py-1 rounded-lg bg-white text-slate-600 border border-slate-200 text-[8px] font-black uppercase tracking-wider hover:bg-slate-50 transition-all cursor-pointer"
+                            >
+                                Askıya Al
                             </button>
                             <button onClick={() => setShowSettings(true)} className="p-1.5 rounded-lg bg-slate-50 text-slate-400 hover:bg-black hover:text-white transition-all border border-slate-100 cursor-pointer"><Settings className="w-4 h-4" /></button>
                             <div className="h-5 w-px bg-slate-200" />
