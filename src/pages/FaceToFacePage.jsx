@@ -77,6 +77,8 @@ export default function FaceToFacePage() {
 
     // AI
     const [activeStrategy, setActiveStrategy] = useState('technical');
+    const [paths, setPaths] = useState([]);          // all 3 question sets from generateInterviewPaths
+    const [activePathIdx, setActivePathIdx] = useState(0); // which set is selected (0/1/2)
     const [questions, setQuestions] = useState([]);
     const [currentQIndex, setCurrentQIndex] = useState(0);
     const [pathLoading, setPathLoading] = useState(false);
@@ -141,19 +143,22 @@ export default function FaceToFacePage() {
     }, []);
 
     // ── question generation ──────────────────────────────────────────────────
-    const fetchQuestions = useCallback(async (strategy, candidate) => {
+    const fetchQuestions = useCallback(async (strategy, candidate, pathIdx = 0) => {
         if (!candidate || pathLoading) return;
         setPathLoading(true);
         setQuestions([]);
         questionsSyncedRef.current = false;
         try {
-            const paths = await generateInterviewPaths(candidate, strategy);
-            if (paths.length > 0) {
-                const qs = paths[0].questions.map((q, i) => ({
+            const generatedPaths = await generateInterviewPaths(candidate, strategy);
+            setPaths(generatedPaths);
+            const selectedPath = generatedPaths[pathIdx] || generatedPaths[0];
+            if (selectedPath) {
+                const qs = selectedPath.questions.map((q, i) => ({
                     id: i + 1, text: q.question, category: q.category, status: 'pending'
                 }));
                 setQuestions(qs);
                 setCurrentQIndex(0);
+                setActivePathIdx(pathIdx);
             }
         } catch (err) {
             console.error('[FaceToFace] Question generation error:', err);
@@ -162,9 +167,25 @@ export default function FaceToFacePage() {
         }
     }, [pathLoading]);
 
+    // Switch to a different set without re-generating
+    const handlePathSwitch = useCallback((idx) => {
+        if (pathLoading || idx === activePathIdx || !paths[idx]) return;
+        setActivePathIdx(idx);
+        const selectedPath = paths[idx];
+        const qs = selectedPath.questions.map((q, i) => ({
+            id: i + 1, text: q.question, category: q.category, status: 'pending'
+        }));
+        setQuestions(qs);
+        setCurrentQIndex(0);
+    }, [pathLoading, activePathIdx, paths]);
+
     // fetch questions when strategy changes (and candidate loaded)
     useEffect(() => {
-        if (phase === 'active' && candidateData) fetchQuestions(activeStrategy, candidateData);
+        if (phase === 'active' && candidateData) {
+            setActivePathIdx(0);
+            setPaths([]);
+            fetchQuestions(activeStrategy, candidateData, 0);
+        }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeStrategy, candidateData?.id, phase]);
 
@@ -182,7 +203,8 @@ export default function FaceToFacePage() {
                 const safeProfile = stripPII(candidateData);
                 const recentSlice = transcript.slice(-6);
                 const linkedPos = positions?.find(p => p.id === (session?.positionId || candidateData?.positionId));
-                const result = await analyzeSTARRealTime(safeProfile, recentSlice, null, {
+                const currentQ = questions[currentQIndex]?.text || null;
+                const result = await analyzeSTARRealTime(safeProfile, recentSlice, currentQ, {
                     title: session?.positionTitle || linkedPos?.title || '',
                     requirements: linkedPos?.requirements?.join(', ') || null,
                 });
@@ -644,7 +666,8 @@ export default function FaceToFacePage() {
                 <div className="w-[380px] shrink-0 flex flex-col overflow-hidden bg-[#0B1120]">
 
                     {/* Strategy selector */}
-                    <div className="px-4 pt-4 pb-3 border-b border-white/5 shrink-0">
+                    <div className="px-4 pt-4 pb-3 border-b border-white/5 shrink-0 space-y-2">
+                        {/* Strateji (tip) butonları */}
                         <div className="flex gap-1.5">
                             {STRATEGIES.map(s => {
                                 const Icon = s.icon;
@@ -662,6 +685,24 @@ export default function FaceToFacePage() {
                                 );
                             })}
                         </div>
+                        {/* Set seçici (paths[0/1/2]) — yalnızca yüklenince görünür */}
+                        {paths.length > 1 && (
+                            <div className="flex gap-1.5">
+                                {paths.map((p, i) => (
+                                    <button
+                                        key={p.id || i}
+                                        onClick={() => handlePathSwitch(i)}
+                                        title={p.description || p.title}
+                                        className={`flex-1 py-1 rounded-md text-[10px] font-bold transition-all truncate px-1 ${activePathIdx === i ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30' : 'bg-white/3 text-white/20 hover:text-white/50 hover:bg-white/8 border border-transparent'}`}
+                                    >
+                                        {p.title || `Set ${i + 1}`}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                        {pathLoading && paths.length === 0 && (
+                            <p className="text-[9px] text-white/20 text-center animate-pulse">Sorular hazırlanıyor…</p>
+                        )}
                     </div>
 
                     <div className="flex-1 overflow-y-auto custom-scrollbar">
