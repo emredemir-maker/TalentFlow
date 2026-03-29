@@ -619,27 +619,19 @@ export default function LiveInterviewPage() {
 
     // Cancel the session from lobby — marks as cancelled without generating a report
     const handleCancelSession = async () => {
-        if (!candidateData?.id || !sessionId) return;
+        if (!sessionId) return;
         try {
             // Stop any running media
             if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
             if (stream) { stream.getTracks().forEach(t => t.stop()); setStream(null); }
 
-            // Mark session as cancelled in candidate array
             const cancelledAt = new Date().toISOString();
-            const updatedSessions = (candidateData.interviewSessions || []).map(s =>
-                s.id === sessionId
-                    ? { ...s, status: 'cancelled', cancelledAt, cancellationReason: 'Hazırlık aşamasında iptal edildi' }
-                    : s
-            );
-            await updateCandidate(candidateData.id, { interviewSessions: updatedSessions });
-
-            // Mark public Firestore doc as cancelled
-            try {
-                await updateDoc(doc(db, 'interviews', sessionId), { status: 'cancelled', cancelledAt });
-            } catch {
-                await setDoc(doc(db, 'interviews', sessionId), { status: 'cancelled', cancelledAt }, { merge: true });
-            }
+            // Use persistSessionData so both interviews/{id} and candidate array are updated
+            await persistSessionData({
+                status: 'cancelled',
+                cancelledAt,
+                cancellationReason: 'Hazırlık aşamasında iptal edildi',
+            });
         } catch (err) {
             console.error('[handleCancelSession]', err);
         } finally {
