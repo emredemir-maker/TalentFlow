@@ -441,101 +441,84 @@ export default function IntegrationsPage() {
                             icon={<GoogleIcon size={24} />}
                             name="Google Workspace"
                             subtitle="Gmail, Google Calendar & Google Meet"
-                            status={googStatus}
+                            status={googStatus === 'configured' ? 'configured' : 'builtin'}
                             features={[
                                 { icon: <Mail className="w-3 h-3" />, label: 'Gmail' },
                                 { icon: <Calendar className="w-3 h-3" />, label: 'Takvim' },
                                 { icon: <Video className="w-3 h-3" />, label: 'Meet' },
                             ]}
                             onSave={saveGoogle}
-                            onRemove={googStatus !== 'unconfigured' ? removeGoogle : undefined}
+                            onRemove={googStatus === 'configured' ? removeGoogle : undefined}
                             saving={googSaving}
                             saved={googSaved}
                             configContent={
                                 <div className="space-y-4">
-                                    <InfoBox type="info">
-                                        Google Cloud Console'da bir OAuth 2.0 istemci oluşturun ve aşağıdaki Redirect URI'yi "Yetkili yönlendirme URI'leri" listesine ekleyin.
+                                    <InfoBox type="success">
+                                        Google Workspace entegrasyonu <strong>şu an aktif ve çalışıyor</strong> — Firebase OAuth 2.0 ile yerleşik olarak entegre edilmiştir. Herhangi bir yapılandırma gerekmez. Kullanıcılar <strong>Ayarlar → Hesabım</strong> bölümünden Gmail ve Google Takvim hesaplarını bağlayabilir.
                                     </InfoBox>
 
-                                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-                                        <p className="text-xs font-bold text-slate-600 mb-3 flex items-center gap-1.5">
-                                            <Zap className="w-3.5 h-3.5 text-amber-500" /> Google Cloud Console Kurulum Adımları
-                                        </p>
-                                        <SetupSteps
-                                            accent="bg-blue-100 text-blue-700"
-                                            steps={[
-                                                'Google Cloud Console → APIs & Services → Credentials',
-                                                '"Create Credentials" → "OAuth client ID" seçin',
-                                                'Application type: "Web application" seçin',
-                                                'Authorized redirect URIs bölümüne aşağıdaki URL\'yi ekleyin',
-                                                'Gmail API ve Google Calendar API\'yi etkinleştirin',
-                                                'OAuth consent screen\'i "External" veya "Internal" olarak yapılandırın',
-                                            ]}
-                                        />
+                                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2.5">
+                                        <p className="text-xs font-semibold text-slate-600 mb-2">Etkin Özellikler</p>
+                                        {[
+                                            { icon: <Mail className="w-3.5 h-3.5 text-blue-500" />, label: 'Gmail API', desc: 'Mülakat davetleri ve e-posta takibi' },
+                                            { icon: <Calendar className="w-3.5 h-3.5 text-emerald-500" />, label: 'Google Calendar', desc: 'Otomatik etkinlik oluşturma ve müsaitlik kontrolü' },
+                                            { icon: <Video className="w-3.5 h-3.5 text-red-500" />, label: 'Google Meet', desc: 'Mülakat davetlerinde otomatik Meet linki üretimi' },
+                                        ].map((f, i) => (
+                                            <div key={i} className="flex items-center gap-3">
+                                                <div className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center shrink-0">{f.icon}</div>
+                                                <div>
+                                                    <p className="text-xs font-medium text-slate-700">{f.label}</p>
+                                                    <p className="text-[10px] text-slate-400">{f.desc}</p>
+                                                </div>
+                                                <CheckCircle className="w-4 h-4 text-emerald-400 ml-auto shrink-0" />
+                                            </div>
+                                        ))}
                                     </div>
 
-                                    <ConfigField
-                                        label="Redirect URI (Google Console'a kaydedin)"
-                                        hint="Bu URL'yi Google Cloud Console → OAuth client → Authorized redirect URIs bölümüne ekleyin."
-                                        value={googleRedirectUri}
-                                        readOnly={true}
-                                        mono={true}
-                                        copyable={true}
-                                    />
-
-                                    <div className="grid grid-cols-1 gap-3">
-                                        <ConfigField
-                                            label="Client ID"
-                                            hint="Google Cloud Console → Credentials → OAuth 2.0 Client IDs → Client ID"
-                                            value={goog.clientId}
-                                            onChange={v => setGoog(p => ({ ...p, clientId: v }))}
-                                            mono={true}
-                                        />
-                                        <ConfigField
-                                            label="Client Secret"
-                                            hint="Google Cloud Console → Credentials → OAuth 2.0 Client IDs → Client Secret"
-                                            value={goog.clientSecret}
-                                            onChange={v => setGoog(p => ({ ...p, clientSecret: v }))}
-                                            type="password"
-                                            mono={true}
-                                        />
-                                    </div>
-
-                                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-                                        <p className="text-xs font-bold text-slate-600 mb-3">Gerekli OAuth Scopes</p>
-                                        <ScopeTable scopes={[
-                                            { scope: 'gmail.modify',     desc: 'Gmail okuma & gönderme' },
-                                            { scope: 'calendar.events',  desc: 'Etkinlik oluşturma/okuma' },
-                                            { scope: 'userinfo.email',   desc: 'Kullanıcı e-postası' },
-                                            { scope: 'userinfo.profile', desc: 'Kullanıcı profili' },
-                                            { scope: 'offline_access',   desc: 'Refresh token (openid)' },
-                                            { scope: 'openid',           desc: 'Kimlik doğrulama' },
-                                        ]} />
-                                    </div>
-
-                                    <div className="flex items-center gap-2">
-                                        <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-1 text-[11px] text-blue-600 font-semibold hover:underline">
-                                            Google Cloud Console <ExternalLink className="w-3 h-3" />
-                                        </a>
-                                        <span className="text-slate-300">·</span>
-                                        <a href="https://console.cloud.google.com/apis/library/gmail.googleapis.com" target="_blank" rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-1 text-[11px] text-blue-600 font-semibold hover:underline">
-                                            Gmail API <ExternalLink className="w-3 h-3" />
-                                        </a>
-                                    </div>
-
-                                    {googStatus === 'configured' && (
-                                        <InfoBox type="success">
-                                            Google Workspace yapılandırması tamamlandı. Kullanıcılar <strong>Ayarlar → Hesabım</strong> bölümünden Google hesaplarını bağlayabilir.
-                                        </InfoBox>
-                                    )}
-
-                                    {configs.google?.configuredAt && (
-                                        <p className="text-[10px] text-slate-400">
-                                            Son güncelleme: {new Date(configs.google.configuredAt).toLocaleString('tr-TR')} · {configs.google.configuredBy}
-                                        </p>
-                                    )}
+                                    {/* Opsiyonel: Farklı ortama deploy için özel credentials */}
+                                    <details className="group">
+                                        <summary className="cursor-pointer text-xs font-semibold text-slate-500 hover:text-slate-700 flex items-center gap-1.5 py-1 select-none list-none">
+                                            <ChevronRight className="w-3.5 h-3.5 transition-transform group-open:rotate-90" />
+                                            Farklı bir ortama deploy için özel OAuth credentials (isteğe bağlı)
+                                        </summary>
+                                        <div className="mt-3 space-y-3 pl-5">
+                                            <InfoBox type="info">
+                                                Bu uygulamayı <strong>farklı bir Firebase projesi veya kuruluşa</strong> deploy ederken kendi Google Cloud Console credentials'larınızı buraya girerek Firebase projesinden bağımsız hale getirebilirsiniz. Mevcut testi etkilemez.
+                                            </InfoBox>
+                                            <ConfigField
+                                                label="Redirect URI (Google Console'a kaydedin)"
+                                                value={googleRedirectUri}
+                                                readOnly={true}
+                                                mono={true}
+                                                copyable={true}
+                                            />
+                                            <ConfigField
+                                                label="Client ID"
+                                                hint="Google Cloud Console → Credentials → OAuth 2.0 Client IDs"
+                                                value={goog.clientId}
+                                                onChange={v => setGoog(p => ({ ...p, clientId: v }))}
+                                                mono={true}
+                                            />
+                                            <ConfigField
+                                                label="Client Secret"
+                                                value={goog.clientSecret}
+                                                onChange={v => setGoog(p => ({ ...p, clientSecret: v }))}
+                                                type="password"
+                                                mono={true}
+                                            />
+                                            <div className="flex items-center gap-2">
+                                                <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer"
+                                                    className="inline-flex items-center gap-1 text-[11px] text-blue-600 font-semibold hover:underline">
+                                                    Google Cloud Console <ExternalLink className="w-3 h-3" />
+                                                </a>
+                                            </div>
+                                            {configs.google?.configuredAt && (
+                                                <p className="text-[10px] text-slate-400">
+                                                    Özel config: {new Date(configs.google.configuredAt).toLocaleString('tr-TR')} · {configs.google.configuredBy}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </details>
                                 </div>
                             }
                         />

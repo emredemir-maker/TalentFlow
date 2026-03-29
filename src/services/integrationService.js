@@ -1,63 +1,102 @@
 // src/services/integrationService.js
-// Google Workspace (Gmail + Calendar) integration.
-// Uses admin-configurable OAuth credentials via the server — NOT tied to Firebase project.
-// sendDirectEmail, createDirectCalendarEvent, etc. remain unchanged (token-based).
+// Google Workspace (Gmail + Calendar) integration with automatic token refresh.
 
+import { getAuth, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
 const USERS_PATH = 'artifacts/talent-flow/public/data/users';
 const TOKEN_TTL_MS = 55 * 60 * 1000;
 
-// ─── CONNECT (popup OAuth, server-side) ───────────────────────────────────────
+// ─── PROVIDER FACTORY ─────────────────────────────────────────────────────────
+const buildGoogleProvider = (forceConsent = false) => {
+    const provider = new GoogleAuthProvider();
+    provider.addScope('https://www.googleapis.com/auth/gmail.modify');
+    provider.addScope('https://www.googleapis.com/auth/calendar.events');
+    provider.setCustomParameters({
+        access_type: 'offline',
+        include_granted_scopes: 'true',
+        ...(forceConsent ? { prompt: 'consent' } : {})
+    });
+    return provider;
+};
+
+// ─── CONNECT (Firebase popup — yerleşik, yapılandırma gerekmez) ───────────────
 export const connectGoogleWorkspace = async (userId, forceConsent = false) => {
     try {
-        const urlRes = await fetch(
-            `/api/auth/google/url?userId=${encodeURIComponent(userId)}&force=${forceConsent ? '1' : '0'}`,
-            { headers: { 'Content-Type': 'application/json' } }
-        );
-        if (!urlRes.ok) {
-            const errData = await urlRes.json().catch(() => ({}));
-            throw new Error(errData.error || 'Google entegrasyonu yapılandırılmamış. Lütfen Entegrasyon Merkezi\'nden yapılandırın.');
-        }
-        const { url } = await urlRes.json();
+        const provider = buildGoogleProvider(forceConsent);
+        const auth = getAuth();
+        const result = await signInWithPopup(auth, provider);
 
-        return new Promise((resolve, reject) => {
-            const w = 500, h = 650;
-            const left = window.screenLeft + (window.outerWidth - w) / 2;
-            const top = window.screenTop + (window.outerHeight - h) / 2;
-            const popup = window.open(url, 'google-oauth', `width=${w},height=${h},left=${left},top=${top},resizable=yes,scrollbars=yes`);
+        const credential = GoogleAuthProvider.credentialFromResult(result);
+        const token = credential?.accessToken;
+        if (!token) throw new Error('Erişim belirteci (Access Token) alınamadı.');
 
-            if (!popup) {
-                reject(new Error('Popup engellendi. Lütfen tarayıcı popup engelleyicisini devre dışı bırakın.'));
-                return;
+        const expiresAt = Date.now() + TOKEN_TTL_MS;
+
+        await updateDoc(doc(db, USERS_PATH, userId), {
+            'integrations.google': {
+                connected: true,
+                email: result.user.email,
+                accessToken: token,
+                tokenExpiresAt: expiresAt,
+                connectedAt: new Date().toISOString()
             }
-
-            const handleMessage = (event) => {
-                if (event.origin !== window.location.origin) return;
-                if (event.data?.type !== 'GOOGLE_OAUTH_CALLBACK') return;
-                window.removeEventListener('message', handleMessage);
-                clearInterval(checkClosed);
-                if (event.data.error) {
-                    reject(new Error(event.data.error));
-                } else {
-                    resolve({ success: true, email: event.data.email });
-                }
-            };
-            window.addEventListener('message', handleMessage);
-
-            const checkClosed = setInterval(() => {
-                if (popup.closed) {
-                    clearInterval(checkClosed);
-                    window.removeEventListener('message', handleMessage);
-                    reject(new Error('Bağlantı penceresi kapatıldı.'));
-                }
-            }, 500);
         });
+
+        return { success: true, email: result.user.email, token };
     } catch (error) {
         console.error('[Google] Connect error:', error);
-        return { success: false, error: error.message };
+        let errorMessage = error.message;
+        if (error.code === 'auth/popup-closed-by-user') errorMessage = 'Bağlantı penceresi kapatıldı.';
+        if (error.code === 'auth/popup-blocked') errorMessage = 'Tarayıcı popup\'ı engelledi. Lütfen popup engelleyiciyi devre dışı bırakın.';
+        return { success: false, error: errorMessage };
     }
+};
+
+// ─── SILENT TOKEN REFRESH ─────────────────────────────────────────────────────
+const _silentRefresh = async (userId, integration) => {
+    try {
+        const provider = buildGoogleProvider(false);
+        const auth = getAuth();
+        const result = await signInWithPopup(auth, provider);
+
+        const credential = GoogleAuthProvider.credentialFromResult(result);
+        const token = credential?.accessToken;
+        if (!token) throw new Error('Token alınamadı');
+
+        const expiresAt = Date.now() + TOKEN_TTL_MS;
+
+        await updateDoc(doc(db, USERS_PATH, userId), {
+            'integrations.google': {
+                ...integration,
+                accessToken: token,
+                tokenExpiresAt: expiresAt,
+                email: result.user.email,
+                connected: true
+            }
+        });
+
+        console.log('[Google] Token silently refreshed, valid until', new Date(expiresAt).toLocaleTimeString());
+        return token;
+    } catch (err) {
+        console.error('[Google] Silent refresh failed:', err);
+        return null;
+    }
+};
+
+// ─── ENSURE VALID TOKEN ────────────────────────────────────────────────────────
+export const ensureValidGoogleToken = async (userId, userProfile) => {
+    const integration = userProfile?.integrations?.google;
+    if (!integration?.connected || !integration?.accessToken) return null;
+
+    const now = Date.now();
+    const expiresAt = integration.tokenExpiresAt ?? 0;
+
+    if (expiresAt && now < expiresAt) return integration.accessToken;
+
+    console.log('[Google] Token expired or missing expiry — refreshing silently...');
+    return _silentRefresh(userId, integration);
 };
 
 // ─── DISCONNECT ───────────────────────────────────────────────────────────────
@@ -73,34 +112,6 @@ export const disconnectGoogleWorkspace = async (userId) => {
     } catch (error) {
         console.error('[Google] Disconnect error:', error);
         return { success: false, error: error.message };
-    }
-};
-
-// ─── ENSURE VALID TOKEN ────────────────────────────────────────────────────────
-export const ensureValidGoogleToken = async (userId, userProfile, idToken) => {
-    const integration = userProfile?.integrations?.google;
-    if (!integration?.connected || !integration?.accessToken) return null;
-
-    const now = Date.now();
-    const expiresAt = integration.tokenExpiresAt ?? 0;
-
-    if (expiresAt && now < expiresAt) return integration.accessToken;
-
-    // Silent refresh via server
-    try {
-        const res = await fetch('/api/auth/google/refresh', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${idToken}`
-            },
-            body: JSON.stringify({ userId, refreshToken: integration.refreshToken })
-        });
-        if (!res.ok) return null;
-        const data = await res.json();
-        return data.accessToken || null;
-    } catch {
-        return null;
     }
 };
 
