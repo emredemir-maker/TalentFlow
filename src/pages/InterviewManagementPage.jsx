@@ -1967,15 +1967,20 @@ export default function InterviewManagementPage() {
                         {/* WIZARD FOOTER NAVIGATION */}
                         <div className="px-6 py-4 border-t border-[#F1F5F9] bg-slate-50/40 flex items-center justify-between">
                             <button
-                                onClick={() => wizardStep > 1 && setWizardStep(s => s - 1)}
-                                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${
-                                    wizardStep > 1
-                                        ? 'text-[#64748B] hover:text-[#0F172A] hover:bg-[#F1F5F9] border border-[#E2E8F0]'
-                                        : 'text-[#CBD5E1] cursor-not-allowed border border-transparent'
-                                }`}
+                                onClick={() => {
+                                    if (wizardStep === 1) {
+                                        setIsPlanningMode(false);
+                                        setWizardStep(1);
+                                        setSelectedCandidate(null);
+                                        setWizardPosition(null);
+                                    } else {
+                                        setWizardStep(s => s - 1);
+                                    }
+                                }}
+                                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all text-[#64748B] hover:text-[#0F172A] hover:bg-[#F1F5F9] border border-[#E2E8F0]"
                             >
                                 <ChevronLeft className="w-3.5 h-3.5" />
-                                {wizardStep === 2 ? 'Aday Seçimi' : wizardStep === 3 ? 'Katılımcılar' : wizardStep === 4 ? 'Zaman Belirle' : 'Geri'}
+                                {wizardStep === 1 ? 'Vazgeç' : wizardStep === 2 ? 'Aday Seçimi' : wizardStep === 3 ? 'Katılımcılar' : 'Zaman Belirle'}
                             </button>
 
                             {/* Center summary chip */}
@@ -2289,7 +2294,13 @@ export default function InterviewManagementPage() {
                                                             </div>
                                                             {s.status === 'live' ? (
                                                                 <button
-                                                                    onClick={() => navigate(`/interviews/${s.id}`)}
+                                                                    onClick={() => {
+                                                                        if (s.mode === 'face_to_face') {
+                                                                            navigate(`/face-interview/${s.id}`);
+                                                                        } else {
+                                                                            navigate(`/live-interview/${s.id}`);
+                                                                        }
+                                                                    }}
                                                                     className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg transition-colors"
                                                                 >
                                                                     <Video className="w-3.5 h-3.5" /> Katıl
