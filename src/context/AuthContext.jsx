@@ -230,9 +230,13 @@ export function AuthProvider({ children }) {
         try {
             await signInWithEmailAndPassword(auth, email, password);
         } catch (err) {
-            let msg = "Giriş yapılamadı.";
-            if (err.code === 'auth/user-not-found') msg = "Kullanıcı bulunamadı.";
-            if (err.code === 'auth/wrong-password') msg = "Hatalı şifre.";
+            let msg = "Giriş yapılamadı. Lütfen tekrar deneyin.";
+            if (err.code === 'auth/user-not-found')       msg = "Bu e-posta ile kayıtlı bir hesap bulunamadı.";
+            if (err.code === 'auth/wrong-password')       msg = "Hatalı şifre. Lütfen tekrar deneyin.";
+            if (err.code === 'auth/invalid-credential')   msg = "E-posta veya şifre hatalı.";
+            if (err.code === 'auth/invalid-email')        msg = "Geçersiz e-posta adresi.";
+            if (err.code === 'auth/user-disabled')        msg = "Bu hesap devre dışı bırakıldı.";
+            if (err.code === 'auth/too-many-requests')    msg = "Çok fazla başarısız deneme. Lütfen birkaç dakika bekleyin.";
             setError(msg);
             setLoading(false);
             throw err;
@@ -333,7 +337,17 @@ export function AuthProvider({ children }) {
             return newUser;
         } catch (err) {
             console.error("[Registration] General error:", err);
-            setError(err.message);
+            let msg = err.message;
+            if (err.code === 'auth/email-already-in-use') {
+                msg = '__EMAIL_IN_USE__Bu e-posta adresi zaten kayıtlı. Mevcut hesabınızla giriş yapmayı deneyin veya şifrenizi sıfırlayın.';
+            } else if (err.code === 'auth/invalid-email') {
+                msg = 'Geçersiz e-posta adresi.';
+            } else if (err.code === 'auth/weak-password') {
+                msg = 'Şifre çok kısa — en az 6 karakter kullanın.';
+            } else if (err.code === 'auth/operation-not-allowed') {
+                msg = 'E-posta ile kayıt şu an devre dışı.';
+            }
+            setError(msg);
             setLoading(false);
             throw err;
         }

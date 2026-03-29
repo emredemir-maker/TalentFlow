@@ -231,17 +231,37 @@ export default function LoginPage() {
                     </div>
 
                     {/* Error Alert */}
-                    {error && (
-                        <div style={{
-                            display: 'flex', alignItems: 'flex-start', gap: '10px',
-                            padding: '12px 14px', borderRadius: '10px', marginBottom: '20px',
-                            backgroundColor: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
-                            color: '#EF4444', fontSize: '13px'
-                        }}>
-                            <AlertCircle size={15} style={{ flexShrink: 0, marginTop: '1px' }} />
-                            <span>{error}</span>
-                        </div>
-                    )}
+                    {error && (() => {
+                        const isEmailInUse = error.startsWith('__EMAIL_IN_USE__');
+                        const displayMsg = isEmailInUse ? error.replace('__EMAIL_IN_USE__', '') : error;
+                        return (
+                            <div style={{
+                                display: 'flex', alignItems: 'flex-start', gap: '10px',
+                                padding: '12px 14px', borderRadius: '10px', marginBottom: '20px',
+                                backgroundColor: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
+                                color: '#EF4444', fontSize: '13px'
+                            }}>
+                                <AlertCircle size={15} style={{ flexShrink: 0, marginTop: '1px' }} />
+                                <span style={{ flex: 1 }}>
+                                    {displayMsg}
+                                    {isEmailInUse && (
+                                        <button
+                                            type="button"
+                                            onClick={() => { setMode('login'); }}
+                                            style={{
+                                                display: 'block', marginTop: '8px',
+                                                background: 'none', border: 'none', padding: 0,
+                                                color: '#2563EB', fontSize: '13px', fontWeight: 700,
+                                                cursor: 'pointer', textDecoration: 'underline'
+                                            }}
+                                        >
+                                            → Giriş ekranına geç
+                                        </button>
+                                    )}
+                                </span>
+                            </div>
+                        );
+                    })()}
 
                     {/* Success Alert */}
                     {success && (
