@@ -1915,7 +1915,7 @@ app.post('/api/applications', async (req, res) => {
 // Routes ALL Gemini calls through the backend so VITE_GEMINI_API_KEY never
 // reaches the browser bundle. Rate-limited to 20 req/min via aiLimiter.
 app.post('/api/ai/generate', aiLimiter, async (req, res) => {
-    const { prompt, modelId = 'gemini-2.5-flash', mimeType } = req.body || {};
+    const { prompt, modelId = 'gemini-2.5-flash', mimeType, maxOutputTokens } = req.body || {};
     if (!prompt || typeof prompt !== 'string') {
         return res.status(400).json({ error: 'prompt is required' });
     }
@@ -1935,6 +1935,11 @@ app.post('/api/ai/generate', aiLimiter, async (req, res) => {
     // text (feedback paragraphs, summaries, etc.) should pass 'text/plain'.
     const responseMimeType = mimeType === 'text/plain' ? 'text/plain' : 'application/json';
 
+    // CV parsing and similar tasks return large structured JSON; default 8192
+    // gives enough room while still capping run-away outputs. Caller may
+    // override with an explicit `maxOutputTokens` field (clamped to 32k).
+    const tokenCap = Math.min(Math.max(parseInt(maxOutputTokens, 10) || 8192, 512), 32768);
+
     const genAI = new GoogleGenerativeAI(keyInfo.key);
     const model = genAI.getGenerativeModel({
         model: modelId,
@@ -1942,7 +1947,7 @@ app.post('/api/ai/generate', aiLimiter, async (req, res) => {
             temperature: responseMimeType === 'text/plain' ? 0.7 : 0,
             topP: responseMimeType === 'text/plain' ? 0.95 : 0,
             topK: responseMimeType === 'text/plain' ? 40 : 1,
-            maxOutputTokens: 2048,
+            maxOutputTokens: tokenCap,
             responseMimeType,
         },
     });
