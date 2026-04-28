@@ -1957,7 +1957,7 @@ app.post('/api/check-duplicate', async (req, res) => {
 // Routes ALL Gemini calls through the backend so VITE_GEMINI_API_KEY never
 // reaches the browser bundle. Rate-limited to 20 req/min via aiLimiter.
 app.post('/api/ai/generate', aiLimiter, async (req, res) => {
-    const { prompt, modelId = 'gemini-2.0-flash' } = req.body || {};
+    const { prompt, modelId = 'gemini-2.0-flash', mimeType } = req.body || {};
     if (!prompt || typeof prompt !== 'string') {
         return res.status(400).json({ error: 'prompt is required' });
     }
@@ -1967,16 +1967,18 @@ app.post('/api/ai/generate', aiLimiter, async (req, res) => {
         return res.status(503).json({ error: 'AI service unavailable — API key missing' });
     }
 
+    const responseMimeType = mimeType === 'text/plain' ? 'text/plain' : 'application/json';
+
     try {
         const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({
             model: modelId,
             generationConfig: {
-                temperature: 0,
-                topP: 0,
-                topK: 1,
+                temperature: responseMimeType === 'text/plain' ? 0.7 : 0,
+                topP: responseMimeType === 'text/plain' ? 0.95 : 0,
+                topK: responseMimeType === 'text/plain' ? 40 : 1,
                 maxOutputTokens: 2048,
-                responseMimeType: 'application/json',
+                responseMimeType,
             },
         });
         const result = await model.generateContent(prompt);

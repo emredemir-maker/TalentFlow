@@ -253,14 +253,17 @@ export default function CandidateProcessPage() {
             const safeCandidate = stripPiiForAI(candidate);
             const outcomeWord = feedbackOutcome === 'positive' ? 'olumlu' : feedbackOutcome === 'negative' ? 'olumsuz' : 'beklemede';
             const prompt = `Sen deneyimli bir İK uzmanısın. Bir adayın başvurusu ${outcomeWord} sonuçlanmıştır. Bu adayın profil bilgileri: pozisyon başvurusu: ${safeCandidate.appliedPosition || safeCandidate.position || 'belirtilmemiş'}, eşleşme skoru: ${safeCandidate.matchScore ?? '-'}/100. Adaya gönderilecek, profesyonel, empatik ve kısa (3-4 cümle) bir geri bildirim e-postası metni yaz. Selamlama veya imza ekleme, sadece geri bildirim paragrafını yaz. Türkçe yaz.`;
-            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${import.meta.env.VITE_GEMINI_API_KEY}`, {
+            // Sunucu üzerinden Gemini proxy'sini kullan — API anahtarı tarayıcıya sızmaz
+            const res = await fetch('/api/ai/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                body: JSON.stringify({ prompt, mimeType: 'text/plain' })
             });
-            const data = await res.json();
-            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-            if (text) setFeedbackText(text.trim());
+            if (!res.ok) {
+                throw new Error(`AI isteği başarısız: ${res.status}`);
+            }
+            const { text } = await res.json();
+            if (text) setFeedbackText(String(text).trim());
         } catch (err) {
             console.error('Feedback AI error:', err);
         } finally {
