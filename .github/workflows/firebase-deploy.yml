@@ -79,15 +79,23 @@ jobs:
         env:
           GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcp-sa.json
 
-      - name: Set Cloud Run env vars (guaranteed delivery)
+      - name: Set Cloud Run env vars + service account (Firestore access)
         run: |
           gcloud auth activate-service-account --key-file=/tmp/gcp-sa.json
           gcloud config set project talentflow-84bb6
-          # Use ^|^ as delimiter to handle spaces/commas in values
+          # Run the api service as the appspot SA (has Firebase Admin / Firestore roles by default)
+          # and inject env vars. Use ^|^ delimiter to handle commas/spaces safely.
           gcloud run services update api \
             --region us-central1 \
+            --service-account=talentflow-84bb6@appspot.gserviceaccount.com \
             --update-env-vars "^|^EMAIL_USER=${EMAIL_USER}|EMAIL_PASS=${EMAIL_PASS}|VITE_GEMINI_API_KEY=${VITE_GEMINI_API_KEY}|VITE_FIREBASE_API_KEY=${VITE_FIREBASE_API_KEY}"
-          echo "✅ Cloud Run env vars set"
+          # Belt-and-suspenders: also grant Datastore User role to the compute SA
+          # (in case anything else still runs under it).
+          gcloud projects add-iam-policy-binding talentflow-84bb6 \
+            --member="serviceAccount:132883257197-compute@developer.gserviceaccount.com" \
+            --role="roles/datastore.user" \
+            --condition=None || true
+          echo "✅ Cloud Run env vars + service account configured"
         env:
           EMAIL_USER: ${{ secrets.EMAIL_USER }}
           EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
