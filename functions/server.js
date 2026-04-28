@@ -254,34 +254,45 @@ const sessionLimiter = rateLimit({
 // Returns { key, source, suffix } — `source` is 'firestore' | 'env' | 'none'.
 let _lastKeyDebug = { source: 'none', suffix: '----', length: 0 };
 async function getApiKeyDetailed() {
+    let firestoreReason = 'unknown';
     // 1. Firestore (admin saved via Settings → API & Ses Motoru)
     try {
         const settingsDoc = await db.doc('artifacts/talent-flow/public/data/settings/api_keys').get();
-        if (settingsDoc.exists && settingsDoc.data().gemini && String(settingsDoc.data().gemini).length > 5) {
-            const key = String(settingsDoc.data().gemini).trim();
-            const info = { key, source: 'firestore', suffix: key.slice(-4), length: key.length };
-            _lastKeyDebug = { source: info.source, suffix: info.suffix, length: info.length };
-            console.log(`🔑 Gemini key kaynağı: firestore (uzunluk=${key.length}, son4=${info.suffix})`);
-            return info;
+        if (!settingsDoc.exists) {
+            firestoreReason = 'doc-not-found';
+        } else {
+            const data = settingsDoc.data() || {};
+            const raw = data.gemini;
+            if (!raw) {
+                firestoreReason = 'gemini-field-empty';
+            } else if (String(raw).length <= 5) {
+                firestoreReason = 'gemini-too-short';
+            } else {
+                const key = String(raw).trim();
+                const info = { key, source: 'firestore', suffix: key.slice(-4), length: key.length, firestoreReason: 'ok' };
+                _lastKeyDebug = info;
+                console.log(`🔑 Gemini key kaynagi: firestore (uzunluk=${key.length}, son4=${info.suffix})`);
+                return info;
+            }
         }
-        console.log('ℹ️ Firestore api_keys/gemini bos veya yok, env fallback kullanilacak.');
+        console.log(`ℹ️ Firestore api_keys/gemini kullanilamadi (sebep=${firestoreReason}), env fallback kullanilacak.`);
     } catch (err) {
-        console.warn('⚠️ Firestore API Key fetch error (env fallback):', err.message);
+        firestoreReason = `error: ${err.code || ''} ${err.message || ''}`.trim().slice(0, 120);
+        console.warn('⚠️ Firestore API Key fetch error (env fallback):', firestoreReason);
     }
 
     // 2. Fallback to env
     const envKey = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
     if (envKey && envKey.trim() !== '' && envKey !== 'null' && envKey !== 'undefined') {
         const key = envKey.trim();
-        const info = { key, source: 'env', suffix: key.slice(-4), length: key.length };
-        _lastKeyDebug = { source: info.source, suffix: info.suffix, length: info.length };
-        console.log(`🔑 Gemini key kaynağı: env (uzunluk=${key.length}, son4=${info.suffix})`);
+        const info = { key, source: 'env', suffix: key.slice(-4), length: key.length, firestoreReason };
+        _lastKeyDebug = info;
+        console.log(`🔑 Gemini key kaynagi: env (uzunluk=${key.length}, son4=${info.suffix}, fs=${firestoreReason})`);
         return info;
     }
 
-    console.warn('⚠️ Gemini API key BOTH Firestore AND env eksik. AI özellikleri çalışmayacak.');
-    _lastKeyDebug = { source: 'none', suffix: '----', length: 0 };
-    return { key: null, source: 'none', suffix: '----', length: 0 };
+    console.warn('⚠️ Gemini API key BOTH Firestore AND env eksik.');
+    return { key: null, source: 'none', suffix: '----', length: 0, firestoreReason };
 }
 
 // Backward-compatible string-only wrapper
@@ -1989,6 +2000,7 @@ app.post('/api/ai/generate', aiLimiter, async (req, res) => {
             keySource: keyInfo.source,
             keySuffix: keyInfo.suffix,
             keyLength: keyInfo.length,
+            firestoreReason: keyInfo.firestoreReason,
         });
     }
 
@@ -2009,12 +2021,13 @@ app.post('/api/ai/generate', aiLimiter, async (req, res) => {
         const result = await model.generateContent(prompt);
         res.json({ text: result.response.text() });
     } catch (err) {
-        console.error(`AI Generate Error [key kaynağı=${keyInfo.source}, son4=${keyInfo.suffix}]:`, err.message);
+        console.error(`AI Generate Error [key kaynagi=${keyInfo.source}, son4=${keyInfo.suffix}, fs=${keyInfo.firestoreReason}]:`, err.message);
         res.status(500).json({
             error: err.message,
             keySource: keyInfo.source,
             keySuffix: keyInfo.suffix,
             keyLength: keyInfo.length,
+            firestoreReason: keyInfo.firestoreReason,
         });
     }
 });

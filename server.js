@@ -213,30 +213,42 @@ app.get('/api/health', (req, res) => {
 // Returns { key, source, suffix, length } so callers can attach diagnostics
 // (which key actually went to Google) into error responses.
 async function getApiKeyDetailed() {
+    let firestoreReason = 'unknown';
     // 1. Firestore (admin saved via Settings → API & Ses Motoru)
     try {
         const settingsRef = db.doc('artifacts/talent-flow/public/data/settings/api_keys');
         const snap = await settingsRef.get();
-        if (snap.exists && snap.data().gemini && String(snap.data().gemini).length > 5) {
-            const key = String(snap.data().gemini).trim();
-            console.log(`🔑 Gemini key kaynagi: firestore (uzunluk=${key.length}, son4=${key.slice(-4)})`);
-            return { key, source: 'firestore', suffix: key.slice(-4), length: key.length };
+        if (!snap.exists) {
+            firestoreReason = 'doc-not-found';
+        } else {
+            const data = snap.data() || {};
+            const raw = data.gemini;
+            if (!raw) {
+                firestoreReason = 'gemini-field-empty';
+            } else if (String(raw).length <= 5) {
+                firestoreReason = 'gemini-too-short';
+            } else {
+                const key = String(raw).trim();
+                console.log(`🔑 Gemini key kaynagi: firestore (uzunluk=${key.length}, son4=${key.slice(-4)})`);
+                return { key, source: 'firestore', suffix: key.slice(-4), length: key.length, firestoreReason: 'ok' };
+            }
         }
-        console.log('Firestore api_keys/gemini bos veya yok, env fallback denenecek.');
+        console.log(`Firestore api_keys/gemini kullanilamadi (sebep=${firestoreReason}), env fallback denenecek.`);
     } catch (err) {
-        console.warn('Firestore API Key fetch warning (env fallback):', err.message);
+        firestoreReason = `error: ${err.code || ''} ${err.message || ''}`.trim().slice(0, 120);
+        console.warn('Firestore API Key fetch warning (env fallback):', firestoreReason);
     }
 
     // 2. Fallback to env (Vite convention or standard)
     const envRaw = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
     if (envRaw && envRaw !== 'null' && envRaw !== 'undefined' && envRaw.trim().length > 5) {
         const key = envRaw.trim();
-        console.log(`🔑 Gemini key kaynagi: env (uzunluk=${key.length}, son4=${key.slice(-4)})`);
-        return { key, source: 'env', suffix: key.slice(-4), length: key.length };
+        console.log(`🔑 Gemini key kaynagi: env (uzunluk=${key.length}, son4=${key.slice(-4)}, fs=${firestoreReason})`);
+        return { key, source: 'env', suffix: key.slice(-4), length: key.length, firestoreReason };
     }
 
-    console.warn('⚠️ Gemini API Key BOTH Firestore AND env eksik. AI features will not work.');
-    return { key: null, source: 'none', suffix: '----', length: 0 };
+    console.warn('⚠️ Gemini API Key BOTH Firestore AND env eksik.');
+    return { key: null, source: 'none', suffix: '----', length: 0, firestoreReason };
 }
 
 async function getApiKey() {
@@ -1915,6 +1927,7 @@ app.post('/api/ai/generate', aiLimiter, async (req, res) => {
             keySource: keyInfo.source,
             keySuffix: keyInfo.suffix,
             keyLength: keyInfo.length,
+            firestoreReason: keyInfo.firestoreReason,
         });
     }
 
@@ -1937,12 +1950,13 @@ app.post('/api/ai/generate', aiLimiter, async (req, res) => {
         const result = await model.generateContent(prompt);
         res.json({ text: result.response.text() });
     } catch (err) {
-        console.error(`AI Generate Error [key=${keyInfo.source}/${keyInfo.suffix}]:`, err.message);
+        console.error(`AI Generate Error [key=${keyInfo.source}/${keyInfo.suffix} fs=${keyInfo.firestoreReason}]:`, err.message);
         res.status(500).json({
             error: err.message,
             keySource: keyInfo.source,
             keySuffix: keyInfo.suffix,
             keyLength: keyInfo.length,
+            firestoreReason: keyInfo.firestoreReason,
         });
     }
 });

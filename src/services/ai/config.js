@@ -35,7 +35,7 @@ export async function getModel(modelId = DEFAULT_GEMINI_MODEL) {
                 // server actually sent to Google. Helps isolate "expired" vs
                 // "wrong key" vs "Firestore unreachable" issues.
                 const debug = errData.keySource
-                    ? ` [Anahtar kaynağı: ${errData.keySource}, son4: ${errData.keySuffix}, uzunluk: ${errData.keyLength}]`
+                    ? ` [Anahtar kaynağı: ${errData.keySource}, son4: ${errData.keySuffix}, uzunluk: ${errData.keyLength}, Firestore: ${errData.firestoreReason || 'n/a'}]`
                     : '';
                 throw new Error(baseMsg + debug);
             }
