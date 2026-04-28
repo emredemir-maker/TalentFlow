@@ -193,7 +193,7 @@ export default function SystemScanner() {
                             if (!pos) continue;
                             const jobDesc = `${pos.title}\n${(pos.requirements || []).join(', ')}\n${pos.description || ''}`;
                             try {
-                                const result = await analyzeCandidateMatch(jobDesc, candidate, 'gemini-2.0-flash');
+                                const result = await analyzeCandidateMatch(jobDesc, candidate, 'gemini-2.5-flash');
                                 updatedAnalyses[pos.title] = result;
                                 setAiCount(prev => prev + 1);
 

@@ -13,7 +13,7 @@
  * (20 req / min), so there is no need for a separate client-side queue.
  */
 
-const DEFAULT_GEMINI_MODEL = 'gemini-2.0-flash';
+const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
 
 /**
  * Returns a lightweight proxy object that forwards generateContent() calls

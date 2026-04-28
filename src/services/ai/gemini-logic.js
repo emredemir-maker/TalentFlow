@@ -24,7 +24,7 @@ export async function checkStarLogicGemini(transcript, context) {
     }`;
 
     try {
-        const model = await getModel('gemini-2.0-flash');
+        const model = await getModel('gemini-2.5-flash');
         const result = await model.generateContent(instruction);
         return parseAIJson(result.response.text(), {
             scores: { S: 50, T: 50, A: 50, R: 50 },
@@ -62,7 +62,7 @@ export async function checkAudioLogicGemini(audioBase64, mimeType = 'audio/webm'
     }`;
 
     try {
-        const model = await getModel('gemini-2.0-flash');
+        const model = await getModel('gemini-2.5-flash');
         const parts = [
             { text: instruction },
             {

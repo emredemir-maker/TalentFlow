@@ -67,7 +67,7 @@ export default function AIMatchPage() {
         getAvailableModels().then(models => {
             setAvailableModels(models);
             if (models.length > 0) setSelectedModel(models[0].id);
-            else setSelectedModel('gemini-2.0-flash');
+            else setSelectedModel('gemini-2.5-flash');
         });
     }, []);
 

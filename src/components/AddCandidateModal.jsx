@@ -141,7 +141,7 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                         resultsData.push({ fileName: file.name, error: 'İçerik okunamadı veya çok kısa', success: false });
                         continue;
                     }
-                    const candidate = await parseCandidateFromText(text, 'gemini-2.0-flash');
+                    const candidate = await parseCandidateFromText(text, 'gemini-2.5-flash');
                     if (!candidate) {
                         resultsData.push({ fileName: file.name, error: 'AI ayrıştırma hatası', success: false });
                         continue;

@@ -257,7 +257,7 @@ async function getApiKey() {
 }
 
 // Gemini Parser Function
-async function parseProfile(text, modelId = 'gemini-2.0-flash') {
+async function parseProfile(text, modelId = 'gemini-2.5-flash') {
     const apiKey = await getApiKey();
     if (!apiKey) {
         console.error('Gemini Parse Error: API Key missing');
@@ -520,13 +520,13 @@ app.get('/api/scrape', aiLimiter, async (req, res) => {
                     }
 
                     console.log(`🤖 Gemini Parsing (${extractionMethod}): ${item.name}...`);
-                    let refined = await parseProfile(profileText, 'gemini-2.0-flash');
+                    let refined = await parseProfile(profileText, 'gemini-2.5-flash');
 
                     // Final Fallback: If full-page parse failed, try snippet one last time
                     if (!refined && extractionMethod === 'full-page') {
                         console.log('🔄 Full-page parse failed. Retrying with original snippet...');
                         profileText = `TITLE: ${item.rawTitle}\nSNIPPET: ${item.rawSnippet}`;
-                        refined = await parseProfile(profileText, 'gemini-2.0-flash');
+                        refined = await parseProfile(profileText, 'gemini-2.5-flash');
                     }
 
                     if (refined && (refined.name || item.name)) {
@@ -623,7 +623,7 @@ async function handleDirectUrl(url, res, isVisual = false) {
             return res.json({ candidates: [], message: 'LinkedIn bu sayfayı görmemizi engelledi (Giriş duvarı). Lütfen "Tarayıcıda Oturumu Hazırla" butonunu kullanarak giriş yapın.' });
         }
 
-        const candidate = await parseProfile(bodyText, 'gemini-2.0-flash');
+        const candidate = await parseProfile(bodyText, 'gemini-2.5-flash');
         if (candidate && candidate.name && candidate.name !== 'Belirtilmemiş') {
             candidate.linkedinUrl = url;
             candidate.source = 'Direct URL Scrape';
@@ -648,7 +648,7 @@ app.post('/api/direct-add', aiLimiter, async (req, res) => {
         const { text, url } = req.body;
         console.log(`📥 Direct Add request for: ${url}`);
 
-        const candidate = await parseProfile(text, 'gemini-2.0-flash');
+        const candidate = await parseProfile(text, 'gemini-2.5-flash');
         if (candidate && candidate.name) {
             candidate.linkedinUrl = url;
             candidate.source = 'Browser Extension';
@@ -690,7 +690,7 @@ app.post('/api/process-cv', aiLimiter, upload.array('cvs', 20), async (req, res)
                     return { fileName: file.originalname, error: 'İçerik okunamadı' };
                 }
 
-                const candidate = await parseProfile(text, 'gemini-2.0-flash');
+                const candidate = await parseProfile(text, 'gemini-2.5-flash');
                 if (!candidate) return { fileName: file.originalname, error: 'AI ayrıştırma hatası' };
 
                 // Add the URL to the stored file
@@ -744,7 +744,7 @@ app.post('/api/gemini-stt', aiLimiter, (req, res, next) => {
         if (!apiKey) return res.status(500).json({ error: 'Gemini API Key eksik' });
 
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
         const result = await model.generateContent([
             { inlineData: { data: audioBase64, mimeType } },
@@ -1915,7 +1915,7 @@ app.post('/api/applications', async (req, res) => {
 // Routes ALL Gemini calls through the backend so VITE_GEMINI_API_KEY never
 // reaches the browser bundle. Rate-limited to 20 req/min via aiLimiter.
 app.post('/api/ai/generate', aiLimiter, async (req, res) => {
-    const { prompt, modelId = 'gemini-2.0-flash', mimeType } = req.body || {};
+    const { prompt, modelId = 'gemini-2.5-flash', mimeType } = req.body || {};
     if (!prompt || typeof prompt !== 'string') {
         return res.status(400).json({ error: 'prompt is required' });
     }
@@ -1989,7 +1989,7 @@ app.post('/api/ai/stt', aiLimiter, async (req, res) => {
 
     try {
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
         const result = await model.generateContent([
             { inlineData: { data: audio, mimeType } },
             `Bu ses dosyasını analiz et. YALNIZCA aşağıdaki JSON formatında yanıt döndür, başka hiçbir şey yazma:\n{"text":"türkçe transkript metni","stress":30,"excitement":70,"confidence":60,"hesitation":20}\nKurallar:\n- text: konuşulan Türkçe sözcükler. Konuşma yoksa boş string.\n- stress/excitement/confidence/hesitation: 0-100 tam sayı.\n- 'Sessizlik', 'Ses yok', 'Boş' gibi ifadeler text alanına YAZMA.`
@@ -2018,7 +2018,7 @@ async function parseTextWithGemini(text, positionTitle) {
     const apiKey = await getApiKey();
     if (!apiKey) return null;
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
     const prompt = `Sen bir uzman CV ayrıştırıcısısın. Aşağıdaki CV metninden aday bilgilerini JSON olarak çıkart.
 Sadece şu JSON formatında yanıt ver (başka hiçbir şey yazma):
 {
@@ -2516,7 +2516,7 @@ app.post('/api/score-screening-answers', aiLimiter, async (req, res) => {
     const prompt = `Sen bir İK uzmanısın. Aşağıdaki pozisyon ön eleme sorularını ve adayın cevaplarını değerlendir.\n\nPozisyon: ${positionTitle || 'Genel Pozisyon'}\n\n${qaPairs}\n\nHer soru için 0-100 arası bir puan ver ve kısa Türkçe bir gerekçe yaz. Yanıtını YALNIZCA şu JSON formatında ver (başka hiçbir şey yazma):\n{"scores":[{"question":"...","score":85,"rationale":"..."}],"aggregateScore":85,"summary":"Kısa genel değerlendirme"}`;
     try {
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
         const result = await model.generateContent(prompt);
         const rawText = result.response.text().replace(/```json|```/gi, '').trim();
         const match = rawText.match(/\{[\s\S]*\}/);
@@ -2550,7 +2550,7 @@ app.post('/api/suggest-screening-questions', aiLimiter, async (req, res) => {
     const prompt = `Sen bir kıdemli İK uzmanısın. Aşağıdaki pozisyon için başvuru formunda adaylara sorulacak en fazla 5 adet ön eleme sorusu öner. Sorular kısa, net ve pozisyona özel olmalı.\n\nPozisyon: ${positionTitle || 'Genel Pozisyon'}\nGereksinimler: ${requirements || ''}\n\nYalnızca şu JSON formatında yanıt ver (başka hiçbir şey yazma):\n{"questions": ["Soru 1", "Soru 2", "Soru 3"]}`;
     try {
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
         const result = await model.generateContent(prompt);
         const rawText = result.response.text().replace(/```json|```/gi, '').trim();
         const match = rawText.match(/\{[\s\S]*\}/);
@@ -2572,7 +2572,7 @@ app.post('/api/improve-screening-question', aiLimiter, async (req, res) => {
     const prompt = `Sen bir kıdemli İK uzmanısın. Aşağıdaki ön eleme sorusunu daha net, profesyonel ve ölçülebilir hale getir. Soruyu kısalt, anlaşılırlığını artır ve pozisyonla ilişkisini güçlendir.\n\nPozisyon: ${positionTitle || 'Genel Pozisyon'}\nGereksinimler: ${requirements || ''}\nMevcut soru: ${question}\n\nYalnızca şu JSON formatında yanıt ver (başka hiçbir şey yazma):\n{"improved": "Düzenlenmiş soru metni"}`;
     try {
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
         const result = await model.generateContent(prompt);
         const rawText = result.response.text().replace(/```json|```/gi, '').trim();
         const match = rawText.match(/\{[\s\S]*\}/);

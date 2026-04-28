@@ -31,7 +31,7 @@ Sen kıdemli ve son derece analitik bir İşe Alım Yöneticisisin. Görevin, ad
 }
 `;
 
-export async function extractCandidateEvidence(jobDescription, candidateProfile, modelId = 'gemini-2.0-flash') {
+export async function extractCandidateEvidence(jobDescription, candidateProfile, modelId = 'gemini-2.5-flash') {
     const sanitizedCandidate = {
         position: candidateProfile.position,
         experience: candidateProfile.experience,

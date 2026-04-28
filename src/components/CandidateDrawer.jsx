@@ -171,7 +171,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
             await Promise.all(openPositions.map(async (pos) => {
                 const descToUse = `${pos.title}\n${(pos.requirements || []).join(', ')}\n${pos.description || ''}`;
                 try {
-                    const result = await analyzeCandidateMatch(descToUse, candidate, 'gemini-2.0-flash');
+                    const result = await analyzeCandidateMatch(descToUse, candidate, 'gemini-2.5-flash');
                     updatedAnalyses[pos.title] = result;
 
                     if (result.score > highestScore) {

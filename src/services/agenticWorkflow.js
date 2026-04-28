@@ -88,7 +88,7 @@ export async function runAgenticWorkflow(candidate, position, services) {
         const analysis = await geminiService.analyzeCandidateMatch(
             position.description,
             candidate,
-            'gemini-2.0-flash'
+            'gemini-2.5-flash'
         );
         result.aiAnalysis = analysis;
         result.matchScore = analysis.score; // AI overrides static

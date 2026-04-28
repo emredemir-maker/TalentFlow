@@ -42,7 +42,7 @@ export {
     analyzeResponseEmail
 };
 
-export async function parseCandidateFromText(text, modelId = 'gemini-2.0-flash') {
+export async function parseCandidateFromText(text, modelId = 'gemini-2.5-flash') {
     // Extract contact fields (incl. name) with regex BEFORE redacting — they will be
     // merged back into the result so the candidate record retains them without leaking to AI.
     const contactInfo = extractPiiFromText(text);
@@ -101,7 +101,7 @@ Sadece şu JSON formatında dön:
     return parsed ? { ...parsed, ...safeContactInfo } : parsed;
 }
 
-export async function parseExperiencesFromText(text, modelId = 'gemini-2.0-flash') {
+export async function parseExperiencesFromText(text, modelId = 'gemini-2.5-flash') {
     if (!text || text.length < 30) return [];
     const instruction = `CV metninden SADECE iş deneyimlerini çıkart. Profil özeti, yetenek listesi veya eğitim bilgisi ekleme.
 
@@ -147,7 +147,7 @@ Sadece şu JSON formatında dön (başka hiçbir şey yazma):
 
 export async function getAvailableModels() {
     return [
-        { id: 'gemini-2.0-flash', displayName: 'Gemini 2.0 Flash (Fast & Deterministic)' }
+        { id: 'gemini-2.5-flash', displayName: 'Gemini 2.5 Flash (Fast & Deterministic)' }
     ];
 }
 
@@ -181,7 +181,7 @@ function calculateHybridScore(data) {
     return Math.min(score, 100);
 }
 
-export async function analyzeCandidateMatch(jobDescription, candidateProfile, modelId = 'gemini-2.0-flash') {
+export async function analyzeCandidateMatch(jobDescription, candidateProfile, modelId = 'gemini-2.5-flash') {
     const safeCandidateProfile = stripPiiForAI(candidateProfile);
     const evidence = await extractCandidateEvidence(jobDescription, safeCandidateProfile, modelId);
     const score = calculateHybridScore(evidence.extractedData);
@@ -201,7 +201,7 @@ export async function analyzeCandidateMatch(jobDescription, candidateProfile, mo
     };
 }
 
-export async function analyzeComparativeCandidates(candidates, modelId = 'gemini-2.0-flash') {
+export async function analyzeComparativeCandidates(candidates, modelId = 'gemini-2.5-flash') {
     const instruction = `Sen kıdemli bir İK Stratejistisin. Aşağıda sana verilen ${candidates.length} adayı birbirleriyle kıyasla.
     Adayların güçlü yönlerini, birbirlerine göre üstünlüklerini ve zayıf kaldıkları noktaları analiz et.
     
