@@ -30,7 +30,14 @@ export async function getModel(modelId = DEFAULT_GEMINI_MODEL) {
 
             if (!res.ok) {
                 const errData = await res.json().catch(() => ({}));
-                throw new Error(errData.error || `AI isteği başarısız: ${res.status}`);
+                const baseMsg = errData.error || `AI isteği başarısız: ${res.status}`;
+                // Diagnostic suffix: which key (source + last 4 chars) the
+                // server actually sent to Google. Helps isolate "expired" vs
+                // "wrong key" vs "Firestore unreachable" issues.
+                const debug = errData.keySource
+                    ? ` [Anahtar kaynağı: ${errData.keySource}, son4: ${errData.keySuffix}, uzunluk: ${errData.keyLength}]`
+                    : '';
+                throw new Error(baseMsg + debug);
             }
 
             const { text } = await res.json();

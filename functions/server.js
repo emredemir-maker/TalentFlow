@@ -251,25 +251,43 @@ const sessionLimiter = rateLimit({
 // Admin-saved key in Settings takes precedence so the env var can be safely
 // rotated without losing service, and so a leaked/revoked env key doesn't
 // block the UI-saved replacement.
-async function getApiKey() {
+// Returns { key, source, suffix } — `source` is 'firestore' | 'env' | 'none'.
+let _lastKeyDebug = { source: 'none', suffix: '----', length: 0 };
+async function getApiKeyDetailed() {
     // 1. Firestore (admin saved via Settings → API & Ses Motoru)
     try {
         const settingsDoc = await db.doc('artifacts/talent-flow/public/data/settings/api_keys').get();
         if (settingsDoc.exists && settingsDoc.data().gemini && String(settingsDoc.data().gemini).length > 5) {
-            return String(settingsDoc.data().gemini).trim();
+            const key = String(settingsDoc.data().gemini).trim();
+            const info = { key, source: 'firestore', suffix: key.slice(-4), length: key.length };
+            _lastKeyDebug = { source: info.source, suffix: info.suffix, length: info.length };
+            console.log(`🔑 Gemini key kaynağı: firestore (uzunluk=${key.length}, son4=${info.suffix})`);
+            return info;
         }
+        console.log('ℹ️ Firestore api_keys/gemini bos veya yok, env fallback kullanilacak.');
     } catch (err) {
-        console.warn('⚠️ Firestore API Key fetch warning (will fall back to env):', err.message);
+        console.warn('⚠️ Firestore API Key fetch error (env fallback):', err.message);
     }
 
     // 2. Fallback to env
-    const key = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
-    if (key && key.trim() !== '' && key !== 'null' && key !== 'undefined') {
-        return key;
+    const envKey = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+    if (envKey && envKey.trim() !== '' && envKey !== 'null' && envKey !== 'undefined') {
+        const key = envKey.trim();
+        const info = { key, source: 'env', suffix: key.slice(-4), length: key.length };
+        _lastKeyDebug = { source: info.source, suffix: info.suffix, length: info.length };
+        console.log(`🔑 Gemini key kaynağı: env (uzunluk=${key.length}, son4=${info.suffix})`);
+        return info;
     }
 
-    console.warn('⚠️ Gemini API key is missing in BOTH Firestore and env. AI features will not work.');
-    return null;
+    console.warn('⚠️ Gemini API key BOTH Firestore AND env eksik. AI özellikleri çalışmayacak.');
+    _lastKeyDebug = { source: 'none', suffix: '----', length: 0 };
+    return { key: null, source: 'none', suffix: '----', length: 0 };
+}
+
+// Backward-compatible string-only wrapper
+async function getApiKey() {
+    const info = await getApiKeyDetailed();
+    return info.key;
 }
 
 // Gemini Parser Function
@@ -1964,15 +1982,20 @@ app.post('/api/ai/generate', aiLimiter, async (req, res) => {
         return res.status(400).json({ error: 'prompt is required' });
     }
 
-    const apiKey = await getApiKey();
-    if (!apiKey) {
-        return res.status(503).json({ error: 'AI service unavailable — API key missing' });
+    const keyInfo = await getApiKeyDetailed();
+    if (!keyInfo.key) {
+        return res.status(503).json({
+            error: 'AI servisi kullanılamıyor — API anahtarı yok (Settings → API ekranından kaydedin).',
+            keySource: keyInfo.source,
+            keySuffix: keyInfo.suffix,
+            keyLength: keyInfo.length,
+        });
     }
 
     const responseMimeType = mimeType === 'text/plain' ? 'text/plain' : 'application/json';
 
     try {
-        const genAI = new GoogleGenerativeAI(apiKey);
+        const genAI = new GoogleGenerativeAI(keyInfo.key);
         const model = genAI.getGenerativeModel({
             model: modelId,
             generationConfig: {
@@ -1986,8 +2009,13 @@ app.post('/api/ai/generate', aiLimiter, async (req, res) => {
         const result = await model.generateContent(prompt);
         res.json({ text: result.response.text() });
     } catch (err) {
-        console.error('AI Generate Error:', err.message);
-        res.status(500).json({ error: err.message });
+        console.error(`AI Generate Error [key kaynağı=${keyInfo.source}, son4=${keyInfo.suffix}]:`, err.message);
+        res.status(500).json({
+            error: err.message,
+            keySource: keyInfo.source,
+            keySuffix: keyInfo.suffix,
+            keyLength: keyInfo.length,
+        });
     }
 });
 
