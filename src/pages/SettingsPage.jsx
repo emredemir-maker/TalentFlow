@@ -70,9 +70,15 @@ export default function SettingsPage({ initialTab }) {
     const [showGeminiKey, setShowGeminiKey] = useState(false);
     const [savingGeminiKey, setSavingGeminiKey] = useState(false);
     const [geminiKeySaved, setGeminiKeySaved] = useState(false);
+    const [hasSavedGeminiKey, setHasSavedGeminiKey] = useState(false);
 
     useEffect(() => {
-        getGlobalGeminiKey().then(k => { if (k) setGeminiKey(k); });
+        getGlobalGeminiKey().then(k => {
+            if (k) {
+                setGeminiKey(k);
+                setHasSavedGeminiKey(true);
+            }
+        });
     }, []);
 
     const handleSaveGeminiKey = async () => {
@@ -81,6 +87,7 @@ export default function SettingsPage({ initialTab }) {
         try {
             await setDoc(doc(db, 'artifacts/talent-flow/public/data/settings', 'api_keys'), { gemini: geminiKey.trim() }, { merge: true });
             setGeminiKeySaved(true);
+            setHasSavedGeminiKey(true);
             setTimeout(() => setGeminiKeySaved(false), 3000);
         } catch (err) { alert('Kayıt hatası: ' + err.message); }
         finally { setSavingGeminiKey(false); }
@@ -402,9 +409,16 @@ export default function SettingsPage({ initialTab }) {
                                     <div className="w-9 h-9 rounded-xl bg-violet-50 border border-violet-100 flex items-center justify-center">
                                         <Key className="w-4 h-4 text-violet-500" />
                                     </div>
-                                    <div>
-                                        <h2 className="text-sm font-bold text-slate-800">Gemini API Anahtarı</h2>
-                                        <p className="text-xs text-slate-400">CV analizi, mülakat soruları ve ses tanıma için gereklidir</p>
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2">
+                                            <h2 className="text-sm font-bold text-slate-800">Gemini API Anahtarı</h2>
+                                            {hasSavedGeminiKey && (
+                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                    <CheckCircle className="w-3 h-3" /> Aktif
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="text-xs text-slate-400">CV analizi, mülakat soruları ve ses tanıma için gereklidir. Buraya kaydedilen anahtar tüm ekip için anında geçerli olur.</p>
                                     </div>
                                 </div>
                                 <div className="space-y-3">

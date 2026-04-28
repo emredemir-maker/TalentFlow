@@ -41,10 +41,25 @@ export async function getModel(modelId = DEFAULT_GEMINI_MODEL) {
 }
 
 /**
- * Kept for backwards compatibility — components that imported this
- * previously will still compile.  It is no longer needed; the key lives
- * only on the server.
+ * Returns the admin-saved Gemini API key from Firestore (Settings → API).
+ * Used by SettingsPage to populate the input so the admin can see whether
+ * a key is currently saved and edit/replace it.  AI features themselves
+ * never use this — they all go through /api/ai/generate, which fetches
+ * the key on the server.
+ *
+ * Returns null if no key is saved or read fails (e.g., user not logged in).
  */
 export async function getGlobalGeminiKey() {
+    try {
+        const { db } = await import('../../config/firebase');
+        const { doc, getDoc } = await import('firebase/firestore');
+        const snap = await getDoc(doc(db, 'artifacts/talent-flow/public/data/settings', 'api_keys'));
+        if (snap.exists()) {
+            const k = snap.data()?.gemini;
+            if (k && typeof k === 'string') return k;
+        }
+    } catch (_err) {
+        // Silent fail — input simply stays empty
+    }
     return null;
 }

@@ -209,26 +209,29 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
-// Load API Key (Priority: Env -> Firestore)
+// Load API Key (Priority: Firestore (admin-saved) -> Env)
+// Admin-saved key in Settings takes precedence so the env var can be safely
+// rotated without losing service, and so a leaked/revoked env key doesn't
+// block the UI-saved replacement.
 async function getApiKey() {
-    // 1. Check process.env (Vite convention or standard)
+    // 1. Firestore (admin saved via Settings → API & Ses Motoru)
+    try {
+        const settingsRef = db.doc('artifacts/talent-flow/public/data/settings/api_keys');
+        const doc = await settingsRef.get();
+        if (doc.exists && doc.data().gemini && String(doc.data().gemini).length > 5) {
+            return String(doc.data().gemini).trim();
+        }
+    } catch (err) {
+        console.warn('Firestore API Key fetch warning (will fall back to env):', err.message);
+    }
+
+    // 2. Fallback to env (Vite convention or standard)
     const envKey = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
     if (envKey && envKey !== 'null' && envKey !== 'undefined' && envKey.length > 5) {
         return envKey;
     }
 
-    // 2. Fallback to Firestore (System Settings)
-    try {
-        const settingsRef = db.doc('artifacts/talent-flow/public/data/settings/api_keys');
-        const doc = await settingsRef.get();
-        if (doc.exists && doc.data().gemini) {
-            return doc.data().gemini;
-        }
-    } catch (err) {
-        console.error('Firestore API Key fetch error:', err);
-    }
-
-    console.warn('⚠️ Gemini API Key is missing in BOTH environment and Firestore. AI features will not work.');
+    console.warn('⚠️ Gemini API Key is missing in BOTH Firestore and environment. AI features will not work.');
     return null;
 }
 

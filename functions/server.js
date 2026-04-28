@@ -247,26 +247,28 @@ const sessionLimiter = rateLimit({
     message: { error: 'Çok fazla oturum sorgusu. Lütfen bekleyin.' }
 });
 
-// Load API Key from .env with Firestore Fallback
+// Load API Key (Priority: Firestore (admin-saved) -> Env)
+// Admin-saved key in Settings takes precedence so the env var can be safely
+// rotated without losing service, and so a leaked/revoked env key doesn't
+// block the UI-saved replacement.
 async function getApiKey() {
-    // 1. Try Environment Variable
+    // 1. Firestore (admin saved via Settings → API & Ses Motoru)
+    try {
+        const settingsDoc = await db.doc('artifacts/talent-flow/public/data/settings/api_keys').get();
+        if (settingsDoc.exists && settingsDoc.data().gemini && String(settingsDoc.data().gemini).length > 5) {
+            return String(settingsDoc.data().gemini).trim();
+        }
+    } catch (err) {
+        console.warn('⚠️ Firestore API Key fetch warning (will fall back to env):', err.message);
+    }
+
+    // 2. Fallback to env
     const key = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
     if (key && key.trim() !== '' && key !== 'null' && key !== 'undefined') {
         return key;
     }
 
-    // 2. Fallback to Firestore (System Settings)
-    try {
-        const settingsDoc = await db.doc('artifacts/talent-flow/public/data/settings/api_keys').get();
-        if (settingsDoc.exists && settingsDoc.data().gemini) {
-            console.log('✅ Gemini API key fetched from Firestore.');
-            return settingsDoc.data().gemini;
-        }
-    } catch (err) {
-        console.warn('⚠️ Could not fetch Gemini API key from Firestore:', err.message);
-    }
-
-    console.warn('⚠️ Gemini API key is missing. AI features will not work.');
+    console.warn('⚠️ Gemini API key is missing in BOTH Firestore and env. AI features will not work.');
     return null;
 }
 
