@@ -2006,30 +2006,44 @@ app.post('/api/ai/generate', aiLimiter, async (req, res) => {
 
     const responseMimeType = mimeType === 'text/plain' ? 'text/plain' : 'application/json';
 
-    try {
-        const genAI = new GoogleGenerativeAI(keyInfo.key);
-        const model = genAI.getGenerativeModel({
-            model: modelId,
-            generationConfig: {
-                temperature: responseMimeType === 'text/plain' ? 0.7 : 0,
-                topP: responseMimeType === 'text/plain' ? 0.95 : 0,
-                topK: responseMimeType === 'text/plain' ? 40 : 1,
-                maxOutputTokens: 2048,
-                responseMimeType,
-            },
-        });
-        const result = await model.generateContent(prompt);
-        res.json({ text: result.response.text() });
-    } catch (err) {
-        console.error(`AI Generate Error [key kaynagi=${keyInfo.source}, son4=${keyInfo.suffix}, fs=${keyInfo.firestoreReason}]:`, err.message);
-        res.status(500).json({
-            error: err.message,
-            keySource: keyInfo.source,
-            keySuffix: keyInfo.suffix,
-            keyLength: keyInfo.length,
-            firestoreReason: keyInfo.firestoreReason,
-        });
+    const genAI = new GoogleGenerativeAI(keyInfo.key);
+    const model = genAI.getGenerativeModel({
+        model: modelId,
+        generationConfig: {
+            temperature: responseMimeType === 'text/plain' ? 0.7 : 0,
+            topP: responseMimeType === 'text/plain' ? 0.95 : 0,
+            topK: responseMimeType === 'text/plain' ? 40 : 1,
+            maxOutputTokens: 2048,
+            responseMimeType,
+        },
+    });
+
+    // Retry on 429/503 with exponential backoff (paid tier still has RPM limits).
+    const MAX_RETRIES = 4;
+    let lastErr = null;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        try {
+            const result = await model.generateContent(prompt);
+            return res.json({ text: result.response.text() });
+        } catch (err) {
+            lastErr = err;
+            const msg = err.message || '';
+            const isTransient = /429|RESOURCE_EXHAUSTED|quota|503|UNAVAILABLE|overloaded/i.test(msg);
+            if (!isTransient || attempt === MAX_RETRIES) break;
+            const backoffMs = Math.min(1000 * Math.pow(2, attempt), 16000) + Math.floor(Math.random() * 500);
+            console.warn(`[ai/generate] transient (attempt ${attempt + 1}/${MAX_RETRIES + 1}), backoff ${backoffMs}ms: ${msg.slice(0, 120)}`);
+            await new Promise(r => setTimeout(r, backoffMs));
+        }
     }
+
+    console.error(`AI Generate Error [key kaynagi=${keyInfo.source}, son4=${keyInfo.suffix}, fs=${keyInfo.firestoreReason}]:`, lastErr?.message);
+    res.status(500).json({
+        error: lastErr?.message || 'AI request failed',
+        keySource: keyInfo.source,
+        keySuffix: keyInfo.suffix,
+        keyLength: keyInfo.length,
+        firestoreReason: keyInfo.firestoreReason,
+    });
 });
 
 // ─── STT + Emotion Analysis Proxy ───────────────────────────────────────────
