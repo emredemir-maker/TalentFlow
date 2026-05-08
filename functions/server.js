@@ -251,48 +251,33 @@ const sessionLimiter = rateLimit({
 // Admin-saved key in Settings takes precedence so the env var can be safely
 // rotated without losing service, and so a leaked/revoked env key doesn't
 // block the UI-saved replacement.
-// Returns { key, source, suffix } — `source` is 'firestore' | 'env' | 'none'.
-let _lastKeyDebug = { source: 'none', suffix: '----', length: 0 };
+// Returns { key, source } where source is 'firestore' | 'env' | 'none'.
+// We deliberately do NOT expose key length, suffix, or raw firestore error
+// detail to callers — those would leak through logs and HTTP error bodies.
 async function getApiKeyDetailed() {
-    let firestoreReason = 'unknown';
     // 1. Firestore (admin saved via Settings → API & Ses Motoru)
     try {
         const settingsDoc = await db.doc('artifacts/talent-flow/public/data/settings/api_keys').get();
-        if (!settingsDoc.exists) {
-            firestoreReason = 'doc-not-found';
-        } else {
-            const data = settingsDoc.data() || {};
-            const raw = data.gemini;
-            if (!raw) {
-                firestoreReason = 'gemini-field-empty';
-            } else if (String(raw).length <= 5) {
-                firestoreReason = 'gemini-too-short';
-            } else {
-                const key = String(raw).trim();
-                const info = { key, source: 'firestore', suffix: key.slice(-4), length: key.length, firestoreReason: 'ok' };
-                _lastKeyDebug = info;
-                console.log(`🔑 Gemini key kaynagi: firestore (uzunluk=${key.length}, son4=${info.suffix})`);
-                return info;
+        if (settingsDoc.exists) {
+            const raw = settingsDoc.data()?.gemini;
+            if (raw && String(raw).length > 5) {
+                console.log('[gemini] key loaded from firestore');
+                return { key: String(raw).trim(), source: 'firestore' };
             }
         }
-        console.log(`ℹ️ Firestore api_keys/gemini kullanilamadi (sebep=${firestoreReason}), env fallback kullanilacak.`);
-    } catch (err) {
-        firestoreReason = `error: ${err.code || ''} ${err.message || ''}`.trim().slice(0, 120);
-        console.warn('⚠️ Firestore API Key fetch error (env fallback):', firestoreReason);
+    } catch {
+        console.warn('[gemini] firestore key lookup failed; falling back to env');
     }
 
     // 2. Fallback to env
     const envKey = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
     if (envKey && envKey.trim() !== '' && envKey !== 'null' && envKey !== 'undefined') {
-        const key = envKey.trim();
-        const info = { key, source: 'env', suffix: key.slice(-4), length: key.length, firestoreReason };
-        _lastKeyDebug = info;
-        console.log(`🔑 Gemini key kaynagi: env (uzunluk=${key.length}, son4=${info.suffix}, fs=${firestoreReason})`);
-        return info;
+        console.log('[gemini] key loaded from env');
+        return { key: envKey.trim(), source: 'env' };
     }
 
-    console.warn('⚠️ Gemini API key BOTH Firestore AND env eksik.');
-    return { key: null, source: 'none', suffix: '----', length: 0, firestoreReason };
+    console.warn('[gemini] no API key configured (firestore and env both empty)');
+    return { key: null, source: 'none' };
 }
 
 // Backward-compatible string-only wrapper
@@ -1997,10 +1982,6 @@ app.post('/api/ai/generate', aiLimiter, async (req, res) => {
     if (!keyInfo.key) {
         return res.status(503).json({
             error: 'AI servisi kullanılamıyor — API anahtarı yok (Settings → API ekranından kaydedin).',
-            keySource: keyInfo.source,
-            keySuffix: keyInfo.suffix,
-            keyLength: keyInfo.length,
-            firestoreReason: keyInfo.firestoreReason,
         });
     }
 
@@ -2041,13 +2022,9 @@ app.post('/api/ai/generate', aiLimiter, async (req, res) => {
         }
     }
 
-    console.error(`AI Generate Error [key kaynagi=${keyInfo.source}, son4=${keyInfo.suffix}, fs=${keyInfo.firestoreReason}]:`, lastErr?.message);
+    console.error(`[ai/generate] failed (key source=${keyInfo.source}):`, lastErr?.message);
     res.status(500).json({
         error: lastErr?.message || 'AI request failed',
-        keySource: keyInfo.source,
-        keySuffix: keyInfo.suffix,
-        keyLength: keyInfo.length,
-        firestoreReason: keyInfo.firestoreReason,
     });
 });
 

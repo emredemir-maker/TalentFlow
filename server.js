@@ -210,45 +210,34 @@ app.get('/api/health', (req, res) => {
 });
 
 // Load API Key (Priority: Firestore (admin-saved) -> Env)
-// Returns { key, source, suffix, length } so callers can attach diagnostics
-// (which key actually went to Google) into error responses.
+// Returns { key, source } where source is 'firestore' | 'env' | 'none'.
+// We deliberately do NOT expose key length, suffix, or raw firestore error
+// detail to callers — those would leak through logs and HTTP error bodies.
 async function getApiKeyDetailed() {
-    let firestoreReason = 'unknown';
     // 1. Firestore (admin saved via Settings → API & Ses Motoru)
     try {
         const settingsRef = db.doc('artifacts/talent-flow/public/data/settings/api_keys');
         const snap = await settingsRef.get();
-        if (!snap.exists) {
-            firestoreReason = 'doc-not-found';
-        } else {
-            const data = snap.data() || {};
-            const raw = data.gemini;
-            if (!raw) {
-                firestoreReason = 'gemini-field-empty';
-            } else if (String(raw).length <= 5) {
-                firestoreReason = 'gemini-too-short';
-            } else {
-                const key = String(raw).trim();
-                console.log(`🔑 Gemini key kaynagi: firestore (uzunluk=${key.length}, son4=${key.slice(-4)})`);
-                return { key, source: 'firestore', suffix: key.slice(-4), length: key.length, firestoreReason: 'ok' };
+        if (snap.exists) {
+            const raw = snap.data()?.gemini;
+            if (raw && String(raw).length > 5) {
+                console.log('[gemini] key loaded from firestore');
+                return { key: String(raw).trim(), source: 'firestore' };
             }
         }
-        console.log(`Firestore api_keys/gemini kullanilamadi (sebep=${firestoreReason}), env fallback denenecek.`);
-    } catch (err) {
-        firestoreReason = `error: ${err.code || ''} ${err.message || ''}`.trim().slice(0, 120);
-        console.warn('Firestore API Key fetch warning (env fallback):', firestoreReason);
+    } catch {
+        console.warn('[gemini] firestore key lookup failed; falling back to env');
     }
 
     // 2. Fallback to env (Vite convention or standard)
     const envRaw = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
     if (envRaw && envRaw !== 'null' && envRaw !== 'undefined' && envRaw.trim().length > 5) {
-        const key = envRaw.trim();
-        console.log(`🔑 Gemini key kaynagi: env (uzunluk=${key.length}, son4=${key.slice(-4)}, fs=${firestoreReason})`);
-        return { key, source: 'env', suffix: key.slice(-4), length: key.length, firestoreReason };
+        console.log('[gemini] key loaded from env');
+        return { key: envRaw.trim(), source: 'env' };
     }
 
-    console.warn('⚠️ Gemini API Key BOTH Firestore AND env eksik.');
-    return { key: null, source: 'none', suffix: '----', length: 0, firestoreReason };
+    console.warn('[gemini] no API key configured (firestore and env both empty)');
+    return { key: null, source: 'none' };
 }
 
 async function getApiKey() {
@@ -1924,10 +1913,6 @@ app.post('/api/ai/generate', aiLimiter, async (req, res) => {
     if (!keyInfo.key) {
         return res.status(503).json({
             error: 'AI servisi kullanılamıyor — API anahtarı yok (Settings → API ekranından kaydedin).',
-            keySource: keyInfo.source,
-            keySuffix: keyInfo.suffix,
-            keyLength: keyInfo.length,
-            firestoreReason: keyInfo.firestoreReason,
         });
     }
 
@@ -1970,13 +1955,9 @@ app.post('/api/ai/generate', aiLimiter, async (req, res) => {
         }
     }
 
-    console.error(`AI Generate Error [key=${keyInfo.source}/${keyInfo.suffix} fs=${keyInfo.firestoreReason}]:`, lastErr?.message);
+    console.error(`[ai/generate] failed (key source=${keyInfo.source}):`, lastErr?.message);
     res.status(500).json({
         error: lastErr?.message || 'AI request failed',
-        keySource: keyInfo.source,
-        keySuffix: keyInfo.suffix,
-        keyLength: keyInfo.length,
-        firestoreReason: keyInfo.firestoreReason,
     });
 });
 
