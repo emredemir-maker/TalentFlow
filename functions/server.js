@@ -235,6 +235,35 @@ async function verifyFirebaseToken(req, res, next) {
     }
 }
 
+// Auth middleware: verify Firebase ID token + authoritative Firestore role check.
+// Returns an Express middleware. Pass an explicit role list to restrict access:
+//   requireAuth()                          -> any of the default roles (recruiter+)
+//   requireAuth(['super_admin'])           -> super-admin endpoints only
+// Defined here (next to verifyFirebaseToken) so /api/admin/* declarations
+// later in the file can reference it without hitting the const TDZ.
+const ALLOWED_ROLES = ['super_admin', 'recruiter', 'department_user'];
+const requireAuth = (allowedRoles = ALLOWED_ROLES) => async (req, res, next) => {
+    const authHeader = req.headers['authorization'] || '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    if (!token) return res.status(401).json({ error: 'Missing Authorization header.' });
+    try {
+        const decoded = await admin.auth().verifyIdToken(token);
+        // Fetch role from Firestore — JWT custom claims may not carry role
+        const userDoc = await db.doc(`artifacts/talent-flow/public/data/users/${decoded.uid}`).get();
+        if (!userDoc.exists) {
+            return res.status(403).json({ error: 'User profile not found.' });
+        }
+        const role = userDoc.data().role || '';
+        if (!allowedRoles.includes(role)) {
+            return res.status(403).json({ error: 'Insufficient permissions.' });
+        }
+        req.user = { uid: decoded.uid, role };
+        next();
+    } catch {
+        return res.status(401).json({ error: 'Invalid or expired token.' });
+    }
+};
+
 // ── Firestore REST API helpers ─────────────────────────────────────────────────
 const FS_BASE = () => `https://firestore.googleapis.com/v1/projects/${process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID}/databases/(default)/documents`;
 
@@ -1874,33 +1903,6 @@ app.post('/api/applications', async (req, res) => {
         res.status(500).json({ error: 'Başvuru kaydedilemedi.' });
     }
 });
-
-// Auth middleware: verify Firebase ID token + authoritative Firestore role check.
-// Returns an Express middleware. Pass an explicit role list to restrict access:
-//   requireAuth()                          -> any of the default roles (recruiter+)
-//   requireAuth(['super_admin'])           -> super-admin endpoints only
-const ALLOWED_ROLES = ['super_admin', 'recruiter', 'department_user'];
-const requireAuth = (allowedRoles = ALLOWED_ROLES) => async (req, res, next) => {
-    const authHeader = req.headers['authorization'] || '';
-    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-    if (!token) return res.status(401).json({ error: 'Missing Authorization header.' });
-    try {
-        const decoded = await admin.auth().verifyIdToken(token);
-        // Fetch role from Firestore — JWT custom claims may not carry role
-        const userDoc = await db.doc(`artifacts/talent-flow/public/data/users/${decoded.uid}`).get();
-        if (!userDoc.exists) {
-            return res.status(403).json({ error: 'User profile not found.' });
-        }
-        const role = userDoc.data().role || '';
-        if (!allowedRoles.includes(role)) {
-            return res.status(403).json({ error: 'Insufficient permissions.' });
-        }
-        req.user = { uid: decoded.uid, role };
-        next();
-    } catch {
-        return res.status(401).json({ error: 'Invalid or expired token.' });
-    }
-};
 
 // GET /api/users — List participant-eligible users for interview wizard
 // Only recruiter / department_user / super_admin accounts are returned.
