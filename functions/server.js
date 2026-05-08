@@ -1,6 +1,5 @@
 // server.js - Backend API for Web Scraper (ESM Version)
 import express from 'express';
-import cors from 'cors';
 import puppeteer from 'puppeteer';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import nodemailer from 'nodemailer';
@@ -9,9 +8,6 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
-import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
-import hpp from 'hpp';
 
 // Load .env if present (dev). In production (Cloud Functions runtime) secrets
 // are injected from functions/.env.production at deploy time — no file needed.
@@ -26,6 +22,12 @@ import { db, admin } from './config/firebaseAdmin.js';
 // and exposes them as a live, mutable object. Importing the module also kicks
 // off the deferred initial fetch.
 import { integrationConfigs } from './config/integrations.js';
+
+// Middleware modules — moved out of this file for separation of concerns.
+import { generalLimiter, aiLimiter, sessionLimiter } from './middleware/rateLimit.js';
+import { corsMiddleware } from './middleware/cors.js';
+import { helmetMiddleware, hppMiddleware } from './middleware/security.js';
+import { verifyFirebaseToken, requireAuth } from './middleware/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -104,100 +106,11 @@ const upload = multer({
 
 const app = express();
 
-const allowedOrigins = [
-    'http://localhost:5173',
-    'http://localhost:5174',
-    'http://localhost:5000',
-    'http://127.0.0.1:5173',
-    'http://127.0.0.1:5174',
-    'http://127.0.0.1:5000',
-    'http://localhost:3000',
-    process.env.VITE_APP_URL,
-    process.env.APP_URL
-].filter(Boolean);
-
-// Whitelist Replit dynamic preview domains (*.replit.dev / *.replit.app /
-// *.pike.replit.dev) plus Firebase Hosting (*.web.app, *.firebaseapp.com)
-// in addition to the explicit list above.
-const isAllowedOrigin = (origin) => {
-    if (!origin) return true; // curl / mobile / server-to-server
-    if (allowedOrigins.includes(origin)) return true;
-    if (/^https:\/\/.*\.replit\.dev$/.test(origin)) return true;
-    if (/^https:\/\/.*\.replit\.app$/.test(origin)) return true;
-    if (/^https:\/\/.*\.pike\.replit\.dev$/.test(origin)) return true;
-    if (/^https:\/\/.*\.web\.app$/.test(origin)) return true;
-    if (/^https:\/\/.*\.firebaseapp\.com$/.test(origin)) return true;
-    return false;
-};
-
-// Rate limiters — declared up front so app.use(generalLimiter) below sees a
-// defined value (these are `const`, so referencing them before the line they
-// appear on would hit the temporal dead zone).
-//   generalLimiter: blanket 200 req / 15 min — applied globally below.
-//   aiLimiter:      20 req / min — gates Gemini-backed routes (/api/ai/*, /scrape, /process-cv).
-//   sessionLimiter: 60 req / min — for the public live-interview heartbeat
-//                                  endpoints; tight enough to block sessionId
-//                                  enumeration, loose enough for normal polling.
-const generalLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 200,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { error: 'Çok fazla istek gönderildi. Lütfen 15 dakika sonra tekrar deneyin.' }
-});
-
-const aiLimiter = rateLimit({
-    windowMs: 60 * 1000,
-    max: 20,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { error: 'AI istek limiti aşıldı. Lütfen 1 dakika sonra tekrar deneyin.' },
-});
-
-const sessionLimiter = rateLimit({
-    windowMs: 60 * 1000,
-    max: 60,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { error: 'Çok fazla oturum sorgusu. Lütfen bekleyin.' }
-});
-
-// --- Security Middlewares ---
-// CSP runs in report-only mode for now: violations are logged but not blocked.
-// This lets us collect real-world violations (Spline 3D viewer, Recharts inline
-// styles, Firebase JS SDK calls, Google Identity Toolkit, etc.) before flipping
-// to enforce mode in a follow-up phase. The directive list intentionally errs
-// on the permissive side for first-party + the known third parties this app
-// already calls; tighten once the violation report is empty in production.
-app.use(helmet({
-    contentSecurityPolicy: {
-        reportOnly: true,
-        directives: {
-            defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://apis.google.com", "https://www.googletagmanager.com"],
-            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-            fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
-            imgSrc: ["'self'", "data:", "blob:", "https:"],
-            connectSrc: [
-                "'self'",
-                "https://*.googleapis.com",
-                "https://*.firebaseio.com",
-                "https://*.cloudfunctions.net",
-                "https://*.firebaseapp.com",
-                "https://identitytoolkit.googleapis.com",
-                "https://securetoken.googleapis.com",
-                "https://generativelanguage.googleapis.com",
-                "https://prod.spline.design",
-                "wss://*.firebaseio.com",
-            ],
-            frameSrc: ["'self'", "https://*.firebaseapp.com", "https://accounts.google.com"],
-            workerSrc: ["'self'", "blob:"],
-            objectSrc: ["'none'"],
-            baseUri: ["'self'"],
-        },
-    },
-}));
-app.use(hpp());
+// --- Security & infra middleware chain ---
+// (helmet+CSP, hpp, trust-proxy, cors, json body parser, global rate limit)
+// All concrete configuration lives in middleware/{security,cors,rateLimit}.js.
+app.use(helmetMiddleware);
+app.use(hppMiddleware);
 
 // Trust the first reverse-proxy hop (Cloud Functions / Replit ingress sets
 // X-Forwarded-For). Without this, express-rate-limit keys on the proxy IP
@@ -205,18 +118,7 @@ app.use(hpp());
 // legitimate users en masse during an attack.
 app.set('trust proxy', 1);
 
-app.use(cors({
-    origin: (origin, callback) => {
-        if (isAllowedOrigin(origin)) {
-            callback(null, true);
-        } else {
-            console.warn(`🛑 Blocked CORS request from: ${origin}`);
-            callback(new Error('CORS Policy: Not allowed origin'));
-        }
-    },
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    credentials: true
-}));
+app.use(corsMiddleware);
 app.use(express.json({ limit: '5mb' }));
 app.use(generalLimiter);
 
@@ -243,57 +145,6 @@ function isSafeLinkedInUrl(input) {
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-
-async function verifyFirebaseToken(req, res, next) {
-    const authHeader = req.headers.authorization || '';
-    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
-    if (!token) return res.status(401).json({ error: 'Kimlik doğrulama gereklidir.' });
-    const apiKey = process.env.VITE_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY;
-    if (!apiKey) {
-        console.error('[verifyFirebaseToken] Firebase API key not configured — rejecting request.');
-        return res.status(500).json({ error: 'Sunucu yapılandırma hatası.' });
-    }
-    try {
-        const resp = await fetch(
-            `https://www.googleapis.com/identitytoolkit/v3/relyingparty/getAccountInfo?key=${apiKey}`,
-            { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken: token }) }
-        );
-        if (!resp.ok) return res.status(401).json({ error: 'Geçersiz kimlik bilgileri.' });
-        req.firebaseToken = token;
-        return next();
-    } catch {
-        return res.status(401).json({ error: 'Kimlik doğrulama başarısız.' });
-    }
-}
-
-// Auth middleware: verify Firebase ID token + authoritative Firestore role check.
-// Returns an Express middleware. Pass an explicit role list to restrict access:
-//   requireAuth()                          -> any of the default roles (recruiter+)
-//   requireAuth(['super_admin'])           -> super-admin endpoints only
-// Defined here (next to verifyFirebaseToken) so /api/admin/* declarations
-// later in the file can reference it without hitting the const TDZ.
-const ALLOWED_ROLES = ['super_admin', 'recruiter', 'department_user'];
-const requireAuth = (allowedRoles = ALLOWED_ROLES) => async (req, res, next) => {
-    const authHeader = req.headers['authorization'] || '';
-    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-    if (!token) return res.status(401).json({ error: 'Missing Authorization header.' });
-    try {
-        const decoded = await admin.auth().verifyIdToken(token);
-        // Fetch role from Firestore — JWT custom claims may not carry role
-        const userDoc = await db.doc(`artifacts/talent-flow/public/data/users/${decoded.uid}`).get();
-        if (!userDoc.exists) {
-            return res.status(403).json({ error: 'User profile not found.' });
-        }
-        const role = userDoc.data().role || '';
-        if (!allowedRoles.includes(role)) {
-            return res.status(403).json({ error: 'Insufficient permissions.' });
-        }
-        req.user = { uid: decoded.uid, role };
-        next();
-    } catch {
-        return res.status(401).json({ error: 'Invalid or expired token.' });
-    }
-};
 
 // ── Firestore REST API helpers ─────────────────────────────────────────────────
 const FS_BASE = () => `https://firestore.googleapis.com/v1/projects/${process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID}/databases/(default)/documents`;
