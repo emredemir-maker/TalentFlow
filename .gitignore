@@ -31,3 +31,15 @@ dist-ssr
 chrome-session/
 uploads/
 .agents/
+
+# Lint / debug output artifacts (re-generated locally; should not be committed)
+eslint*.json
+!eslint.config.js
+lint*.txt
+eslint_output*.txt
+eslint_out.txt
+
+# Temporary diagnostic dumps
+tmp_*
+*.tmp
+error.txt
