@@ -78,21 +78,9 @@ jobs:
         run: firebase deploy --only hosting,functions,firestore --project talentflow-84bb6
         env:
           GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcp-sa.json
-
-      - name: Set Cloud Run env vars (guaranteed delivery)
-        run: |
-          gcloud auth activate-service-account --key-file=/tmp/gcp-sa.json
-          gcloud config set project talentflow-84bb6
-          # Inject env vars. Use ^|^ delimiter to handle commas/spaces safely.
-          # NOTE: Cloud Run service account stays as default (compute SA). The compute SA
-          # has 'roles/datastore.user' granted manually via IAM console, so admin SDK
-          # can read Firestore (api_keys doc, etc.) without needing to switch SA.
-          gcloud run services update api \
-            --region us-central1 \
-            --update-env-vars "^|^EMAIL_USER=${EMAIL_USER}|EMAIL_PASS=${EMAIL_PASS}|VITE_GEMINI_API_KEY=${VITE_GEMINI_API_KEY}|VITE_FIREBASE_API_KEY=${VITE_FIREBASE_API_KEY}"
-          echo "✅ Cloud Run env vars set"
-        env:
-          EMAIL_USER: ${{ secrets.EMAIL_USER }}
-          EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
-          VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
-          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+        # Env vars are picked up automatically from functions/.env.production (created
+        # in the "Create functions/.env.production" step above). Firebase Functions v2
+        # injects them into the Cloud Run revision during deploy — no manual gcloud
+        # run services update is needed. The previous manual step referenced a fixed
+        # image tag (api:version_1) that Firebase no longer produces, causing CI
+        # failures while the actual deploy had already succeeded.
