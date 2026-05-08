@@ -32,9 +32,6 @@ const AuthContext = createContext(null);
 const USERS_PATH = 'artifacts/talent-flow/public/data/users';
 const INVITATIONS_PATH = 'artifacts/talent-flow/public/data/invitations';
 
-// List of emails that get super_admin status automatically on their first login
-const INITIAL_SUPER_ADMINS = ['emre.demir@infoset.app'];
-
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
     const [userProfile, setUserProfile] = useState(null); // { role, status, etc }
@@ -112,7 +109,6 @@ export function AuthProvider({ children }) {
             try {
                 const emailLower = currentUser.email.toLowerCase();
                 const emailDomain = emailLower.split('@')[1] || '';
-                const isPrimaryAdmin = INITIAL_SUPER_ADMINS.includes(emailLower);
 
                 // Safety check for user doc
                 const userDocRef = doc(db, USERS_PATH, currentUser.uid);
@@ -131,19 +127,7 @@ export function AuthProvider({ children }) {
 
                 const isDomainAllowed = allowedDomains.includes(emailDomain);
 
-                if (isPrimaryAdmin) {
-                    const firstProfile = {
-                        uid: currentUser.uid,
-                        email: emailLower,
-                        displayName: currentUser.displayName || emailLower.split('@')[0],
-                        photoURL: currentUser.photoURL || '',
-                        role: 'super_admin',
-                        status: 'active',
-                        createdAt: serverTimestamp()
-                    };
-                    await setDoc(userDocRef, firstProfile);
-                    setUserProfile(firstProfile);
-                } else if (isDomainAllowed) {
+                if (isDomainAllowed) {
                     // Domain whitelist bypass — automatically allow as recruiter
                     const domainProfile = {
                         uid: currentUser.uid,
@@ -251,10 +235,11 @@ export function AuthProvider({ children }) {
         let _invitation = null;
         let _emailLower = '';
         try {
-            // 1. Check if invitation exists OR is primary admin
+            // 1. Check if invitation exists or domain is allow-listed.
+            // Super-admin bootstrapping is no longer hard-coded by email;
+            // run scripts/grant-super-admin.mjs after the account exists.
             _emailLower = email.trim().toLowerCase();
             const emailLower = _emailLower;
-            const isPrimaryAdmin = INITIAL_SUPER_ADMINS.includes(emailLower);
 
             // Check allowed domains
             const emailDomain = emailLower.split('@')[1] || '';
@@ -283,13 +268,13 @@ export function AuthProvider({ children }) {
                 }
             } catch (snapErr) {
                 console.error("[Registration] Invitation check failed:", snapErr);
-                if (!isPrimaryAdmin && !isDomainAllowed) {
+                if (!isDomainAllowed) {
                     throw new Error(`Davetiye kontrolü başarısız: ${snapErr.message}`);
                 }
             }
 
-            if (!invitation && !isPrimaryAdmin && !isDomainAllowed) {
-                console.warn(`[Registration] No invitation and not primary admin or allowed domain.`);
+            if (!invitation && !isDomainAllowed) {
+                console.warn(`[Registration] No invitation and domain not allow-listed.`);
                 throw new Error("Geçerli bir davetiyeniz bulunmuyor. Lütfen administratörden davet isteyeniz.");
             }
 
@@ -309,7 +294,7 @@ export function AuthProvider({ children }) {
                 email: newUser.email,
                 displayName: name,
                 photoURL: '',
-                role: isPrimaryAdmin ? 'super_admin' : (invitation?.role || 'recruiter'),
+                role: invitation?.role || 'recruiter',
                 departments: invitation?.departments ? invitation.departments : (invitation?.department ? [invitation.department] : [] ),
                 status: 'active',
                 createdAt: serverTimestamp()

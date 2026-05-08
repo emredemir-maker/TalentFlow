@@ -149,8 +149,39 @@ const isAllowedOrigin = (origin) => {
 };
 
 // --- Security Middlewares ---
+// CSP runs in report-only mode for now: violations are logged but not blocked.
+// This lets us collect real-world violations (Spline 3D viewer, Recharts inline
+// styles, Firebase JS SDK calls, Google Identity Toolkit, etc.) before flipping
+// to enforce mode in a follow-up phase. The directive list intentionally errs
+// on the permissive side for first-party + the known third parties this app
+// already calls; tighten once the violation report is empty in production.
 app.use(helmet({
-    contentSecurityPolicy: false,
+    contentSecurityPolicy: {
+        reportOnly: true,
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://apis.google.com", "https://www.googletagmanager.com"],
+            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+            fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
+            imgSrc: ["'self'", "data:", "blob:", "https:"],
+            connectSrc: [
+                "'self'",
+                "https://*.googleapis.com",
+                "https://*.firebaseio.com",
+                "https://*.cloudfunctions.net",
+                "https://*.firebaseapp.com",
+                "https://identitytoolkit.googleapis.com",
+                "https://securetoken.googleapis.com",
+                "https://generativelanguage.googleapis.com",
+                "https://prod.spline.design",
+                "wss://*.firebaseio.com",
+            ],
+            frameSrc: ["'self'", "https://*.firebaseapp.com", "https://accounts.google.com"],
+            workerSrc: ["'self'", "blob:"],
+            objectSrc: ["'none'"],
+            baseUri: ["'self'"],
+        },
+    },
 }));
 app.use(hpp());
 
@@ -209,46 +240,49 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
+// SSRF guard for puppeteer scraping. Allow only https URLs whose hostname is
+// linkedin.com (apex or subdomain). Reject raw IPs and IPv6 literals so an
+// attacker cannot pivot through /api/scrape to internal services or the
+// cloud metadata endpoint (169.254.169.254).
+function isSafeLinkedInUrl(input) {
+    if (typeof input !== 'string' || input.length > 2048) return false;
+    let parsed;
+    try { parsed = new URL(input); } catch { return false; }
+    if (parsed.protocol !== 'https:') return false;
+    const host = parsed.hostname.toLowerCase();
+    if (/^[\d.]+$/.test(host) || host.includes(':')) return false;
+    return host === 'linkedin.com' || host.endsWith('.linkedin.com');
+}
+
 // Load API Key (Priority: Firestore (admin-saved) -> Env)
-// Returns { key, source, suffix, length } so callers can attach diagnostics
-// (which key actually went to Google) into error responses.
+// Returns { key, source } where source is 'firestore' | 'env' | 'none'.
+// We deliberately do NOT expose key length, suffix, or raw firestore error
+// detail to callers — those would leak through logs and HTTP error bodies.
 async function getApiKeyDetailed() {
-    let firestoreReason = 'unknown';
     // 1. Firestore (admin saved via Settings → API & Ses Motoru)
     try {
         const settingsRef = db.doc('artifacts/talent-flow/public/data/settings/api_keys');
         const snap = await settingsRef.get();
-        if (!snap.exists) {
-            firestoreReason = 'doc-not-found';
-        } else {
-            const data = snap.data() || {};
-            const raw = data.gemini;
-            if (!raw) {
-                firestoreReason = 'gemini-field-empty';
-            } else if (String(raw).length <= 5) {
-                firestoreReason = 'gemini-too-short';
-            } else {
-                const key = String(raw).trim();
-                console.log(`🔑 Gemini key kaynagi: firestore (uzunluk=${key.length}, son4=${key.slice(-4)})`);
-                return { key, source: 'firestore', suffix: key.slice(-4), length: key.length, firestoreReason: 'ok' };
+        if (snap.exists) {
+            const raw = snap.data()?.gemini;
+            if (raw && String(raw).length > 5) {
+                console.log('[gemini] key loaded from firestore');
+                return { key: String(raw).trim(), source: 'firestore' };
             }
         }
-        console.log(`Firestore api_keys/gemini kullanilamadi (sebep=${firestoreReason}), env fallback denenecek.`);
-    } catch (err) {
-        firestoreReason = `error: ${err.code || ''} ${err.message || ''}`.trim().slice(0, 120);
-        console.warn('Firestore API Key fetch warning (env fallback):', firestoreReason);
+    } catch {
+        console.warn('[gemini] firestore key lookup failed; falling back to env');
     }
 
     // 2. Fallback to env (Vite convention or standard)
     const envRaw = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
     if (envRaw && envRaw !== 'null' && envRaw !== 'undefined' && envRaw.trim().length > 5) {
-        const key = envRaw.trim();
-        console.log(`🔑 Gemini key kaynagi: env (uzunluk=${key.length}, son4=${key.slice(-4)}, fs=${firestoreReason})`);
-        return { key, source: 'env', suffix: key.slice(-4), length: key.length, firestoreReason };
+        console.log('[gemini] key loaded from env');
+        return { key: envRaw.trim(), source: 'env' };
     }
 
-    console.warn('⚠️ Gemini API Key BOTH Firestore AND env eksik.');
-    return { key: null, source: 'none', suffix: '----', length: 0, firestoreReason };
+    console.warn('[gemini] no API key configured (firestore and env both empty)');
+    return { key: null, source: 'none' };
 }
 
 async function getApiKey() {
@@ -309,10 +343,14 @@ app.get('/api/scrape', aiLimiter, async (req, res) => {
     console.log(`🔍 Received Request: "${query}"`);
     const isVisual = req.query.visual === 'true';
 
-    // Check if the query is a direct LinkedIn/Sales Navigator URL
-    if (query.includes('linkedin.com')) {
+    // If the query parses as a URL, only allow https://*.linkedin.com hostnames.
+    // Anything that looks URL-ish but is not a safe LinkedIn URL is rejected to
+    // prevent SSRF (e.g., http://169.254.169.254, http://localhost, raw IPs).
+    if (/^https?:\/\//i.test(query)) {
+        if (!isSafeLinkedInUrl(query)) {
+            return res.status(400).json({ error: 'Yalnızca https LinkedIn URL\'lerine izin verilir.' });
+        }
         console.log('🔗 Direct URL detected. Jumping straight to profile...');
-        // We'll define this helper function or handle it inline
         return await handleDirectUrl(query, res, isVisual);
     }
 
@@ -1057,6 +1095,35 @@ async function verifyFirebaseToken(req, res, next) {
     }
 }
 
+// Auth middleware: verify Firebase ID token + authoritative Firestore role check.
+// Returns an Express middleware. Pass an explicit role list to restrict access:
+//   requireAuth()                          -> any of the default roles (recruiter+)
+//   requireAuth(['super_admin'])           -> super-admin endpoints only
+// Defined here (next to verifyFirebaseToken) so /api/admin/* declarations
+// later in the file can reference it without hitting the const TDZ.
+const ALLOWED_ROLES = ['super_admin', 'recruiter', 'department_user'];
+const requireAuth = (allowedRoles = ALLOWED_ROLES) => async (req, res, next) => {
+    const authHeader = req.headers['authorization'] || '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    if (!token) return res.status(401).json({ error: 'Missing Authorization header.' });
+    try {
+        const decoded = await admin.auth().verifyIdToken(token);
+        // Fetch role from Firestore — JWT custom claims may not carry role
+        const userDoc = await db.doc(`artifacts/talent-flow/public/data/users/${decoded.uid}`).get();
+        if (!userDoc.exists) {
+            return res.status(403).json({ error: 'User profile not found.' });
+        }
+        const role = userDoc.data().role || '';
+        if (!allowedRoles.includes(role)) {
+            return res.status(403).json({ error: 'Insufficient permissions.' });
+        }
+        req.user = { uid: decoded.uid, role };
+        next();
+    } catch {
+        return res.status(401).json({ error: 'Invalid or expired token.' });
+    }
+};
+
 // ── Firestore REST API helpers (avoid Admin SDK GCP auth issues in dev) ────────
 const FS_BASE = () => `https://firestore.googleapis.com/v1/projects/${process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID}/databases/(default)/documents`;
 
@@ -1269,7 +1336,7 @@ app.post('/api/google/create-calendar-event', async (req, res) => {
 // ─── Admin Integration Config ──────────────────────────────────────────────────
 
 // GET /api/admin/integrations — returns current configs (secrets redacted)
-app.get('/api/admin/integrations', verifyFirebaseToken, async (req, res) => {
+app.get('/api/admin/integrations', requireAuth(['super_admin']), async (req, res) => {
     try {
         const snap = await fsGet('artifacts/talent-flow/public/data/settings/integrations', req.firebaseToken);
         if (!snap) return res.json({ microsoft365: null });
@@ -1295,7 +1362,7 @@ app.get('/api/admin/integrations', verifyFirebaseToken, async (req, res) => {
 });
 
 // DELETE /api/admin/auth-user/:uid — Firebase Auth kullanıcısını siler (super_admin only)
-app.delete('/api/admin/auth-user/:uid', verifyFirebaseToken, async (req, res) => {
+app.delete('/api/admin/auth-user/:uid', requireAuth(['super_admin']), async (req, res) => {
     try {
         const { uid } = req.params;
         if (!uid) return res.status(400).json({ error: 'uid gerekli' });
@@ -1313,7 +1380,7 @@ app.delete('/api/admin/auth-user/:uid', verifyFirebaseToken, async (req, res) =>
 });
 
 // POST /api/admin/integrations — save/update an integration config
-app.post('/api/admin/integrations', verifyFirebaseToken, async (req, res) => {
+app.post('/api/admin/integrations', requireAuth(['super_admin']), async (req, res) => {
     try {
         const { provider, config } = req.body;
         if (!provider || !config) return res.status(400).json({ error: 'provider and config required' });
@@ -1924,10 +1991,6 @@ app.post('/api/ai/generate', aiLimiter, async (req, res) => {
     if (!keyInfo.key) {
         return res.status(503).json({
             error: 'AI servisi kullanılamıyor — API anahtarı yok (Settings → API ekranından kaydedin).',
-            keySource: keyInfo.source,
-            keySuffix: keyInfo.suffix,
-            keyLength: keyInfo.length,
-            firestoreReason: keyInfo.firestoreReason,
         });
     }
 
@@ -1970,13 +2033,9 @@ app.post('/api/ai/generate', aiLimiter, async (req, res) => {
         }
     }
 
-    console.error(`AI Generate Error [key=${keyInfo.source}/${keyInfo.suffix} fs=${keyInfo.firestoreReason}]:`, lastErr?.message);
+    console.error(`[ai/generate] failed (key source=${keyInfo.source}):`, lastErr?.message);
     res.status(500).json({
         error: lastErr?.message || 'AI request failed',
-        keySource: keyInfo.source,
-        keySuffix: keyInfo.suffix,
-        keyLength: keyInfo.length,
-        firestoreReason: keyInfo.firestoreReason,
     });
 });
 
@@ -2324,30 +2383,6 @@ async function executeJob(jobId) {
     }
 }
 
-// Auth middleware: verify Firebase ID token + authoritative Firestore role check
-const ALLOWED_ROLES = ['super_admin', 'recruiter', 'department_user'];
-const requireAuth = async (req, res, next) => {
-    const authHeader = req.headers['authorization'] || '';
-    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-    if (!token) return res.status(401).json({ error: 'Missing Authorization header.' });
-    try {
-        const decoded = await admin.auth().verifyIdToken(token);
-        // Fetch role from Firestore — JWT custom claims may not carry role
-        const userDoc = await db.doc(`artifacts/talent-flow/public/data/users/${decoded.uid}`).get();
-        if (!userDoc.exists) {
-            return res.status(403).json({ error: 'User profile not found.' });
-        }
-        const role = userDoc.data().role || '';
-        if (!ALLOWED_ROLES.includes(role)) {
-            return res.status(403).json({ error: 'Insufficient permissions.' });
-        }
-        req.user = { uid: decoded.uid, role };
-        next();
-    } catch (err) {
-        return res.status(401).json({ error: 'Invalid or expired token.' });
-    }
-};
-
 // ─── POST /api/bulk-import ────────────────────────────────────────────────────
 // Accepts:
 //   A) multipart/form-data with field 'cvs': PDF, DOCX, or ZIP (containing PDF/DOCX)
@@ -2376,7 +2411,7 @@ const bulkUpload = multer({
     },
 });
 
-app.post('/api/bulk-import', requireAuth, bulkUpload.array('cvs', 20), async (req, res) => {
+app.post('/api/bulk-import', requireAuth(), bulkUpload.array('cvs', 20), async (req, res) => {
     try {
         const positionId = req.body?.positionId || '';
         const positionTitle = req.body?.positionTitle || '';
@@ -2493,7 +2528,7 @@ app.post('/api/bulk-import', requireAuth, bulkUpload.array('cvs', 20), async (re
 });
 
 // ─── GET /api/bulk-import/:jobId ─────────────────────────────────────────────
-app.get('/api/bulk-import/:jobId', requireAuth, async (req, res) => {
+app.get('/api/bulk-import/:jobId', requireAuth(), async (req, res) => {
     try {
         const snap = await db.doc(`${BULK_JOBS_COLL}/${req.params.jobId}`).get();
         if (!snap.exists) return res.status(404).json({ error: 'Job bulunamadı.' });
@@ -2642,7 +2677,7 @@ app.post('/api/check-duplicate', async (req, res) => {
 // Only recruiter / department_user / super_admin accounts are returned.
 // Minimal fields to reduce unnecessary data exposure.
 const PARTICIPANT_ROLES = ['super_admin', 'recruiter', 'department_user'];
-app.get('/api/users', requireAuth, async (req, res) => {
+app.get('/api/users', requireAuth(), async (req, res) => {
     try {
         const snap = await db.collection('artifacts/talent-flow/public/data/users').get();
         const users = [];
@@ -2687,7 +2722,7 @@ const localToUTC = (dateStr, timeStr, timezone) => {
 };
 
 // POST /api/users/availability — Check Google Calendar free/busy for multiple platform users
-app.post('/api/users/availability', requireAuth, async (req, res) => {
+app.post('/api/users/availability', requireAuth(), async (req, res) => {
     const { userIds, date, time, timezone } = req.body;
     if (!Array.isArray(userIds) || !date || !time) {
         return res.status(400).json({ error: 'userIds[], date, and time are required.' });
@@ -2726,6 +2761,11 @@ app.post('/api/send-info-request', generalLimiter, verifyFirebaseToken, async (r
     const { to, candidateName, recruiterName, recruiterEmail, position, requestMessage, requestedItems, sessionId, candidateId, branding, requestId: clientRequestId, respondUrl: clientRespondUrl } = req.body;
     if (!to || !candidateName) return res.status(400).json({ error: 'Email ve aday adı gereklidir.' });
     if (!EMAIL_RE.test(to)) return res.status(400).json({ error: 'Geçersiz email adresi.' });
+    // recruiterEmail flows into the SMTP `replyTo` header, so reject anything
+    // that isn't a clean address (incl. CRLF that could splice extra headers).
+    if (recruiterEmail && (!EMAIL_RE.test(recruiterEmail) || /[\r\n]/.test(recruiterEmail))) {
+        return res.status(400).json({ error: 'Geçersiz recruiter email adresi.' });
+    }
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
         return res.status(500).json({ error: 'Sistem email yapılandırması eksik.' });
     }
