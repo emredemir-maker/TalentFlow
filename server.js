@@ -2725,6 +2725,11 @@ app.post('/api/send-info-request', generalLimiter, verifyFirebaseToken, async (r
     const { to, candidateName, recruiterName, recruiterEmail, position, requestMessage, requestedItems, sessionId, candidateId, branding, requestId: clientRequestId, respondUrl: clientRespondUrl } = req.body;
     if (!to || !candidateName) return res.status(400).json({ error: 'Email ve aday adı gereklidir.' });
     if (!EMAIL_RE.test(to)) return res.status(400).json({ error: 'Geçersiz email adresi.' });
+    // recruiterEmail flows into the SMTP `replyTo` header, so reject anything
+    // that isn't a clean address (incl. CRLF that could splice extra headers).
+    if (recruiterEmail && (!EMAIL_RE.test(recruiterEmail) || /[\r\n]/.test(recruiterEmail))) {
+        return res.status(400).json({ error: 'Geçersiz recruiter email adresi.' });
+    }
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
         return res.status(500).json({ error: 'Sistem email yapılandırması eksik.' });
     }
