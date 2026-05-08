@@ -1180,7 +1180,7 @@ app.post('/api/google/create-calendar-event', async (req, res) => {
 });
 
 // DELETE /api/admin/auth-user/:uid — Firebase Auth kullanıcısını siler (super_admin only)
-app.delete('/api/admin/auth-user/:uid', verifyFirebaseToken, async (req, res) => {
+app.delete('/api/admin/auth-user/:uid', requireAuth(['super_admin']), async (req, res) => {
     try {
         const { uid } = req.params;
         if (!uid) return res.status(400).json({ error: 'uid gerekli' });
@@ -1197,7 +1197,7 @@ app.delete('/api/admin/auth-user/:uid', verifyFirebaseToken, async (req, res) =>
 
 // ─── Admin Integration Config ──────────────────────────────────────────────────
 
-app.get('/api/admin/integrations', verifyFirebaseToken, async (req, res) => {
+app.get('/api/admin/integrations', requireAuth(['super_admin']), async (req, res) => {
     try {
         const snap = await fsGet('artifacts/talent-flow/public/data/settings/integrations', req.firebaseToken);
         if (!snap) return res.json({ microsoft365: null });
@@ -1222,7 +1222,7 @@ app.get('/api/admin/integrations', verifyFirebaseToken, async (req, res) => {
     }
 });
 
-app.post('/api/admin/integrations', verifyFirebaseToken, async (req, res) => {
+app.post('/api/admin/integrations', requireAuth(['super_admin']), async (req, res) => {
     try {
         const { provider, config } = req.body;
         if (!provider || !config) return res.status(400).json({ error: 'provider and config required' });
@@ -1842,9 +1842,12 @@ app.post('/api/applications', async (req, res) => {
     }
 });
 
-// Auth middleware: verify Firebase ID token + authoritative Firestore role check
+// Auth middleware: verify Firebase ID token + authoritative Firestore role check.
+// Returns an Express middleware. Pass an explicit role list to restrict access:
+//   requireAuth()                          -> any of the default roles (recruiter+)
+//   requireAuth(['super_admin'])           -> super-admin endpoints only
 const ALLOWED_ROLES = ['super_admin', 'recruiter', 'department_user'];
-const requireAuth = async (req, res, next) => {
+const requireAuth = (allowedRoles = ALLOWED_ROLES) => async (req, res, next) => {
     const authHeader = req.headers['authorization'] || '';
     const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
     if (!token) return res.status(401).json({ error: 'Missing Authorization header.' });
@@ -1856,12 +1859,12 @@ const requireAuth = async (req, res, next) => {
             return res.status(403).json({ error: 'User profile not found.' });
         }
         const role = userDoc.data().role || '';
-        if (!ALLOWED_ROLES.includes(role)) {
+        if (!allowedRoles.includes(role)) {
             return res.status(403).json({ error: 'Insufficient permissions.' });
         }
         req.user = { uid: decoded.uid, role };
         next();
-    } catch (err) {
+    } catch {
         return res.status(401).json({ error: 'Invalid or expired token.' });
     }
 };
@@ -1870,7 +1873,7 @@ const requireAuth = async (req, res, next) => {
 // Only recruiter / department_user / super_admin accounts are returned.
 // Minimal fields to reduce unnecessary data exposure.
 const PARTICIPANT_ROLES = ['super_admin', 'recruiter', 'department_user'];
-app.get('/api/users', requireAuth, async (req, res) => {
+app.get('/api/users', requireAuth(), async (req, res) => {
     try {
         const snap = await db.collection('artifacts/talent-flow/public/data/users').get();
         const users = [];
@@ -1913,7 +1916,7 @@ const localToUTC = (dateStr, timeStr, timezone) => {
 };
 
 // POST /api/users/availability — Check Google Calendar free/busy for multiple platform users
-app.post('/api/users/availability', requireAuth, async (req, res) => {
+app.post('/api/users/availability', requireAuth(), async (req, res) => {
     const { userIds, date, time, timezone } = req.body;
     if (!Array.isArray(userIds) || !date || !time) {
         return res.status(400).json({ error: 'userIds[], date, and time are required.' });
@@ -2388,7 +2391,7 @@ const bulkUpload = multer({
     },
 });
 
-app.post('/api/bulk-import', requireAuth, bulkUpload.array('cvs', 20), async (req, res) => {
+app.post('/api/bulk-import', requireAuth(), bulkUpload.array('cvs', 20), async (req, res) => {
     try {
         const positionId = req.body?.positionId || '';
         const positionTitle = req.body?.positionTitle || '';
@@ -2477,7 +2480,7 @@ app.post('/api/bulk-import', requireAuth, bulkUpload.array('cvs', 20), async (re
     }
 });
 
-app.get('/api/bulk-import/:jobId', requireAuth, async (req, res) => {
+app.get('/api/bulk-import/:jobId', requireAuth(), async (req, res) => {
     try {
         const snap = await db.doc(`${BULK_JOBS_COLL}/${req.params.jobId}`).get();
         if (!snap.exists) return res.status(404).json({ error: 'Job bulunamadı.' });
