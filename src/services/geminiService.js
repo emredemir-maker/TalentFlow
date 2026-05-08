@@ -90,7 +90,9 @@ Sadece şu JSON formatında dön:
 
     const prompt = buildStructuredPrompt(instruction, { "PROFIL_METNI": sanitizeForPrompt(safeText, 20000) });
     const model = await getModel(modelId);
-    const result = await model.generateContent(prompt);
+    // Long CVs produce long structured JSON (cvData + multi-entry experiences).
+    // Default 8k cap was truncating the output mid-string and breaking JSON.parse.
+    const result = await model.generateContent(prompt, { maxOutputTokens: 32768 });
     const parsed = parseAIJson(result.response.text());
     // Merge regex-extracted contact info so the record is complete
     // without having leaked PII to the AI model.
@@ -131,7 +133,9 @@ Sadece şu JSON formatında dön (başka hiçbir şey yazma):
         .replace(/(?:https?:\/\/)?(?:www\.)?github\.com\/[\w\-]+/gi, '[GITHUB]');
     const prompt = buildStructuredPrompt(instruction, { "CV_METNI": sanitizeForPrompt(structuralSafeText, 15000) });
     const model = await getModel(modelId);
-    const result = await model.generateContent(prompt);
+    // Same rationale as parseCandidateFromText: long CVs blow past the
+    // 8k default and the structured array gets truncated mid-entry.
+    const result = await model.generateContent(prompt, { maxOutputTokens: 32768 });
     const raw = result.response.text().replace(/```json|```/gi, '').trim();
     try {
         const arr = JSON.parse(raw);
