@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"vite\" \"node server.js\"",
+    "dev": "concurrently \"vite\" \"node functions/server.js\"",
     "build": "vite build",
     "lint": "eslint .",
     "scrape": "node cli-scraper.mjs",
