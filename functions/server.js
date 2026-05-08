@@ -12,46 +12,20 @@ import dotenv from 'dotenv';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import hpp from 'hpp';
-import admin from 'firebase-admin';
 
 // Load .env if present (dev). In production (Cloud Functions runtime) secrets
 // are injected from functions/.env.production at deploy time — no file needed.
 dotenv.config({ quiet: true });
 
-// Initialize Firebase Admin. Pass an explicit projectId so local dev (where
-// ADC may resolve to a different default project) reliably hits this app's
-// Firestore. In Cloud Functions the runtime SA already targets the right
-// project, but the explicit value is harmless there.
-if (!admin.apps.length) {
-    admin.initializeApp({
-        projectId: process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID,
-    });
-}
+// Firebase Admin SDK + Firestore handle live in config/firebaseAdmin.js so
+// all modules share the same initialized instance. `admin` is also re-exported
+// from there for callers that need admin.auth(), admin.firestore.FieldValue, etc.
+import { db, admin } from './config/firebaseAdmin.js';
 
-const db = admin.firestore();
-
-// ── Integration configs (in-memory cache) ─────────────────────────────────────
-const integrationConfigs = { google: null, microsoft365: null };
-
-async function loadIntegrationConfigs() {
-    try {
-        const snap = await db.doc('artifacts/talent-flow/public/data/settings/integrations').get();
-        if (snap.exists) {
-            const data = snap.data();
-            if (data.google) {
-                integrationConfigs.google = data.google;
-                console.log('[integrations] Google config loaded from Firestore');
-            }
-            if (data.microsoft365) {
-                integrationConfigs.microsoft365 = data.microsoft365;
-                console.log('[integrations] Microsoft 365 config loaded from Firestore');
-            }
-        }
-    } catch (err) {
-        console.warn('[integrations] Could not load integration configs:', err.message);
-    }
-}
-setTimeout(loadIntegrationConfigs, 3000);
+// Loads OAuth client configs (Google, Microsoft 365) from Firestore at startup
+// and exposes them as a live, mutable object. Importing the module also kicks
+// off the deferred initial fetch.
+import { integrationConfigs } from './config/integrations.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
