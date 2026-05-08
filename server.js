@@ -149,8 +149,39 @@ const isAllowedOrigin = (origin) => {
 };
 
 // --- Security Middlewares ---
+// CSP runs in report-only mode for now: violations are logged but not blocked.
+// This lets us collect real-world violations (Spline 3D viewer, Recharts inline
+// styles, Firebase JS SDK calls, Google Identity Toolkit, etc.) before flipping
+// to enforce mode in a follow-up phase. The directive list intentionally errs
+// on the permissive side for first-party + the known third parties this app
+// already calls; tighten once the violation report is empty in production.
 app.use(helmet({
-    contentSecurityPolicy: false,
+    contentSecurityPolicy: {
+        reportOnly: true,
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://apis.google.com", "https://www.googletagmanager.com"],
+            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+            fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
+            imgSrc: ["'self'", "data:", "blob:", "https:"],
+            connectSrc: [
+                "'self'",
+                "https://*.googleapis.com",
+                "https://*.firebaseio.com",
+                "https://*.cloudfunctions.net",
+                "https://*.firebaseapp.com",
+                "https://identitytoolkit.googleapis.com",
+                "https://securetoken.googleapis.com",
+                "https://generativelanguage.googleapis.com",
+                "https://prod.spline.design",
+                "wss://*.firebaseio.com",
+            ],
+            frameSrc: ["'self'", "https://*.firebaseapp.com", "https://accounts.google.com"],
+            workerSrc: ["'self'", "blob:"],
+            objectSrc: ["'none'"],
+            baseUri: ["'self'"],
+        },
+    },
 }));
 app.use(hpp());
 
