@@ -49,6 +49,8 @@ import authRoutes from './routes/auth.js';
 import googleRoutes from './routes/google.js';
 import adminRoutes from './routes/admin.js';
 import emailRoutes, { cleanupOldFiles } from './routes/email.js';
+import positionsRoutes from './routes/positions.js';
+import usersRoutes from './routes/users.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -100,197 +102,12 @@ app.use(authRoutes);
 app.use(googleRoutes);
 app.use(adminRoutes);
 app.use(emailRoutes);
+app.use(positionsRoutes);
+app.use(usersRoutes);
 
 
 // /api/gemini-stt moved to routes/ai.js
 
-// ─────────────────────────────────────────────────────────────
-// PUBLIC JOB APPLICATION SYSTEM
-// Uses Firestore REST API so no Admin SDK credentials needed
-// ─────────────────────────────────────────────────────────────
-const FS_PROJECT = process.env.VITE_FIREBASE_PROJECT_ID;
-const FS_API_KEY = process.env.VITE_FIREBASE_API_KEY;
-
-function fsVal(v) {
-    if (v === null || v === undefined) return { nullValue: null };
-    if (typeof v === 'boolean') return { booleanValue: v };
-    if (typeof v === 'number') return { integerValue: String(Math.round(v)) };
-    if (typeof v === 'string') return { stringValue: v };
-    if (Array.isArray(v)) return { arrayValue: { values: v.map(fsVal) } };
-    if (typeof v === 'object') {
-        const fields = {};
-        for (const [k, val] of Object.entries(v)) fields[k] = fsVal(val);
-        return { mapValue: { fields } };
-    }
-    return { stringValue: String(v) };
-}
-
-function fsToJs(fields) {
-    if (!fields) return {};
-    const out = {};
-    for (const [k, v] of Object.entries(fields)) {
-        if ('stringValue' in v) out[k] = v.stringValue;
-        else if ('integerValue' in v) out[k] = Number(v.integerValue);
-        else if ('doubleValue' in v) out[k] = v.doubleValue;
-        else if ('booleanValue' in v) out[k] = v.booleanValue;
-        else if ('nullValue' in v) out[k] = null;
-        else if ('arrayValue' in v) out[k] = (v.arrayValue.values || []).map(i => fsToJs(i.mapValue?.fields || { _: i }));
-        else if ('mapValue' in v) out[k] = fsToJs(v.mapValue.fields);
-        else out[k] = null;
-    }
-    return out;
-}
-
-app.get('/api/positions/:positionId', async (req, res) => {
-    try {
-        const url = `${FS_BASE()}/artifacts%2Ftalent-flow%2Fpublic%2Fdata%2Fpositions/${req.params.positionId}?key=${FS_API_KEY}`;
-        const r = await fetch(url);
-        if (r.status === 404) return res.status(404).json({ error: 'Pozisyon bulunamadı.' });
-        if (!r.ok) {
-            const errBody = await r.text();
-            console.error('Firestore GET position error:', r.status, errBody);
-            return res.status(500).json({ error: 'Pozisyon yüklenirken hata oluştu.' });
-        }
-        const docSnap = await r.json();
-        const data = fsToJs(docSnap.fields || {});
-        if (data.status !== 'open') return res.status(403).json({ error: 'Bu pozisyon şu an başvuruya kapalı.' });
-        res.json({ id: req.params.positionId, ...data });
-    } catch (err) {
-        console.error('GET /api/positions/:id error:', err);
-        res.status(500).json({ error: 'Pozisyon yüklenirken hata oluştu.' });
-    }
-});
-
-app.post('/api/applications', async (req, res) => {
-    try {
-        const {
-            positionId, positionTitle,
-            name, email, phone, linkedin,
-            cvText, cvFileName,
-            source,
-            parsedCandidate, aiScore, aiScoreBreakdown, aiSummary,
-        } = req.body;
-        if (!positionId || !name || !email || !phone) {
-            return res.status(400).json({ error: 'Zorunlu alanlar eksik.' });
-        }
-        const fields = {
-            positionId: fsVal(positionId),
-            positionTitle: fsVal(positionTitle || ''),
-            name: fsVal(String(name).trim()),
-            email: fsVal(String(email).trim().toLowerCase()),
-            phone: fsVal(String(phone).trim()),
-            linkedin: fsVal(String(linkedin || '').trim()),
-            cvFileName: fsVal(cvFileName || ''),
-            cvText: fsVal(cvText ? String(cvText).slice(0, 6000) : ''),
-            source: fsVal(source || 'Direkt'),
-            aiScore: fsVal(aiScore || 0),
-            aiSummary: fsVal(aiSummary || ''),
-            status: fsVal('new'),
-            kvkkConsent: fsVal(true),
-        };
-        if (parsedCandidate) fields.parsedCandidate = fsVal(parsedCandidate);
-        if (aiScoreBreakdown) fields.aiScoreBreakdown = fsVal(aiScoreBreakdown);
-
-        const url = `${FS_BASE()}/artifacts%2Ftalent-flow%2Fpublic%2Fdata%2Fapplications?key=${FS_API_KEY}`;
-        const r = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fields }),
-        });
-        if (!r.ok) {
-            const errBody = await r.text();
-            console.error('Firestore POST application error:', r.status, errBody);
-            return res.status(500).json({ error: 'Başvuru kaydedilemedi.' });
-        }
-        const docData = await r.json();
-        const id = docData.name?.split('/').pop();
-        res.json({ id });
-    } catch (err) {
-        console.error('POST /api/applications error:', err);
-        res.status(500).json({ error: 'Başvuru kaydedilemedi.' });
-    }
-});
-
-// GET /api/users — List participant-eligible users for interview wizard
-// Only recruiter / department_user / super_admin accounts are returned.
-// Minimal fields to reduce unnecessary data exposure.
-const PARTICIPANT_ROLES = ['super_admin', 'recruiter', 'department_user'];
-app.get('/api/users', requireAuth(), async (req, res) => {
-    try {
-        const snap = await db.collection('artifacts/talent-flow/public/data/users').get();
-        const users = [];
-        snap.forEach(d => {
-            const data = d.data();
-            const role = data.role || '';
-            if (!PARTICIPANT_ROLES.includes(role)) return; // skip candidates and unknown roles
-            users.push({
-                id: d.id,
-                name: data.name || data.displayName || data.email || 'Kullanıcı',
-                email: data.email || null,
-                role,
-                googleConnected: Boolean(data.integrations?.google?.connected),
-            });
-        });
-        res.json({ users });
-    } catch (err) {
-        console.error('[API /api/users] Error:', err);
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// Helper: convert a local date+time string to a UTC Date using the client's IANA timezone.
-const localToUTC = (dateStr, timeStr, timezone) => {
-    const naiveUTC = new Date(`${dateStr}T${timeStr}:00Z`);
-    if (!timezone) return naiveUTC;
-    try {
-        const fmt = new Intl.DateTimeFormat('sv', {
-            timeZone: timezone,
-            year: 'numeric', month: '2-digit', day: '2-digit',
-            hour: '2-digit', minute: '2-digit', second: '2-digit'
-        });
-        const localStr = fmt.format(naiveUTC).replace(' ', 'T');
-        const localAsUTC = new Date(localStr + 'Z');
-        const offsetMs = localAsUTC.getTime() - naiveUTC.getTime();
-        return new Date(naiveUTC.getTime() - offsetMs);
-    } catch (e) {
-        return naiveUTC;
-    }
-};
-
-// POST /api/users/availability — Check Google Calendar free/busy for multiple platform users
-app.post('/api/users/availability', requireAuth(), async (req, res) => {
-    const { userIds, date, time, timezone } = req.body;
-    if (!Array.isArray(userIds) || !date || !time) {
-        return res.status(400).json({ error: 'userIds[], date, and time are required.' });
-    }
-    const slotStartDate = localToUTC(date, time, timezone);
-    if (isNaN(slotStartDate.getTime())) return res.status(400).json({ error: 'Invalid date/time format.' });
-    const slotStart = slotStartDate.toISOString();
-    const slotEnd = new Date(slotStartDate.getTime() + 60 * 60 * 1000).toISOString();
-
-    const results = {};
-    await Promise.all(userIds.map(async (uid) => {
-        try {
-            const userDoc = await db.doc(`artifacts/talent-flow/public/data/users/${uid}`).get();
-            if (!userDoc.exists) { results[uid] = 'unknown'; return; }
-            const googleIntegration = userDoc.data()?.integrations?.google;
-            if (!googleIntegration?.connected || !googleIntegration?.accessToken) { results[uid] = 'unknown'; return; }
-            const resp = await fetch('https://www.googleapis.com/calendar/v3/freeBusy', {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${googleIntegration.accessToken}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ timeMin: slotStart, timeMax: slotEnd, items: [{ id: 'primary' }] })
-            });
-            if (!resp.ok) { results[uid] = 'unknown'; return; }
-            const fbData = await resp.json();
-            const busy = fbData.calendars?.primary?.busy || [];
-            results[uid] = busy.length > 0 ? 'busy' : 'available';
-        } catch (err) {
-            console.warn(`[Availability] uid=${uid}:`, err.message);
-            results[uid] = 'unknown';
-        }
-    }));
-    res.json({ availability: results });
-});
 
 
 // ─── AI Generate Proxy ──────────────────────────────────────────────────────
