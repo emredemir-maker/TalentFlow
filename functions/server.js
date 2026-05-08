@@ -8,6 +8,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import { createRequire } from 'module';
 
 // Load .env if present (dev). In production (Cloud Functions runtime) secrets
 // are injected from functions/.env.production at deploy time — no file needed.
@@ -29,42 +30,19 @@ import { corsMiddleware } from './middleware/cors.js';
 import { helmetMiddleware, hppMiddleware } from './middleware/security.js';
 import { verifyFirebaseToken, requireAuth } from './middleware/auth.js';
 
+// Service modules — pure-logic helpers used across multiple route handlers.
+import { pdf } from './services/pdf.js';
+import { toFsValue, fsGet, fsPatch, fsSet } from './services/firestoreRest.js';
+import { getApiKey, getApiKeyDetailed, parseProfile } from './services/gemini.js';
+import { isSafeLinkedInUrl } from './services/scrape.js';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-import { createRequire } from 'module';
+// `createRequire` lets us pull in pdf-parse, mammoth, multer, adm-zip etc.
+// without forcing them through ESM transforms — these CJS-only libs are still
+// used elsewhere in this file (notably the bulk-import worker for adm-zip).
 const require = createRequire(import.meta.url);
-const pdfLib = require('pdf-parse');
-const pdf = async (buffer) => {
-    try {
-        const PDFClass = pdfLib.PDFParse || pdfLib.default;
-        if (PDFClass && typeof PDFClass === 'function') {
-            try {
-                // Try as class first
-                const instance = new PDFClass({ data: buffer });
-                const result = await instance.getText();
-                await instance.destroy().catch(() => { });
-                return result;
-            } catch (err) {
-                if (err.message.includes("cannot be invoked without 'new'")) {
-                    // This shouldn't happen if we used new, but let's be safe
-                    throw err;
-                }
-                // If it's the old pdf-parse function style
-                if (typeof pdfLib === 'function') {
-                    return await pdfLib(buffer);
-                }
-                throw err;
-            }
-        } else if (typeof pdfLib === 'function') {
-            return await pdfLib(buffer);
-        }
-        throw new Error('PDF parsing library not found or invalid');
-    } catch (err) {
-        console.error('PDF Error:', err);
-        return { text: 'PDF Error: ' + err.message };
-    }
-};
 const mammoth = require('mammoth');
 const multer = require('multer');
 
@@ -130,150 +108,7 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
-// SSRF guard for puppeteer scraping. Allow only https URLs whose hostname is
-// linkedin.com (apex or subdomain). Reject raw IPs and IPv6 literals so an
-// attacker cannot pivot through /api/scrape to internal services or the
-// cloud metadata endpoint (169.254.169.254).
-function isSafeLinkedInUrl(input) {
-    if (typeof input !== 'string' || input.length > 2048) return false;
-    let parsed;
-    try { parsed = new URL(input); } catch { return false; }
-    if (parsed.protocol !== 'https:') return false;
-    const host = parsed.hostname.toLowerCase();
-    if (/^[\d.]+$/.test(host) || host.includes(':')) return false;
-    return host === 'linkedin.com' || host.endsWith('.linkedin.com');
-}
-
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-
-// ── Firestore REST API helpers ─────────────────────────────────────────────────
-const FS_BASE = () => `https://firestore.googleapis.com/v1/projects/${process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID}/databases/(default)/documents`;
-
-function toFsValue(v) {
-    if (v === null || v === undefined) return { nullValue: null };
-    if (typeof v === 'boolean') return { booleanValue: v };
-    if (typeof v === 'number') return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
-    if (v instanceof Date) return { timestampValue: v.toISOString() };
-    if (Array.isArray(v)) return { arrayValue: { values: v.map(toFsValue) } };
-    if (typeof v === 'object') return { mapValue: { fields: Object.fromEntries(Object.entries(v).map(([k, val]) => [k, toFsValue(val)])) } };
-    return { stringValue: String(v) };
-}
-async function fsGet(docPath, token) {
-    const r = await fetch(`${FS_BASE()}/${docPath}`, { headers: { Authorization: `Bearer ${token}` } });
-    if (r.status === 404) return null;
-    if (!r.ok) throw new Error(`Firestore GET failed: ${r.status}`);
-    return r.json();
-}
-async function fsPatch(docPath, fields, token) {
-    const fsFields = Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, toFsValue(v)]));
-    const mask = Object.keys(fields).map(k => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
-    const r = await fetch(`${FS_BASE()}/${docPath}?${mask}`, {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fields: fsFields }),
-    });
-    if (!r.ok) throw new Error(`Firestore PATCH failed: ${r.status} ${await r.text()}`);
-    return r.json();
-}
-async function fsSet(collPath, docId, fields, token) {
-    const fsFields = Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, toFsValue(v)]));
-    const r = await fetch(`${FS_BASE()}/${collPath}?documentId=${docId}`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fields: fsFields }),
-    });
-    if (!r.ok) throw new Error(`Firestore SET failed: ${r.status} ${await r.text()}`);
-    return r.json();
-}
-
-// Load API Key (Priority: Firestore (admin-saved) -> Env)
-// Admin-saved key in Settings takes precedence so the env var can be safely
-// rotated without losing service, and so a leaked/revoked env key doesn't
-// block the UI-saved replacement.
-// Returns { key, source } where source is 'firestore' | 'env' | 'none'.
-// We deliberately do NOT expose key length, suffix, or raw firestore error
-// detail to callers — those would leak through logs and HTTP error bodies.
-async function getApiKeyDetailed() {
-    // 1. Firestore (admin saved via Settings → API & Ses Motoru)
-    try {
-        const settingsDoc = await db.doc('artifacts/talent-flow/public/data/settings/api_keys').get();
-        if (settingsDoc.exists) {
-            const raw = settingsDoc.data()?.gemini;
-            if (raw && String(raw).length > 5) {
-                console.log('[gemini] key loaded from firestore');
-                return { key: String(raw).trim(), source: 'firestore' };
-            }
-        }
-    } catch {
-        console.warn('[gemini] firestore key lookup failed; falling back to env');
-    }
-
-    // 2. Fallback to env
-    const envKey = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
-    if (envKey && envKey.trim() !== '' && envKey !== 'null' && envKey !== 'undefined') {
-        console.log('[gemini] key loaded from env');
-        return { key: envKey.trim(), source: 'env' };
-    }
-
-    console.warn('[gemini] no API key configured (firestore and env both empty)');
-    return { key: null, source: 'none' };
-}
-
-// Backward-compatible string-only wrapper
-async function getApiKey() {
-    const info = await getApiKeyDetailed();
-    return info.key;
-}
-
-// Gemini Parser Function
-async function parseProfile(text, modelId = 'gemini-2.5-flash') {
-    const apiKey = await getApiKey();
-    if (!apiKey) {
-        console.error('Gemini Parse Error: API Key missing');
-        return null;
-    }
-
-    console.log(`🤖 Using model: ${modelId} for parsing...`);
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: modelId });
-    const prompt = `You are a strict JSON parser.
-    Extract the following fields from the LinkedIn profile text below:
-    - name (Full Name)
-    - position (Current Job Title)
-    - company (Current Company)
-    - location (City, Country)
-    - skills (Array of strings)
-    - experience (Total years as number)
-    - education (Last school/degree)
-    - summary (Professional summary in TURKISH, max 400 chars)
-
-
-    Mark missing fields as null.
-    Add "source": "Auto Scraper".
-    IMPORTANT: The input text might be in any language, but ALL output text fields MUST be in TURKISH.
-
-    TEXT:
-    ${text.substring(0, 20000)}
-
-    Return ONLY raw JSON. No markdown.`;
-
-    try {
-        console.log(`🤖 Using Gemini (${modelId}) to parse profile...`);
-        const model = genAI.getGenerativeModel({ model: modelId });
-        const result = await model.generateContent(prompt);
-        let responseText = result.response.text();
-
-        // Clean markdown code blocks if present
-        responseText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-
-        const json = JSON.parse(responseText);
-        console.log(`✅ Parsed: ${json.name}`);
-        return json;
-    } catch (e) {
-        console.error('Gemini Parse Error:', e.message);
-        return null;
-    }
-}
 
 // Scrape Endpoint
 app.get('/api/scrape', aiLimiter, async (req, res) => {
