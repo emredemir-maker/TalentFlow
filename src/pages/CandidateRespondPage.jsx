@@ -236,14 +236,16 @@ export default function CandidateRespondPage() {
                                     </p>
                                 </div>
 
-                                {/* mailto reply button */}
-                                <a
-                                    href={`mailto:${data.recruiterEmail || 'emre.demir@infoset.app'}?subject=${encodeURIComponent(`Re: Bilgi Talebi — ${data.position || 'Başvurunuz'}`)}&body=${encodeURIComponent(`Sayın ${data.recruiterName || 'İK Ekibi'},\n\nAşağıda talep ettiğiniz bilgileri iletiyorum:\n\n`)}`}
-                                    className="w-full h-12 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 bg-cyan-500 hover:bg-cyan-600 text-white shadow-sm shadow-cyan-200"
-                                >
-                                    <Send className="w-3.5 h-3.5" />
-                                    E-posta ile Yanıtla
-                                </a>
+                                {/* mailto reply button — only shown when recruiter address is on the request */}
+                                {data.recruiterEmail && (
+                                    <a
+                                        href={`mailto:${data.recruiterEmail}?subject=${encodeURIComponent(`Re: Bilgi Talebi — ${data.position || 'Başvurunuz'}`)}&body=${encodeURIComponent(`Sayın ${data.recruiterName || 'İK Ekibi'},\n\nAşağıda talep ettiğiniz bilgileri iletiyorum:\n\n`)}`}
+                                        className="w-full h-12 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 bg-cyan-500 hover:bg-cyan-600 text-white shadow-sm shadow-cyan-200"
+                                    >
+                                        <Send className="w-3.5 h-3.5" />
+                                        E-posta ile Yanıtla
+                                    </a>
+                                )}
                             </div>
                         )}
 
