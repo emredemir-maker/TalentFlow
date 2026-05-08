@@ -13,6 +13,7 @@
 // builds a router with the supplied base.
 import { Router } from 'express';
 import fs from 'fs';
+import { readFile, writeFile } from 'fs/promises';
 import path from 'path';
 import { createRequire } from 'module';
 
@@ -73,7 +74,9 @@ export function createBulkRouter(uploadBaseDir) {
                                 const entryExt = path.extname(entry.entryName);
                                 const destName = `bulk-${Date.now()}-${Math.round(Math.random() * 1e6)}${entryExt}`;
                                 const destPath = path.join(bulkDir, destName);
-                                fs.writeFileSync(destPath, entry.getData());
+                                // Async write so a large ZIP with many entries doesn't
+                                // park the event loop while extracting.
+                                await writeFile(destPath, entry.getData());
                                 items.push({ index: items.length, originalName: path.basename(entry.entryName), tempPath: destPath, status: 'pending' });
                             }
                             try { fs.unlinkSync(file.path); } catch {}
@@ -117,7 +120,7 @@ export function createBulkRouter(uploadBaseDir) {
                 if (item.tempPath && !item.cvText) {
                     try {
                         const ext = path.extname(item.tempPath).replace(/^\./, '').toLowerCase();
-                        const buf = fs.readFileSync(item.tempPath);
+                        const buf = await readFile(item.tempPath);
                         item.cvText = (await extractCvText(buf, ext)).slice(0, 6000);
                     } catch (extractErr) {
                         console.warn(`[bulk-import] Pre-extract failed for ${item.originalName}:`, extractErr.message);

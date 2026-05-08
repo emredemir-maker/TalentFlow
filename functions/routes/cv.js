@@ -14,6 +14,7 @@
 // All three are gated by aiLimiter where they hit Gemini.
 import { Router } from 'express';
 import fs from 'fs';
+import { readFile } from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
@@ -101,7 +102,10 @@ router.post('/api/process-cv', aiLimiter, upload.array('cvs', 20), async (req, r
         const results = await Promise.all(req.files.map(async (file) => {
             try {
                 let text = '';
-                const fileBuffer = fs.readFileSync(file.path);
+                // Async read — Promise.all() above already runs files in
+                // parallel; using readFileSync here would block the event
+                // loop and serialize them de facto.
+                const fileBuffer = await readFile(file.path);
 
                 if (file.mimetype === 'application/pdf') {
                     const data = await pdf(fileBuffer);

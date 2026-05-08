@@ -9,11 +9,10 @@
 //                              (LiveInterviewPage path) and base64 JSON
 //                              (SettingsPage mic test path) interchangeably
 import { Router } from 'express';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createRequire } from 'module';
 
 import { aiLimiter } from '../middleware/rateLimit.js';
-import { getApiKey, getApiKeyDetailed } from '../services/gemini.js';
+import { getApiKeyDetailed, generateText } from '../services/gemini.js';
 
 const require = createRequire(import.meta.url);
 const multer = require('multer');
@@ -40,40 +39,25 @@ router.post('/api/ai/generate', aiLimiter, async (req, res) => {
     // override with an explicit `maxOutputTokens` field (clamped to 32k).
     const tokenCap = Math.min(Math.max(parseInt(maxOutputTokens, 10) || 8192, 512), 32768);
 
-    const genAI = new GoogleGenerativeAI(keyInfo.key);
-    const model = genAI.getGenerativeModel({
-        model: modelId,
-        generationConfig: {
-            temperature: responseMimeType === 'text/plain' ? 0.7 : 0,
-            topP: responseMimeType === 'text/plain' ? 0.95 : 0,
-            topK: responseMimeType === 'text/plain' ? 40 : 1,
-            maxOutputTokens: tokenCap,
-            responseMimeType,
-        },
-    });
-
-    // Retry on 429/503 with exponential backoff (paid tier still has RPM limits).
-    const MAX_RETRIES = 4;
-    let lastErr = null;
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-        try {
-            const result = await model.generateContent(prompt);
-            return res.json({ text: result.response.text() });
-        } catch (err) {
-            lastErr = err;
-            const msg = err.message || '';
-            const isTransient = /429|RESOURCE_EXHAUSTED|quota|503|UNAVAILABLE|overloaded/i.test(msg);
-            if (!isTransient || attempt === MAX_RETRIES) break;
-            const backoffMs = Math.min(1000 * Math.pow(2, attempt), 16000) + Math.floor(Math.random() * 500);
-            console.warn(`[ai/generate] transient (attempt ${attempt + 1}/${MAX_RETRIES + 1}), backoff ${backoffMs}ms: ${msg.slice(0, 120)}`);
-            await new Promise(r => setTimeout(r, backoffMs));
-        }
+    try {
+        // generateText() handles retry/backoff (4 attempts on 429/503) and
+        // an in-memory LRU cache (1h TTL) keyed on SHA256(prompt + modelId +
+        // generationConfig). Identical re-runs return instantly.
+        const text = await generateText(prompt, {
+            modelId,
+            generationConfig: {
+                temperature: responseMimeType === 'text/plain' ? 0.7 : 0,
+                topP: responseMimeType === 'text/plain' ? 0.95 : 0,
+                topK: responseMimeType === 'text/plain' ? 40 : 1,
+                maxOutputTokens: tokenCap,
+                responseMimeType,
+            },
+        });
+        res.json({ text });
+    } catch (err) {
+        console.error(`[ai/generate] failed (key source=${keyInfo.source}):`, err?.message);
+        res.status(500).json({ error: err?.message || 'AI request failed' });
     }
-
-    console.error(`[ai/generate] failed (key source=${keyInfo.source}):`, lastErr?.message);
-    res.status(500).json({
-        error: lastErr?.message || 'AI request failed',
-    });
 });
 
 router.post('/api/ai/stt', aiLimiter, async (req, res) => {
@@ -82,17 +66,14 @@ router.post('/api/ai/stt', aiLimiter, async (req, res) => {
         return res.status(400).json({ error: 'audio (base64) is required' });
     }
 
-    const apiKey = await getApiKey();
-    if (!apiKey) return res.status(503).json({ error: 'AI service unavailable' });
-
     try {
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-        const result = await model.generateContent([
+        // useCache: false — every audio chunk is unique, caching would just
+        // grow the cache without ever hitting.
+        const text = await generateText([
             { inlineData: { data: audio, mimeType } },
             `Bu ses dosyasını analiz et. YALNIZCA aşağıdaki JSON formatında yanıt döndür, başka hiçbir şey yazma:\n{"text":"türkçe transkript metni","stress":30,"excitement":70,"confidence":60,"hesitation":20}\nKurallar:\n- text: konuşulan Türkçe sözcükler. Konuşma yoksa boş string.\n- stress/excitement/confidence/hesitation: 0-100 tam sayı.\n- 'Sessizlik', 'Ses yok', 'Boş' gibi ifadeler text alanına YAZMA.`
-        ]);
-        res.json({ text: result.response.text() });
+        ], { useCache: false });
+        res.json({ text });
     } catch (err) {
         console.error('STT Error:', err.message);
         res.status(500).json({ error: err.message });
@@ -128,13 +109,8 @@ router.post('/api/gemini-stt', aiLimiter, (req, res, next) => {
             return res.status(400).json({ error: 'Ses dosyası bulunamadı' });
         }
 
-        const apiKey = await getApiKey();
-        if (!apiKey) return res.status(500).json({ error: 'Gemini API Key eksik' });
-
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-
-        const result = await model.generateContent([
+        // useCache: false — audio inputs are always unique
+        const raw = (await generateText([
             { inlineData: { data: audioBase64, mimeType } },
             `Bu ses dosyasını analiz et. YALNIZCA aşağıdaki JSON formatında yanıt döndür, başka hiçbir şey yazma:
 {"text":"türkçe transkript metni","stress":30,"excitement":70,"confidence":60,"hesitation":20}
@@ -146,9 +122,7 @@ Kurallar:
 - hesitation: tereddüt/dolgu sesi seviyesi 0-100
 - Skorlar 0-100 arası tam sayı olmalı.
 - 'Sessizlik', 'Ses yok', 'Boş' gibi ifadeler text alanına YAZMA.`
-        ]);
-
-        const raw = result.response.text().trim();
+        ], { useCache: false })).trim();
         let text = raw;
         let emotion = null;
         try {

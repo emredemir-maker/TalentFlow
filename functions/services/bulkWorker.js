@@ -18,13 +18,13 @@
 // The /api/bulk-import endpoint enqueues new jobs but does NOT call
 // runBulkWorkerLoop directly — it relies on the polling worker to pick
 // the new job up on its next 5-second tick.
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import fs from 'fs';
+import { readFile } from 'fs/promises';
 import { createRequire } from 'module';
 
 import { db, admin } from '../config/firebaseAdmin.js';
 import { pdf } from './pdf.js';
-import { getApiKey } from './gemini.js';
+import { generateText } from './gemini.js';
 
 const require = createRequire(import.meta.url);
 const mammoth = require('mammoth');
@@ -36,10 +36,6 @@ export const CANDIDATES_COLL = 'artifacts/talent-flow/public/data/candidates';
 let bulkWorkerActive = false;
 
 async function parseTextWithGemini(text, positionTitle) {
-    const apiKey = await getApiKey();
-    if (!apiKey) return null;
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
     const prompt = `Sen bir uzman CV ayrıştırıcısısın. Aşağıdaki CV metninden aday bilgilerini JSON olarak çıkart.
 Sadece şu JSON formatında yanıt ver (başka hiçbir şey yazma):
 {
@@ -57,9 +53,10 @@ Sadece şu JSON formatında yanıt ver (başka hiçbir şey yazma):
 
 CV:
 ${text.substring(0, 8000)}`;
-    // Do NOT swallow quota errors — let callers handle retry/backoff
-    const result = await model.generateContent(prompt);
-    const raw = result.response.text().replace(/```json|```/gi, '').trim();
+    // generateText() handles retry/backoff and caches identical CV text
+    // (same prompt -> same SHA256 key) so re-runs on transient errors
+    // don't pay another quota tick.
+    const raw = (await generateText(prompt)).replace(/```json|```/gi, '').trim();
     const match = raw.match(/\{[\s\S]*\}/);
     if (!match) return null;
     try { return JSON.parse(match[0]); } catch { return null; }
@@ -224,7 +221,7 @@ async function executeJob(jobId) {
                         // Fallback: file path still available (same-process, no restart)
                         const filePath = item.tempPath;
                         if (!fs.existsSync(filePath)) throw new Error('Dosya bulunamadı ve cvText mevcut değil');
-                        const fileBuffer = fs.readFileSync(filePath);
+                        const fileBuffer = await readFile(filePath);
                         const ext = (item.originalName || '').toLowerCase().split('.').pop();
                         cvText = await extractCvText(fileBuffer, ext);
                         if (!cvText || cvText.length < 30) throw new Error('CV içeriği okunamadı');
