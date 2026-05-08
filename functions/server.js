@@ -156,6 +156,38 @@ const isAllowedOrigin = (origin) => {
     return false;
 };
 
+// Rate limiters — declared up front so app.use(generalLimiter) below sees a
+// defined value (these are `const`, so referencing them before the line they
+// appear on would hit the temporal dead zone).
+//   generalLimiter: blanket 200 req / 15 min — applied globally below.
+//   aiLimiter:      20 req / min — gates Gemini-backed routes (/api/ai/*, /scrape, /process-cv).
+//   sessionLimiter: 60 req / min — for the public live-interview heartbeat
+//                                  endpoints; tight enough to block sessionId
+//                                  enumeration, loose enough for normal polling.
+const generalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 200,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Çok fazla istek gönderildi. Lütfen 15 dakika sonra tekrar deneyin.' }
+});
+
+const aiLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'AI istek limiti aşıldı. Lütfen 1 dakika sonra tekrar deneyin.' },
+});
+
+const sessionLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Çok fazla oturum sorgusu. Lütfen bekleyin.' }
+});
+
 // --- Security Middlewares ---
 // CSP runs in report-only mode for now: violations are logged but not blocked.
 // This lets us collect real-world violations (Spline 3D viewer, Recharts inline
@@ -235,36 +267,6 @@ function isSafeLinkedInUrl(input) {
     if (/^[\d.]+$/.test(host) || host.includes(':')) return false;
     return host === 'linkedin.com' || host.endsWith('.linkedin.com');
 }
-
-// Rate limiters — kept together so the request-throttling story is in one place.
-//   generalLimiter: blanket 200 req / 15 min — applied globally below.
-//   aiLimiter:      20 req / min — gates Gemini-backed routes (/api/ai/*, /scrape, /process-cv).
-//   sessionLimiter: 60 req / min — for the public live-interview heartbeat
-//                                  endpoints; tight enough to block sessionId
-//                                  enumeration, loose enough for normal polling.
-const generalLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 200,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { error: 'Çok fazla istek gönderildi. Lütfen 15 dakika sonra tekrar deneyin.' }
-});
-
-const aiLimiter = rateLimit({
-    windowMs: 60 * 1000,
-    max: 20,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { error: 'AI istek limiti aşıldı. Lütfen 1 dakika sonra tekrar deneyin.' },
-});
-
-const sessionLimiter = rateLimit({
-    windowMs: 60 * 1000,
-    max: 60,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { error: 'Çok fazla oturum sorgusu. Lütfen bekleyin.' }
-});
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
