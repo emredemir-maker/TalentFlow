@@ -29,7 +29,6 @@
         "multer": "^2.0.2",
         "nodemailer": "^8.0.1",
         "pdf-parse": "^2.4.5",
-        "puppeteer": "^24.37.3",
-        "xss-clean": "^0.1.4"
+        "puppeteer": "^24.37.3"
     }
 }
