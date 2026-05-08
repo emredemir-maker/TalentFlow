@@ -1,6 +1,5 @@
 // server.js - Backend API for Web Scraper (ESM Version)
 import express from 'express';
-import cors from 'cors';
 import puppeteer from 'puppeteer';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import nodemailer from 'nodemailer';
@@ -9,86 +8,41 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
-import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
-import hpp from 'hpp';
-import admin from 'firebase-admin';
+import { createRequire } from 'module';
 
 // Load .env if present (dev). In production (Cloud Functions runtime) secrets
 // are injected from functions/.env.production at deploy time — no file needed.
 dotenv.config({ quiet: true });
 
-// Initialize Firebase Admin. Pass an explicit projectId so local dev (where
-// ADC may resolve to a different default project) reliably hits this app's
-// Firestore. In Cloud Functions the runtime SA already targets the right
-// project, but the explicit value is harmless there.
-if (!admin.apps.length) {
-    admin.initializeApp({
-        projectId: process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID,
-    });
-}
+// Firebase Admin SDK + Firestore handle live in config/firebaseAdmin.js so
+// all modules share the same initialized instance. `admin` is also re-exported
+// from there for callers that need admin.auth(), admin.firestore.FieldValue, etc.
+import { db, admin } from './config/firebaseAdmin.js';
 
-const db = admin.firestore();
+// Loads OAuth client configs (Google, Microsoft 365) from Firestore at startup
+// and exposes them as a live, mutable object. Importing the module also kicks
+// off the deferred initial fetch.
+import { integrationConfigs } from './config/integrations.js';
 
-// ── Integration configs (in-memory cache) ─────────────────────────────────────
-const integrationConfigs = { google: null, microsoft365: null };
+// Middleware modules — moved out of this file for separation of concerns.
+import { generalLimiter, aiLimiter, sessionLimiter } from './middleware/rateLimit.js';
+import { corsMiddleware } from './middleware/cors.js';
+import { helmetMiddleware, hppMiddleware } from './middleware/security.js';
+import { verifyFirebaseToken, requireAuth } from './middleware/auth.js';
 
-async function loadIntegrationConfigs() {
-    try {
-        const snap = await db.doc('artifacts/talent-flow/public/data/settings/integrations').get();
-        if (snap.exists) {
-            const data = snap.data();
-            if (data.google) {
-                integrationConfigs.google = data.google;
-                console.log('[integrations] Google config loaded from Firestore');
-            }
-            if (data.microsoft365) {
-                integrationConfigs.microsoft365 = data.microsoft365;
-                console.log('[integrations] Microsoft 365 config loaded from Firestore');
-            }
-        }
-    } catch (err) {
-        console.warn('[integrations] Could not load integration configs:', err.message);
-    }
-}
-setTimeout(loadIntegrationConfigs, 3000);
+// Service modules — pure-logic helpers used across multiple route handlers.
+import { pdf } from './services/pdf.js';
+import { toFsValue, fsGet, fsPatch, fsSet } from './services/firestoreRest.js';
+import { getApiKey, getApiKeyDetailed, parseProfile } from './services/gemini.js';
+import { isSafeLinkedInUrl } from './services/scrape.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-import { createRequire } from 'module';
+// `createRequire` lets us pull in pdf-parse, mammoth, multer, adm-zip etc.
+// without forcing them through ESM transforms — these CJS-only libs are still
+// used elsewhere in this file (notably the bulk-import worker for adm-zip).
 const require = createRequire(import.meta.url);
-const pdfLib = require('pdf-parse');
-const pdf = async (buffer) => {
-    try {
-        const PDFClass = pdfLib.PDFParse || pdfLib.default;
-        if (PDFClass && typeof PDFClass === 'function') {
-            try {
-                // Try as class first
-                const instance = new PDFClass({ data: buffer });
-                const result = await instance.getText();
-                await instance.destroy().catch(() => { });
-                return result;
-            } catch (err) {
-                if (err.message.includes("cannot be invoked without 'new'")) {
-                    // This shouldn't happen if we used new, but let's be safe
-                    throw err;
-                }
-                // If it's the old pdf-parse function style
-                if (typeof pdfLib === 'function') {
-                    return await pdfLib(buffer);
-                }
-                throw err;
-            }
-        } else if (typeof pdfLib === 'function') {
-            return await pdfLib(buffer);
-        }
-        throw new Error('PDF parsing library not found or invalid');
-    } catch (err) {
-        console.error('PDF Error:', err);
-        return { text: 'PDF Error: ' + err.message };
-    }
-};
 const mammoth = require('mammoth');
 const multer = require('multer');
 
@@ -130,100 +84,11 @@ const upload = multer({
 
 const app = express();
 
-const allowedOrigins = [
-    'http://localhost:5173',
-    'http://localhost:5174',
-    'http://localhost:5000',
-    'http://127.0.0.1:5173',
-    'http://127.0.0.1:5174',
-    'http://127.0.0.1:5000',
-    'http://localhost:3000',
-    process.env.VITE_APP_URL,
-    process.env.APP_URL
-].filter(Boolean);
-
-// Whitelist Replit dynamic preview domains (*.replit.dev / *.replit.app /
-// *.pike.replit.dev) plus Firebase Hosting (*.web.app, *.firebaseapp.com)
-// in addition to the explicit list above.
-const isAllowedOrigin = (origin) => {
-    if (!origin) return true; // curl / mobile / server-to-server
-    if (allowedOrigins.includes(origin)) return true;
-    if (/^https:\/\/.*\.replit\.dev$/.test(origin)) return true;
-    if (/^https:\/\/.*\.replit\.app$/.test(origin)) return true;
-    if (/^https:\/\/.*\.pike\.replit\.dev$/.test(origin)) return true;
-    if (/^https:\/\/.*\.web\.app$/.test(origin)) return true;
-    if (/^https:\/\/.*\.firebaseapp\.com$/.test(origin)) return true;
-    return false;
-};
-
-// Rate limiters — declared up front so app.use(generalLimiter) below sees a
-// defined value (these are `const`, so referencing them before the line they
-// appear on would hit the temporal dead zone).
-//   generalLimiter: blanket 200 req / 15 min — applied globally below.
-//   aiLimiter:      20 req / min — gates Gemini-backed routes (/api/ai/*, /scrape, /process-cv).
-//   sessionLimiter: 60 req / min — for the public live-interview heartbeat
-//                                  endpoints; tight enough to block sessionId
-//                                  enumeration, loose enough for normal polling.
-const generalLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 200,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { error: 'Çok fazla istek gönderildi. Lütfen 15 dakika sonra tekrar deneyin.' }
-});
-
-const aiLimiter = rateLimit({
-    windowMs: 60 * 1000,
-    max: 20,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { error: 'AI istek limiti aşıldı. Lütfen 1 dakika sonra tekrar deneyin.' },
-});
-
-const sessionLimiter = rateLimit({
-    windowMs: 60 * 1000,
-    max: 60,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { error: 'Çok fazla oturum sorgusu. Lütfen bekleyin.' }
-});
-
-// --- Security Middlewares ---
-// CSP runs in report-only mode for now: violations are logged but not blocked.
-// This lets us collect real-world violations (Spline 3D viewer, Recharts inline
-// styles, Firebase JS SDK calls, Google Identity Toolkit, etc.) before flipping
-// to enforce mode in a follow-up phase. The directive list intentionally errs
-// on the permissive side for first-party + the known third parties this app
-// already calls; tighten once the violation report is empty in production.
-app.use(helmet({
-    contentSecurityPolicy: {
-        reportOnly: true,
-        directives: {
-            defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://apis.google.com", "https://www.googletagmanager.com"],
-            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-            fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
-            imgSrc: ["'self'", "data:", "blob:", "https:"],
-            connectSrc: [
-                "'self'",
-                "https://*.googleapis.com",
-                "https://*.firebaseio.com",
-                "https://*.cloudfunctions.net",
-                "https://*.firebaseapp.com",
-                "https://identitytoolkit.googleapis.com",
-                "https://securetoken.googleapis.com",
-                "https://generativelanguage.googleapis.com",
-                "https://prod.spline.design",
-                "wss://*.firebaseio.com",
-            ],
-            frameSrc: ["'self'", "https://*.firebaseapp.com", "https://accounts.google.com"],
-            workerSrc: ["'self'", "blob:"],
-            objectSrc: ["'none'"],
-            baseUri: ["'self'"],
-        },
-    },
-}));
-app.use(hpp());
+// --- Security & infra middleware chain ---
+// (helmet+CSP, hpp, trust-proxy, cors, json body parser, global rate limit)
+// All concrete configuration lives in middleware/{security,cors,rateLimit}.js.
+app.use(helmetMiddleware);
+app.use(hppMiddleware);
 
 // Trust the first reverse-proxy hop (Cloud Functions / Replit ingress sets
 // X-Forwarded-For). Without this, express-rate-limit keys on the proxy IP
@@ -231,18 +96,7 @@ app.use(hpp());
 // legitimate users en masse during an attack.
 app.set('trust proxy', 1);
 
-app.use(cors({
-    origin: (origin, callback) => {
-        if (isAllowedOrigin(origin)) {
-            callback(null, true);
-        } else {
-            console.warn(`🛑 Blocked CORS request from: ${origin}`);
-            callback(new Error('CORS Policy: Not allowed origin'));
-        }
-    },
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    credentials: true
-}));
+app.use(corsMiddleware);
 app.use(express.json({ limit: '5mb' }));
 app.use(generalLimiter);
 
@@ -254,201 +108,7 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
-// SSRF guard for puppeteer scraping. Allow only https URLs whose hostname is
-// linkedin.com (apex or subdomain). Reject raw IPs and IPv6 literals so an
-// attacker cannot pivot through /api/scrape to internal services or the
-// cloud metadata endpoint (169.254.169.254).
-function isSafeLinkedInUrl(input) {
-    if (typeof input !== 'string' || input.length > 2048) return false;
-    let parsed;
-    try { parsed = new URL(input); } catch { return false; }
-    if (parsed.protocol !== 'https:') return false;
-    const host = parsed.hostname.toLowerCase();
-    if (/^[\d.]+$/.test(host) || host.includes(':')) return false;
-    return host === 'linkedin.com' || host.endsWith('.linkedin.com');
-}
-
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-
-async function verifyFirebaseToken(req, res, next) {
-    const authHeader = req.headers.authorization || '';
-    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
-    if (!token) return res.status(401).json({ error: 'Kimlik doğrulama gereklidir.' });
-    const apiKey = process.env.VITE_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY;
-    if (!apiKey) {
-        console.error('[verifyFirebaseToken] Firebase API key not configured — rejecting request.');
-        return res.status(500).json({ error: 'Sunucu yapılandırma hatası.' });
-    }
-    try {
-        const resp = await fetch(
-            `https://www.googleapis.com/identitytoolkit/v3/relyingparty/getAccountInfo?key=${apiKey}`,
-            { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken: token }) }
-        );
-        if (!resp.ok) return res.status(401).json({ error: 'Geçersiz kimlik bilgileri.' });
-        req.firebaseToken = token;
-        return next();
-    } catch {
-        return res.status(401).json({ error: 'Kimlik doğrulama başarısız.' });
-    }
-}
-
-// Auth middleware: verify Firebase ID token + authoritative Firestore role check.
-// Returns an Express middleware. Pass an explicit role list to restrict access:
-//   requireAuth()                          -> any of the default roles (recruiter+)
-//   requireAuth(['super_admin'])           -> super-admin endpoints only
-// Defined here (next to verifyFirebaseToken) so /api/admin/* declarations
-// later in the file can reference it without hitting the const TDZ.
-const ALLOWED_ROLES = ['super_admin', 'recruiter', 'department_user'];
-const requireAuth = (allowedRoles = ALLOWED_ROLES) => async (req, res, next) => {
-    const authHeader = req.headers['authorization'] || '';
-    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-    if (!token) return res.status(401).json({ error: 'Missing Authorization header.' });
-    try {
-        const decoded = await admin.auth().verifyIdToken(token);
-        // Fetch role from Firestore — JWT custom claims may not carry role
-        const userDoc = await db.doc(`artifacts/talent-flow/public/data/users/${decoded.uid}`).get();
-        if (!userDoc.exists) {
-            return res.status(403).json({ error: 'User profile not found.' });
-        }
-        const role = userDoc.data().role || '';
-        if (!allowedRoles.includes(role)) {
-            return res.status(403).json({ error: 'Insufficient permissions.' });
-        }
-        req.user = { uid: decoded.uid, role };
-        next();
-    } catch {
-        return res.status(401).json({ error: 'Invalid or expired token.' });
-    }
-};
-
-// ── Firestore REST API helpers ─────────────────────────────────────────────────
-const FS_BASE = () => `https://firestore.googleapis.com/v1/projects/${process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID}/databases/(default)/documents`;
-
-function toFsValue(v) {
-    if (v === null || v === undefined) return { nullValue: null };
-    if (typeof v === 'boolean') return { booleanValue: v };
-    if (typeof v === 'number') return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
-    if (v instanceof Date) return { timestampValue: v.toISOString() };
-    if (Array.isArray(v)) return { arrayValue: { values: v.map(toFsValue) } };
-    if (typeof v === 'object') return { mapValue: { fields: Object.fromEntries(Object.entries(v).map(([k, val]) => [k, toFsValue(val)])) } };
-    return { stringValue: String(v) };
-}
-async function fsGet(docPath, token) {
-    const r = await fetch(`${FS_BASE()}/${docPath}`, { headers: { Authorization: `Bearer ${token}` } });
-    if (r.status === 404) return null;
-    if (!r.ok) throw new Error(`Firestore GET failed: ${r.status}`);
-    return r.json();
-}
-async function fsPatch(docPath, fields, token) {
-    const fsFields = Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, toFsValue(v)]));
-    const mask = Object.keys(fields).map(k => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
-    const r = await fetch(`${FS_BASE()}/${docPath}?${mask}`, {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fields: fsFields }),
-    });
-    if (!r.ok) throw new Error(`Firestore PATCH failed: ${r.status} ${await r.text()}`);
-    return r.json();
-}
-async function fsSet(collPath, docId, fields, token) {
-    const fsFields = Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, toFsValue(v)]));
-    const r = await fetch(`${FS_BASE()}/${collPath}?documentId=${docId}`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fields: fsFields }),
-    });
-    if (!r.ok) throw new Error(`Firestore SET failed: ${r.status} ${await r.text()}`);
-    return r.json();
-}
-
-// Load API Key (Priority: Firestore (admin-saved) -> Env)
-// Admin-saved key in Settings takes precedence so the env var can be safely
-// rotated without losing service, and so a leaked/revoked env key doesn't
-// block the UI-saved replacement.
-// Returns { key, source } where source is 'firestore' | 'env' | 'none'.
-// We deliberately do NOT expose key length, suffix, or raw firestore error
-// detail to callers — those would leak through logs and HTTP error bodies.
-async function getApiKeyDetailed() {
-    // 1. Firestore (admin saved via Settings → API & Ses Motoru)
-    try {
-        const settingsDoc = await db.doc('artifacts/talent-flow/public/data/settings/api_keys').get();
-        if (settingsDoc.exists) {
-            const raw = settingsDoc.data()?.gemini;
-            if (raw && String(raw).length > 5) {
-                console.log('[gemini] key loaded from firestore');
-                return { key: String(raw).trim(), source: 'firestore' };
-            }
-        }
-    } catch {
-        console.warn('[gemini] firestore key lookup failed; falling back to env');
-    }
-
-    // 2. Fallback to env
-    const envKey = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
-    if (envKey && envKey.trim() !== '' && envKey !== 'null' && envKey !== 'undefined') {
-        console.log('[gemini] key loaded from env');
-        return { key: envKey.trim(), source: 'env' };
-    }
-
-    console.warn('[gemini] no API key configured (firestore and env both empty)');
-    return { key: null, source: 'none' };
-}
-
-// Backward-compatible string-only wrapper
-async function getApiKey() {
-    const info = await getApiKeyDetailed();
-    return info.key;
-}
-
-// Gemini Parser Function
-async function parseProfile(text, modelId = 'gemini-2.5-flash') {
-    const apiKey = await getApiKey();
-    if (!apiKey) {
-        console.error('Gemini Parse Error: API Key missing');
-        return null;
-    }
-
-    console.log(`🤖 Using model: ${modelId} for parsing...`);
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: modelId });
-    const prompt = `You are a strict JSON parser.
-    Extract the following fields from the LinkedIn profile text below:
-    - name (Full Name)
-    - position (Current Job Title)
-    - company (Current Company)
-    - location (City, Country)
-    - skills (Array of strings)
-    - experience (Total years as number)
-    - education (Last school/degree)
-    - summary (Professional summary in TURKISH, max 400 chars)
-
-
-    Mark missing fields as null.
-    Add "source": "Auto Scraper".
-    IMPORTANT: The input text might be in any language, but ALL output text fields MUST be in TURKISH.
-
-    TEXT:
-    ${text.substring(0, 20000)}
-
-    Return ONLY raw JSON. No markdown.`;
-
-    try {
-        console.log(`🤖 Using Gemini (${modelId}) to parse profile...`);
-        const model = genAI.getGenerativeModel({ model: modelId });
-        const result = await model.generateContent(prompt);
-        let responseText = result.response.text();
-
-        // Clean markdown code blocks if present
-        responseText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-
-        const json = JSON.parse(responseText);
-        console.log(`✅ Parsed: ${json.name}`);
-        return json;
-    } catch (e) {
-        console.error('Gemini Parse Error:', e.message);
-        return null;
-    }
-}
 
 // Scrape Endpoint
 app.get('/api/scrape', aiLimiter, async (req, res) => {
