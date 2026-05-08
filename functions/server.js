@@ -14,11 +14,18 @@ import rateLimit from 'express-rate-limit';
 import hpp from 'hpp';
 import admin from 'firebase-admin';
 
+// Load .env if present (dev). In production (Cloud Functions runtime) secrets
+// are injected from functions/.env.production at deploy time — no file needed.
 dotenv.config({ quiet: true });
 
-// Initialize Firebase Admin (using local default or environment)
+// Initialize Firebase Admin. Pass an explicit projectId so local dev (where
+// ADC may resolve to a different default project) reliably hits this app's
+// Firestore. In Cloud Functions the runtime SA already targets the right
+// project, but the explicit value is harmless there.
 if (!admin.apps.length) {
-    admin.initializeApp();
+    admin.initializeApp({
+        projectId: process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID,
+    });
 }
 
 const db = admin.firestore();
@@ -123,6 +130,32 @@ const upload = multer({
 
 const app = express();
 
+const allowedOrigins = [
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'http://localhost:5000',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:5174',
+    'http://127.0.0.1:5000',
+    'http://localhost:3000',
+    process.env.VITE_APP_URL,
+    process.env.APP_URL
+].filter(Boolean);
+
+// Whitelist Replit dynamic preview domains (*.replit.dev / *.replit.app /
+// *.pike.replit.dev) plus Firebase Hosting (*.web.app, *.firebaseapp.com)
+// in addition to the explicit list above.
+const isAllowedOrigin = (origin) => {
+    if (!origin) return true; // curl / mobile / server-to-server
+    if (allowedOrigins.includes(origin)) return true;
+    if (/^https:\/\/.*\.replit\.dev$/.test(origin)) return true;
+    if (/^https:\/\/.*\.replit\.app$/.test(origin)) return true;
+    if (/^https:\/\/.*\.pike\.replit\.dev$/.test(origin)) return true;
+    if (/^https:\/\/.*\.web\.app$/.test(origin)) return true;
+    if (/^https:\/\/.*\.firebaseapp\.com$/.test(origin)) return true;
+    return false;
+};
+
 // --- Security Middlewares ---
 // CSP runs in report-only mode for now: violations are logged but not blocked.
 // This lets us collect real-world violations (Spline 3D viewer, Recharts inline
@@ -160,26 +193,26 @@ app.use(helmet({
 }));
 app.use(hpp());
 
-// Open CORS for Firebase Hosting + Replit + localhost
+// Trust the first reverse-proxy hop (Cloud Functions / Replit ingress sets
+// X-Forwarded-For). Without this, express-rate-limit keys on the proxy IP
+// instead of the real client IP, which both breaks throttling and blocks
+// legitimate users en masse during an attack.
+app.set('trust proxy', 1);
+
 app.use(cors({
     origin: (origin, callback) => {
-        if (!origin) return callback(null, true); // server-to-server / curl
-        const allowed =
-            /^https:\/\/.*\.replit\.dev$/.test(origin) ||
-            /^https:\/\/.*\.replit\.app$/.test(origin) ||
-            /^https:\/\/.*\.pike\.replit\.dev$/.test(origin) ||
-            /^https:\/\/.*\.web\.app$/.test(origin) ||
-            /^https:\/\/.*\.firebaseapp\.com$/.test(origin) ||
-            /^http:\/\/localhost(:\d+)?$/.test(origin) ||
-            /^http:\/\/127\.0\.0\.1(:\d+)?$/.test(origin);
-        if (allowed) return callback(null, true);
-        console.warn(`🛑 Blocked CORS: ${origin}`);
-        callback(new Error('CORS: Not allowed'));
+        if (isAllowedOrigin(origin)) {
+            callback(null, true);
+        } else {
+            console.warn(`🛑 Blocked CORS request from: ${origin}`);
+            callback(new Error('CORS Policy: Not allowed origin'));
+        }
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     credentials: true
 }));
-app.use(express.json({ limit: '10mb' })); // 10MB for base64 audio payloads
+app.use(express.json({ limit: '5mb' }));
+app.use(generalLimiter);
 
 // Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(uploadBaseDir, 'uploads')));
@@ -203,12 +236,34 @@ function isSafeLinkedInUrl(input) {
     return host === 'linkedin.com' || host.endsWith('.linkedin.com');
 }
 
+// Rate limiters — kept together so the request-throttling story is in one place.
+//   generalLimiter: blanket 200 req / 15 min — applied globally below.
+//   aiLimiter:      20 req / min — gates Gemini-backed routes (/api/ai/*, /scrape, /process-cv).
+//   sessionLimiter: 60 req / min — for the public live-interview heartbeat
+//                                  endpoints; tight enough to block sessionId
+//                                  enumeration, loose enough for normal polling.
 const generalLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
+    windowMs: 15 * 60 * 1000, // 15 minutes
     max: 200,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Çok fazla istek gönderildi. Lütfen 15 dakika sonra tekrar deneyin.' }
+});
+
+const aiLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'AI istek limiti aşıldı. Lütfen 1 dakika sonra tekrar deneyin.' },
+});
+
+const sessionLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Çok fazla oturum sorgusu. Lütfen bekleyin.' }
 });
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -304,25 +359,6 @@ async function fsSet(collPath, docId, fields, token) {
     return r.json();
 }
 
-// Rate limiter for AI endpoints (20 req/min/IP)
-const aiLimiter = rateLimit({
-    windowMs: 60 * 1000,
-    max: 20,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { error: 'Too many AI requests, please slow down.' },
-});
-
-// Public session polling + candidate status updates.
-// 60 req/min is plenty for a live interview heartbeat but blocks enumeration.
-const sessionLimiter = rateLimit({
-    windowMs: 60 * 1000,
-    max: 60,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { error: 'Çok fazla oturum sorgusu. Lütfen bekleyin.' }
-});
-
 // Load API Key (Priority: Firestore (admin-saved) -> Env)
 // Admin-saved key in Settings takes precedence so the env var can be safely
 // rotated without losing service, and so a leaked/revoked env key doesn't
@@ -413,7 +449,7 @@ async function parseProfile(text, modelId = 'gemini-2.5-flash') {
 }
 
 // Scrape Endpoint
-app.get('/api/scrape', async (req, res) => {
+app.get('/api/scrape', aiLimiter, async (req, res) => {
     const query = req.query.q;
     if (!query) return res.status(400).json({ error: 'Query parameter "q" is required.' });
 
@@ -759,7 +795,7 @@ async function handleDirectUrl(url, res, isVisual = false) {
 }
 
 // Direct Add from Browser Extension / Console Script
-app.post('/api/direct-add', async (req, res) => {
+app.post('/api/direct-add', aiLimiter, async (req, res) => {
     try {
         const { text, url } = req.body;
         console.log(`📥 Direct Add request for: ${url}`);
@@ -781,7 +817,7 @@ app.post('/api/direct-add', async (req, res) => {
 });
 
 // Process CV Uploads (Bulk)
-app.post('/api/process-cv', upload.array('cvs', 20), async (req, res) => {
+app.post('/api/process-cv', aiLimiter, upload.array('cvs', 20), async (req, res) => {
     try {
         if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'Dosya seçilmedi' });
 
@@ -1726,7 +1762,7 @@ app.post('/api/update-candidate-status', sessionLimiter, async (req, res) => {
 // Gemini STT Endpoint (Audio to Text)
 // Accepts both multipart/form-data (LiveInterviewPage) and base64 JSON (SettingsPage)
 const audioUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
-app.post('/api/gemini-stt', (req, res, next) => {
+app.post('/api/gemini-stt', aiLimiter, (req, res, next) => {
     const ct = req.headers['content-type'] || '';
     if (ct.includes('multipart/form-data')) {
         audioUpload.single('audio')(req, res, next);
