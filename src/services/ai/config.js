@@ -18,14 +18,29 @@ const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
 /**
  * Returns a lightweight proxy object that forwards generateContent() calls
  * to the backend /api/ai/generate endpoint.
+ *
+ * generateContent accepts an optional `options` arg so callers that need
+ * a higher token cap (e.g. CV parsing on very long resumes) or plain-text
+ * output can opt in:
+ *
+ *   model.generateContent(prompt)
+ *   model.generateContent(prompt, { maxOutputTokens: 32768 })
+ *   model.generateContent(prompt, { mimeType: 'text/plain' })
+ *
+ * Backend clamps maxOutputTokens to [512, 32768]; values above that are
+ * silently capped, values below default to 8192.
  */
 export async function getModel(modelId = DEFAULT_GEMINI_MODEL) {
     return {
-        generateContent: async (prompt) => {
+        generateContent: async (prompt, options = {}) => {
+            const body = { prompt, modelId };
+            if (options.maxOutputTokens != null) body.maxOutputTokens = options.maxOutputTokens;
+            if (options.mimeType) body.mimeType = options.mimeType;
+
             const res = await fetch('/api/ai/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt, modelId }),
+                body: JSON.stringify(body),
             });
 
             if (!res.ok) {
