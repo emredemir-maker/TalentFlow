@@ -27,7 +27,6 @@ export const helmetMiddleware = helmet({
                 "https://identitytoolkit.googleapis.com",
                 "https://securetoken.googleapis.com",
                 "https://generativelanguage.googleapis.com",
-                "https://prod.spline.design",
                 "wss://*.firebaseio.com",
             ],
             frameSrc: ["'self'", "https://*.firebaseapp.com", "https://accounts.google.com"],
