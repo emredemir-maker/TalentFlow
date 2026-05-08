@@ -156,6 +156,20 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
+// SSRF guard for puppeteer scraping. Allow only https URLs whose hostname is
+// linkedin.com (apex or subdomain). Reject raw IPs and IPv6 literals so an
+// attacker cannot pivot through /api/scrape to internal services or the
+// cloud metadata endpoint (169.254.169.254).
+function isSafeLinkedInUrl(input) {
+    if (typeof input !== 'string' || input.length > 2048) return false;
+    let parsed;
+    try { parsed = new URL(input); } catch { return false; }
+    if (parsed.protocol !== 'https:') return false;
+    const host = parsed.hostname.toLowerCase();
+    if (/^[\d.]+$/.test(host) || host.includes(':')) return false;
+    return host === 'linkedin.com' || host.endsWith('.linkedin.com');
+}
+
 const generalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 200,
@@ -344,10 +358,14 @@ app.get('/api/scrape', async (req, res) => {
     console.log(`🔍 Received Request: "${query}"`);
     const isVisual = req.query.visual === 'true';
 
-    // Check if the query is a direct LinkedIn/Sales Navigator URL
-    if (query.includes('linkedin.com')) {
+    // If the query parses as a URL, only allow https://*.linkedin.com hostnames.
+    // Anything that looks URL-ish but is not a safe LinkedIn URL is rejected to
+    // prevent SSRF (e.g., http://169.254.169.254, http://localhost, raw IPs).
+    if (/^https?:\/\//i.test(query)) {
+        if (!isSafeLinkedInUrl(query)) {
+            return res.status(400).json({ error: 'Yalnızca https LinkedIn URL\'lerine izin verilir.' });
+        }
         console.log('🔗 Direct URL detected. Jumping straight to profile...');
-        // We'll define this helper function or handle it inline
         return await handleDirectUrl(query, res, isVisual);
     }
 
