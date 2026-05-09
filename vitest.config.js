@@ -28,6 +28,9 @@ export default defineConfig({
             '**/coverage/**',
             'attached_assets/**',
             'artifacts/**',
+            // Playwright E2E specs live under tests/e2e/ — they're driven
+            // by `npm run test:e2e` (a separate runner), not vitest.
+            'tests/e2e/**',
         ],
         coverage: {
             provider: 'v8',

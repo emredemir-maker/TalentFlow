@@ -70,8 +70,11 @@ export default defineConfig([
     files: [
       'functions/**/*.js',
       'scripts/**/*.{js,mjs,cjs}',
+      'tests/e2e/**/*.{js,mjs}',
       'eslint.config.js',
       'vite.config.js',
+      'vitest.config.js',
+      'playwright.config.js',
     ],
     extends: [js.configs.recommended],
     languageOptions: {
