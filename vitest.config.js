@@ -41,12 +41,14 @@ export default defineConfig({
             // narrow means CI coverage gates fail on regression in tested
             // code, not on the absence of tests for code we haven't gotten
             // to yet.
+            // Use {js,ts} globs so a Phase 4e-style .js → .ts migration of a
+            // tested module doesn't require updating this list.
             include: [
-                'functions/services/firestoreRest.js',
-                'functions/services/gemini.js',
-                'src/utils/pii.js',
-                'src/utils/emailTemplates.js',
-                'src/services/matchService.js',
+                'functions/services/firestoreRest.{js,ts}',
+                'functions/services/gemini.{js,ts}',
+                'src/utils/pii.{js,ts}',
+                'src/utils/emailTemplates.{js,ts}',
+                'src/services/matchService.{js,ts}',
             ],
             // bulkWorker.js's extractCvText is unit-tested but the rest of
             // the file (claimNextQueuedJob, recoverStaleJobs, the polling
