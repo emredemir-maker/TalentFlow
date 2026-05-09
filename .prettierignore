@@ -1,0 +1,46 @@
+# Build outputs
+dist
+build
+coverage
+
+# Dependencies
+node_modules
+
+# Generated / vendored
+public/pdf.worker.mjs
+attached_assets
+chrome-session
+functions/lib
+functions/uploads
+
+# Mockup sandbox — separate sub-project not part of TalentFlow build
+artifacts
+
+# Legacy one-off scripts (kept for archive only)
+scripts/legacy
+
+# Lock files
+package-lock.json
+functions/package-lock.json
+
+# Phase 4a baseline — existing source files are NOT mass-reformatted to keep
+# this PR's diff focused on tooling. As future PRs touch files, lint-staged
+# auto-formats them and the entries below are removed incrementally.
+# Once empty, the codebase is fully Prettier-conformant.
+src/**/*.js
+src/**/*.jsx
+src/**/*.css
+functions/**/*.js
+scripts/**/*.js
+scripts/**/*.mjs
+scripts/**/*.cjs
+*.config.js
+*.config.mjs
+cli-scraper.mjs
+index.html
+firebase.json
+cors.json
+package.json
+functions/package.json
+.github/workflows/firebase-deploy.yml
+*.md
