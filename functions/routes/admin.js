@@ -22,6 +22,8 @@ import { requireAuth } from '../middleware/auth.js';
 import { admin } from '../config/firebaseAdmin.js';
 import { integrationConfigs } from '../config/integrations.js';
 import { fsGet, fsPatch } from '../services/firestoreRest.js';
+import { childLogger } from '../services/logger.js';
+const log = childLogger('admin');
 
 const router = Router();
 
@@ -31,11 +33,11 @@ router.delete('/api/admin/auth-user/:uid', requireAuth(['super_admin']), async (
         if (!uid) return res.status(400).json({ error: 'uid gerekli' });
         if (uid === req.user?.uid) return res.status(403).json({ error: 'Kendi hesabınızı silemezsiniz.' });
         await admin.auth().deleteUser(uid);
-        console.log(`[admin] Firebase Auth kullanıcısı silindi: ${uid}`);
+        log.info(`[admin] Firebase Auth kullanıcısı silindi: ${uid}`);
         res.json({ success: true });
     } catch (err) {
         if (err.code === 'auth/user-not-found') return res.json({ success: true, note: 'Zaten silinmiş' });
-        console.error('[admin/delete-auth-user]', err.message);
+        log.error('[admin/delete-auth-user]', err.message);
         res.status(500).json({ error: err.message });
     }
 });
@@ -60,7 +62,7 @@ router.get('/api/admin/integrations', requireAuth(['super_admin']), async (req, 
         }
         res.json(data);
     } catch (err) {
-        console.error('[admin/integrations GET]', err.message);
+        log.error('[admin/integrations GET]', err.message);
         res.status(500).json({ error: err.message });
     }
 });
@@ -71,17 +73,17 @@ router.post('/api/admin/integrations', requireAuth(['super_admin']), async (req,
         if (!provider || !config) return res.status(400).json({ error: 'provider and config required' });
         if (provider === 'google') {
             integrationConfigs.google = config;
-            console.log('[integrations] Google config updated in-memory');
+            log.info('[integrations] Google config updated in-memory');
         }
         if (provider === 'microsoft365') {
             integrationConfigs.microsoft365 = config;
-            console.log('[integrations] Microsoft 365 config updated in-memory');
+            log.info('[integrations] Microsoft 365 config updated in-memory');
         }
         const docPath = 'artifacts/talent-flow/public/data/settings/integrations';
         await fsPatch(docPath, { [provider]: config }, req.firebaseToken);
         res.json({ success: true });
     } catch (err) {
-        console.error('[admin/integrations POST]', err.message);
+        log.error('[admin/integrations POST]', err.message);
         res.status(500).json({ error: err.message });
     }
 });

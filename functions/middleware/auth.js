@@ -18,6 +18,8 @@
 //   The no-arg form accepts any of the three default roles (super_admin,
 //   recruiter, department_user).
 import { db, admin } from '../config/firebaseAdmin.js';
+import { childLogger } from '../services/logger.js';
+const log = childLogger('auth-mw');
 
 export async function verifyFirebaseToken(req, res, next) {
     const authHeader = req.headers.authorization || '';
@@ -25,7 +27,7 @@ export async function verifyFirebaseToken(req, res, next) {
     if (!token) return res.status(401).json({ error: 'Kimlik doğrulama gereklidir.' });
     const apiKey = process.env.VITE_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY;
     if (!apiKey) {
-        console.error('[verifyFirebaseToken] Firebase API key not configured — rejecting request.');
+        log.error('[verifyFirebaseToken] Firebase API key not configured — rejecting request.');
         return res.status(500).json({ error: 'Sunucu yapılandırma hatası.' });
     }
     try {

@@ -20,6 +20,8 @@ import { Router } from 'express';
 
 import { sessionLimiter } from '../middleware/rateLimit.js';
 import { db } from '../config/firebaseAdmin.js';
+import { childLogger } from '../services/logger.js';
+const log = childLogger('interview');
 
 const router = Router();
 
@@ -33,7 +35,7 @@ router.get('/api/session/:sessionId', sessionLimiter, async (req, res) => {
             const session = (data.interviewSessions || []).find(s => s.id === sessionId);
             if (session) {
                 const visibleQuestions = (session.questions || []).filter(q => q.visibleToCandidate);
-                console.log(`[GET /api/session] Found session ${sessionId} — ${visibleQuestions.length} visible question(s), status: ${session.candidateStatus}`);
+                log.info(`[GET /api/session] Found session ${sessionId} — ${visibleQuestions.length} visible question(s), status: ${session.candidateStatus}`);
                 return res.json({
                     found: true,
                     candidateId: docSnap.id,
@@ -49,7 +51,7 @@ router.get('/api/session/:sessionId', sessionLimiter, async (req, res) => {
         }
         return res.status(404).json({ found: false, error: 'Seans bulunamadı.' });
     } catch (err) {
-        console.error('GET /api/session error:', err.message);
+        log.error('GET /api/session error:', err.message);
         res.status(500).json({ error: err.message });
     }
 });
@@ -78,16 +80,16 @@ router.post('/api/init-interview-session', sessionLimiter, async (req, res) => {
         const snap = await sessionRef.get();
         if (!snap.exists) {
             await sessionRef.set({ sessionId, createdAt: new Date().toISOString(), ...(initialData || {}) });
-            console.log(`[init-interview-session] Created /interviews/${sessionId}`);
+            log.info(`[init-interview-session] Created /interviews/${sessionId}`);
         } else {
             if (initialData && Object.keys(initialData).length > 0) {
                 await sessionRef.set(initialData, { merge: true });
             }
-            console.log(`[init-interview-session] /interviews/${sessionId} already exists.`);
+            log.info(`[init-interview-session] /interviews/${sessionId} already exists.`);
         }
         res.json({ success: true });
     } catch (err) {
-        console.error('[init-interview-session] Error:', err.message);
+        log.error('[init-interview-session] Error:', err.message);
         res.status(500).json({ error: err.message });
     }
 });
@@ -103,7 +105,7 @@ router.post('/api/update-candidate-status', sessionLimiter, async (req, res) => 
         if (CANDIDATE_ALLOWED_FIELDS.has(key)) {
             safeUpdates[key] = updates[key];
         } else {
-            console.warn(`[update-candidate-status] Blocked field "${key}" from session ${sessionId}`);
+            log.warn(`[update-candidate-status] Blocked field "${key}" from session ${sessionId}`);
         }
     }
     if (Object.keys(safeUpdates).length === 0) {
@@ -129,7 +131,7 @@ router.post('/api/update-candidate-status', sessionLimiter, async (req, res) => 
 
         res.json({ success: true });
     } catch (error) {
-        console.error("Failed to update candidate session via proxy:", error);
+        log.error("Failed to update candidate session via proxy:", error);
         res.status(500).json({ error: error.message });
     }
 });

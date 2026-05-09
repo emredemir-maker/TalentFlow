@@ -41,6 +41,8 @@ import { db, admin } from '../config/firebaseAdmin.js';
 // Firestore impersonating the end user so security rules apply, vs. the
 // admin SDK which bypasses rules.
 import { fsGet, fsPatch, fsSet } from '../services/firestoreRest.js';
+import { childLogger } from '../services/logger.js';
+const log = childLogger('email');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
@@ -155,15 +157,15 @@ function buildInviteEmailHtml({ companyName = 'Talent-Inn' }, { inviteLink, role
 // Invite Email Endpoint
 router.post('/api/send-invite', async (req, res) => {
     const { email, role, inviteLink, branding, invitedByName } = req.body;
-    console.log(`✉️ Received invite request for: ${email}, role: ${role}`);
+    log.info(`✉️ Received invite request for: ${email}, role: ${role}`);
 
     if (!email || !inviteLink) {
-        console.warn('❌ Missing email or inviteLink in request');
+        log.warn('❌ Missing email or inviteLink in request');
         return res.status(400).json({ error: 'Email ve davet linki gereklidir.' });
     }
 
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-        console.error('❌ Email configuration missing in .env (EMAIL_USER or EMAIL_PASS)');
+        log.error('❌ Email configuration missing in .env (EMAIL_USER or EMAIL_PASS)');
         return res.status(500).json({ error: 'Sistem email yapılandırması eksik (.env kontrol edin).' });
     }
 
@@ -193,10 +195,10 @@ router.post('/api/send-invite', async (req, res) => {
         };
 
         await transporter.sendMail(mailOptions);
-        console.log(`✉️ Invite email sent successfully to: ${email}`);
+        log.info(`✉️ Invite email sent successfully to: ${email}`);
         res.json({ success: true, message: 'Davet maili başarıyla gönderildi.' });
     } catch (error) {
-        console.error('❌ Nodemailer Error:', error);
+        log.error('❌ Nodemailer Error:', error);
         res.status(500).json({ error: 'Mail gönderilirken bir hata oluştu: ' + (error.code || error.message) });
     }
 });
@@ -222,7 +224,7 @@ export function cleanupOldFiles(uploadBaseDir) {
             count++;
         }
     });
-    if (count > 0) console.log(`🧹 KVKK Veri Minimizasyonu: ${count} adet eski ham CV dosyası diskten silindi. (İletişim kayıtları korunuyor)`);
+    if (count > 0) log.info(`🧹 KVKK Veri Minimizasyonu: ${count} adet eski ham CV dosyası diskten silindi. (İletişim kayıtları korunuyor)`);
 }
 // Candidate Feedback Email Endpoint (Task #7)
 router.post('/api/send-feedback', generalLimiter, verifyFirebaseToken, async (req, res) => {
@@ -292,7 +294,7 @@ ${position ? `<p style="margin:8px 0 0;font-size:12px;color:#64748B;">Başvurula
         });
         res.json({ success: true });
     } catch (error) {
-        console.error('❌ Feedback email error:', error);
+        log.error('❌ Feedback email error:', error);
         res.status(500).json({ error: 'Mail gönderilemedi: ' + (error.code || error.message) });
     }
 });
@@ -328,10 +330,10 @@ router.post('/api/send-interview-invite', generalLimiter, verifyFirebaseToken, a
             }];
         }
         await transporter.sendMail(mailOptions);
-        console.log(`✉️ Interview invite sent to: ${to}`);
+        log.info(`✉️ Interview invite sent to: ${to}`);
         res.json({ success: true });
     } catch (error) {
-        console.error('❌ Interview invite email error:', error);
+        log.error('❌ Interview invite email error:', error);
         res.status(500).json({ error: 'Mail gönderilemedi: ' + (error.code || error.message) });
     }
 });
@@ -377,9 +379,9 @@ router.post('/api/send-info-request', generalLimiter, verifyFirebaseToken, async
                 },
                 req.firebaseToken
             );
-            console.log(`✅ infoRequest Firestore'a yazıldı: ${requestId}`);
+            log.info(`✅ infoRequest Firestore'a yazıldı: ${requestId}`);
         } catch (dbErr) {
-            console.warn('⚠️ infoRequests Firestore write failed (non-fatal):', dbErr.message);
+            log.warn('⚠️ infoRequests Firestore write failed (non-fatal):', dbErr.message);
         }
         const items = Array.isArray(requestedItems) && requestedItems.length
             ? requestedItems.map(i => `<li style="margin:6px 0;">📎 ${i}</li>`).join('') : '';
@@ -407,10 +409,10 @@ router.post('/api/send-info-request', generalLimiter, verifyFirebaseToken, async
             subject: `Bilgi Talebi — ${position || 'Başvurunuz'} [#${requestId}]`,
             html,
         });
-        console.log(`✉️ Info request sent to: ${to} | requestId: ${requestId}`);
+        log.info(`✉️ Info request sent to: ${to} | requestId: ${requestId}`);
         res.json({ success: true, requestId, respondUrl });
     } catch (error) {
-        console.error('❌ Info request email error:', error);
+        log.error('❌ Info request email error:', error);
         res.status(500).json({ error: 'Bilgi talebi gönderilemedi: ' + (error.code || error.message) });
     }
 });
@@ -448,7 +450,7 @@ router.post('/api/candidate-respond', generalLimiter, async (req, res) => {
         }
         res.json({ success: true });
     } catch (error) {
-        console.error('❌ Candidate respond error:', error);
+        log.error('❌ Candidate respond error:', error);
         res.status(500).json({ error: 'Yanıt kaydedilemedi: ' + error.message });
     }
 });
@@ -554,13 +556,13 @@ function fetchImapInfoReplies() {
         function runSearch() {
             const since = new Date();
             since.setDate(since.getDate() - 7);
-            console.log(`📬 IMAP SINCE: ${since.toISOString().slice(0, 10)}`);
+            log.info(`📬 IMAP SINCE: ${since.toISOString().slice(0, 10)}`);
             imap.search([['SINCE', since]], (err, uids) => {
                 if (err || !uids || uids.length === 0) {
-                    console.log(`📬 SINCE sonuç: ${err ? err.message : 0} UID`);
+                    log.info(`📬 SINCE sonuç: ${err ? err.message : 0} UID`);
                     return finish();
                 }
-                console.log(`📬 SINCE araması: ${uids.length} UID bulundu`);
+                log.info(`📬 SINCE araması: ${uids.length} UID bulundu`);
                 const slice = uids.slice(-200);
                 const f = imap.fetch(slice, { bodies: ['HEADER.FIELDS (FROM SUBJECT DATE CONTENT-TYPE CONTENT-TRANSFER-ENCODING MIME-VERSION)', 'TEXT'], struct: false });
                 let pending = 0;
@@ -595,14 +597,14 @@ function fetchImapInfoReplies() {
                         const fromDecoded = decodeEncodedWords(fromRaw.trim());
                         const emailMatch = fromDecoded.match(/<([^>]+@[^>]+)>/) || fromDecoded.match(/([^\s<>]+@[^\s<>]+)/);
                         if (idMatch && emailMatch) {
-                            console.log(`  ✅ Match: requestId=${idMatch[1]} from=${emailMatch[1]}`);
+                            log.info(`  ✅ Match: requestId=${idMatch[1]} from=${emailMatch[1]}`);
                             const cleanBody = extractReplyText(bodyText, raw);
                             replies.push({ requestId: idMatch[1].trim(), from: emailMatch[1].trim().toLowerCase(), subject, replyBody: cleanBody });
                         }
                         tryFinish();
                     });
                 });
-                f.once('error', (e) => { console.error('❌ fetch error:', e); finish(); });
+                f.once('error', (e) => { log.error('❌ fetch error:', e); finish(); });
                 f.once('end', () => { fetchEnded = true; tryFinish(); });
             });
         }
@@ -610,7 +612,7 @@ function fetchImapInfoReplies() {
         imap.once('ready', () => {
             imap.openBox('[Gmail]/All Mail', true, (err) => {
                 if (err) {
-                    console.warn('⚠️ [Gmail]/All Mail açılamadı, INBOX deneniyor:', err.message);
+                    log.warn('⚠️ [Gmail]/All Mail açılamadı, INBOX deneniyor:', err.message);
                     imap.openBox('INBOX', true, (err2) => {
                         if (err2) return reject(err2);
                         runSearch();
@@ -627,14 +629,14 @@ function fetchImapInfoReplies() {
 router.post('/api/check-info-replies', generalLimiter, verifyFirebaseToken, async (req, res) => {
     try {
         const replies = await fetchImapInfoReplies();
-        console.log(`📬 IMAP tarama tamamlandı: ${replies.length} eşleşme`, replies.map(r => r.requestId));
+        log.info(`📬 IMAP tarama tamamlandı: ${replies.length} eşleşme`, replies.map(r => r.requestId));
         let updated = 0;
         const token = req.firebaseToken;
         for (const reply of replies) {
             try {
                 const docPath = `artifacts/talent-flow/public/data/infoRequests/${reply.requestId}`;
                 const existing = await fsGet(docPath, token);
-                if (!existing) { console.warn(`⚠️ requestId ${reply.requestId} bulunamadı`); continue; }
+                if (!existing) { log.warn(`⚠️ requestId ${reply.requestId} bulunamadı`); continue; }
                 const status = existing.fields?.status?.stringValue;
                 const existingReplyBody = existing.fields?.replyBody?.stringValue || '';
                 if (status !== 'pending' && existingReplyBody) continue;
@@ -642,15 +644,15 @@ router.post('/api/check-info-replies', generalLimiter, verifyFirebaseToken, asyn
                 if (status === 'pending') { patch.status = 'responded'; patch.respondedAt = new Date(); }
                 await fsPatch(docPath, patch, token);
                 updated++;
-                console.log(`✅ Yanıt işaretlendi: ${reply.requestId}`);
+                log.info(`✅ Yanıt işaretlendi: ${reply.requestId}`);
             } catch (err) {
-                console.error(`❌ ${reply.requestId} güncellenemedi:`, err.message);
+                log.error(`❌ ${reply.requestId} güncellenemedi:`, err.message);
             }
         }
-        console.log(`📬 Tamamlandı: ${replies.length} tarandı, ${updated} güncellendi.`);
+        log.info(`📬 Tamamlandı: ${replies.length} tarandı, ${updated} güncellendi.`);
         res.json({ success: true, scanned: replies.length, updated });
     } catch (error) {
-        console.error('❌ IMAP check-info-replies error:', error);
+        log.error('❌ IMAP check-info-replies error:', error);
         res.status(500).json({ error: 'IMAP kontrolü başarısız: ' + (error.message || error) });
     }
 });
@@ -685,10 +687,10 @@ router.post('/api/send-participant-invite', generalLimiter, async (req, res) => 
             })
         ));
         const failed = results.filter(r => r.status === 'rejected').map(r => r.reason?.message);
-        if (failed.length > 0) console.warn('⚠️ Bazı katılımcı davetleri gönderilemedi:', failed);
+        if (failed.length > 0) log.warn('⚠️ Bazı katılımcı davetleri gönderilemedi:', failed);
         res.json({ success: true, sent: results.filter(r => r.status === 'fulfilled').length, failed: failed.length });
     } catch (error) {
-        console.error('❌ send-participant-invite error:', error);
+        log.error('❌ send-participant-invite error:', error);
         res.status(500).json({ error: 'Davet gönderilemedi: ' + error.message });
     }
 });

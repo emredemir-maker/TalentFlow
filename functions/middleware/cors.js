@@ -6,6 +6,8 @@
 //   import { corsMiddleware } from './middleware/cors.js';
 //   app.use(corsMiddleware);
 import cors from 'cors';
+import { childLogger } from '../services/logger.js';
+const log = childLogger('cors');
 
 const allowedOrigins = [
     'http://localhost:5173',
@@ -35,7 +37,7 @@ export const corsMiddleware = cors({
         if (isAllowedOrigin(origin)) {
             callback(null, true);
         } else {
-            console.warn(`🛑 Blocked CORS request from: ${origin}`);
+            log.warn(`🛑 Blocked CORS request from: ${origin}`);
             callback(new Error('CORS Policy: Not allowed origin'));
         }
     },

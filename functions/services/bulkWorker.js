@@ -25,6 +25,8 @@ import { createRequire } from 'module';
 import { db, admin } from '../config/firebaseAdmin.js';
 import { pdf } from './pdf.js';
 import { generateText } from './gemini.js';
+import { childLogger } from './logger.js';
+const log = childLogger('bulk-worker');
 
 const require = createRequire(import.meta.url);
 const mammoth = require('mammoth');
@@ -137,12 +139,12 @@ export async function recoverStaleJobs() {
     try {
         const snap = await db.collection(BULK_JOBS_COLL).where('status', '==', 'processing').get();
         for (const doc of snap.docs) {
-            console.log(`[bulk-import] Recovering stale job ${doc.id}`);
+            log.info(`[bulk-import] Recovering stale job ${doc.id}`);
             await doc.ref.update({ status: 'queued' });
         }
-        if (!snap.empty) console.log(`[bulk-import] Recovered ${snap.size} stale job(s)`);
+        if (!snap.empty) log.info(`[bulk-import] Recovered ${snap.size} stale job(s)`);
     } catch (err) {
-        console.warn('[bulk-import] Recovery scan failed:', err.message);
+        log.warn('[bulk-import] Recovery scan failed:', err.message);
     }
 }
 
@@ -150,7 +152,7 @@ export async function recoverStaleJobs() {
 export async function runBulkWorkerLoop() {
     if (bulkWorkerActive) return;
     bulkWorkerActive = true;
-    console.log('[bulk-import] Worker loop started');
+    log.info('[bulk-import] Worker loop started');
     try {
         while (true) {
             let jobId = null;
@@ -158,7 +160,7 @@ export async function runBulkWorkerLoop() {
                 jobId = await claimNextQueuedJob();
             } catch (pollErr) {
                 // Firestore poll failed — retry after backoff
-                console.warn('[bulk-import] Poll error:', pollErr.message);
+                log.warn('[bulk-import] Poll error:', pollErr.message);
                 await new Promise(r => setTimeout(r, 10000));
                 continue;
             }
@@ -166,11 +168,11 @@ export async function runBulkWorkerLoop() {
                 await new Promise(r => setTimeout(r, 5000));
                 continue;
             }
-            console.log(`[bulk-import] Worker claimed job ${jobId}`);
+            log.info(`[bulk-import] Worker claimed job ${jobId}`);
             try {
                 await executeJob(jobId);
             } catch (err) {
-                console.error(`[bulk-import] Job ${jobId} fatal error:`, err.message);
+                log.error(`[bulk-import] Job ${jobId} fatal error:`, err.message);
                 try {
                     await db.doc(`${BULK_JOBS_COLL}/${jobId}`).update({
                         status: 'error',
@@ -183,7 +185,7 @@ export async function runBulkWorkerLoop() {
         }
     } finally {
         bulkWorkerActive = false;
-        console.warn('[bulk-import] Worker loop exited — restarting in 5s');
+        log.warn('[bulk-import] Worker loop exited — restarting in 5s');
         setTimeout(runBulkWorkerLoop, 5000);
     }
 }
@@ -269,7 +271,7 @@ async function executeJob(jobId) {
                         break;
                     }
                     const backoffMs = Math.pow(2, retries) * 5000;
-                    console.warn(`[bulk-import] quota error on ${item.originalName}, backoff ${backoffMs}ms`);
+                    log.warn(`[bulk-import] quota error on ${item.originalName}, backoff ${backoffMs}ms`);
                     await new Promise(r => setTimeout(r, backoffMs));
                 }
             }
@@ -309,9 +311,9 @@ async function executeJob(jobId) {
             avgScoreByPosition,
             completedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
-        console.log(`[bulk-import] Job ${jobId} complete: ${processedCount} done, ${failedCount} failed`);
+        log.info(`[bulk-import] Job ${jobId} complete: ${processedCount} done, ${failedCount} failed`);
     } catch (err) {
-        console.error(`[bulk-import] executeJob ${jobId} error:`, err.message);
+        log.error(`[bulk-import] executeJob ${jobId} error:`, err.message);
         throw err;
     }
 }
