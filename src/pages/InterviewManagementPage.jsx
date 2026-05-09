@@ -11,6 +11,7 @@ import { db } from '../config/firebase';
 import { getCalendarEvents, connectGoogleWorkspace, sendDirectEmail, createDirectCalendarEvent, ensureValidGoogleToken } from '../services/integrationService';
 import { getInviteEmail, getParticipantEmail, getRescheduleEmail } from '../utils/templateService';
 import { buildICS } from '../utils/emailTemplates';
+import AddManualInterviewModal from '../components/AddManualInterviewModal';
 import { 
     Plus, 
     Video, 
@@ -103,6 +104,9 @@ export default function InterviewManagementPage() {
 
     // "My Interviews" filter for department users in calendar view
     const [showMyInterviews, setShowMyInterviews] = useState(false);
+
+    // Manual interview entry modal — see components/AddManualInterviewModal.jsx
+    const [manualInterviewOpen, setManualInterviewOpen] = useState(false);
     
     // Close menu when clicking outside
     useEffect(() => {
@@ -2095,6 +2099,13 @@ export default function InterviewManagementPage() {
                                 <Play className="w-4 h-4 fill-current" /> Hızlı Mülakat Başlat
                             </button>
                             <button
+                                onClick={() => setManualInterviewOpen(true)}
+                                className="flex items-center gap-2 bg-white text-slate-700 border border-slate-200 px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-slate-50 transition-all shadow-sm"
+                                title="Sistem dışında yapılmış görüşmeyi manuel olarak ekle (telefon, yüzyüze, vb.)"
+                            >
+                                <Plus className="w-4 h-4" /> Manuel Görüşme Ekle
+                            </button>
+                            <button
                                 onClick={() => { setWizardStep(1); setSelectedCandidate(null); setManualDate(''); setManualTime('09:00'); setIsPlanningMode(true); }}
                                 className="flex items-center gap-2 bg-[#1E3A8A] text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-800 transition-all shadow-md shadow-blue-900/10"
                             >
@@ -2264,7 +2275,17 @@ export default function InterviewManagementPage() {
                                                                     {initials}
                                                                 </div>
                                                                 <div>
-                                                                    <h4 className="text-sm font-semibold text-[#0F172A]">{s.candidateName}</h4>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <h4 className="text-sm font-semibold text-[#0F172A]">{s.candidateName}</h4>
+                                                                        {s.mode === 'manual' && (
+                                                                            <span
+                                                                                title="Bu görüşme manuel olarak girildi (sistem dışında yapılmış)"
+                                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-slate-100 text-slate-600 border border-slate-200"
+                                                                            >
+                                                                                📞 Manuel
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
                                                                     <p className="text-xs text-[#64748B]">{s.positionTitle || s.position || s.title || '—'}</p>
                                                                 </div>
                                                             </div>
@@ -2730,6 +2751,17 @@ export default function InterviewManagementPage() {
                 </div>
             )}
 
+        <AddManualInterviewModal
+            open={manualInterviewOpen}
+            onClose={() => setManualInterviewOpen(false)}
+            candidates={enrichedCandidates}
+            positions={positions}
+            currentUser={userProfile || currentUser}
+            onCreated={() => {
+                // Listener on /interviews picks up the new doc automatically
+                // — no manual refresh needed. Just close the modal.
+            }}
+        />
     </div>
     );
 }
