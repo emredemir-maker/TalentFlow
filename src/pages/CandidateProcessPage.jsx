@@ -496,10 +496,33 @@ export default function CandidateProcessPage() {
         try {
             // ── Stage 1: Scout — find best position match ──────────────────────
             const openPositions = positions?.filter(p => p.status === 'open') || [];
-            const matchedPosition = openPositions.find(p => p.id === c.positionId)
-                || openPositions[0];
 
-            if (!matchedPosition) throw new Error('Açık pozisyon bulunamadı.');
+            // Priority 1: candidate's stored positionId if it's still open
+            // (recruiter explicitly assigned the candidate to this position;
+            // respect that intent).
+            let matchedPosition = openPositions.find(p => p.id === c.positionId);
+
+            // Priority 2: among open positions in the candidate's domain,
+            // pick the highest-scoring one.
+            //
+            // Pre-fix this fallback was `openPositions[0]` — first-in-array,
+            // no fit check at all. Result: an HR candidate with no positionId
+            // would land on whatever happened to be index 0 (e.g. "Project
+            // Manager"), and STAR analysis would score them ~%55 — bad UX
+            // and misleading data.
+            if (!matchedPosition) {
+                const compatibleOpen = filterPositionsByDomain(c, openPositions);
+                const ranked = compatibleOpen
+                    .map(p => ({ position: p, score: calculateMatchScore(c, p).score }))
+                    .sort((a, b) => b.score - a.score);
+                matchedPosition = ranked[0]?.position;
+            }
+
+            if (!matchedPosition) {
+                throw new Error(
+                    'Bu adayın domain\'ine uygun açık pozisyon yok. Açık pozisyon ekleyin veya mevcut pozisyonların durumunu kontrol edin.'
+                );
+            }
 
             // ── Stage 2: Analyst — deep AI STAR analysis (otonom agent) ────────
             const jobText = `${matchedPosition.title}\n${(matchedPosition.requirements || []).join(', ')}\n${matchedPosition.description || ''}`;
