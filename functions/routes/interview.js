@@ -13,13 +13,23 @@
 //                                            heartbeat / consent fields. Only
 //                                            CANDIDATE_ALLOWED_FIELDS pass; any
 //                                            other field is logged and dropped.
+//   POST /api/create-manual-interview     — recruiter-only. Creates an
+//                                            interview record from manually
+//                                            entered Q&A + notes (no WebRTC,
+//                                            no live transcript) and runs
+//                                            Gemini evaluation in the same
+//                                            request. Returns the AI scores
+//                                            so the modal can render them.
 //
-// All three are throttled by sessionLimiter (60 req/min/IP) — tight enough
-// to block sessionId enumeration, loose enough for normal heartbeat polling.
+// All session endpoints are throttled by sessionLimiter (60 req/min/IP) —
+// tight enough to block sessionId enumeration, loose enough for normal
+// heartbeat polling.
 import { Router } from 'express';
 
-import { sessionLimiter } from '../middleware/rateLimit.js';
-import { db } from '../config/firebaseAdmin.js';
+import { sessionLimiter, aiLimiter } from '../middleware/rateLimit.js';
+import { db, admin } from '../config/firebaseAdmin.js';
+import { requireAuth } from '../middleware/auth.js';
+import { generateText } from '../services/gemini.js';
 import { childLogger } from '../services/logger.js';
 const log = childLogger('interview');
 
@@ -135,5 +145,262 @@ router.post('/api/update-candidate-status', sessionLimiter, async (req, res) => 
         res.status(500).json({ error: error.message });
     }
 });
+
+// ─── Manual interview entry ──────────────────────────────────────────────
+// Recruiter-driven flow for interviews that didn't go through LiveInterview
+// or Face-to-face — phone calls, in-person without recording, etc. The
+// recruiter fills a structured form (Q&A + transcript + notes) and we run
+// the same Gemini evaluation pipeline so the resulting record looks the
+// same as automated interviews in lists, reports, and search.
+
+const VALID_INTERVIEW_TYPES = new Set(['phone', 'in-person', 'teams', 'zoom', 'meet', 'other']);
+const VALID_OUTCOMES = new Set(['positive', 'negative', 'pending']);
+
+/**
+ * Build a Gemini prompt that scores Q&A pairs + optional transcript/notes
+ * and returns a structured evaluation. Mirrors /api/score-screening-answers
+ * shape, plus a recommendedOutcome field the UI uses to suggest a label.
+ */
+export function buildManualInterviewPrompt({
+    positionTitle,
+    candidateName,
+    interviewType,
+    date,
+    time,
+    questions,
+    transcript,
+    notes,
+}) {
+    const qaPairs = (questions || [])
+        .map((q, i) => `Soru ${i + 1}: ${q.question}\nCevap: ${q.answer || '(cevap girilmedi)'}`)
+        .join('\n\n');
+
+    const optionalSections = [];
+    if (transcript && transcript.trim()) {
+        optionalSections.push(`Tam Transkript:\n${transcript.trim().slice(0, 12000)}`);
+    }
+    if (notes && notes.trim()) {
+        optionalSections.push(`Görüşmeci Notları:\n${notes.trim().slice(0, 4000)}`);
+    }
+
+    return `Sen kıdemli bir İK uzmanısın. Aşağıdaki MANUEL OLARAK YAPILMIŞ görüşmenin kayıtlarını değerlendir.
+
+Pozisyon: ${positionTitle || 'Genel Pozisyon'}
+Aday: ${candidateName || '(belirtilmedi)'}
+Görüşme Tipi: ${interviewType}
+Tarih: ${date || ''} ${time || ''}
+
+Sorular ve Cevaplar:
+${qaPairs || '(soru-cevap girilmedi)'}
+
+${optionalSections.join('\n\n')}
+
+Görevin:
+1. Her soru için 0-100 arası puan ver ve kısa Türkçe gerekçe yaz.
+2. Genel agregat skor üret (0-100).
+3. Görüşme hakkında 2-3 cümlelik Türkçe genel değerlendirme yaz.
+4. Outcome önerisi: "positive" (olumlu — pozisyona uygun), "negative" (olumsuz — uygun değil), veya "pending" (belirsiz — daha fazla görüşme gerek).
+
+YALNIZCA aşağıdaki JSON formatında yanıt ver, başka hiçbir şey yazma:
+{
+  "questions": [{"question": "...", "score": 85, "rationale": "..."}],
+  "aggregateScore": 85,
+  "summary": "Kısa genel değerlendirme",
+  "recommendedOutcome": "positive"
+}`;
+}
+
+router.post(
+    '/api/create-manual-interview',
+    aiLimiter,
+    requireAuth(['recruiter', 'admin', 'super_admin']),
+    async (req, res) => {
+        const {
+            candidateId,
+            candidateName,
+            positionId,
+            positionTitle,
+            interviewerName,
+            date,
+            time,
+            durationMinutes,
+            interviewType,
+            questions,
+            transcript,
+            notes,
+            recruiterOutcome,
+        } = req.body || {};
+
+        // ── Validation
+        if (!candidateId || !candidateName) {
+            return res.status(400).json({ error: 'candidateId ve candidateName zorunludur.' });
+        }
+        if (!date || typeof date !== 'string') {
+            return res.status(400).json({ error: 'Geçerli bir görüşme tarihi gerekli.' });
+        }
+        if (!VALID_INTERVIEW_TYPES.has(interviewType)) {
+            return res.status(400).json({
+                error: `interviewType şunlardan biri olmalı: ${[...VALID_INTERVIEW_TYPES].join(', ')}`,
+            });
+        }
+        if (recruiterOutcome && !VALID_OUTCOMES.has(recruiterOutcome)) {
+            return res.status(400).json({
+                error: `recruiterOutcome şunlardan biri olmalı: ${[...VALID_OUTCOMES].join(', ')}`,
+            });
+        }
+        const safeQuestions = Array.isArray(questions)
+            ? questions
+                  .filter((q) => q && typeof q.question === 'string' && q.question.trim())
+                  .map((q) => ({
+                      question: String(q.question).slice(0, 1000).trim(),
+                      answer: String(q.answer || '').slice(0, 5000).trim(),
+                  }))
+            : [];
+        const hasContent =
+            safeQuestions.length > 0 ||
+            (transcript && transcript.trim()) ||
+            (notes && notes.trim());
+        if (!hasContent) {
+            return res.status(400).json({
+                error: 'En az bir soru-cevap, transcript veya not girilmelidir.',
+            });
+        }
+
+        // ── AI evaluation (Gemini)
+        let aiAnalysis = null;
+        try {
+            const prompt = buildManualInterviewPrompt({
+                positionTitle,
+                candidateName,
+                interviewType,
+                date,
+                time,
+                questions: safeQuestions,
+                transcript,
+                notes,
+            });
+            const raw = (
+                await generateText(prompt, {
+                    generationConfig: {
+                        temperature: 0,
+                        topP: 0,
+                        topK: 1,
+                        maxOutputTokens: 4096,
+                        responseMimeType: 'application/json',
+                    },
+                })
+            )
+                .replace(/```json|```/gi, '')
+                .trim();
+            const match = raw.match(/\{[\s\S]*\}/);
+            if (match) {
+                const parsed = JSON.parse(match[0]);
+                const clamp = (v) => Math.min(100, Math.max(0, Math.round(Number(v) || 0)));
+                const scoredQuestions = (parsed.questions || []).map((s) => ({
+                    question: String(s.question || ''),
+                    score: clamp(s.score),
+                    rationale: String(s.rationale || ''),
+                }));
+                aiAnalysis = {
+                    questions: scoredQuestions,
+                    aggregateScore:
+                        parsed.aggregateScore != null
+                            ? clamp(parsed.aggregateScore)
+                            : scoredQuestions.length > 0
+                              ? Math.round(
+                                    scoredQuestions.reduce((sum, q) => sum + q.score, 0) /
+                                        scoredQuestions.length
+                                )
+                              : null,
+                    summary: String(parsed.summary || ''),
+                    recommendedOutcome: VALID_OUTCOMES.has(parsed.recommendedOutcome)
+                        ? parsed.recommendedOutcome
+                        : 'pending',
+                };
+            }
+        } catch (err) {
+            // AI eval failures don't block the record — recruiter still gets
+            // their manually entered data saved. The UI shows "AI değerlendirme
+            // başarısız" and the record can be re-evaluated later.
+            log.warn({ err: err.message }, '[create-manual-interview] AI evaluation failed');
+        }
+
+        // ── Persist to /interviews/{sessionId}
+        const sessionId = `mi-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+        try {
+            const sessionRef = db.doc(`interviews/${sessionId}`);
+            const payload = {
+                sessionId,
+                mode: 'manual',
+                candidateId,
+                candidateName,
+                positionId: positionId || null,
+                positionTitle: positionTitle || null,
+                interviewerId: req.user?.uid || null,
+                interviewerName: interviewerName || req.user?.email || null,
+                date,
+                time: time || null,
+                durationMinutes:
+                    typeof durationMinutes === 'number' && durationMinutes > 0
+                        ? Math.min(durationMinutes, 600)
+                        : null,
+                interviewType,
+                questions: safeQuestions,
+                transcript: typeof transcript === 'string' ? transcript.slice(0, 50000) : '',
+                notes: typeof notes === 'string' ? notes.slice(0, 10000) : '',
+                recruiterOutcome: recruiterOutcome || 'pending',
+                aiAnalysis,
+                status: 'completed',
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                createdBy: req.user?.uid || null,
+            };
+            await sessionRef.set(payload);
+
+            // Mirror onto candidate.interviewSessions[] so existing dashboard
+            // & timeline UIs (which read off the candidate doc) pick it up
+            // without changes.
+            try {
+                const candidateRef = db.doc(
+                    `artifacts/talent-flow/public/data/candidates/${candidateId}`
+                );
+                await candidateRef.set(
+                    {
+                        interviewSessions: admin.firestore.FieldValue.arrayUnion({
+                            id: sessionId,
+                            mode: 'manual',
+                            date,
+                            time: time || null,
+                            interviewType,
+                            status: 'completed',
+                            recruiterOutcome: recruiterOutcome || 'pending',
+                            aggregateScore: aiAnalysis?.aggregateScore ?? null,
+                            createdAt: new Date().toISOString(),
+                        }),
+                    },
+                    { merge: true }
+                );
+            } catch (mirrorErr) {
+                // Mirror is best-effort — the canonical record is /interviews/.
+                log.warn(
+                    { err: mirrorErr.message },
+                    '[create-manual-interview] candidate mirror failed'
+                );
+            }
+
+            log.info(
+                {
+                    sessionId,
+                    candidateId,
+                    aiOk: !!aiAnalysis,
+                },
+                '[create-manual-interview] created'
+            );
+            res.json({ sessionId, aiAnalysis });
+        } catch (err) {
+            log.error({ err: err.message }, '[create-manual-interview] Firestore write failed');
+            res.status(500).json({ error: err.message });
+        }
+    }
+);
 
 export default router;
