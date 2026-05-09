@@ -86,18 +86,34 @@ export default defineConfig([
       'no-undef': 'error',
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_', caughtErrors: 'none' }],
       'no-empty': ['warn', { allowEmptyCatch: true }],
-      // Console is fine on the server today — Phase 4b switches to pino, at
-      // which point this gate flips back to warn for `console.*`.
+      // Phase 4b — backend now uses pino via services/logger.js. Direct
+      // console.* calls bypass the structured logger and the Cloud Logging
+      // severity mapping, so flag them. The Puppeteer browser-context
+      // exception (functions/routes/scrape.js page.evaluate body) is
+      // overridden in the Puppeteer block below.
+      'no-console': 'warn',
+    },
+  },
+  // CLI scripts — interactive output to stdout is the whole point. Keep
+  // pino's structured logger reserved for the server runtime.
+  {
+    files: ['scripts/**/*.{js,mjs,cjs}'],
+    rules: {
       'no-console': 'off',
     },
   },
   // Puppeteer files — page.evaluate(() => document.foo) callbacks run inside
   // the headless browser context, so document/window are valid there. Allow
   // both Node and browser globals to avoid no-undef false positives.
+  // Also relax no-console: page.evaluate() callbacks log via console.* in
+  // the headless browser; pino isn't available in that scope.
   {
     files: ['functions/routes/scrape.js', 'functions/services/scrape.js', 'cli-scraper.mjs'],
     languageOptions: {
       globals: { ...globals.node, ...globals.browser, ...globals.es2022 },
+    },
+    rules: {
+      'no-console': 'off',
     },
   },
 ])
