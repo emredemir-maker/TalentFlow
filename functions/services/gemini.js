@@ -28,6 +28,9 @@
 import crypto from 'crypto';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { db } from '../config/firebaseAdmin.js';
+import { childLogger } from './logger.js';
+
+const log = childLogger('gemini');
 
 // In-memory cache. Bounded by MAX_CACHE_ENTRIES with FIFO eviction so a long-
 // running Cloud Functions instance doesn't accumulate unbounded state. Each
@@ -77,22 +80,22 @@ export async function getApiKeyDetailed() {
         if (settingsDoc.exists) {
             const raw = settingsDoc.data()?.gemini;
             if (raw && String(raw).length > 5) {
-                console.log('[gemini] key loaded from firestore');
+                log.info('key loaded from firestore');
                 return { key: String(raw).trim(), source: 'firestore' };
             }
         }
     } catch {
-        console.warn('[gemini] firestore key lookup failed; falling back to env');
+        log.warn('firestore key lookup failed; falling back to env');
     }
 
     // 2. Fallback to env
     const envKey = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
     if (envKey && envKey.trim() !== '' && envKey !== 'null' && envKey !== 'undefined') {
-        console.log('[gemini] key loaded from env');
+        log.info('key loaded from env');
         return { key: envKey.trim(), source: 'env' };
     }
 
-    console.warn('[gemini] no API key configured (firestore and env both empty)');
+    log.warn('no API key configured (firestore and env both empty)');
     return { key: null, source: 'none' };
 }
 
@@ -121,7 +124,7 @@ export async function generateText(prompt, options = {}) {
     if (key) {
         const cached = cacheGet(key);
         if (cached !== null) {
-            console.log('[gemini] cache hit');
+            log.debug('cache hit');
             return cached;
         }
     }
@@ -147,7 +150,10 @@ export async function generateText(prompt, options = {}) {
             const msg = err.message || '';
             if (!TRANSIENT_ERR.test(msg) || attempt === MAX_RETRIES) break;
             const backoffMs = Math.min(1000 * Math.pow(2, attempt), 16000) + Math.floor(Math.random() * 500);
-            console.warn(`[gemini] transient (attempt ${attempt + 1}/${MAX_RETRIES + 1}), backoff ${backoffMs}ms: ${msg.slice(0, 120)}`);
+            log.warn(
+                { attempt: attempt + 1, maxAttempts: MAX_RETRIES + 1, backoffMs, error: msg.slice(0, 120) },
+                'transient gemini error, retrying'
+            );
             await new Promise(r => setTimeout(r, backoffMs));
         }
     }
@@ -177,14 +183,14 @@ export async function parseProfile(text, modelId = 'gemini-2.5-flash') {
     Return ONLY raw JSON. No markdown.`;
 
     try {
-        console.log(`🤖 Using Gemini (${modelId}) to parse profile...`);
+        log.info({ modelId }, '🤖 Using Gemini to parse profile');
         const responseText = (await generateText(prompt, { modelId }))
             .replace(/```json/g, '').replace(/```/g, '').trim();
         const json = JSON.parse(responseText);
-        console.log(`✅ Parsed: ${json.name}`);
+        log.info({ name: json.name }, '✅ Parsed profile');
         return json;
     } catch (e) {
-        console.error('Gemini Parse Error:', e.message);
+        log.error({ err: e }, 'Gemini Parse Error');
         return null;
     }
 }

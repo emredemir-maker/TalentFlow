@@ -13,6 +13,8 @@ import { createRequire } from 'module';
 
 import { aiLimiter } from '../middleware/rateLimit.js';
 import { getApiKeyDetailed, generateText } from '../services/gemini.js';
+import { childLogger } from '../services/logger.js';
+const log = childLogger('ai');
 
 const require = createRequire(import.meta.url);
 const multer = require('multer');
@@ -55,7 +57,7 @@ router.post('/api/ai/generate', aiLimiter, async (req, res) => {
         });
         res.json({ text });
     } catch (err) {
-        console.error(`[ai/generate] failed (key source=${keyInfo.source}):`, err?.message);
+        log.error(`[ai/generate] failed (key source=${keyInfo.source}):`, err?.message);
         res.status(500).json({ error: err?.message || 'AI request failed' });
     }
 });
@@ -75,7 +77,7 @@ router.post('/api/ai/stt', aiLimiter, async (req, res) => {
         ], { useCache: false });
         res.json({ text });
     } catch (err) {
-        console.error('STT Error:', err.message);
+        log.error('STT Error:', err.message);
         res.status(500).json({ error: err.message });
     }
 });
@@ -98,13 +100,13 @@ router.post('/api/gemini-stt', aiLimiter, (req, res, next) => {
             // Path 1: multipart upload (LiveInterviewPage)
             audioBase64 = req.file.buffer.toString('base64');
             mimeType = (req.file.mimetype || 'audio/webm').split(';')[0];
-            console.log(`🎙️ STT (multipart) ${mimeType} ${(req.file.buffer.length / 1024).toFixed(1)}KB`);
+            log.info(`🎙️ STT (multipart) ${mimeType} ${(req.file.buffer.length / 1024).toFixed(1)}KB`);
         } else if (req.body?.audio) {
             // Path 2: base64 JSON (SettingsPage)
             audioBase64 = req.body.audio;
             mimeType = (req.body.mimeType || 'audio/webm').split(';')[0];
             const sizeKB = (audioBase64.length * 0.75 / 1024).toFixed(1);
-            console.log(`🎙️ STT (base64) ${mimeType} ~${sizeKB}KB`);
+            log.info(`🎙️ STT (base64) ${mimeType} ~${sizeKB}KB`);
         } else {
             return res.status(400).json({ error: 'Ses dosyası bulunamadı' });
         }
@@ -139,10 +141,10 @@ Kurallar:
             }
         } catch { /* fallback: use raw as text */ }
 
-        console.log(`✅ STT: "${text.substring(0, 60)}" | emotion: ${JSON.stringify(emotion)}`);
+        log.info(`✅ STT: "${text.substring(0, 60)}" | emotion: ${JSON.stringify(emotion)}`);
         res.json({ success: true, text, emotion });
     } catch (err) {
-        console.error('💥 Gemini STT Error:', err.message);
+        log.error('💥 Gemini STT Error:', err.message);
         res.status(500).json({ error: err.message });
     }
 });

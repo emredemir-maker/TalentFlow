@@ -11,6 +11,8 @@
 // so a single bad PDF in a bulk upload does not abort the entire batch — the
 // caller decides how to handle the sentinel string.
 import { createRequire } from 'module';
+import { childLogger } from './logger.js';
+const log = childLogger('pdf');
 
 const require = createRequire(import.meta.url);
 const pdfLib = require('pdf-parse');
@@ -41,7 +43,7 @@ export async function pdf(buffer) {
         }
         throw new Error('PDF parsing library not found or invalid');
     } catch (err) {
-        console.error('PDF Error:', err);
+        log.error('PDF Error:', err);
         return { text: 'PDF Error: ' + err.message };
     }
 }

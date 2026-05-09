@@ -10,6 +10,8 @@ import { Router } from 'express';
 
 import { aiLimiter } from '../middleware/rateLimit.js';
 import { generateText } from '../services/gemini.js';
+import { childLogger } from '../services/logger.js';
+const log = childLogger('screening');
 
 const router = Router();
 
@@ -37,7 +39,7 @@ router.post('/api/score-screening-answers', aiLimiter, async (req, res) => {
             : (scores.length > 0 ? Math.round(scores.reduce((sum, s) => sum + s.score, 0) / scores.length) : null);
         res.json({ scores, aggregateScore, summary: parsed.summary || '' });
     } catch (err) {
-        console.error('[score-screening-answers] Error:', err.message);
+        log.error('[score-screening-answers] Error:', err.message);
         res.status(500).json({ error: err.message });
     }
 });
@@ -57,7 +59,7 @@ router.post('/api/suggest-screening-questions', aiLimiter, async (req, res) => {
         const questions = (parsed.questions || []).slice(0, 5).filter(q => q && q.trim());
         res.json({ questions });
     } catch (err) {
-        console.error('[suggest-screening-questions] Error:', err.message);
+        log.error('[suggest-screening-questions] Error:', err.message);
         res.status(500).json({ error: err.message });
     }
 });
@@ -73,7 +75,7 @@ router.post('/api/improve-screening-question', aiLimiter, async (req, res) => {
         const parsed = JSON.parse(match[0]);
         res.json({ improved: parsed.improved || question });
     } catch (err) {
-        console.error('[improve-screening-question] Error:', err.message);
+        log.error('[improve-screening-question] Error:', err.message);
         res.status(500).json({ error: err.message });
     }
 });

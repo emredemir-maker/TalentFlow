@@ -4,6 +4,8 @@
 // Routes that need OAuth credentials should import the live `integrationConfigs`
 // object — values are mutated in place so a single import sees fresh state.
 import { db } from './firebaseAdmin.js';
+import { childLogger } from '../services/logger.js';
+const log = childLogger('integrations');
 
 export const integrationConfigs = { google: null, microsoft365: null };
 
@@ -14,15 +16,15 @@ export async function loadIntegrationConfigs() {
             const data = snap.data();
             if (data.google) {
                 integrationConfigs.google = data.google;
-                console.log('[integrations] Google config loaded from Firestore');
+                log.info('[integrations] Google config loaded from Firestore');
             }
             if (data.microsoft365) {
                 integrationConfigs.microsoft365 = data.microsoft365;
-                console.log('[integrations] Microsoft 365 config loaded from Firestore');
+                log.info('[integrations] Microsoft 365 config loaded from Firestore');
             }
         }
     } catch (err) {
-        console.warn('[integrations] Could not load integration configs:', err.message);
+        log.warn('[integrations] Could not load integration configs:', err.message);
     }
 }
 

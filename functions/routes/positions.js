@@ -13,6 +13,8 @@
 // nested objects). The two diverged historically — keep them separate to avoid
 // silently changing the type-coercion semantics of existing public traffic.
 import { Router } from 'express';
+import { childLogger } from '../services/logger.js';
+const log = childLogger('positions');
 
 const FS_BASE = () =>
     `https://firestore.googleapis.com/v1/projects/${process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID}/databases/(default)/documents`;
@@ -57,7 +59,7 @@ router.get('/api/positions/:positionId', async (req, res) => {
         if (r.status === 404) return res.status(404).json({ error: 'Pozisyon bulunamadı.' });
         if (!r.ok) {
             const errBody = await r.text();
-            console.error('Firestore GET position error:', r.status, errBody);
+            log.error('Firestore GET position error:', r.status, errBody);
             return res.status(500).json({ error: 'Pozisyon yüklenirken hata oluştu.' });
         }
         const docSnap = await r.json();
@@ -65,7 +67,7 @@ router.get('/api/positions/:positionId', async (req, res) => {
         if (data.status !== 'open') return res.status(403).json({ error: 'Bu pozisyon şu an başvuruya kapalı.' });
         res.json({ id: req.params.positionId, ...data });
     } catch (err) {
-        console.error('GET /api/positions/:id error:', err);
+        log.error('GET /api/positions/:id error:', err);
         res.status(500).json({ error: 'Pozisyon yüklenirken hata oluştu.' });
     }
 });
@@ -108,14 +110,14 @@ router.post('/api/applications', async (req, res) => {
         });
         if (!r.ok) {
             const errBody = await r.text();
-            console.error('Firestore POST application error:', r.status, errBody);
+            log.error('Firestore POST application error:', r.status, errBody);
             return res.status(500).json({ error: 'Başvuru kaydedilemedi.' });
         }
         const docData = await r.json();
         const id = docData.name?.split('/').pop();
         res.json({ id });
     } catch (err) {
-        console.error('POST /api/applications error:', err);
+        log.error('POST /api/applications error:', err);
         res.status(500).json({ error: 'Başvuru kaydedilemedi.' });
     }
 });

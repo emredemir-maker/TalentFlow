@@ -23,6 +23,8 @@ import { verifyFirebaseToken } from '../middleware/auth.js';
 import { db } from '../config/firebaseAdmin.js';
 import { integrationConfigs } from '../config/integrations.js';
 import { fsPatch } from '../services/firestoreRest.js';
+import { childLogger } from '../services/logger.js';
+const log = childLogger('auth');
 
 const router = Router();
 
@@ -50,7 +52,7 @@ router.get('/api/auth/microsoft/url', async (req, res) => {
         const url = `https://login.microsoftonline.com/${cfg.tenantId}/oauth2/v2.0/authorize?${params}`;
         res.json({ url });
     } catch (err) {
-        console.error('[microsoft/url]', err.message);
+        log.error('[microsoft/url]', err.message);
         res.status(500).json({ error: err.message });
     }
 });
@@ -129,10 +131,10 @@ router.post('/api/auth/microsoft/exchange', verifyFirebaseToken, async (req, res
             );
         }
 
-        console.log(`[microsoft/exchange] User ${userId} connected Microsoft: ${email}`);
+        log.info(`[microsoft/exchange] User ${userId} connected Microsoft: ${email}`);
         res.json({ success: true, email });
     } catch (err) {
-        console.error('[microsoft/exchange]', err.message);
+        log.error('[microsoft/exchange]', err.message);
         res.status(500).json({ error: err.message });
     }
 });
@@ -179,7 +181,7 @@ router.post('/api/auth/microsoft/refresh', verifyFirebaseToken, async (req, res)
 
         res.json({ success: true, accessToken: access_token });
     } catch (err) {
-        console.error('[microsoft/refresh]', err.message);
+        log.error('[microsoft/refresh]', err.message);
         res.status(500).json({ error: err.message });
     }
 });
@@ -212,7 +214,7 @@ router.get('/api/auth/google/url', async (req, res) => {
         });
         res.json({ url: `https://accounts.google.com/o/oauth2/v2/auth?${params}` });
     } catch (err) {
-        console.error('[google/url]', err.message);
+        log.error('[google/url]', err.message);
         res.status(500).json({ error: err.message });
     }
 });
@@ -280,10 +282,10 @@ router.post('/api/auth/google/exchange', verifyFirebaseToken, async (req, res) =
                 { 'integrations.google': integrationData }, req.firebaseToken);
         }
 
-        console.log(`[google/exchange] User ${userId} connected: ${email}`);
+        log.info(`[google/exchange] User ${userId} connected: ${email}`);
         res.json({ success: true, email });
     } catch (err) {
-        console.error('[google/exchange]', err.message);
+        log.error('[google/exchange]', err.message);
         res.status(500).json({ error: err.message });
     }
 });
@@ -325,7 +327,7 @@ router.post('/api/auth/google/refresh', verifyFirebaseToken, async (req, res) =>
 
         res.json({ success: true, accessToken: access_token });
     } catch (err) {
-        console.error('[google/refresh]', err.message);
+        log.error('[google/refresh]', err.message);
         res.status(500).json({ error: err.message });
     }
 });

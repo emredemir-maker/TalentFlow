@@ -15,6 +15,8 @@ import { Router } from 'express';
 
 import { requireAuth } from '../middleware/auth.js';
 import { db } from '../config/firebaseAdmin.js';
+import { childLogger } from '../services/logger.js';
+const log = childLogger('users');
 
 const PARTICIPANT_ROLES = ['super_admin', 'recruiter', 'department_user'];
 
@@ -59,7 +61,7 @@ router.get('/api/users', requireAuth(), async (req, res) => {
         });
         res.json({ users });
     } catch (err) {
-        console.error('[API /api/users] Error:', err);
+        log.error('[API /api/users] Error:', err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -91,7 +93,7 @@ router.post('/api/users/availability', requireAuth(), async (req, res) => {
             const busy = fbData.calendars?.primary?.busy || [];
             results[uid] = busy.length > 0 ? 'busy' : 'available';
         } catch (err) {
-            console.warn(`[Availability] uid=${uid}:`, err.message);
+            log.warn(`[Availability] uid=${uid}:`, err.message);
             results[uid] = 'unknown';
         }
     }));

@@ -20,6 +20,8 @@ import { fileURLToPath } from 'url';
 import { aiLimiter } from '../middleware/rateLimit.js';
 import { isSafeLinkedInUrl } from '../services/scrape.js';
 import { parseProfile, getApiKey } from '../services/gemini.js';
+import { childLogger } from '../services/logger.js';
+const log = childLogger('scrape');
 
 const __filename = fileURLToPath(import.meta.url);
 // Chrome user-data lives at the repo root, not inside functions/routes/.
@@ -33,7 +35,7 @@ router.get('/api/scrape', aiLimiter, async (req, res) => {
     const query = req.query.q;
     if (!query) return res.status(400).json({ error: 'Query parameter "q" is required.' });
 
-    console.log(`🔍 Received Request: "${query}"`);
+    log.info(`🔍 Received Request: "${query}"`);
     const isVisual = req.query.visual === 'true';
 
     // If the query parses as a URL, only allow https://*.linkedin.com hostnames.
@@ -43,7 +45,7 @@ router.get('/api/scrape', aiLimiter, async (req, res) => {
         if (!isSafeLinkedInUrl(query)) {
             return res.status(400).json({ error: 'Yalnızca https LinkedIn URL\'lerine izin verilir.' });
         }
-        console.log('🔗 Direct URL detected. Jumping straight to profile...');
+        log.info('🔗 Direct URL detected. Jumping straight to profile...');
         return await handleDirectUrl(query, res, isVisual);
     }
 
@@ -62,7 +64,7 @@ router.get('/api/scrape', aiLimiter, async (req, res) => {
 
     let browser;
     try {
-        console.log(`🌐 Launching browser (Visual: ${isVisual}, Profile: ${sessionPath})...`);
+        log.info(`🌐 Launching browser (Visual: ${isVisual}, Profile: ${sessionPath})...`);
 
         browser = await puppeteer.launch({
             headless: isVisual ? false : 'new',
@@ -88,14 +90,14 @@ router.get('/api/scrape', aiLimiter, async (req, res) => {
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
         await page.setViewport({ width: 1920, height: 1080 });
 
-        console.log(`🔎 Searching across engines for "${query}"...`);
+        log.info(`🔎 Searching across engines for "${query}"...`);
         let scrapedData = [];
         let seenUrls = new Set();
 
         for (const url of SEARCH_URLS) {
             if (scrapedData.length >= 5) break;
 
-            console.log(`📡 Trying engine: ${url}`);
+            log.info(`📡 Trying engine: ${url}`);
             try {
                 // Use a more relaxed waitUntil to avoid 'blank page' issues with slow trackers
                 await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
@@ -106,15 +108,15 @@ router.get('/api/scrape', aiLimiter, async (req, res) => {
                 // If page seems blank or loading failed, try one more wait
                 const isBlank = await page.evaluate(() => document.body.innerText.length < 100);
                 if (isBlank) {
-                    console.log('⚠️ Page looks empty, waiting longer for dynamic content...');
+                    log.info('⚠️ Page looks empty, waiting longer for dynamic content...');
                     await new Promise(r => setTimeout(r, 5000));
                 }
 
                 // If we are directly on LinkedIn, wait for results to load
                 if (url.includes('linkedin.com/search')) {
-                    console.log('⏳ Waiting for LinkedIn search results UI...');
+                    log.info('⏳ Waiting for LinkedIn search results UI...');
                     await page.waitForSelector('.reusable-search__result-container, .artdeco-list__item, .entity-result', { timeout: 15000 }).catch(() => {
-                        console.log('Timeout waiting for LinkedIn results, proceeding with current content.');
+                        log.info('Timeout waiting for LinkedIn results, proceeding with current content.');
                     });
                 }
 
@@ -123,9 +125,9 @@ router.get('/api/scrape', aiLimiter, async (req, res) => {
                 // Check for block/captcha
                 const pageBody = await page.evaluate(() => document.body.innerText.toLowerCase());
                 if (pageBody.includes('security check') || pageBody.includes('not a robot') || pageBody.includes('captcha')) {
-                    console.warn(`🛑 CAPTCHA detected on: ${url.split('/')[2]}`);
+                    log.warn(`🛑 CAPTCHA detected on: ${url.split('/')[2]}`);
                     if (isVisual) {
-                        console.log('👀 Visual Mode: Waiting 30 seconds for manual resolution...');
+                        log.info('👀 Visual Mode: Waiting 30 seconds for manual resolution...');
                         await new Promise(r => setTimeout(r, 30000));
                     }
                 }
@@ -208,19 +210,19 @@ router.get('/api/scrape', aiLimiter, async (req, res) => {
                     return unique;
                 });
 
-                console.log(`✅ Engine ${url.split('/')[2]} found ${itemsFromPage.length} potential items.`);
+                log.info(`✅ Engine ${url.split('/')[2]} found ${itemsFromPage.length} potential items.`);
 
                 for (const item of itemsFromPage) {
                     if (scrapedData.length >= MAX_RESULTS) break;
                     if (seenUrls.has(item.url)) continue;
                     seenUrls.add(item.url);
 
-                    console.log(`🚀 Processing candidate: ${item.name}`);
+                    log.info(`🚀 Processing candidate: ${item.name}`);
                     let profileText = `TITLE: ${item.rawTitle}\nSNIPPET: ${item.rawSnippet}`;
                     let extractionMethod = 'snippet';
 
                     if (isVisual && (item.url.includes('/in/') || item.url.includes('/sales/profile/'))) {
-                        console.log(`🔍 Visiting profile: ${item.url}`);
+                        log.info(`🔍 Visiting profile: ${item.url}`);
                         try {
                             const detailPage = await browser.newPage();
                             await detailPage.setUserAgent(await page.evaluate(() => navigator.userAgent));
@@ -237,24 +239,24 @@ router.get('/api/scrape', aiLimiter, async (req, res) => {
                                 (fullText.includes("LinkedIn'e katılın") || fullText.includes("Join LinkedIn"));
 
                             if (fullText.length > 1000 && !hasLoginText) {
-                                console.log(`📄 Detail Page captured (${fullText.length} chars)`);
+                                log.info(`📄 Detail Page captured (${fullText.length} chars)`);
                                 profileText = fullText;
                                 extractionMethod = 'full-page';
                             } else {
-                                console.log(`⚠️ Profile hidden or restricted. Using snippet as fallback.`);
+                                log.info(`⚠️ Profile hidden or restricted. Using snippet as fallback.`);
                             }
                             await detailPage.close();
                         } catch (detailErr) {
-                            console.warn(`⚠️ Detail visit failed: ${item.url}. Error: ${detailErr.message}`);
+                            log.warn(`⚠️ Detail visit failed: ${item.url}. Error: ${detailErr.message}`);
                         }
                     }
 
-                    console.log(`🤖 Gemini Parsing (${extractionMethod}): ${item.name}...`);
+                    log.info(`🤖 Gemini Parsing (${extractionMethod}): ${item.name}...`);
                     let refined = await parseProfile(profileText, 'gemini-2.5-flash');
 
                     // Final Fallback: If full-page parse failed, try snippet one last time
                     if (!refined && extractionMethod === 'full-page') {
-                        console.log('🔄 Full-page parse failed. Retrying with original snippet...');
+                        log.info('🔄 Full-page parse failed. Retrying with original snippet...');
                         profileText = `TITLE: ${item.rawTitle}\nSNIPPET: ${item.rawSnippet}`;
                         refined = await parseProfile(profileText, 'gemini-2.5-flash');
                     }
@@ -271,33 +273,33 @@ router.get('/api/scrape', aiLimiter, async (req, res) => {
                         };
 
                         scrapedData.push(finalCandidate);
-                        console.log(`✅ Candidate Added: ${finalCandidate.name}`);
+                        log.info(`✅ Candidate Added: ${finalCandidate.name}`);
                     } else {
-                        console.warn(`❌ No data extracted for: ${item.name}`);
+                        log.warn(`❌ No data extracted for: ${item.name}`);
                     }
                 }
 
                 // If we found results on LinkedIn (first engine), no need to check Google/Bing
                 if (scrapedData.length > 0) {
-                    console.log('✨ Found enough candidates on LinkedIn. Skipping other engines.');
+                    log.info('✨ Found enough candidates on LinkedIn. Skipping other engines.');
                     break;
                 }
             } catch (e) {
-                console.warn(`⚠️ Engine failed: ${url.split('/')[2]}`, e.message);
+                log.warn(`⚠️ Engine failed: ${url.split('/')[2]}`, e.message);
             }
         }
 
         if (scrapedData.length === 0 && isVisual) {
-            console.log('⚠️ No profiles found in Visual Mode. Keeping browser open for 15s for inspection...');
+            log.info('⚠️ No profiles found in Visual Mode. Keeping browser open for 15s for inspection...');
             await new Promise(r => setTimeout(r, 15000));
         }
 
         await browser.close();
-        console.log(`🎉 Scraping session finished. Total: ${scrapedData.length}`);
+        log.info(`🎉 Scraping session finished. Total: ${scrapedData.length}`);
         res.json({ candidates: scrapedData, message: `Successfully found ${scrapedData.length} profiles from deep search.` });
 
     } catch (error) {
-        console.error('💥 Critical Server Scrape Error:', error);
+        log.error('💥 Critical Server Scrape Error:', error);
         if (browser) try { await browser.close(); } catch (e) { }
         res.status(500).json({ error: error.message || 'Internal Server Error' });
     }
@@ -307,7 +309,7 @@ router.get('/api/scrape', aiLimiter, async (req, res) => {
 async function handleDirectUrl(url, res, isVisual = false) {
     let browser;
     try {
-        console.log(`🌐 Launching browser for direct URL (Visual: ${isVisual}, Profile: ${sessionPath})...`);
+        log.info(`🌐 Launching browser for direct URL (Visual: ${isVisual}, Profile: ${sessionPath})...`);
 
         browser = await puppeteer.launch({
             headless: isVisual ? false : 'new',
@@ -329,12 +331,12 @@ async function handleDirectUrl(url, res, isVisual = false) {
         const page = pages.length > 0 ? pages[0] : await browser.newPage();
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
 
-        console.log(`🚀 Visiting direct URL: ${url}`);
+        log.info(`🚀 Visiting direct URL: ${url}`);
         await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
 
         // Special case for Login/Setup
         if (url.includes('login') || url.includes('linkedin.com') && !url.includes('/in/') && !url.includes('/sales/')) {
-            console.log('🔑 Setup mode detected. Waiting for user to complete login...');
+            log.info('🔑 Setup mode detected. Waiting for user to complete login...');
             if (isVisual) {
                 // Wait for 2 minutes or until closed to let user log in
                 await new Promise(r => setTimeout(r, 120000));
@@ -347,7 +349,7 @@ async function handleDirectUrl(url, res, isVisual = false) {
         const bodyText = await page.evaluate(() => document.body.innerText);
 
         if (bodyText.includes("Sign In") || bodyText.includes("Security Check") || bodyText.length < 1000) {
-            console.warn('❌ LinkedIn block detected on direct visit.');
+            log.warn('❌ LinkedIn block detected on direct visit.');
             await browser.close();
             return res.json({ candidates: [], message: 'LinkedIn bu sayfayı görmemizi engelledi (Giriş duvarı). Lütfen "Tarayıcıda Oturumu Hazırla" butonunu kullanarak giriş yapın.' });
         }
@@ -366,7 +368,7 @@ async function handleDirectUrl(url, res, isVisual = false) {
         await browser.close();
         res.json({ candidates: [], message: 'Profil verisi bu sayfadan ayrıştırılamadı.' });
     } catch (e) {
-        console.error('💥 Direct URL Error:', e.message);
+        log.error('💥 Direct URL Error:', e.message);
         if (browser) await browser.close();
         res.status(500).json({ error: e.message });
     }

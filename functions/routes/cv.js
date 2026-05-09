@@ -23,6 +23,8 @@ import { aiLimiter } from '../middleware/rateLimit.js';
 import { pdf } from '../services/pdf.js';
 import { parseProfile } from '../services/gemini.js';
 import { db } from '../config/firebaseAdmin.js';
+import { childLogger } from '../services/logger.js';
+const log = childLogger('cv');
 
 const require = createRequire(import.meta.url);
 const mammoth = require('mammoth');
@@ -75,7 +77,7 @@ const router = Router();
 router.post('/api/direct-add', aiLimiter, async (req, res) => {
     try {
         const { text, url } = req.body;
-        console.log(`📥 Direct Add request for: ${url}`);
+        log.info(`📥 Direct Add request for: ${url}`);
 
         const candidate = await parseProfile(text, 'gemini-2.5-flash');
         if (candidate && candidate.name) {
@@ -97,7 +99,7 @@ router.post('/api/process-cv', aiLimiter, upload.array('cvs', 20), async (req, r
     try {
         if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'Dosya seçilmedi' });
 
-        console.log(`📂 Processing ${req.files.length} uploaded CVs...`);
+        log.info(`📂 Processing ${req.files.length} uploaded CVs...`);
 
         const results = await Promise.all(req.files.map(async (file) => {
             try {
@@ -130,14 +132,14 @@ router.post('/api/process-cv', aiLimiter, upload.array('cvs', 20), async (req, r
 
                 return { fileName: file.originalname, candidate, success: true };
             } catch (err) {
-                console.error(`Error processing ${file.originalname}:`, err);
+                log.error(`Error processing ${file.originalname}:`, err);
                 return { fileName: file.originalname, error: err.message };
             }
         }));
 
         res.json({ results });
     } catch (err) {
-        console.error('Bulk CV Processing Error:', err);
+        log.error('Bulk CV Processing Error:', err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -176,7 +178,7 @@ router.post('/api/check-duplicate', async (req, res) => {
             existingName: existing?.name || null,
         });
     } catch (err) {
-        console.error('Duplicate check error:', err.message);
+        log.error('Duplicate check error:', err.message);
         res.json({ isDuplicate: false });
     }
 });

@@ -47,6 +47,7 @@ import {
     recoverStaleJobs,
     runBulkWorkerLoop,
 } from './services/bulkWorker.js';
+import { logger } from './services/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -103,7 +104,7 @@ app.use(createBulkRouter(uploadBaseDir));
 setImmediate(() => {
     setTimeout(async () => {
         await recoverStaleJobs();
-        runBulkWorkerLoop().catch(err => console.error('[bulk-import] Worker loop fatal:', err));
+        runBulkWorkerLoop().catch((err) => logger.error({ err }, '[bulk-import] Worker loop fatal'));
     }, 3000);
 });
 
@@ -113,8 +114,8 @@ const PORT = process.env.PORT || 3001;
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 if (isMain) {
     app.listen(PORT, '0.0.0.0', () => {
-        console.log(`🚀 Backend Server running on http://localhost:${PORT}`);
-        console.log(`📡 Health: http://localhost:${PORT}/api/health`);
+        logger.info({ port: PORT, url: `http://localhost:${PORT}` }, '🚀 Backend Server running');
+        logger.info({ url: `http://localhost:${PORT}/api/health` }, '📡 Health check ready');
         cleanupOldFiles(uploadBaseDir);
     });
 }
