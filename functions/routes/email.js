@@ -36,7 +36,11 @@ import path from 'path';
 
 import { generalLimiter } from '../middleware/rateLimit.js';
 import { verifyFirebaseToken } from '../middleware/auth.js';
-import { db } from '../config/firebaseAdmin.js';
+import { db, admin } from '../config/firebaseAdmin.js';
+// fsGet/fsPatch/fsSet are caller-token Firestore REST helpers — they hit
+// Firestore impersonating the end user so security rules apply, vs. the
+// admin SDK which bypasses rules.
+import { fsGet, fsPatch, fsSet } from '../services/firestoreRest.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
