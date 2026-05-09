@@ -79,7 +79,10 @@ router.post('/api/direct-add', aiLimiter, async (req, res) => {
         const { text, url } = req.body;
         log.info(`📥 Direct Add request for: ${url}`);
 
-        const candidate = await parseProfile(text, 'gemini-2.5-flash');
+        // Use parseProfile's default model — controlled via CV_PARSING_MODEL
+        // env var (defaults to gemini-2.5-flash; can be flipped to gemma-3-27b-it
+        // or any other Google AI Studio model id without code changes).
+        const candidate = await parseProfile(text);
         if (candidate && candidate.name) {
             candidate.linkedinUrl = url;
             candidate.source = 'Browser Extension';
@@ -123,7 +126,10 @@ router.post('/api/process-cv', aiLimiter, upload.array('cvs', 20), async (req, r
                     return { fileName: file.originalname, error: 'İçerik okunamadı' };
                 }
 
-                const candidate = await parseProfile(text, 'gemini-2.5-flash');
+                // Same CV_PARSING_MODEL env var as /api/direct-add — see
+                // services/gemini.js getDefaultCvParsingModel() for the
+                // resolution order.
+                const candidate = await parseProfile(text);
                 if (!candidate) return { fileName: file.originalname, error: 'AI ayrıştırma hatası' };
 
                 // Add the URL to the stored file

@@ -160,7 +160,25 @@ export async function generateText(prompt, options = {}) {
     throw lastErr;
 }
 
-export async function parseProfile(text, modelId = 'gemini-2.5-flash') {
+// CV parsing model — defaults to Gemini, but operators can flip to Gemma
+// (or any other Google AI Studio model id) without redeploy by setting the
+// CV_PARSING_MODEL env var. Per-call modelId still wins if explicitly
+// passed. Evaluated per-call so a runtime env update takes effect on the
+// next request without restart.
+//
+// Why CV parsing first:
+//   - Highest-volume task (every uploaded CV)
+//   - Text-in / JSON-out — no audio/multimodal Gemini lock-in
+//   - parseProfile already returns null on failure → safe failure mode
+//     during A/B testing (frontend handles null gracefully)
+//   - Other tasks (STT, STAR analysis, screening) stay on Gemini until
+//     this one's quality is validated in production.
+export function getDefaultCvParsingModel() {
+    return process.env.CV_PARSING_MODEL || 'gemini-2.5-flash';
+}
+
+export async function parseProfile(text, modelId) {
+    const effectiveModelId = modelId || getDefaultCvParsingModel();
     const prompt = `You are a strict JSON parser.
     Extract the following fields from the LinkedIn profile text below:
     - name (Full Name)
@@ -183,14 +201,14 @@ export async function parseProfile(text, modelId = 'gemini-2.5-flash') {
     Return ONLY raw JSON. No markdown.`;
 
     try {
-        log.info({ modelId }, '🤖 Using Gemini to parse profile');
-        const responseText = (await generateText(prompt, { modelId }))
+        log.info({ modelId: effectiveModelId }, '🤖 Parsing profile');
+        const responseText = (await generateText(prompt, { modelId: effectiveModelId }))
             .replace(/```json/g, '').replace(/```/g, '').trim();
         const json = JSON.parse(responseText);
-        log.info({ name: json.name }, '✅ Parsed profile');
+        log.info({ name: json.name, modelId: effectiveModelId }, '✅ Parsed profile');
         return json;
     } catch (e) {
-        log.error({ err: e }, 'Gemini Parse Error');
+        log.error({ err: e, modelId: effectiveModelId }, 'Profile parse error');
         return null;
     }
 }
