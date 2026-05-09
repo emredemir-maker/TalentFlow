@@ -213,18 +213,23 @@ export function areDomainsCompatible(d1, d2) {
 
 /**
  * Detect the job domain for a candidate.
- * Strategy: check job title/position first (title signals are more reliable
- * than CV body which may contain incidental context from the employer's industry).
- * Only fall back to full-text if the title gives no clear domain.
+ * Strategy:
+ *   1. Title/position — most specific signal for non-management roles
+ *   2. If title is 'management' (a WILDCARD, compatible with everything),
+ *      check the CV body for a more specific signal — a "Project Manager"
+ *      whose career has been entirely in HR should classify as 'hr', not
+ *      "compatible-with-anything". Without this rescue, a candidate gets
+ *      paired with random open positions because the wildcard skips
+ *      filterPositionsByDomain entirely.
+ *   3. Fall back to full body text for 'general' titles
  */
 export function detectCandidateDomain(candidate) {
-    // 1. Try title/position — the most reliable signal
+    // 1. Title — most reliable for specific roles (Frontend Developer,
+    //    Data Analyst, Sales Manager, etc.)
     const titleDomain = detectDomainFromTitle(
         `${candidate.position || ''} ${candidate.title || ''}`
     );
-    if (titleDomain !== 'general') return titleDomain;
 
-    // 2. Fall back to full profile text
     const fullText = [
         candidate.about || '',
         candidate.description || '',
@@ -234,6 +239,24 @@ export function detectCandidateDomain(candidate) {
             : '',
         candidate.cvData || '',
     ].join(' ');
+
+    // 2. Management wildcard rescue — if the title gave us 'management'
+    //    (e.g. "Project Manager", "General Manager"), check the body. If
+    //    the body shows a clear specialist domain (hr, finance, engineering
+    //    etc.), prefer that over the wildcard. Only keep 'management' when
+    //    the body also says 'management' or 'general' — i.e. a true
+    //    cross-functional manager with no clear specialty.
+    if (titleDomain === 'management') {
+        const bodyDomain = detectJobDomain(fullText);
+        if (bodyDomain !== 'general' && bodyDomain !== 'management') {
+            return bodyDomain;
+        }
+        return 'management';
+    }
+
+    if (titleDomain !== 'general') return titleDomain;
+
+    // 3. Body fallback for vague/missing titles
     return detectJobDomain(fullText);
 }
 

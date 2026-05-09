@@ -137,6 +137,58 @@ describe('detectCandidateDomain', () => {
     it('returns general when nothing matches', () => {
         expect(detectCandidateDomain({ position: 'Baker', cvData: 'Bread' })).toBe('general');
     });
+
+    // Production bug fix: 'management' titles like "Project Manager" used to
+    // short-circuit the function and return immediately as a wildcard,
+    // skipping body inspection. That meant a "Project Manager" with all-HR
+    // experience was paired with random open positions because the wildcard
+    // skipped filterPositionsByDomain. The rescue: when title is
+    // 'management', check the body for a more specific signal.
+    describe('management wildcard rescue', () => {
+        it('prefers HR body over "Project Manager" title', () => {
+            const candidate = {
+                position: 'Project Manager',
+                cvData:
+                    'İK uzmanı olarak işe alım, talent acquisition ve İK Müdürü olarak işe alım uzmanı süreçlerinde 10 yıl deneyim. HR business partner ve performans yönetimi.',
+            };
+            expect(detectCandidateDomain(candidate)).toBe('hr');
+        });
+
+        it('prefers engineering body over "Software Manager" title', () => {
+            const candidate = {
+                position: 'Software Manager',
+                skills: ['React', 'TypeScript', 'Node.js', 'PostgreSQL', 'Docker'],
+                cvData: 'Frontend developer ve backend developer olarak 8 yıl deneyim.',
+            };
+            // Title alone matches both 'engineering' and 'management' keywords;
+            // the rescue is only used when title === 'management' exactly.
+            // For "Software Manager" the title scoring picks 'engineering' so
+            // the rescue isn't needed — but verify it lands on engineering
+            // either way.
+            expect(detectCandidateDomain(candidate)).toBe('engineering');
+        });
+
+        it('prefers finance body over "Finance Manager" title (literally management term too)', () => {
+            const candidate = {
+                position: 'Finance Manager',
+                cvData:
+                    'Finansal analist ve finans müdürü olarak bütçe planlama ve mali müşavir görevlerinde deneyim.',
+            };
+            expect(detectCandidateDomain(candidate)).toBe('finance');
+        });
+
+        it('keeps "management" wildcard when body is also generic/management', () => {
+            // A real cross-functional manager with no specialty signal — the
+            // wildcard is correct here.
+            const candidate = {
+                position: 'General Manager',
+                cvData:
+                    'Genel müdür olarak yönetim kurulu ve direktör pozisyonlarında deneyim.',
+            };
+            expect(detectCandidateDomain(candidate)).toBe('management');
+        });
+
+    });
 });
 
 describe('detectPositionDomain', () => {
