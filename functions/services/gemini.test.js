@@ -39,7 +39,7 @@ vi.mock('../config/firebaseAdmin.js', () => ({
 }));
 
 // Now safe to import the module.
-const { generateText, parseProfile } = await import('./gemini.js');
+const { generateText, parseProfile, getDefaultCvParsingModel } = await import('./gemini.js');
 
 beforeEach(() => {
     mockGenerateContent.mockReset();
@@ -201,5 +201,105 @@ describe('parseProfile', () => {
 
         const result = await parseProfile(uniq());
         expect(result).toBeNull();
+    });
+});
+
+describe('getDefaultCvParsingModel — Gemma A/B switch', () => {
+    const origEnv = process.env.CV_PARSING_MODEL;
+
+    afterEach(() => {
+        // Restore env to whatever the surrounding shell had
+        if (origEnv === undefined) {
+            delete process.env.CV_PARSING_MODEL;
+        } else {
+            process.env.CV_PARSING_MODEL = origEnv;
+        }
+    });
+
+    it('defaults to gemini-2.5-flash when env var is unset', () => {
+        delete process.env.CV_PARSING_MODEL;
+        expect(getDefaultCvParsingModel()).toBe('gemini-2.5-flash');
+    });
+
+    it('returns the CV_PARSING_MODEL env var value when set (Gemma flip)', () => {
+        process.env.CV_PARSING_MODEL = 'gemma-3-27b-it';
+        expect(getDefaultCvParsingModel()).toBe('gemma-3-27b-it');
+    });
+
+    it('is evaluated per-call so a runtime env update is picked up immediately', () => {
+        delete process.env.CV_PARSING_MODEL;
+        expect(getDefaultCvParsingModel()).toBe('gemini-2.5-flash');
+        process.env.CV_PARSING_MODEL = 'gemma-3-27b-it';
+        // No restart, no module reload — just calling again
+        expect(getDefaultCvParsingModel()).toBe('gemma-3-27b-it');
+    });
+
+    it('treats empty string env var as unset (defensive)', () => {
+        process.env.CV_PARSING_MODEL = '';
+        // Empty string is falsy → fallback kicks in. Operators that
+        // accidentally clear the env var don't break parsing.
+        expect(getDefaultCvParsingModel()).toBe('gemini-2.5-flash');
+    });
+});
+
+describe('parseProfile model resolution', () => {
+    const origEnv = process.env.CV_PARSING_MODEL;
+
+    beforeEach(() => {
+        delete process.env.CV_PARSING_MODEL;
+    });
+
+    afterEach(() => {
+        if (origEnv === undefined) {
+            delete process.env.CV_PARSING_MODEL;
+        } else {
+            process.env.CV_PARSING_MODEL = origEnv;
+        }
+    });
+
+    it('uses the explicit modelId argument when passed (highest priority)', async () => {
+        process.env.CV_PARSING_MODEL = 'gemma-3-27b-it';
+        mockGenerateContent.mockResolvedValue({
+            response: { text: () => '{"name":"X"}' },
+        });
+
+        // Spy on getGenerativeModel to capture which model was selected
+        const sdk = await import('@google/generative-ai');
+        const spy = vi.spyOn(sdk.GoogleGenerativeAI.prototype, 'getGenerativeModel');
+
+        await parseProfile('text-' + Math.random(), 'explicit-model-id');
+        const call = spy.mock.calls.at(-1);
+        expect(call?.[0]?.model).toBe('explicit-model-id');
+        spy.mockRestore();
+    });
+
+    it('falls back to CV_PARSING_MODEL env var when no modelId passed', async () => {
+        process.env.CV_PARSING_MODEL = 'gemma-3-27b-it';
+        mockGenerateContent.mockResolvedValue({
+            response: { text: () => '{"name":"Y"}' },
+        });
+
+        const sdk = await import('@google/generative-ai');
+        const spy = vi.spyOn(sdk.GoogleGenerativeAI.prototype, 'getGenerativeModel');
+
+        await parseProfile('text-' + Math.random());
+        const call = spy.mock.calls.at(-1);
+        expect(call?.[0]?.model).toBe('gemma-3-27b-it');
+        spy.mockRestore();
+    });
+
+    it('falls back to gemini-2.5-flash when neither arg nor env var is set', async () => {
+        delete process.env.CV_PARSING_MODEL;
+        mockGenerateContent.mockResolvedValue({
+            response: { text: () => '{"name":"Z"}' },
+        });
+
+        const sdk = await import('@google/generative-ai');
+        const spy = vi.spyOn(sdk.GoogleGenerativeAI.prototype, 'getGenerativeModel');
+
+        await parseProfile('text-' + Math.random());
+        const call = spy.mock.calls.at(-1);
+        expect(call?.[0]?.model).toBe('gemini-2.5-flash');
+        spy.mockRestore();
     });
 });
