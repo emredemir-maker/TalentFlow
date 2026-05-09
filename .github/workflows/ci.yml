@@ -1,0 +1,55 @@
+# CI — runs on every PR and on pushes to main.
+# Phase 4a establishes lint + format + build gates. Future phases (4c/4d) will
+# add Vitest unit tests and Playwright E2E.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Cancel superseded runs when a branch is pushed to repeatedly.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint & Format
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci --no-audit --no-fund
+      # lint:ci enforces the baseline warning count via --max-warnings. Adding
+      # warnings without removing equivalents elsewhere will fail this gate.
+      - name: ESLint (baseline-locked)
+        run: npm run lint:ci
+      # Prettier check — fails if any committed file would be reformatted.
+      # This relies on lint-staged having auto-formatted touched files locally
+      # before commit.
+      - name: Prettier check
+        run: npm run format:check
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci --no-audit --no-fund
+      - name: Vite build
+        run: npm run build
+        env:
+          # Build runs without real Firebase keys — the bundle compiles fine
+          # without them since Vite only warns on missing VITE_* vars.
+          NODE_ENV: production
