@@ -1,7 +1,7 @@
 # CI — runs on every PR and on pushes to main.
 #
 # Four parallel jobs:
-#   - lint:  dep-drift check, ESLint (baseline-locked), Prettier
+#   - lint:  dep-drift, ESLint (baseline-locked), Prettier, tsc --noEmit
 #   - test:  Vitest with coverage gate (50% on curated service slice)
 #   - build: Vite production build
 #   - e2e:   Playwright smoke tests against `vite preview` (no Firebase
@@ -48,6 +48,13 @@ jobs:
       # before commit.
       - name: Prettier check
         run: npm run format:check
+      # TypeScript type check on .ts/.tsx files. With `allowJs: true` and
+      # `checkJs: false` in tsconfig.json, .js files are accepted as inputs
+      # but not type-checked, so this gate only validates the slice of the
+      # codebase that has graduated to TS. Phase 4e migrates one module
+      # (pii.ts) as a demo; future PRs add more.
+      - name: TypeScript typecheck
+        run: npm run typecheck
 
   test:
     name: Unit tests
