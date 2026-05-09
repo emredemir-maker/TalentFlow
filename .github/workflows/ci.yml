@@ -36,6 +36,32 @@ jobs:
       - name: Prettier check
         run: npm run format:check
 
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci --no-audit --no-fund
+      # Vitest with coverage — the gate is configured in vitest.config.js
+      # (50% across statements/branches/functions/lines on the curated
+      # service slice). Phase 4d adds Playwright E2E as a separate job.
+      - name: Vitest (with coverage gate)
+        run: npm run test:coverage
+      # Upload the HTML coverage report so reviewers can drill into hot
+      # spots without running the suite locally.
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html
+          path: coverage/
+          retention-days: 7
+
   build:
     name: Build
     runs-on: ubuntu-latest
