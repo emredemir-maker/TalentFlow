@@ -1222,26 +1222,30 @@ export default function InterviewManagementPage() {
             if (candidate.email && (newStatus === 'postponed' || newStatus === 'cancelled') && originalSession) {
                 try {
                     const freshToken = await ensureValidGoogleToken(userId, userProfile);
+                    // Build email content up front so both the Gmail-API path and the
+                    // SMTP fallback below can reuse the same subject/body/html. (Pre-fix
+                    // these consts were declared inside the `if (freshToken)` branch and
+                    // the fallback referenced them out of scope → ReferenceError.)
+                    const isCancelled = newStatus === 'cancelled';
+                    const { html: rescheduleHtml } = await getRescheduleEmail(branding, {
+                        candidateName: candidate.name,
+                        recruiterName: userProfile?.displayName || '',
+                        position:      candidate.position,
+                        oldDate:       originalSession.date || '',
+                        oldTime:       originalSession.time || '',
+                        newDate:       newDate || null,
+                        newTime:       newTime || null,
+                        joinLink:      (newDate || newTime) ? (originalSession.meetLink || null) : null,
+                        isCancelled,
+                        companyEmail:  userProfile?.email || null,
+                    });
+                    const rescheduleSubject = isCancelled
+                        ? `Mülakat İptali: ${originalSession.title || 'Mülakat'} - ${candidate.name}`
+                        : `Mülakat Tarihi Güncellendi: ${originalSession.title || 'Mülakat'} - ${candidate.name}`;
+                    const rescheduleBody = isCancelled
+                        ? `Sayın ${candidate.name},\n\n${branding.companyName || 'Şirketimiz'} ile planlanmış olan ${originalSession.title || 'mülakat'} (${originalSession.date || ''} ${originalSession.time || ''}) maalesef iptal edilmiştir.\n\nHerhangi bir sorunuz için bizimle iletişime geçebilirsiniz.\n\nSaygılarımızla,\n${userProfile?.displayName || 'İK Ekibi'}`
+                        : `Sayın ${candidate.name},\n\n${branding.companyName || 'Şirketimiz'} ile planlanmış olan mülakatınızın (${originalSession.date || ''} ${originalSession.time || ''}) tarihi güncellenmiştir.\n\nYeni tarih: ${newDate || originalSession.date || ''} ${newTime || originalSession.time || ''}\n\nHerhangi bir sorunuz için bizimle iletişime geçebilirsiniz.\n\nSaygılarımızla,\n${userProfile?.displayName || 'İK Ekibi'}`;
                     if (freshToken) {
-                        const isCancelled = newStatus === 'cancelled';
-                        const { html: rescheduleHtml } = await getRescheduleEmail(branding, {
-                            candidateName: candidate.name,
-                            recruiterName: userProfile?.displayName || '',
-                            position:      candidate.position,
-                            oldDate:       originalSession.date || '',
-                            oldTime:       originalSession.time || '',
-                            newDate:       newDate || null,
-                            newTime:       newTime || null,
-                            joinLink:      (newDate || newTime) ? (originalSession.meetLink || null) : null,
-                            isCancelled,
-                            companyEmail:  userProfile?.email || null,
-                        });
-                        const rescheduleSubject = isCancelled
-                            ? `Mülakat İptali: ${originalSession.title || 'Mülakat'} - ${candidate.name}`
-                            : `Mülakat Tarihi Güncellendi: ${originalSession.title || 'Mülakat'} - ${candidate.name}`;
-                        const rescheduleBody = isCancelled
-                            ? `Sayın ${candidate.name},\n\n${branding.companyName || 'Şirketimiz'} ile planlanmış olan ${originalSession.title || 'mülakat'} (${originalSession.date || ''} ${originalSession.time || ''}) maalesef iptal edilmiştir.\n\nHerhangi bir sorunuz için bizimle iletişime geçebilirsiniz.\n\nSaygılarımızla,\n${userProfile?.displayName || 'İK Ekibi'}`
-                            : `Sayın ${candidate.name},\n\n${branding.companyName || 'Şirketimiz'} ile planlanmış olan mülakatınızın (${originalSession.date || ''} ${originalSession.time || ''}) tarihi güncellenmiştir.\n\nYeni tarih: ${newDate || originalSession.date || ''} ${newTime || originalSession.time || ''}\n\nHerhangi bir sorunuz için bizimle iletişime geçebilirsiniz.\n\nSaygılarımızla,\n${userProfile?.displayName || 'İK Ekibi'}`;
                         await sendDirectEmail(userId, freshToken, {
                             to:      candidate.email,
                             subject: rescheduleSubject,

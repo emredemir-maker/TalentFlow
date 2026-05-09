@@ -749,7 +749,7 @@ await analyzeSTARRealTime(
 );
 
 // Prompt içinde kullanımı (server.js)
-// "Soru: ${currentQuestion}\\nAday cevabı: ${transcript}\\nSTAR..."
+// "Soru: \${currentQuestion}\\nAday cevabı: \${transcript}\\nSTAR..."
 `}</CodeBlock>
             <InfoBox type="success">
                 Soru bağlamı eklenmeden önce tüm cevaplar aynı genel prompt'a gönderiliyordu. Şimdi her STAR skoru o soruya özgü kriterlere göre hesaplanır.
