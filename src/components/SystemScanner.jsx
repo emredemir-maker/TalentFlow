@@ -10,6 +10,27 @@ import { findBestPositionMatch, filterPositionsByDomain } from '../services/matc
 import { analyzeCandidateMatch } from '../services/geminiService';
 import { useNotifications } from '../context/NotificationContext';
 
+/**
+ * Recursively replace undefined values with null so Firestore's updateDoc()
+ * doesn't reject the write. Firestore treats `undefined` as an unsupported
+ * field value, but happily accepts `null` (preserves the field as
+ * "explicitly empty"). This is the third bug we've hit from AI returning
+ * partial objects — defensive at the boundary now.
+ */
+function sanitizeForFirestore(value) {
+    if (value === undefined) return null;
+    if (value === null) return null;
+    if (Array.isArray(value)) return value.map(sanitizeForFirestore);
+    if (typeof value === 'object') {
+        const out = {};
+        for (const [k, v] of Object.entries(value)) {
+            out[k] = sanitizeForFirestore(v);
+        }
+        return out;
+    }
+    return value;
+}
+
 // ─── Scope option definitions ──────────────────────────────────────────────
 const SCOPE_OPTIONS = [
     {
@@ -194,7 +215,9 @@ export default function SystemScanner() {
                             const jobDesc = `${pos.title}\n${(pos.requirements || []).join(', ')}\n${pos.description || ''}`;
                             try {
                                 const result = await analyzeCandidateMatch(jobDesc, candidate, 'gemini-2.5-flash');
-                                updatedAnalyses[pos.title] = result;
+                                // Sanitize undefined → null at the write boundary; the AI
+                                // sometimes omits fields and Firestore rejects undefined.
+                                updatedAnalyses[pos.title] = sanitizeForFirestore(result);
                                 setAiCount(prev => prev + 1);
 
                                 if (result.score > highestScore) {
@@ -208,12 +231,12 @@ export default function SystemScanner() {
                         }
 
                         if (bestResult) {
-                            updates.aiAnalysis = {
+                            updates.aiAnalysis = sanitizeForFirestore({
                                 ...bestResult,
                                 lastAnalyzedAt:      new Date().toISOString(),
                                 analyzedForPosition: bestTitle,
-                            };
-                            updates.summary              = bestResult.summary;
+                            });
+                            updates.summary              = bestResult.summary ?? null;
                             updates.matchScore           = bestResult.score;
                             updates.aiScore              = bestResult.score;
                             updates.matchedPositionTitle = bestTitle;

@@ -190,18 +190,21 @@ export async function analyzeCandidateMatch(jobDescription, candidateProfile, mo
     const evidence = await extractCandidateEvidence(jobDescription, safeCandidateProfile, modelId);
     const score = calculateHybridScore(evidence.extractedData);
 
+    // Coerce undefined → null so Firestore writes don't reject. The AI
+    // sometimes omits starAnalysis or summary fields entirely; downstream
+    // updateDoc() refuses any object that contains an `undefined` leaf.
     return {
         ...evidence.evidence,
         scoreData: evidence.extractedData,
         score: score,
-        starAnalysis: evidence.extractedData.starAnalysis,
+        starAnalysis: evidence.extractedData.starAnalysis ?? null,
         reasons: evidence.evidence.reasoning || [],
-        summary: evidence.evidence.summary,
-        agentReasoning: evidence.evidence.reasoning,
+        summary: evidence.evidence.summary ?? null,
+        agentReasoning: evidence.evidence.reasoning ?? null,
         nextAction: evidence.extractedData.totalYearsOfExperience >= 2 ? "schedule_interview" : "potential_review",
         topSkills: (evidence.extractedData.matchedKeywords || []).map(s => ({ skill: s, relevance: "High" })),
         gapAnalysis: (evidence.extractedData.missingKeywords || []).map(s => ({ gap: s, severity: "Medium", suggestion: "Eğitim veya oryantasyon önerilir" })),
-        personalizedMessage: `Merhabalar ${candidateProfile.name || 'Aday'}. Profilinizi inceledim. ${evidence.evidence.summary}`
+        personalizedMessage: `Merhabalar ${candidateProfile.name || 'Aday'}. Profilinizi inceledim. ${evidence.evidence.summary ?? ''}`
     };
 }
 
