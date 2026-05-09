@@ -1,6 +1,11 @@
 # CI — runs on every PR and on pushes to main.
-# Phase 4a establishes lint + format + build gates. Future phases (4c/4d) will
-# add Vitest unit tests and Playwright E2E.
+#
+# Three parallel jobs:
+#   - lint:  dep-drift check, ESLint (baseline-locked), Prettier
+#   - test:  Vitest with coverage gate (50% on curated service slice)
+#   - build: Vite production build
+#
+# Phase 4d will add a Playwright E2E job alongside these.
 name: CI
 
 on:
@@ -26,6 +31,14 @@ jobs:
           node-version: '20'
           cache: 'npm'
       - run: npm ci --no-audit --no-fund
+      # Dependency-drift guard. Catches the Phase 4b regression class:
+      # a package added to root package.json that gets imported in
+      # functions/ source but is missing from functions/package.json.
+      # Cloud Build only installs functions/package.json, so the missing
+      # dep crashes Cloud Run at startup with ERR_MODULE_NOT_FOUND. Cheap
+      # check (~50ms) — no npm install needed beyond the one above.
+      - name: Backend dependency drift check
+        run: npm run check:deps
       # lint:ci enforces the baseline warning count via --max-warnings. Adding
       # warnings without removing equivalents elsewhere will fail this gate.
       - name: ESLint (baseline-locked)
