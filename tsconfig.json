@@ -1,0 +1,62 @@
+{
+  // Phase 4e — TypeScript foundation. Incremental migration: existing
+  // .js/.jsx files keep working (allowJs + noCheckJs), new files can be
+  // .ts/.tsx and are type-checked. As modules graduate from JS to TS one
+  // at a time, this config doesn't change.
+  "compilerOptions": {
+    // ── Output: we never emit .js — Vite handles transpilation. tsc is
+    // only used as a type checker via `tsc --noEmit`.
+    "noEmit": true,
+    "target": "ES2022",
+    "module": "ESNext",
+    // Bundler resolution lets us keep import paths without explicit
+    // extensions (and lets `import x from './foo.js'` resolve to foo.ts
+    // during the gradual migration, which Node's default ESM resolver
+    // would NOT do).
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "useDefineForClassFields": true,
+    "isolatedModules": true,
+
+    // ── Interop with the existing JS codebase
+    "allowJs": true,
+    // Phase 4e starts strict on TS only. Flipping this to true would
+    // require fixing pre-existing JSDoc inconsistencies in 200+ files —
+    // not in scope for the foundation PR.
+    "checkJs": false,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+
+    // ── Strictness on TS files only
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "exactOptionalPropertyTypes": false
+  },
+  "include": [
+    // The frontend SPA + the (currently empty) shared TS modules
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.js",
+    "src/**/*.jsx",
+    "vite-env.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "coverage",
+    "test-results",
+    "playwright-report",
+    "**/*.test.js",
+    "**/*.test.jsx",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "tests/e2e/**"
+  ]
+}
