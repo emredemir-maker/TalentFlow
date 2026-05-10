@@ -11,7 +11,10 @@
 //   - The emulator's REST surface is documented and stable, so setup
 //     stays fast (sub-second) and has fewer moving parts.
 
-const PROJECT_ID = 'talentflow-e2e';
+// `demo-` prefix: firebase-tools recognises this as a demo project ID
+// and skips the auth/login check that real project IDs require. Lets
+// the emulators run on CI without any service account or token.
+const PROJECT_ID = 'demo-talentflow';
 const AUTH_HOST = '127.0.0.1:9099';
 const FIRESTORE_HOST = '127.0.0.1:8080';
 

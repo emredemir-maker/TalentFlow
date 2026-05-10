@@ -56,12 +56,19 @@ export default defineConfig({
     webServer: process.env.E2E_BASE_URL
         ? undefined
         : {
+              // `npx` runs the firebase-tools binary whether it's a
+              // global install (CI) or a local devDependency (future).
+              // `demo-` project ID skips firebase-tools' auth check —
+              // the emulators don't care, and CI has no service account.
               command:
-                  'firebase emulators:exec --only auth,firestore --project talentflow-e2e "npm run build:e2e-emulator && npm run preview -- --port 4175 --host 127.0.0.1"',
+                  'npx firebase emulators:exec --only auth,firestore --project demo-talentflow "npm run build:e2e-emulator && npm run preview -- --port 4175 --host 127.0.0.1"',
               url: BASE_URL,
               reuseExistingServer: !process.env.CI,
               timeout: 180_000,
-              stdout: 'ignore',
+              // stdout piped so a CI failure's webServer log lands in
+              // the Playwright report instead of disappearing into
+              // GitHub Actions' group-collapsed step output.
+              stdout: 'pipe',
               stderr: 'pipe',
           },
 });
