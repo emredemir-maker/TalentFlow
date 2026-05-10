@@ -210,3 +210,65 @@ jobs:
           name: playwright-traces-auth
           path: test-results/
           retention-days: 7
+
+  e2e-emulator:
+    name: E2E (Playwright real-auth via Firebase emulator)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      # The Firebase Auth + Firestore emulators are JVM processes.
+      # Without Java the `firebase emulators:exec` command fails to
+      # spawn them. Eclipse Temurin 17 is the LTS that firebase-tools
+      # currently recommends.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          # firebase-tools >=14 dropped Java 17 support; needs 21+.
+          java-version: '21'
+      - run: npm ci --no-audit --no-fund
+      # firebase-tools is required to run the emulators. We install it
+      # at the job level instead of as a devDependency to keep
+      # node_modules lean for the other jobs (the package weighs in
+      # north of 50 MB).
+      - name: Install firebase-tools
+        run: npm install -g firebase-tools@latest
+      - name: Get Playwright version
+        id: pw
+        run: |
+          PW_VERSION=$(node -p "require('@playwright/test/package.json').version")
+          echo "version=$PW_VERSION" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+      - name: Install Playwright browsers
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: npx playwright install chromium --with-deps
+      # The emulator config wraps Vite preview in `firebase emulators:exec`
+      # so Playwright sees both the running emulators and the served
+      # SPA. Global setup seeds a recruiter user via REST before tests.
+      - name: Run Playwright tests (real-auth via emulator)
+        run: npm run test:e2e:emulator
+        env:
+          CI: 'true'
+      - name: Upload Playwright report (emulator)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-emulator
+          path: playwright-report-emulator/
+          retention-days: 7
+      - name: Upload Playwright traces (emulator)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces-emulator
+          path: test-results/
+          retention-days: 7

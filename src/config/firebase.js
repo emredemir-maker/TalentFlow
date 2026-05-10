@@ -1,7 +1,7 @@
 // src/config/firebase.js
 import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
-import { getAuth, GoogleAuthProvider } from 'firebase/auth';
+import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { getAuth, GoogleAuthProvider, connectAuthEmulator } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
@@ -32,6 +32,18 @@ if (isFirebaseConfigured) {
     auth = getAuth(app);
     googleProvider = new GoogleAuthProvider();
     storage = getStorage(app);
+
+    // Local emulator wiring. Off in production builds because the env
+    // var isn't set there; on for the dedicated test build (see
+    // .env.e2e-emulator + playwright.config.emulator.js). Both calls
+    // must run BEFORE any auth/firestore call, so we do them here at
+    // module load. The disableWarnings flag keeps the test logs clean
+    // — the SDK otherwise prints a banner about insecure connections.
+    if (import.meta.env.VITE_USE_FIREBASE_EMULATOR === 'true') {
+      connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+      connectFirestoreEmulator(db, '127.0.0.1', 8080);
+      console.info('[Firebase] Connected to local emulators (auth:9099, firestore:8080)');
+    }
   } catch (err) {
     console.error('[Firebase] Initialization failed:', err);
   }
