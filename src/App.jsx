@@ -1,5 +1,5 @@
 // src/App.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { Routes, Route, useLocation, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { CandidatesProvider } from './context/CandidatesContext';
@@ -10,25 +10,46 @@ import { NotificationProvider } from './context/NotificationContext';
 
 import Sidebar from './components/Sidebar';
 import LoadingScreen from './components/LoadingScreen';
-import Dashboard from './pages/Dashboard';
-import SettingsPage from './pages/SettingsPage';
-import MessagesPage from './pages/MessagesPage';
-import CandidateProcessPage from './pages/CandidateProcessPage';
-import PositionsPage from './pages/PositionsPage';
+// LoginPage stays eager — it's the first paint before auth resolves so
+// shipping a separate chunk just to wait for it on cold start hurts TTI.
 import LoginPage from './pages/LoginPage';
-import AnalyticsPage from './pages/AnalyticsPage';
-import InterviewManagementPage from './pages/InterviewManagementPage';
-import LiveInterviewPage from './pages/LiveInterviewPage';
-import FaceToFacePage from './pages/FaceToFacePage';
-import InterviewReportPage from './pages/InterviewReportPage';
-import CandidateExitPage from './pages/CandidateExitPage';
-import ApplyPage from './pages/ApplyPage';
-import TechDocsPage from './pages/TechDocsPage';
-import PipelinePage from './pages/PipelinePage';
-import CandidateRespondPage from './pages/CandidateRespondPage';
-import IntegrationsPage from './pages/IntegrationsPage';
-import MicrosoftCallbackPage from './pages/MicrosoftCallbackPage';
-import GoogleCallbackPage from './pages/GoogleCallbackPage';
+
+// Every other page is route-level code-split via React.lazy. The page
+// chunks are produced as separate JS files by Vite/Rollup, so the
+// initial bundle no longer includes ~700KB of inactive screen code
+// (LiveInterviewPage 2782 LOC, InterviewManagementPage 2731,
+// CandidateProcessPage 2484, etc.). Each page now only loads when its
+// route is hit. Suspense fallback below renders LoadingScreen while
+// the chunk is in flight.
+const Dashboard               = lazy(() => import('./pages/Dashboard'));
+const SettingsPage            = lazy(() => import('./pages/SettingsPage'));
+const MessagesPage            = lazy(() => import('./pages/MessagesPage'));
+const CandidateProcessPage    = lazy(() => import('./pages/CandidateProcessPage'));
+const PositionsPage           = lazy(() => import('./pages/PositionsPage'));
+const AnalyticsPage           = lazy(() => import('./pages/AnalyticsPage'));
+const InterviewManagementPage = lazy(() => import('./pages/InterviewManagementPage'));
+const LiveInterviewPage       = lazy(() => import('./pages/LiveInterviewPage'));
+const FaceToFacePage          = lazy(() => import('./pages/FaceToFacePage'));
+const InterviewReportPage     = lazy(() => import('./pages/InterviewReportPage'));
+const CandidateExitPage       = lazy(() => import('./pages/CandidateExitPage'));
+const ApplyPage               = lazy(() => import('./pages/ApplyPage'));
+const TechDocsPage            = lazy(() => import('./pages/TechDocsPage'));
+const PipelinePage            = lazy(() => import('./pages/PipelinePage'));
+const CandidateRespondPage    = lazy(() => import('./pages/CandidateRespondPage'));
+const IntegrationsPage        = lazy(() => import('./pages/IntegrationsPage'));
+const MicrosoftCallbackPage   = lazy(() => import('./pages/MicrosoftCallbackPage'));
+const GoogleCallbackPage      = lazy(() => import('./pages/GoogleCallbackPage'));
+
+// Tiny inline fallback for in-app route transitions — a full LoadingScreen
+// flashes too aggressively for sub-second chunk fetches. Used only for
+// authenticated route changes; public routes use the full LoadingScreen.
+function PageFallback() {
+    return (
+        <div className="flex items-center justify-center min-h-[60vh]">
+            <div className="w-8 h-8 border-2 border-slate-200 border-t-blue-600 rounded-full animate-spin" />
+        </div>
+    );
+}
 
 export default function App() {
   return (
@@ -37,18 +58,23 @@ export default function App() {
         <UserSettingsProvider>
           <NotificationProvider>
             <MessageQueueProvider>
-              <Routes>
-                <Route path="/live-interview/:sessionId" element={<LiveInterviewPage />} />
-                <Route path="/face-interview/:sessionId" element={<FaceToFacePage />} />
-                <Route path="/join/:sessionId" element={<LiveInterviewPage />} />
-                <Route path="/interview-report/:sessionId" element={<InterviewReportPage />} />
-                <Route path="/exit" element={<CandidateExitPage />} />
-                <Route path="/apply/:positionId" element={<ApplyPage />} />
-                <Route path="/respond/:id" element={<CandidateRespondPage />} />
-                <Route path="/auth/microsoft/callback" element={<MicrosoftCallbackPage />} />
-                <Route path="/auth/google/callback" element={<GoogleCallbackPage />} />
-                <Route path="/*" element={<AuthenticatedApp />} />
-              </Routes>
+              {/* Public routes use the full LoadingScreen because the URL maps
+                  one-to-one to a single screen — there's no shell to fall back
+                  to while the chunk loads. */}
+              <Suspense fallback={<LoadingScreen message="Yükleniyor..." />}>
+                <Routes>
+                  <Route path="/live-interview/:sessionId" element={<LiveInterviewPage />} />
+                  <Route path="/face-interview/:sessionId" element={<FaceToFacePage />} />
+                  <Route path="/join/:sessionId" element={<LiveInterviewPage />} />
+                  <Route path="/interview-report/:sessionId" element={<InterviewReportPage />} />
+                  <Route path="/exit" element={<CandidateExitPage />} />
+                  <Route path="/apply/:positionId" element={<ApplyPage />} />
+                  <Route path="/respond/:id" element={<CandidateRespondPage />} />
+                  <Route path="/auth/microsoft/callback" element={<MicrosoftCallbackPage />} />
+                  <Route path="/auth/google/callback" element={<GoogleCallbackPage />} />
+                  <Route path="/*" element={<AuthenticatedApp />} />
+                </Routes>
+              </Suspense>
             </MessageQueueProvider>
           </NotificationProvider>
         </UserSettingsProvider>
@@ -148,7 +174,11 @@ function AuthenticatedApp() {
         className={`flex-1 min-h-screen transition-all duration-300 min-w-0
           ${sidebarCollapsed ? 'lg:ml-[80px]' : 'lg:ml-[240px]'}`}
       >
-        {renderPage()}
+        {/* In-app route changes — sidebar/header are already painted, so
+            the inline spinner is enough until the page chunk arrives. */}
+        <Suspense fallback={<PageFallback />}>
+          {renderPage()}
+        </Suspense>
       </main>
     </div>
   );
