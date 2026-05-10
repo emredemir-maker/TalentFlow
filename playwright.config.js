@@ -23,6 +23,11 @@ const BASE_URL = process.env.E2E_BASE_URL || `http://localhost:${PORT}`;
 
 export default defineConfig({
     testDir: './tests/e2e',
+    // *.auth.spec.js files belong to the authenticated suite — they
+    // need a build with VITE_E2E_MOCK_AUTH=true and run via
+    // `playwright.config.auth.js`. Skip them here so the default suite
+    // doesn't try to run them against an unauthenticated build.
+    testIgnore: /.*\.auth\.spec\.js$/,
     // CI: be strict — flaky tests are a contagion. 1 retry just smooths
     // network blips. Local: 0 retries so authors see the actual failure.
     retries: process.env.CI ? 1 : 0,

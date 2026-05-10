@@ -160,3 +160,53 @@ jobs:
           name: playwright-traces
           path: test-results/
           retention-days: 7
+
+  e2e-auth:
+    name: E2E (Playwright authenticated)
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci --no-audit --no-fund
+      - name: Get Playwright version
+        id: pw
+        run: |
+          PW_VERSION=$(node -p "require('@playwright/test/package.json').version")
+          echo "version=$PW_VERSION" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+      - name: Install Playwright browsers
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: npx playwright install chromium --with-deps
+      # The auth-suite config (playwright.config.auth.js) handles its
+      # own build via `npm run build:e2e-auth` — that build picks up
+      # `.env.e2e-auth` which sets VITE_E2E_MOCK_AUTH=true plus a fake
+      # Firebase config. The mock-auth branch in AuthContext then
+      # short-circuits before any real network call. No emulator,
+      # no real secrets.
+      - name: Run Playwright tests (authenticated suite)
+        run: npm run test:e2e:auth
+        env:
+          CI: 'true'
+      - name: Upload Playwright report (auth)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-auth
+          path: playwright-report-auth/
+          retention-days: 7
+      - name: Upload Playwright traces (auth)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces-auth
+          path: test-results/
+          retention-days: 7
