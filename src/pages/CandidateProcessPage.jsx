@@ -11,6 +11,7 @@ import { applyPiiMask, stripPiiForAI } from '../utils/pii';
 import { getFeedbackEmail } from '../utils/templateService';
 import { db } from '../config/firebase';
 import { doc, getDoc, onSnapshot, setDoc, serverTimestamp, collection, query, where } from 'firebase/firestore';
+import Header from '../components/Header';
 import SystemScanner from '../components/SystemScanner';
 import AddCandidateModal from '../components/AddCandidateModal';
 import CandidateAvatar from '../components/CandidateAvatar';
@@ -751,11 +752,12 @@ export default function CandidateProcessPage() {
 
     return (
         <div className="h-screen bg-slate-50 flex flex-col font-sans overflow-hidden">
-            {/* PAGE HEADER */}
-            <div className="bg-white border-b border-slate-200 px-8 py-5 flex items-center justify-between shrink-0">
+            <Header title="Adaylar" />
+            {/* SUB-HEADER — page-level controls, the brand/title now lives in Header */}
+            <div className="bg-white border-b border-slate-200 px-8 py-3 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-3">
-                    <h1 className="text-[20px] font-black text-slate-900 tracking-tight">Aday Yönetimi</h1>
-                    <div className="rounded-full bg-slate-100 text-slate-400 text-[11px] px-2.5 py-0.5 font-medium">
+                    <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-widest">Aday Yönetimi</span>
+                    <div className="rounded-full bg-slate-100 text-slate-500 text-[11px] px-2.5 py-0.5 font-bold">
                         {candidates.length}
                     </div>
                 </div>
@@ -1027,17 +1029,17 @@ export default function CandidateProcessPage() {
                                     </div>
                                 </div>
 
-                                {/* Stat pills */}
+                                {/* Stat pills.
+                                    Previously rendered three indicators that all read off the same
+                                    score: a "%X Uyum" badge next to the name, a STAR-flavoured
+                                    sub-score pill, AND a category chip ("GÜÇLÜ / ORTA / ZAYIF").
+                                    The category chip duplicated what the badge already conveyed
+                                    via colour + percentage; dropped it. STAR (methodology score)
+                                    and Eleme (screening) stay because they're distinct metrics. */}
                                 <div className="flex items-center gap-2">
                                     <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">
                                         <span className="text-[9px] font-bold text-slate-400 uppercase">STAR</span>
                                         <span className="text-[13px] font-black text-slate-800">{candidate.bestScore ? `${Math.round(candidate.bestScore * 0.98)}%` : '—'}</span>
-                                    </div>
-                                    <div className="flex items-center gap-1.5 bg-cyan-500 rounded-lg px-3 py-1.5 shadow-sm shadow-cyan-200">
-                                        <span className="text-[9px] font-bold text-cyan-100 uppercase">Uyum</span>
-                                        <span className="text-[13px] font-black text-white">
-                                            {score > 80 ? 'GÜÇLÜ' : score > 60 ? 'ORTA' : 'ZAYIF'}
-                                        </span>
                                     </div>
                                     {candidate.screeningScore != null && (
                                         <div className="flex items-center gap-1.5 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-1.5">
