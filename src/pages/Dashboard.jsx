@@ -94,7 +94,7 @@ export default function Dashboard() {
 
         // Direct per-stage counts (non-cumulative) for the 6 canonical pipeline stages
         const stageDefs = [
-            { key: 'ai_analysis', label: 'AI Tarama',   color: '#2563EB', legacy: ['new', 'pending', 'applied', 'unknown'] },
+            { key: 'ai_analysis', label: 'Ön Eleme',    color: '#2563EB', legacy: ['new', 'pending', 'applied', 'unknown'] },
             { key: 'review',      label: 'İnceleme',    color: '#3B82F6', legacy: ['Review', 'değerlendirme', 'Evaluation'] },
             { key: 'interview',   label: 'Mülakat',     color: '#7C3AED', legacy: ['Interview', 'mülakat', 'Mülakat'] },
             { key: 'offer',       label: 'Teklif',      color: '#F59E0B', legacy: ['Offer'] },
@@ -196,10 +196,10 @@ export default function Dashboard() {
     // İşe Alım Hızı is the inverse: a -22% means hiring got faster, which is
     // a positive outcome → goodness: true even though the sign is negative.
     const kpis = useMemo(() => [
-        { label: "Toplam Aday",   value: String(candidates.length),  change: "+12",  goodness: true, desc: "bu hafta yeni başvuru", icon: Users },
-        { label: "Aktif Pozisyon", value: String(allOpenCount),       change: "+2",   goodness: true, desc: "açık ilan",            icon: Target },
-        { label: "AI Match Skoru", value: `${dynamicMetrics.avgMatch}%`, change: "+5%", goodness: true, desc: "ortalama uyum",       icon: Star },
-        { label: "İşe Alım Hızı",  value: dynamicMetrics.recruitSpeed, change: "-22%", goodness: true, desc: "ortalama süre",        icon: Clock },
+        { label: "Toplam Aday",   value: String(candidates.length),     change: "+12",  goodness: true, desc: "bu hafta yeni başvuru", icon: Users  },
+        { label: "Aktif Pozisyon", value: String(allOpenCount),          change: "+2",   goodness: true, desc: "açık ilan",             icon: Target },
+        { label: "Uyum Skoru",     value: `${dynamicMetrics.avgMatch}%`, change: "+5%",  goodness: true, desc: "ortalama uyum",         icon: Star   },
+        { label: "İşe Alım Hızı",  value: dynamicMetrics.recruitSpeed,   change: "-22%", goodness: true, desc: "ortalama süre",         icon: Clock  },
     ], [candidates.length, allOpenCount, dynamicMetrics]);
 
     if (error) return <div className="p-10 text-[11px] font-black text-red-500 uppercase tracking-widest text-center">Sistem Hatası: Veri Senkronizasyonu Başarısız.</div>;
@@ -419,7 +419,7 @@ export default function Dashboard() {
                             <div className="relative z-10">
                                 <div className="flex items-center gap-1.5 mb-3">
                                     <Zap className="w-3.5 h-3.5 text-blue-300 fill-blue-300" />
-                                    <span className="text-[8px] font-black text-blue-300 uppercase tracking-[0.2em]">AI Performans Özeti</span>
+                                    <span className="text-[8px] font-black text-blue-300 uppercase tracking-[0.2em]">Performans Özeti</span>
                                 </div>
                                 <p className="text-[12px] text-blue-100/80 leading-relaxed mb-5 font-medium">
                                     AI sistemimiz bu periyotta{' '}
@@ -532,7 +532,7 @@ export default function Dashboard() {
                                 ))}
                             </div>
                             <div className="mt-4 p-3 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-center">
-                                <span className="text-[9px] font-black text-blue-200 uppercase tracking-[0.3em]">AI CORE ACTIVE</span>
+                                <span className="text-[9px] font-black text-blue-200 uppercase tracking-[0.3em]">Sistem Aktif</span>
                             </div>
                         </div>
 
