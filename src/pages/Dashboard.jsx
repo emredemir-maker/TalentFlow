@@ -24,10 +24,27 @@ import {
     TrendingUp,
 } from 'lucide-react';
 
-function Trend({ up, val }) {
+/**
+ * Renders a KPI delta with semantically-correct arrow direction and colour.
+ *
+ * Two independent axes:
+ *  - direction (↗ vs ↘): pure numerical sign — "+12" → up, "-22%" → down
+ *  - goodness (green vs red): is this change good or bad for THIS metric?
+ *    e.g. "Toplam Aday -5" is bad (red), "İşe Alım Hızı -22%" is GOOD (green —
+ *    süre düştü), so direction and colour are independent.
+ *
+ * @param {string}  val      Raw delta string with sign, e.g. "+12" or "-22%"
+ * @param {boolean} goodness Is this delta a positive outcome? (default: derives
+ *                           from sign — "+" → good, "-" → bad)
+ */
+function Trend({ val, goodness }) {
+    const isDown = typeof val === 'string' && val.trim().startsWith('-');
+    const Icon = isDown ? ArrowDownRight : ArrowUpRight;
+    const isGood = typeof goodness === 'boolean' ? goodness : !isDown;
+    const colorClass = isGood ? 'text-emerald-600' : 'text-red-500';
     return (
-        <span className={`inline-flex items-center gap-0.5 text-[10px] font-black ${up ? 'text-emerald-600' : 'text-red-500'}`}>
-            {up ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+        <span className={`inline-flex items-center gap-0.5 text-[10px] font-black ${colorClass}`}>
+            <Icon className="w-3 h-3" />
             {val}
         </span>
     );
@@ -174,11 +191,15 @@ export default function Dashboard() {
         };
     }, [stats, candidates]);
 
+    // KPI deltas: `goodness` is whether THIS delta is a good outcome for the
+    // metric. For most "more is better" KPIs goodness mirrors the sign, but
+    // İşe Alım Hızı is the inverse: a -22% means hiring got faster, which is
+    // a positive outcome → goodness: true even though the sign is negative.
     const kpis = useMemo(() => [
-        { label: "Toplam Aday", value: String(candidates.length), change: "+12", up: true, desc: "bu hafta yeni başvuru", icon: Users },
-        { label: "Aktif Pozisyon", value: String(allOpenCount), change: "+2", up: true, desc: "açık ilan", icon: Target },
-        { label: "AI Match Skoru", value: `${dynamicMetrics.avgMatch}%`, change: "+5%", up: true, desc: "ortalama uyum", icon: Star },
-        { label: "İşe Alım Hızı", value: dynamicMetrics.recruitSpeed, change: "-22%", up: true, desc: "ortalama süre", icon: Clock },
+        { label: "Toplam Aday",   value: String(candidates.length),  change: "+12",  goodness: true, desc: "bu hafta yeni başvuru", icon: Users },
+        { label: "Aktif Pozisyon", value: String(allOpenCount),       change: "+2",   goodness: true, desc: "açık ilan",            icon: Target },
+        { label: "AI Match Skoru", value: `${dynamicMetrics.avgMatch}%`, change: "+5%", goodness: true, desc: "ortalama uyum",       icon: Star },
+        { label: "İşe Alım Hızı",  value: dynamicMetrics.recruitSpeed, change: "-22%", goodness: true, desc: "ortalama süre",        icon: Clock },
     ], [candidates.length, allOpenCount, dynamicMetrics]);
 
     if (error) return <div className="p-10 text-[11px] font-black text-red-500 uppercase tracking-widest text-center">Sistem Hatası: Veri Senkronizasyonu Başarısız.</div>;
@@ -228,7 +249,7 @@ export default function Dashboard() {
                             <div key={i} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-shadow">
                                 <div className="flex items-start justify-between mb-3">
                                     <span className="text-[11px] font-semibold text-slate-500">{k.label}</span>
-                                    <Trend up={k.up} val={k.change} />
+                                    <Trend val={k.change} goodness={k.goodness} />
                                 </div>
                                 <div className="text-[32px] font-black text-[#0F172A] leading-none mb-1">{k.value}</div>
                                 <div className="text-[10px] text-slate-400 font-medium">{k.desc}</div>
