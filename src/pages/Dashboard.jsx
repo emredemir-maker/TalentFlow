@@ -40,6 +40,7 @@ export default function Dashboard() {
         stats,
         error,
         deleteCandidate,
+        loading: candidatesLoading,
     } = useCandidates();
 
     const candidates = enrichedCandidates || [];
@@ -60,8 +61,12 @@ export default function Dashboard() {
         return () => unsubscribe();
     }, []);
 
-    const { positions } = usePositions();
+    const { positions, loading: positionsLoading } = usePositions();
     const navigate = useNavigate();
+
+    // Combined loading state — true while either context is doing its initial fetch.
+    // Drives the skeleton placeholders below so KPIs don't flash 0 → real value.
+    const isLoading = candidatesLoading || positionsLoading;
 
     const activePositions = useMemo(() => positions.filter(p => p.status === 'open').slice(0, 4), [positions]);
     const allOpenCount = useMemo(() => positions.filter(p => p.status === 'open').length, [positions]);
@@ -207,17 +212,28 @@ export default function Dashboard() {
                 </div>
 
                 {/* KPI ROW */}
-                <div className="grid grid-cols-4 gap-4">
-                    {kpis.map((k, i) => (
-                        <div key={i} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-shadow">
-                            <div className="flex items-start justify-between mb-3">
-                                <span className="text-[11px] font-semibold text-slate-500">{k.label}</span>
-                                <Trend up={k.up} val={k.change} />
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    {isLoading
+                        ? Array.from({ length: 4 }).map((_, i) => (
+                            <div key={i} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 animate-pulse">
+                                <div className="flex items-start justify-between mb-3">
+                                    <div className="h-3 w-20 bg-slate-100 rounded" />
+                                    <div className="h-3 w-10 bg-slate-100 rounded" />
+                                </div>
+                                <div className="h-8 w-24 bg-slate-200 rounded mb-2" />
+                                <div className="h-2.5 w-32 bg-slate-100 rounded" />
                             </div>
-                            <div className="text-[32px] font-black text-[#0F172A] leading-none mb-1">{k.value}</div>
-                            <div className="text-[10px] text-slate-400 font-medium">{k.desc}</div>
-                        </div>
-                    ))}
+                        ))
+                        : kpis.map((k, i) => (
+                            <div key={i} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-shadow">
+                                <div className="flex items-start justify-between mb-3">
+                                    <span className="text-[11px] font-semibold text-slate-500">{k.label}</span>
+                                    <Trend up={k.up} val={k.change} />
+                                </div>
+                                <div className="text-[32px] font-black text-[#0F172A] leading-none mb-1">{k.value}</div>
+                                <div className="text-[10px] text-slate-400 font-medium">{k.desc}</div>
+                            </div>
+                        ))}
                 </div>
 
                 {/* MAIN CONTENT */}
@@ -241,33 +257,42 @@ export default function Dashboard() {
                                 </button>
                             </div>
                             <div className="space-y-3">
-                                {funnelData.map((p, i) => {
-                                    const prev = i === 0 ? candidates.length * 0.93 : funnelData[i - 1].count * 0.93;
-                                    const diff = p.count - Math.round(prev);
-                                    return (
-                                        <div key={i} className="flex items-center gap-4">
-                                            <div className="w-24 text-[11px] font-semibold text-slate-600 text-right shrink-0">{p.label}</div>
-                                            <div className="flex-1 h-10 bg-slate-50 rounded-xl overflow-hidden border border-slate-100 relative">
-                                                <div
-                                                    className="h-full rounded-xl flex items-center px-4 transition-all duration-700"
-                                                    style={{
-                                                        width: `${Math.max(p.pct, 8)}%`,
-                                                        backgroundColor: p.color + '18',
-                                                        borderRight: `3px solid ${p.color}`,
-                                                    }}
-                                                >
-                                                    <span className="text-[9px] font-black" style={{ color: p.color }}>{p.label.toUpperCase()}</span>
+                                {isLoading
+                                    ? Array.from({ length: 6 }).map((_, i) => (
+                                        <div key={i} className="flex items-center gap-4 animate-pulse">
+                                            <div className="w-24 h-3 bg-slate-100 rounded shrink-0" />
+                                            <div className="flex-1 h-10 bg-slate-50 rounded-xl border border-slate-100" />
+                                            <div className="w-12 h-4 bg-slate-100 rounded shrink-0" />
+                                            <div className="w-14 h-3 bg-slate-100 rounded shrink-0" />
+                                        </div>
+                                    ))
+                                    : funnelData.map((p, i) => {
+                                        const prev = i === 0 ? candidates.length * 0.93 : funnelData[i - 1].count * 0.93;
+                                        const diff = p.count - Math.round(prev);
+                                        return (
+                                            <div key={i} className="flex items-center gap-4">
+                                                <div className="w-24 text-[11px] font-semibold text-slate-600 text-right shrink-0">{p.label}</div>
+                                                <div className="flex-1 h-10 bg-slate-50 rounded-xl overflow-hidden border border-slate-100 relative">
+                                                    <div
+                                                        className="h-full rounded-xl flex items-center px-4 transition-all duration-700"
+                                                        style={{
+                                                            width: `${Math.max(p.pct, 8)}%`,
+                                                            backgroundColor: p.color + '18',
+                                                            borderRight: `3px solid ${p.color}`,
+                                                        }}
+                                                    >
+                                                        <span className="text-[9px] font-black" style={{ color: p.color }}>{p.label.toUpperCase()}</span>
+                                                    </div>
+                                                </div>
+                                                <div className="w-12 text-right text-[15px] font-black text-[#0F172A] tabular-nums shrink-0">{p.count}</div>
+                                                <div className="w-14 text-right shrink-0">
+                                                    <span className={`text-[9px] font-bold ${diff >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                                                        {diff >= 0 ? '+' : ''}{diff}
+                                                    </span>
                                                 </div>
                                             </div>
-                                            <div className="w-12 text-right text-[15px] font-black text-[#0F172A] tabular-nums shrink-0">{p.count}</div>
-                                            <div className="w-14 text-right shrink-0">
-                                                <span className={`text-[9px] font-bold ${diff >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                                                    {diff >= 0 ? '+' : ''}{diff}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
+                                        );
+                                    })}
                             </div>
                             <div className="mt-5 pt-4 border-t border-slate-100 flex items-center gap-6 flex-wrap">
                                 <div className="text-[10px] text-slate-500 font-medium">Teklife dönüşüm:</div>
@@ -397,12 +422,29 @@ export default function Dashboard() {
                         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
                             <div className="flex items-center justify-between mb-4">
                                 <span className="text-[12px] font-black text-[#0F172A]">Açık Pozisyonlar</span>
-                                <span className="text-[8px] font-bold px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full border border-blue-100">
-                                    {allOpenCount} Aktif
-                                </span>
+                                {isLoading
+                                    ? <span className="h-4 w-14 bg-slate-100 rounded-full animate-pulse" />
+                                    : (
+                                        <span className="text-[8px] font-bold px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full border border-blue-100">
+                                            {allOpenCount} Aktif
+                                        </span>
+                                    )}
                             </div>
                             <div className="space-y-3">
-                                {activePositions.map((pos, i) => {
+                                {isLoading
+                                    ? Array.from({ length: 4 }).map((_, i) => (
+                                        <div key={i} className="animate-pulse">
+                                            <div className="flex items-start justify-between mb-1.5">
+                                                <div className="space-y-1">
+                                                    <div className="h-3 w-32 bg-slate-200 rounded" />
+                                                    <div className="h-2 w-12 bg-slate-100 rounded" />
+                                                </div>
+                                                <div className="h-3 w-8 bg-slate-100 rounded" />
+                                            </div>
+                                            <div className="h-1 bg-slate-100 rounded-full" />
+                                        </div>
+                                    ))
+                                    : activePositions.map((pos, i) => {
                                     const posCount = candidates.filter(c => c.position === pos.title || c.bestTitle === pos.title).length;
                                     const fillPct = Math.min(Math.round((posCount / Math.max(posCount + 5, 20)) * 100), 95);
                                     const barColor = fillPct > 75 ? '#10B981' : fillPct > 50 ? '#3B82F6' : '#F59E0B';
