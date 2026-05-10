@@ -92,14 +92,17 @@ export default function Dashboard() {
         const byStatus = stats.byStatus || {};
         const total = candidates.length || 1;
 
-        // Direct per-stage counts (non-cumulative) for the 6 canonical pipeline stages
+        // Direct per-stage counts (non-cumulative) for the 6 canonical pipeline stages.
+        // `goodnessOnIncrease` controls the colour of the per-stage delta:
+        // for "Reddedildi" an increase is BAD (more rejections), so the +diff
+        // chip should be red there even though it's positive numerically.
         const stageDefs = [
-            { key: 'ai_analysis', label: 'Ön Eleme',    color: '#2563EB', legacy: ['new', 'pending', 'applied', 'unknown'] },
-            { key: 'review',      label: 'İnceleme',    color: '#3B82F6', legacy: ['Review', 'değerlendirme', 'Evaluation'] },
-            { key: 'interview',   label: 'Mülakat',     color: '#7C3AED', legacy: ['Interview', 'mülakat', 'Mülakat'] },
-            { key: 'offer',       label: 'Teklif',      color: '#F59E0B', legacy: ['Offer'] },
-            { key: 'hired',       label: 'İşe Alındı',  color: '#059669', legacy: ['Hired'] },
-            { key: 'rejected',    label: 'Reddedildi',  color: '#DC2626', legacy: ['Rejected'] },
+            { key: 'ai_analysis', label: 'Ön Eleme',    color: '#2563EB', goodnessOnIncrease: true,  legacy: ['new', 'pending', 'applied', 'unknown'] },
+            { key: 'review',      label: 'İnceleme',    color: '#3B82F6', goodnessOnIncrease: true,  legacy: ['Review', 'değerlendirme', 'Evaluation'] },
+            { key: 'interview',   label: 'Mülakat',     color: '#7C3AED', goodnessOnIncrease: true,  legacy: ['Interview', 'mülakat', 'Mülakat'] },
+            { key: 'offer',       label: 'Teklif',      color: '#F59E0B', goodnessOnIncrease: true,  legacy: ['Offer'] },
+            { key: 'hired',       label: 'İşe Alındı',  color: '#059669', goodnessOnIncrease: true,  legacy: ['Hired'] },
+            { key: 'rejected',    label: 'Reddedildi',  color: '#DC2626', goodnessOnIncrease: false, legacy: ['Rejected'] },
         ];
 
         // Collect all known status keys so we can catch-all the rest into AI Tarama
@@ -118,6 +121,7 @@ export default function Dashboard() {
                 count,
                 pct: Math.max(Math.round((count / total) * 100), count > 0 ? 4 : 0),
                 color: s.color,
+                goodnessOnIncrease: s.goodnessOnIncrease,
             };
         });
     }, [stats, candidates]);
@@ -290,6 +294,13 @@ export default function Dashboard() {
                                     : funnelData.map((p, i) => {
                                         const prev = i === 0 ? candidates.length * 0.93 : funnelData[i - 1].count * 0.93;
                                         const diff = p.count - Math.round(prev);
+                                        // Colour the delta chip by OUTCOME, not raw sign.
+                                        // For "Reddedildi" goodnessOnIncrease=false, so +diff is bad (red),
+                                        // -diff is good (green). For all other stages the natural mapping holds.
+                                        const isGoodOutcome =
+                                            diff === 0 ? true :
+                                            (diff > 0 && p.goodnessOnIncrease) ||
+                                            (diff < 0 && !p.goodnessOnIncrease);
                                         return (
                                             <div key={i} className="flex items-center gap-4">
                                                 <div className="w-24 text-[11px] font-semibold text-slate-600 text-right shrink-0">{p.label}</div>
@@ -307,7 +318,7 @@ export default function Dashboard() {
                                                 </div>
                                                 <div className="w-12 text-right text-[15px] font-black text-[#0F172A] tabular-nums shrink-0">{p.count}</div>
                                                 <div className="w-14 text-right shrink-0">
-                                                    <span className={`text-[9px] font-bold ${diff >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                                                    <span className={`text-[9px] font-bold ${isGoodOutcome ? 'text-emerald-600' : 'text-red-500'}`}>
                                                         {diff >= 0 ? '+' : ''}{diff}
                                                     </span>
                                                 </div>
