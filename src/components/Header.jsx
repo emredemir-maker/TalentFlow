@@ -1,7 +1,7 @@
 // src/components/Header.jsx
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
-    Search, Bell, Settings, Home, Video, X, Users, Briefcase,
+    Search, Bell, Settings, Home, X, Users, Briefcase,
     Calendar, MessageSquare, BarChart3, LayoutDashboard, FileText,
     ChevronRight, AlertTriangle, CheckCircle, Info, Loader2,
     Sparkles, LogOut, Building2, Globe, Shield, ArrowRight
@@ -250,26 +250,22 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
     return (
         <header className="h-[88px] flex items-center justify-between px-8 bg-white/80 backdrop-blur-md border-b border-[#F1F5F9] sticky top-0 z-40">
 
-            {/* ── Logo & Home ── */}
-            <div className="flex items-center gap-4 mr-8">
-                <div onClick={() => dispatchView('dashboard')} className="flex items-center gap-2 cursor-pointer group">
-                    <div className="w-9 h-9 rounded-xl bg-[#0F172A] flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <Video className="w-5 h-5 text-white" />
-                    </div>
-                    <div className="hidden md:block">
-                        <h2 className="text-[18px] font-black text-[#0F172A] tracking-tighter uppercase italic leading-none">
-                            Talent-Inn <span className="text-blue-600">Pro</span>
-                        </h2>
-                        {title && <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1 italic">{title}</p>}
-                    </div>
-                </div>
+            {/* ── Page Title & Home ──
+                Brand identity already lives in the sidebar (Talent-Inn + AI Recruitment).
+                Top-bar shows page-level context only — no second brand wordmark. */}
+            <div className="flex items-center gap-3 mr-6">
                 <button
                     onClick={() => dispatchView('dashboard')}
-                    className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-blue-600 transition-all"
+                    className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-blue-600 transition-all"
                     title="Anasayfa"
                 >
                     <Home className="w-5 h-5" />
                 </button>
+                {title && (
+                    <h2 className="hidden md:block text-[15px] font-bold text-[#0F172A] tracking-tight">
+                        {title}
+                    </h2>
+                )}
             </div>
 
             {/* ── Search ── */}
