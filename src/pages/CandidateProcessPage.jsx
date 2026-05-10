@@ -584,22 +584,46 @@ export default function CandidateProcessPage() {
         return unsub;
     }, [candidate?.id]);
 
+    // Position filter dropdown is built from CURRENTLY-OPEN positions (not
+    // CV-extracted text titles). This way the recruiter filters by their
+    // active openings — a candidate matched to a now-closed position falls
+    // out of any open-position filter as expected.
+    //
+    // Fallback to candidate-derived list if no open positions are loaded
+    // yet, so the page doesn't appear broken during initial render.
     const filterOptions = useMemo(() => {
         const sources = [...new Set(candidates.map(c => c.source).filter(Boolean))];
-        const positions = [...new Set(candidates.map(c => c.position || c.bestTitle).filter(Boolean))];
+        const openPosTitles = (positions || [])
+            .filter(p => p.status === 'open')
+            .map(p => p.title)
+            .filter(Boolean);
+        const positionsList = openPosTitles.length > 0
+            ? [...new Set(openPosTitles)]
+            : [...new Set(candidates.map(c => c.matchedPositionTitle || c.position || c.bestTitle).filter(Boolean))];
         const statuses = [...new Set(candidates.map(c => normalizePipelineStatus(c.status)).filter(Boolean))];
-        return { sources, positions, statuses };
-    }, [candidates]);
+        return { sources, positions: positionsList, statuses };
+    }, [candidates, positions]);
 
     const activeFilterCount = [filterSource, filterStatus, filterPosition, filterMinScore > 0].filter(Boolean).length;
 
     const filtered = useMemo(() => {
         const q = searchQuery.toLowerCase();
         const results = candidates.filter(c => {
-            if (q && !c.name?.toLowerCase().includes(q) && !(c.position || c.bestTitle)?.toLowerCase().includes(q)) return false;
+            // Position-related fields the candidate might be searched/filtered
+            // by. matchedPositionTitle is the system's pick (highest-scoring
+            // open position for this candidate); position/bestTitle come from
+            // CV text. Search hits any of them; filter prefers the system pick.
+            const candidatePosForSearch = [
+                c.matchedPositionTitle,
+                c.position,
+                c.bestTitle,
+            ].filter(Boolean).join(' ').toLowerCase();
+            const candidatePosForFilter = c.matchedPositionTitle || c.position || c.bestTitle || '';
+
+            if (q && !c.name?.toLowerCase().includes(q) && !candidatePosForSearch.includes(q)) return false;
             if (filterSource && c.source !== filterSource) return false;
             if (filterStatus && normalizePipelineStatus(c.status) !== filterStatus) return false;
-            if (filterPosition && (c.position || c.bestTitle) !== filterPosition) return false;
+            if (filterPosition && candidatePosForFilter !== filterPosition) return false;
             if (filterMinScore > 0 && (c.bestScore || 0) < filterMinScore) return false;
             return true;
         });
@@ -984,7 +1008,16 @@ export default function CandidateProcessPage() {
                                             </span>
                                         </div>
                                         <div className="flex items-center gap-3 mt-0.5">
-                                            <p className="text-[11px] text-slate-500 font-medium">{candidate.position || candidate.bestTitle || '—'}</p>
+                                            {/*
+                                              Show the system's match (matchedPositionTitle) over the
+                                              CV-extracted title (candidate.position) so the header
+                                              reflects "what we'd consider this candidate for" rather
+                                              than "what the CV literally says". Falls back to
+                                              position/bestTitle when no AI match has run yet.
+                                            */}
+                                            <p className="text-[11px] text-slate-500 font-medium" title={candidate.position && candidate.matchedPositionTitle && candidate.position !== candidate.matchedPositionTitle ? `CV: ${candidate.position}` : undefined}>
+                                                {candidate.matchedPositionTitle || candidate.position || candidate.bestTitle || '—'}
+                                            </p>
                                             {candidate.email && (
                                                 <span className="text-[10px] text-slate-400 flex items-center gap-1">
                                                     <Mail className="w-3 h-3" /> {candidate.email}
