@@ -107,10 +107,18 @@ export default function InterviewManagementPage() {
 
     // Manual interview entry modal — see components/AddManualInterviewModal.jsx
     const [manualInterviewOpen, setManualInterviewOpen] = useState(false);
-    
+
+    // Single dropdown that consolidates the 4 separate action buttons
+    // (Yeni Seans Planla / Hızlı Mülakat Başlat / Yüz Yüze / Manuel Görüşme Ekle).
+    // Reduces visual competition in the page header — see design-critique.
+    const [newInterviewMenuOpen, setNewInterviewMenuOpen] = useState(false);
+
     // Close menu when clicking outside
     useEffect(() => {
-        const handleClickOutside = () => setOpenMenuId(null);
+        const handleClickOutside = () => {
+            setOpenMenuId(null);
+            setNewInterviewMenuOpen(false);
+        };
         window.addEventListener('click', handleClickOutside);
         return () => window.removeEventListener('click', handleClickOutside);
     }, []);
@@ -2086,31 +2094,109 @@ export default function InterviewManagementPage() {
                                     className="pl-9 pr-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1E3A8A] focus:border-transparent w-64 shadow-sm transition-all"
                                 />
                             </div>
-                            <button
-                                onClick={() => { setQuickCandidate(null); setQuickSearch(''); setQuickType('technical'); setQuickModal(true); }}
-                                className="flex items-center gap-2 bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition-all shadow-md shadow-indigo-900/10"
-                            >
-                                <User className="w-4 h-4" /> Yüz Yüze
-                            </button>
-                            <button
-                                onClick={() => { setQuickCandidate(null); setQuickSearch(''); setQuickType('technical'); setQuickModal(true); }}
-                                className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-all shadow-md shadow-emerald-900/10"
-                            >
-                                <Play className="w-4 h-4 fill-current" /> Hızlı Mülakat Başlat
-                            </button>
-                            <button
-                                onClick={() => setManualInterviewOpen(true)}
-                                className="flex items-center gap-2 bg-white text-slate-700 border border-slate-200 px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-slate-50 transition-all shadow-sm"
-                                title="Sistem dışında yapılmış görüşmeyi manuel olarak ekle (telefon, yüzyüze, vb.)"
-                            >
-                                <Plus className="w-4 h-4" /> Manuel Görüşme Ekle
-                            </button>
-                            <button
-                                onClick={() => { setWizardStep(1); setSelectedCandidate(null); setManualDate(''); setManualTime('09:00'); setIsPlanningMode(true); }}
-                                className="flex items-center gap-2 bg-[#1E3A8A] text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-800 transition-all shadow-md shadow-blue-900/10"
-                            >
-                                <Plus className="w-4 h-4" /> Yeni Seans Planla
-                            </button>
+                            {/* Single primary action with grouped sub-actions.
+                                Replaces 4 competing buttons (Yüz Yüze / Hızlı Mülakat /
+                                Manuel / Yeni Seans). Default click opens the menu;
+                                each item runs its own handler. */}
+                            <div className="relative" onClick={(e) => e.stopPropagation()}>
+                                <button
+                                    onClick={() => setNewInterviewMenuOpen(o => !o)}
+                                    className="flex items-center gap-2 bg-[#1E3A8A] text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-800 transition-all shadow-md shadow-blue-900/10"
+                                    aria-haspopup="menu"
+                                    aria-expanded={newInterviewMenuOpen}
+                                >
+                                    <Plus className="w-4 h-4" /> Yeni Mülakat
+                                    <ChevronDown className={`w-4 h-4 transition-transform ${newInterviewMenuOpen ? 'rotate-180' : ''}`} />
+                                </button>
+
+                                {newInterviewMenuOpen && (
+                                    <div
+                                        role="menu"
+                                        className="absolute right-0 top-full mt-2 w-[300px] bg-white rounded-xl shadow-2xl border border-slate-100 z-50 overflow-hidden py-1.5"
+                                    >
+                                        <button
+                                            role="menuitem"
+                                            onClick={() => {
+                                                setNewInterviewMenuOpen(false);
+                                                setWizardStep(1);
+                                                setSelectedCandidate(null);
+                                                setManualDate('');
+                                                setManualTime('09:00');
+                                                setIsPlanningMode(true);
+                                            }}
+                                            className="w-full flex items-start gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left"
+                                        >
+                                            <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0 mt-0.5">
+                                                <Calendar className="w-4 h-4 text-[#1E3A8A]" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-[13px] font-semibold text-slate-800">Seans Planla</div>
+                                                <div className="text-[11px] text-slate-500 mt-0.5">Adımlı sihirbaz ile yeni mülakat oluştur</div>
+                                            </div>
+                                        </button>
+
+                                        <button
+                                            role="menuitem"
+                                            onClick={() => {
+                                                setNewInterviewMenuOpen(false);
+                                                setQuickCandidate(null);
+                                                setQuickSearch('');
+                                                setQuickType('technical');
+                                                setQuickModal(true);
+                                            }}
+                                            className="w-full flex items-start gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left"
+                                        >
+                                            <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0 mt-0.5">
+                                                <Play className="w-4 h-4 text-emerald-600 fill-current" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-[13px] font-semibold text-slate-800">Hızlı Mülakat Başlat</div>
+                                                <div className="text-[11px] text-slate-500 mt-0.5">Anında canlı oturum aç</div>
+                                            </div>
+                                        </button>
+
+                                        <button
+                                            role="menuitem"
+                                            onClick={() => {
+                                                setNewInterviewMenuOpen(false);
+                                                setQuickCandidate(null);
+                                                setQuickSearch('');
+                                                setQuickType('technical');
+                                                setQuickModal(true);
+                                            }}
+                                            className="w-full flex items-start gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left"
+                                        >
+                                            <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0 mt-0.5">
+                                                <User className="w-4 h-4 text-indigo-600" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-[13px] font-semibold text-slate-800">Yüz Yüze Mülakat</div>
+                                                <div className="text-[11px] text-slate-500 mt-0.5">Ofiste yapılacak görüşme</div>
+                                            </div>
+                                        </button>
+
+                                        <div className="border-t border-slate-100 mt-1 pt-1">
+                                            <button
+                                                role="menuitem"
+                                                onClick={() => {
+                                                    setNewInterviewMenuOpen(false);
+                                                    setManualInterviewOpen(true);
+                                                }}
+                                                className="w-full flex items-start gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left"
+                                                title="Sistem dışında yapılmış görüşmeyi manuel olarak ekle (telefon, yüzyüze, vb.)"
+                                            >
+                                                <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0 mt-0.5">
+                                                    <Plus className="w-4 h-4 text-slate-600" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="text-[13px] font-semibold text-slate-800">Manuel Görüşme Ekle</div>
+                                                    <div className="text-[11px] text-slate-500 mt-0.5">Sistem dışında yapılmış görüşmeyi kaydet</div>
+                                                </div>
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
 
