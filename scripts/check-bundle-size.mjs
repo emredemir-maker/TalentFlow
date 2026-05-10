@@ -34,11 +34,31 @@ const ASSETS_DIR = path.join(REPO_ROOT, 'dist', 'assets');
 
 // Budgets in kilobytes (gzipped). Tightened after PR #35 (route-level
 // lazy loading); keep some headroom for organic growth.
+//
+// Each entry: prefix → max gzipped KB. Multiple chunks matching a
+// prefix are checked individually (e.g. several `index-*.js` files,
+// though Vite typically emits one).
 const BUDGETS = {
-    // Main app entry — the only chunk every visitor downloads on first
-    // paint. PR #35 shipped this at 73.1 KB gzip. 130 KB allows ~80%
-    // headroom before failing.
+    // Main app entry — the only JS chunk every visitor downloads on
+    // first paint. PR #35 shipped this at 73.1 KB gzip. 130 KB allows
+    // ~80% headroom before failing.
     'index-': Number(process.env.BUDGET_INDEX_GZIP_KB) || 130,
+
+    // Firebase SDK chunk — firebase/auth + firestore + storage. Heavy
+    // (~162 KB gzip) but needed on every authenticated route, so it's
+    // the second-biggest item on the initial network. Budget guards
+    // against accidentally pulling in firebase-functions or another
+    // heavy sub-package via a wildcard import.
+    'firebase-': Number(process.env.BUDGET_FIREBASE_GZIP_KB) || 200,
+
+    // React + react-router. Tiny and stable; the budget exists mostly
+    // to flag a runtime that flips into an unminified mode.
+    'react-vendor-': Number(process.env.BUDGET_REACT_GZIP_KB) || 30,
+
+    // lucide-react icon set. Tree-shaking should keep this small even
+    // as we add icons; a regression here usually means a `*` re-export
+    // somewhere defeating the shake.
+    'icons-': Number(process.env.BUDGET_ICONS_GZIP_KB) || 25,
 };
 
 async function listAssetFiles() {
