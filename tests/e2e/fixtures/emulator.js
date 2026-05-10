@@ -43,8 +43,10 @@ export async function clearEmulators() {
 }
 
 /**
- * Create an Auth user with email + password. Returns the localId
- * (Firebase UID) so callers can write a matching profile doc.
+ * Create an Auth user with email + password. Returns both the localId
+ * (Firebase UID) AND the idToken so callers can write a matching
+ * profile doc *as that user* — the project's Firestore rules require
+ * authenticated writes for `users/{uid}`.
  */
 export async function createAuthUser({ email, password, displayName }) {
     const res = await fetch(`${AUTH_BASE}/accounts:signUp?key=fake-emulator-api-key`, {
@@ -56,19 +58,27 @@ export async function createAuthUser({ email, password, displayName }) {
         throw new Error(`Auth user creation failed: ${res.status} ${await res.text()}`);
     }
     const data = await res.json();
-    return data.localId;
+    return { uid: data.localId, idToken: data.idToken };
 }
 
 /**
  * Write a recruiter-shaped profile doc at
  * artifacts/talent-flow/public/data/users/{uid}. Mirrors the shape
  * AuthContext expects so the in-app shell renders normally.
+ *
+ * The Firestore emulator enforces the project's real firestore.rules,
+ * so this call has to carry an Authorization Bearer token belonging
+ * to the user whose UID is in the path. Pass the idToken returned by
+ * createAuthUser.
  */
-export async function writeUserProfile({ uid, email, displayName, role }) {
+export async function writeUserProfile({ uid, idToken, email, displayName, role }) {
     const docPath = `artifacts/talent-flow/public/data/users/${uid}`;
     const res = await fetch(`${FIRESTORE_BASE}/${docPath}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${idToken}`,
+        },
         body: JSON.stringify({
             fields: {
                 uid: { stringValue: uid },

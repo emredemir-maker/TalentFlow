@@ -30,9 +30,10 @@ export default async function globalSetup() {
     }
 
     await clearEmulators();
-    const uid = await createAuthUser(TEST_USER);
+    const { uid, idToken } = await createAuthUser(TEST_USER);
     await writeUserProfile({
         uid,
+        idToken,
         email: TEST_USER.email,
         displayName: TEST_USER.displayName,
         role: 'recruiter',
