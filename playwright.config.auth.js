@@ -24,6 +24,11 @@ const BASE_URL = process.env.E2E_BASE_URL || `http://localhost:${PORT}`;
 export default defineConfig({
     testDir: './tests/e2e',
     testMatch: /.*\.auth\.spec\.js$/,
+    // The match regex above also catches `.real-auth.spec.js` files
+    // (their suffix happens to end in `.auth.spec.js`). Exclude them
+    // explicitly so the mock-auth suite doesn't try to run the
+    // emulator-backed tests against the wrong build.
+    testIgnore: /.*\.real-auth\.spec\.js$/,
     retries: process.env.CI ? 1 : 0,
     workers: process.env.CI ? 2 : undefined,
     reporter: process.env.CI
