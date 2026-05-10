@@ -180,7 +180,7 @@ export default function Dashboard() {
 
     return (
         <div className="min-h-screen bg-[#F0F4F8]">
-            <Header />
+            <Header title="Kontrol Paneli" />
 
             <div className="max-w-[1500px] mx-auto px-8 py-6 space-y-6">
 
