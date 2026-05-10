@@ -18,6 +18,8 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
+    "test:e2e:auth": "playwright test --config=playwright.config.auth.js",
+    "build:e2e-auth": "vite build --mode e2e-auth",
     "check:deps": "node scripts/check-deps-sync.mjs",
     "check:bundle-size": "node scripts/check-bundle-size.mjs",
     "scrape": "node cli-scraper.mjs",

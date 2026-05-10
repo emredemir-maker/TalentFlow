@@ -39,6 +39,37 @@ export function AuthProvider({ children }) {
     const [error, setError] = useState(null);
 
     useEffect(() => {
+        // ── E2E mock-auth short-circuit ──────────────────────────────────
+        // Vite resolves `import.meta.env.VITE_E2E_MOCK_AUTH` at build time.
+        // When the env var is set to 'true' (only the Playwright "auth"
+        // project does this), AuthContext skips Firebase entirely and
+        // hands the rest of the app a fixed authenticated session. The
+        // production build is unaffected because the env var is not set
+        // there — the dead branch is removed by Rollup's tree shaker.
+        //
+        // The mock user is a recruiter (not super_admin) so any test that
+        // *does* exercise super-admin gates surfaces the right error,
+        // and not a falsely-allowed path.
+        if (import.meta.env.VITE_E2E_MOCK_AUTH === 'true') {
+            setUser({
+                uid: 'e2e-test-recruiter',
+                email: 'e2e@test.local',
+                displayName: 'E2E Test Recruiter',
+                isAnonymous: false,
+            });
+            setUserProfile({
+                uid: 'e2e-test-recruiter',
+                email: 'e2e@test.local',
+                displayName: 'E2E Test Recruiter',
+                name: 'E2E Test Recruiter',
+                role: 'recruiter',
+                departments: [],
+                status: 'active',
+            });
+            setLoading(false);
+            return;
+        }
+
         if (!isFirebaseConfigured || !auth) {
             setError('Firebase yapılandırılmamış. Lütfen VITE_FIREBASE_* ortam değişkenlerini ayarlayın.');
             setLoading(false);
