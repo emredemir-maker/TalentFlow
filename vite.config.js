@@ -34,7 +34,9 @@ export default defineConfig({
             'firebase/storage',
           ],
           'firebase-admin': ['firebase'],
-          'charts': ['recharts'],
+          // 'charts' chunk removed — recharts is no longer a dependency
+          // (3 chart wrappers under src/components/charts/ that imported
+          // it were never wired into any page).
           'pdf': ['pdfjs-dist'],
           'icons': ['lucide-react'],
           'ai': ['@google/generative-ai'],
