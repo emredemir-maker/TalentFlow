@@ -106,6 +106,24 @@ export default function Header({ title }) {
     const [selIdx, setSelIdx]       = useState(0);
     const [notifOpen, setNotifOpen] = useState(false);
     const [settOpen, setSettOpen]   = useState(false);
+    // Track viewport ≥md so the search placeholder can be richer on desktop
+    // ("Aday, beceri veya sayfa ara… (Ctrl+K)") and stay short on mobile ("Ara…").
+    const [isMdUp, setIsMdUp] = useState(
+        typeof window !== 'undefined' ? window.matchMedia('(min-width: 768px)').matches : true
+    );
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const mq = window.matchMedia('(min-width: 768px)');
+        const handler = (e) => setIsMdUp(e.matches);
+        mq.addEventListener('change', handler);
+        return () => mq.removeEventListener('change', handler);
+    }, []);
+    // Detect Mac so we can show ⌘ instead of Ctrl in the placeholder hint.
+    const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
+    const shortcutHint = isMac ? '⌘K' : 'Ctrl+K';
+    const searchPlaceholder = isMdUp
+        ? `Aday, beceri veya sayfa ara… (${shortcutHint})`
+        : 'Ara…';
 
     const searchRef   = useRef(null);
     const inputRef    = useRef(null);
@@ -287,7 +305,7 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                         onChange={e => { setQuery(e.target.value); setPanelOpen(true); }}
                         onFocus={() => setPanelOpen(true)}
                         onKeyDown={handleKeyDown}
-                        placeholder="Ara…"
+                        placeholder={searchPlaceholder}
                         className="w-full pl-10 md:pl-12 pr-8 md:pr-10 py-2 md:py-2.5 bg-[#F1F5F9] rounded-lg focus:bg-white focus:ring-1 focus:ring-[#2563EB] outline-none transition-all text-[13px] md:text-[14px] text-[#0F172A] placeholder:text-[#94A3B8]"
                     />
                     {query && (
