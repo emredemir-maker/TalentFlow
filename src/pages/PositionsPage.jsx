@@ -13,6 +13,7 @@ import {
     Search, Sparkles, Loader2, Cpu, ArrowUpRight, Building2,
     AlertCircle, Unlock, Edit2, X, Send, Link2, Copy, Check,
     ExternalLink, FileText, ChevronRight, TrendingUp, RefreshCw,
+    MoreHorizontal,
 } from 'lucide-react';
 import {
     subscribeToApplications, getSourceColor, APP_STATUS_CONFIG, updateApplicationStatus, deleteApplication
@@ -1109,6 +1110,15 @@ export default function PositionsPage() {
     const [departments, setDepartments]         = useState([]);
     const [jdText, setJdText]                   = useState('');
     const [isExtracting, setIsExtracting]       = useState(false);
+    // ID of the row whose "more actions" overflow menu is currently open.
+    // Only one row can have an open menu at a time. Click-outside closes it.
+    const [openActionMenuId, setOpenActionMenuId] = useState(null);
+
+    useEffect(() => {
+        const close = () => setOpenActionMenuId(null);
+        window.addEventListener('click', close);
+        return () => window.removeEventListener('click', close);
+    }, []);
 
     useEffect(() => {
         const unsub = onSnapshot(collection(db, 'artifacts/talent-flow/public/data/departments'), (snap) => {
@@ -1404,14 +1414,51 @@ export default function PositionsPage() {
                                         {/* Col 6 — stop propagation so clicks don't open drawer */}
                                         <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
                                             {pos.status === 'open' && <>
+                                                {/* Visible primary actions:
+                                                    - Departmana Aç (recruiter/admin yalnız)
+                                                    - Düzenle
+                                                    Destructive actions (Kapat, Sil) live in the
+                                                    "..." overflow menu so the row doesn't surface
+                                                    four icon buttons at once. */}
                                                 {isRecruiterOrAdmin && (
                                                     <button onClick={() => handleRelease(pos)} disabled={releaseLoading && releasingPosId === pos.id} className={`p-1.5 rounded-lg border transition-colors ${pos.releasedToDepartment ? 'bg-emerald-50 border-emerald-200 text-emerald-500' : 'bg-violet-50 border-violet-200 text-violet-500 hover:bg-violet-100'}`} title="Departmana Aç">
                                                         {releaseLoading && releasingPosId === pos.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Unlock className="w-4 h-4" />}
                                                     </button>
                                                 )}
                                                 <button onClick={() => setEditPos(pos)} className="p-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-400 hover:bg-amber-50 hover:border-amber-200 hover:text-amber-500 transition-colors" title="Düzenle"><Edit2 className="w-4 h-4" /></button>
-                                                <button onClick={() => handleToggleStatus(pos.id, pos.status)} className="p-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-400 hover:bg-red-50 hover:border-red-200 hover:text-red-400 transition-colors" title="Kapat"><XCircle className="w-4 h-4" /></button>
-                                                <button onClick={() => deletePosition(pos.id)} className="p-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-400 hover:bg-red-50 hover:border-red-200 hover:text-red-400 transition-colors" title="Sil"><Trash2 className="w-4 h-4" /></button>
+
+                                                {/* Overflow menu: Kapat + Sil */}
+                                                <div className="relative">
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); setOpenActionMenuId(openActionMenuId === pos.id ? null : pos.id); }}
+                                                        className="p-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+                                                        title="Daha fazla"
+                                                        aria-haspopup="menu"
+                                                        aria-expanded={openActionMenuId === pos.id}
+                                                    >
+                                                        <MoreHorizontal className="w-4 h-4" />
+                                                    </button>
+                                                    {openActionMenuId === pos.id && (
+                                                        <div role="menu" className="absolute right-0 top-full mt-1 w-44 bg-white rounded-xl shadow-2xl border border-slate-100 z-50 overflow-hidden py-1">
+                                                            <button
+                                                                role="menuitem"
+                                                                onClick={() => { setOpenActionMenuId(null); handleToggleStatus(pos.id, pos.status); }}
+                                                                className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 transition-colors text-left text-[12px] text-slate-700"
+                                                            >
+                                                                <XCircle className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                                                <span>Pozisyonu Kapat</span>
+                                                            </button>
+                                                            <button
+                                                                role="menuitem"
+                                                                onClick={() => { setOpenActionMenuId(null); deletePosition(pos.id); }}
+                                                                className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-red-50 transition-colors text-left text-[12px] text-red-600"
+                                                            >
+                                                                <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                                                                <span>Sil</span>
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </>}
                                             {isPending && isRecruiterOrAdmin && <>
                                                 <button onClick={() => { if (window.confirm('Onaylamak istiyor musunuz?')) approvePosition(pos.id); }} className="p-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-500 hover:bg-emerald-100 transition-colors" title="Onayla"><CheckCircle2 className="w-4 h-4" /></button>
