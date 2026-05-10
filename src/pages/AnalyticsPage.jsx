@@ -48,7 +48,9 @@ function OverviewTab({ candidates, funnelData, trendsData, positionStatusData, a
                 {[
                     { icon: Users,        bg: 'bg-blue-50',    color: 'text-blue-500',    val: candidates.length,  label: 'Aktif Aday Havuzu',  trend: '▲ 12%', positive: true  },
                     { icon: BrainCircuit, bg: 'bg-violet-50',  color: 'text-violet-500',  val: `${avgMatchScore}%`, label: 'Ort. Yetenek Skoru', trend: '▲ 3.4%', positive: true  },
-                    { icon: Clock,        bg: 'bg-amber-50',   color: 'text-amber-500',   val: pendingReply,        label: 'Yanıt Bekleyen',     trend: '▼ 5%',  positive: false },
+                    // "Yanıt Bekleyen ▼ 5%" — bekleyenin azalması iyi haber
+                    // (yanıtlandılar), yani positive: true (yeşil).
+                    { icon: Clock,        bg: 'bg-amber-50',   color: 'text-amber-500',   val: pendingReply,        label: 'Yanıt Bekleyen',     trend: '▼ 5%',  positive: true  },
                     { icon: Target,       bg: 'bg-emerald-50', color: 'text-emerald-500', val: `${hiringRate}%`,    label: 'İşe Alım Verimi',    trend: '▲ 2%',  positive: true  },
                 ].map(({ icon: Icon, bg, color, val, label, trend, positive }) => (
                     <div key={label} className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col gap-3 shadow-sm">
@@ -525,7 +527,11 @@ export default function AnalyticsPage() {
 
     const pendingApprovals = useMemo(() => messages.filter(m => m.status === 'draft' || m.status === 'ready_to_send'), [messages]);
     const sentMessages     = useMemo(() => messages.filter(m => m.status === 'sent' || m.status === 'email_opened' || m.status === 'replied'), [messages]);
-    const pendingCount     = messageStats.sent - messageStats.replied;
+    // Defensive: if context is still loading or `replied` is missing,
+    // pendingCount must be a finite non-negative number — never NaN.
+    const sentSafe    = Number.isFinite(messageStats?.sent)    ? messageStats.sent    : 0;
+    const repliedSafe = Number.isFinite(messageStats?.replied) ? messageStats.replied : 0;
+    const pendingCount = Math.max(0, sentSafe - repliedSafe);
 
     const loading = candidatesLoading || messagesLoading;
 
@@ -548,11 +554,12 @@ export default function AnalyticsPage() {
         <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-800">
             <Header title="Stratejik Analitik" />
 
-            {/* Sub-header */}
+            {/* Sub-header — "Stratejik Analitik" lives in the top-bar (Header
+                title). Don't repeat it here; just the live-status indicator
+                + record count remain. */}
             <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-3">
                     <Activity size={16} className="text-cyan-500" />
-                    <span className="font-black text-slate-900 text-sm tracking-tight">Stratejik Analitik</span>
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                     <span className="text-[11px] text-slate-400">{candidates.length} aktif kayıt</span>
                 </div>

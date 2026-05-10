@@ -51,6 +51,7 @@ export function MessageQueueProvider({ children }) {
         draft: messages.filter((m) => m.status === 'draft').length,
         readyToSend: messages.filter((m) => m.status === 'ready_to_send').length,
         sent: messages.filter((m) => m.status === 'sent').length,
+        replied: messages.filter((m) => m.status === 'replied').length,
         failed: messages.filter((m) => m.status === 'failed').length,
     };
 
