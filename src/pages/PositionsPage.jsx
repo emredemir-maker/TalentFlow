@@ -1305,12 +1305,10 @@ export default function PositionsPage() {
                             </button>
                         ))}
                     </div>
-                    <div className="mt-auto pt-4 border-t border-slate-100">
-                        <div className="rounded-xl bg-cyan-50 border border-cyan-100 p-3 flex items-start gap-2">
-                            <Sparkles className="w-3.5 h-3.5 text-cyan-500 shrink-0 mt-0.5" />
-                            <span className="text-[11px] text-slate-500 leading-snug">AI eşleştirme aktif</span>
-                        </div>
-                    </div>
+                    {/* Sidebar footer "AI eşleştirme aktif" pill removed.
+                        The same status indicator is rendered in the table
+                        footer (Cpu icon + "Eşleştirme aktif") just below;
+                        keeping it twice on a single page was decoration. */}
                 </aside>
 
                 {/* Main */}
@@ -1336,7 +1334,7 @@ export default function PositionsPage() {
                     {/* Table header */}
                     <div className="px-7 pt-4 pb-2 shrink-0">
                         <div className="grid grid-cols-[2fr_0.8fr_0.8fr_0.9fr_1.2fr_auto] gap-4 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2 px-4">
-                            <div>POZİSYON / DEPARTMAN</div><div>ADAYLAR</div><div>TECRÜBE</div><div>DURUM</div><div>AI UYUM SKORU</div><div>İŞLEMLER</div>
+                            <div>POZİSYON / DEPARTMAN</div><div>ADAYLAR</div><div>TECRÜBE</div><div>DURUM</div><div>UYUM SKORU</div><div>İŞLEMLER</div>
                         </div>
                     </div>
 
@@ -1483,7 +1481,7 @@ export default function PositionsPage() {
                     {/* Footer */}
                     <div className="px-7 py-3 border-t border-slate-100 bg-slate-50 flex items-center justify-between shrink-0">
                         <p className="text-xs text-slate-400 font-medium">{visiblePositions.length} pozisyon gösteriliyor</p>
-                        <div className="flex items-center gap-1"><Cpu className="w-3 h-3 text-cyan-400" /><span className="text-[10px] text-slate-400">AI eşleştirme aktif</span></div>
+                        <div className="flex items-center gap-1"><Cpu className="w-3 h-3 text-cyan-400" /><span className="text-[10px] text-slate-400">Eşleştirme aktif</span></div>
                     </div>
                 </div>
             </div>
