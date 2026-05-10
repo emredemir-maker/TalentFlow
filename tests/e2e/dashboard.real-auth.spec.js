@@ -66,7 +66,7 @@ test.describe('Real-auth login + dashboard', () => {
         });
         await page.locator('input[type="email"]').first().fill(TEST_USER.email);
         await page.locator('input[type="password"]').first().fill(TEST_USER.password);
-        await page.getByRole('button', { name: /Giriş Yap/i }).click();
+        await page.getByRole('button', { name: 'Sisteme Giriş Yap' }).click();
         await expect(page.getByRole('heading', { name: 'Stratejik Genel Bakış' })).toBeVisible({
             timeout: 20_000,
         });
