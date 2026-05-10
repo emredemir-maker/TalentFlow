@@ -62,6 +62,8 @@ function AuthenticatedApp() {
   const { settings } = useUserSettings();
   const [activeView, setActiveView] = useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // Mobile drawer (<lg). Desktop layout (≥lg) uses sidebarCollapsed instead.
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -72,9 +74,16 @@ function AuthenticatedApp() {
       } else if (e.detail?.view) {
         setActiveView(e.detail.view);
       }
+      // Closing nav also closes the mobile drawer if open.
+      setMobileSidebarOpen(false);
     };
+    const handleOpenMobile = () => setMobileSidebarOpen(true);
     window.addEventListener('changeView', handleNav);
-    return () => window.removeEventListener('changeView', handleNav);
+    window.addEventListener('openMobileSidebar', handleOpenMobile);
+    return () => {
+      window.removeEventListener('changeView', handleNav);
+      window.removeEventListener('openMobileSidebar', handleOpenMobile);
+    };
   }, []);
 
   useEffect(() => {
@@ -132,10 +141,12 @@ function AuthenticatedApp() {
         onNavigate={setActiveView}
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+        mobileOpen={mobileSidebarOpen}
+        onCloseMobile={() => setMobileSidebarOpen(false)}
       />
       <main
         className={`flex-1 min-h-screen transition-all duration-300 min-w-0
-          ${sidebarCollapsed ? 'md:ml-[80px]' : 'md:ml-[240px]'}`}
+          ${sidebarCollapsed ? 'lg:ml-[80px]' : 'lg:ml-[240px]'}`}
       >
         {renderPage()}
       </main>

@@ -4,7 +4,7 @@ import {
     Search, Bell, Settings, Home, X, Users, Briefcase,
     Calendar, MessageSquare, BarChart3, LayoutDashboard, FileText,
     ChevronRight, AlertTriangle, CheckCircle, Info, Loader2,
-    Sparkles, LogOut, Building2, Globe, Shield, ArrowRight
+    Sparkles, LogOut, Building2, Globe, Shield, ArrowRight, Menu
 } from 'lucide-react';
 import { useNotifications } from '../context/NotificationContext';
 import { useCandidates } from '../context/CandidatesContext';
@@ -248,15 +248,23 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
     const hasResults = total > 0;
 
     return (
-        <header className="h-[88px] flex items-center justify-between px-8 bg-white/80 backdrop-blur-md border-b border-[#F1F5F9] sticky top-0 z-40">
+        <header className="h-[88px] flex items-center justify-between px-4 md:px-8 bg-white/80 backdrop-blur-md border-b border-[#F1F5F9] sticky top-0 z-40">
 
-            {/* ── Page Title & Home ──
-                Brand identity already lives in the sidebar (Talent-Inn + AI Recruitment).
-                Top-bar shows page-level context only — no second brand wordmark. */}
-            <div className="flex items-center gap-3 mr-6">
+            {/* ── Mobile Hamburger + Page Title + Home ──
+                Brand identity lives in the sidebar (Talent-Inn + AI Recruitment).
+                Top-bar shows page-level context only — no second brand wordmark.
+                On <lg the hamburger opens the sidebar drawer. */}
+            <div className="flex items-center gap-2 md:gap-3 md:mr-6">
+                <button
+                    onClick={() => window.dispatchEvent(new CustomEvent('openMobileSidebar'))}
+                    className="p-2 rounded-lg hover:bg-slate-100 text-slate-600 transition-all lg:hidden"
+                    aria-label="Menüyü aç"
+                >
+                    <Menu className="w-5 h-5" />
+                </button>
                 <button
                     onClick={() => dispatchView('dashboard')}
-                    className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-blue-600 transition-all"
+                    className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-blue-600 transition-all hidden sm:inline-flex"
                     title="Anasayfa"
                 >
                     <Home className="w-5 h-5" />
@@ -269,9 +277,9 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
             </div>
 
             {/* ── Search ── */}
-            <div className="flex-1 max-w-[500px] relative" ref={searchRef}>
+            <div className="flex-1 max-w-[500px] relative mx-2 md:mx-4" ref={searchRef}>
                 <div className="relative group">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#94A3B8] group-focus-within:text-[#2563EB] transition-colors pointer-events-none" />
+                    <Search className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#94A3B8] group-focus-within:text-[#2563EB] transition-colors pointer-events-none" />
                     <input
                         ref={inputRef}
                         type="text"
@@ -279,8 +287,8 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                         onChange={e => { setQuery(e.target.value); setPanelOpen(true); }}
                         onFocus={() => setPanelOpen(true)}
                         onKeyDown={handleKeyDown}
-                        placeholder="Aday, beceri veya sayfa ara… (⌘K)"
-                        className="w-full pl-12 pr-10 py-2.5 bg-[#F1F5F9] rounded-lg focus:bg-white focus:ring-1 focus:ring-[#2563EB] outline-none transition-all text-[14px] text-[#0F172A] placeholder:text-[#94A3B8]"
+                        placeholder="Ara…"
+                        className="w-full pl-10 md:pl-12 pr-8 md:pr-10 py-2 md:py-2.5 bg-[#F1F5F9] rounded-lg focus:bg-white focus:ring-1 focus:ring-[#2563EB] outline-none transition-all text-[13px] md:text-[14px] text-[#0F172A] placeholder:text-[#94A3B8]"
                     />
                     {query && (
                         <button
@@ -544,12 +552,12 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                     )}
                 </div>
 
-                {/* Profile */}
-                <div className="flex items-center gap-3 pl-4 ml-2 border-l border-[#E2E8F0]">
+                {/* Profile — name/role hidden on small screens */}
+                <div className="flex items-center gap-3 pl-2 sm:pl-4 ml-2 border-l border-[#E2E8F0]">
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-violet-500 flex items-center justify-center text-white text-xs font-black shrink-0 select-none">
                         {userName[0]?.toUpperCase() || 'U'}
                     </div>
-                    <div>
+                    <div className="hidden sm:block">
                         <div className="text-[13px] font-bold text-[#0F172A] leading-none truncate max-w-[110px]">{userName}</div>
                         <div className="text-[10px] text-[#64748B] font-medium mt-0.5">{roleLabel}</div>
                     </div>
