@@ -1,3 +1,7 @@
+/* global document, window */
+// `page.evaluate(...)` callbacks execute inside the browser, so document/
+// window are valid there even though the file itself is loaded by Node.
+
 // Smoke tests — Phase 4d.
 //
 // Verifies the SPA mounts, public routes resolve, and critical text/form
@@ -75,5 +79,28 @@ test.describe('SPA boot & public routes', () => {
         // The bundle's <title> from index.html should be present even on
         // an unknown route, since the SPA shell serves regardless.
         await expect(page).toHaveTitle(/Talent/i);
+    });
+
+    test('login renders inside a mobile viewport without horizontal scroll', async ({ page }) => {
+        // Pins the mobile-responsive shell from PR #25. Before that PR the
+        // 240px fixed sidebar would overlap the login form on a phone-
+        // width viewport, and the body would scroll sideways. A
+        // regression here means a recruiter on a phone can't even reach
+        // the login form.
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.goto('/login');
+
+        // The login form's right-panel heading must still render.
+        await expect(page.getByRole('heading', { name: 'Hoş Geldiniz' })).toBeVisible();
+
+        // No horizontal overflow — document width must not exceed the
+        // viewport width. A few pixels of slop are tolerated for
+        // scrollbar gutter rendering quirks.
+        const overflow = await page.evaluate(() => {
+            const docW = document.documentElement.scrollWidth;
+            const winW = window.innerWidth;
+            return { docW, winW };
+        });
+        expect(overflow.docW).toBeLessThanOrEqual(overflow.winW + 4);
     });
 });

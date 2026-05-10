@@ -99,6 +99,11 @@ jobs:
           # Build runs without real Firebase keys — the bundle compiles fine
           # without them since Vite only warns on missing VITE_* vars.
           NODE_ENV: production
+      - name: Bundle size budget check
+        # Guards the gain from PR #35 (route-level lazy loading). Fails
+        # the build if the main app chunk grows past the budget defined
+        # in scripts/check-bundle-size.mjs.
+        run: npm run check:bundle-size
 
   e2e:
     name: E2E (Playwright smoke)
