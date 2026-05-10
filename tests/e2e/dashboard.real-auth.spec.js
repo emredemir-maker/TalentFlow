@@ -39,9 +39,11 @@ test.describe('Real-auth login + dashboard', () => {
         await page.locator('input[type="email"]').first().fill(TEST_USER.email);
         await page.locator('input[type="password"]').first().fill(TEST_USER.password);
 
-        // Find the submit button by its visible label. LoginPage uses
-        // "Giriş Yap" for both initial and submitted states.
-        await page.getByRole('button', { name: /Giriş Yap/i }).click();
+        // LoginPage has TWO buttons whose label contains "Giriş Yap":
+        // the email/password submit ("Sisteme Giriş Yap") and the
+        // Google sign-in CTA ("Google ile Giriş Yap"). Pin the exact
+        // submit-button label to avoid strict-mode violations.
+        await page.getByRole('button', { name: 'Sisteme Giriş Yap' }).click();
 
         // After successful auth, AuthContext sets user + profile and
         // App.jsx flips to AuthenticatedApp. The Dashboard's body
