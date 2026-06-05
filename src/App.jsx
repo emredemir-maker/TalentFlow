@@ -112,12 +112,6 @@ function AuthenticatedApp() {
     };
   }, []);
 
-  useEffect(() => {
-    if (settings?.theme) {
-      document.documentElement.setAttribute('data-theme', settings.theme);
-    }
-  }, [settings?.theme]);
-
   // Auth loading
   if (loading) {
     return (
