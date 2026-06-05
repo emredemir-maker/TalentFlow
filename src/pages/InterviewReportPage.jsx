@@ -230,7 +230,7 @@ export default function InterviewReportPage() {
                              </button>
                              <button 
                                 onClick={handleDownload}
-                                className="h-10 px-4 bg-[#1E3A8A] text-white rounded-xl text-[11px] font-black uppercase flex items-center gap-2 shadow-lg shadow-blue-900/10 hover:bg-blue-800 transition-all cursor-pointer"
+                                className="h-10 px-4 bg-[#13294E] text-white rounded-xl text-[11px] font-black uppercase flex items-center gap-2 shadow-lg shadow-blue-900/10 hover:bg-blue-800 transition-all cursor-pointer"
                              >
                                  <DownloadCloud className="w-4 h-4" /> Raporu İndir
                              </button>
@@ -256,10 +256,10 @@ export default function InterviewReportPage() {
                             <button 
                                 key={tab.id} 
                                 onClick={() => setActiveTab(tab.id)}
-                                className={`py-4 flex items-center gap-2.5 text-[10px] font-black uppercase tracking-widest relative transition-all ${activeTab === tab.id ? 'text-[#1E3A8A]' : 'text-[#94A3B8] hover:text-[#475569]'}`}
+                                className={`py-4 flex items-center gap-2.5 text-[10px] font-black uppercase tracking-widest relative transition-all ${activeTab === tab.id ? 'text-[#13294E]' : 'text-[#94A3B8] hover:text-[#475569]'}`}
                             >
                                 <tab.icon className={`w-3.5 h-3.5 ${activeTab === tab.id ? 'fill-blue-100' : ''}`} /> {tab.label}
-                                {activeTab === tab.id && <div className="absolute bottom-[-1px] left-0 right-0 h-0.5 bg-[#1E3A8A] shadow-[0_4px_12px_rgba(30,58,138,0.3)]" />}
+                                {activeTab === tab.id && <div className="absolute bottom-[-1px] left-0 right-0 h-0.5 bg-[#13294E] shadow-[0_4px_12px_rgba(19, 41, 78,0.3)]" />}
                             </button>
                         ))}
                     </div>
@@ -275,7 +275,7 @@ export default function InterviewReportPage() {
                                         <div className="p-2 bg-blue-600/10 rounded-xl">
                                             <Brain className="w-5 h-5 text-blue-600" />
                                         </div>
-                                        <h3 className="text-[12px] font-black text-[#1E3A8A] uppercase tracking-widest italic">AI STAR ÖZETİ</h3>
+                                        <h3 className="text-[12px] font-black text-[#13294E] uppercase tracking-widest italic">AI STAR ÖZETİ</h3>
                                         <div className="ml-auto flex gap-1.5">
                                             <Sparkles className="w-4 h-4 text-blue-300 animate-pulse" />
                                         </div>
@@ -340,7 +340,7 @@ export default function InterviewReportPage() {
                                                     <div className="flex items-center justify-between">
                                                         <h4 className="text-[14px] font-black text-[#0F172A] tracking-tight">{star.label}</h4>
                                                         {star.score !== null
-                                                            ? <span className="text-[10px] font-black bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100 text-[#1E3A8A]">Skor: {star.score}/100</span>
+                                                            ? <span className="text-[10px] font-black bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100 text-[#13294E]">Skor: {star.score}/100</span>
                                                             : <span className="text-[10px] font-bold bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100 text-slate-400">Analiz edilmedi</span>
                                                         }
                                                     </div>
@@ -424,8 +424,8 @@ export default function InterviewReportPage() {
                                                     const r = val / 2;
                                                     return `${50 + r * Math.cos(angle * Math.PI / 180)},${50 + r * Math.sin(angle * Math.PI / 180)}`;
                                                 }).join(' ')}
-                                                fill="rgba(30, 58, 138, 0.15)"
-                                                stroke="#1E3A8A"
+                                                fill="rgba(19, 41, 78, 0.15)"
+                                                stroke="#13294E"
                                                 strokeWidth="2"
                                             />
                                         </svg>
@@ -441,13 +441,13 @@ export default function InterviewReportPage() {
                                     <div className="grid grid-cols-2 gap-3 w-full">
                                         <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 flex flex-col gap-1">
                                             <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">YETKİNLİK ORTALAMASI</span>
-                                            <span className="text-[14px] font-black text-[#1E3A8A]">
+                                            <span className="text-[14px] font-black text-[#13294E]">
                                                 {((Object.values(starScores).reduce((a, b) => a + b, 0) / 5) / 10).toFixed(1)} / 10
                                             </span>
                                         </div>
                                         <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 flex flex-col gap-1">
                                             <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">UYUM SKORU</span>
-                                            <span className="text-[14px] font-black text-[#1E3A8A]">{starScores.cultureFit}/100</span>
+                                            <span className="text-[14px] font-black text-[#13294E]">{starScores.cultureFit}/100</span>
                                         </div>
                                     </div>
                                 </section>
@@ -476,7 +476,7 @@ export default function InterviewReportPage() {
                                         </div>
                                     )}
                                     </div>
-                                    <button onClick={() => setActiveTab('transcript')} className="w-full py-2.5 text-[9px] font-black text-[#1E3A8A] uppercase hover:bg-slate-50 rounded-xl border border-slate-100 transition-all">Tüm Transkripti Görüntüle →</button>
+                                    <button onClick={() => setActiveTab('transcript')} className="w-full py-2.5 text-[9px] font-black text-[#13294E] uppercase hover:bg-slate-50 rounded-xl border border-slate-100 transition-all">Tüm Transkripti Görüntüle →</button>
                                 </section>
 
                                 {/* DECISION CARD */}
@@ -686,7 +686,7 @@ export default function InterviewReportPage() {
                                                  return (
                                                      <div key={i} className={`flex gap-6 group ${isAday ? 'pl-12' : 'pr-12'}`}>
                                                          {!isAday && (
-                                                             <div className="w-10 h-10 rounded-xl bg-[#1E3A8A] text-white flex items-center justify-center font-black text-[12px] shrink-0 shadow-lg">{initial}</div>
+                                                             <div className="w-10 h-10 rounded-xl bg-[#13294E] text-white flex items-center justify-center font-black text-[12px] shrink-0 shadow-lg">{initial}</div>
                                                          )}
                                                          <div className="space-y-3 flex-1">
                                                              <div className={`flex items-center gap-3 ${isAday ? 'justify-end' : ''}`}>
@@ -719,7 +719,7 @@ export default function InterviewReportPage() {
                                            <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform"><Sparkles className="w-6 h-6 text-blue-600 fill-blue-600" /></div>
                                            <div>
                                                <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest italic mb-0.5">AI ÖZET</p>
-                                               <p className="text-[13px] font-bold text-[#1E3A8A] italic">{session.aiSummary || "Adayın performansı ve cevapları gerçek zamanlı analiz edildi."}</p>
+                                               <p className="text-[13px] font-bold text-[#13294E] italic">{session.aiSummary || "Adayın performansı ve cevapları gerçek zamanlı analiz edildi."}</p>
                                            </div>
                                        </div>
                                        <ArrowRight className="w-5 h-5 text-blue-300" />

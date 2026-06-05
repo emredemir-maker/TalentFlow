@@ -229,7 +229,7 @@ export default function Dashboard() {
                         </div>
                         <button
                             onClick={() => setIsAddModalOpen(true)}
-                            className="text-[10px] font-bold text-white bg-[#1E3A8A] hover:bg-blue-800 px-4 py-2 rounded-xl transition-colors"
+                            className="text-[10px] font-bold text-white bg-[#13294E] hover:bg-blue-800 px-4 py-2 rounded-xl transition-colors"
                         >
                             + Aday Ekle
                         </button>
@@ -271,7 +271,7 @@ export default function Dashboard() {
                         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
                             <div className="flex items-center justify-between mb-5">
                                 <div className="flex items-center gap-2">
-                                    <BarChart2 className="w-4 h-4 text-[#1E3A8A]" />
+                                    <BarChart2 className="w-4 h-4 text-[#13294E]" />
                                     <span className="text-[13px] font-black text-[#0F172A]">Aday Pipeline</span>
                                 </div>
                                 <button
@@ -328,7 +328,7 @@ export default function Dashboard() {
                             </div>
                             <div className="mt-5 pt-4 border-t border-slate-100 flex items-center gap-6 flex-wrap">
                                 <div className="text-[10px] text-slate-500 font-medium">Teklife dönüşüm:</div>
-                                <div className="font-black text-[13px] text-[#1E3A8A]">
+                                <div className="font-black text-[13px] text-[#13294E]">
                                     %{candidates.length > 0 ? Math.round((funnelData[3].count / candidates.length) * 100) : 0}
                                 </div>
                                 <div className="text-[10px] text-slate-500 font-medium mt-1">İşe alım oranı:</div>
@@ -346,7 +346,7 @@ export default function Dashboard() {
                         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
                             <div className="flex items-center justify-between mb-5">
                                 <div className="flex items-center gap-2">
-                                    <Calendar className="w-4 h-4 text-[#1E3A8A]" />
+                                    <Calendar className="w-4 h-4 text-[#13294E]" />
                                     <span className="text-[13px] font-black text-[#0F172A]">Haftanın Planı</span>
                                 </div>
                                 <button
@@ -410,7 +410,7 @@ export default function Dashboard() {
                                                         navigate(`/live-interview/${s.id}`);
                                                     }
                                                 }}
-                                                className={`shrink-0 text-[9px] font-bold px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${effComp ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-[#1E3A8A] hover:bg-blue-800 text-white'}`}
+                                                className={`shrink-0 text-[9px] font-bold px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${effComp ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-[#13294E] hover:bg-blue-800 text-white'}`}
                                             >
                                                 {effComp ? 'Rapor' : s.status === 'live' ? 'Katıl' : 'Görüntüle'}
                                             </button>
@@ -425,7 +425,7 @@ export default function Dashboard() {
                     <div className="col-span-4 space-y-5">
 
                         {/* AI INSIGHT */}
-                        <div className="bg-[#1E3A8A] text-white rounded-2xl p-5 relative overflow-hidden">
+                        <div className="bg-[#13294E] text-white rounded-2xl p-5 relative overflow-hidden">
                             <div className="absolute -right-6 -top-6 w-28 h-28 bg-blue-500/20 rounded-full blur-xl" />
                             <div className="relative z-10">
                                 <div className="flex items-center gap-1.5 mb-3">

@@ -72,7 +72,7 @@ function defaultBlock(type, color) {
         case 'heading':    return { id, type, level: 'h2', text: 'Yeni Başlık' };
         case 'text':       return { id, type, text: 'Buraya metin yazın...' };
         case 'info_table': return { id, type, rows: [{ label: 'Alan', value: 'Değer' }] };
-        case 'button':     return { id, type, label: 'Tıklayın', href: '{{joinLink}}', color: color || '#0E7490' };
+        case 'button':     return { id, type, label: 'Tıklayın', href: '{{joinLink}}', color: color || '#13294E' };
         case 'alert':      return { id, type, variant: 'info', text: 'Bilgi mesajı buraya gelecek.' };
         case 'signature':  return { id, type, name: '{{recruiterName}}', title: '{{companyName}} İnsan Kaynakları' };
         default:           return { id, type, text: '' };
@@ -81,7 +81,7 @@ function defaultBlock(type, color) {
 
 // ─── Default block sets per template ─────────────────────────────────────────
 function defaultBlocks(templateId, color) {
-    const c = color || '#0E7490';
+    const c = color || '#13294E';
     switch (templateId) {
         case 'invite':
             return [
@@ -136,7 +136,7 @@ function defaultBlocks(templateId, color) {
 
 // ─── Block → HTML renderer ────────────────────────────────────────────────────
 function blocksToHtml(blocks, branding) {
-    const color = branding?.primaryColor || '#0E7490';
+    const color = branding?.primaryColor || '#13294E';
     const parts = blocks.map(block => {
         switch (block.type) {
             case 'heading':
@@ -189,7 +189,7 @@ function blocksToHtml(blocks, branding) {
 }
 
 function hexToRgb(hex) {
-    const clean = (hex || '#0E7490').replace('#', '');
+    const clean = (hex || '#13294E').replace('#', '');
     const r = parseInt(clean.slice(0, 2), 16);
     const g = parseInt(clean.slice(2, 4), 16);
     const b = parseInt(clean.slice(4, 6), 16);
@@ -201,7 +201,7 @@ function hexToRgb(hex) {
 // and {{companyName}} placeholders so templateService.applyVars can always
 // inject the *current* branding at send-time — not stale values from save-time.
 function buildPreviewHtml(blocks, branding) {
-    const color = branding?.primaryColor || '#0E7490';
+    const color = branding?.primaryColor || '#13294E';
     const rgb = hexToRgb(color);
 
     const content = blocksToHtml(blocks, branding);
@@ -227,7 +227,7 @@ function buildPreviewHtml(blocks, branding) {
 
 // Build the branding header block (logo img or initials div) for a given branding object
 function buildBrandingHeader(branding) {
-    const color = branding?.primaryColor || '#0E7490';
+    const color = branding?.primaryColor || '#13294E';
     const company = branding?.companyName || 'Şirket Adı';
     const tagline = branding?.tagline || '';
     const logoUrl = branding?.logoUrl || '';
@@ -458,7 +458,7 @@ export default function EmailTemplateEditorPage() {
     const [blocks, setBlocks] = useState({});
     const [htmlCode, setHtmlCode] = useState({});
     const [subjectLines, setSubjectLines] = useState({});
-    const [branding, setBranding] = useState({ companyName: 'Talent-Inn', primaryColor: '#0E7490', tagline: 'Akıllı İnsan Kaynakları Platformu' });
+    const [branding, setBranding] = useState({ companyName: 'Talent-Inn', primaryColor: '#13294E', tagline: 'Akıllı İnsan Kaynakları Platformu' });
     const [saveStatus, setSaveStatus] = useState('idle'); // idle | saving | success
     const [loadingTemplates, setLoadingTemplates] = useState(true);
 
@@ -487,7 +487,7 @@ export default function EmailTemplateEditorPage() {
 
                 TEMPLATE_TYPES.forEach(t => {
                     const bkg = brandingSnap.exists() ? brandingSnap.data() : branding;
-                    const color = bkg.primaryColor || '#0E7490';
+                    const color = bkg.primaryColor || '#13294E';
                     if (templatesSnap.exists() && templatesSnap.data()[t.id]) {
                         const saved = templatesSnap.data()[t.id];
                         savedBlocks[t.id] = saved.blocks || defaultBlocks(t.id, color);
@@ -540,7 +540,7 @@ export default function EmailTemplateEditorPage() {
     }, [activeTemplate]);
 
     const addBlock = useCallback((type) => {
-        const color = branding.primaryColor || '#0E7490';
+        const color = branding.primaryColor || '#13294E';
         setBlocks(prev => {
             const arr = [...(prev[activeTemplate] || [])];
             arr.push(defaultBlock(type, color));
@@ -549,7 +549,7 @@ export default function EmailTemplateEditorPage() {
     }, [activeTemplate, branding]);
 
     const resetToDefault = useCallback(() => {
-        const color = branding.primaryColor || '#0E7490';
+        const color = branding.primaryColor || '#13294E';
         setBlocks(prev => ({ ...prev, [activeTemplate]: defaultBlocks(activeTemplate, color) }));
         setHtmlCode(prev => ({ ...prev, [activeTemplate]: '' }));
     }, [activeTemplate, branding]);
@@ -652,7 +652,7 @@ export default function EmailTemplateEditorPage() {
                         disabled={saveStatus === 'saving'}
                         className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold rounded-lg transition-colors"
                         style={{
-                            background: saveStatus === 'success' ? '#16A34A' : (branding.primaryColor || '#0E7490'),
+                            background: saveStatus === 'success' ? '#16A34A' : (branding.primaryColor || '#13294E'),
                             color: '#fff',
                         }}
                     >
@@ -758,7 +758,7 @@ export default function EmailTemplateEditorPage() {
                                         block={block}
                                         onUpdate={updated => updateBlock(idx, updated)}
                                         onDelete={() => deleteBlock(idx)}
-                                        color={branding.primaryColor || '#0E7490'}
+                                        color={branding.primaryColor || '#13294E'}
                                         insertVariable={insertVariable}
                                         isDragging={dragIndexRef.current === idx}
                                         dragHandleProps={{}}

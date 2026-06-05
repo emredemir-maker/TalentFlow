@@ -45,7 +45,7 @@ export default function SuperAdminPage() {
     const [domainSaved, setDomainSaved] = useState(false);
 
     // Branding (for invite emails)
-    const [branding, setBrandingLocal] = useState({ companyName: 'Talent-Inn', primaryColor: '#1E3A8A' });
+    const [branding, setBrandingLocal] = useState({ companyName: 'Talent-Inn', primaryColor: '#13294E' });
     useEffect(() => {
         const unsub = onSnapshot(collection(db, 'artifacts/talent-flow/public/data/departments'), (snap) => {
             setDepartments(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -371,7 +371,7 @@ export default function SuperAdminPage() {
                         <button
                             onClick={handleSaveDomains}
                             disabled={savingDomains}
-                            className="w-full py-2.5 bg-[#1E3A8A] hover:bg-[#1e3a8a]/90 text-white font-bold text-sm rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+                            className="w-full py-2.5 bg-[#13294E] hover:bg-[#13294E]/90 text-white font-bold text-sm rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
                         >
                             {savingDomains ? <Loader2 className="w-4 h-4 animate-spin" /> : domainSaved ? <CheckCircle className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
                             {savingDomains ? 'Kaydediliyor...' : domainSaved ? 'Kaydedildi!' : 'Değişiklikleri Kaydet'}

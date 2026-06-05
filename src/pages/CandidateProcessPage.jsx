@@ -112,7 +112,7 @@ export default function CandidateProcessPage() {
     const [infoReqsLoading, setInfoReqsLoading]     = useState(false);
 
     // Branding — loaded once from Firestore for email template generation
-    const [branding, setBranding] = useState({ companyName: 'Talent-Inn', primaryColor: '#1E3A8A' });
+    const [branding, setBranding] = useState({ companyName: 'Talent-Inn', primaryColor: '#13294E' });
     useEffect(() => {
         getDoc(doc(db, 'artifacts/talent-flow/public/data/settings', 'branding'))
             .then(snap => { if (snap.exists()) setBranding(snap.data()); })
@@ -1358,13 +1358,13 @@ export default function CandidateProcessPage() {
                                         <div className="space-y-5 animate-in fade-in duration-300">
                                             {/* Domain header */}
                                             <div className="flex items-center gap-3 p-4 bg-slate-50 border border-slate-100 rounded-2xl">
-                                                <div className="w-9 h-9 rounded-xl bg-[#1E3A8A]/10 flex items-center justify-center shrink-0">
-                                                    <Layers className="w-4.5 h-4.5 text-[#1E3A8A]" />
+                                                <div className="w-9 h-9 rounded-xl bg-[#13294E]/10 flex items-center justify-center shrink-0">
+                                                    <Layers className="w-4.5 h-4.5 text-[#13294E]" />
                                                 </div>
                                                 <div>
                                                     <p className="text-[11px] font-black text-slate-800">
                                                         Aday Meslek Alanı:
-                                                        <span className="ml-1.5 px-2 py-0.5 bg-[#1E3A8A]/10 text-[#1E3A8A] rounded-md">{domainLabel(candidateDomain)}</span>
+                                                        <span className="ml-1.5 px-2 py-0.5 bg-[#13294E]/10 text-[#13294E] rounded-md">{domainLabel(candidateDomain)}</span>
                                                     </p>
                                                     <p className="text-[10px] text-slate-400 mt-0.5">Yalnızca uyumlu meslek alanındaki açık pozisyonlar eşleştirilir.</p>
                                                 </div>

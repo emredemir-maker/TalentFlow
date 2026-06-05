@@ -10,7 +10,7 @@ import { Building2, Upload, CheckCircle, Loader2, Palette, Globe, Type, Image, X
 const BRANDING_PATH = 'artifacts/talent-flow/public/data/settings/branding';
 
 const PRESET_COLORS = [
-    '#1E3A8A', '#7C3AED', '#DC2626', '#059669',
+    '#13294E', '#7C3AED', '#DC2626', '#059669',
     '#D97706', '#0891B2', '#BE185D', '#374151'
 ];
 
@@ -18,7 +18,7 @@ export default function BrandingSettingsPage() {
     const [branding, setBranding] = useState({
         companyName: '',
         logoUrl: '',
-        primaryColor: '#1E3A8A',
+        primaryColor: '#13294E',
         tagline: '',
         website: ''
     });
@@ -78,7 +78,7 @@ export default function BrandingSettingsPage() {
     if (loading) {
         return (
             <div className="flex items-center justify-center py-20">
-                <Loader2 className="w-6 h-6 animate-spin text-[#1E3A8A]" />
+                <Loader2 className="w-6 h-6 animate-spin text-[#13294E]" />
             </div>
         );
     }
@@ -171,7 +171,7 @@ export default function BrandingSettingsPage() {
                     {/* Logo Upload */}
                     <div className="bg-white border border-[#E2E8F0] rounded-2xl p-5">
                         <div className="flex items-center gap-2 mb-4">
-                            <Image className="w-4 h-4 text-[#1E3A8A]" />
+                            <Image className="w-4 h-4 text-[#13294E]" />
                             <h3 className="text-sm font-semibold text-[#0F172A]">Şirket Logosu</h3>
                         </div>
                         <div className="flex items-center gap-4">
@@ -188,7 +188,7 @@ export default function BrandingSettingsPage() {
                                     <button
                                         onClick={() => fileInputRef.current?.click()}
                                         disabled={uploadingLogo}
-                                        className="flex items-center gap-2 px-3 py-2 text-sm bg-[#1E3A8A] text-white rounded-lg hover:bg-[#1e3a8a]/90 transition-colors disabled:opacity-50"
+                                        className="flex items-center gap-2 px-3 py-2 text-sm bg-[#13294E] text-white rounded-lg hover:bg-[#13294E]/90 transition-colors disabled:opacity-50"
                                     >
                                         {uploadingLogo ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
                                         {uploadingLogo ? 'Yükleniyor...' : 'Logo Yükle'}
@@ -210,7 +210,7 @@ export default function BrandingSettingsPage() {
                     {/* Company Info */}
                     <div className="bg-white border border-[#E2E8F0] rounded-2xl p-5 space-y-4">
                         <div className="flex items-center gap-2 mb-1">
-                            <Type className="w-4 h-4 text-[#1E3A8A]" />
+                            <Type className="w-4 h-4 text-[#13294E]" />
                             <h3 className="text-sm font-semibold text-[#0F172A]">Şirket Bilgileri</h3>
                         </div>
 
@@ -223,7 +223,7 @@ export default function BrandingSettingsPage() {
                                 value={branding.companyName}
                                 onChange={e => setBranding(p => ({ ...p, companyName: e.target.value }))}
                                 placeholder="örn: BTC Türk, Infoset, Talent-Inn"
-                                className="w-full px-3 py-2.5 text-sm border border-[#E2E8F0] rounded-lg bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]/20 focus:border-[#1E3A8A] transition-all"
+                                className="w-full px-3 py-2.5 text-sm border border-[#E2E8F0] rounded-lg bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#13294E]/20 focus:border-[#13294E] transition-all"
                             />
                         </div>
 
@@ -236,7 +236,7 @@ export default function BrandingSettingsPage() {
                                 value={branding.tagline}
                                 onChange={e => setBranding(p => ({ ...p, tagline: e.target.value }))}
                                 placeholder="örn: Türkiye'nin Önde Gelen Kripto Para Platformu"
-                                className="w-full px-3 py-2.5 text-sm border border-[#E2E8F0] rounded-lg bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]/20 focus:border-[#1E3A8A] transition-all"
+                                className="w-full px-3 py-2.5 text-sm border border-[#E2E8F0] rounded-lg bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#13294E]/20 focus:border-[#13294E] transition-all"
                             />
                         </div>
 
@@ -249,7 +249,7 @@ export default function BrandingSettingsPage() {
                                 value={branding.website}
                                 onChange={e => setBranding(p => ({ ...p, website: e.target.value }))}
                                 placeholder="https://www.sirketiniz.com"
-                                className="w-full px-3 py-2.5 text-sm border border-[#E2E8F0] rounded-lg bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]/20 focus:border-[#1E3A8A] transition-all"
+                                className="w-full px-3 py-2.5 text-sm border border-[#E2E8F0] rounded-lg bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#13294E]/20 focus:border-[#13294E] transition-all"
                             />
                         </div>
                     </div>
@@ -257,7 +257,7 @@ export default function BrandingSettingsPage() {
                     {/* Brand Color */}
                     <div className="bg-white border border-[#E2E8F0] rounded-2xl p-5">
                         <div className="flex items-center gap-2 mb-4">
-                            <Palette className="w-4 h-4 text-[#1E3A8A]" />
+                            <Palette className="w-4 h-4 text-[#13294E]" />
                             <h3 className="text-sm font-semibold text-[#0F172A]">Marka Rengi</h3>
                         </div>
                         <div className="flex items-center gap-3 flex-wrap">
@@ -294,7 +294,7 @@ export default function BrandingSettingsPage() {
                     <button
                         onClick={handleSave}
                         disabled={saving || !branding.companyName.trim()}
-                        className="flex items-center gap-2 px-5 py-2.5 bg-[#1E3A8A] text-white text-sm font-semibold rounded-xl hover:bg-[#1e3a8a]/90 transition-colors disabled:opacity-50"
+                        className="flex items-center gap-2 px-5 py-2.5 bg-[#13294E] text-white text-sm font-semibold rounded-xl hover:bg-[#13294E]/90 transition-colors disabled:opacity-50"
                     >
                         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <CheckCircle className="w-4 h-4" /> : null}
                         {saving ? 'Kaydediliyor...' : saved ? 'Kaydedildi!' : 'Değişiklikleri Kaydet'}
