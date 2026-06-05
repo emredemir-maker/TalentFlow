@@ -11,12 +11,8 @@ import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
 import { useAuth } from '../context/AuthContext';
 import { useUserSettings } from '../context/UserSettingsContext';
+import { roleLabel } from '../utils/roles';
 
-const ROLE_LABELS = {
-    super_admin: 'Sistem Yöneticisi',
-    recruiter: 'Recruiter',
-    department_user: 'Departman Kullanıcısı',
-};
 
 const PAGES = [
     { view: 'dashboard',         label: 'Kontrol Paneli',  icon: LayoutDashboard, desc: 'Ana ekran ve genel bakış' },
@@ -130,8 +126,8 @@ export default function Header({ title }) {
     const notifRef    = useRef(null);
     const settRef     = useRef(null);
 
-    const userName  = userProfile?.name || userProfile?.email?.split('@')[0] || 'Kullanıcı';
-    const roleLabel = ROLE_LABELS[userProfile?.role] || 'Kullanıcı';
+    const userName  = userProfile?.displayName || userProfile?.name || userProfile?.email?.split('@')[0] || 'Kullanıcı';
+    const roleText  = roleLabel(userProfile?.role);
 
     useEffect(() => {
         const handler = (e) => {
@@ -577,7 +573,7 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                     </div>
                     <div className="hidden sm:block">
                         <div className="text-[13px] font-bold text-[#0F172A] leading-none truncate max-w-[110px]">{userName}</div>
-                        <div className="text-[10px] text-[#64748B] font-medium mt-0.5">{roleLabel}</div>
+                        <div className="text-[10px] text-[#64748B] font-medium mt-0.5">{roleText}</div>
                     </div>
                 </div>
             </div>

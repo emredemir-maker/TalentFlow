@@ -16,6 +16,7 @@ import {
     X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { roleLabel } from '../utils/roles';
 import TalentInnLogo, { TIIconMark } from './TalentInnLogo';
 
 export default function Sidebar({
@@ -160,13 +161,13 @@ export default function Sidebar({
                                 <img src={userProfile.imgUrl} alt="User" className="w-full h-full object-cover" />
                             ) : (
                                 <div className="w-full h-full flex items-center justify-center text-white text-xs font-bold bg-gradient-to-tr from-slate-600 to-slate-500">
-                                    {userProfile?.displayName?.[0] || 'A'}
+                                    {(userProfile?.displayName || userProfile?.email || '?')[0]?.toUpperCase()}
                                 </div>
                             )}
                         </div>
                         <div className={`flex flex-col flex-1 min-w-0 ${collapsed ? 'flex lg:hidden' : 'flex'}`}>
-                            <span className="text-white text-[13px] font-semibold truncate">{userProfile?.displayName || 'Alex Rivera'}</span>
-                            <span className="text-[#64748B] text-[11px] truncate">Lead Talent Partner</span>
+                            <span className="text-white text-[13px] font-semibold truncate">{userProfile?.displayName || userProfile?.email || 'Kullanıcı'}</span>
+                            <span className="text-[#64748B] text-[11px] truncate">{roleLabel(userProfile?.role)}</span>
                         </div>
                     </div>
                     <button
