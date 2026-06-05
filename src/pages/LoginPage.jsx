@@ -61,8 +61,8 @@ export default function LoginPage() {
     };
 
     const handleFocus = (e) => {
-        e.target.style.borderColor = '#2563EB';
-        e.target.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.12)';
+        e.target.style.borderColor = '#29A9E0';
+        e.target.style.boxShadow = '0 0 0 3px rgba(41,169,224,0.15)';
     };
     const handleBlur = (e) => {
         e.target.style.borderColor = '#E2E8F0';
@@ -112,19 +112,19 @@ export default function LoginPage() {
                 <div style={{
                     position: 'absolute', top: '-10%', right: '-10%',
                     width: '55%', height: '55%', borderRadius: '50%',
-                    background: 'radial-gradient(circle, rgba(37,99,235,0.18) 0%, transparent 70%)',
+                    background: 'radial-gradient(circle, rgba(41,169,224,0.18) 0%, transparent 70%)',
                     pointerEvents: 'none'
                 }} />
                 <div style={{
                     position: 'absolute', bottom: '-10%', left: '-10%',
                     width: '55%', height: '55%', borderRadius: '50%',
-                    background: 'radial-gradient(circle, rgba(59,130,246,0.12) 0%, transparent 70%)',
+                    background: 'radial-gradient(circle, rgba(19,194,190,0.10) 0%, transparent 70%)',
                     pointerEvents: 'none'
                 }} />
 
                 {/* Logo */}
                 <div style={{ position: 'relative', zIndex: 1 }}>
-                    <TalentInnLogo iconSize={46} showText={true} showSub={true} textSize="20px" />
+                    <TalentInnLogo iconSize={46} showText={true} showSub={true} textSize="20px" onDark />
                 </div>
 
                 {/* Hero Text */}
@@ -133,9 +133,9 @@ export default function LoginPage() {
                     <div style={{
                         display: 'inline-flex', alignItems: 'center', gap: '8px',
                         padding: '6px 14px', borderRadius: '999px',
-                        backgroundColor: 'rgba(37,99,235,0.10)',
-                        border: '1px solid rgba(37,99,235,0.22)',
-                        color: '#93C5FD',
+                        backgroundColor: 'rgba(41,169,224,0.12)',
+                        border: '1px solid rgba(41,169,224,0.25)',
+                        color: '#8BE3EC',
                         fontSize: '11px', fontWeight: 700,
                         letterSpacing: '1.5px', textTransform: 'uppercase',
                         marginBottom: '28px',
@@ -156,7 +156,7 @@ export default function LoginPage() {
                     }}>
                         İşe Alımın <br />
                         <span style={{
-                            backgroundImage: 'linear-gradient(90deg, #60A5FA, #93C5FD)',
+                            backgroundImage: 'linear-gradient(90deg, #29A9E0, #13C2BE)',
                             WebkitBackgroundClip: 'text',
                             WebkitTextFillColor: 'transparent',
                             backgroundClip: 'text',
@@ -184,12 +184,12 @@ export default function LoginPage() {
                             <li key={f} style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#CBD5E1', fontSize: '13px', fontWeight: 500 }}>
                                 <div style={{
                                     width: '20px', height: '20px', borderRadius: '50%',
-                                    background: 'rgba(37,99,235,0.14)',
-                                    border: '1px solid rgba(37,99,235,0.30)',
+                                    background: 'rgba(41,169,224,0.14)',
+                                    border: '1px solid rgba(41,169,224,0.30)',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                                     flexShrink: 0,
                                 }}>
-                                    <Zap size={10} color="#3B82F6" />
+                                    <Zap size={10} color="#29A9E0" />
                                 </div>
                                 {f}
                             </li>
@@ -206,7 +206,7 @@ export default function LoginPage() {
                                 borderRight: i < stats.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
                                 paddingLeft: i > 0 ? '24px' : '0',
                             }}>
-                                <s.icon size={16} color="#3B82F6" style={{ marginBottom: '8px', opacity: 0.8 }} />
+                                <s.icon size={16} color="#29A9E0" style={{ marginBottom: '8px', opacity: 0.8 }} />
                                 <div style={{ fontSize: '22px', fontWeight: 900, color: '#F8FAFC', lineHeight: 1 }}>{s.value}</div>
                                 <div style={{ fontSize: '11px', color: '#94A3B8', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', marginTop: '4px' }}>{s.label}</div>
                             </div>
@@ -269,7 +269,7 @@ export default function LoginPage() {
                                             style={{
                                                 display: 'block', marginTop: '8px',
                                                 background: 'none', border: 'none', padding: 0,
-                                                color: '#2563EB', fontSize: '13px', fontWeight: 700,
+                                                color: '#0C7CB0', fontSize: '13px', fontWeight: 700,
                                                 cursor: 'pointer', textDecoration: 'underline'
                                             }}
                                         >
@@ -296,7 +296,7 @@ export default function LoginPage() {
                                             style={{
                                                 display: 'block', marginTop: '8px',
                                                 background: 'none', border: 'none', padding: 0,
-                                                color: '#2563EB', fontSize: '13px', fontWeight: 700,
+                                                color: '#0C7CB0', fontSize: '13px', fontWeight: 700,
                                                 cursor: 'pointer', textDecoration: 'underline'
                                             }}
                                         >
@@ -395,12 +395,12 @@ export default function LoginPage() {
                             disabled={loading}
                             style={{
                                 width: '100%', height: '50px', borderRadius: '10px',
-                                background: loading ? '#94A3B8' : 'linear-gradient(135deg, #1E3A8A 0%, #2563EB 100%)',
+                                background: loading ? '#94A3B8' : 'linear-gradient(135deg, #29A9E0 0%, #13C2BE 100%)',
                                 color: '#fff', fontWeight: 700, fontSize: '14px',
                                 letterSpacing: '0.3px', border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
                                 marginTop: '4px',
-                                boxShadow: loading ? 'none' : '0 8px 24px rgba(37,99,235,0.25)',
+                                boxShadow: loading ? 'none' : '0 8px 24px rgba(41,169,224,0.28)',
                                 transition: 'opacity 0.2s',
                             }}
                             onMouseEnter={e => { if (!loading) e.currentTarget.style.opacity = '0.9'; }}
@@ -458,7 +458,7 @@ export default function LoginPage() {
                                 background: 'none', border: 'none', cursor: 'pointer',
                                 fontSize: '13px', color: '#64748B', display: 'inline-flex', alignItems: 'center', gap: '4px',
                             }}
-                            onMouseEnter={e => e.currentTarget.style.color = '#2563EB'}
+                            onMouseEnter={e => e.currentTarget.style.color = '#0C7CB0'}
                             onMouseLeave={e => e.currentTarget.style.color = '#64748B'}
                         >
                             {mode === 'login' ? 'Hesabınız yok mu? Kayıt olun' : 'Zaten üye misiniz? Giriş yapın'}

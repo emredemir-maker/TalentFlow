@@ -297,7 +297,7 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
             {/* ── Search ── */}
             <div className="flex-1 max-w-[500px] relative mx-2 md:mx-4" ref={searchRef}>
                 <div className="relative group">
-                    <Search className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#94A3B8] group-focus-within:text-[#2563EB] transition-colors pointer-events-none" />
+                    <Search className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#94A3B8] group-focus-within:text-[#29A9E0] transition-colors pointer-events-none" />
                     <input
                         ref={inputRef}
                         type="text"
@@ -306,7 +306,7 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                         onFocus={() => setPanelOpen(true)}
                         onKeyDown={handleKeyDown}
                         placeholder={searchPlaceholder}
-                        className="w-full pl-10 md:pl-12 pr-8 md:pr-10 py-2 md:py-2.5 bg-[#F1F5F9] rounded-lg focus:bg-white focus:ring-1 focus:ring-[#2563EB] outline-none transition-all text-[13px] md:text-[14px] text-[#0F172A] placeholder:text-[#94A3B8]"
+                        className="w-full pl-10 md:pl-12 pr-8 md:pr-10 py-2 md:py-2.5 bg-[#F1F5F9] rounded-lg focus:bg-white focus:ring-1 focus:ring-[#29A9E0] outline-none transition-all text-[13px] md:text-[14px] text-[#0F172A] placeholder:text-[#94A3B8]"
                     />
                     {query && (
                         <button
