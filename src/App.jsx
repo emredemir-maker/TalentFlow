@@ -4,7 +4,7 @@ import { Routes, Route, useLocation, Navigate, useNavigate } from 'react-router-
 import { useAuth } from './context/AuthContext';
 import { CandidatesProvider } from './context/CandidatesContext';
 import { PositionsProvider } from './context/PositionsContext';
-import { UserSettingsProvider, useUserSettings } from './context/UserSettingsContext';
+import { UserSettingsProvider } from './context/UserSettingsContext';
 import { MessageQueueProvider } from './context/MessageQueueContext';
 import { NotificationProvider } from './context/NotificationContext';
 
@@ -85,7 +85,6 @@ export default function App() {
 
 function AuthenticatedApp() {
   const { loading, error, isAuthenticated, user, userProfile } = useAuth();
-  const { settings } = useUserSettings();
   const [activeView, setActiveView] = useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   // Mobile drawer (<lg). Desktop layout (≥lg) uses sidebarCollapsed instead.
