@@ -7,6 +7,37 @@
    open for a real, user-controlled dark mode later. */
 @custom-variant dark (&:where([data-theme="dark"] *));
 
+/* ==================== BRAND THEME TOKENS (Tailwind v4) ====================
+   These utility colors (bg-electric, text-navy-700, bg-bg-primary, ...) were
+   used across the app but never defined, so Tailwind generated no CSS for them.
+   Defining them here both "lights them up" and binds them to the official
+   Talent-inn brand: navy #13294E + cyan→teal accent. */
+@theme {
+  /* Accent — brand cyan→teal ("electric") */
+  --color-electric: #29A9E0;
+  --color-electric-light: #5CC4EA;
+  --color-electric-hover: #1E90C4;
+
+  /* Navy ramp (anchored on brand navy #13294E) */
+  --color-navy-200: #C3D0E6;
+  --color-navy-300: #9FB2D4;
+  --color-navy-400: #6E84AE;
+  --color-navy-500: #44588A;
+  --color-navy-600: #2A3F6B;
+  --color-navy-700: #1B305A;
+  --color-navy-800: #13294E;
+  --color-navy-900: #0E2042;
+  --color-navy-950: #0A1730;
+
+  /* Semantic neutrals */
+  --color-text-primary: #1E293B;
+  --color-text-secondary: #475569;
+  --color-text-muted: #94A3B8;
+  --color-bg-primary: #F8FAFC;
+  --color-bg-secondary: #F1F5F9;
+  --color-border-subtle: #E2E8F0;
+}
+
 /* ==================== THE COGNITIVE ARCHITECT - DESIGN SYSTEM ==================== */
 :root {
   color-scheme: light;       /* keep native controls (inputs, scrollbars) light */

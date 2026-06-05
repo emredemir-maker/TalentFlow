@@ -5,13 +5,13 @@
 const DEFAULT_BRANDING = {
     companyName: 'Talent-Inn',
     logoUrl: '',
-    primaryColor: '#0E7490',
+    primaryColor: '#13294E',
     tagline: 'Akıllı İnsan Kaynakları Platformu',
     website: ''
 };
 
 function hex2rgb(hex) {
-    const clean = (hex || '#0E7490').replace('#', '');
+    const clean = (hex || '#13294E').replace('#', '');
     const r = parseInt(clean.slice(0, 2), 16);
     const g = parseInt(clean.slice(2, 4), 16);
     const b = parseInt(clean.slice(4, 6), 16);
@@ -24,7 +24,7 @@ function initials(name) {
 
 function baseLayout(branding, content) {
     const b = { ...DEFAULT_BRANDING, ...branding };
-    const color = b.primaryColor || '#0E7490';
+    const color = b.primaryColor || '#13294E';
     const rgb = hex2rgb(color);
 
     return `<!DOCTYPE html>
@@ -162,7 +162,7 @@ function infoCard(rows, color) {
 // ─── 1. KULLANICI DAVET MAİLİ (system → new user) ───────────────────────────
 export function buildInviteEmail(branding, { inviteLink, role, invitedByName }) {
     const b = { ...DEFAULT_BRANDING, ...branding };
-    const color = b.primaryColor || '#0E7490';
+    const color = b.primaryColor || '#13294E';
     const roleLabel =
         role === 'super_admin' ? 'Süper Admin' :
         role === 'department_user' ? 'Departman Kullanıcısı' : 'Recruiter';
@@ -207,7 +207,7 @@ export function buildInterviewInviteEmail(branding, {
     date, time, interviewType, joinLink, companyEmail
 }) {
     const b = { ...DEFAULT_BRANDING, ...branding };
-    const color = b.primaryColor || '#0E7490';
+    const color = b.primaryColor || '#13294E';
 
     const rows = [
         infoRow('Pozisyon', position),
@@ -272,7 +272,7 @@ export function buildRescheduleEmail(branding, {
     joinLink, reason, isCancelled, companyEmail
 }) {
     const b = { ...DEFAULT_BRANDING, ...branding };
-    const color = b.primaryColor || '#0E7490';
+    const color = b.primaryColor || '#13294E';
 
     const subject = isCancelled ? 'Mülakat İptali' : 'Mülakat Tarihi Güncellendi';
     const headerColor = isCancelled ? '#DC2626' : '#D97706';
@@ -374,7 +374,7 @@ export function buildParticipantNotificationEmail(branding, {
     date, time, interviewType, meetLink, googleMeetLink, recruiterName
 }) {
     const b = { ...DEFAULT_BRANDING, ...branding };
-    const color = b.primaryColor || '#0E7490';
+    const color = b.primaryColor || '#13294E';
 
     const rows = [
         infoRow('Aday', candidateName),
@@ -521,7 +521,7 @@ export function buildInfoRequestEmail(branding, { candidateName, recruiterName, 
         <!-- Request Message -->
         ${requestMessage ? `
         <tr><td style="padding:20px 48px 0;">
-            <div style="background:#F8FAFC;border-left:4px solid #0E7490;border-radius:0 12px 12px 0;padding:20px 24px;">
+            <div style="background:#F8FAFC;border-left:4px solid #13294E;border-radius:0 12px 12px 0;padding:20px 24px;">
                 <p style="margin:0 0 6px;font-size:10px;font-weight:700;color:#94A3B8;letter-spacing:0.1em;text-transform:uppercase;">İstek Detayı</p>
                 <p style="margin:0;font-size:14px;color:#334155;line-height:1.7;white-space:pre-line;">${requestMessage}</p>
             </div>
