@@ -195,15 +195,15 @@ export default function Dashboard() {
         };
     }, [stats, candidates]);
 
-    // KPI deltas: `goodness` is whether THIS delta is a good outcome for the
-    // metric. For most "more is better" KPIs goodness mirrors the sign, but
-    // İşe Alım Hızı is the inverse: a -22% means hiring got faster, which is
-    // a positive outcome → goodness: true even though the sign is negative.
+    // KPI deltas removed: there is no historical/previous-period baseline yet,
+    // so the previous "+12 / +2 / +5% / -22%" values were fabricated. We show the
+    // real current values without a misleading trend until a real trend source
+    // exists. (`change: null` → Trend chip hidden.)
     const kpis = useMemo(() => [
-        { label: "Toplam Aday",   value: String(candidates.length),     change: "+12",  goodness: true, desc: "bu hafta yeni başvuru", icon: Users  },
-        { label: "Aktif Pozisyon", value: String(allOpenCount),          change: "+2",   goodness: true, desc: "açık ilan",             icon: Target },
-        { label: "Uyum Skoru",     value: `${dynamicMetrics.avgMatch}%`, change: "+5%",  goodness: true, desc: "ortalama uyum",         icon: Star   },
-        { label: "İşe Alım Hızı",  value: dynamicMetrics.recruitSpeed,   change: "-22%", goodness: true, desc: "ortalama süre",         icon: Clock  },
+        { label: "Toplam Aday",    value: String(candidates.length),     change: null, goodness: true, desc: "kayıtlı aday",  icon: Users  },
+        { label: "Aktif Pozisyon", value: String(allOpenCount),          change: null, goodness: true, desc: "açık ilan",     icon: Target },
+        { label: "Uyum Skoru",     value: `${dynamicMetrics.avgMatch}%`, change: null, goodness: true, desc: "ortalama uyum",  icon: Star   },
+        { label: "İşe Alım Hızı",  value: dynamicMetrics.recruitSpeed,   change: null, goodness: true, desc: "ortalama süre",  icon: Clock  },
     ], [candidates.length, allOpenCount, dynamicMetrics]);
 
     if (error) return <div className="p-10 text-[11px] font-black text-red-500 uppercase tracking-widest text-center">Sistem Hatası: Veri Senkronizasyonu Başarısız.</div>;
@@ -253,7 +253,7 @@ export default function Dashboard() {
                             <div key={i} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-shadow">
                                 <div className="flex items-start justify-between mb-3">
                                     <span className="text-[11px] font-semibold text-slate-500">{k.label}</span>
-                                    <Trend val={k.change} goodness={k.goodness} />
+                                    {k.change && <Trend val={k.change} goodness={k.goodness} />}
                                 </div>
                                 <div className="text-[32px] font-black text-[#0F172A] leading-none mb-1">{k.value}</div>
                                 <div className="text-[10px] text-slate-400 font-medium">{k.desc}</div>
@@ -288,19 +288,9 @@ export default function Dashboard() {
                                             <div className="w-24 h-3 bg-slate-100 rounded shrink-0" />
                                             <div className="flex-1 h-10 bg-slate-50 rounded-xl border border-slate-100" />
                                             <div className="w-12 h-4 bg-slate-100 rounded shrink-0" />
-                                            <div className="w-14 h-3 bg-slate-100 rounded shrink-0" />
                                         </div>
                                     ))
                                     : funnelData.map((p, i) => {
-                                        const prev = i === 0 ? candidates.length * 0.93 : funnelData[i - 1].count * 0.93;
-                                        const diff = p.count - Math.round(prev);
-                                        // Colour the delta chip by OUTCOME, not raw sign.
-                                        // For "Reddedildi" goodnessOnIncrease=false, so +diff is bad (red),
-                                        // -diff is good (green). For all other stages the natural mapping holds.
-                                        const isGoodOutcome =
-                                            diff === 0 ? true :
-                                            (diff > 0 && p.goodnessOnIncrease) ||
-                                            (diff < 0 && !p.goodnessOnIncrease);
                                         return (
                                             <div key={i} className="flex items-center gap-4">
                                                 <div className="w-24 text-[11px] font-semibold text-slate-600 text-right shrink-0">{p.label}</div>
@@ -317,11 +307,6 @@ export default function Dashboard() {
                                                     </div>
                                                 </div>
                                                 <div className="w-12 text-right text-[15px] font-black text-[#0F172A] tabular-nums shrink-0">{p.count}</div>
-                                                <div className="w-14 text-right shrink-0">
-                                                    <span className={`text-[9px] font-bold ${isGoodOutcome ? 'text-emerald-600' : 'text-red-500'}`}>
-                                                        {diff >= 0 ? '+' : ''}{diff}
-                                                    </span>
-                                                </div>
                                             </div>
                                         );
                                     })}
