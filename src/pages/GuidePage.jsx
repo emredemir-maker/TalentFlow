@@ -553,7 +553,7 @@ const FEATURES = [
         mockup: (
             <div className="space-y-2">
                 <div className="border border-slate-200 rounded-xl overflow-hidden text-[9px]">
-                    <div className="bg-[#1E3A8A] px-3 py-2 text-center">
+                    <div className="bg-[#13294E] px-3 py-2 text-center">
                         <div className="inline-block bg-white/20 rounded-lg px-2 py-0.5 text-white font-bold">Şirket Adı</div>
                         <div className="text-white/70 text-[7px] mt-0.5">Akıllı İK Platformu</div>
                     </div>
@@ -565,7 +565,7 @@ const FEATURES = [
                             <div className="text-slate-600">📅 25 Mart 2026 · 14:00</div>
                         </div>
                         <div className="text-center">
-                            <span className="bg-[#1E3A8A] text-white px-3 py-1 rounded text-[8px] font-bold inline-block">Mülakata Katıl →</span>
+                            <span className="bg-[#13294E] text-white px-3 py-1 rounded text-[8px] font-bold inline-block">Mülakata Katıl →</span>
                         </div>
                     </div>
                     <div className="bg-slate-50 border-t border-slate-100 px-3 py-1.5 text-center text-slate-400 text-[7px]">Talent-Inn Platformu</div>
@@ -704,11 +704,11 @@ const FEATURES = [
         mockup: (
             <div className="space-y-2">
                 <div className="border border-slate-200 rounded-xl overflow-hidden">
-                    <div className="bg-[#1E3A8A] p-2 text-center">
+                    <div className="bg-[#13294E] p-2 text-center">
                         <div className="inline-block bg-white/20 rounded px-2 py-0.5 text-white text-[9px] font-bold">LOGO</div>
                     </div>
                     <div className="p-2 space-y-1.5 bg-white">
-                        {[['Şirket Adı', 'BTC Türk A.Ş.'], ['Slogan', 'Kripto & Blockchain'], ['Ana Renk', '#1E3A8A']].map(([l, v]) => (
+                        {[['Şirket Adı', 'BTC Türk A.Ş.'], ['Slogan', 'Kripto & Blockchain'], ['Ana Renk', '#13294E']].map(([l, v]) => (
                             <div key={l} className="flex items-center gap-2">
                                 <span className="text-[8px] text-slate-400 w-16">{l}</span>
                                 <span className="text-[9px] font-medium text-slate-700">{v}</span>

@@ -78,8 +78,8 @@ export default function InterviewHistory({ sessions = [], onStartSession, onDele
             .meta-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 40px; }
             .meta-item { padding: 20px; background: #f8fbff; border-radius: 20px; border: 1px solid #e2e8f0; }
             .meta-label { font-size: 8px; font-weight: 900; color: #64748b; text-transform: uppercase; letter-spacing: 0.2em; margin-bottom: 6px; }
-            .meta-value { font-size: 14px; font-weight: 700; color: #1e3a8a; }
-            .score-card { background: #1e3a8a; color: #fff; padding: 30px; border-radius: 24px; margin-bottom: 40px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 20px 40px rgba(30,58,138,0.1); }
+            .meta-value { font-size: 14px; font-weight: 700; color: #13294E; }
+            .score-card { background: #13294E; color: #fff; padding: 30px; border-radius: 24px; margin-bottom: 40px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 20px 40px rgba(19, 41, 78,0.1); }
             .score-item { text-align: center; border-right: 1px solid rgba(255,255,255,0.1); flex: 1; }
             .score-item:last-child { border: none; }
             .score-label { font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.2em; opacity: 0.6; margin-bottom: 6px; }
@@ -87,7 +87,7 @@ export default function InterviewHistory({ sessions = [], onStartSession, onDele
             .section-title { font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.2em; margin: 50px 0 20px 0; color: #64748b; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px; }
             p { font-size: 14px; line-height: 1.8; color: #334155; margin-bottom: 20px; }
             .footer { margin-top: 80px; padding-top: 40px; border-top: 2px solid #f1f5f9; text-align: center; }
-            .footer-text { font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.3em; color: #1e3a8a; }
+            .footer-text { font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.3em; color: #13294E; }
         </style></head><body>
             <h1>MÜLAKAT ANALİZ RAPORU</h1>
             <div class="subtitle">Talent-Inn Core Architecture v2.4</div>
@@ -105,7 +105,7 @@ export default function InterviewHistory({ sessions = [], onStartSession, onDele
 
             <div class="section-title">STRATEJİK ÖZET</div>
             <p><strong>Değerlendirme Notu:</strong> ${session.aiVerdict || 'Analiz verisi mevcut değil.'}</p>
-            <p style="font-style: italic; color: #1e3a8a; font-weight: 600;">"${session.aiSummary || ''}"</p>
+            <p style="font-style: italic; color: #13294E; font-weight: 600;">"${session.aiSummary || ''}"</p>
 
             <div class="section-title">SORU VE CEVAP ANALİZİ</div>
             ${qaHtml}
@@ -120,7 +120,7 @@ export default function InterviewHistory({ sessions = [], onStartSession, onDele
 
     return (
         <div className="space-y-6 italic">
-            <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-[#1e3a8a] mb-6 flex items-center gap-3 opacity-60">
+            <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-[#13294E] mb-6 flex items-center gap-3 opacity-60">
                 <Clock className="w-4 h-4" /> MÜLAKAT OTURUMLARI ({sorted.length})
             </h3>
             
