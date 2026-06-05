@@ -13,6 +13,18 @@ export default function LoginPage() {
     const [name, setName] = useState('');
     const [success, setSuccess] = useState(null);
 
+    // Stack the split layout below 860px so the hero panel and form don't
+    // squeeze side-by-side on phones (headline wrapped one word per line).
+    const [isNarrow, setIsNarrow] = useState(
+        typeof window !== 'undefined' && window.matchMedia('(max-width: 860px)').matches
+    );
+    useEffect(() => {
+        const mq = window.matchMedia('(max-width: 860px)');
+        const onChange = (e) => setIsNarrow(e.matches);
+        mq.addEventListener('change', onChange);
+        return () => mq.removeEventListener('change', onChange);
+    }, []);
+
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const inviteEmail = params.get('invite');
@@ -76,6 +88,7 @@ export default function LoginPage() {
                 minHeight: '100vh',
                 width: '100%',
                 display: 'flex',
+                flexDirection: isNarrow ? 'column' : 'row',
                 fontFamily: "'Inter', ui-sans-serif, system-ui, sans-serif",
                 overflow: 'hidden',
             }}
@@ -83,12 +96,12 @@ export default function LoginPage() {
             {/* ── LEFT PANEL ── */}
             <div
                 style={{
-                    width: '45%',
-                    minHeight: '100vh',
+                    width: isNarrow ? '100%' : '45%',
+                    minHeight: isNarrow ? 'auto' : '100vh',
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'space-between',
-                    padding: '56px 48px',
+                    padding: isNarrow ? '32px 24px 28px' : '56px 48px',
                     background: 'linear-gradient(155deg, #0F172A 0%, #1E1B4B 55%, #0F172A 100%)',
                     position: 'relative',
                     overflow: 'hidden',
@@ -115,16 +128,16 @@ export default function LoginPage() {
                 </div>
 
                 {/* Hero Text */}
-                <div style={{ position: 'relative', zIndex: 1, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', paddingTop: '48px', paddingBottom: '48px' }}>
+                <div style={{ position: 'relative', zIndex: 1, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', paddingTop: isNarrow ? '24px' : '48px', paddingBottom: isNarrow ? '8px' : '48px' }}>
                     {/* Badge */}
                     <div style={{
                         display: 'inline-flex', alignItems: 'center', gap: '8px',
                         padding: '6px 14px', borderRadius: '999px',
                         backgroundColor: 'rgba(6,182,212,0.08)',
                         border: '1px solid rgba(6,182,212,0.15)',
-                        color: '#67E8F9',
-                        fontSize: '10px', fontWeight: 800,
-                        letterSpacing: '3px', textTransform: 'uppercase',
+                        color: '#A5F3FC',
+                        fontSize: '11px', fontWeight: 700,
+                        letterSpacing: '1.5px', textTransform: 'uppercase',
                         marginBottom: '28px',
                         width: 'fit-content',
                     }}>
@@ -143,7 +156,7 @@ export default function LoginPage() {
                     }}>
                         İşe Alımın <br />
                         <span style={{
-                            background: 'linear-gradient(90deg, #06B6D4, #67E8F9, #34D399)',
+                            backgroundImage: 'linear-gradient(90deg, #22D3EE, #7DD3FC)',
                             WebkitBackgroundClip: 'text',
                             WebkitTextFillColor: 'transparent',
                             backgroundClip: 'text',
@@ -165,8 +178,8 @@ export default function LoginPage() {
                         <span style={{ color: '#F8FAFC', fontWeight: 700 }}>Yapay Zeka Ekosistemidir.</span>
                     </p>
 
-                    {/* Feature list */}
-                    <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 40px 0', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {/* Feature list — hidden on narrow screens to keep the form reachable */}
+                    <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 40px 0', display: isNarrow ? 'none' : 'flex', flexDirection: 'column', gap: '12px' }}>
                         {features.map((f) => (
                             <li key={f} style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#CBD5E1', fontSize: '13px', fontWeight: 500 }}>
                                 <div style={{
@@ -184,7 +197,7 @@ export default function LoginPage() {
                     </ul>
 
                     {/* Stats */}
-                    <div style={{ display: 'flex', gap: '0', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '28px' }}>
+                    <div style={{ display: isNarrow ? 'none' : 'flex', gap: '0', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '28px' }}>
                         {stats.map((s, i) => (
                             <div key={s.label} style={{
                                 flex: 1,
@@ -195,14 +208,14 @@ export default function LoginPage() {
                             }}>
                                 <s.icon size={16} color="#06B6D4" style={{ marginBottom: '8px', opacity: 0.8 }} />
                                 <div style={{ fontSize: '22px', fontWeight: 900, color: '#F8FAFC', lineHeight: 1 }}>{s.value}</div>
-                                <div style={{ fontSize: '9px', color: '#64748B', fontWeight: 700, letterSpacing: '2px', textTransform: 'uppercase', marginTop: '4px' }}>{s.label}</div>
+                                <div style={{ fontSize: '11px', color: '#94A3B8', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', marginTop: '4px' }}>{s.label}</div>
                             </div>
                         ))}
                     </div>
                 </div>
 
                 {/* Footer note */}
-                <div style={{ position: 'relative', zIndex: 1, color: '#475569', fontSize: '11px', letterSpacing: '1px' }}>
+                <div style={{ position: 'relative', zIndex: 1, color: '#94A3B8', fontSize: '11px', letterSpacing: '1px', display: isNarrow ? 'none' : 'block' }}>
                     © 2025 Talent-Inn · AI-Powered Talent Intelligence
                 </div>
             </div>
