@@ -311,10 +311,6 @@ export default function SettingsPage({ initialTab }) {
                             {/* Tercihler */}
                             <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-0">
                                 <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Tercihler</p>
-                                <SettingRow icon={Palette} label="Tema" description="Arayüz temasını seçin">
-                                    <Select value={settings.theme} onChange={(v) => updateSettings({ theme: v })}
-                                        options={[{ value: 'dark', label: '🌙 Koyu' }, { value: 'light', label: '☀️ Açık' }]} />
-                                </SettingRow>
                                 <SettingRow icon={Bell} label="Uygulama Bildirimleri" description="Bildirim rozeti ve paneli göster / gizle" noBorder>
                                     <Toggle checked={settings.notifications !== false} onChange={(v) => updateSettings({ notifications: v })} />
                                 </SettingRow>

@@ -61,8 +61,8 @@ export default function LoginPage() {
     };
 
     const handleFocus = (e) => {
-        e.target.style.borderColor = '#06B6D4';
-        e.target.style.boxShadow = '0 0 0 3px rgba(6,182,212,0.12)';
+        e.target.style.borderColor = '#2563EB';
+        e.target.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.12)';
     };
     const handleBlur = (e) => {
         e.target.style.borderColor = '#E2E8F0';
@@ -102,7 +102,7 @@ export default function LoginPage() {
                     flexDirection: 'column',
                     justifyContent: 'space-between',
                     padding: isNarrow ? '32px 24px 28px' : '56px 48px',
-                    background: 'linear-gradient(155deg, #0F172A 0%, #1E1B4B 55%, #0F172A 100%)',
+                    background: 'linear-gradient(155deg, #0F172A 0%, #122E5E 55%, #0F172A 100%)',
                     position: 'relative',
                     overflow: 'hidden',
                     flexShrink: 0,
@@ -112,13 +112,13 @@ export default function LoginPage() {
                 <div style={{
                     position: 'absolute', top: '-10%', right: '-10%',
                     width: '55%', height: '55%', borderRadius: '50%',
-                    background: 'radial-gradient(circle, rgba(6,182,212,0.18) 0%, transparent 70%)',
+                    background: 'radial-gradient(circle, rgba(37,99,235,0.18) 0%, transparent 70%)',
                     pointerEvents: 'none'
                 }} />
                 <div style={{
                     position: 'absolute', bottom: '-10%', left: '-10%',
                     width: '55%', height: '55%', borderRadius: '50%',
-                    background: 'radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%)',
+                    background: 'radial-gradient(circle, rgba(59,130,246,0.12) 0%, transparent 70%)',
                     pointerEvents: 'none'
                 }} />
 
@@ -133,9 +133,9 @@ export default function LoginPage() {
                     <div style={{
                         display: 'inline-flex', alignItems: 'center', gap: '8px',
                         padding: '6px 14px', borderRadius: '999px',
-                        backgroundColor: 'rgba(6,182,212,0.08)',
-                        border: '1px solid rgba(6,182,212,0.15)',
-                        color: '#A5F3FC',
+                        backgroundColor: 'rgba(37,99,235,0.10)',
+                        border: '1px solid rgba(37,99,235,0.22)',
+                        color: '#93C5FD',
                         fontSize: '11px', fontWeight: 700,
                         letterSpacing: '1.5px', textTransform: 'uppercase',
                         marginBottom: '28px',
@@ -156,7 +156,7 @@ export default function LoginPage() {
                     }}>
                         İşe Alımın <br />
                         <span style={{
-                            backgroundImage: 'linear-gradient(90deg, #22D3EE, #7DD3FC)',
+                            backgroundImage: 'linear-gradient(90deg, #60A5FA, #93C5FD)',
                             WebkitBackgroundClip: 'text',
                             WebkitTextFillColor: 'transparent',
                             backgroundClip: 'text',
@@ -184,12 +184,12 @@ export default function LoginPage() {
                             <li key={f} style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#CBD5E1', fontSize: '13px', fontWeight: 500 }}>
                                 <div style={{
                                     width: '20px', height: '20px', borderRadius: '50%',
-                                    background: 'rgba(6,182,212,0.12)',
-                                    border: '1px solid rgba(6,182,212,0.25)',
+                                    background: 'rgba(37,99,235,0.14)',
+                                    border: '1px solid rgba(37,99,235,0.30)',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                                     flexShrink: 0,
                                 }}>
-                                    <Zap size={10} color="#06B6D4" />
+                                    <Zap size={10} color="#3B82F6" />
                                 </div>
                                 {f}
                             </li>
@@ -206,7 +206,7 @@ export default function LoginPage() {
                                 borderRight: i < stats.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
                                 paddingLeft: i > 0 ? '24px' : '0',
                             }}>
-                                <s.icon size={16} color="#06B6D4" style={{ marginBottom: '8px', opacity: 0.8 }} />
+                                <s.icon size={16} color="#3B82F6" style={{ marginBottom: '8px', opacity: 0.8 }} />
                                 <div style={{ fontSize: '22px', fontWeight: 900, color: '#F8FAFC', lineHeight: 1 }}>{s.value}</div>
                                 <div style={{ fontSize: '11px', color: '#94A3B8', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', marginTop: '4px' }}>{s.label}</div>
                             </div>
@@ -395,12 +395,12 @@ export default function LoginPage() {
                             disabled={loading}
                             style={{
                                 width: '100%', height: '50px', borderRadius: '10px',
-                                background: loading ? '#94A3B8' : 'linear-gradient(135deg, #06B6D4 0%, #3B82F6 100%)',
+                                background: loading ? '#94A3B8' : 'linear-gradient(135deg, #1E3A8A 0%, #2563EB 100%)',
                                 color: '#fff', fontWeight: 700, fontSize: '14px',
                                 letterSpacing: '0.3px', border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
                                 marginTop: '4px',
-                                boxShadow: loading ? 'none' : '0 8px 24px rgba(6,182,212,0.25)',
+                                boxShadow: loading ? 'none' : '0 8px 24px rgba(37,99,235,0.25)',
                                 transition: 'opacity 0.2s',
                             }}
                             onMouseEnter={e => { if (!loading) e.currentTarget.style.opacity = '0.9'; }}
@@ -458,7 +458,7 @@ export default function LoginPage() {
                                 background: 'none', border: 'none', cursor: 'pointer',
                                 fontSize: '13px', color: '#64748B', display: 'inline-flex', alignItems: 'center', gap: '4px',
                             }}
-                            onMouseEnter={e => e.currentTarget.style.color = '#06B6D4'}
+                            onMouseEnter={e => e.currentTarget.style.color = '#2563EB'}
                             onMouseLeave={e => e.currentTarget.style.color = '#64748B'}
                         >
                             {mode === 'login' ? 'Hesabınız yok mu? Kayıt olun' : 'Zaten üye misiniz? Giriş yapın'}
