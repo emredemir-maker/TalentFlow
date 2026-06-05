@@ -3,12 +3,17 @@
  *
  * Props:
  *  iconSize   : number  — icon square size in px (default 40)
- *  showText   : bool    — show "Talent-Inn" wordmark (default true)
+ *  showText   : bool    — show "Talent-inn" wordmark (default true)
  *  showSub    : bool    — show subtitle text (default false)
  *  subtitle   : string  — subtitle text
  *  textSize   : string  — CSS font-size for wordmark, e.g. '18px'
  *  horizontal : bool    — icon + text side by side (default true)
+ *  onDark     : bool    — invert outline/text to light for dark backgrounds
  *  className  : string  — wrapper class
+ *
+ * The brand mark is navy + cyan→teal (designed for light surfaces). On dark
+ * surfaces (login hero, sidebar) pass `onDark` so the navy outline and "Talent-"
+ * wordmark flip to light; the cyan→teal accents stay the same on both.
  */
 export default function TalentInnLogo({
     iconSize = 40,
@@ -17,8 +22,11 @@ export default function TalentInnLogo({
     subtitle = 'AI-Powered HR Platform',
     textSize = '18px',
     horizontal = true,
+    onDark = false,
     className = '',
 }) {
+    const wordmarkColor = onDark ? '#F8FAFC' : '#13294E';
+
     return (
         <div
             className={className}
@@ -29,34 +37,31 @@ export default function TalentInnLogo({
                 gap: horizontal ? '10px' : '8px',
             }}
         >
-            <TIIconMark size={iconSize} />
+            <TIIconMark size={iconSize} onDark={onDark} />
 
             {showText && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-                    {/* Metallic wordmark — CSS gradient text */}
+                    {/* Wordmark — navy/light "Talent-" + cyan→teal "inn" (brand) */}
                     <div style={{ display: 'flex', alignItems: 'baseline', lineHeight: 1, gap: 0 }}>
                         <span style={{
-                            fontFamily: "'Inter', system-ui, sans-serif",
-                            fontWeight: 800,
+                            fontFamily: "'Space Grotesk', 'Inter', system-ui, sans-serif",
+                            fontWeight: 700,
                             fontSize: textSize,
-                            letterSpacing: '-0.03em',
-                            background: 'linear-gradient(180deg, #C8E8F8 0%, #5BB8E0 40%, #2B7BAA 100%)',
-                            WebkitBackgroundClip: 'text',
-                            WebkitTextFillColor: 'transparent',
-                            backgroundClip: 'text',
+                            letterSpacing: '-0.02em',
+                            color: wordmarkColor,
                             lineHeight: 1.1,
                         }}>Talent-</span>
                         <span style={{
-                            fontFamily: "'Inter', system-ui, sans-serif",
-                            fontWeight: 800,
+                            fontFamily: "'Space Grotesk', 'Inter', system-ui, sans-serif",
+                            fontWeight: 700,
                             fontSize: textSize,
-                            letterSpacing: '-0.03em',
-                            background: 'linear-gradient(180deg, #F9E0A0 0%, #D4982A 40%, #8A5E10 100%)',
+                            letterSpacing: '-0.02em',
+                            background: 'linear-gradient(100deg, #29A9E0 0%, #13C2BE 100%)',
                             WebkitBackgroundClip: 'text',
                             WebkitTextFillColor: 'transparent',
                             backgroundClip: 'text',
                             lineHeight: 1.1,
-                        }}>Inn</span>
+                        }}>inn</span>
                     </div>
 
                     {showSub && (
@@ -65,7 +70,7 @@ export default function TalentInnLogo({
                             fontWeight: 600,
                             letterSpacing: '0.18em',
                             textTransform: 'uppercase',
-                            color: '#64748B',
+                            color: onDark ? '#94A3B8' : '#64748B',
                             fontFamily: "'Inter', system-ui, sans-serif",
                             marginTop: '2px',
                         }}>{subtitle}</span>
@@ -77,10 +82,13 @@ export default function TalentInnLogo({
 }
 
 /**
- * Standalone icon mark — circular network hub with 4 glowing nodes + interlocking swirl + 3 stars
+ * Standalone icon mark — AI-screened CV: document with verified candidate,
+ * list, magnifier, and circuit traces. Navy outline + cyan→teal accents
+ * (light outline when `onDark`).
  */
-export function TIIconMark({ size = 40 }) {
-    const rx = Math.round(size * 0.18);
+export function TIIconMark({ size = 40, onDark = false }) {
+    const ink = onDark ? '#EAF1F8' : '#13294E';   // document / person / magnifier outline
+    const paper = onDark ? 'none' : '#FFFFFF';     // page fill (transparent on dark)
 
     return (
         <svg
@@ -91,68 +99,52 @@ export function TIIconMark({ size = 40 }) {
             xmlns="http://www.w3.org/2000/svg"
         >
             <defs>
-                <linearGradient id="ti-bg" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
-                    <stop offset="0%"   stopColor="#061633" />
-                    <stop offset="100%" stopColor="#0A1F4E" />
+                <linearGradient id="ti-accent" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stopColor="#29A9E0" />
+                    <stop offset="100%" stopColor="#13C2BE" />
                 </linearGradient>
-                <filter id="ti-glow" x="-100%" y="-100%" width="300%" height="300%">
-                    <feGaussianBlur stdDeviation="3.5" result="blur" />
-                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                </filter>
-                <filter id="ti-glow-soft" x="-50%" y="-50%" width="200%" height="200%">
-                    <feGaussianBlur stdDeviation="2" result="blur" />
-                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                </filter>
-                <clipPath id="ti-clip">
-                    <rect width="100" height="100" rx={rx} />
-                </clipPath>
             </defs>
 
-            {/* Badge */}
-            <rect width="100" height="100" rx={rx} fill="url(#ti-bg)" />
-
-            <g clipPath="url(#ti-clip)">
-                {/* Soft overall glow centre */}
-                <circle cx="50" cy="45" r="30" fill="#06B6D4" fillOpacity="0.07" />
-
-                {/* ── Outer ring arcs (connecting adjacent nodes) ── */}
-                <path d="M 26,26 C 50,9  50,9  74,26" stroke="#38BDF8" strokeWidth="2"   strokeLinecap="round" fill="none" strokeOpacity="0.65" />
-                <path d="M 74,26 C 90,45 90,45 74,64" stroke="#38BDF8" strokeWidth="2"   strokeLinecap="round" fill="none" strokeOpacity="0.65" />
-                <path d="M 74,64 C 50,80 50,80 26,64" stroke="#38BDF8" strokeWidth="2"   strokeLinecap="round" fill="none" strokeOpacity="0.65" />
-                <path d="M 26,64 C 10,45 10,45 26,26" stroke="#38BDF8" strokeWidth="2"   strokeLinecap="round" fill="none" strokeOpacity="0.65" />
-
-                {/* ── Inner swirl — S-curve A (NW→SE), back portion ── */}
-                <path d="M 26,26 C 62,26 38,45 50,45"   stroke="#67E8F9" strokeWidth="2.2" strokeLinecap="round" fill="none" />
-                {/* Knockout where B crosses A */}
-                <path d="M 74,26 C 38,26 62,45 50,45"   stroke="#061633" strokeWidth="5.5" strokeLinecap="round" fill="none" />
-                {/* S-curve B (NE→SW), full, on top */}
-                <path d="M 74,26 C 38,26 62,64 26,64"   stroke="#67E8F9" strokeWidth="2.2" strokeLinecap="round" fill="none" />
-                {/* S-curve A, front portion */}
-                <path d="M 50,45 C 62,45 38,64 74,64"   stroke="#67E8F9" strokeWidth="2.2" strokeLinecap="round" fill="none" />
-
-                {/* ── Node glow halos ── */}
-                <g filter="url(#ti-glow)">
-                    <circle cx="26" cy="26" r="5" fill="#06B6D4" fillOpacity="0.6" />
-                    <circle cx="74" cy="26" r="5" fill="#06B6D4" fillOpacity="0.6" />
-                    <circle cx="74" cy="64" r="5" fill="#06B6D4" fillOpacity="0.6" />
-                    <circle cx="26" cy="64" r="5" fill="#06B6D4" fillOpacity="0.6" />
-                </g>
-
-                {/* ── Node circles ── */}
-                <circle cx="26" cy="26" r="5.5" fill="#061633" stroke="#67E8F9" strokeWidth="2.2" />
-                <circle cx="26" cy="26" r="2.2" fill="#A5F3FC" />
-                <circle cx="74" cy="26" r="5.5" fill="#061633" stroke="#67E8F9" strokeWidth="2.2" />
-                <circle cx="74" cy="26" r="2.2" fill="#A5F3FC" />
-                <circle cx="74" cy="64" r="5.5" fill="#061633" stroke="#67E8F9" strokeWidth="2.2" />
-                <circle cx="74" cy="64" r="2.2" fill="#A5F3FC" />
-                <circle cx="26" cy="64" r="5.5" fill="#061633" stroke="#67E8F9" strokeWidth="2.2" />
-                <circle cx="26" cy="64" r="2.2" fill="#A5F3FC" />
-
-                {/* ── 3 stars below ── */}
-                <polygon points="37,77 38,80 41,80 39,82 40,85 37,83 34,85 35,82 33,80 36,80" fill="#38BDF8" fillOpacity="0.7" />
-                <polygon points="50,77 51,80 54,80 52,82 53,85 50,83 47,85 48,82 46,80 49,80" fill="#38BDF8" fillOpacity="0.7" />
-                <polygon points="63,77 64,80 67,80 65,82 66,85 63,83 60,85 61,82 59,80 62,80" fill="#38BDF8" fillOpacity="0.7" />
+            {/* Circuit traces (left) */}
+            <g stroke="#29A9E0" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none">
+                <path d="M14 42 H24 L30 48" />
+                <path d="M9 56 H22" />
+                <path d="M14 70 H24 L30 64" />
             </g>
+            <g fill={onDark ? '#0A1629' : '#FFFFFF'} stroke="#29A9E0" strokeWidth="3">
+                <circle cx="11" cy="42" r="3.2" />
+                <circle cx="6" cy="56" r="3.2" />
+                <circle cx="11" cy="70" r="3.2" />
+            </g>
+
+            {/* Document with folded corner */}
+            <path
+                d="M38 18 H66 L82 34 V82 A4 4 0 0 1 78 86 H38 A4 4 0 0 1 34 82 V22 A4 4 0 0 1 38 18 Z"
+                fill={paper} stroke={ink} strokeWidth="5" strokeLinejoin="round"
+            />
+            <path d="M66 18 V30 A4 4 0 0 0 70 34 H82" fill="none" stroke={ink} strokeWidth="5" strokeLinejoin="round" />
+
+            {/* Person avatar */}
+            <circle cx="51" cy="42" r="13.5" fill="none" stroke={ink} strokeWidth="4" />
+            <circle cx="51" cy="38" r="5.2" fill={ink} />
+            <path d="M42 51 A9 9 0 0 1 60 51" fill={ink} />
+            {/* Teal verified check */}
+            <circle cx="62" cy="50" r="6.5" fill="url(#ti-accent)" />
+            <path d="M59 50 l2 2 l4 -4" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+
+            {/* List rows */}
+            <circle cx="44" cy="62" r="2.4" fill="#29A9E0" />
+            <line x1="50" y1="62" x2="68" y2="62" stroke={ink} strokeWidth="3.4" strokeLinecap="round" />
+            <circle cx="44" cy="70" r="2.4" fill="#29A9E0" />
+            <line x1="50" y1="70" x2="64" y2="70" stroke={ink} strokeWidth="3.4" strokeLinecap="round" />
+            <circle cx="44" cy="78" r="2.4" fill="#29A9E0" />
+            <line x1="50" y1="78" x2="60" y2="78" stroke={ink} strokeWidth="3.4" strokeLinecap="round" />
+
+            {/* Magnifier (bottom-right, overlapping) */}
+            <circle cx="69" cy="71" r="12" fill={onDark ? '#0A1629' : '#FFFFFF'} stroke={ink} strokeWidth="5" />
+            <line x1="78" y1="80" x2="86" y2="88" stroke={ink} strokeWidth="6" strokeLinecap="round" />
+            <line x1="63" y1="69" x2="75" y2="69" stroke="#29A9E0" strokeWidth="2.6" strokeLinecap="round" />
+            <line x1="63" y1="74" x2="75" y2="74" stroke="#13C2BE" strokeWidth="2.6" strokeLinecap="round" />
         </svg>
     );
 }

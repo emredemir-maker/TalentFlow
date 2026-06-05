@@ -18,25 +18,22 @@ export default function LoadingScreen({ message = 'Talent-Inn Başlatılıyor...
                 {/* "Talent-Inn" metallic wordmark */}
                 <div className="flex items-baseline justify-center gap-0 leading-none">
                     <span style={{
-                        fontFamily: "'Inter', system-ui, sans-serif",
-                        fontWeight: 900,
+                        fontFamily: "'Space Grotesk', 'Inter', system-ui, sans-serif",
+                        fontWeight: 700,
                         fontSize: '30px',
-                        letterSpacing: '-0.04em',
-                        background: 'linear-gradient(180deg, #C8E8F8 0%, #5BB8E0 40%, #2B7BAA 100%)',
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent',
-                        backgroundClip: 'text',
+                        letterSpacing: '-0.03em',
+                        color: '#F8FAFC',
                     }}>Talent-</span>
                     <span style={{
-                        fontFamily: "'Inter', system-ui, sans-serif",
-                        fontWeight: 900,
+                        fontFamily: "'Space Grotesk', 'Inter', system-ui, sans-serif",
+                        fontWeight: 700,
                         fontSize: '30px',
-                        letterSpacing: '-0.04em',
-                        background: 'linear-gradient(180deg, #F9E0A0 0%, #D4982A 40%, #8A5E10 100%)',
+                        letterSpacing: '-0.03em',
+                        background: 'linear-gradient(100deg, #29A9E0 0%, #13C2BE 100%)',
                         WebkitBackgroundClip: 'text',
                         WebkitTextFillColor: 'transparent',
                         backgroundClip: 'text',
-                    }}>Inn</span>
+                    }}>inn</span>
                 </div>
 
                 {/* Status lines */}

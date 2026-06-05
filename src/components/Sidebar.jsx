@@ -71,7 +71,7 @@ export default function Sidebar({
                 <span className={`text-[13px] font-medium tracking-tight truncate ${labelClass}`}>{item.label}</span>
 
                 {isActive && (
-                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#2563EB]" />
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#29A9E0]" />
                 )}
             </button>
         );
@@ -118,11 +118,11 @@ export default function Sidebar({
                                 <TIIconMark size={38} />
                             </span>
                             <span className="lg:hidden">
-                                <TalentInnLogo iconSize={38} showText={true} showSub={true} subtitle="AI Recruitment" textSize="16px" />
+                                <TalentInnLogo iconSize={38} showText={true} showSub={true} subtitle="AI Recruitment" textSize="16px" onDark />
                             </span>
                         </>
                     ) : (
-                        <TalentInnLogo iconSize={38} showText={true} showSub={true} subtitle="AI Recruitment" textSize="16px" />
+                        <TalentInnLogo iconSize={38} showText={true} showSub={true} subtitle="AI Recruitment" textSize="16px" onDark />
                     )}
                 </div>
 
