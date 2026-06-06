@@ -8,6 +8,7 @@ import CandidateDrawer from '../components/CandidateDrawer';
 import AddCandidateModal from '../components/AddCandidateModal';
 import { doc, getDoc, collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { STAGES } from '../utils/pipelineStages';
 import {
     Users,
     Target,
@@ -92,18 +93,8 @@ export default function Dashboard() {
         const byStatus = stats.byStatus || {};
         const total = candidates.length || 1;
 
-        // Direct per-stage counts (non-cumulative) for the 6 canonical pipeline stages.
-        // `goodnessOnIncrease` controls the colour of the per-stage delta:
-        // for "Reddedildi" an increase is BAD (more rejections), so the +diff
-        // chip should be red there even though it's positive numerically.
-        const stageDefs = [
-            { key: 'ai_analysis', label: 'Ön Eleme',    color: '#2563EB', goodnessOnIncrease: true,  legacy: ['new', 'pending', 'applied', 'unknown'] },
-            { key: 'review',      label: 'İnceleme',    color: '#3B82F6', goodnessOnIncrease: true,  legacy: ['Review', 'değerlendirme', 'Evaluation'] },
-            { key: 'interview',   label: 'Mülakat',     color: '#7C3AED', goodnessOnIncrease: true,  legacy: ['Interview', 'mülakat', 'Mülakat'] },
-            { key: 'offer',       label: 'Teklif',      color: '#F59E0B', goodnessOnIncrease: true,  legacy: ['Offer'] },
-            { key: 'hired',       label: 'İşe Alındı',  color: '#059669', goodnessOnIncrease: true,  legacy: ['Hired'] },
-            { key: 'rejected',    label: 'Reddedildi',  color: '#DC2626', goodnessOnIncrease: false, legacy: ['Rejected'] },
-        ];
+        // Canonical 6-stage pipeline (shared single source — see utils/pipelineStages).
+        const stageDefs = STAGES;
 
         // Collect all known status keys so we can catch-all the rest into AI Tarama
         const allKnownKeys = new Set(stageDefs.flatMap(s => [s.key, ...s.legacy]));

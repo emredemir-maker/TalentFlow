@@ -6,11 +6,13 @@ import { X, Save, Layers, Share2, Loader2, CheckCircle, AlertCircle, ChevronRigh
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
+// Canonical pipeline palette (see utils/pipelineStages):
+// Ön Eleme=cyan · İnceleme=teal · Mülakat=violet · Teklif=amber · İşe Alındı=emerald · Reddedildi=red
 const STAGE_OPTIONS = [
-    { value: 'ai_analysis', label: 'AI Analiz', color: 'text-violet-400', bg: 'bg-violet-500/10' },
-    { value: 'review', label: 'İnceleme', color: 'text-amber-400', bg: 'bg-amber-500/10' },
-    { value: 'interview', label: 'Mülakat', color: 'text-blue-400', bg: 'bg-blue-500/10' },
-    { value: 'offer', label: 'Teklif', color: 'text-cyan-400', bg: 'bg-cyan-500/10' },
+    { value: 'ai_analysis', label: 'AI Analiz', color: 'text-cyan-400', bg: 'bg-cyan-500/10' },
+    { value: 'review', label: 'İnceleme', color: 'text-teal-400', bg: 'bg-teal-500/10' },
+    { value: 'interview', label: 'Mülakat', color: 'text-violet-400', bg: 'bg-violet-500/10' },
+    { value: 'offer', label: 'Teklif', color: 'text-amber-400', bg: 'bg-amber-500/10' },
     { value: 'hired', label: 'İşe Alındı', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
     { value: 'rejected', label: 'Red', color: 'text-red-400', bg: 'bg-red-500/10' },
 ];

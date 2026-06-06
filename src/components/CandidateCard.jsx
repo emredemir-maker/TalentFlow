@@ -6,20 +6,22 @@ import { useCandidates } from '../context/CandidatesContext';
 import { useAuth } from '../context/AuthContext';
 import { applyPiiMask } from '../utils/pii';
 
+// Stage badge colours follow the canonical pipeline palette (see utils/pipelineStages):
+// Ön Eleme=cyan · İnceleme=teal · Mülakat=violet · Teklif=amber · İşe Alındı=emerald · Reddedildi=red
 const STATUS_CONFIG = {
-    ai_analysis: { label: 'AI ANALİZİ',       classes: 'bg-violet-500/20 text-violet-700 dark:text-violet-400 border-violet-500/30' },
-    review:      { label: 'MANUEL İNCELEME', classes: 'bg-amber-500/20 text-amber-800 dark:text-amber-400 border-amber-500/30' },
-    interview:   { label: 'MÜLAKAT',         classes: 'bg-blue-500/20 text-blue-800 dark:text-blue-400 border-blue-500/30' },
-    offer:       { label: 'TEKLİF',          classes: 'bg-cyan-500/20 text-cyan-800 dark:text-cyan-400 border-cyan-500/30' },
-    hired:       { label: 'İŞE ALINDI',      classes: 'bg-emerald-500/20 text-emerald-800 dark:text-emerald-400 border-emerald-500/30' },
-    rejected:    { label: 'BAĞLANTI KESİLDİ',classes: 'bg-red-500/20 text-red-800 dark:text-red-400 border-red-500/30' },
+    ai_analysis: { label: 'AI ANALİZİ',       classes: 'bg-cyan-500/20 text-cyan-800 border-cyan-500/30' },
+    review:      { label: 'MANUEL İNCELEME', classes: 'bg-teal-500/20 text-teal-800 border-teal-500/30' },
+    interview:   { label: 'MÜLAKAT',         classes: 'bg-violet-500/20 text-violet-800 border-violet-500/30' },
+    offer:       { label: 'TEKLİF',          classes: 'bg-amber-500/20 text-amber-800 border-amber-500/30' },
+    hired:       { label: 'İŞE ALINDI',      classes: 'bg-emerald-500/20 text-emerald-800 border-emerald-500/30' },
+    rejected:    { label: 'BAĞLANTI KESİLDİ',classes: 'bg-red-500/20 text-red-800 border-red-500/30' },
 };
 
 const PIPELINE_STAGES = [
-    { value: 'ai_analysis', label: 'AI Analiz',  color: 'text-violet-700', bg: 'bg-violet-50', hover: 'hover:bg-violet-50' },
-    { value: 'review',      label: 'İnceleme',   color: 'text-amber-700',  bg: 'bg-amber-50',  hover: 'hover:bg-amber-50' },
-    { value: 'interview',   label: 'Mülakat',    color: 'text-blue-700',   bg: 'bg-blue-50',   hover: 'hover:bg-blue-50' },
-    { value: 'offer',       label: 'Teklif',     color: 'text-cyan-700',   bg: 'bg-cyan-50',   hover: 'hover:bg-cyan-50' },
+    { value: 'ai_analysis', label: 'AI Analiz',  color: 'text-cyan-700',   bg: 'bg-cyan-50',   hover: 'hover:bg-cyan-50' },
+    { value: 'review',      label: 'İnceleme',   color: 'text-teal-700',   bg: 'bg-teal-50',   hover: 'hover:bg-teal-50' },
+    { value: 'interview',   label: 'Mülakat',    color: 'text-violet-700', bg: 'bg-violet-50', hover: 'hover:bg-violet-50' },
+    { value: 'offer',       label: 'Teklif',     color: 'text-amber-700',  bg: 'bg-amber-50',  hover: 'hover:bg-amber-50' },
     { value: 'hired',       label: 'İşe Alındı', color: 'text-emerald-700',bg: 'bg-emerald-50',hover: 'hover:bg-emerald-50' },
     { value: 'rejected',    label: 'Reddedildi', color: 'text-red-700',    bg: 'bg-red-50',    hover: 'hover:bg-red-50' },
 ];

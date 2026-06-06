@@ -44,9 +44,11 @@ const PIPELINE_STATUS_LABELS = {
 };
 
 // Ordered pipeline stages for the full status selector
+// Canonical pipeline palette (see utils/pipelineStages):
+// Ön Eleme=cyan · İnceleme=teal · Mülakat=violet · Teklif=amber · İşe Alındı=emerald · Reddedildi=red
 const PIPELINE_STAGES = [
-    { value: 'ai_analysis', label: 'AI Analiz',   color: 'text-blue-600',   bg: 'bg-blue-50' },
-    { value: 'review',      label: 'İnceleme',     color: 'text-indigo-600', bg: 'bg-indigo-50' },
+    { value: 'ai_analysis', label: 'AI Analiz',   color: 'text-cyan-600',   bg: 'bg-cyan-50' },
+    { value: 'review',      label: 'İnceleme',     color: 'text-teal-600',   bg: 'bg-teal-50' },
     { value: 'interview',   label: 'Mülakat',      color: 'text-violet-600', bg: 'bg-violet-50' },
     { value: 'offer',       label: 'Teklif',       color: 'text-amber-600',  bg: 'bg-amber-50' },
     { value: 'hired',       label: 'İşe Alındı',   color: 'text-emerald-600',bg: 'bg-emerald-50' },
