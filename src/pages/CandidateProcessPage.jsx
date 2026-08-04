@@ -164,6 +164,7 @@ export default function CandidateProcessPage() {
                 }));
                 if (allDone && !toastShown) {
                     toastShown = true;
+                    try { localStorage.removeItem('bulkActiveJobs'); } catch { /* storage unavailable */ }
                     setBulkImporting(false);
                     setBulkToast({
                         total,
@@ -212,6 +213,23 @@ export default function CandidateProcessPage() {
         })();
         return () => { stopped = true; };
     }, [bulkImporting, bulkJobIds, user]);
+
+    // Resume tracking after a page reload: active job ids are persisted to
+    // localStorage when an upload starts. Without this, refreshing the page
+    // drops the keepalive chain and a half-done job goes back to crawling.
+    // Re-attaching also re-fires the completion toast if the job finished
+    // while the user was away — that's intentional.
+    useEffect(() => {
+        try {
+            const stored = JSON.parse(localStorage.getItem('bulkActiveJobs') || '[]');
+            if (Array.isArray(stored) && stored.length > 0) {
+                setBulkJobIds(stored);
+                setBulkImporting(true);
+            }
+        } catch {
+            try { localStorage.removeItem('bulkActiveJobs'); } catch { /* storage unavailable */ }
+        }
+    }, []);
 
     const showSuccess = (type) => {
         setActionSuccess(type);
@@ -481,6 +499,7 @@ export default function CandidateProcessPage() {
                     body: JSON.stringify({ positionId: selectedPos?.id || '', positionTitle: selectedPos?.title || '', records }),
                 });
                 setBulkJobIds([data.jobId]);
+                try { localStorage.setItem('bulkActiveJobs', JSON.stringify([data.jobId])); } catch { /* storage unavailable */ }
                 setBulkProgress(prev => ({ ...prev, total: data.totalCount || prev.total, status: 'queued' }));
             } else {
                 // File upload path — split into <28MB batches: Cloud Functions
@@ -509,6 +528,7 @@ export default function CandidateProcessPage() {
                     jobIds.push(data.jobId);
                 }
                 setBulkJobIds(jobIds);
+                try { localStorage.setItem('bulkActiveJobs', JSON.stringify(jobIds)); } catch { /* storage unavailable */ }
                 setBulkProgress(prev => ({ ...prev, status: 'queued' }));
             }
         } catch (err) {
