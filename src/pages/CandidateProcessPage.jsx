@@ -8,6 +8,7 @@ import { analyzeCandidateMatch, parseExperiencesFromText, parseCandidateFromText
 import { extractTextFromFile } from '../services/cvParser';
 import { calculateMatchScore, filterPositionsByDomain, domainLabel, detectCandidateDomain, detectPositionDomain } from '../services/matchService';
 import { applyPiiMask, stripPiiForAI } from '../utils/pii';
+import { batchFilesBySize, formatBytes, totalBytes, MAX_REQUEST_BYTES } from '../utils/bulkUpload';
 import { getFeedbackEmail } from '../utils/templateService';
 import { db } from '../config/firebase';
 import { doc, getDoc, onSnapshot, setDoc, serverTimestamp, collection, query, where } from 'firebase/firestore';
@@ -93,7 +94,9 @@ export default function CandidateProcessPage() {
     const [bulkPositionId, setBulkPositionId]   = useState('');
     const [bulkImporting, setBulkImporting]     = useState(false);
     const [bulkProgress, setBulkProgress]       = useState({ total: 0, completed: 0, failed: 0, items: [], avgScore: null, status: null });
-    const [bulkJobId, setBulkJobId]             = useState(null);
+    // Multiple job ids: uploads are split into <28MB batches (Cloud Functions
+    // caps requests at 32MB) and each batch becomes its own backend job.
+    const [bulkJobIds, setBulkJobIds]           = useState([]);
     const [bulkToast, setBulkToast]             = useState(null);
     const [bulkTab, setBulkTab]                 = useState('files');
     const [bulkJsonText, setBulkJsonText]       = useState('');
@@ -121,43 +124,61 @@ export default function CandidateProcessPage() {
             .catch(() => {});
     }, []);
 
-    // Real-time Firestore subscription for active bulk import job
+    // Real-time Firestore subscription for active bulk import job(s).
+    // A single upload may enqueue several jobs (size-based batching), so the
+    // effect listens to every job doc and aggregates their counters into one
+    // progress view. Completion fires only when EVERY job has finished.
     useEffect(() => {
-        if (!bulkJobId || !db) return;
-        const jobDocRef = doc(db, `artifacts/talent-flow/public/data/bulkImportJobs/${bulkJobId}`);
-        const unsub = onSnapshot(jobDocRef, (snap) => {
-            if (!snap.exists()) return;
-            const data = snap.data();
-            const total = data.totalCount || 0;
-            const completed = data.processedCount || 0;
-            const failed = data.failedCount || 0;
-            const status = data.status || 'queued';
-            const avgScore = data.avgScore ?? null;
-            const avgScoreByPosition = data.avgScoreByPosition || null;
-            setBulkProgress(prev => ({
-                ...prev,
-                total,
-                completed,
-                failed,
-                avgScore,
-                avgScoreByPosition,
-                status,
-            }));
-            if (status === 'completed' || status === 'error') {
-                setBulkImporting(false);
-                setBulkToast({
+        if (!bulkJobIds.length || !db) return;
+        const jobData = new Map();
+        let toastShown = false;
+        const unsubs = bulkJobIds.map((jobId) =>
+            onSnapshot(doc(db, `artifacts/talent-flow/public/data/bulkImportJobs/${jobId}`), (snap) => {
+                if (!snap.exists()) return;
+                jobData.set(jobId, snap.data());
+                const jobs = Array.from(jobData.values());
+                const total = jobs.reduce((s, d) => s + (d.totalCount || 0), 0);
+                const completed = jobs.reduce((s, d) => s + (d.processedCount || 0), 0);
+                const failed = jobs.reduce((s, d) => s + (d.failedCount || 0), 0);
+                const allDone = jobData.size === bulkJobIds.length &&
+                    jobs.every(d => d.status === 'completed' || d.status === 'error');
+                const status = allDone ? 'completed'
+                    : jobs.some(d => d.status === 'processing') ? 'processing' : 'queued';
+                // Weighted average over jobs that reported a score
+                const scored = jobs.filter(d => d.avgScore != null && (d.processedCount || 0) > 0);
+                const scoredCount = scored.reduce((s, d) => s + (d.processedCount || 0), 0);
+                const avgScore = scoredCount > 0
+                    ? Math.round(scored.reduce((s, d) => s + d.avgScore * (d.processedCount || 0), 0) / scoredCount)
+                    : null;
+                const avgScoreByPosition = jobs.reduce((acc, d) => (
+                    d.avgScoreByPosition ? { ...acc, ...d.avgScoreByPosition } : acc
+                ), {});
+                setBulkProgress(prev => ({
+                    ...prev,
                     total,
                     completed,
                     failed,
                     avgScore,
-                    avgScoreByPosition,
-                    positionTitle: data.positionTitle || '',
-                });
-                setTimeout(() => setBulkToast(null), 12000);
-            }
-        });
-        return () => unsub();
-    }, [bulkJobId]);
+                    avgScoreByPosition: Object.keys(avgScoreByPosition).length ? avgScoreByPosition : null,
+                    status,
+                }));
+                if (allDone && !toastShown) {
+                    toastShown = true;
+                    setBulkImporting(false);
+                    setBulkToast({
+                        total,
+                        completed,
+                        failed,
+                        avgScore,
+                        avgScoreByPosition: Object.keys(avgScoreByPosition).length ? avgScoreByPosition : null,
+                        positionTitle: jobs[0]?.positionTitle || '',
+                    });
+                    setTimeout(() => setBulkToast(null), 12000);
+                }
+            })
+        );
+        return () => unsubs.forEach(u => u());
+    }, [bulkJobIds]);
 
     const showSuccess = (type) => {
         setActionSuccess(type);
@@ -393,14 +414,24 @@ export default function CandidateProcessPage() {
     const handleBulkImport = async () => {
         if (bulkImporting) return;
         setBulkImporting(true);
-        setBulkJobId(null);
+        setBulkJobIds([]);
         const selectedPos = positions.find(p => p.id === bulkPositionId);
 
         try {
-            let resp, data;
-
             const fbAuthTok = await user?.getIdToken?.() || '';
             const authHeaders = { 'Authorization': `Bearer ${fbAuthTok}` };
+
+            // Reads the body defensively: infra-level failures (e.g. the 32MB
+            // Cloud Functions request cap) return plain text, not JSON.
+            const postBulkImport = async (init) => {
+                const resp = await fetch('/api/bulk-import', init);
+                let data = {};
+                try { data = await resp.json(); } catch { /* non-JSON error body */ }
+                if (!resp.ok || !data.jobId) {
+                    throw new Error(data.error || `Toplu yükleme başlatılamadı (HTTP ${resp.status}).`);
+                }
+                return data;
+            };
 
             if (bulkTab === 'json') {
                 // JSON records path
@@ -411,37 +442,46 @@ export default function CandidateProcessPage() {
                 if (!Array.isArray(records) || records.length === 0) throw new Error('Kayıt dizisi boş veya geçersiz.');
                 const initialItems = records.map(r => ({ name: r.name || 'Aday', status: 'pending' }));
                 setBulkProgress({ total: records.length, completed: 0, failed: 0, items: initialItems, avgScore: null, status: 'queued' });
-                resp = await fetch('/api/bulk-import', {
+                const data = await postBulkImport({
                     method: 'POST',
                     headers: { ...authHeaders, 'Content-Type': 'application/json' },
                     body: JSON.stringify({ positionId: selectedPos?.id || '', positionTitle: selectedPos?.title || '', records }),
                 });
-                data = await resp.json();
+                setBulkJobIds([data.jobId]);
+                setBulkProgress(prev => ({ ...prev, total: data.totalCount || prev.total, status: 'queued' }));
             } else {
-                // File upload path
+                // File upload path — split into <28MB batches: Cloud Functions
+                // kills requests over 32MB at the infrastructure level (plain
+                // "Internal Error", no logs), so one big multipart POST with
+                // many ZIPs never reaches the backend at all.
                 if (!bulkFiles.length) { setBulkImporting(false); return; }
+                const { batches, oversized } = batchFilesBySize(bulkFiles);
+                if (oversized.length > 0) {
+                    throw new Error(
+                        `Şu dosyalar tek başına ${formatBytes(MAX_REQUEST_BYTES)} sınırını aşıyor: ` +
+                        `${oversized.map(f => f.name).join(', ')}. Lütfen ZIP'i daha küçük parçalara bölüp tekrar deneyin.`
+                    );
+                }
                 const initialItems = bulkFiles.map(f => ({ name: f.name, status: 'pending' }));
                 setBulkProgress({ total: bulkFiles.length, completed: 0, failed: 0, items: initialItems, avgScore: null, status: 'queued' });
-                const formData = new FormData();
-                bulkFiles.forEach(f => formData.append('cvs', f));
-                if (selectedPos) {
-                    formData.append('positionId', selectedPos.id);
-                    formData.append('positionTitle', selectedPos.title);
+                const jobIds = [];
+                for (const batch of batches) {
+                    const formData = new FormData();
+                    batch.forEach(f => formData.append('cvs', f));
+                    if (selectedPos) {
+                        formData.append('positionId', selectedPos.id);
+                        formData.append('positionTitle', selectedPos.title);
+                    }
+                    const data = await postBulkImport({ method: 'POST', headers: authHeaders, body: formData });
+                    jobIds.push(data.jobId);
                 }
-                resp = await fetch('/api/bulk-import', { method: 'POST', headers: authHeaders, body: formData });
-                data = await resp.json();
+                setBulkJobIds(jobIds);
+                setBulkProgress(prev => ({ ...prev, status: 'queued' }));
             }
-
-            if (!resp.ok || !data.jobId) {
-                throw new Error(data.error || 'Toplu yükleme başlatılamadı.');
-            }
-
-            setBulkJobId(data.jobId);
-            setBulkProgress(prev => ({ ...prev, total: data.totalCount || prev.total, status: 'queued' }));
         } catch (err) {
             console.error('Bulk import start error:', err);
             setBulkImporting(false);
-            setBulkProgress(prev => ({ ...prev, status: 'error' }));
+            setBulkProgress(prev => ({ ...prev, status: 'error', errorMessage: err.message }));
         }
     };
 
@@ -766,7 +806,7 @@ export default function CandidateProcessPage() {
                 <div className="flex items-center gap-2">
                     <SystemScanner />
                     <button
-                        onClick={() => { setBulkFiles([]); setBulkProgress({ total: 0, completed: 0, failed: 0, items: [] }); setBulkImportModal(true); }}
+                        onClick={() => { setBulkFiles([]); setBulkJobIds([]); setBulkProgress({ total: 0, completed: 0, failed: 0, items: [] }); setBulkImportModal(true); }}
                         className="bg-violet-500 hover:bg-violet-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-colors shadow-sm shadow-violet-200 flex items-center gap-1.5"
                     >
                         <Upload className="w-3.5 h-3.5" /> Toplu Yükleme
@@ -2288,7 +2328,7 @@ export default function CandidateProcessPage() {
                                                 onDragOver={e => e.preventDefault()}
                                                 onDrop={e => {
                                                     e.preventDefault();
-                                                    const files = Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.pdf') || f.name.endsWith('.docx') || f.name.endsWith('.zip'));
+                                                    const files = Array.from(e.dataTransfer.files).filter(f => /\.(pdf|docx|zip)$/i.test(f.name));
                                                     setBulkFiles(prev => [...prev, ...files].slice(0, 20));
                                                 }}
                                                 onClick={() => document.getElementById('bulk-cv-input')?.click()}
@@ -2311,19 +2351,46 @@ export default function CandidateProcessPage() {
                                             </div>
 
                                             {bulkFiles.length > 0 && (
-                                                <div className="space-y-1 max-h-32 overflow-y-auto">
-                                                    {bulkFiles.map((f, i) => (
-                                                        <div key={i} className="flex items-center justify-between px-3 py-1.5 bg-slate-50 rounded-lg border border-slate-200">
-                                                            <span className="text-[11px] text-slate-600 font-medium truncate">{f.name}</span>
-                                                            <button
-                                                                onClick={() => setBulkFiles(prev => prev.filter((_, j) => j !== i))}
-                                                                className="text-slate-300 hover:text-red-400 shrink-0 ml-2"
-                                                            >
-                                                                <X className="w-3 h-3" />
-                                                            </button>
-                                                        </div>
-                                                    ))}
-                                                </div>
+                                                <>
+                                                    <div className="space-y-1 max-h-32 overflow-y-auto">
+                                                        {bulkFiles.map((f, i) => {
+                                                            const tooBig = (f.size || 0) > MAX_REQUEST_BYTES;
+                                                            return (
+                                                                <div key={i} className={`flex items-center justify-between px-3 py-1.5 rounded-lg border ${tooBig ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-200'}`}>
+                                                                    <span className={`text-[11px] font-medium truncate ${tooBig ? 'text-red-600' : 'text-slate-600'}`}>{f.name}</span>
+                                                                    <div className="flex items-center gap-2 shrink-0 ml-2">
+                                                                        <span className={`text-[10px] font-semibold ${tooBig ? 'text-red-400' : 'text-slate-400'}`}>{formatBytes(f.size)}</span>
+                                                                        <button
+                                                                            onClick={() => setBulkFiles(prev => prev.filter((_, j) => j !== i))}
+                                                                            className="text-slate-300 hover:text-red-400"
+                                                                        >
+                                                                            <X className="w-3 h-3" />
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                    <div className="flex items-center justify-between px-1">
+                                                        <span className="text-[10px] text-slate-400 font-semibold">
+                                                            Toplam: {formatBytes(totalBytes(bulkFiles))}
+                                                        </span>
+                                                        {(() => {
+                                                            const { batches, oversized } = batchFilesBySize(bulkFiles);
+                                                            if (oversized.length > 0) return (
+                                                                <span className="text-[10px] text-red-500 font-bold">
+                                                                    {oversized.length} dosya {formatBytes(MAX_REQUEST_BYTES)} sınırını aşıyor — ZIP'i bölün
+                                                                </span>
+                                                            );
+                                                            if (batches.length > 1) return (
+                                                                <span className="text-[10px] text-violet-500 font-semibold">
+                                                                    {batches.length} parti halinde gönderilecek
+                                                                </span>
+                                                            );
+                                                            return null;
+                                                        })()}
+                                                    </div>
+                                                </>
                                             )}
                                         </>
                                     )}
@@ -2432,7 +2499,7 @@ export default function CandidateProcessPage() {
                                             {bulkProgress.status === 'queued' && <Clock className="w-3 h-3" />}
                                             <span>
                                                 {bulkProgress.status === 'completed' ? `Tamamlandı — ${bulkProgress.completed} başarılı${bulkProgress.failed > 0 ? `, ${bulkProgress.failed} hatalı` : ''}${bulkProgress.avgScore != null ? ` · Ort. Eşleşme: %${bulkProgress.avgScore}` : ''}` :
-                                                 bulkProgress.status === 'error' ? 'İşlem hatası oluştu' :
+                                                 bulkProgress.status === 'error' ? (bulkProgress.errorMessage || 'İşlem hatası oluştu') :
                                                  bulkProgress.status === 'processing' ? `İşleniyor… ${bulkProgress.completed + bulkProgress.failed}/${bulkProgress.total}` :
                                                  'Sıraya alındı'}
                                             </span>
@@ -2441,7 +2508,7 @@ export default function CandidateProcessPage() {
 
                                     {!bulkImporting && (
                                         <button
-                                            onClick={() => { setBulkImportModal(false); setBulkProgress({ total: 0, completed: 0, failed: 0, items: [], avgScore: null, status: null }); setBulkJobId(null); setBulkFiles([]); setBulkTab('files'); setBulkJsonText(''); }}
+                                            onClick={() => { setBulkImportModal(false); setBulkProgress({ total: 0, completed: 0, failed: 0, items: [], avgScore: null, status: null }); setBulkJobIds([]); setBulkFiles([]); setBulkTab('files'); setBulkJsonText(''); }}
                                             className="w-full h-9 rounded-xl text-[10px] font-black text-white bg-slate-800 hover:bg-slate-900 uppercase tracking-widest transition-all"
                                         >
                                             Kapat
