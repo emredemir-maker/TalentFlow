@@ -11,7 +11,7 @@ import { applyPiiMask, stripPiiForAI } from '../utils/pii';
 import { batchFilesBySize, formatBytes, totalBytes, MAX_REQUEST_BYTES } from '../utils/bulkUpload';
 import { getFeedbackEmail } from '../utils/templateService';
 import { db } from '../config/firebase';
-import { doc, getDoc, onSnapshot, setDoc, serverTimestamp, collection, query, where } from 'firebase/firestore';
+import { doc, getDoc, getDocs, onSnapshot, setDoc, serverTimestamp, collection, query, where } from 'firebase/firestore';
 import Header from '../components/Header';
 import SystemScanner from '../components/SystemScanner';
 import AddCandidateModal from '../components/AddCandidateModal';
@@ -217,22 +217,37 @@ export default function CandidateProcessPage() {
         return () => { stopped = true; };
     }, [bulkImporting, bulkJobIds, user]);
 
-    // Resume tracking after a page reload: active job ids are persisted to
-    // localStorage when an upload starts. Without this, refreshing the page
-    // drops the keepalive chain and a half-done job goes back to crawling.
-    // Re-attaching also re-fires the completion toast if the job finished
-    // while the user was away — that's intentional.
+    // Resume tracking after a page reload: any unfinished bulk job this user
+    // created is picked up straight from Firestore when the page opens — no
+    // client-side state survives a reload, and without re-attaching, the
+    // keepalive chain drops and a half-done job goes back to crawling.
+    // localStorage is only a fast-path hint; Firestore is the authority, so
+    // even jobs started on another device/session resume here.
     useEffect(() => {
-        try {
-            const stored = JSON.parse(localStorage.getItem('bulkActiveJobs') || '[]');
-            if (Array.isArray(stored) && stored.length > 0) {
-                setBulkJobIds(stored);
-                setBulkImporting(true);
+        if (!user?.uid) return;
+        (async () => {
+            try {
+                const stored = JSON.parse(localStorage.getItem('bulkActiveJobs') || '[]');
+                // Single-field query (auto-indexed); status filtered client-side
+                // to avoid needing a composite Firestore index.
+                const snap = await getDocs(query(
+                    collection(db, 'artifacts/talent-flow/public/data/bulkImportJobs'),
+                    where('createdBy', '==', user.uid)
+                ));
+                const active = snap.docs
+                    .filter(d => ['queued', 'processing'].includes(d.data().status))
+                    .sort((a, b) => (a.data().createdAt?.toMillis?.() || 0) - (b.data().createdAt?.toMillis?.() || 0))
+                    .map(d => d.id);
+                const ids = active.length > 0 ? active : (Array.isArray(stored) ? stored : []);
+                if (ids.length > 0) {
+                    setBulkJobIds(prev => (prev.length ? prev : ids));
+                    setBulkImporting(true);
+                }
+            } catch {
+                try { localStorage.removeItem('bulkActiveJobs'); } catch { /* storage unavailable */ }
             }
-        } catch {
-            try { localStorage.removeItem('bulkActiveJobs'); } catch { /* storage unavailable */ }
-        }
-    }, []);
+        })();
+    }, [user?.uid]);
 
     const showSuccess = (type) => {
         setActionSuccess(type);
