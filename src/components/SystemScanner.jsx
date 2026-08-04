@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
     RefreshCw, Play, Loader2, CheckCircle, Brain, Database,
-    X, Eye, GitBranch, MessageSquare, Search, Users, Zap, CheckSquare, Square
+    X, Eye, GitBranch, MessageSquare, Search, Users, Zap, CheckSquare, Square, Target
 } from 'lucide-react';
 import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
@@ -60,6 +60,15 @@ const SCOPE_OPTIONS = [
         bg: 'bg-violet-400/10',
         border: 'border-violet-400/30',
     },
+    {
+        id: 'filtered',
+        label: 'Hedefli Tarama',
+        desc: 'Seçtiğiniz pozisyon için, ön uyum skoru belirlediğiniz eşiğin üzerindeki adayları detaylı analiz edin',
+        icon: Target,
+        color: 'text-emerald-400',
+        bg: 'bg-emerald-400/10',
+        border: 'border-emerald-400/30',
+    },
 ];
 
 export default function SystemScanner() {
@@ -73,9 +82,15 @@ export default function SystemScanner() {
     const [showMonitor, setShowMonitor] = useState(false);
 
     // ── Scope / filter state ────────────────────────────────────────────────
-    const [scanScope, setScanScope]         = useState('unanalyzed'); // 'unanalyzed' | 'all' | 'selected'
+    const [scanScope, setScanScope]         = useState('unanalyzed'); // 'unanalyzed' | 'all' | 'selected' | 'filtered'
     const [selectedIds, setSelectedIds]     = useState(new Set());
     const [candidateSearch, setCandidateSearch] = useState('');
+    // 'filtered' (Hedefli Tarama) kapsamı: pozisyon + minimum ön skor eşiği.
+    // Amaç: ucuz ön skor üzerinden filtreleyip pahalı detaylı AI analizini
+    // yalnızca barajı geçen adaylara koşturmak.
+    const [targetPositionId, setTargetPositionId] = useState('');
+    const [minPreScore, setMinPreScore]           = useState(60);
+    const [skipAnalyzedForTarget, setSkipAnalyzedForTarget] = useState(true);
 
     // ── Process state ───────────────────────────────────────────────────────
     const isScanningRef   = useRef(false);
@@ -96,9 +111,20 @@ export default function SystemScanner() {
         return !q || c.name?.toLowerCase().includes(q) || c.position?.toLowerCase().includes(q);
     });
 
+    // Ön skor: içe aktarma/başvuru anında hesaplanan ilk uyum puanı.
+    const preScoreOf = (c) => Number(c.initialAiScore ?? c.matchScore ?? c.aiScore ?? 0) || 0;
+
+    const targetPosition = positions.find(p => p.id === targetPositionId) || null;
+    const filteredQueue = targetPosition
+        ? candidates.filter(c =>
+            preScoreOf(c) >= Number(minPreScore || 0) &&
+            (!skipAnalyzedForTarget || !c.positionAnalyses?.[targetPosition.title]))
+        : [];
+
     const queuedCount =
         scanScope === 'unanalyzed' ? unanalyzedCandidates.length :
         scanScope === 'all'        ? candidates.length :
+        scanScope === 'filtered'   ? filteredQueue.length :
         selectedIds.size;
 
     // ── Auto-scan on new position ───────────────────────────────────────────
@@ -150,6 +176,12 @@ export default function SystemScanner() {
             queue = candidates.filter(c => !c.aiAnalysis?.starAnalysis);
         } else if (scope === 'all') {
             queue = [...candidates];
+        } else if (scope === 'filtered') {
+            if (!targetPosition) {
+                addNotification({ title: 'Pozisyon Seçilmedi', message: 'Hedefli tarama için önce bir pozisyon seçin.', type: 'info' });
+                return;
+            }
+            queue = filteredQueue;
         } else {
             queue = candidates.filter(c => ids.has(c.id));
         }
@@ -206,8 +238,11 @@ export default function SystemScanner() {
                         let bestResult   = null;
                         let bestTitle    = candidate.matchedPositionTitle;
 
-                        const positionsToAnalyze = forceAnalyze
-                            ? compatiblePositions
+                        // Hedefli taramada YALNIZCA seçilen pozisyon analiz
+                        // edilir — amaç zaten kotayı tek pozisyona odaklamak.
+                        const positionsToAnalyze =
+                            scope === 'filtered' ? [targetPosition]
+                            : forceAnalyze ? compatiblePositions
                             : [bestMatch || compatiblePositions[0]].filter(Boolean);
 
                         for (const pos of positionsToAnalyze) {
@@ -297,7 +332,8 @@ export default function SystemScanner() {
     // ── Confirm Modal ───────────────────────────────────────────────────────
     if (showConfirm && !scanning) {
         const allSelected = filteredForSelection.length > 0 && selectedIds.size === filteredForSelection.length;
-        const canStart    = scanScope !== 'selected' || selectedIds.size > 0;
+        const canStart    = (scanScope !== 'selected' || selectedIds.size > 0)
+            && (scanScope !== 'filtered' || (targetPosition && filteredQueue.length > 0));
 
         return createPortal(
             <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-sm">
@@ -332,6 +368,7 @@ export default function SystemScanner() {
                                     const count   =
                                         opt.id === 'unanalyzed' ? unanalyzedCandidates.length :
                                         opt.id === 'all'        ? candidates.length :
+                                        opt.id === 'filtered'   ? filteredQueue.length :
                                         selectedIds.size;
 
                                     return (
@@ -363,6 +400,48 @@ export default function SystemScanner() {
                                 })}
                             </div>
                         </div>
+
+                        {/* Targeted scan controls — shown only for 'filtered' scope */}
+                        {scanScope === 'filtered' && (
+                            <div className="space-y-2.5">
+                                <p className="text-[10px] font-black text-navy-400 uppercase tracking-widest">Hedef Pozisyon & Skor Eşiği</p>
+                                <select
+                                    value={targetPositionId}
+                                    onChange={e => setTargetPositionId(e.target.value)}
+                                    className="w-full px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-text-primary outline-none focus:border-emerald-400/40 transition-colors"
+                                >
+                                    <option value="" className="bg-navy-900">— Pozisyon seçin —</option>
+                                    {positions.filter(p => p.status === 'open').map(p => (
+                                        <option key={p.id} value={p.id} className="bg-navy-900">{p.title}</option>
+                                    ))}
+                                </select>
+                                <div className="flex items-center gap-3 flex-wrap">
+                                    <label className="flex items-center gap-2 text-xs text-navy-400">
+                                        Min. ön skor
+                                        <input
+                                            type="number" min="0" max="100"
+                                            value={minPreScore}
+                                            onChange={e => setMinPreScore(e.target.value)}
+                                            className="w-20 px-2 py-1.5 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-text-primary outline-none focus:border-emerald-400/40 transition-colors"
+                                        />
+                                    </label>
+                                    <label className="flex items-center gap-1.5 text-xs text-navy-400 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={skipAnalyzedForTarget}
+                                            onChange={e => setSkipAnalyzedForTarget(e.target.checked)}
+                                            className="accent-emerald-400"
+                                        />
+                                        Bu pozisyon için analiz edilmişleri atla
+                                    </label>
+                                </div>
+                                <p className="text-xs text-navy-500">
+                                    {targetPosition
+                                        ? `${filteredQueue.length} aday kriterlere uyuyor (ön skor ≥ ${minPreScore || 0}). Yalnızca "${targetPosition.title}" pozisyonu için detaylı analiz yapılacak.`
+                                        : 'Uyan aday sayısını görmek için bir pozisyon seçin.'}
+                                </p>
+                            </div>
+                        )}
 
                         {/* Candidate checklist — shown only for 'selected' scope */}
                         {scanScope === 'selected' && (
