@@ -132,10 +132,11 @@ export default function CandidateProcessPage() {
         if (!bulkJobIds.length || !db) return;
         const jobData = new Map();
         let toastShown = false;
-        const unsubs = bulkJobIds.map((jobId) =>
-            onSnapshot(doc(db, `artifacts/talent-flow/public/data/bulkImportJobs/${jobId}`), (snap) => {
-                if (!snap.exists()) return;
-                jobData.set(jobId, snap.data());
+        // recompute, jobData'daki mevcut durumdan toplam ilerlemeyi türetir.
+        // Hem normal snapshot'lar hem hata/eksik-doküman yolları bunu çağırır;
+        // böylece tek bir job okunamasa bile allDone çözülür ve modal asla
+        // veri bekleyerek kilitli kalmaz.
+        const recompute = () => {
                 const jobs = Array.from(jobData.values());
                 const total = jobs.reduce((s, d) => s + (d.totalCount || 0), 0);
                 const completed = jobs.reduce((s, d) => s + (d.processedCount || 0), 0);
@@ -179,7 +180,24 @@ export default function CandidateProcessPage() {
                     });
                     setTimeout(() => setBulkToast(null), 12000);
                 }
-            })
+        };
+        const unsubs = bulkJobIds.map((jobId) =>
+            onSnapshot(
+                doc(db, `artifacts/talent-flow/public/data/bulkImportJobs/${jobId}`),
+                (snap) => {
+                    // Silinmiş/bulunamayan job takibi kilitlemesin — sıfır
+                    // katkılı "tamamlanmış" sayılır.
+                    jobData.set(jobId, snap.exists() ? snap.data() : { status: 'completed', totalCount: 0, processedCount: 0, failedCount: 0 });
+                    recompute();
+                },
+                (err) => {
+                    // Okuma hatası (ör. izin değişikliği): job'ı hatalı-bitmiş
+                    // say ki diğer job'lar ve kapanış mantığı ilerleyebilsin.
+                    console.error('[Bulk] job listener error:', jobId, err);
+                    jobData.set(jobId, { status: 'error', totalCount: 0, processedCount: 0, failedCount: 0 });
+                    recompute();
+                }
+            )
         );
         return () => unsubs.forEach(u => u());
     }, [bulkJobIds]);
@@ -225,13 +243,13 @@ export default function CandidateProcessPage() {
     // created is picked up straight from Firestore when the page opens — no
     // client-side state survives a reload, and without re-attaching, the
     // keepalive chain drops and a half-done job goes back to crawling.
-    // localStorage is only a fast-path hint; Firestore is the authority, so
-    // even jobs started on another device/session resume here.
+    // Firestore is the SINGLE authority here. (An earlier localStorage
+    // fallback could resurrect ids of finished/deleted jobs and freeze the
+    // modal at 0/0 waiting for data that would never arrive.)
     useEffect(() => {
         if (!user?.uid) return;
         (async () => {
             try {
-                const stored = JSON.parse(localStorage.getItem('bulkActiveJobs') || '[]');
                 // Single-field query (auto-indexed); status filtered client-side
                 // to avoid needing a composite Firestore index.
                 const snap = await getDocs(query(
@@ -242,13 +260,14 @@ export default function CandidateProcessPage() {
                     .filter(d => ['queued', 'processing'].includes(d.data().status))
                     .sort((a, b) => (a.data().createdAt?.toMillis?.() || 0) - (b.data().createdAt?.toMillis?.() || 0))
                     .map(d => d.id);
-                const ids = active.length > 0 ? active : (Array.isArray(stored) ? stored : []);
-                if (ids.length > 0) {
-                    setBulkJobIds(prev => (prev.length ? prev : ids));
+                if (active.length > 0) {
+                    setBulkJobIds(prev => (prev.length ? prev : active));
                     setBulkImporting(true);
+                } else {
+                    try { localStorage.removeItem('bulkActiveJobs'); } catch { /* storage unavailable */ }
                 }
-            } catch {
-                try { localStorage.removeItem('bulkActiveJobs'); } catch { /* storage unavailable */ }
+            } catch (err) {
+                console.error('[Bulk] resume query failed:', err);
             }
         })();
     }, [user?.uid]);
@@ -881,7 +900,17 @@ export default function CandidateProcessPage() {
                 <div className="flex items-center gap-2">
                     <SystemScanner />
                     <button
-                        onClick={() => { setBulkFiles([]); setBulkJobIds([]); setBulkProgress({ total: 0, completed: 0, failed: 0, items: [] }); setBulkImportModal(true); }}
+                        onClick={() => {
+                            // Yalnızca boşta iken sıfırla — aktif bir iş takip
+                            // edilirken sıfırlamak, bulkImporting açıkken takip
+                            // verisini silip modalı 0/0'da kilitliyordu.
+                            if (!bulkImporting) {
+                                setBulkFiles([]);
+                                setBulkJobIds([]);
+                                setBulkProgress({ total: 0, completed: 0, failed: 0, items: [] });
+                            }
+                            setBulkImportModal(true);
+                        }}
                         className="bg-violet-500 hover:bg-violet-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-colors shadow-sm shadow-violet-200 flex items-center gap-1.5"
                     >
                         <Upload className="w-3.5 h-3.5" /> Toplu Yükleme
@@ -2370,7 +2399,7 @@ export default function CandidateProcessPage() {
                                 <h3 className="text-[13px] font-black text-slate-800">Toplu CV Yükleme</h3>
                             </div>
                             <button
-                                onClick={() => { if (!bulkImporting) { setBulkImportModal(false); } }}
+                                onClick={() => setBulkImportModal(false)}
                                 className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-50"
                             >
                                 <X className="w-4 h-4" />
