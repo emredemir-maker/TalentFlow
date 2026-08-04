@@ -3,6 +3,7 @@ import React from 'react';
 import {
     LayoutDashboard,
     Users,
+    Table2,
     Briefcase,
     Calendar,
     BarChart3,
@@ -33,6 +34,7 @@ export default function Sidebar({
         { id: 'dashboard', label: 'Kontrol Paneli', icon: LayoutDashboard },
         { id: 'interviews', label: 'Mülakatlar', icon: Calendar },
         { id: 'candidate-process', label: 'Adaylar', icon: Users },
+        { id: 'candidates-table', label: 'Aday Raporu', icon: Table2 },
         { id: 'positions', label: 'Açık İlanlar', icon: Briefcase },
         { id: 'analytics', label: 'Analitik Raporlar', icon: BarChart3 },
         { id: 'messages', label: 'Mesajlaşma', icon: MessageSquare },
