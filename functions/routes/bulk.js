@@ -18,6 +18,7 @@ import path from 'path';
 import { createRequire } from 'module';
 
 import { requireAuth } from '../middleware/auth.js';
+import { wrapMulter } from '../middleware/multipart.js';
 import { db, admin } from '../config/firebaseAdmin.js';
 import {
     BULK_JOBS_COLL,
@@ -56,7 +57,7 @@ export function createBulkRouter(uploadBaseDir) {
         },
     });
 
-    router.post('/api/bulk-import', requireAuth(), bulkUpload.array('cvs', 20), async (req, res) => {
+    router.post('/api/bulk-import', requireAuth(), wrapMulter(bulkUpload.array('cvs', 20)), async (req, res) => {
         try {
             const positionId = req.body?.positionId || '';
             const positionTitle = req.body?.positionTitle || '';

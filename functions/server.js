@@ -97,6 +97,18 @@ app.use(usersRoutes);
 // bulk needs the on-disk uploads root, so it's a factory not a default export.
 app.use(createBulkRouter(uploadBaseDir));
 
+// JSON error handler — must be registered after all routes. Without this,
+// middleware errors (multer file-type/size rejections, busboy parse errors)
+// fall through to Express's default HTML error page, which the SPA's
+// resp.json() can't parse — the user sees a generic failure instead of the
+// real message. MulterError = client mistake (bad type/too many/too big).
+app.use((err, req, res, next) => {
+    if (res.headersSent) return next(err);
+    logger.error({ err: err.message, path: req.path }, 'Request middleware error');
+    const status = err.name === 'MulterError' ? 400 : (err.status || err.statusCode || 500);
+    res.status(status).json({ error: err.message || 'Sunucu hatası' });
+});
+
 // ── Start bulk worker in BOTH runtime modes (local server main OR the
 // Firebase Functions runtime that imports this module). setImmediate lets
 // the module finish loading before the first poll attempt; the 3s setTimeout

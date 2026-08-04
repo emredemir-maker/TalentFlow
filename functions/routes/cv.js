@@ -20,6 +20,7 @@ import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 
 import { aiLimiter } from '../middleware/rateLimit.js';
+import { wrapMulter } from '../middleware/multipart.js';
 import { pdf } from '../services/pdf.js';
 import { parseProfile } from '../services/gemini.js';
 import { db } from '../config/firebaseAdmin.js';
@@ -98,7 +99,7 @@ router.post('/api/direct-add', aiLimiter, async (req, res) => {
     }
 });
 
-router.post('/api/process-cv', aiLimiter, upload.array('cvs', 20), async (req, res) => {
+router.post('/api/process-cv', aiLimiter, wrapMulter(upload.array('cvs', 20)), async (req, res) => {
     try {
         if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'Dosya seçilmedi' });
 
