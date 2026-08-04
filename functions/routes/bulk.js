@@ -150,12 +150,28 @@ export function createBulkRouter(uploadBaseDir) {
 
     router.get('/api/bulk-import/:jobId', requireAuth(), async (req, res) => {
         try {
-            const snap = await db.doc(`${BULK_JOBS_COLL}/${req.params.jobId}`).get();
+            const jobRef = db.doc(`${BULK_JOBS_COLL}/${req.params.jobId}`);
+            let snap = await jobRef.get();
             if (!snap.exists) return res.status(404).json({ error: 'Job bulunamadı.' });
-            const data = snap.data();
+            let data = snap.data();
             // Ownership check: only allow access by the job creator or admins
             if (data.createdBy && data.createdBy !== req.user.uid && req.user.role !== 'admin') {
                 return res.status(403).json({ error: 'Bu işe erişim izniniz yok.' });
+            }
+            // ?wait=1 → long-poll: hold the response up to ~20s or until the
+            // job finishes. The point is not data freshness — Cloud Functions
+            // only gives background work (the bulk worker loop) real CPU
+            // while a request is in flight, and idle instances get throttled
+            // or killed, which stalls big jobs mid-run. The progress modal
+            // chains these long-polls to keep the instance awake until the
+            // job completes.
+            if (req.query.wait === '1') {
+                const deadline = Date.now() + 20000;
+                while (data.status !== 'completed' && data.status !== 'error' && Date.now() < deadline) {
+                    await new Promise((r) => setTimeout(r, 2000));
+                    snap = await jobRef.get();
+                    data = snap.data() || data;
+                }
             }
             res.json({ jobId: snap.id, ...data });
         } catch (err) {

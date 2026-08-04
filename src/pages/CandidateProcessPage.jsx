@@ -180,6 +180,39 @@ export default function CandidateProcessPage() {
         return () => unsubs.forEach(u => u());
     }, [bulkJobIds]);
 
+    // Keepalive long-poll while a bulk job is running. Cloud Functions gives
+    // background work (the bulk worker loop) real CPU only while an HTTP
+    // request is in flight and kills idle instances — without this, a large
+    // job crawls or stalls (e.g. frozen at 34/455) as soon as the upload
+    // requests finish. Chaining ?wait=1 long-polls (~20s server-side hold)
+    // keeps the instance awake and un-throttled until every job completes.
+    // Progress numbers still come from the Firestore listener above.
+    useEffect(() => {
+        if (!bulkImporting || bulkJobIds.length === 0) return;
+        let stopped = false;
+        (async () => {
+            let jobIdx = 0;
+            while (!stopped && jobIdx < bulkJobIds.length) {
+                try {
+                    const tok = await user?.getIdToken?.() || '';
+                    const resp = await fetch(`/api/bulk-import/${bulkJobIds[jobIdx]}?wait=1`, {
+                        headers: { 'Authorization': `Bearer ${tok}` },
+                    });
+                    const data = await resp.json().catch(() => ({}));
+                    if (resp.ok && (data.status === 'completed' || data.status === 'error')) {
+                        jobIdx++; // this job is done — keep the next one awake
+                    } else if (!resp.ok) {
+                        await new Promise(r => setTimeout(r, 10000)); // backoff on 4xx/5xx
+                    }
+                } catch {
+                    if (!stopped) await new Promise(r => setTimeout(r, 10000)); // network hiccup
+                }
+                if (!stopped) await new Promise(r => setTimeout(r, 2000));
+            }
+        })();
+        return () => { stopped = true; };
+    }, [bulkImporting, bulkJobIds, user]);
+
     const showSuccess = (type) => {
         setActionSuccess(type);
         setTimeout(() => setActionSuccess(null), 3000);
