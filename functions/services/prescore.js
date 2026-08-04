@@ -1,0 +1,67 @@
+// Geriye dönük ucuz ön skor üretimi (maintenance/prescore endpoint'i).
+//
+// Toplu içe aktarma ön skoru artık içe aktarma ANINDA üretiyor
+// (bulkWorker.parseTextWithGemini) — bu modül, o özellikten ÖNCE içe
+// aktarılmış 0 skorlu adaylar için aynı kalitede skoru sonradan basar.
+//
+// Maliyet sıralaması:
+//   1. Kayıtlı cvText varsa: TEK hafif Gemini çağrısı — yalnızca skor +
+//      pozisyon + 1 cümle gerekçe istenir (detaylı STAR analizi DEĞİL).
+//   2. cvText yoksa ya da AI başarısız olursa: sıfır maliyetli
+//      anahtar-kelime skoru (kayıtlı position/skills alanları açık
+//      pozisyon başlıklarıyla karşılaştırılır) — kimse 0'da kalmaz.
+import { generateText } from './gemini.js';
+import { calculateSimpleMatchScore } from './bulkWorker.js';
+
+/** Anahtar-kelime yedeği: açık pozisyonlardan en iyi skoru seç. */
+export function keywordPrescore(candidateData, openPositionTitles) {
+    let best = { score: 0, matchedTitle: candidateData?.position || '' };
+    for (const title of openPositionTitles || []) {
+        const s = calculateSimpleMatchScore(candidateData, title);
+        if (s > best.score) best = { score: s, matchedTitle: title };
+    }
+    return { ...best, matchReason: '', method: 'keyword' };
+}
+
+/**
+ * Tek aday için ön skor üret. AI yanıtı geçersizse/patlarsa sessizce
+ * anahtar-kelime yedeğine düşer — endpoint akışını asla durdurmaz.
+ */
+export async function computePrescore(candidateData, openPositionTitles) {
+    const cvText = (candidateData?.cvText || '').trim();
+    if (cvText.length >= 40) {
+        const scoreContext = openPositionTitles?.length
+            ? `Şirketteki açık pozisyonlar: ${openPositionTitles.map((t) => `"${t}"`).join(', ')}. Adaya EN UYGUN pozisyonu seç ve skoru ona göre ver.`
+            : `Açık pozisyon listesi yok. Skoru adayın profil kalitesine ve istihdam edilebilirliğine göre ver.`;
+        const prompt = `Sen bir işe alım ön değerlendirme uzmanısın. Aşağıdaki CV metni için bir ön uyum skoru ver.
+${scoreContext}
+Sadece şu JSON formatında yanıt ver (başka hiçbir şey yazma):
+{
+  "matchScore": 75,
+  "matchedPosition": "Skorun verildiği pozisyon başlığı",
+  "matchReason": "1-2 cümlelik skor gerekçesi (Türkçe)"
+}
+
+CV:
+${cvText.substring(0, 6000)}`;
+        try {
+            const raw = (await generateText(prompt)).replace(/```json|```/gi, '').trim();
+            const match = raw.match(/\{[\s\S]*\}/);
+            if (match) {
+                const parsed = JSON.parse(match[0]);
+                const score = Number(parsed?.matchScore);
+                if (!isNaN(score) && score > 0) {
+                    return {
+                        score: Math.max(0, Math.min(100, Math.round(score))),
+                        matchedTitle: parsed?.matchedPosition || candidateData?.position || '',
+                        matchReason: parsed?.matchReason || '',
+                        method: 'ai',
+                    };
+                }
+            }
+        } catch {
+            // AI hatası → anahtar-kelime yedeği
+        }
+    }
+    return keywordPrescore(candidateData, openPositionTitles);
+}

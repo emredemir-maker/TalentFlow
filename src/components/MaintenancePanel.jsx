@@ -9,8 +9,8 @@
 //      her grupta EN ESKİ kayıt korunur, fazlalıklar seçilip silinebilir.
 //      Sunucu silme isteğindeki her id'yi yeniden doğrular — korunan kayıt
 //      istemci hatasında bile silinemez.
-import { useState } from 'react';
-import { Loader2, RefreshCw, Trash2, AlertTriangle, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Loader2, RefreshCw, Trash2, AlertTriangle, CheckCircle2, XCircle, Clock, Gauge } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const JOB_STATUS = {
@@ -39,6 +39,11 @@ export default function MaintenancePanel() {
     const [scan, setScan] = useState(null);
     const [selected, setSelected] = useState(new Set());
     const [lastCleanResult, setLastCleanResult] = useState(null);
+    const [prescoring, setPrescoring] = useState(false);
+    const [prescoreInfo, setPrescoreInfo] = useState(null);
+    // Bileşen kapanınca zincirleme prescore döngüsünü durdur
+    const unmountedRef = useRef(false);
+    useEffect(() => () => { unmountedRef.current = true; }, []);
 
     const authedFetch = async (url, init = {}) => {
         const tok = await user?.getIdToken?.() || '';
@@ -95,6 +100,37 @@ export default function MaintenancePanel() {
             setError(err.message);
         } finally {
             setCleaning(false);
+        }
+    };
+
+    // Geriye dönük ön skor: sunucu her çağrıda en fazla 40 adayı puanlayıp
+    // kalan sayıyı döndürür; kalan 0 olana dek zincirleme çağrılır. Böylece
+    // tek uzun istek yerine her biri ~30 sn'lik parçalar hâlinde ilerler.
+    const runPrescore = async () => {
+        if (prescoring) return;
+        setPrescoring(true);
+        setError(null);
+        try {
+            let totals = { updated: 0, aiUsed: 0, failed: 0, remaining: 1 };
+            while (totals.remaining > 0 && !unmountedRef.current) {
+                const data = await authedFetch('/api/maintenance/prescore', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ batchSize: 40 }),
+                });
+                totals = {
+                    updated: totals.updated + (data.updated || 0),
+                    aiUsed: totals.aiUsed + (data.aiUsed || 0),
+                    failed: totals.failed + (data.failed || 0),
+                    remaining: data.remaining || 0,
+                };
+                setPrescoreInfo({ ...totals });
+                if ((data.processed || 0) === 0) break; // ilerleme yoksa sonsuz döngüye girme
+            }
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setPrescoring(false);
         }
     };
 
@@ -220,6 +256,33 @@ export default function MaintenancePanel() {
                     )}
                 </div>
             )}
+
+            {/* ── Geriye dönük ön skor basma ───────────────────────────────── */}
+            <div className="border-t border-slate-100 pt-3">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div>
+                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ön Skor Basma</h3>
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                            Skoru 0 olan adayları hafif AI çağrısıyla puanlar (CV metni yoksa anahtar-kelime skoru) — detaylı analiz değildir
+                        </p>
+                    </div>
+                    <button
+                        onClick={runPrescore}
+                        disabled={prescoring}
+                        className="flex items-center gap-1.5 text-[11px] font-black text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-60 px-3.5 py-1.5 rounded-lg transition-colors"
+                    >
+                        {prescoring ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Gauge className="w-3.5 h-3.5" />}
+                        {prescoring ? 'Puanlanıyor…' : '0 Skorluları Puanla'}
+                    </button>
+                </div>
+                {prescoreInfo && (
+                    <p className={`mt-2 text-[11px] font-semibold rounded-lg px-3 py-2 border ${prescoreInfo.remaining > 0 ? 'text-violet-700 bg-violet-50 border-violet-100' : 'text-emerald-700 bg-emerald-50 border-emerald-100'}`}>
+                        {prescoreInfo.updated} aday puanlandı ({prescoreInfo.aiUsed} AI, {prescoreInfo.updated - prescoreInfo.aiUsed} anahtar-kelime)
+                        {prescoreInfo.failed > 0 ? ` · ${prescoreInfo.failed} hata` : ''}
+                        {prescoreInfo.remaining > 0 ? ` · ${prescoreInfo.remaining} kaldı…` : ' · tamamlandı ✓'}
+                    </p>
+                )}
+            </div>
 
             {!jobs && !scan && !loading && (
                 <p className="text-[11px] text-slate-400">Başlamak için "Tara" düğmesine basın — mevcut veriler değişmez, yalnızca rapor üretilir.</p>

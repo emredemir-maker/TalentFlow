@@ -15,8 +15,10 @@
 import { Router } from 'express';
 
 import { requireAuth } from '../middleware/auth.js';
-import { db } from '../config/firebaseAdmin.js';
+import { db, admin } from '../config/firebaseAdmin.js';
 import { groupDuplicateCandidates } from '../services/duplicateScan.js';
+import { computePrescore } from '../services/prescore.js';
+import { POSITIONS_COLL } from '../services/bulkWorker.js';
 import { childLogger } from '../services/logger.js';
 
 const log = childLogger('maintenance');
@@ -116,6 +118,75 @@ router.post('/api/maintenance/duplicate-clean', requireAuth(ROLES), async (req, 
         res.json({ deleted, skipped: ids.length - deleted });
     } catch (err) {
         log.error(`[maintenance/duplicate-clean] ${err.message}`);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Geriye dönük ön skor basma. Her çağrı en fazla batchSize adayı puanlar
+// ve kalan sayıyı döndürür — istemci (MaintenancePanel) kalan 0 olana dek
+// zincirleme çağırır. Uzun tek istek yerine parça parça: 300 sn'lik
+// fonksiyon zaman aşımına takılmaz ve her istek aktif olduğundan CPU
+// kısıtlaması yaşanmaz. Yalnızca skoru hiç olmayan (<=0) adaylar seçilir;
+// gerçek skoru olan hiçbir kayıtın üzerine yazılmaz.
+router.post('/api/maintenance/prescore', requireAuth(ROLES), async (req, res) => {
+    try {
+        const batchSize = Math.min(60, Math.max(1, parseInt(req.body?.batchSize, 10) || 40));
+        const scoreOf = (c) => Number(c.initialAiScore || 0) || Number(c.matchScore || 0) || Number(c.aiScore || 0);
+
+        const snap = await db.collection(CANDIDATES_COLL).get();
+        const pendingDocs = snap.docs.filter((d) => scoreOf(d.data()) <= 0);
+        const batchDocs = pendingDocs.slice(0, batchSize);
+
+        let openPositionTitles = [];
+        try {
+            const posSnap = await db.collection(POSITIONS_COLL).where('status', '==', 'open').get();
+            openPositionTitles = posSnap.docs.map((d) => d.data().title).filter(Boolean).slice(0, 25);
+        } catch (posErr) {
+            log.warn(`[maintenance/prescore] open positions read failed: ${posErr.message}`);
+        }
+
+        let updated = 0;
+        let failed = 0;
+        let aiUsed = 0;
+        let idx = 0;
+        // 4 paralel işçi — bulk worker ile aynı eşzamanlılık düzeyi
+        await Promise.all(
+            Array.from({ length: Math.min(4, batchDocs.length) }, async () => {
+                while (idx < batchDocs.length) {
+                    const docSnap = batchDocs[idx];
+                    idx += 1;
+                    try {
+                        const data = docSnap.data();
+                        const result = await computePrescore(data, openPositionTitles);
+                        await docSnap.ref.update({
+                            initialAiScore: result.score,
+                            matchScore: result.score,
+                            combinedScore: result.score,
+                            matchedPositionTitle: result.matchedTitle || data.position || '',
+                            matchReason: result.matchReason || '',
+                            prescoreMethod: result.method,
+                            prescoredAt: admin.firestore.FieldValue.serverTimestamp(),
+                        });
+                        if (result.method === 'ai') aiUsed += 1;
+                        updated += 1;
+                    } catch (err) {
+                        failed += 1;
+                        log.warn(`[maintenance/prescore] candidate ${docSnap.id} failed: ${err.message}`);
+                    }
+                }
+            })
+        );
+
+        log.info(`[maintenance/prescore] batch done: ${updated} updated (${aiUsed} AI), ${failed} failed, ${pendingDocs.length - batchDocs.length} remaining`);
+        res.json({
+            processed: batchDocs.length,
+            updated,
+            failed,
+            aiUsed,
+            remaining: pendingDocs.length - batchDocs.length,
+        });
+    } catch (err) {
+        log.error(`[maintenance/prescore] ${err.message}`);
         res.status(500).json({ error: err.message });
     }
 });
