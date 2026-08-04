@@ -90,7 +90,13 @@ export default function SystemScanner() {
     // yalnızca barajı geçen adaylara koşturmak.
     const [targetPositionId, setTargetPositionId] = useState('');
     const [minPreScore, setMinPreScore]           = useState(60);
-    const [skipAnalyzedForTarget, setSkipAnalyzedForTarget] = useState(true);
+    // Hedefli taramaya kimler dahil edilecek?
+    //   'never_analyzed'   — hiç detaylı analizi olmayanlar (varsayılan):
+    //                        eski otonom taramadan geçmiş kayıtlar tekrar
+    //                        analiz edilmez, kota yalnızca yeni adaylara gider
+    //   'not_for_position' — seçilen pozisyon için analiz edilmemiş herkes
+    //   'all'              — eşiği geçen herkes (yeniden analiz dahil)
+    const [filteredInclusion, setFilteredInclusion] = useState('never_analyzed');
     // Akıllı pozisyon sınırı: 'Tüm Adaylar'/'Seçili' kapsamlarında aday
     // başına HER uyumlu pozisyonu AI'a göndermek yerine, ücretsiz
     // anahtar-kelime ön sıralamasıyla en iyi 5 pozisyon seçilir ve yalnızca
@@ -122,9 +128,16 @@ export default function SystemScanner() {
 
     const targetPosition = positions.find(p => p.id === targetPositionId) || null;
     const filteredQueue = targetPosition
-        ? candidates.filter(c =>
-            preScoreOf(c) >= Number(minPreScore || 0) &&
-            (!skipAnalyzedForTarget || !c.positionAnalyses?.[targetPosition.title]))
+        ? candidates.filter(c => {
+            if (preScoreOf(c) < Number(minPreScore || 0)) return false;
+            if (filteredInclusion === 'never_analyzed') {
+                return !c.aiAnalysis?.starAnalysis && !c.positionAnalyses?.[targetPosition.title];
+            }
+            if (filteredInclusion === 'not_for_position') {
+                return !c.positionAnalyses?.[targetPosition.title];
+            }
+            return true; // 'all'
+        })
         : [];
 
     const queuedCount =
@@ -476,15 +489,30 @@ export default function SystemScanner() {
                                             className="w-20 px-2 py-1.5 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-text-primary outline-none focus:border-emerald-400/40 transition-colors"
                                         />
                                     </label>
-                                    <label className="flex items-center gap-1.5 text-xs text-navy-400 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={skipAnalyzedForTarget}
-                                            onChange={e => setSkipAnalyzedForTarget(e.target.checked)}
-                                            className="accent-emerald-400"
-                                        />
-                                        Bu pozisyon için analiz edilmişleri atla
-                                    </label>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-black text-navy-400 uppercase tracking-widest mb-1.5">Kimler Dahil Edilsin?</p>
+                                    <div className="space-y-1">
+                                        {[
+                                            { id: 'never_analyzed', label: 'Hiç detaylı analizi olmayanlar (önerilen)', desc: 'Daha önce otonom taramadan geçmiş kayıtlar tekrar analiz edilmez' },
+                                            { id: 'not_for_position', label: 'Bu pozisyon için analiz edilmemişler', desc: 'Başka pozisyon için analiz edilmiş olsa bile bu pozisyon için analiz edilir' },
+                                            { id: 'all', label: 'Eşiği geçen herkes', desc: 'Önceki analizler dahil hepsi yeniden analiz edilir — en yüksek maliyet' },
+                                        ].map(opt => (
+                                            <label key={opt.id} className={`flex items-start gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-all ${filteredInclusion === opt.id ? 'bg-emerald-400/10 border-emerald-400/30' : 'bg-white/[0.02] border-white/[0.05] hover:bg-white/[0.05]'}`}>
+                                                <input
+                                                    type="radio"
+                                                    name="filtered-inclusion"
+                                                    checked={filteredInclusion === opt.id}
+                                                    onChange={() => setFilteredInclusion(opt.id)}
+                                                    className="accent-emerald-400 mt-0.5"
+                                                />
+                                                <span className="text-xs leading-relaxed">
+                                                    <span className={`font-bold ${filteredInclusion === opt.id ? 'text-emerald-400' : 'text-navy-300'}`}>{opt.label}</span>
+                                                    <span className="block text-navy-500">{opt.desc}</span>
+                                                </span>
+                                            </label>
+                                        ))}
+                                    </div>
                                 </div>
                                 <p className="text-xs text-navy-500">
                                     {targetPosition
