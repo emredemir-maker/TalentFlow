@@ -28,7 +28,7 @@ vi.mock('../config/firebaseAdmin.js', () => ({
     },
 }));
 
-const { extractCvText, findDuplicateCandidate } = await import('./bulkWorker.js');
+const { extractCvText, findDuplicateCandidate, resolvePreScore } = await import('./bulkWorker.js');
 
 beforeEach(() => {
     mockPdf.mockReset();
@@ -119,5 +119,26 @@ describe('findDuplicateCandidate', () => {
         mockWhereGet.mockResolvedValue(emptySnap);
         const result = await findDuplicateCandidate({ email: 'yok@aday.com', phone: '+90 555 000 00 00' }, {});
         expect(result).toBeNull();
+    });
+});
+
+describe('resolvePreScore', () => {
+    it('uses the Gemini score when valid and clamps to 0-100', () => {
+        expect(resolvePreScore({ matchScore: 82, matchedPosition: 'Frontend Dev' }, '')).toEqual({ score: 82, matchedTitle: 'Frontend Dev' });
+        expect(resolvePreScore({ matchScore: 140, matchedPosition: 'X' }, '').score).toBe(100);
+        expect(resolvePreScore({ matchScore: 76.6, matchedPosition: 'X' }, '').score).toBe(77);
+    });
+
+    it('prefers the Gemini-matched position over the upload selection', () => {
+        expect(resolvePreScore({ matchScore: 60, matchedPosition: 'Backend Dev' }, 'İK Uzmanı').matchedTitle).toBe('Backend Dev');
+        expect(resolvePreScore({ matchScore: 60 }, 'İK Uzmanı').matchedTitle).toBe('İK Uzmanı');
+    });
+
+    it('falls back to the keyword score when the AI score is missing or zero', () => {
+        const parsed = { position: 'frontend developer', skills: ['react'], matchScore: 0 };
+        const { score, matchedTitle } = resolvePreScore(parsed, 'Frontend Developer');
+        expect(matchedTitle).toBe('Frontend Developer');
+        expect(score).toBeGreaterThan(0); // anahtar-kelime eşleşmesi ('frontend', 'developer')
+        expect(resolvePreScore({ matchScore: 'abc', position: '' }, '').score).toBe(0);
     });
 });
