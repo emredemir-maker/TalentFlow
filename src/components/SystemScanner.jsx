@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
-import { findBestPositionMatch, filterPositionsByDomain } from '../services/matchService';
+import { findBestPositionMatch, filterPositionsByDomain, calculateMatchScore } from '../services/matchService';
 import { analyzeCandidateMatch } from '../services/geminiService';
 import { useNotifications } from '../context/NotificationContext';
 
@@ -91,6 +91,12 @@ export default function SystemScanner() {
     const [targetPositionId, setTargetPositionId] = useState('');
     const [minPreScore, setMinPreScore]           = useState(60);
     const [skipAnalyzedForTarget, setSkipAnalyzedForTarget] = useState(true);
+    // Akıllı pozisyon sınırı: 'Tüm Adaylar'/'Seçili' kapsamlarında aday
+    // başına HER uyumlu pozisyonu AI'a göndermek yerine, ücretsiz
+    // anahtar-kelime ön sıralamasıyla en iyi 5 pozisyon seçilir ve yalnızca
+    // onlar detaylı analize girer. Bariz alakasız pozisyonlara AI çağrısı
+    // harcanmaz; analiz kalitesi (model + prompt) değişmez.
+    const [smartPositionLimit, setSmartPositionLimit] = useState(true);
 
     // ── Process state ───────────────────────────────────────────────────────
     const isScanningRef   = useRef(false);
@@ -203,16 +209,16 @@ export default function SystemScanner() {
             setUpdatedCount(0);
             setTotalQueued(queue.length);
 
-            for (let i = 0; i < queue.length; i++) {
-                if (!isScanningRef.current) break;
-
-                const candidate = queue[i];
+            // Tek adayı uçtan uca işler. Eskiden sıralı for-döngüsüydü ve her
+            // adayda ~1 sn yapay bekleme (50+80+800+80 ms sahne animasyonu)
+            // vardı; artık beklemeler kaldırıldı ve adaylar 3'lü havuzda
+            // paralel işleniyor — model ve prompt aynı, kalite değişmez.
+            const processOne = async (candidate) => {
+                if (!isScanningRef.current) return;
                 setCurrentCandidate(candidate);
-                setProgress((i / queue.length) * 100);
 
                 // ── Stage 1: Scout ─────────────────────────────────────────
                 setActiveStage('scout');
-                await new Promise(r => setTimeout(r, 50));
                 const compatiblePositions = filterPositionsByDomain(candidate, openPositions);
                 const bestMatch = findBestPositionMatch(candidate, compatiblePositions);
 
@@ -222,7 +228,6 @@ export default function SystemScanner() {
                 // ── Stage 2: Researcher ────────────────────────────────────
                 if (bestMatch && (bestMatch.matchScore || 0) > 5) {
                     setActiveStage('researcher');
-                    await new Promise(r => setTimeout(r, 80));
                 }
 
                 // ── Stage 3: Analyst ───────────────────────────────────────
@@ -240,9 +245,19 @@ export default function SystemScanner() {
 
                         // Hedefli taramada YALNIZCA seçilen pozisyon analiz
                         // edilir — amaç zaten kotayı tek pozisyona odaklamak.
+                        // Force kapsamlarında akıllı sınır açıksa, ücretsiz
+                        // anahtar-kelime skoruyla ön-sıralanıp yalnızca en iyi
+                        // 5 pozisyon AI'a gönderilir.
+                        const rankedForce = smartPositionLimit && compatiblePositions.length > 5
+                            ? [...compatiblePositions]
+                                .map(p => ({ p, s: calculateMatchScore(candidate, p) || 0 }))
+                                .sort((a, b) => b.s - a.s)
+                                .slice(0, 5)
+                                .map(x => x.p)
+                            : compatiblePositions;
                         const positionsToAnalyze =
                             scope === 'filtered' ? [targetPosition]
-                            : forceAnalyze ? compatiblePositions
+                            : forceAnalyze ? rankedForce
                             : [bestMatch || compatiblePositions[0]].filter(Boolean);
 
                         for (const pos of positionsToAnalyze) {
@@ -280,9 +295,6 @@ export default function SystemScanner() {
 
                         updates.lastScannedAt = new Date().toISOString();
                         needsUpdate = true;
-
-                        await new Promise(r => setTimeout(r, 800));
-
                     } catch (aiErr) {
                         console.error('AI Error:', aiErr);
                         if (bestMatch) {
@@ -296,7 +308,6 @@ export default function SystemScanner() {
                 // ── Stage 4: Engagement ────────────────────────────────────
                 if (updates.matchScore && updates.matchScore > 75) {
                     setActiveStage('engagement');
-                    await new Promise(r => setTimeout(r, 80));
                 }
 
                 // ── Stage 5: Recruiter ─────────────────────────────────────
@@ -305,9 +316,33 @@ export default function SystemScanner() {
                     await updateCandidate(candidate.id, updates);
                     setUpdatedCount(prev => prev + 1);
                 }
+            };
 
-                setProcessedCount(prev => prev + 1);
-            }
+            // 3'lü paralel havuz. JS tek iş parçacıklı olduğundan sayaç
+            // yarışsızdır; durdurma bayrağı her adaydan önce kontrol edilir.
+            // Bir adayın hatası diğerlerini durdurmaz.
+            let completedCount = 0;
+            const bumpProgress = () => {
+                completedCount += 1;
+                setProcessedCount(completedCount);
+                setProgress((completedCount / queue.length) * 100);
+            };
+            const CONCURRENCY = 3;
+            let nextIdx = 0;
+            await Promise.all(
+                Array.from({ length: Math.min(CONCURRENCY, queue.length) }, async () => {
+                    while (isScanningRef.current && nextIdx < queue.length) {
+                        const candidate = queue[nextIdx];
+                        nextIdx += 1;
+                        try {
+                            await processOne(candidate);
+                        } catch (oneErr) {
+                            console.error('Scan item error:', candidate?.name, oneErr);
+                        }
+                        bumpProgress();
+                    }
+                })
+            );
 
             setProgress(100);
             setActiveStage(null);
@@ -400,6 +435,22 @@ export default function SystemScanner() {
                                 })}
                             </div>
                         </div>
+
+                        {/* Smart position cap — applies to force-analyze scopes */}
+                        {(scanScope === 'all' || scanScope === 'selected') && (
+                            <label className="flex items-start gap-2 p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={smartPositionLimit}
+                                    onChange={e => setSmartPositionLimit(e.target.checked)}
+                                    className="accent-emerald-400 mt-0.5"
+                                />
+                                <span className="text-xs text-navy-400 leading-relaxed">
+                                    <span className="font-bold text-navy-300">Akıllı pozisyon sınırı (önerilen).</span>{' '}
+                                    Aday başına tüm uyumlu pozisyonlar yerine, ön eşleşmeye göre en iyi 5 pozisyon detaylı analize girer — süre ve AI maliyeti belirgin düşer, analiz kalitesi değişmez.
+                                </span>
+                            </label>
+                        )}
 
                         {/* Targeted scan controls — shown only for 'filtered' scope */}
                         {scanScope === 'filtered' && (
