@@ -33,12 +33,36 @@ const mammoth = require('mammoth');
 
 export const BULK_JOBS_COLL = 'artifacts/talent-flow/public/data/bulkImportJobs';
 export const CANDIDATES_COLL = 'artifacts/talent-flow/public/data/candidates';
+export const POSITIONS_COLL = 'artifacts/talent-flow/public/data/positions';
+
+/**
+ * Ön skoru çözümle: Gemini geçerli bir matchScore verdiyse onu kullan
+ * (0-100'e sıkıştırılır), vermediyse anahtar-kelime skoruna düş. Pozisyon
+ * başlığı tercihi: Gemini'nin seçtiği > yüklemede seçilen.
+ */
+export function resolvePreScore(parsed, positionTitle) {
+    const aiScore = Number(parsed?.matchScore);
+    const matchedTitle = parsed?.matchedPosition || positionTitle || '';
+    if (!isNaN(aiScore) && aiScore > 0) {
+        return { score: Math.max(0, Math.min(100, Math.round(aiScore))), matchedTitle };
+    }
+    return { score: calculateSimpleMatchScore(parsed, matchedTitle), matchedTitle };
+}
 
 // Global single-worker flag — only one job runs at a time across all requests.
 let bulkWorkerActive = false;
 
-async function parseTextWithGemini(text, positionTitle) {
-    const prompt = `Sen bir uzman CV ayrıştırıcısısın. Aşağıdaki CV metninden aday bilgilerini JSON olarak çıkart.
+async function parseTextWithGemini(text, positionTitle, openPositionTitles = []) {
+    // Skor bağlamı: yüklemede pozisyon seçildiyse ona göre, seçilmediyse
+    // açık pozisyonların en uygununa göre puanlanır. Böylece ayrıştırma ve
+    // ön skor TEK Gemini çağrısında çıkar — aday başına ek AI maliyeti yok.
+    const scoreContext = positionTitle
+        ? `Hedef pozisyon: "${positionTitle}". matchScore'u bu pozisyona uygunluğa göre ver ve matchedPosition alanına bu pozisyonu yaz.`
+        : openPositionTitles.length > 0
+            ? `Şirketteki açık pozisyonlar: ${openPositionTitles.map((t) => `"${t}"`).join(', ')}. Adaya EN UYGUN pozisyonu seç, matchedPosition alanına yaz ve matchScore'u ona göre ver.`
+            : `Açık pozisyon listesi yok. matchScore'u adayın profil kalitesine ve istihdam edilebilirliğine göre ver; matchedPosition alanına adayın kendi pozisyonunu yaz.`;
+    const prompt = `Sen bir uzman CV ayrıştırıcısı ve işe alım ön değerlendirme uzmanısın. Aşağıdaki CV metninden aday bilgilerini JSON olarak çıkart ve bir ön uyum skoru ver.
+${scoreContext}
 Sadece şu JSON formatında yanıt ver (başka hiçbir şey yazma):
 {
   "name": "Ad Soyad",
@@ -50,7 +74,10 @@ Sadece şu JSON formatında yanıt ver (başka hiçbir şey yazma):
   "skills": ["yetenek1", "yetenek2"],
   "experience": 5,
   "education": "Son okul / Bölüm",
-  "summary": "Kısa özet (Türkçe, max 300 karakter)"
+  "summary": "Kısa özet (Türkçe, max 300 karakter)",
+  "matchScore": 75,
+  "matchedPosition": "Skorun verildiği pozisyon başlığı",
+  "matchReason": "1-2 cümlelik skor gerekçesi (Türkçe)"
 }
 
 CV:
@@ -257,6 +284,18 @@ async function executeJob(jobId) {
         const positionId = jobData.positionId || '';
         const positionTitle = jobData.positionTitle || '';
 
+        // Açık pozisyon başlıkları (işe bir kez okunur): yüklemede pozisyon
+        // seçilmediyse Gemini ön skoru en uygun açık pozisyona göre verir.
+        // Bu okuma başarısız olsa da içe aktarma devam eder — skor yalnızca
+        // anahtar-kelime yedeğine düşer.
+        let openPositionTitles = [];
+        try {
+            const posSnap = await db.collection(POSITIONS_COLL).where('status', '==', 'open').get();
+            openPositionTitles = posSnap.docs.map((d) => d.data().title).filter(Boolean).slice(0, 25);
+        } catch (posErr) {
+            log.warn(`[bulk-import] open positions read failed: ${posErr.message}`);
+        }
+
         const STALE_ITEM_MS = 10 * 60 * 1000;
         // Ortak kota soğuma penceresi: bir işçi Gemini'den 429 yediğinde
         // damgalanır; tüm işçiler bir sonraki AI çağrısından önce bu
@@ -307,7 +346,7 @@ async function executeJob(jobId) {
                     }
                     const cooldownWait = quotaCooldownUntil - Date.now();
                     if (cooldownWait > 0) await new Promise((r) => setTimeout(r, cooldownWait));
-                    const parsed = await parseTextWithGemini(cvText, positionTitle);
+                    const parsed = await parseTextWithGemini(cvText, positionTitle, openPositionTitles);
                     // Mükerrer koruması: aynı e-posta/telefon havuzda varsa yeni
                     // kayıt açma — item 'duplicate' işaretlenir, mevcut aday korunur.
                     let duplicate = null;
@@ -329,12 +368,15 @@ async function executeJob(jobId) {
                         await jobRef.update({ processedCount, failedCount, duplicateCount, lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp() });
                         break;
                     }
-                    const matchScore = calculateSimpleMatchScore(parsed, positionTitle);
+                    const { score: matchScore, matchedTitle } = resolvePreScore(parsed, positionTitle);
                     await db.collection(CANDIDATES_COLL).add({
                         name: parsed?.name || item.name || item.originalName?.replace(/\.[^.]+$/, '') || '',
                         email: parsed?.email || item.email || '',
                         phone: parsed?.phone || '',
                         position: positionTitle || parsed?.position || '',
+                        matchedPositionTitle: matchedTitle,
+                        initialAiScore: matchScore,
+                        matchReason: parsed?.matchReason || '',
                         positionId: positionId || item.positionId || '',
                         company: parsed?.company || '',
                         location: parsed?.location || '',
