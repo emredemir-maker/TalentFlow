@@ -12,6 +12,7 @@ import { Router } from 'express';
 import { createRequire } from 'module';
 
 import { aiLimiter } from '../middleware/rateLimit.js';
+import { wrapMulter } from '../middleware/multipart.js';
 import { getApiKeyDetailed, generateText } from '../services/gemini.js';
 import { childLogger } from '../services/logger.js';
 const log = childLogger('ai');
@@ -88,7 +89,7 @@ const audioUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize
 router.post('/api/gemini-stt', aiLimiter, (req, res, next) => {
     const ct = req.headers['content-type'] || '';
     if (ct.includes('multipart/form-data')) {
-        audioUpload.single('audio')(req, res, next);
+        wrapMulter(audioUpload.single('audio'))(req, res, next);
     } else {
         next();
     }
