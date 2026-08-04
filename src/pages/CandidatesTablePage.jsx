@@ -9,8 +9,9 @@
 import { useMemo, useState } from 'react';
 import {
     Search, Download, Users, ChevronUp, ChevronDown, ChevronLeft, ChevronRight,
-    FilterX, Table2,
+    FilterX, Table2, Wrench,
 } from 'lucide-react';
+import MaintenancePanel from '../components/MaintenancePanel';
 import { useCandidates } from '../context/CandidatesContext';
 import { STAGES, getStage } from '../utils/pipelineStages';
 import {
@@ -71,6 +72,7 @@ export default function CandidatesTablePage() {
     const [sortDir, setSortDir] = useState('desc');
     const [page, setPage] = useState(0);
     const [exporting, setExporting] = useState(false);
+    const [showMaintenance, setShowMaintenance] = useState(false);
 
     const setFilter = (key, value) => {
         setFilters((prev) => ({ ...prev, [key]: value }));
@@ -150,6 +152,12 @@ export default function CandidatesTablePage() {
                 </div>
                 <div className="flex items-center gap-2">
                     <button
+                        onClick={() => setShowMaintenance(v => !v)}
+                        className={`flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-lg transition-colors ${showMaintenance ? 'text-white bg-[#13294E]' : 'text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200'}`}
+                    >
+                        <Wrench className="w-3.5 h-3.5" /> Bakım
+                    </button>
+                    <button
                         onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'candidate-process' }))}
                         className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors"
                     >
@@ -165,6 +173,13 @@ export default function CandidatesTablePage() {
                     </button>
                 </div>
             </div>
+
+            {/* ── Maintenance panel (toggle) ───────────────────────────────── */}
+            {showMaintenance && (
+                <div className="px-6 pt-4">
+                    <MaintenancePanel />
+                </div>
+            )}
 
             {/* ── Filter bar ───────────────────────────────────────────────── */}
             <div className="px-6 pt-4">
