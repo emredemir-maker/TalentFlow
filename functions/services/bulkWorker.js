@@ -91,7 +91,7 @@ ${text.substring(0, 8000)}`;
     try { return JSON.parse(match[0]); } catch { return null; }
 }
 
-function calculateSimpleMatchScore(candidate, positionTitle) {
+export function calculateSimpleMatchScore(candidate, positionTitle) {
     if (!positionTitle || !candidate) return 0;
     const pLower = positionTitle.toLowerCase();
     const cPos = (candidate.position || '').toLowerCase();
