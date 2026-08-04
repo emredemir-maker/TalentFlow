@@ -154,21 +154,40 @@ async function claimNextQueuedJob() {
     await db.runTransaction(async (tx) => {
         const fresh = await tx.get(jobDoc.ref);
         if (!fresh.exists || fresh.data().status !== 'queued') return;
-        tx.update(jobDoc.ref, { status: 'processing', startedAt: admin.firestore.FieldValue.serverTimestamp() });
+        // lastUpdatedAt doubles as the liveness heartbeat recoverStaleJobs
+        // checks — stamp it at claim so a freshly-claimed job never looks stale.
+        tx.update(jobDoc.ref, {
+            status: 'processing',
+            startedAt: admin.firestore.FieldValue.serverTimestamp(),
+            lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
         claimed = true;
     });
     return claimed ? jobDoc.id : null;
 }
 
 // Recover stale 'processing' jobs left from a previous crash/restart.
+//
+// CRITICAL: only requeue when the job's heartbeat (lastUpdatedAt — touched
+// on claim and after every processed item) is genuinely old. The previous
+// unconditional requeue ran on EVERY instance cold start (autoscaling makes
+// those frequent), yanked jobs away from workers that were actively
+// processing them, and put a second worker on the same job — which then
+// re-processed the same items and created duplicate candidates.
+const STALE_JOB_MS = 10 * 60 * 1000;
 export async function recoverStaleJobs() {
     try {
         const snap = await db.collection(BULK_JOBS_COLL).where('status', '==', 'processing').get();
+        let recovered = 0;
         for (const doc of snap.docs) {
+            const d = doc.data();
+            const heartbeat = d.lastUpdatedAt?.toMillis?.() || d.startedAt?.toMillis?.() || d.createdAt?.toMillis?.() || 0;
+            if (Date.now() - heartbeat < STALE_JOB_MS) continue; // hâlâ canlı bir worker'da
             log.info(`[bulk-import] Recovering stale job ${doc.id}`);
             await doc.ref.update({ status: 'queued' });
+            recovered++;
         }
-        if (!snap.empty) log.info(`[bulk-import] Recovered ${snap.size} stale job(s)`);
+        if (recovered > 0) log.info(`[bulk-import] Recovered ${recovered} stale job(s)`);
     } catch (err) {
         log.warn('[bulk-import] Recovery scan failed:', err.message);
     }
@@ -231,10 +250,27 @@ async function executeJob(jobId) {
         const positionId = jobData.positionId || '';
         const positionTitle = jobData.positionTitle || '';
 
+        const STALE_ITEM_MS = 10 * 60 * 1000;
         for (const itemDoc of itemsSnap.docs) {
             const item = itemDoc.data();
             if (item.status === 'done' || item.status === 'error' || item.status === 'duplicate') { processedCount++; continue; }
-            await itemDoc.ref.update({ status: 'processing' });
+            // Per-item transactional claim. itemsSnap is a point-in-time read;
+            // if a second worker overlapped on this job (crash recovery,
+            // autoscaling), item statuses may have moved since. Claiming
+            // atomically guarantees an item is processed EXACTLY once — the
+            // root cause of duplicate candidates was both workers passing the
+            // stale-snapshot check and processing the same item.
+            const claim = await db.runTransaction(async (tx) => {
+                const fresh = await tx.get(itemDoc.ref);
+                const cur = fresh.data() || {};
+                if (cur.status === 'done' || cur.status === 'error' || cur.status === 'duplicate') return 'finished';
+                const workingSince = cur.workingAt?.toMillis?.() || 0;
+                if (cur.status === 'processing' && Date.now() - workingSince < STALE_ITEM_MS) return 'busy';
+                tx.update(itemDoc.ref, { status: 'processing', workingAt: admin.firestore.FieldValue.serverTimestamp() });
+                return 'claimed';
+            });
+            if (claim === 'finished') { processedCount++; continue; }
+            if (claim === 'busy') continue; // başka bir worker üzerinde çalışıyor
             let retries = 0;
             const MAX_RETRIES = 3;
             while (retries <= MAX_RETRIES) {
@@ -348,6 +384,42 @@ async function executeJob(jobId) {
                 avgScore: Math.round(scores.reduce((s, v) => s + v, 0) / scores.length),
                 count: scores.length,
             };
+        }
+
+        // Authoritative recount from a FRESH read — the loop's counters come
+        // from a point-in-time snapshot and drift if another worker touched
+        // this job. If items are still in flight elsewhere, give a short
+        // grace period, then requeue instead of declaring completion.
+        const recount = async () => {
+            const fresh = await itemsRef.get();
+            const counts = { done: 0, duplicate: 0, error: 0, unfinished: 0 };
+            for (const d of fresh.docs) {
+                const s = d.data().status;
+                if (s === 'done') counts.done++;
+                else if (s === 'duplicate') counts.duplicate++;
+                else if (s === 'error') counts.error++;
+                else counts.unfinished++;
+            }
+            return counts;
+        };
+        let counts = await recount();
+        if (counts.unfinished > 0) {
+            await new Promise((r) => setTimeout(r, 30000));
+            counts = await recount();
+        }
+        processedCount = counts.done + counts.duplicate;
+        duplicateCount = counts.duplicate;
+        failedCount = counts.error;
+        if (counts.unfinished > 0) {
+            await jobRef.update({
+                status: 'queued',
+                processedCount,
+                failedCount,
+                duplicateCount,
+                lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+            log.info(`[bulk-import] Job ${jobId} requeued: ${counts.unfinished} item(s) still in flight on another worker`);
+            return;
         }
 
         await jobRef.update({
