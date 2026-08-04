@@ -443,12 +443,16 @@ async function executeJob(jobId) {
             ? Math.round(doneSnap.docs.reduce((sum, d) => sum + (d.data().matchScore || 0), 0) / doneSnap.size)
             : 0;
 
-        // Build per-position avgScore map — aggregate across all unique positionIds in the batch
+        // Build per-position avgScore map — aggregate across all unique positionIds in the batch.
+        // Anahtar 'genel' (pozisyonsuz yüklemeler): Firestore, çift alt
+        // çizgiyle başlayıp biten alan adlarını rezerve tutar — eski
+        // '__none__' anahtarı final update'i INVALID_ARGUMENT ile patlatıp
+        // tüm item'ları işlenmiş işleri 'error' durumunda bırakıyordu.
         const positionScoreMap = {};
         for (const d of doneSnap.docs) {
             const dat = d.data();
-            const pId = dat.positionId || positionId || '__none__';
-            const pTitle = dat.positionTitle || positionTitle || '';
+            const pId = dat.positionId || positionId || 'genel';
+            const pTitle = dat.positionTitle || positionTitle || 'Genel Değerlendirme';
             if (!positionScoreMap[pId]) positionScoreMap[pId] = { positionTitle: pTitle, scores: [] };
             positionScoreMap[pId].scores.push(dat.matchScore || 0);
         }
