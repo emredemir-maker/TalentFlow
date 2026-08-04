@@ -189,7 +189,7 @@ export async function recoverStaleJobs() {
         }
         if (recovered > 0) log.info(`[bulk-import] Recovered ${recovered} stale job(s)`);
     } catch (err) {
-        log.warn('[bulk-import] Recovery scan failed:', err.message);
+        log.warn(`[bulk-import] Recovery scan failed: ${err.message}`);
     }
 }
 
@@ -206,7 +206,7 @@ export async function runBulkWorkerLoop() {
                 jobId = await claimNextQueuedJob();
             } catch (pollErr) {
                 // Firestore poll failed — retry after backoff
-                log.warn('[bulk-import] Poll error:', pollErr.message);
+                log.warn(`[bulk-import] Poll error: ${pollErr.message}`);
                 await new Promise(r => setTimeout(r, 10000));
                 continue;
             }
@@ -224,7 +224,7 @@ export async function runBulkWorkerLoop() {
             try {
                 await executeJob(jobId);
             } catch (err) {
-                log.error(`[bulk-import] Job ${jobId} fatal error:`, err.message);
+                log.error(`[bulk-import] Job ${jobId} fatal error: ${err.message}`);
                 try {
                     await db.doc(`${BULK_JOBS_COLL}/${jobId}`).update({
                         status: 'error',
@@ -315,7 +315,7 @@ async function executeJob(jobId) {
                         duplicate = await findDuplicateCandidate(parsed, item);
                     } catch (dupErr) {
                         // Lookup failure must not block candidate creation
-                        log.warn(`[bulk-import] duplicate lookup failed for ${item.originalName}:`, dupErr.message);
+                        log.warn(`[bulk-import] duplicate lookup failed for ${item.originalName}: ${dupErr.message}`);
                     }
                     if (duplicate) {
                         duplicateCount++;
@@ -468,7 +468,7 @@ async function executeJob(jobId) {
         });
         log.info(`[bulk-import] Job ${jobId} complete: ${processedCount} done (${duplicateCount} duplicate), ${failedCount} failed`);
     } catch (err) {
-        log.error(`[bulk-import] executeJob ${jobId} error:`, err.message);
+        log.error(`[bulk-import] executeJob ${jobId} error: ${err.message}`);
         throw err;
     }
 }

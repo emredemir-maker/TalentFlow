@@ -84,7 +84,7 @@ export function createBulkRouter(uploadBaseDir) {
                             }
                             try { fs.unlinkSync(file.path); } catch {}
                         } catch (zipErr) {
-                            log.error('[bulk-import] ZIP extraction error:', zipErr.message);
+                            log.error(`[bulk-import] ZIP extraction error: ${zipErr.message}`);
                             try { fs.unlinkSync(file.path); } catch {}
                         }
                     } else {
@@ -126,7 +126,7 @@ export function createBulkRouter(uploadBaseDir) {
                         const buf = await readFile(item.tempPath);
                         item.cvText = (await extractCvText(buf, ext)).slice(0, 6000);
                     } catch (extractErr) {
-                        log.warn(`[bulk-import] Pre-extract failed for ${item.originalName}:`, extractErr.message);
+                        log.warn(`[bulk-import] Pre-extract failed for ${item.originalName}: ${extractErr.message}`);
                     }
                     // Clean up temp file — text is now stored in Firestore
                     try { fs.unlinkSync(item.tempPath); } catch {}
@@ -143,7 +143,7 @@ export function createBulkRouter(uploadBaseDir) {
             res.json({ jobId: jobRef.id, totalCount: items.length });
             // Worker loop will pick this job up automatically via polling
         } catch (err) {
-            log.error('[bulk-import] Error:', err.message);
+            log.error(`[bulk-import] Error: ${err.message}`);
             res.status(500).json({ error: err.message });
         }
     });
