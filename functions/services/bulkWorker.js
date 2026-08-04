@@ -199,6 +199,7 @@ export async function runBulkWorkerLoop() {
     bulkWorkerActive = true;
     log.info('[bulk-import] Worker loop started');
     try {
+        let idlePolls = 0;
         while (true) {
             let jobId = null;
             try {
@@ -210,6 +211,12 @@ export async function runBulkWorkerLoop() {
                 continue;
             }
             if (!jobId) {
+                // Öksüz iş taraması: deploy/ölçekleme sırasında instance'ı
+                // ölen bir job 'processing'de takılı kalır; kurtarma yalnızca
+                // cold start'ta çalıştığından, trafik canlı kaldığı sürece
+                // kimse onu kuyruğa geri koymazdı. Boşta dakikada bir tara.
+                idlePolls += 1;
+                if (idlePolls % 12 === 0) await recoverStaleJobs();
                 await new Promise(r => setTimeout(r, 5000));
                 continue;
             }
@@ -251,9 +258,14 @@ async function executeJob(jobId) {
         const positionTitle = jobData.positionTitle || '';
 
         const STALE_ITEM_MS = 10 * 60 * 1000;
-        for (const itemDoc of itemsSnap.docs) {
+        // Ortak kota soğuma penceresi: bir işçi Gemini'den 429 yediğinde
+        // damgalanır; tüm işçiler bir sonraki AI çağrısından önce bu
+        // pencerenin geçmesini bekler (tek işçinin cezasını herkes paylaşır,
+        // aynı anda tekrar vurup cezayı uzatmazlar).
+        let quotaCooldownUntil = 0;
+        const processItem = async (itemDoc) => {
             const item = itemDoc.data();
-            if (item.status === 'done' || item.status === 'error' || item.status === 'duplicate') { processedCount++; continue; }
+            if (item.status === 'done' || item.status === 'error' || item.status === 'duplicate') { processedCount++; return; }
             // Per-item transactional claim. itemsSnap is a point-in-time read;
             // if a second worker overlapped on this job (crash recovery,
             // autoscaling), item statuses may have moved since. Claiming
@@ -269,10 +281,10 @@ async function executeJob(jobId) {
                 tx.update(itemDoc.ref, { status: 'processing', workingAt: admin.firestore.FieldValue.serverTimestamp() });
                 return 'claimed';
             });
-            if (claim === 'finished') { processedCount++; continue; }
-            if (claim === 'busy') continue; // başka bir worker üzerinde çalışıyor
+            if (claim === 'finished') { processedCount++; return; }
+            if (claim === 'busy') return; // başka bir worker üzerinde çalışıyor
             let retries = 0;
-            const MAX_RETRIES = 3;
+            const MAX_RETRIES = 5;
             while (retries <= MAX_RETRIES) {
                 try {
                     let cvText = '';
@@ -293,6 +305,8 @@ async function executeJob(jobId) {
                     } else {
                         throw new Error('cvText, cvUrl veya dosya yolu gereklidir');
                     }
+                    const cooldownWait = quotaCooldownUntil - Date.now();
+                    if (cooldownWait > 0) await new Promise((r) => setTimeout(r, cooldownWait));
                     const parsed = await parseTextWithGemini(cvText, positionTitle);
                     // Mükerrer koruması: aynı e-posta/telefon havuzda varsa yeni
                     // kayıt açma — item 'duplicate' işaretlenir, mevcut aday korunur.
@@ -354,13 +368,33 @@ async function executeJob(jobId) {
                         await jobRef.update({ processedCount, failedCount, lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp() });
                         break;
                     }
-                    const backoffMs = Math.pow(2, retries) * 5000;
+                    const backoffMs = Math.min(60000, Math.pow(2, retries) * 5000);
+                    quotaCooldownUntil = Math.max(quotaCooldownUntil, Date.now() + backoffMs);
                     log.warn(`[bulk-import] quota error on ${item.originalName}, backoff ${backoffMs}ms`);
                     await new Promise(r => setTimeout(r, backoffMs));
                 }
             }
-            await new Promise(r => setTimeout(r, 1500));
-        }
+        };
+
+        // Paralel işleme havuzu. Kayıtlar transaction ile atomik
+        // sahiplenildiği için eşzamanlılık güvenli (bir kayıt en fazla bir
+        // kez işlenir). Sıralı düzende CV başına ~10 sn (Gemini + Firestore
+        // + sabit 1.5 sn bekleme) 455 CV'yi 75+ dakikaya taşıyordu; sabit
+        // bekleme kalktı, N işçi süreyi ~N'e böler. Kota koruması yukarıdaki
+        // ortak soğuma penceresiyle sağlanır.
+        const CONCURRENCY = Math.max(1, parseInt(process.env.BULK_CONCURRENCY || '4', 10));
+        let nextIdx = 0;
+        await Promise.all(
+            Array.from({ length: Math.min(CONCURRENCY, itemsSnap.docs.length) }, async (_, w) => {
+                // Kademeli başlangıç — işçiler Gemini'ye aynı anda vurmasın
+                await new Promise((r) => setTimeout(r, w * 500));
+                while (nextIdx < itemsSnap.docs.length) {
+                    const itemDoc = itemsSnap.docs[nextIdx];
+                    nextIdx += 1;
+                    await processItem(itemDoc);
+                }
+            })
+        );
 
         const doneSnap = await itemsRef.where('status', '==', 'done').get();
         const avgScore = doneSnap.size > 0

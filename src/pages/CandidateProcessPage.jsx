@@ -208,10 +208,14 @@ export default function CandidateProcessPage() {
                     } else if (!resp.ok) {
                         await new Promise(r => setTimeout(r, 10000)); // backoff on 4xx/5xx
                     }
+                    // NO delay on the happy path: background tabs throttle
+                    // setTimeout to ≥1/min, so a 2s gap here became a ~60s
+                    // CPU-starved stall between long-polls (observed as one
+                    // CV "taking 5+ minutes"). Back-to-back chaining is only
+                    // ~3 req/min thanks to the ~20s server-side hold.
                 } catch {
                     if (!stopped) await new Promise(r => setTimeout(r, 10000)); // network hiccup
                 }
-                if (!stopped) await new Promise(r => setTimeout(r, 2000));
             }
         })();
         return () => { stopped = true; };
