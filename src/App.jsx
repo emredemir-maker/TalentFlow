@@ -25,6 +25,7 @@ const Dashboard               = lazy(() => import('./pages/Dashboard'));
 const SettingsPage            = lazy(() => import('./pages/SettingsPage'));
 const MessagesPage            = lazy(() => import('./pages/MessagesPage'));
 const CandidateProcessPage    = lazy(() => import('./pages/CandidateProcessPage'));
+const CandidatesTablePage     = lazy(() => import('./pages/CandidatesTablePage'));
 const PositionsPage           = lazy(() => import('./pages/PositionsPage'));
 const AnalyticsPage           = lazy(() => import('./pages/AnalyticsPage'));
 const InterviewManagementPage = lazy(() => import('./pages/InterviewManagementPage'));
@@ -138,6 +139,7 @@ function AuthenticatedApp() {
       case 'messages': return <MessagesPage />;
       case 'analytics': return <AnalyticsPage />;
       case 'candidate-process': return <CandidateProcessPage />;
+      case 'candidates-table': return <CandidatesTablePage />;
       case 'positions': return <PositionsPage />;
       case 'interviews': return <InterviewManagementPage />;
       case 'pipeline': return <PipelinePage />;
