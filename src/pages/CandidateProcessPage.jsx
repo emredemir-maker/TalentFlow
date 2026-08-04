@@ -140,6 +140,7 @@ export default function CandidateProcessPage() {
                 const total = jobs.reduce((s, d) => s + (d.totalCount || 0), 0);
                 const completed = jobs.reduce((s, d) => s + (d.processedCount || 0), 0);
                 const failed = jobs.reduce((s, d) => s + (d.failedCount || 0), 0);
+                const duplicates = jobs.reduce((s, d) => s + (d.duplicateCount || 0), 0);
                 const allDone = jobData.size === bulkJobIds.length &&
                     jobs.every(d => d.status === 'completed' || d.status === 'error');
                 const status = allDone ? 'completed'
@@ -158,6 +159,7 @@ export default function CandidateProcessPage() {
                     total,
                     completed,
                     failed,
+                    duplicates,
                     avgScore,
                     avgScoreByPosition: Object.keys(avgScoreByPosition).length ? avgScoreByPosition : null,
                     status,
@@ -170,6 +172,7 @@ export default function CandidateProcessPage() {
                         total,
                         completed,
                         failed,
+                        duplicates,
                         avgScore,
                         avgScoreByPosition: Object.keys(avgScoreByPosition).length ? avgScoreByPosition : null,
                         positionTitle: jobs[0]?.positionTitle || '',
@@ -2551,7 +2554,7 @@ export default function CandidateProcessPage() {
                                             {bulkProgress.status === 'error' && <XCircle className="w-3 h-3" />}
                                             {bulkProgress.status === 'queued' && <Clock className="w-3 h-3" />}
                                             <span>
-                                                {bulkProgress.status === 'completed' ? `Tamamlandı — ${bulkProgress.completed} başarılı${bulkProgress.failed > 0 ? `, ${bulkProgress.failed} hatalı` : ''}${bulkProgress.avgScore != null ? ` · Ort. Eşleşme: %${bulkProgress.avgScore}` : ''}` :
+                                                {bulkProgress.status === 'completed' ? `Tamamlandı — ${bulkProgress.completed - (bulkProgress.duplicates || 0)} başarılı${bulkProgress.duplicates > 0 ? `, ${bulkProgress.duplicates} mükerrer atlandı` : ''}${bulkProgress.failed > 0 ? `, ${bulkProgress.failed} hatalı` : ''}${bulkProgress.avgScore != null ? ` · Ort. Eşleşme: %${bulkProgress.avgScore}` : ''}` :
                                                  bulkProgress.status === 'error' ? (bulkProgress.errorMessage || 'İşlem hatası oluştu') :
                                                  bulkProgress.status === 'processing' ? `İşleniyor… ${bulkProgress.completed + bulkProgress.failed}/${bulkProgress.total}` :
                                                  'Sıraya alındı'}
@@ -2581,7 +2584,7 @@ export default function CandidateProcessPage() {
                     <div className="flex-1 min-w-0">
                         <p className="text-[12px] font-black text-slate-800">Toplu Yükleme Tamamlandı</p>
                         <p className="text-[11px] text-slate-500 mt-0.5">
-                            {bulkToast.completed} aday eklendi{bulkToast.failed > 0 && <span className="text-red-500">, {bulkToast.failed} hata</span>}
+                            {bulkToast.completed - (bulkToast.duplicates || 0)} aday eklendi{(bulkToast.duplicates || 0) > 0 && <span className="text-amber-600">, {bulkToast.duplicates} mükerrer atlandı</span>}{bulkToast.failed > 0 && <span className="text-red-500">, {bulkToast.failed} hata</span>}
                         </p>
                         {bulkToast.avgScoreByPosition && Object.keys(bulkToast.avgScoreByPosition).length > 0 ? (
                             <div className="mt-1 space-y-0.5">

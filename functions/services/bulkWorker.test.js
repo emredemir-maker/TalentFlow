@@ -12,11 +12,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mockPdf = vi.hoisted(() => vi.fn());
 vi.mock('./pdf.js', () => ({ pdf: mockPdf }));
 
-// Avoid pulling firebase-admin into tests
+// Avoid pulling firebase-admin into tests. `mockWhereGet(field, value)`
+// stands in for collection().where(field,'==',value).limit(1).get() so
+// findDuplicateCandidate's query fan-out is testable.
+const mockWhereGet = vi.hoisted(() => vi.fn());
 vi.mock('../config/firebaseAdmin.js', () => ({
     db: {
         collection: () => ({
-            where: () => ({ limit: () => ({ get: vi.fn() }) }),
+            where: (field, _op, value) => ({ limit: () => ({ get: () => mockWhereGet(field, value) }) }),
         }),
         runTransaction: vi.fn(),
     },
@@ -25,7 +28,7 @@ vi.mock('../config/firebaseAdmin.js', () => ({
     },
 }));
 
-const { extractCvText } = await import('./bulkWorker.js');
+const { extractCvText, findDuplicateCandidate } = await import('./bulkWorker.js');
 
 beforeEach(() => {
     mockPdf.mockReset();
@@ -71,5 +74,50 @@ describe('extractCvText', () => {
     it('propagates parser errors to the caller (worker treats them as item failure)', async () => {
         mockPdf.mockRejectedValue(new Error('corrupt PDF'));
         await expect(extractCvText(Buffer.from('x'), 'pdf')).rejects.toThrow(/corrupt PDF/);
+    });
+});
+
+describe('findDuplicateCandidate', () => {
+    const emptySnap = { empty: true, docs: [] };
+    const hitSnap = { empty: false, docs: [{ id: 'existing-1', data: () => ({}) }] };
+
+    beforeEach(() => {
+        mockWhereGet.mockReset();
+    });
+
+    it('returns null without querying when neither email nor phone exists', async () => {
+        const result = await findDuplicateCandidate({ name: 'Ali' }, {});
+        expect(result).toBeNull();
+        expect(mockWhereGet).not.toHaveBeenCalled();
+    });
+
+    it('finds an existing candidate by lowercased email', async () => {
+        mockWhereGet.mockImplementation((field, value) =>
+            Promise.resolve(field === 'email' && value === 'ali@firma.com' ? hitSnap : emptySnap)
+        );
+        const result = await findDuplicateCandidate({ email: '  Ali@Firma.com ' }, {});
+        expect(result).toEqual({ id: 'existing-1', foundBy: 'email' });
+    });
+
+    it('uses the item email when the parsed profile has none', async () => {
+        mockWhereGet.mockImplementation((field, value) =>
+            Promise.resolve(field === 'email' && value === 'json@kayit.com' ? hitSnap : emptySnap)
+        );
+        const result = await findDuplicateCandidate(null, { email: 'json@kayit.com' });
+        expect(result).toEqual({ id: 'existing-1', foundBy: 'email' });
+    });
+
+    it('falls back to normalized phone matching when email misses', async () => {
+        mockWhereGet.mockImplementation((field, value) =>
+            Promise.resolve(field === 'phone' && value === '905551112233' ? hitSnap : emptySnap)
+        );
+        const result = await findDuplicateCandidate({ email: 'yeni@aday.com', phone: '+90 555 111 22 33' }, {});
+        expect(result).toEqual({ id: 'existing-1', foundBy: 'phone' });
+    });
+
+    it('returns null when no email or phone matches', async () => {
+        mockWhereGet.mockResolvedValue(emptySnap);
+        const result = await findDuplicateCandidate({ email: 'yok@aday.com', phone: '+90 555 000 00 00' }, {});
+        expect(result).toBeNull();
     });
 });
