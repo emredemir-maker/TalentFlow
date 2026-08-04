@@ -86,6 +86,32 @@ export async function extractCvText(buffer, ext) {
     throw new Error('Desteklenmeyen format: ' + ext);
 }
 
+// Contact normalizer — mirrors /api/check-duplicate (routes/cv.js) so the
+// manual-add flow and the bulk worker agree on what counts as "the same
+// person".
+const normContact = (s) => (s || '').trim().toLowerCase().replace(/[\s\-().+]/g, '');
+
+/**
+ * Duplicate lookup for bulk import: email first (raw + lowercased forms,
+ * since older docs may store mixed case), then phone (raw + normalized).
+ * Returns { id, foundBy } of the existing candidate, or null.
+ */
+export async function findDuplicateCandidate(parsed, item = {}) {
+    const emailRaw = (parsed?.email || item.email || '').trim();
+    const emails = [...new Set([emailRaw.toLowerCase(), emailRaw].filter(Boolean))];
+    for (const value of emails) {
+        const snap = await db.collection(CANDIDATES_COLL).where('email', '==', value).limit(1).get();
+        if (!snap.empty) return { id: snap.docs[0].id, foundBy: 'email' };
+    }
+    const phoneRaw = (parsed?.phone || '').trim();
+    const phones = [...new Set([normContact(phoneRaw), phoneRaw].filter(Boolean))];
+    for (const value of phones) {
+        const snap = await db.collection(CANDIDATES_COLL).where('phone', '==', value).limit(1).get();
+        if (!snap.empty) return { id: snap.docs[0].id, foundBy: 'phone' };
+    }
+    return null;
+}
+
 // SSRF validation: only allow public HTTPS URLs
 function assertSafeCvUrl(cvUrl) {
     let parsed;
@@ -200,13 +226,14 @@ async function executeJob(jobId) {
         const total = itemsSnap.size;
         let processedCount = 0;
         let failedCount = 0;
+        let duplicateCount = 0;
         const jobData = (await jobRef.get()).data() || {};
         const positionId = jobData.positionId || '';
         const positionTitle = jobData.positionTitle || '';
 
         for (const itemDoc of itemsSnap.docs) {
             const item = itemDoc.data();
-            if (item.status === 'done' || item.status === 'error') { processedCount++; continue; }
+            if (item.status === 'done' || item.status === 'error' || item.status === 'duplicate') { processedCount++; continue; }
             await itemDoc.ref.update({ status: 'processing' });
             let retries = 0;
             const MAX_RETRIES = 3;
@@ -231,6 +258,27 @@ async function executeJob(jobId) {
                         throw new Error('cvText, cvUrl veya dosya yolu gereklidir');
                     }
                     const parsed = await parseTextWithGemini(cvText, positionTitle);
+                    // Mükerrer koruması: aynı e-posta/telefon havuzda varsa yeni
+                    // kayıt açma — item 'duplicate' işaretlenir, mevcut aday korunur.
+                    let duplicate = null;
+                    try {
+                        duplicate = await findDuplicateCandidate(parsed, item);
+                    } catch (dupErr) {
+                        // Lookup failure must not block candidate creation
+                        log.warn(`[bulk-import] duplicate lookup failed for ${item.originalName}:`, dupErr.message);
+                    }
+                    if (duplicate) {
+                        duplicateCount++;
+                        processedCount++;
+                        await itemDoc.ref.update({
+                            status: 'duplicate',
+                            duplicateOf: duplicate.id,
+                            foundBy: duplicate.foundBy,
+                            candidateName: parsed?.name || item.name || '',
+                        });
+                        await jobRef.update({ processedCount, failedCount, duplicateCount, lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp() });
+                        break;
+                    }
                     const matchScore = calculateSimpleMatchScore(parsed, positionTitle);
                     await db.collection(CANDIDATES_COLL).add({
                         name: parsed?.name || item.name || item.originalName?.replace(/\.[^.]+$/, '') || '',
@@ -306,12 +354,13 @@ async function executeJob(jobId) {
             status: 'completed',
             processedCount,
             failedCount,
+            duplicateCount,
             totalCount: total,
             avgScore,
             avgScoreByPosition,
             completedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
-        log.info(`[bulk-import] Job ${jobId} complete: ${processedCount} done, ${failedCount} failed`);
+        log.info(`[bulk-import] Job ${jobId} complete: ${processedCount} done (${duplicateCount} duplicate), ${failedCount} failed`);
     } catch (err) {
         log.error(`[bulk-import] executeJob ${jobId} error:`, err.message);
         throw err;

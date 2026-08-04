@@ -11,7 +11,7 @@ import { applyPiiMask, stripPiiForAI } from '../utils/pii';
 import { batchFilesBySize, formatBytes, totalBytes, MAX_REQUEST_BYTES } from '../utils/bulkUpload';
 import { getFeedbackEmail } from '../utils/templateService';
 import { db } from '../config/firebase';
-import { doc, getDoc, onSnapshot, setDoc, serverTimestamp, collection, query, where } from 'firebase/firestore';
+import { doc, getDoc, getDocs, onSnapshot, setDoc, serverTimestamp, collection, query, where } from 'firebase/firestore';
 import Header from '../components/Header';
 import SystemScanner from '../components/SystemScanner';
 import AddCandidateModal from '../components/AddCandidateModal';
@@ -140,6 +140,7 @@ export default function CandidateProcessPage() {
                 const total = jobs.reduce((s, d) => s + (d.totalCount || 0), 0);
                 const completed = jobs.reduce((s, d) => s + (d.processedCount || 0), 0);
                 const failed = jobs.reduce((s, d) => s + (d.failedCount || 0), 0);
+                const duplicates = jobs.reduce((s, d) => s + (d.duplicateCount || 0), 0);
                 const allDone = jobData.size === bulkJobIds.length &&
                     jobs.every(d => d.status === 'completed' || d.status === 'error');
                 const status = allDone ? 'completed'
@@ -158,17 +159,20 @@ export default function CandidateProcessPage() {
                     total,
                     completed,
                     failed,
+                    duplicates,
                     avgScore,
                     avgScoreByPosition: Object.keys(avgScoreByPosition).length ? avgScoreByPosition : null,
                     status,
                 }));
                 if (allDone && !toastShown) {
                     toastShown = true;
+                    try { localStorage.removeItem('bulkActiveJobs'); } catch { /* storage unavailable */ }
                     setBulkImporting(false);
                     setBulkToast({
                         total,
                         completed,
                         failed,
+                        duplicates,
                         avgScore,
                         avgScoreByPosition: Object.keys(avgScoreByPosition).length ? avgScoreByPosition : null,
                         positionTitle: jobs[0]?.positionTitle || '',
@@ -212,6 +216,38 @@ export default function CandidateProcessPage() {
         })();
         return () => { stopped = true; };
     }, [bulkImporting, bulkJobIds, user]);
+
+    // Resume tracking after a page reload: any unfinished bulk job this user
+    // created is picked up straight from Firestore when the page opens — no
+    // client-side state survives a reload, and without re-attaching, the
+    // keepalive chain drops and a half-done job goes back to crawling.
+    // localStorage is only a fast-path hint; Firestore is the authority, so
+    // even jobs started on another device/session resume here.
+    useEffect(() => {
+        if (!user?.uid) return;
+        (async () => {
+            try {
+                const stored = JSON.parse(localStorage.getItem('bulkActiveJobs') || '[]');
+                // Single-field query (auto-indexed); status filtered client-side
+                // to avoid needing a composite Firestore index.
+                const snap = await getDocs(query(
+                    collection(db, 'artifacts/talent-flow/public/data/bulkImportJobs'),
+                    where('createdBy', '==', user.uid)
+                ));
+                const active = snap.docs
+                    .filter(d => ['queued', 'processing'].includes(d.data().status))
+                    .sort((a, b) => (a.data().createdAt?.toMillis?.() || 0) - (b.data().createdAt?.toMillis?.() || 0))
+                    .map(d => d.id);
+                const ids = active.length > 0 ? active : (Array.isArray(stored) ? stored : []);
+                if (ids.length > 0) {
+                    setBulkJobIds(prev => (prev.length ? prev : ids));
+                    setBulkImporting(true);
+                }
+            } catch {
+                try { localStorage.removeItem('bulkActiveJobs'); } catch { /* storage unavailable */ }
+            }
+        })();
+    }, [user?.uid]);
 
     const showSuccess = (type) => {
         setActionSuccess(type);
@@ -481,6 +517,7 @@ export default function CandidateProcessPage() {
                     body: JSON.stringify({ positionId: selectedPos?.id || '', positionTitle: selectedPos?.title || '', records }),
                 });
                 setBulkJobIds([data.jobId]);
+                try { localStorage.setItem('bulkActiveJobs', JSON.stringify([data.jobId])); } catch { /* storage unavailable */ }
                 setBulkProgress(prev => ({ ...prev, total: data.totalCount || prev.total, status: 'queued' }));
             } else {
                 // File upload path — split into <28MB batches: Cloud Functions
@@ -509,6 +546,7 @@ export default function CandidateProcessPage() {
                     jobIds.push(data.jobId);
                 }
                 setBulkJobIds(jobIds);
+                try { localStorage.setItem('bulkActiveJobs', JSON.stringify(jobIds)); } catch { /* storage unavailable */ }
                 setBulkProgress(prev => ({ ...prev, status: 'queued' }));
             }
         } catch (err) {
@@ -2531,7 +2569,7 @@ export default function CandidateProcessPage() {
                                             {bulkProgress.status === 'error' && <XCircle className="w-3 h-3" />}
                                             {bulkProgress.status === 'queued' && <Clock className="w-3 h-3" />}
                                             <span>
-                                                {bulkProgress.status === 'completed' ? `Tamamlandı — ${bulkProgress.completed} başarılı${bulkProgress.failed > 0 ? `, ${bulkProgress.failed} hatalı` : ''}${bulkProgress.avgScore != null ? ` · Ort. Eşleşme: %${bulkProgress.avgScore}` : ''}` :
+                                                {bulkProgress.status === 'completed' ? `Tamamlandı — ${bulkProgress.completed - (bulkProgress.duplicates || 0)} başarılı${bulkProgress.duplicates > 0 ? `, ${bulkProgress.duplicates} mükerrer atlandı` : ''}${bulkProgress.failed > 0 ? `, ${bulkProgress.failed} hatalı` : ''}${bulkProgress.avgScore != null ? ` · Ort. Eşleşme: %${bulkProgress.avgScore}` : ''}` :
                                                  bulkProgress.status === 'error' ? (bulkProgress.errorMessage || 'İşlem hatası oluştu') :
                                                  bulkProgress.status === 'processing' ? `İşleniyor… ${bulkProgress.completed + bulkProgress.failed}/${bulkProgress.total}` :
                                                  'Sıraya alındı'}
@@ -2561,7 +2599,7 @@ export default function CandidateProcessPage() {
                     <div className="flex-1 min-w-0">
                         <p className="text-[12px] font-black text-slate-800">Toplu Yükleme Tamamlandı</p>
                         <p className="text-[11px] text-slate-500 mt-0.5">
-                            {bulkToast.completed} aday eklendi{bulkToast.failed > 0 && <span className="text-red-500">, {bulkToast.failed} hata</span>}
+                            {bulkToast.completed - (bulkToast.duplicates || 0)} aday eklendi{(bulkToast.duplicates || 0) > 0 && <span className="text-amber-600">, {bulkToast.duplicates} mükerrer atlandı</span>}{bulkToast.failed > 0 && <span className="text-red-500">, {bulkToast.failed} hata</span>}
                         </p>
                         {bulkToast.avgScoreByPosition && Object.keys(bulkToast.avgScoreByPosition).length > 0 ? (
                             <div className="mt-1 space-y-0.5">
