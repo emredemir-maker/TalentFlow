@@ -10,11 +10,12 @@ import { useEffect, useMemo, useState } from 'react';
 import {
     Search, Download, Users, ChevronUp, ChevronDown, ChevronLeft, ChevronRight,
     FilterX, Table2, Wrench, CheckSquare, Square, Layers, X, Loader2, AlertCircle, CheckCircle2,
-    Share2, Building2, Brain,
+    Share2, Building2, Brain, Mail,
 } from 'lucide-react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import MaintenancePanel from '../components/MaintenancePanel';
+import EvaluationEmailModal from '../components/EvaluationEmailModal';
 import { useAuth } from '../context/AuthContext';
 import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
@@ -260,6 +261,7 @@ export default function CandidatesTablePage() {
     const [bulkApplying, setBulkApplying] = useState(false);
     const [bulkResult, setBulkResult] = useState(null);
     const [scanProgress, setScanProgress] = useState(null); // {done,total}
+    const [evalModalOpen, setEvalModalOpen] = useState(false);
     const openBulkModal = (type) => { setBulkType(type); setBulkModalOpen(true); };
 
     const setFilter = (key, value) => {
@@ -588,6 +590,14 @@ export default function CandidatesTablePage() {
                                     Otonom Tarama
                                 </button>
                                 <button
+                                    onClick={() => setEvalModalOpen(true)}
+                                    disabled={Boolean(scanProgress)}
+                                    title="Seçili adayları uyum analizi ve detay linkleriyle iş arkadaşlarınıza e-postalayın (kendi hesabınızdan)"
+                                    className="flex items-center gap-1.5 text-[11px] font-black bg-emerald-500/80 hover:bg-emerald-500 disabled:opacity-60 px-3 py-1.5 rounded-lg transition-colors"
+                                >
+                                    <Mail className="w-3.5 h-3.5" /> Değerlendirmeye Gönder
+                                </button>
+                                <button
                                     onClick={() => openBulkModal('stage')}
                                     disabled={Boolean(scanProgress)}
                                     className="flex items-center gap-1.5 text-[11px] font-black bg-white/10 hover:bg-white/20 disabled:opacity-50 px-3 py-1.5 rounded-lg transition-colors"
@@ -779,6 +789,13 @@ export default function CandidatesTablePage() {
                 </div>
             </div>
 
+            <EvaluationEmailModal
+                isOpen={evalModalOpen}
+                candidates={Array.from(selectedIds).map((id) => coherentRows.find((c) => c.id === id)).filter(Boolean)}
+                openPositions={openPositions}
+                onClose={() => setEvalModalOpen(false)}
+                onSent={(message) => { setBulkResult({ message, failed: 0 }); setSelectedIds(new Set()); }}
+            />
             <BulkActionModal
                 isOpen={bulkModalOpen}
                 type={bulkType}

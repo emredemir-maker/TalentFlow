@@ -17,7 +17,12 @@ export function CandidatesProvider({ children }) {
     const [candidates, setCandidates] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [viewCandidateId, setViewCandidateId] = useState(null);
+    // Derin-link: değerlendirme e-postalarındaki "Detayı Aç" linkleri
+    // ?aday=<id> parametresiyle gelir — girişten sonra doğrudan o adayın
+    // kartı açılır (App.jsx aynı parametreyle görünümü değiştirir).
+    const [viewCandidateId, setViewCandidateId] = useState(
+        () => new URLSearchParams(window.location.search).get('aday') || null
+    );
     const [compareIds, setCompareIds] = useState([]);
     const [preselectedInterviewData, setPreselectedInterviewData] = useState(null); // For passing data to InterviewManagementPage
 

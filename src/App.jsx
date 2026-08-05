@@ -86,7 +86,11 @@ export default function App() {
 
 function AuthenticatedApp() {
   const { loading, error, isAuthenticated, user, userProfile } = useAuth();
-  const [activeView, setActiveView] = useState('dashboard');
+  // Derin-link: ?aday=<id> ile gelindiyse girişten sonra aday detayında
+  // başla (CandidatesContext aynı parametreden viewCandidateId'yi kurar).
+  const [activeView, setActiveView] = useState(
+    () => (new URLSearchParams(window.location.search).get('aday') ? 'candidate-process' : 'dashboard')
+  );
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   // Mobile drawer (<lg). Desktop layout (≥lg) uses sidebarCollapsed instead.
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
