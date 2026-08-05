@@ -195,6 +195,9 @@ router.post('/api/maintenance/prescore', requireAuth(ROLES), async (req, res) =>
                             // pozisyon adı asla eşleşme diye yazılmaz.
                             matchedPositionTitle: result.matchedTitle ?? null,
                             matchReason: result.matchReason || '',
+                            // CV'ye göre ideal rol yalnızca AI ürettiyse yazılır;
+                            // mevcut değer boş yanıtla ezilmez.
+                            ...(result.suggestedRole ? { suggestedRole: result.suggestedRole } : {}),
                             prescoreMethod: result.method,
                             prescoredAt: admin.firestore.FieldValue.serverTimestamp(),
                         });

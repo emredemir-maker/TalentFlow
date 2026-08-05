@@ -41,7 +41,14 @@ describe('computePrescore', () => {
     it('uses the AI score when Gemini returns valid JSON', async () => {
         mockGenerateText.mockResolvedValue('{"matchScore": 130, "matchedPosition": "Frontend Developer", "matchReason": "Güçlü React deneyimi"}');
         const result = await computePrescore(CANDIDATE, TITLES);
-        expect(result).toEqual({ score: 100, matchedTitle: 'Frontend Developer', matchReason: 'Güçlü React deneyimi', method: 'ai' });
+        expect(result).toEqual({ score: 100, matchedTitle: 'Frontend Developer', matchReason: 'Güçlü React deneyimi', suggestedRole: '', method: 'ai' });
+    });
+
+    it('passes through the CV-based suggested role independently of the open-position match', async () => {
+        mockGenerateText.mockResolvedValue('{"matchScore": 60, "matchedPosition": "Frontend Developer", "matchReason": "ok", "suggestedRole": "Senior UI Engineer"}');
+        const result = await computePrescore(CANDIDATE, TITLES);
+        expect(result.suggestedRole).toBe('Senior UI Engineer');
+        expect(result.matchedTitle).toBe('Frontend Developer');
     });
 
     it('rejects an AI-invented position title and falls back to keyword scoring', async () => {
@@ -54,7 +61,7 @@ describe('computePrescore', () => {
     it('accepts the AI title case-insensitively and returns the canonical spelling', async () => {
         mockGenerateText.mockResolvedValue('{"matchScore": 70, "matchedPosition": "frontend developer", "matchReason": "ok"}');
         const result = await computePrescore(CANDIDATE, TITLES);
-        expect(result).toEqual({ score: 70, matchedTitle: 'Frontend Developer', matchReason: 'ok', method: 'ai' });
+        expect(result).toEqual({ score: 70, matchedTitle: 'Frontend Developer', matchReason: 'ok', suggestedRole: '', method: 'ai' });
     });
 
     it('falls back to keyword scoring when Gemini output is unparseable', async () => {

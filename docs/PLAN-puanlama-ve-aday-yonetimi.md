@@ -50,7 +50,14 @@ Durum: Uygulama başladı — 2026-08-05
 - ✅ Bakım paneli tek tek butonlardan YÖNLENDİRMELİ sürece dönüştürüldü: `GET /api/maintenance/health-check` tüm sayaçları tek aday-projeksiyon okumasıyla üretir (takılı iş / mükerrer / geçersiz eşleşme / 0 skor); panel adımları sırayla listeler, sayacı 0 olanları "Gerek yok ✓" kapatır, sıradaki gerekli adımı vurgulayıp tek buton gösterir (Atla seçenekli). Adım sırası: takılı işler → mükerrer temizliği (AI maliyeti kopyalara gitmesin) → eşleşme onarımı (bedava) → ön skor (hafif AI). Süreç bitince "Sistem Taraması'nı çalıştırın" önerisi gösterilir.
 - Doğrulama: 214/214 vitest, eslint temiz, build başarılı
 
-**Kalan:** Faz 1.5 (opsiyonel kuyruk), 2/5 kalan yüzeyler (ComparisonModal, Analytics, SendMessage koruması), 2B/8+10 kalanı (içe aktarmada positionAnalyses hedef skoru, Pozisyon Eşleşmeleri sekmesinde hedef rozeti), Faz 3A/5-6 (provenance + %98 kırpması), 3B/7-8+10-14 (experiences, PDF sentinel, kesme, retry, duplicate stratejisi, backfill).
+**2026-08-05 — Tur 6 (Skor tutarlılığı PR #67 + CV'ye göre ideal rol PR #68):**
+- ✅ Faz 3A/5-6 (PR #67): "Gösterilen skor, gösterilen pozisyonun skorudur" — `withCoherentScores` (tablo AI/Genel), detay başlığı + sol liste + banner aynı kural; eski analiz başka pozisyon içinse uyarı; "Doğrulandı" ifadesi kaldırıldı; STAR rozeti gerçek STAR skoru (bestScore*0.98 kırpması gitti). 4 yeni test (Eda vakası birebir).
+- ✅ Prescore 55 sn zaman aşımı (PR #66 içinde yayında): sunucuda 40 sn süre bütçesi, parti 15, istemcide otomatik retry + durma korumaları.
+- ✅ Yeni gereksinim R1 (PR #68): Pozisyon Eşleşmeleri sekmesinde HER açık pozisyon ayrı skorla görünür — "Farklı Meslek Alanı" bölümü artık skorsuz çip değil, tek tek skorlu satırlar.
+- ✅ Yeni gereksinim R2 (PR #68): "CV'ye göre ideal rol" (`suggestedRole`) — açık pozisyonlardan BAĞIMSIZ serbest metin; bulk import + prescore prompt'larına eklendi, persist ediliyor; UI'da üç yerde ayrı bilgi olarak görünür (detay başlığı "CV'ye göre: X", Pozisyon Eşleşmeleri üst bandı, tablo Pozisyon kolonu ikinci satır). Mevcut adaylar için `position` (CV'deki rol) yedek olarak kullanılır.
+- Doğrulama: 219/219 vitest, eslint 0 hata, build başarılı
+
+**Kalan:** Faz 1.5 (opsiyonel kuyruk), 2/5 kalan yüzeyler (ComparisonModal, Analytics, SendMessage koruması), 2B/8 (içe aktarmada positionAnalyses hedef skoru), 3B/7-8+10-14 (experiences, PDF sentinel, kesme, retry, duplicate stratejisi, backfill).
 
 Bu plan, bildirilen 6 sorunun kod incelemesiyle doğrulanmış kök nedenlerine ve fazlara ayrılmış çözüm adımlarına dayanır.
 

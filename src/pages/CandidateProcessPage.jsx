@@ -1225,14 +1225,25 @@ export default function CandidateProcessPage() {
                                             {candidate.matchedPositionTitle === null ? (
                                                 // Açık sentinel: sistem bu adayı hiçbir AÇIK pozisyona
                                                 // bağlayamadı — CV'deki serbest başlık eşleşme gibi gösterilmez.
-                                                <p className="text-[11px] text-amber-600 font-semibold italic" title={candidate.position ? `CV'deki pozisyon: ${candidate.position}` : undefined}>
+                                                <p className="text-[11px] text-amber-600 font-semibold italic">
                                                     Uygun açık pozisyon yok
                                                 </p>
                                             ) : (
-                                                <p className="text-[11px] text-slate-500 font-medium" title={candidate.position && candidate.matchedPositionTitle && candidate.position !== candidate.matchedPositionTitle ? `CV: ${candidate.position}` : undefined}>
+                                                <p className="text-[11px] text-slate-500 font-medium">
                                                     {candidate.matchedPositionTitle || candidate.position || candidate.bestTitle || '—'}
                                                 </p>
                                             )}
+                                            {/* İki kavram ayrı ayrı görünür: açık pozisyon eşleşmesi
+                                                (yukarıda) + CV'ye göre ideal rol (açık pozisyonlardan
+                                                bağımsız) — farklıysa burada gösterilir. */}
+                                            {(() => {
+                                                const cvRole = candidate.suggestedRole || candidate.position;
+                                                return cvRole && cvRole !== candidate.matchedPositionTitle ? (
+                                                    <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">
+                                                        CV'ye göre: <span className="font-bold text-slate-500">{cvRole}</span>
+                                                    </span>
+                                                ) : null;
+                                            })()}
                                             {candidate.email && (
                                                 <span className="text-[10px] text-slate-400 flex items-center gap-1">
                                                     <Mail className="w-3 h-3" /> {candidate.email}
@@ -1590,7 +1601,14 @@ export default function CandidateProcessPage() {
                                                         Aday Meslek Alanı:
                                                         <span className="ml-1.5 px-2 py-0.5 bg-[#13294E]/10 text-[#13294E] rounded-md">{domainLabel(candidateDomain)}</span>
                                                     </p>
-                                                    <p className="text-[10px] text-slate-400 mt-0.5">Yalnızca uyumlu meslek alanındaki açık pozisyonlar eşleştirilir.</p>
+                                                    <p className="text-[10px] text-slate-400 mt-0.5">Her açık pozisyon ayrı skorlanır; otomatik eşleştirme uyumlu meslek alanına öncelik verir.</p>
+                                                    {(candidate.suggestedRole || candidate.position) && (
+                                                        <p className="text-[10px] text-slate-500 mt-1">
+                                                            CV'ye göre ideal rol:
+                                                            <span className="ml-1 font-black text-slate-700">{candidate.suggestedRole || candidate.position}</span>
+                                                            <span className="ml-1 text-slate-300">(açık pozisyonlardan bağımsız)</span>
+                                                        </p>
+                                                    )}
                                                 </div>
                                                 <div className="ml-auto flex items-center gap-3 text-center shrink-0">
                                                     <div>
@@ -1668,22 +1686,28 @@ export default function CandidateProcessPage() {
                                                 </div>
                                             )}
 
-                                            {/* Incompatible — collapsed notice */}
+                                            {/* Incompatible — her biri yine de ayrı skorla listelenir */}
                                             {incompatible.length > 0 && (
                                                 <div className="border border-dashed border-slate-200 rounded-2xl p-4">
                                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.1em] mb-1">
                                                         Farklı Meslek Alanı ({incompatible.length} pozisyon)
                                                     </p>
                                                     <p className="text-[11px] text-slate-400">
-                                                        Bu pozisyonlar aday profiliyle uyumlu meslek alanında değil; eşleştirme dışı tutuldu.
+                                                        Bu pozisyonlar aday profiliyle farklı meslek alanında; otomatik eşleştirme önceliği almaz ama her biri ayrıca skorlanır.
                                                     </p>
-                                                    <div className="flex flex-wrap gap-1.5 mt-2">
-                                                        {incompatible.slice(0, 6).map(({ position: pos }) => (
-                                                            <span key={pos.id} className="text-[8px] font-medium px-2 py-0.5 bg-slate-50 border border-slate-100 rounded-full text-slate-400">{pos.title}</span>
+                                                    <div className="space-y-1 mt-2">
+                                                        {incompatible.map(({ position: pos, match }) => (
+                                                            <div key={pos.id} className="flex items-center gap-2 text-[10px]">
+                                                                <span className="font-black w-9 text-right shrink-0" style={{ color: scoreColor(match.score) }}>%{match.score}</span>
+                                                                <span className="text-slate-500 truncate">{pos.title}</span>
+                                                                {match.isAi && (
+                                                                    <span className="shrink-0 inline-flex items-center gap-0.5 text-[7px] font-black px-1 py-0.5 bg-violet-50 text-violet-600 border border-violet-100 rounded-full">
+                                                                        <Sparkles className="w-2 h-2" /> AI
+                                                                    </span>
+                                                                )}
+                                                                <span className="text-slate-300 text-[9px] shrink-0 ml-auto">{pos.department || ''}</span>
+                                                            </div>
                                                         ))}
-                                                        {incompatible.length > 6 && (
-                                                            <span className="text-[8px] font-medium px-2 py-0.5 bg-slate-50 border border-slate-100 rounded-full text-slate-400">+{incompatible.length - 6} daha</span>
-                                                        )}
                                                     </div>
                                                 </div>
                                             )}
