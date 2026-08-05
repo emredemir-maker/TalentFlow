@@ -1,16 +1,19 @@
-// Bakım paneli — Aday Raporu sayfasından açılır.
+// Bakım paneli — Adaylar sayfasından açılır.
 //
-// İki işlevi var:
-//   1. Son toplu içe aktarma işlerinin GERÇEK durumunu gösterir (durum,
-//      sayaçlar ve varsa hata mesajı) — modaldaki ilerleme görünümü iş
-//      hata ile durduğunda da "bitti" gibi görünebildiği için buradan
-//      doğrulanır.
-//   2. Mükerrer aday taraması: aynı e-posta/telefonlu kayıtları gruplar,
-//      her grupta EN ESKİ kayıt korunur, fazlalıklar seçilip silinebilir.
-//      Sunucu silme isteğindeki her id'yi yeniden doğrular — korunan kayıt
-//      istemci hatasında bile silinemez.
+// Tek tek butonlar yerine YÖNLENDİRMELİ bir süreç sunar: "Durum Tespiti"
+// tüm sayaçları tek seferde çıkarır (takılı işler, mükerrerler, geçersiz
+// pozisyon eşleşmeleri, 0 skorlular) ve panel sıradaki gerekli adımı
+// kendisi işaret eder. Sayacı 0 olan adımlar "Gerek yok" olarak kapanır;
+// kullanıcı yalnızca vurgulanan adımın butonunu görür, isterse atlar.
+//
+// Adım sırası bilinçli: takılı işler (etiket düzeltme) → mükerrer temizliği
+// (AI maliyeti mükerrerlere harcanmasın) → eşleşme onarımı (bedava,
+// deterministik) → ön skor basma (hafif AI). Son öneri: Sistem Taraması.
 import { useEffect, useRef, useState } from 'react';
-import { Loader2, RefreshCw, Trash2, AlertTriangle, CheckCircle2, XCircle, Clock, Gauge, Wrench, ClipboardCheck } from 'lucide-react';
+import {
+    Loader2, RefreshCw, Trash2, AlertTriangle, CheckCircle2, XCircle, Clock,
+    Gauge, Wrench, ClipboardCheck, ChevronRight, SkipForward, Sparkles,
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const JOB_STATUS = {
@@ -30,28 +33,62 @@ function JobStatusChip({ status }) {
     );
 }
 
+const STEP_DEFS = [
+    {
+        key: 'stuck',
+        title: 'Takılı İşleri Kapat',
+        icon: ClipboardCheck,
+        desc: 'Tüm CV\'leri işlenmiş ama özet yazımı hatası yüzünden "Hata" etiketinde kalmış toplu işler "Tamamlandı" yapılır — veri kaybı yoktur.',
+        countLabel: (n) => `${n} takılı iş`,
+        action: 'Kapat',
+    },
+    {
+        key: 'dup',
+        title: 'Mükerrer Temizliği',
+        icon: Trash2,
+        desc: 'Aynı e-posta/telefonlu kopya kayıtlar silinir; her grubun en eski kaydı korunur. Önce bunu yapmak, sonraki AI puanlamasının kopyalara harcanmasını önler.',
+        countLabel: (n) => `${n} fazlalık kayıt`,
+        action: 'Seçilenleri Sil',
+    },
+    {
+        key: 'match',
+        title: 'Eşleşme Onarımı',
+        icon: Wrench,
+        desc: 'Sistemde olmayan (AI\'nın uydurduğu) pozisyon başlıkları açık pozisyonlara bağlanır; bağlanamayanlar "uygun açık pozisyon yok" olarak işaretlenir. AI çağrısı yapmaz, skorlara dokunmaz.',
+        countLabel: (n) => `${n} geçersiz eşleşme`,
+        action: 'Onar',
+    },
+    {
+        key: 'score',
+        title: 'Ön Skor Basma',
+        icon: Gauge,
+        desc: 'Skoru hiç olmayan adaylar hafif bir AI çağrısıyla puanlanır (CV metni yoksa anahtar-kelime skoru). Dolu skorların üzerine yazılmaz.',
+        countLabel: (n) => `${n} skorsuz aday`,
+        action: 'Puanla',
+    },
+];
+
 export default function MaintenancePanel() {
     const { user } = useAuth();
     const [loading, setLoading] = useState(false);
-    const [cleaning, setCleaning] = useState(false);
     const [error, setError] = useState(null);
     const [jobs, setJobs] = useState(null);
     const [scan, setScan] = useState(null);
+    const [health, setHealth] = useState(null);
     const [selected, setSelected] = useState(new Set());
-    const [lastCleanResult, setLastCleanResult] = useState(null);
-    const [prescoring, setPrescoring] = useState(false);
-    const [prescoreInfo, setPrescoreInfo] = useState(null);
-    const [repairing, setRepairing] = useState(false);
-    const [repairInfo, setRepairInfo] = useState(null);
-    const [closingJobs, setClosingJobs] = useState(false);
-    const [closeJobsInfo, setCloseJobsInfo] = useState(null);
+    // Adım durumları: counts sıfırlanmasa bile "bu oturumda çalıştırıldı"
+    // bilgisiyle süreç ilerler (ör. anahtar-kelime skoru 0 kalan adaylar).
+    const [doneSteps, setDoneSteps] = useState(new Set());
+    const [skippedSteps, setSkippedSteps] = useState(new Set());
+    const [running, setRunning] = useState(null); // çalışan adımın key'i
+    const [stepResults, setStepResults] = useState({});
+    const [prescoreProgress, setPrescoreProgress] = useState(null);
     // Bileşen kapanınca zincirleme prescore döngüsünü durdur
     const unmountedRef = useRef(false);
     useEffect(() => () => { unmountedRef.current = true; }, []);
 
     // Hosting rewrite istekleri 60 sn'de kesilir — 55 sn'de istemci tarafında
-    // iptal edip anlaşılır bir mesaj gösteriyoruz; tarayıcının bağlantıyı
-    // sessizce koparmasını beklemiyoruz.
+    // iptal edip anlaşılır bir mesaj gösteriyoruz.
     const FETCH_TIMEOUT_MS = 55000;
     const authedFetch = async (url, init = {}) => {
         const tok = await user?.getIdToken?.() || '';
@@ -78,17 +115,20 @@ export default function MaintenancePanel() {
         return data;
     };
 
+    const refreshHealth = async () => {
+        try { setHealth(await authedFetch('/api/maintenance/health-check')); } catch { /* sayaç tazeleme kritik değil */ }
+    };
+
+    // ── Adım 0: Durum tespiti ────────────────────────────────────────────
     const runScan = async () => {
         if (loading) return;
         setLoading(true);
         setError(null);
-        setLastCleanResult(null);
         try {
-            // allSettled: iki uçtan biri düşerse diğerinin sonucu yine gösterilir
-            // (eski Promise.all iki sonucu birden çöpe atıyordu).
-            const [jobsRes, scanRes] = await Promise.allSettled([
+            const [jobsRes, scanRes, healthRes] = await Promise.allSettled([
                 authedFetch('/api/maintenance/bulk-jobs'),
                 authedFetch('/api/maintenance/duplicate-scan'),
+                authedFetch('/api/maintenance/health-check'),
             ]);
             if (jobsRes.status === 'fulfilled') setJobs(jobsRes.value.jobs || []);
             if (scanRes.status === 'fulfilled') {
@@ -96,7 +136,8 @@ export default function MaintenancePanel() {
                 // Varsayılan seçim: tüm fazlalıklar (korunanlar asla listede değil)
                 setSelected(new Set((scanRes.value.groups || []).flatMap(g => g.extras.map(e => e.id))));
             }
-            const failures = [jobsRes, scanRes].filter(r => r.status === 'rejected');
+            if (healthRes.status === 'fulfilled') setHealth(healthRes.value);
+            const failures = [jobsRes, scanRes, healthRes].filter(r => r.status === 'rejected');
             if (failures.length > 0) {
                 setError([...new Set(failures.map(f => f.reason?.message || 'Bilinmeyen hata'))].join(' · '));
             }
@@ -105,19 +146,33 @@ export default function MaintenancePanel() {
         }
     };
 
-    const toggle = (id) => {
-        setSelected(prev => {
-            const next = new Set(prev);
-            if (next.has(id)) next.delete(id); else next.add(id);
-            return next;
-        });
+    // ── Adım eylemleri ───────────────────────────────────────────────────
+    const markDone = (key, result) => {
+        setDoneSteps(prev => new Set(prev).add(key));
+        if (result !== undefined) setStepResults(prev => ({ ...prev, [key]: result }));
     };
 
-    const handleClean = async () => {
-        if (cleaning || selected.size === 0) return;
+    const runStuck = async () => {
+        setRunning('stuck');
+        setError(null);
+        try {
+            const data = await authedFetch('/api/maintenance/close-stuck-jobs', { method: 'POST' });
+            markDone('stuck', `${data.closed} iş "Tamamlandı" olarak işaretlendi`);
+            const jobsData = await authedFetch('/api/maintenance/bulk-jobs');
+            setJobs(jobsData.jobs || []);
+            await refreshHealth();
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setRunning(null);
+        }
+    };
+
+    const runDupClean = async () => {
+        if (selected.size === 0) return;
         const ok = window.confirm(`${selected.size} mükerrer kayıt silinecek. Her grubun en eski kaydı korunuyor. Devam edilsin mi?`);
         if (!ok) return;
-        setCleaning(true);
+        setRunning('dup');
         setError(null);
         try {
             const data = await authedFetch('/api/maintenance/duplicate-clean', {
@@ -125,29 +180,66 @@ export default function MaintenancePanel() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ids: Array.from(selected) }),
             });
-            setLastCleanResult(data);
-            await runScan(); // güncel durumu yeniden çek
+            markDone('dup', `${data.deleted} kayıt silindi${data.skipped > 0 ? `, ${data.skipped} atlandı` : ''}`);
+            const scanData = await authedFetch('/api/maintenance/duplicate-scan');
+            setScan(scanData);
+            setSelected(new Set((scanData.groups || []).flatMap(g => g.extras.map(e => e.id))));
+            await refreshHealth();
         } catch (err) {
             setError(err.message);
         } finally {
-            setCleaning(false);
+            setRunning(null);
         }
     };
 
-    // Geriye dönük ön skor: sunucu her çağrıda en fazla 40 adayı puanlayıp
-    // kalan sayıyı döndürür; kalan 0 olana dek zincirleme çağrılır. Böylece
-    // tek uzun istek yerine her biri ~30 sn'lik parçalar hâlinde ilerler.
-    const runPrescore = async () => {
-        if (prescoring) return;
-        setPrescoring(true);
+    const runMatchRepair = async () => {
+        setRunning('match');
         setError(null);
         try {
-            let totals = { updated: 0, aiUsed: 0, failed: 0, remaining: 1 };
+            const RULE_LABELS = { assignment: 'atamadan', canonical: 'yazım düzeltme', job: 'iş hedefinden', keyword: 'anahtar-kelime', none: '"uygun pozisyon yok"' };
+            const data = await authedFetch('/api/maintenance/validate-matches', { method: 'POST' });
+            const detail = Object.entries(data.byRule || {}).map(([r, n]) => `${n} ${RULE_LABELS[r] || r}`).join(', ');
+            markDone('match', `${data.repaired} kayıt onarıldı${detail ? ` (${detail})` : ''}${data.remaining > 0 ? ` · ${data.remaining} kaldı — adımı tekrar çalıştırın` : ''}`);
+            await refreshHealth();
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setRunning(null);
+        }
+    };
+
+    // Geçici hatalarda (zaman aşımı / 5xx / ağ) kısa bekleyip yeniden dener —
+    // uzun zincirli işlemler tek aksaklıkta ölmesin.
+    const fetchWithRetry = async (url, init, tries = 3) => {
+        for (let attempt = 1; ; attempt++) {
+            try {
+                return await authedFetch(url, init);
+            } catch (err) {
+                const transient = /55 saniyede|geçici olarak|ulaşılamadı/.test(err.message || '');
+                if (!transient || attempt >= tries || unmountedRef.current) throw err;
+                await new Promise(r => setTimeout(r, 4000 * attempt));
+            }
+        }
+    };
+
+    // Sunucu her çağrıda küçük bir partiyi puanlayıp kalanı döndürür; kalan
+    // 0 olana dek zincirleme çağrılır. Parti küçük tutulur (Gemini kota
+    // beklemeleri tek çağrıyı 30+ sn'ye taşıyabiliyor) ve sunucu ayrıca
+    // 40 sn'lik süre bütçesiyle kendini korur — 55 sn'lik istemci iptaline
+    // takılmaz. Puanlanan her aday kalıcıdır: yarıda kalırsa tekrar
+    // basıldığında kaldığı yerden devam eder.
+    const PRESCORE_BATCH = 15;
+    const runPrescore = async () => {
+        setRunning('score');
+        setError(null);
+        let totals = { updated: 0, aiUsed: 0, failed: 0, remaining: 1 };
+        try {
+            let prevRemaining = Infinity;
             while (totals.remaining > 0 && !unmountedRef.current) {
-                const data = await authedFetch('/api/maintenance/prescore', {
+                const data = await fetchWithRetry('/api/maintenance/prescore', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ batchSize: 40 }),
+                    body: JSON.stringify({ batchSize: PRESCORE_BATCH }),
                 });
                 totals = {
                     updated: totals.updated + (data.updated || 0),
@@ -155,48 +247,50 @@ export default function MaintenancePanel() {
                     failed: totals.failed + (data.failed || 0),
                     remaining: data.remaining || 0,
                 };
-                setPrescoreInfo({ ...totals });
+                setPrescoreProgress({ ...totals });
                 if ((data.processed || 0) === 0) break; // ilerleme yoksa sonsuz döngüye girme
+                // Kalan azalmıyorsa (sürekli başarısız olan kayıtlar) durup bildir
+                if (totals.remaining >= prevRemaining) break;
+                prevRemaining = totals.remaining;
             }
+            const summary = `${totals.updated} aday puanlandı (${totals.aiUsed} AI, ${totals.updated - totals.aiUsed} anahtar-kelime)`
+                + (totals.failed > 0 ? ` · ${totals.failed} hata` : '')
+                + (totals.remaining > 0 ? ` · ${totals.remaining} aday puanlanamadı — adımı tekrar çalıştırabilirsiniz` : '');
+            markDone('score', summary);
+            await refreshHealth();
         } catch (err) {
-            setError(err.message);
+            // Yarıda kesilme: o ana kadarki ilerleme kalıcı — kullanıcıya söyle
+            setError(`${err.message}${totals.updated > 0 ? ` — Şu ana kadar ${totals.updated} aday puanlandı; ilerleme kayıtlı, "Puanla"ya tekrar basınca kaldığı yerden devam eder.` : ''}`);
+            await refreshHealth();
         } finally {
-            setPrescoring(false);
+            setRunning(null);
+            setPrescoreProgress(null);
         }
     };
 
-    // Uydurma pozisyon başlıklarını deterministik kurallarla onarır (AI yok)
-    const runRepairMatches = async () => {
-        if (repairing) return;
-        setRepairing(true);
-        setError(null);
-        try {
-            const data = await authedFetch('/api/maintenance/validate-matches', { method: 'POST' });
-            setRepairInfo(data);
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setRepairing(false);
-        }
+    const STEP_RUNNERS = { stuck: runStuck, dup: runDupClean, match: runMatchRepair, score: runPrescore };
+    const toggleDup = (id) => {
+        setSelected(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
     };
 
-    // Tüm kayıtları işlenmiş ama 'Hata' etiketinde takılı işleri kapatır
-    const runCloseStuckJobs = async () => {
-        if (closingJobs) return;
-        setClosingJobs(true);
-        setError(null);
-        try {
-            const data = await authedFetch('/api/maintenance/close-stuck-jobs', { method: 'POST' });
-            setCloseJobsInfo(data);
-            if (data.closed > 0) await runScan(); // iş listesini tazele
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setClosingJobs(false);
-        }
+    // ── Adım durum türetme (sayaç odaklı, kendi kendini yönlendirir) ─────
+    const countOf = {
+        stuck: health?.stuckJobs ?? 0,
+        dup: scan?.extrasCount ?? 0,
+        match: health?.invalidMatches ?? 0,
+        score: health?.zeroScore ?? 0,
     };
-
-    const RULE_LABELS = { assignment: 'atamadan', canonical: 'yazım düzeltme', job: 'iş hedefinden', keyword: 'anahtar-kelime', none: '"uygun pozisyon yok"' };
+    const statusOf = (key) => {
+        if (doneSteps.has(key)) return 'done';
+        if (skippedSteps.has(key)) return 'skipped';
+        return countOf[key] > 0 ? 'needed' : 'clear';
+    };
+    const currentStep = health ? STEP_DEFS.find(s => statusOf(s.key) === 'needed')?.key || null : null;
+    const allHandled = health && !currentStep;
 
     const fmtDate = (ms) => ms ? new Date(ms).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
 
@@ -204,16 +298,20 @@ export default function MaintenancePanel() {
         <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 space-y-4">
             <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div>
-                    <h2 className="text-[13px] font-black text-slate-800">Bakım — Toplu İşler & Mükerrer Temizliği</h2>
-                    <p className="text-[10px] text-slate-400 mt-0.5">İş durumlarını doğrula, aynı e-posta/telefonlu kopya adayları temizle</p>
+                    <h2 className="text-[13px] font-black text-slate-800">Bakım Süreci</h2>
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                        {health
+                            ? `${health.totalCandidates} aday · ${health.openPositions} açık pozisyon — panel sıradaki gerekli adımı işaret eder`
+                            : 'Durum tespiti tüm sayaçları çıkarır; panel sizi adım adım yönlendirir — tespit veri değiştirmez'}
+                    </p>
                 </div>
                 <button
                     onClick={runScan}
-                    disabled={loading}
+                    disabled={loading || Boolean(running)}
                     className="flex items-center gap-1.5 text-[11px] font-black text-white bg-[#13294E] hover:bg-[#1E3A6E] disabled:opacity-60 px-3.5 py-1.5 rounded-lg transition-colors"
                 >
                     {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-                    {scan ? 'Yeniden Tara' : 'Tara'}
+                    {health ? 'Durumu Yenile' : 'Durum Tespitini Başlat'}
                 </button>
             </div>
 
@@ -222,13 +320,133 @@ export default function MaintenancePanel() {
                     <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> {error}
                 </div>
             )}
-            {lastCleanResult && (
-                <div className="flex items-center gap-2 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                    {lastCleanResult.deleted} kayıt silindi{lastCleanResult.skipped > 0 ? `, ${lastCleanResult.skipped} atlandı (fazlalık değildi)` : ''}.
+
+            {/* ── Yönlendirmeli adım listesi ───────────────────────────────── */}
+            {health && (
+                <div className="space-y-1.5">
+                    {STEP_DEFS.map((s, i) => {
+                        const st = statusOf(s.key);
+                        const isCurrent = currentStep === s.key;
+                        const Icon = s.icon;
+                        return (
+                            <div
+                                key={s.key}
+                                className={`rounded-xl border px-3 py-2.5 transition-colors ${isCurrent ? 'border-[#13294E] bg-[#13294E]/[0.03] shadow-sm' : 'border-slate-100'}`}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 text-[10px] font-black ${
+                                        st === 'done' ? 'bg-emerald-100 text-emerald-700'
+                                        : st === 'clear' ? 'bg-slate-100 text-slate-400'
+                                        : st === 'skipped' ? 'bg-slate-100 text-slate-400'
+                                        : isCurrent ? 'bg-[#13294E] text-white'
+                                        : 'bg-amber-100 text-amber-700'
+                                    }`}>
+                                        {st === 'done' || st === 'clear' ? <CheckCircle2 className="w-3.5 h-3.5" /> : i + 1}
+                                    </div>
+                                    <Icon className="w-4 h-4 text-slate-400 shrink-0" />
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-[12px] font-bold text-slate-800">
+                                            {s.title}
+                                            <span className={`ml-2 text-[10px] font-black ${
+                                                st === 'clear' ? 'text-emerald-600'
+                                                : st === 'done' ? 'text-emerald-600'
+                                                : st === 'skipped' ? 'text-slate-400'
+                                                : 'text-amber-600'
+                                            }`}>
+                                                {st === 'clear' ? 'Gerek yok ✓'
+                                                    : st === 'done' ? 'Tamamlandı ✓'
+                                                    : st === 'skipped' ? 'Atlandı'
+                                                    : s.countLabel(countOf[s.key])}
+                                            </span>
+                                        </p>
+                                        {isCurrent && <p className="text-[10px] text-slate-400 mt-0.5">{s.desc}</p>}
+                                        {stepResults[s.key] && (
+                                            <p className="text-[10px] text-emerald-600 font-semibold mt-0.5">{stepResults[s.key]}</p>
+                                        )}
+                                        {s.key === 'score' && running === 'score' && prescoreProgress && (
+                                            <p className="text-[10px] text-violet-600 font-semibold mt-0.5">
+                                                {prescoreProgress.updated} puanlandı · {prescoreProgress.remaining} kaldı…
+                                            </p>
+                                        )}
+                                    </div>
+                                    {isCurrent && (
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                            <button
+                                                onClick={STEP_RUNNERS[s.key]}
+                                                disabled={Boolean(running) || (s.key === 'dup' && selected.size === 0)}
+                                                className="flex items-center gap-1.5 text-[11px] font-black text-white bg-[#13294E] hover:bg-[#1E3A6E] disabled:opacity-60 px-3.5 py-1.5 rounded-lg transition-colors"
+                                            >
+                                                {running === s.key ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                                                {running === s.key ? 'Çalışıyor…' : s.key === 'dup' ? `${s.action} (${selected.size})` : s.action}
+                                            </button>
+                                            <button
+                                                onClick={() => setSkippedSteps(prev => new Set(prev).add(s.key))}
+                                                disabled={Boolean(running)}
+                                                title="Bu adımı atla"
+                                                className="flex items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-slate-600 px-2 py-1.5 transition-colors"
+                                            >
+                                                <SkipForward className="w-3 h-3" /> Atla
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Mükerrer adımı aktifken grup seçimi gösterilir */}
+                                {s.key === 'dup' && isCurrent && scan && scan.extrasCount > 0 && (
+                                    <div className="mt-2 space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                                        {scan.groups.map(g => (
+                                            <div key={g.key} className="border border-slate-100 rounded-lg px-3 py-2">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <p className="text-[11px] font-bold text-slate-700 truncate">
+                                                        {g.keep.name || 'İsimsiz'}
+                                                        <span className="text-slate-400 font-medium ml-1.5">{g.keep.email || g.keep.phone}</span>
+                                                    </p>
+                                                    <span className="text-[10px] font-black text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full shrink-0">
+                                                        {g.extras.length + 1} kopya
+                                                    </span>
+                                                </div>
+                                                <div className="mt-1 space-y-0.5">
+                                                    <p className="text-[10px] text-emerald-600 font-semibold">
+                                                        ✓ Korunacak: {fmtDate(g.keep.createdAtMs)} ({g.keep.source || 'kaynak yok'})
+                                                    </p>
+                                                    {g.extras.map(e => (
+                                                        <label key={e.id} className="flex items-center gap-2 text-[10px] text-slate-500 cursor-pointer hover:text-slate-700">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selected.has(e.id)}
+                                                                onChange={() => toggleDup(e.id)}
+                                                                className="w-3 h-3 accent-red-600"
+                                                            />
+                                                            Silinecek: {fmtDate(e.createdAtMs)} ({e.source || 'kaynak yok'})
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+
+                    {/* Süreç bitti — önerilen son adım */}
+                    {allHandled && (
+                        <div className="flex items-start gap-2.5 rounded-xl border border-emerald-100 bg-emerald-50 px-3.5 py-3">
+                            <Sparkles className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                            <div>
+                                <p className="text-[12px] font-black text-emerald-800">Bakım süreci tamamlandı 🎉</p>
+                                <p className="text-[11px] text-emerald-700 mt-0.5">
+                                    Önerilen son adım: <strong>Detay & Yükleme</strong> görünümündeki <strong>Sistem Taraması</strong>'nı
+                                    "Tüm Adaylar" kapsamıyla çalıştırın — adaylar CV içerikleriyle derinlemesine yeniden puanlanır
+                                    (eksik CV'liler atlanıp raporlanır).
+                                </p>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 
+            {/* ── Son toplu işler (bilgi) ──────────────────────────────────── */}
             {jobs && (
                 <div>
                     <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Son Toplu İşler</h3>
@@ -266,144 +484,8 @@ export default function MaintenancePanel() {
                 </div>
             )}
 
-            {scan && (
-                <div>
-                    <div className="flex items-center justify-between gap-3 mb-1.5 flex-wrap">
-                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                            Mükerrer Adaylar — {scan.duplicateGroups} grup, {scan.extrasCount} fazlalık
-                        </h3>
-                        {scan.extrasCount > 0 && (
-                            <button
-                                onClick={handleClean}
-                                disabled={cleaning || selected.size === 0}
-                                className="flex items-center gap-1.5 text-[11px] font-black text-white bg-red-600 hover:bg-red-700 disabled:bg-slate-300 disabled:cursor-not-allowed px-3.5 py-1.5 rounded-lg transition-colors"
-                            >
-                                {cleaning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                                Seçilenleri Sil ({selected.size})
-                            </button>
-                        )}
-                    </div>
-                    {scan.extrasCount === 0 ? (
-                        <p className="text-[11px] text-emerald-600 font-semibold bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
-                            Mükerrer kayıt yok — havuz temiz. 🎉
-                        </p>
-                    ) : (
-                        <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
-                            {scan.groups.map(g => (
-                                <div key={g.key} className="border border-slate-100 rounded-lg px-3 py-2">
-                                    <div className="flex items-center justify-between gap-2">
-                                        <p className="text-[11px] font-bold text-slate-700 truncate">
-                                            {g.keep.name || 'İsimsiz'}
-                                            <span className="text-slate-400 font-medium ml-1.5">{g.keep.email || g.keep.phone}</span>
-                                        </p>
-                                        <span className="text-[10px] font-black text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full shrink-0">
-                                            {g.extras.length + 1} kopya
-                                        </span>
-                                    </div>
-                                    <div className="mt-1 space-y-0.5">
-                                        <p className="text-[10px] text-emerald-600 font-semibold">
-                                            ✓ Korunacak: {fmtDate(g.keep.createdAtMs)} ({g.keep.source || 'kaynak yok'})
-                                        </p>
-                                        {g.extras.map(e => (
-                                            <label key={e.id} className="flex items-center gap-2 text-[10px] text-slate-500 cursor-pointer hover:text-slate-700">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selected.has(e.id)}
-                                                    onChange={() => toggle(e.id)}
-                                                    className="w-3 h-3 accent-red-600"
-                                                />
-                                                Silinecek: {fmtDate(e.createdAtMs)} ({e.source || 'kaynak yok'})
-                                            </label>
-                                        ))}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* ── Geriye dönük ön skor basma ───────────────────────────────── */}
-            <div className="border-t border-slate-100 pt-3">
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                    <div>
-                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ön Skor Basma</h3>
-                        <p className="text-[10px] text-slate-400 mt-0.5">
-                            Skoru 0 olan adayları hafif AI çağrısıyla puanlar (CV metni yoksa anahtar-kelime skoru) — detaylı analiz değildir
-                        </p>
-                    </div>
-                    <button
-                        onClick={runPrescore}
-                        disabled={prescoring}
-                        className="flex items-center gap-1.5 text-[11px] font-black text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-60 px-3.5 py-1.5 rounded-lg transition-colors"
-                    >
-                        {prescoring ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Gauge className="w-3.5 h-3.5" />}
-                        {prescoring ? 'Puanlanıyor…' : '0 Skorluları Puanla'}
-                    </button>
-                </div>
-                {prescoreInfo && (
-                    <p className={`mt-2 text-[11px] font-semibold rounded-lg px-3 py-2 border ${prescoreInfo.remaining > 0 ? 'text-violet-700 bg-violet-50 border-violet-100' : 'text-emerald-700 bg-emerald-50 border-emerald-100'}`}>
-                        {prescoreInfo.updated} aday puanlandı ({prescoreInfo.aiUsed} AI, {prescoreInfo.updated - prescoreInfo.aiUsed} anahtar-kelime)
-                        {prescoreInfo.failed > 0 ? ` · ${prescoreInfo.failed} hata` : ''}
-                        {prescoreInfo.remaining > 0 ? ` · ${prescoreInfo.remaining} kaldı…` : ' · tamamlandı ✓'}
-                    </p>
-                )}
-            </div>
-
-            {/* ── Onarım araçları ─────────────────────────────────────────── */}
-            <div className="border-t border-slate-100 pt-3 space-y-3">
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                    <div>
-                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pozisyon Eşleşme Onarımı</h3>
-                        <p className="text-[10px] text-slate-400 mt-0.5">
-                            Sistemde olmayan (AI'nın uydurduğu) pozisyon başlıklarını açık pozisyonlara bağlar; bağlanamayanları "uygun açık pozisyon yok" olarak işaretler — AI çağrısı yapmaz, skorlara dokunmaz
-                        </p>
-                    </div>
-                    <button
-                        onClick={runRepairMatches}
-                        disabled={repairing}
-                        className="flex items-center gap-1.5 text-[11px] font-black text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-60 px-3.5 py-1.5 rounded-lg transition-colors"
-                    >
-                        {repairing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wrench className="w-3.5 h-3.5" />}
-                        {repairing ? 'Onarılıyor…' : 'Eşleşmeleri Doğrula'}
-                    </button>
-                </div>
-                {repairInfo && (
-                    <p className="text-[11px] font-semibold text-teal-700 bg-teal-50 border border-teal-100 rounded-lg px-3 py-2">
-                        {repairInfo.scanned} aday tarandı · {repairInfo.repaired} kayıt onarıldı
-                        {repairInfo.repaired > 0 && Object.keys(repairInfo.byRule || {}).length > 0
-                            ? ` (${Object.entries(repairInfo.byRule).map(([r, n]) => `${n} ${RULE_LABELS[r] || r}`).join(', ')})`
-                            : ''}
-                        {repairInfo.remaining > 0 ? ` · ${repairInfo.remaining} kaldı — tekrar çalıştırın` : ''}
-                    </p>
-                )}
-
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                    <div>
-                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Takılı İşleri Kapat</h3>
-                        <p className="text-[10px] text-slate-400 mt-0.5">
-                            Tüm CV'leri işlenmiş ama son özet yazımı hatası yüzünden "Hata" etiketinde kalmış toplu işleri "Tamamlandı" yapar — kayıp veri yoktur, yalnızca etiket düzeltilir
-                        </p>
-                    </div>
-                    <button
-                        onClick={runCloseStuckJobs}
-                        disabled={closingJobs}
-                        className="flex items-center gap-1.5 text-[11px] font-black text-white bg-slate-600 hover:bg-slate-700 disabled:opacity-60 px-3.5 py-1.5 rounded-lg transition-colors"
-                    >
-                        {closingJobs ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ClipboardCheck className="w-3.5 h-3.5" />}
-                        {closingJobs ? 'Kapatılıyor…' : 'Takılı İşleri Kapat'}
-                    </button>
-                </div>
-                {closeJobsInfo && (
-                    <p className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
-                        {closeJobsInfo.checked} hatalı iş kontrol edildi · {closeJobsInfo.closed} iş "Tamamlandı" olarak işaretlendi
-                        {closeJobsInfo.closed === 0 && closeJobsInfo.checked > 0 ? ' (kalan işlerde gerçekten işlenmemiş kayıt var)' : ''}
-                    </p>
-                )}
-            </div>
-
-            {!jobs && !scan && !loading && (
-                <p className="text-[11px] text-slate-400">Başlamak için "Tara" düğmesine basın — mevcut veriler değişmez, yalnızca rapor üretilir.</p>
+            {!health && !loading && (
+                <p className="text-[11px] text-slate-400">Başlamak için "Durum Tespitini Başlat" düğmesine basın — tespit hiçbir veriyi değiştirmez, yalnızca rapor üretir.</p>
             )}
         </div>
     );

@@ -165,6 +165,13 @@ router.post('/api/maintenance/prescore', requireAuth(ROLES), async (req, res) =>
             log.warn(`[maintenance/prescore] open positions read failed: ${posErr.message}`);
         }
 
+        // Süre bütçesi: Hosting rewrite 60 sn'de, istemci 55 sn'de keser.
+        // Gemini yavaşlar/kota bekletirse (tek çağrı retry'larla 30+ sn
+        // sürebilir) parti yarıda kalmasın: bütçe dolunca yeni aday alınmaz,
+        // o ana kadarki sonuç ve gerçek 'remaining' döndürülür — istemci
+        // zinciri kaldığı yerden sürdürür.
+        const startedAt = Date.now();
+        const DEADLINE_MS = 40000;
         let updated = 0;
         let failed = 0;
         let aiUsed = 0;
@@ -173,6 +180,7 @@ router.post('/api/maintenance/prescore', requireAuth(ROLES), async (req, res) =>
         await Promise.all(
             Array.from({ length: Math.min(4, batchDocs.length) }, async () => {
                 while (idx < batchDocs.length) {
+                    if (Date.now() - startedAt > DEADLINE_MS) break;
                     const docSnap = batchDocs[idx];
                     idx += 1;
                     try {
@@ -200,16 +208,81 @@ router.post('/api/maintenance/prescore', requireAuth(ROLES), async (req, res) =>
             })
         );
 
-        log.info(`[maintenance/prescore] batch done: ${updated} updated (${aiUsed} AI), ${failed} failed, ${pendingRefs.length - batchDocs.length} remaining`);
+        // Süre bütçesi dolduysa partinin tamamı denenmemiş olabilir —
+        // 'attempted' gerçek sayıdır ve remaining ona göre hesaplanır.
+        const attempted = Math.min(idx, batchDocs.length);
+        const deadlineHit = attempted < batchDocs.length;
+        log.info(`[maintenance/prescore] batch done: ${updated} updated (${aiUsed} AI), ${failed} failed, ${pendingRefs.length - attempted} remaining${deadlineHit ? ' (süre bütçesi doldu)' : ''}`);
         res.json({
-            processed: batchDocs.length,
+            processed: attempted,
             updated,
             failed,
             aiUsed,
-            remaining: pendingRefs.length - batchDocs.length,
+            deadlineHit,
+            remaining: pendingRefs.length - attempted,
         });
     } catch (err) {
         log.error(`[maintenance/prescore] ${err.message}`);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Bakım süreci durum tespiti — panelin adım adım yönlendirmesi için tüm
+// sayaçları TEK aday projeksiyon okumasıyla üretir: takılı işler, mükerrer
+// fazlalıklar, geçersiz pozisyon eşleşmeleri ve 0 skorlu adaylar.
+router.get('/api/maintenance/health-check', requireAuth(ROLES), async (req, res) => {
+    try {
+        const posSnap = await db.collection(POSITIONS_COLL).where('status', '==', 'open').get();
+        const openPositions = posSnap.docs
+            .map((d) => ({ id: d.id, title: d.data().title }))
+            .filter((p) => Boolean(p.title));
+
+        const candSnap = await db.collection(CANDIDATES_COLL)
+            .select('name', 'email', 'phone', 'source', 'bulkJobId', 'createdAt',
+                'matchedPositionTitle', 'positionId', 'position', 'skills',
+                'initialAiScore', 'matchScore', 'aiScore')
+            .get();
+        const candidates = candSnap.docs.map((d) => {
+            const c = d.data();
+            return { id: d.id, ...c, createdAtMs: c.createdAt?.toMillis?.() || 0 };
+        });
+
+        const dupGroups = groupDuplicateCandidates(candidates);
+        const duplicates = dupGroups.reduce((s, g) => s + g.extras.length, 0);
+
+        const scoreOf = (c) => Number(c.initialAiScore || 0) || Number(c.matchScore || 0) || Number(c.aiScore || 0);
+        const zeroScore = candidates.filter((c) => scoreOf(c) <= 0).length;
+
+        let invalidMatches = 0;
+        if (openPositions.length > 0) {
+            const jobIds = collectJobIdsNeedingLookup(candidates, openPositions);
+            const jobsById = new Map();
+            if (jobIds.length > 0) {
+                const jobDocs = await db.getAll(
+                    ...jobIds.map((id) => db.doc(`${BULK_JOBS_COLL}/${id}`)),
+                    { fieldMask: ['positionId', 'positionTitle'] }
+                );
+                for (const j of jobDocs) if (j.exists) jobsById.set(j.id, j.data());
+            }
+            invalidMatches = planMatchRepairs(candidates, openPositions, jobsById).length;
+        }
+
+        const errSnap = await db.collection(BULK_JOBS_COLL).where('status', '==', 'error').get();
+        const stuckJobs = errSnap.docs.filter((d) => {
+            const j = d.data();
+            return (j.totalCount || 0) > 0 && (j.processedCount || 0) >= (j.totalCount || 0);
+        }).length;
+
+        res.json({
+            totalCandidates: candidates.length,
+            openPositions: openPositions.length,
+            stuckJobs,
+            duplicates,
+            invalidMatches,
+            zeroScore,
+        });
+    } catch (err) {
+        log.error(`[maintenance/health-check] ${err.message}`);
         res.status(500).json({ error: err.message });
     }
 });
