@@ -10,7 +10,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
     Search, Download, Users, ChevronUp, ChevronDown, ChevronLeft, ChevronRight,
     FilterX, Table2, Wrench, CheckSquare, Square, Layers, X, Loader2, AlertCircle, CheckCircle2,
-    Share2, Building2,
+    Share2, Building2, Brain,
 } from 'lucide-react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -19,6 +19,7 @@ import { useAuth } from '../context/AuthContext';
 import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
 import { calculateMatchScore } from '../services/matchService';
+import { deepScanCandidate } from '../services/scanService';
 import { STAGES, getStage } from '../utils/pipelineStages';
 import {
     DEFAULT_FILTERS, applyTableFilters, withCoherentScores, sortRows, buildExportRows,
@@ -26,6 +27,14 @@ import {
 } from '../utils/candidateTable';
 
 const PAGE_SIZE = 50;
+
+// Görünüm değişince (aday detayına gidip dönünce) bileşen unmount olur ve
+// yerel state sıfırlanırdı — filtre/sıralama/sayfa sessionStorage'da yaşar
+// ki liste bırakıldığı gibi bulunsun. (Sekme kapanınca temizlenir.)
+const TABLE_STATE_KEY = 'candidatesTableState.v1';
+const loadTableState = () => {
+    try { return JSON.parse(sessionStorage.getItem(TABLE_STATE_KEY)) || {}; } catch { return {}; }
+};
 
 function StageChip({ status }) {
     const stage = getStage(resolveStageKey(status));
@@ -233,10 +242,14 @@ export default function CandidatesTablePage() {
     // yetkisiz role gösterip 403 yedirmek yerine hiç göstermiyoruz.
     const canMaintain = role === 'super_admin' || role === 'recruiter';
 
-    const [filters, setFilters] = useState(DEFAULT_FILTERS);
-    const [sortKey, setSortKey] = useState('appliedDate');
-    const [sortDir, setSortDir] = useState('desc');
-    const [page, setPage] = useState(0);
+    const [filters, setFilters] = useState(() => ({ ...DEFAULT_FILTERS, ...(loadTableState().filters || {}) }));
+    const [sortKey, setSortKey] = useState(() => loadTableState().sortKey || 'appliedDate');
+    const [sortDir, setSortDir] = useState(() => loadTableState().sortDir || 'desc');
+    const [page, setPage] = useState(() => loadTableState().page || 0);
+    // Her değişiklikte kalıcılaştır — detaydan dönüşte liste aynı kalır
+    useEffect(() => {
+        try { sessionStorage.setItem(TABLE_STATE_KEY, JSON.stringify({ filters, sortKey, sortDir, page })); } catch { /* dolu/kapalı storage önemsiz */ }
+    }, [filters, sortKey, sortDir, page]);
     const [exporting, setExporting] = useState(false);
     const [showMaintenance, setShowMaintenance] = useState(false);
     // Toplu seçim: filtre değişince temizlenir — görünmeyen adaylarda
@@ -246,6 +259,7 @@ export default function CandidatesTablePage() {
     const [bulkType, setBulkType] = useState('stage');
     const [bulkApplying, setBulkApplying] = useState(false);
     const [bulkResult, setBulkResult] = useState(null);
+    const [scanProgress, setScanProgress] = useState(null); // {done,total}
     const openBulkModal = (type) => { setBulkType(type); setBulkModalOpen(true); };
 
     const setFilter = (key, value) => {
@@ -371,6 +385,56 @@ export default function CandidatesTablePage() {
         } finally {
             setBulkApplying(false);
         }
+    };
+
+    // Seçili adaylardan HENÜZ otonom taramadan geçmemiş olanları derinlemesine
+    // analiz eder (SystemScanner ile aynı kurallar — scanService). Zaten
+    // taranmışlara dokunmaz; CV metni olmayanlar atlanıp raporlanır.
+    const handleBulkScan = async () => {
+        if (bulkApplying || scanProgress || selectedIds.size === 0) return;
+        if (openPositions.length === 0) { setBulkResult({ message: 'Otonom tarama için açık pozisyon gerekli', failed: 1 }); return; }
+        const rowById = new Map(coherentRows.map((c) => [c.id, c]));
+        const rows = Array.from(selectedIds).map((id) => rowById.get(id)).filter(Boolean);
+        const unscanned = rows.filter((c) => !c.aiAnalysis?.starAnalysis);
+        if (unscanned.length === 0) {
+            setBulkResult({ message: `Seçili ${rows.length} adayın tümü zaten otonom taramadan geçmiş — yeniden tarama gerekmiyor`, failed: 0 });
+            setSelectedIds(new Set());
+            return;
+        }
+        const ok = window.confirm(
+            `${rows.length} seçili adaydan ${unscanned.length} tanesi henüz taranmamış.\n` +
+            `${unscanned.length} aday için otonom tarama başlatılsın mı? (aday başına 1-5 AI çağrısı yapılır)`
+        );
+        if (!ok) return;
+
+        setBulkResult(null);
+        setScanProgress({ done: 0, total: unscanned.length });
+        let scanned = 0, skippedNoCv = 0, noResult = 0, failed = 0;
+        // 3'lü paralel havuz — SystemScanner ile aynı eşzamanlılık
+        let nextIdx = 0;
+        await Promise.all(Array.from({ length: Math.min(3, unscanned.length) }, async () => {
+            while (nextIdx < unscanned.length) {
+                const candidate = unscanned[nextIdx];
+                nextIdx += 1;
+                try {
+                    const result = await deepScanCandidate(candidate, openPositions);
+                    if (result.status === 'scanned') { await updateCandidate(candidate.id, result.updates); scanned += 1; }
+                    else if (result.status === 'skipped_no_cv') skippedNoCv += 1;
+                    else noResult += 1;
+                } catch {
+                    failed += 1;
+                }
+                setScanProgress((p) => (p ? { ...p, done: p.done + 1 } : p));
+            }
+        }));
+        setScanProgress(null);
+        setSelectedIds(new Set());
+        setBulkResult({
+            message: `${scanned} aday otonom taramadan geçirildi`
+                + (skippedNoCv > 0 ? ` · ${skippedNoCv} aday CV metni olmadığı için atlandı` : '')
+                + (noResult > 0 ? ` · ${noResult} aday için sonuç alınamadı` : ''),
+            failed,
+        });
     };
 
     const handleExport = async () => {
@@ -503,29 +567,46 @@ export default function CandidatesTablePage() {
                 <div className="px-6 pt-3">
                     {selectedIds.size > 0 ? (
                         <div className="flex items-center justify-between gap-3 flex-wrap bg-[#13294E] text-white rounded-xl px-4 py-2.5 shadow-sm">
-                            <span className="text-[12px] font-bold">{selectedIds.size} aday seçildi</span>
+                            <span className="text-[12px] font-bold">
+                                {scanProgress
+                                    ? `Otonom tarama: ${scanProgress.done} / ${scanProgress.total} aday…`
+                                    : `${selectedIds.size} aday seçildi`}
+                            </span>
                             <div className="flex items-center gap-2 flex-wrap">
                                 <button
+                                    onClick={handleBulkScan}
+                                    disabled={Boolean(scanProgress)}
+                                    title="Seçililerden henüz taranmamış olanlar için derin AI analizi çalıştırır"
+                                    className="flex items-center gap-1.5 text-[11px] font-black bg-violet-500/80 hover:bg-violet-500 disabled:opacity-60 px-3 py-1.5 rounded-lg transition-colors"
+                                >
+                                    {scanProgress ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Brain className="w-3.5 h-3.5" />}
+                                    Otonom Tarama
+                                </button>
+                                <button
                                     onClick={() => openBulkModal('stage')}
-                                    className="flex items-center gap-1.5 text-[11px] font-black bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-colors"
+                                    disabled={Boolean(scanProgress)}
+                                    className="flex items-center gap-1.5 text-[11px] font-black bg-white/10 hover:bg-white/20 disabled:opacity-50 px-3 py-1.5 rounded-lg transition-colors"
                                 >
                                     <Layers className="w-3.5 h-3.5" /> Aşama Değiştir
                                 </button>
                                 <button
                                     onClick={() => openBulkModal('source')}
-                                    className="flex items-center gap-1.5 text-[11px] font-black bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-colors"
+                                    disabled={Boolean(scanProgress)}
+                                    className="flex items-center gap-1.5 text-[11px] font-black bg-white/10 hover:bg-white/20 disabled:opacity-50 px-3 py-1.5 rounded-lg transition-colors"
                                 >
                                     <Share2 className="w-3.5 h-3.5" /> Kaynak Değiştir
                                 </button>
                                 <button
                                     onClick={() => openBulkModal('department')}
-                                    className="flex items-center gap-1.5 text-[11px] font-black bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-colors"
+                                    disabled={Boolean(scanProgress)}
+                                    className="flex items-center gap-1.5 text-[11px] font-black bg-white/10 hover:bg-white/20 disabled:opacity-50 px-3 py-1.5 rounded-lg transition-colors"
                                 >
                                     <Building2 className="w-3.5 h-3.5" /> Departmana Aç
                                 </button>
                                 <button
                                     onClick={() => setSelectedIds(new Set())}
-                                    className="flex items-center gap-1.5 text-[11px] font-bold text-white/70 hover:text-white px-2 py-1.5 transition-colors"
+                                    disabled={Boolean(scanProgress)}
+                                    className="flex items-center gap-1.5 text-[11px] font-bold text-white/70 hover:text-white disabled:opacity-50 px-2 py-1.5 transition-colors"
                                 >
                                     <X className="w-3.5 h-3.5" /> Seçimi Temizle
                                 </button>

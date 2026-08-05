@@ -73,7 +73,13 @@ Durum: Uygulama başladı — 2026-08-05
 - ✅ 3B/14: "Eksik Profilleri Tamamla" backfill'i — `enrich.js` (needsEnrichment + extractExperiences), `POST /api/maintenance/enrich-profiles` (parti 10, 40 sn bütçe, kalan sayısı), bakım sürecine 5. adım olarak eklendi (`enrichedAt` damgası boş sonuçların sonsuz kuyruğunu önler); health-check `missingExperiences` sayacı
 - Doğrulama: 231/231 vitest (12 yeni), eslint 0 hata, build başarılı
 
-**Kalan:** Faz 1.5 (opsiyonel kuyruk), 2/5 kalan yüzeyler (ComparisonModal, Analytics, SendMessage koruması), 2B/8 (içe aktarmada positionAnalyses hedef skoru).
+**2026-08-05 — Tur 9 (Liste kalıcılığı + toplu otonom tarama, PR #71):**
+- ✅ Filtre/sıralama/sayfa durumu sessionStorage'da kalıcı — aday detayına gidip dönünce liste bırakıldığı gibi bulunur (görünüm değişimi bileşeni unmount ettiğinden yerel state sıfırlanıyordu)
+- ✅ Toplu "Otonom Tarama": seçili adaylardan HENÜZ taranmamış olanlar (aiAnalysis.starAnalysis yok) derin AI analizinden geçirilir — `scanService.deepScanCandidate` (SystemScanner ile birebir aynı kurallar: kanıt kontrolü, atanan pozisyon bağlayıcı, akıllı top-5, 0 puan "en iyi" olamaz, scoringStage kapısı); 3'lü paralel havuz, canlı ilerleme, onay diyaloğu, sonuç raporu (tarandı/CV'siz atlandı/sonuçsuz)
+- Not: scanService, SystemScanner.processOne'ın kural ikizi — davranış değişikliği ikisine birden uygulanmalı; uzun vadede SystemScanner'ın bu servise taşınması planlı
+- Doğrulama: 231/231 vitest, eslint 0 hata, build başarılı
+
+**Kalan:** Faz 1.5 (opsiyonel kuyruk), 2/5 kalan yüzeyler (ComparisonModal, Analytics, SendMessage koruması), 2B/8 (içe aktarmada positionAnalyses hedef skoru), SystemScanner→scanService birleştirme.
 
 Bu plan, bildirilen 6 sorunun kod incelemesiyle doğrulanmış kök nedenlerine ve fazlara ayrılmış çözüm adımlarına dayanır.
 
