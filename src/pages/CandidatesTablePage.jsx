@@ -697,14 +697,21 @@ export default function CandidatesTablePage() {
                                             <p className="font-bold text-slate-800 whitespace-nowrap">{c.name || 'İsimsiz'}</p>
                                             <p className="text-[10px] text-slate-400 whitespace-nowrap">{c.email || '—'}</p>
                                         </td>
-                                        <td className="px-3 py-2.5 text-slate-600 whitespace-nowrap">
+                                        {/* Serbest metin kolonları genişlik sınırlı: AI'nın ürettiği
+                                            uzun rol adları tabloyu yatayda taşırıyordu — kesilen
+                                            metnin tamamı tooltip'te. */}
+                                        <td className="px-3 py-2.5 text-slate-600">
                                             {c.matchedPositionTitle === null
-                                                ? <span className="italic text-amber-600 font-semibold">Uygun açık pozisyon yok</span>
-                                                : (c.bestTitle || c.position || '—')}
+                                                ? <p className="italic text-amber-600 font-semibold truncate max-w-[180px]">Uygun açık pozisyon yok</p>
+                                                : <p className="truncate max-w-[180px]" title={c.bestTitle || c.position || ''}>{c.bestTitle || c.position || '—'}</p>}
                                         </td>
                                         {/* CV'ye göre ideal rol — açık pozisyon eşleşmesinden AYRI kolon */}
-                                        <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap">{c.suggestedRole || c.position || '—'}</td>
-                                        <td className="px-3 py-2.5 text-slate-600 whitespace-nowrap">{c.department || '—'}</td>
+                                        <td className="px-3 py-2.5 text-slate-500">
+                                            <p className="truncate max-w-[160px]" title={c.suggestedRole || c.position || ''}>{c.suggestedRole || c.position || '—'}</p>
+                                        </td>
+                                        <td className="px-3 py-2.5 text-slate-600">
+                                            <p className="truncate max-w-[120px]" title={c.department || ''}>{c.department || '—'}</p>
+                                        </td>
                                         <td className="px-3 py-2.5"><StageChip status={c.status} /></td>
                                         <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap">{c.source || '—'}</td>
                                         <td className="px-3 py-2.5 text-center">
