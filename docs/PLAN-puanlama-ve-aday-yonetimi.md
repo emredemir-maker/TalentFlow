@@ -38,7 +38,15 @@ Durum: Uygulama başladı — 2026-08-05
 - ✅ 4B/11: Sidebar tek "Adaylar" girişi (`candidates-table`); "Aday Raporu" girişi kaldırıldı; Header hızlı geçişi güncellendi; detay/yükleme görünümü satır tıklaması + "Detay & Yükleme" butonuyla erişilir
 - ✅ **Deploy akışı düzeltildi:** TalentFlow klasörü git deposuymuş (`origin: emredemir-maker/TalentFlow`), canlıya deploy `firebase-deploy.yml` GitHub Actions ile main'den yapılıyor ve TÜM gerçek secrets (EMAIL_USER/PASS, GEMINI, FIREBASE) GitHub Secrets'ta. Tüm değişiklikler commit'lendi (918bdd9, önceki oturumun bekleyen firestore.rules sıkılaştırması dahil), PR #63 → main merge, CI deploy ✓ (3dk18sn) → **e-posta env'i GitHub Secrets'tan otomatik geri yüklendi; açık e-posta konusu kapandı.** Bundan sonra deploy = main'e merge; doğrudan `firebase deploy` kullanılmayacak.
 
-**Kalan:** Faz 1.5 (opsiyonel kuyruk), Faz 2/5 (UI null etiketi), 2B/7-8+10+12 (modal zorunlu pozisyon, positionAnalyses hedef skoru, UI yüzeyleri, onarım aracı), Faz 3A/5-6 (provenance + %98 kırpması), 3B/7-8+10-14.
+**2026-08-05 — Tur 4 (Onarım araçları + sentinel etiketleri, PR #65):**
+- ✅ 2B/12: "Eşleşmeleri Doğrula" bakım aracı — `functions/services/matchRepair.js` (salt mantık, 10 birim test): atama bağlayıcı → kanonikleştirme → iş hedefi kurtarma (bulkJobId) → anahtar-kelime → null sentinel; AI çağrısı yok, skorlara dokunmaz; `POST /api/maintenance/validate-matches` batch'li uygular
+- ✅ "Takılı İşleri Kapat" — tüm kayıtları işlenmiş ama özet yazımı hatasıyla 'error'da kalmış işleri 'completed' yapar (`POST /api/maintenance/close-stuck-jobs`); dünkü `__none__` kurbanı 3 iş bununla kapanacak
+- ✅ 2B/10 (kısmen): Bakım panelindeki iş tablosuna "Pozisyon" kolonu eklendi (API zaten dönüyordu, render edilmiyordu)
+- ✅ 2/5 (kısmen): `matchedPositionTitle === null` sentineli arayüzde "Uygun açık pozisyon yok" olarak görünür (aday başlığı + tablo pozisyon kolonu, CV'deki başlık tooltip'te)
+- ✅ 2B/7: Toplu yükleme modalında pozisyon seçilmediğinde uyarı ("genel havuza alınır, sizin pozisyonunuza göre puanlanmaz"); önceki partinin pozisyon seçimi modal açılışında sıfırlanır
+- Doğrulama: 214/214 vitest, eslint 0 hata, build başarılı
+
+**Kalan:** Faz 1.5 (opsiyonel kuyruk), 2/5 kalan yüzeyler (ComparisonModal, Analytics, SendMessage koruması), 2B/8+10 kalanı (içe aktarmada positionAnalyses hedef skoru, Pozisyon Eşleşmeleri sekmesinde hedef rozeti), Faz 3A/5-6 (provenance + %98 kırpması), 3B/7-8+10-14 (experiences, PDF sentinel, kesme, retry, duplicate stratejisi, backfill).
 
 Bu plan, bildirilen 6 sorunun kod incelemesiyle doğrulanmış kök nedenlerine ve fazlara ayrılmış çözüm adımlarına dayanır.
 

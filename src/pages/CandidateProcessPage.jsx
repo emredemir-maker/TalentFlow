@@ -22,7 +22,7 @@ import {
     AlertCircle, Trophy, Calendar, Edit3,
     CheckCircle2, Link2, ExternalLink, Video, Play, Award, User, Mail,
     ChevronRight, ChevronDown, BarChart2, MessageSquare, XCircle, Send, Loader2,
-    Sparkles, Trash2, RefreshCw, Layers, TrendingUp, Upload, FileQuestion
+    Sparkles, Trash2, RefreshCw, Layers, TrendingUp, Upload, FileQuestion, AlertTriangle
 } from 'lucide-react';
 
 const STATUS_CONFIG = {
@@ -934,6 +934,9 @@ export default function CandidateProcessPage() {
                                 setBulkFiles([]);
                                 setBulkJobIds([]);
                                 setBulkProgress({ total: 0, completed: 0, failed: 0, items: [] });
+                                // Önceki partinin pozisyon seçimi sessizce yeni
+                                // partiye taşınmasın
+                                setBulkPositionId('');
                             }
                             setBulkImportModal(true);
                         }}
@@ -1189,9 +1192,17 @@ export default function CandidateProcessPage() {
                                               than "what the CV literally says". Falls back to
                                               position/bestTitle when no AI match has run yet.
                                             */}
-                                            <p className="text-[11px] text-slate-500 font-medium" title={candidate.position && candidate.matchedPositionTitle && candidate.position !== candidate.matchedPositionTitle ? `CV: ${candidate.position}` : undefined}>
-                                                {candidate.matchedPositionTitle || candidate.position || candidate.bestTitle || '—'}
-                                            </p>
+                                            {candidate.matchedPositionTitle === null ? (
+                                                // Açık sentinel: sistem bu adayı hiçbir AÇIK pozisyona
+                                                // bağlayamadı — CV'deki serbest başlık eşleşme gibi gösterilmez.
+                                                <p className="text-[11px] text-amber-600 font-semibold italic" title={candidate.position ? `CV'deki pozisyon: ${candidate.position}` : undefined}>
+                                                    Uygun açık pozisyon yok
+                                                </p>
+                                            ) : (
+                                                <p className="text-[11px] text-slate-500 font-medium" title={candidate.position && candidate.matchedPositionTitle && candidate.position !== candidate.matchedPositionTitle ? `CV: ${candidate.position}` : undefined}>
+                                                    {candidate.matchedPositionTitle || candidate.position || candidate.bestTitle || '—'}
+                                                </p>
+                                            )}
                                             {candidate.email && (
                                                 <span className="text-[10px] text-slate-400 flex items-center gap-1">
                                                     <Mail className="w-3 h-3" /> {candidate.email}
@@ -2541,7 +2552,7 @@ export default function CandidateProcessPage() {
 
                                     {/* Position selector */}
                                     <div>
-                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Pozisyon (İsteğe Bağlı)</label>
+                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Hedef Pozisyon</label>
                                         <select
                                             value={bulkPositionId}
                                             onChange={e => setBulkPositionId(e.target.value)}
@@ -2552,6 +2563,12 @@ export default function CandidateProcessPage() {
                                                 <option key={p.id} value={p.id}>{p.title}</option>
                                             ))}
                                         </select>
+                                        {!bulkPositionId && (
+                                            <p className="mt-1.5 text-[10px] text-amber-600 font-semibold flex items-start gap-1">
+                                                <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
+                                                Pozisyon seçilmezse adaylar genel havuza alınır ve sizin belirlediğiniz bir pozisyona göre puanlanmaz — sistem en uygun açık pozisyonu kendisi seçer.
+                                            </p>
+                                        )}
                                     </div>
 
                                     <div className="flex gap-2 justify-end">

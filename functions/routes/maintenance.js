@@ -18,6 +18,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { db, admin } from '../config/firebaseAdmin.js';
 import { groupDuplicateCandidates } from '../services/duplicateScan.js';
 import { computePrescore } from '../services/prescore.js';
+import { planMatchRepairs, collectJobIdsNeedingLookup } from '../services/matchRepair.js';
 import { POSITIONS_COLL } from '../services/bulkWorker.js';
 import { childLogger } from '../services/logger.js';
 
@@ -209,6 +210,99 @@ router.post('/api/maintenance/prescore', requireAuth(ROLES), async (req, res) =>
         });
     } catch (err) {
         log.error(`[maintenance/prescore] ${err.message}`);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Pozisyon eşleşme onarımı: geçmişte doğrulanmadan yazılmış (sistemde
+// olmayan) matchedPositionTitle değerlerini deterministik kurallarla düzeltir
+// — AI çağrısı yapmaz, skorlara dokunmaz. Kurallar: services/matchRepair.js.
+router.post('/api/maintenance/validate-matches', requireAuth(ROLES), async (req, res) => {
+    try {
+        const posSnap = await db.collection(POSITIONS_COLL).where('status', '==', 'open').get();
+        const openPositions = posSnap.docs
+            .map((d) => ({ id: d.id, title: d.data().title }))
+            .filter((p) => Boolean(p.title));
+        if (openPositions.length === 0) {
+            return res.status(400).json({ error: 'Onarım için en az bir açık pozisyon gerekli.' });
+        }
+
+        const candSnap = await db.collection(CANDIDATES_COLL)
+            .select('matchedPositionTitle', 'positionId', 'bulkJobId', 'position', 'skills')
+            .get();
+        const candidates = candSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+        // Yalnızca kural 1-2'nin çözemediği adayların işleri okunur (tekil)
+        const jobIds = collectJobIdsNeedingLookup(candidates, openPositions);
+        const jobsById = new Map();
+        if (jobIds.length > 0) {
+            const jobRefs = jobIds.map((id) => db.doc(`${BULK_JOBS_COLL}/${id}`));
+            const jobDocs = await db.getAll(...jobRefs, { fieldMask: ['positionId', 'positionTitle'] });
+            for (const j of jobDocs) if (j.exists) jobsById.set(j.id, j.data());
+        }
+
+        const plans = planMatchRepairs(candidates, openPositions, jobsById);
+
+        // Tek istekte en fazla 2000 yazım (400'lük batch'ler); kalanı bildirilir
+        const MAX_WRITES = 2000;
+        const toApply = plans.slice(0, MAX_WRITES);
+        let applied = 0;
+        while (applied < toApply.length) {
+            const chunk = toApply.slice(applied, applied + 400);
+            const batch = db.batch();
+            for (const p of chunk) {
+                batch.update(db.collection(CANDIDATES_COLL).doc(p.id), {
+                    ...p.update,
+                    matchRepairedAt: admin.firestore.FieldValue.serverTimestamp(),
+                });
+            }
+            await batch.commit();
+            applied += chunk.length;
+        }
+
+        const byRule = {};
+        for (const p of toApply) byRule[p.rule] = (byRule[p.rule] || 0) + 1;
+        log.info(`[maintenance/validate-matches] ${candSnap.size} tarandı, ${applied} onarıldı: ${JSON.stringify(byRule)}`);
+        res.json({
+            scanned: candSnap.size,
+            repaired: applied,
+            byRule,
+            remaining: plans.length - toApply.length,
+        });
+    } catch (err) {
+        log.error(`[maintenance/validate-matches] ${err.message}`);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Tüm kayıtları işlenmiş ama son özet yazımı hatası yüzünden 'error'
+// etiketinde takılı kalmış toplu işleri 'completed' olarak kapatır (ör. eski
+// '__none__' rezerve alan adı hatası). Kayıt kaybı yoktur — yalnızca etiket
+// düzeltilir; orijinal hata mesajı lastErrorMessage alanında saklanır.
+router.post('/api/maintenance/close-stuck-jobs', requireAuth(ROLES), async (req, res) => {
+    try {
+        const snap = await db.collection(BULK_JOBS_COLL).where('status', '==', 'error').get();
+        let closed = 0;
+        const batch = db.batch();
+        for (const d of snap.docs) {
+            if (closed >= 400) break;
+            const j = d.data();
+            const total = j.totalCount || 0;
+            if (total > 0 && (j.processedCount || 0) >= total) {
+                batch.update(d.ref, {
+                    status: 'completed',
+                    errorMessage: null,
+                    lastErrorMessage: j.errorMessage || null,
+                    repairedAt: admin.firestore.FieldValue.serverTimestamp(),
+                });
+                closed++;
+            }
+        }
+        if (closed > 0) await batch.commit();
+        log.info(`[maintenance/close-stuck-jobs] ${snap.size} hatalı iş kontrol edildi, ${closed} kapatıldı`);
+        res.json({ checked: snap.size, closed });
+    } catch (err) {
+        log.error(`[maintenance/close-stuck-jobs] ${err.message}`);
         res.status(500).json({ error: err.message });
     }
 });
