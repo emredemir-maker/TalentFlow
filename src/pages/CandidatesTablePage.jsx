@@ -18,7 +18,7 @@ import { usePositions } from '../context/PositionsContext';
 import { calculateMatchScore } from '../services/matchService';
 import { STAGES, getStage } from '../utils/pipelineStages';
 import {
-    DEFAULT_FILTERS, applyTableFilters, sortRows, buildExportRows,
+    DEFAULT_FILTERS, applyTableFilters, withCoherentScores, sortRows, buildExportRows,
     resolveStageKey, getAppliedDate,
 } from '../utils/candidateTable';
 
@@ -197,12 +197,19 @@ export default function CandidatesTablePage() {
             : null),
         [filters.position, openPositions]
     );
+    // Tutarlılık: satırda gösterilen AI/Genel skorlar, satırda gösterilen
+    // pozisyonun skorudur — başka bir pozisyon için hesaplanmış eski skor
+    // başlığın yanında gösterilmez.
+    const coherentRows = useMemo(
+        () => withCoherentScores(enrichedCandidates, openPositions, (c, p) => calculateMatchScore(c, p).score),
+        [enrichedCandidates, openPositions]
+    );
     const filteredRows = useMemo(
-        () => applyTableFilters(enrichedCandidates, filters, {
+        () => applyTableFilters(coherentRows, filters, {
             position: selectedPosition,
             keywordScoreFn: (c, p) => calculateMatchScore(c, p).score,
         }),
-        [enrichedCandidates, filters, selectedPosition]
+        [coherentRows, filters, selectedPosition]
     );
     const sortedRows = useMemo(
         () => sortRows(filteredRows, sortKey, sortDir),

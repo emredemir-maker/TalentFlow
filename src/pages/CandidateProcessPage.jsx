@@ -865,7 +865,37 @@ export default function CandidateProcessPage() {
         return sourceColors?.[src.toLowerCase()] || '#64748B';
     };
 
-    const score = Math.round(candidate?.bestScore || 0);
+    // Skor tutarlılığı: gösterilen skor, gösterilen pozisyonun (matchedPositionTitle)
+    // skorudur — kayıtlı pozisyon analizi, o pozisyon için yapılmış derin analiz ve
+    // anahtar-kelime skorunun en büyüğü. Başlık açık bir pozisyona işaret etmiyorsa
+    // bestScore'a düşülür. (Eskiden başlık Growth PM iken başka pozisyonun eski
+    // %75'i gösterilebiliyordu; gerçek uyum %34'tü.)
+    const openByTitle = useMemo(
+        () => new Map((positions || []).filter(p => p.status === 'open' && p.title).map(p => [p.title, p])),
+        [positions]
+    );
+    const coherentScoreOf = (c) => {
+        if (!c) return 0;
+        const pos = c.matchedPositionTitle ? openByTitle.get(c.matchedPositionTitle) : null;
+        if (!pos) return Math.round(c.bestScore || 0);
+        const saved = Number(c.positionAnalyses?.[pos.title]?.score ?? 0);
+        const fromAnalysis = c.aiAnalysis?.analyzedForPosition === pos.title ? Number(c.aiAnalysis?.score || 0) : 0;
+        const keyword = Number(calculateMatchScore(c, pos)?.score || 0);
+        return Math.round(Math.max(saved, fromAnalysis, keyword));
+    };
+    const score = coherentScoreOf(candidate);
+
+    // Gerçek STAR metodolojisi skoru (S+T+A+R ortalaması × 10). Yoksa null —
+    // rozet '—' gösterir. Eskiden bu rozet bestScore*0.98 gösteriyordu: hem
+    // belgesiz bir kırpmaydı hem de STAR ile ilgisi yoktu.
+    const starScoreOf = (c) => {
+        const sa = c?.aiAnalysis?.starAnalysis;
+        if (!sa) return null;
+        const val = (k) => Number(sa[k]?.score ?? sa[k] ?? 0);
+        const sum = val('Situation') + val('Task') + val('Action') + val('Result');
+        return Math.min(100, Math.max(0, Math.round((sum / 4) * 10)));
+    };
+    const starScore = starScoreOf(candidate);
 
     // ── TOP 2% BADGE ────────────────────────────────────────────────────────────
     const isTop2Percent = useMemo(() => {
@@ -1096,7 +1126,7 @@ export default function CandidateProcessPage() {
                         )}
                         {filtered.map(c => {
                             const mc = applyPiiMask(c, role);
-                            const sc = Math.round(c.bestScore || 0);
+                            const sc = coherentScoreOf(c);
                             const srcColor = getSourceColor(c.source);
                             const isActive = c.id === candidate?.id;
                             return (
@@ -1220,9 +1250,9 @@ export default function CandidateProcessPage() {
                                     via colour + percentage; dropped it. STAR (methodology score)
                                     and Eleme (screening) stay because they're distinct metrics. */}
                                 <div className="flex items-center gap-2">
-                                    <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">
+                                    <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5" title={starScore == null ? 'STAR analizi henüz çalıştırılmadı' : 'STAR metodolojisi skoru (S+T+A+R ortalaması)'}>
                                         <span className="text-[9px] font-bold text-slate-400 uppercase">STAR</span>
-                                        <span className="text-[13px] font-black text-slate-800">{candidate.bestScore ? `${Math.round(candidate.bestScore * 0.98)}%` : '—'}</span>
+                                        <span className="text-[13px] font-black text-slate-800">{starScore != null ? `${starScore}%` : '—'}</span>
                                     </div>
                                     {candidate.screeningScore != null && (
                                         <div className="flex items-center gap-1.5 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-1.5">
@@ -1386,10 +1416,21 @@ export default function CandidateProcessPage() {
                                                 </span>
                                             </div>
                                             <p className="text-[12px] text-slate-600 leading-relaxed italic font-medium pr-16">
-                                                "{candidate.aiAnalysis?.summary || `${candidate.name} teknik profili, ${candidate.position || 'Hedef Pozisyon'} pozisyonu ile %${score} uyum göstermektedir.`}"
+                                                "{candidate.aiAnalysis?.summary || `${candidate.name} teknik profili, ${candidate.matchedPositionTitle || candidate.position || 'Hedef Pozisyon'} pozisyonu ile %${score} uyum göstermektedir.`}"
                                             </p>
+                                            {/* Eski analiz uyarısı: metin başka bir pozisyon için üretildiyse
+                                                bunu açıkça söyle — skor rozeti her zaman GÜNCEL eşleşmenin
+                                                skorunu gösterir, eski analizin skorunu değil. */}
+                                            {candidate.aiAnalysis?.analyzedForPosition &&
+                                                candidate.matchedPositionTitle &&
+                                                candidate.aiAnalysis.analyzedForPosition !== candidate.matchedPositionTitle && (
+                                                <p className="mt-1.5 text-[10px] text-amber-600 font-semibold flex items-center gap-1">
+                                                    <AlertTriangle className="w-3 h-3 shrink-0" />
+                                                    Bu değerlendirme metni "{candidate.aiAnalysis.analyzedForPosition}" pozisyonu için üretilmiş eski bir analizdir; güncel eşleşme ({candidate.matchedPositionTitle}) için AI Analiz'i yeniden çalıştırın.
+                                                </p>
+                                            )}
                                             <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 bg-white border border-slate-200 rounded-lg text-[10px] font-black text-cyan-600 shadow-sm">
-                                                <Zap className="w-3 h-3 text-amber-400 fill-amber-400" /> %{score} Uyum Skoru Doğrulandı
+                                                <Zap className="w-3 h-3 text-amber-400 fill-amber-400" /> %{score} Uyum{candidate.matchedPositionTitle ? ` — ${candidate.matchedPositionTitle}` : ''}
                                             </div>
                                         </div>
 
