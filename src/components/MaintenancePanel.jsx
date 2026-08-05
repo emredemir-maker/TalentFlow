@@ -208,18 +208,38 @@ export default function MaintenancePanel() {
         }
     };
 
-    // Sunucu her çağrıda en fazla 40 adayı puanlayıp kalanı döndürür;
-    // kalan 0 olana dek zincirleme çağrılır.
+    // Geçici hatalarda (zaman aşımı / 5xx / ağ) kısa bekleyip yeniden dener —
+    // uzun zincirli işlemler tek aksaklıkta ölmesin.
+    const fetchWithRetry = async (url, init, tries = 3) => {
+        for (let attempt = 1; ; attempt++) {
+            try {
+                return await authedFetch(url, init);
+            } catch (err) {
+                const transient = /55 saniyede|geçici olarak|ulaşılamadı/.test(err.message || '');
+                if (!transient || attempt >= tries || unmountedRef.current) throw err;
+                await new Promise(r => setTimeout(r, 4000 * attempt));
+            }
+        }
+    };
+
+    // Sunucu her çağrıda küçük bir partiyi puanlayıp kalanı döndürür; kalan
+    // 0 olana dek zincirleme çağrılır. Parti küçük tutulur (Gemini kota
+    // beklemeleri tek çağrıyı 30+ sn'ye taşıyabiliyor) ve sunucu ayrıca
+    // 40 sn'lik süre bütçesiyle kendini korur — 55 sn'lik istemci iptaline
+    // takılmaz. Puanlanan her aday kalıcıdır: yarıda kalırsa tekrar
+    // basıldığında kaldığı yerden devam eder.
+    const PRESCORE_BATCH = 15;
     const runPrescore = async () => {
         setRunning('score');
         setError(null);
+        let totals = { updated: 0, aiUsed: 0, failed: 0, remaining: 1 };
         try {
-            let totals = { updated: 0, aiUsed: 0, failed: 0, remaining: 1 };
+            let prevRemaining = Infinity;
             while (totals.remaining > 0 && !unmountedRef.current) {
-                const data = await authedFetch('/api/maintenance/prescore', {
+                const data = await fetchWithRetry('/api/maintenance/prescore', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ batchSize: 40 }),
+                    body: JSON.stringify({ batchSize: PRESCORE_BATCH }),
                 });
                 totals = {
                     updated: totals.updated + (data.updated || 0),
@@ -229,11 +249,19 @@ export default function MaintenancePanel() {
                 };
                 setPrescoreProgress({ ...totals });
                 if ((data.processed || 0) === 0) break; // ilerleme yoksa sonsuz döngüye girme
+                // Kalan azalmıyorsa (sürekli başarısız olan kayıtlar) durup bildir
+                if (totals.remaining >= prevRemaining) break;
+                prevRemaining = totals.remaining;
             }
-            markDone('score', `${totals.updated} aday puanlandı (${totals.aiUsed} AI, ${totals.updated - totals.aiUsed} anahtar-kelime)${totals.failed > 0 ? ` · ${totals.failed} hata` : ''}`);
+            const summary = `${totals.updated} aday puanlandı (${totals.aiUsed} AI, ${totals.updated - totals.aiUsed} anahtar-kelime)`
+                + (totals.failed > 0 ? ` · ${totals.failed} hata` : '')
+                + (totals.remaining > 0 ? ` · ${totals.remaining} aday puanlanamadı — adımı tekrar çalıştırabilirsiniz` : '');
+            markDone('score', summary);
             await refreshHealth();
         } catch (err) {
-            setError(err.message);
+            // Yarıda kesilme: o ana kadarki ilerleme kalıcı — kullanıcıya söyle
+            setError(`${err.message}${totals.updated > 0 ? ` — Şu ana kadar ${totals.updated} aday puanlandı; ilerleme kayıtlı, "Puanla"ya tekrar basınca kaldığı yerden devam eder.` : ''}`);
+            await refreshHealth();
         } finally {
             setRunning(null);
             setPrescoreProgress(null);

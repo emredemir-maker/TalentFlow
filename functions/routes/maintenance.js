@@ -165,6 +165,13 @@ router.post('/api/maintenance/prescore', requireAuth(ROLES), async (req, res) =>
             log.warn(`[maintenance/prescore] open positions read failed: ${posErr.message}`);
         }
 
+        // Süre bütçesi: Hosting rewrite 60 sn'de, istemci 55 sn'de keser.
+        // Gemini yavaşlar/kota bekletirse (tek çağrı retry'larla 30+ sn
+        // sürebilir) parti yarıda kalmasın: bütçe dolunca yeni aday alınmaz,
+        // o ana kadarki sonuç ve gerçek 'remaining' döndürülür — istemci
+        // zinciri kaldığı yerden sürdürür.
+        const startedAt = Date.now();
+        const DEADLINE_MS = 40000;
         let updated = 0;
         let failed = 0;
         let aiUsed = 0;
@@ -173,6 +180,7 @@ router.post('/api/maintenance/prescore', requireAuth(ROLES), async (req, res) =>
         await Promise.all(
             Array.from({ length: Math.min(4, batchDocs.length) }, async () => {
                 while (idx < batchDocs.length) {
+                    if (Date.now() - startedAt > DEADLINE_MS) break;
                     const docSnap = batchDocs[idx];
                     idx += 1;
                     try {
@@ -200,13 +208,18 @@ router.post('/api/maintenance/prescore', requireAuth(ROLES), async (req, res) =>
             })
         );
 
-        log.info(`[maintenance/prescore] batch done: ${updated} updated (${aiUsed} AI), ${failed} failed, ${pendingRefs.length - batchDocs.length} remaining`);
+        // Süre bütçesi dolduysa partinin tamamı denenmemiş olabilir —
+        // 'attempted' gerçek sayıdır ve remaining ona göre hesaplanır.
+        const attempted = Math.min(idx, batchDocs.length);
+        const deadlineHit = attempted < batchDocs.length;
+        log.info(`[maintenance/prescore] batch done: ${updated} updated (${aiUsed} AI), ${failed} failed, ${pendingRefs.length - attempted} remaining${deadlineHit ? ' (süre bütçesi doldu)' : ''}`);
         res.json({
-            processed: batchDocs.length,
+            processed: attempted,
             updated,
             failed,
             aiUsed,
-            remaining: pendingRefs.length - batchDocs.length,
+            deadlineHit,
+            remaining: pendingRefs.length - attempted,
         });
     } catch (err) {
         log.error(`[maintenance/prescore] ${err.message}`);
