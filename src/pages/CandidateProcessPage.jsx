@@ -626,8 +626,26 @@ export default function CandidateProcessPage() {
         const c = targetCandidate || candidate;
         if (!c || analyzingIds.has(c.id)) return;
 
-        // Skip if already has a complete STAR analysis (use forceRescan via SystemScanner for re-analysis)
-        if (c.aiAnalysis?.starAnalysis) return;
+        // Eski davranış: mevcut STAR analizi varsa buton SESSİZCE hiçbir şey
+        // yapmıyordu — kullanıcı "analiz çalışmıyor" sanıyordu. Artık yeniden
+        // analiz onaylatılır (eski/yanlış pozisyona yapılmış analizler de
+        // böylece tazelenebilir).
+        if (c.aiAnalysis?.starAnalysis) {
+            const ok = window.confirm(
+                `${c.name || 'Bu aday'} için mevcut bir otonom analiz var` +
+                (c.aiAnalysis?.analyzedForPosition ? ` ("${c.aiAnalysis.analyzedForPosition}" pozisyonu için)` : '') +
+                `.\nYeniden analiz edilsin mi? Mevcut analiz güncellenecek.`
+            );
+            if (!ok) return;
+        }
+
+        // Kanıt kontrolü: CV gövdesi ve deneyim listesi boşsa analiz boş
+        // girdiyle çalışıp yanıltıcı düşük skor üretir — açık hata göster.
+        const cvBody = `${c.cvData || ''}${c.cvText || ''}`.trim();
+        if (cvBody.length < 40 && !(c.experiences?.length > 0)) {
+            setAnalysisError('CV metni bulunamadı — önce Bakım > "Eksik Profilleri Tamamla" çalıştırın ya da adayın CV\'sini yeniden yükleyin.');
+            return;
+        }
 
         setAnalyzingIds(prev => new Set(prev).add(c.id));
         setAnalysisError(null);
