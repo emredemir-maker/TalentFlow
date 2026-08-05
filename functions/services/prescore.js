@@ -47,7 +47,8 @@ Sadece şu JSON formatında yanıt ver (başka hiçbir şey yazma):
 {
   "matchScore": 75,
   "matchedPosition": "Skorun verildiği pozisyon başlığı",
-  "matchReason": "1-2 cümlelik skor gerekçesi (Türkçe)"
+  "matchReason": "1-2 cümlelik skor gerekçesi (Türkçe)",
+  "suggestedRole": "Adayın CV'sine göre EN UYGUN olacağı rol — açık pozisyon listesinden BAĞIMSIZ, serbest metin (Türkçe)"
 }
 
 CV:
@@ -68,6 +69,7 @@ ${cvText.substring(0, 6000)}`;
                             score: Math.max(0, Math.min(100, Math.round(score))),
                             matchedTitle: validated,
                             matchReason: parsed?.matchReason || '',
+                            suggestedRole: parsed?.suggestedRole || '',
                             method: 'ai',
                         };
                     }
@@ -78,6 +80,7 @@ ${cvText.substring(0, 6000)}`;
                             score: Math.max(0, Math.min(100, Math.round(score))),
                             matchedTitle: null,
                             matchReason: parsed?.matchReason || '',
+                            suggestedRole: parsed?.suggestedRole || '',
                             method: 'ai',
                         };
                     }

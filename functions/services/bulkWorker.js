@@ -116,6 +116,7 @@ Sadece şu JSON formatında yanıt ver (başka hiçbir şey yazma):
   "experience": 5,
   "education": "Son okul / Bölüm",
   "summary": "Kısa özet (Türkçe, max 300 karakter)",
+  "suggestedRole": "Adayın CV'sine göre EN UYGUN olacağı rol — açık pozisyon listesinden BAĞIMSIZ, serbest metin (Türkçe)",
   "matchScore": 75,
   "matchedPosition": "Skorun verildiği pozisyon başlığı",
   "matchReason": "1-2 cümlelik skor gerekçesi (Türkçe)"
@@ -437,6 +438,9 @@ async function executeJob(jobId) {
                         experience: parsed?.experience || 0,
                         education: parsed?.education || '',
                         summary: parsed?.summary || '',
+                        // CV'ye göre ideal rol — açık pozisyon eşleşmesinden ayrı
+                        // bir bilgi olarak saklanır ve UI'da ayrıca gösterilir.
+                        suggestedRole: parsed?.suggestedRole || parsed?.position || '',
                         cvText: cvText.slice(0, 6000),
                         cvFileName: item.originalName || '',
                         matchScore,

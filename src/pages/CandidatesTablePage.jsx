@@ -491,8 +491,16 @@ export default function CandidatesTablePage() {
                                         </td>
                                         <td className="px-3 py-2.5 text-slate-600 whitespace-nowrap">
                                             {c.matchedPositionTitle === null
-                                                ? <span className="italic text-amber-600 font-semibold" title={c.position ? `CV'deki pozisyon: ${c.position}` : ''}>Uygun açık pozisyon yok</span>
+                                                ? <span className="italic text-amber-600 font-semibold">Uygun açık pozisyon yok</span>
                                                 : (c.bestTitle || c.position || '—')}
+                                            {/* CV'ye göre ideal rol — açık pozisyon eşleşmesinden ayrı bilgi */}
+                                            {(() => {
+                                                const cvRole = c.suggestedRole || c.position;
+                                                const shown = c.matchedPositionTitle === null ? null : (c.bestTitle || c.position);
+                                                return cvRole && cvRole !== shown
+                                                    ? <p className="text-[9px] text-slate-400 mt-0.5">CV'ye göre: {cvRole}</p>
+                                                    : null;
+                                            })()}
                                         </td>
                                         <td className="px-3 py-2.5 text-slate-600 whitespace-nowrap">{c.department || '—'}</td>
                                         <td className="px-3 py-2.5"><StageChip status={c.status} /></td>
