@@ -46,6 +46,10 @@ Durum: Uygulama başladı — 2026-08-05
 - ✅ 2B/7: Toplu yükleme modalında pozisyon seçilmediğinde uyarı ("genel havuza alınır, sizin pozisyonunuza göre puanlanmaz"); önceki partinin pozisyon seçimi modal açılışında sıfırlanır
 - Doğrulama: 214/214 vitest, eslint 0 hata, build başarılı
 
+**2026-08-05 — Tur 5 (Yönlendirmeli bakım süreci, PR #66):**
+- ✅ Bakım paneli tek tek butonlardan YÖNLENDİRMELİ sürece dönüştürüldü: `GET /api/maintenance/health-check` tüm sayaçları tek aday-projeksiyon okumasıyla üretir (takılı iş / mükerrer / geçersiz eşleşme / 0 skor); panel adımları sırayla listeler, sayacı 0 olanları "Gerek yok ✓" kapatır, sıradaki gerekli adımı vurgulayıp tek buton gösterir (Atla seçenekli). Adım sırası: takılı işler → mükerrer temizliği (AI maliyeti kopyalara gitmesin) → eşleşme onarımı (bedava) → ön skor (hafif AI). Süreç bitince "Sistem Taraması'nı çalıştırın" önerisi gösterilir.
+- Doğrulama: 214/214 vitest, eslint temiz, build başarılı
+
 **Kalan:** Faz 1.5 (opsiyonel kuyruk), 2/5 kalan yüzeyler (ComparisonModal, Analytics, SendMessage koruması), 2B/8+10 kalanı (içe aktarmada positionAnalyses hedef skoru, Pozisyon Eşleşmeleri sekmesinde hedef rozeti), Faz 3A/5-6 (provenance + %98 kırpması), 3B/7-8+10-14 (experiences, PDF sentinel, kesme, retry, duplicate stratejisi, backfill).
 
 Bu plan, bildirilen 6 sorunun kod incelemesiyle doğrulanmış kök nedenlerine ve fazlara ayrılmış çözüm adımlarına dayanır.

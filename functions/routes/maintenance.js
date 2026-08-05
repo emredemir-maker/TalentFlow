@@ -214,6 +214,66 @@ router.post('/api/maintenance/prescore', requireAuth(ROLES), async (req, res) =>
     }
 });
 
+// Bakım süreci durum tespiti — panelin adım adım yönlendirmesi için tüm
+// sayaçları TEK aday projeksiyon okumasıyla üretir: takılı işler, mükerrer
+// fazlalıklar, geçersiz pozisyon eşleşmeleri ve 0 skorlu adaylar.
+router.get('/api/maintenance/health-check', requireAuth(ROLES), async (req, res) => {
+    try {
+        const posSnap = await db.collection(POSITIONS_COLL).where('status', '==', 'open').get();
+        const openPositions = posSnap.docs
+            .map((d) => ({ id: d.id, title: d.data().title }))
+            .filter((p) => Boolean(p.title));
+
+        const candSnap = await db.collection(CANDIDATES_COLL)
+            .select('name', 'email', 'phone', 'source', 'bulkJobId', 'createdAt',
+                'matchedPositionTitle', 'positionId', 'position', 'skills',
+                'initialAiScore', 'matchScore', 'aiScore')
+            .get();
+        const candidates = candSnap.docs.map((d) => {
+            const c = d.data();
+            return { id: d.id, ...c, createdAtMs: c.createdAt?.toMillis?.() || 0 };
+        });
+
+        const dupGroups = groupDuplicateCandidates(candidates);
+        const duplicates = dupGroups.reduce((s, g) => s + g.extras.length, 0);
+
+        const scoreOf = (c) => Number(c.initialAiScore || 0) || Number(c.matchScore || 0) || Number(c.aiScore || 0);
+        const zeroScore = candidates.filter((c) => scoreOf(c) <= 0).length;
+
+        let invalidMatches = 0;
+        if (openPositions.length > 0) {
+            const jobIds = collectJobIdsNeedingLookup(candidates, openPositions);
+            const jobsById = new Map();
+            if (jobIds.length > 0) {
+                const jobDocs = await db.getAll(
+                    ...jobIds.map((id) => db.doc(`${BULK_JOBS_COLL}/${id}`)),
+                    { fieldMask: ['positionId', 'positionTitle'] }
+                );
+                for (const j of jobDocs) if (j.exists) jobsById.set(j.id, j.data());
+            }
+            invalidMatches = planMatchRepairs(candidates, openPositions, jobsById).length;
+        }
+
+        const errSnap = await db.collection(BULK_JOBS_COLL).where('status', '==', 'error').get();
+        const stuckJobs = errSnap.docs.filter((d) => {
+            const j = d.data();
+            return (j.totalCount || 0) > 0 && (j.processedCount || 0) >= (j.totalCount || 0);
+        }).length;
+
+        res.json({
+            totalCandidates: candidates.length,
+            openPositions: openPositions.length,
+            stuckJobs,
+            duplicates,
+            invalidMatches,
+            zeroScore,
+        });
+    } catch (err) {
+        log.error(`[maintenance/health-check] ${err.message}`);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Pozisyon eşleşme onarımı: geçmişte doğrulanmadan yazılmış (sistemde
 // olmayan) matchedPositionTitle değerlerini deterministik kurallarla düzeltir
 // — AI çağrısı yapmaz, skorlara dokunmaz. Kurallar: services/matchRepair.js.
