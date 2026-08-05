@@ -49,6 +49,33 @@ export function scoreForPosition(candidate, position, keywordScoreFn) {
 }
 
 /**
+ * Skor tutarlılığı kuralı: GÖSTERİLEN skor, GÖSTERİLEN pozisyonun skorudur.
+ *
+ * Adayın matchedPositionTitle'ı açık bir pozisyona işaret ediyorsa satırdaki
+ * AI skoru o pozisyonun skoru olur (kayıtlı pozisyon analizi, o pozisyon için
+ * yapılmış derin analiz ve anahtar-kelime skorunun en büyüğü). Aksi halde
+ * (başlık yok/kapalı) mevcut bestScore korunur. combinedScore mülakat
+ * skoruyla aynı formülle yeniden türetilir. Eski davranış "en iyi eşleşme"
+ * skorunu başka bir pozisyonun başlığının yanında gösterip yanıltıyordu
+ * (örn. başlık Growth PM, skor eski bir analizden %75, gerçek uyum %34).
+ */
+export function withCoherentScores(rows, openPositions, keywordScoreFn) {
+    const byTitle = new Map((openPositions || []).map((p) => [p.title, p]));
+    return rows.map((c) => {
+        const pos = c.matchedPositionTitle ? byTitle.get(c.matchedPositionTitle) : null;
+        if (!pos) return c;
+        const fromAnalysis = c.aiAnalysis?.analyzedForPosition === pos.title
+            ? Number(c.aiAnalysis?.score || 0)
+            : 0;
+        const score = Math.round(Math.max(scoreForPosition(c, pos, keywordScoreFn), fromAnalysis));
+        const combined = c.interviewScore != null
+            ? Math.round((score + Number(c.interviewScore)) / 2)
+            : score;
+        return { ...c, bestScore: score, combinedScore: combined };
+    });
+}
+
+/**
  * Filter enriched candidates for the table view.
  * All filters combine with AND; 'all' / empty string means "not active".
  *

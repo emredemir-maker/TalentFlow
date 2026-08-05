@@ -4,6 +4,7 @@ import {
     getAppliedDate,
     applyTableFilters,
     scoreForPosition,
+    withCoherentScores,
     sortRows,
     buildExportRows,
     DEFAULT_FILTERS,
@@ -117,6 +118,52 @@ describe('scoreForPosition', () => {
     it('returns 0 for missing analysis, missing position, or empty candidate', () => {
         expect(scoreForPosition({}, POSITION)).toBe(0);
         expect(scoreForPosition({}, null, () => 90)).toBe(0);
+    });
+});
+
+describe('withCoherentScores', () => {
+    const OPEN = [{ id: 'p1', title: 'Growth Product Manager' }];
+
+    it('replaces the best-fit score with the DISPLAYED position\'s score', () => {
+        // Eda vakası: başlık Growth PM, eski analiz başka pozisyon için %75,
+        // Growth PM'in gerçek skoru %34 — satır %34 göstermeli.
+        const rows = withCoherentScores([{
+            id: 'c1', matchedPositionTitle: 'Growth Product Manager',
+            bestScore: 75, combinedScore: 75, interviewScore: null,
+            positionAnalyses: {},
+            aiAnalysis: { score: 75, analyzedForPosition: 'Senior Performance Marketing Specialist' },
+        }], OPEN, () => 34);
+        expect(rows[0].bestScore).toBe(34);
+        expect(rows[0].combinedScore).toBe(34);
+    });
+
+    it('uses the deep-analysis score when it was made FOR the displayed position', () => {
+        const rows = withCoherentScores([{
+            id: 'c1', matchedPositionTitle: 'Growth Product Manager',
+            bestScore: 20, interviewScore: null, positionAnalyses: {},
+            aiAnalysis: { score: 81, analyzedForPosition: 'Growth Product Manager' },
+        }], OPEN, () => 34);
+        expect(rows[0].bestScore).toBe(81);
+    });
+
+    it('recombines the interview score with the coherent AI score', () => {
+        const rows = withCoherentScores([{
+            id: 'c1', matchedPositionTitle: 'Growth Product Manager',
+            bestScore: 75, interviewScore: 90,
+            positionAnalyses: { 'Growth Product Manager': { score: 40 } },
+        }], OPEN, () => 0);
+        expect(rows[0].bestScore).toBe(40);
+        expect(rows[0].combinedScore).toBe(65); // (40+90)/2
+    });
+
+    it('leaves rows untouched when the title is absent or not an open position', () => {
+        const input = [
+            { id: 'a', matchedPositionTitle: null, bestScore: 70, combinedScore: 70 },
+            { id: 'b', matchedPositionTitle: 'Kapalı Pozisyon', bestScore: 60, combinedScore: 60 },
+        ];
+        const rows = withCoherentScores(input, OPEN, () => 99);
+        expect(rows[0].bestScore).toBe(70);
+        expect(rows[1].bestScore).toBe(60);
     });
 });
 
