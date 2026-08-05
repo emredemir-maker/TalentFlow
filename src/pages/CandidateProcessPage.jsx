@@ -948,6 +948,13 @@ export default function CandidateProcessPage() {
             {/* SUB-HEADER — page-level controls, the brand/title now lives in Header */}
             <div className="bg-white border-b border-slate-200 px-8 py-3 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'candidates-table' }))}
+                        className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors"
+                        title="Aday listesine (tablo görünümü) dön"
+                    >
+                        <ChevronRight className="w-3.5 h-3.5 rotate-180" /> Listeye Dön
+                    </button>
                     <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-widest">Aday Yönetimi</span>
                     <div className="rounded-full bg-slate-100 text-slate-500 text-[11px] px-2.5 py-0.5 font-bold">
                         {candidates.length}

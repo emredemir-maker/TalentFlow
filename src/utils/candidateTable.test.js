@@ -233,6 +233,7 @@ describe('buildExportRows', () => {
             'E-posta': 'ayse@example.com',
             'Telefon': '+90 555 111 1111',
             'Pozisyon': 'Frontend Developer',
+            "CV'ye Göre İdeal Rol": 'Frontend Developer',
             'Departman': 'Yazılım',
             'Aşama': 'Mülakat',
             'Kaynak': 'LinkedIn',

@@ -6,11 +6,14 @@
 // utils/candidateTable.js so it stays unit-testable; this component only
 // owns filter state and rendering. The xlsx library is imported lazily on
 // the first export click so it never enters the initial bundle.
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
     Search, Download, Users, ChevronUp, ChevronDown, ChevronLeft, ChevronRight,
     FilterX, Table2, Wrench, CheckSquare, Square, Layers, X, Loader2, AlertCircle, CheckCircle2,
+    Share2, Building2,
 } from 'lucide-react';
+import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { db } from '../config/firebase';
 import MaintenancePanel from '../components/MaintenancePanel';
 import { useAuth } from '../context/AuthContext';
 import { useCandidates } from '../context/CandidatesContext';
@@ -64,11 +67,56 @@ function SortableHeader({ label, sortKey, activeKey, dir, onSort, align = 'left'
 
 const SELECT_CLS = 'text-[12px] border border-slate-200 rounded-lg bg-white px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-100 text-slate-700';
 
-// Toplu statü değişikliği modali — statü listesi tek kaynaktan (pipelineStages)
-// gelir; CandidateProcessPage'deki tekil değişiklikle aynı damgaları basar.
-function BulkStageModal({ isOpen, count, applying, onApply, onClose }) {
+// Toplu işlem modali — üç tür: aşama (pipelineStages'ten), kaynak (sources
+// koleksiyonundan, opsiyonel alt mecra) ve departmana açma (departments
+// koleksiyonundan; adayın visibleToDepartments listesine eklenir — pozisyon
+// tarafındaki "Departmana Aç" ile aynı görünürlük mekanizması).
+const BULK_TYPES = {
+    stage:      { title: 'Toplu Aşama Değişikliği',   icon: Layers,    warn: (n) => `Seçili ${n} adayın aşaması topluca değiştirilecek.` },
+    source:     { title: 'Toplu Kaynak Değişikliği',  icon: Share2,    warn: (n) => `Seçili ${n} adayın kaynak bilgisi topluca değiştirilecek.` },
+    department: { title: 'Departmana Aç',             icon: Building2, warn: (n) => `Seçili ${n} aday, seçeceğiniz departmanın kullanıcılarına görünür olacak.` },
+};
+
+function BulkActionModal({ isOpen, type, count, applying, onApply, onClose }) {
     const [stageKey, setStageKey] = useState('');
+    const [sources, setSources] = useState(null);
+    const [sourceName, setSourceName] = useState('');
+    const [subSource, setSubSource] = useState('');
+    const [departments, setDepartments] = useState(null);
+    const [departmentName, setDepartmentName] = useState('');
+
+    // Tür değişince seçimler sıfırlanır; kaynak/departman listeleri modal
+    // açıldığında Firestore'dan çekilir.
+    useEffect(() => {
+        if (!isOpen) return;
+        setStageKey(''); setSourceName(''); setSubSource(''); setDepartmentName('');
+        const load = async (path, setter) => {
+            try {
+                const snap = await getDocs(query(collection(db, path), orderBy('name', 'asc')));
+                setter(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            } catch {
+                setter([]);
+            }
+        };
+        if (type === 'source') { setSources(null); load('artifacts/talent-flow/public/data/sources', setSources); }
+        if (type === 'department') { setDepartments(null); load('artifacts/talent-flow/public/data/departments', setDepartments); }
+    }, [isOpen, type]);
+
     if (!isOpen) return null;
+    const cfg = BULK_TYPES[type];
+    const Icon = cfg.icon;
+    const selectedSource = (sources || []).find(s => s.name === sourceName);
+    const canApply = type === 'stage' ? Boolean(stageKey)
+        : type === 'source' ? Boolean(sourceName)
+        : Boolean(departmentName);
+    const apply = () => {
+        if (!canApply) return;
+        if (type === 'stage') onApply({ type, stageKey });
+        else if (type === 'source') onApply({ type, source: sourceName, sourceDetail: subSource });
+        else onApply({ type, department: departmentName });
+    };
+    const OPTION_CLS = (active) => `flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-left transition-all ${active ? 'border-slate-400 bg-slate-50 shadow-sm' : 'border-slate-100 hover:border-slate-200'}`;
+
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={applying ? undefined : onClose} />
@@ -76,10 +124,10 @@ function BulkStageModal({ isOpen, count, applying, onApply, onClose }) {
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-xl bg-[#13294E] flex items-center justify-center">
-                            <Layers className="w-4.5 h-4.5 text-white" />
+                            <Icon className="w-4.5 h-4.5 text-white" />
                         </div>
                         <div>
-                            <h3 className="text-[14px] font-black text-slate-900">Toplu Statü Değişikliği</h3>
+                            <h3 className="text-[14px] font-black text-slate-900">{cfg.title}</h3>
                             <p className="text-[10px] text-slate-400 font-bold">{count} aday seçildi</p>
                         </div>
                     </div>
@@ -87,38 +135,77 @@ function BulkStageModal({ isOpen, count, applying, onApply, onClose }) {
                         <X className="w-4 h-4" />
                     </button>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                    {STAGES.map((s) => (
-                        <button
-                            key={s.key}
-                            type="button"
-                            onClick={() => setStageKey(s.key)}
-                            className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-left transition-all ${stageKey === s.key
-                                ? 'border-slate-400 bg-slate-50 shadow-sm'
-                                : 'border-slate-100 hover:border-slate-200'}`}
-                        >
-                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: s.color }} />
-                            <span className={`text-[12px] font-bold ${stageKey === s.key ? 'text-slate-900' : 'text-slate-600'}`}>{s.label}</span>
-                        </button>
-                    ))}
-                </div>
+
+                {type === 'stage' && (
+                    <div className="grid grid-cols-2 gap-2">
+                        {STAGES.map((s) => (
+                            <button key={s.key} type="button" onClick={() => setStageKey(s.key)} className={OPTION_CLS(stageKey === s.key)}>
+                                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: s.color }} />
+                                <span className={`text-[12px] font-bold ${stageKey === s.key ? 'text-slate-900' : 'text-slate-600'}`}>{s.label}</span>
+                            </button>
+                        ))}
+                    </div>
+                )}
+
+                {type === 'source' && (
+                    sources === null ? (
+                        <div className="flex items-center gap-2 text-slate-400 text-[11px] py-4"><Loader2 className="w-4 h-4 animate-spin" /> Kaynaklar yükleniyor…</div>
+                    ) : sources.length === 0 ? (
+                        <p className="text-[11px] text-slate-400 py-4">Tanımlı kaynak yok — Kaynak Yönetimi sayfasından ekleyebilirsiniz.</p>
+                    ) : (
+                        <div className="space-y-3">
+                            <div className="grid grid-cols-2 gap-2 max-h-52 overflow-y-auto pr-1">
+                                {sources.map((s) => (
+                                    <button key={s.id} type="button" onClick={() => { setSourceName(s.name); setSubSource(''); }} className={OPTION_CLS(sourceName === s.name)}>
+                                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: s.color || '#94A3B8' }} />
+                                        <span className={`text-[12px] font-bold truncate ${sourceName === s.name ? 'text-slate-900' : 'text-slate-600'}`}>{s.name}</span>
+                                    </button>
+                                ))}
+                            </div>
+                            {selectedSource?.subSources?.length > 0 && (
+                                <div>
+                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Alt Detay / Mecra (opsiyonel)</p>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {selectedSource.subSources.map((sub) => (
+                                            <button key={sub} type="button" onClick={() => setSubSource(subSource === sub ? '' : sub)}
+                                                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all ${subSource === sub ? 'bg-[#13294E] text-white border-[#13294E]' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}>
+                                                {sub}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )
+                )}
+
+                {type === 'department' && (
+                    departments === null ? (
+                        <div className="flex items-center gap-2 text-slate-400 text-[11px] py-4"><Loader2 className="w-4 h-4 animate-spin" /> Departmanlar yükleniyor…</div>
+                    ) : departments.length === 0 ? (
+                        <p className="text-[11px] text-slate-400 py-4">Tanımlı departman yok — Departman Yönetimi sayfasından ekleyebilirsiniz.</p>
+                    ) : (
+                        <div className="grid grid-cols-2 gap-2 max-h-52 overflow-y-auto pr-1">
+                            {departments.map((d) => (
+                                <button key={d.id} type="button" onClick={() => setDepartmentName(d.name)} className={OPTION_CLS(departmentName === d.name)}>
+                                    <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                    <span className={`text-[12px] font-bold truncate ${departmentName === d.name ? 'text-slate-900' : 'text-slate-600'}`}>{d.name}</span>
+                                </button>
+                            ))}
+                        </div>
+                    )
+                )}
+
                 <div className="mt-4 flex items-start gap-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
                     <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                    Seçili {count} adayın statüsü topluca değiştirilecek.
+                    {cfg.warn(count)}
                 </div>
                 <div className="mt-4 flex gap-2">
-                    <button
-                        onClick={onClose}
-                        disabled={applying}
-                        className="flex-1 py-2.5 rounded-xl border border-slate-200 text-[12px] font-bold text-slate-600 hover:bg-slate-50 transition-colors"
-                    >
+                    <button onClick={onClose} disabled={applying} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-[12px] font-bold text-slate-600 hover:bg-slate-50 transition-colors">
                         İptal
                     </button>
-                    <button
-                        onClick={() => stageKey && onApply(stageKey)}
-                        disabled={!stageKey || applying}
-                        className="flex-[2] py-2.5 rounded-xl bg-[#13294E] hover:bg-[#1E3A6E] text-white text-[12px] font-black disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
-                    >
+                    <button onClick={apply} disabled={!canApply || applying}
+                        className="flex-[2] py-2.5 rounded-xl bg-[#13294E] hover:bg-[#1E3A6E] text-white text-[12px] font-black disabled:opacity-50 flex items-center justify-center gap-2 transition-colors">
                         {applying ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                         {applying ? 'Uygulanıyor…' : 'Uygula'}
                     </button>
@@ -156,8 +243,10 @@ export default function CandidatesTablePage() {
     // "gizli" toplu güncelleme yapılmasın.
     const [selectedIds, setSelectedIds] = useState(() => new Set());
     const [bulkModalOpen, setBulkModalOpen] = useState(false);
+    const [bulkType, setBulkType] = useState('stage');
     const [bulkApplying, setBulkApplying] = useState(false);
     const [bulkResult, setBulkResult] = useState(null);
+    const openBulkModal = (type) => { setBulkType(type); setBulkModalOpen(true); };
 
     const setFilter = (key, value) => {
         setFilters((prev) => ({ ...prev, [key]: value }));
@@ -186,7 +275,7 @@ export default function CandidatesTablePage() {
             setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
         } else {
             setSortKey(key);
-            setSortDir(key === 'name' || key === 'position' ? 'asc' : 'desc');
+            setSortDir(key === 'name' || key === 'position' || key === 'cvRole' ? 'asc' : 'desc');
         }
         setPage(0);
     };
@@ -238,26 +327,45 @@ export default function CandidatesTablePage() {
         setSelectedIds(allFilteredSelected ? new Set() : new Set(sortedRows.map((c) => c.id)));
     };
 
-    const handleBulkStage = async (stageKey) => {
+    const handleBulkApply = async (payload) => {
         if (bulkApplying || selectedIds.size === 0) return;
         setBulkApplying(true);
         setBulkResult(null);
         try {
-            // Tekil değişiklikle (CandidateProcessPage.handleStatusChange) aynı damgalar
-            const now = new Date().toISOString();
-            const by = user?.displayName || user?.email || 'HR';
-            const update = { status: stageKey, statusChangedAt: now, statusChangedBy: by };
-            if (stageKey === 'rejected') { update.rejectedAt = now; update.rejectedBy = by; }
-            if (stageKey === 'hired') { update.hiredAt = now; update.hiredBy = by; }
-
             const ids = Array.from(selectedIds);
-            const results = await Promise.allSettled(ids.map((id) => updateCandidate(id, update)));
-            const failed = results.filter((r) => r.status === 'rejected').length;
-            setBulkResult({
-                ok: ids.length - failed,
-                failed,
-                stageLabel: getStage(stageKey).label,
-            });
+            let message = '';
+            let failed = 0;
+
+            if (payload.type === 'stage') {
+                // Tekil değişiklikle (CandidateProcessPage.handleStatusChange) aynı damgalar
+                const now = new Date().toISOString();
+                const by = user?.displayName || user?.email || 'HR';
+                const update = { status: payload.stageKey, statusChangedAt: now, statusChangedBy: by };
+                if (payload.stageKey === 'rejected') { update.rejectedAt = now; update.rejectedBy = by; }
+                if (payload.stageKey === 'hired') { update.hiredAt = now; update.hiredBy = by; }
+                const results = await Promise.allSettled(ids.map((id) => updateCandidate(id, update)));
+                failed = results.filter((r) => r.status === 'rejected').length;
+                message = `${ids.length - failed} aday "${getStage(payload.stageKey).label}" aşamasına taşındı`;
+            } else if (payload.type === 'source') {
+                const update = { source: payload.source, ...(payload.sourceDetail ? { sourceDetail: payload.sourceDetail } : {}) };
+                const results = await Promise.allSettled(ids.map((id) => updateCandidate(id, update)));
+                failed = results.filter((r) => r.status === 'rejected').length;
+                message = `${ids.length - failed} adayın kaynağı "${payload.source}${payload.sourceDetail ? ` / ${payload.sourceDetail}` : ''}" olarak güncellendi`;
+            } else if (payload.type === 'department') {
+                // Pozisyon tarafındaki "Departmana Aç" ile aynı mekanizma: aday,
+                // departmanın visibleToDepartments listesine eklenir (varsa atlanır).
+                const rowById = new Map(coherentRows.map((c) => [c.id, c]));
+                let already = 0;
+                const results = await Promise.allSettled(ids.map((id) => {
+                    const cur = rowById.get(id)?.visibleToDepartments || [];
+                    if (cur.includes(payload.department)) { already += 1; return Promise.resolve(); }
+                    return updateCandidate(id, { visibleToDepartments: [...cur, payload.department] });
+                }));
+                failed = results.filter((r) => r.status === 'rejected').length;
+                message = `${ids.length - failed - already} aday "${payload.department}" departmanına açıldı${already > 0 ? ` (${already} zaten açıktı)` : ''}`;
+            }
+
+            setBulkResult({ message, failed });
             setSelectedIds(new Set());
             setBulkModalOpen(false);
         } finally {
@@ -394,14 +502,26 @@ export default function CandidatesTablePage() {
             {(selectedIds.size > 0 || bulkResult) && (
                 <div className="px-6 pt-3">
                     {selectedIds.size > 0 ? (
-                        <div className="flex items-center justify-between gap-3 bg-[#13294E] text-white rounded-xl px-4 py-2.5 shadow-sm">
+                        <div className="flex items-center justify-between gap-3 flex-wrap bg-[#13294E] text-white rounded-xl px-4 py-2.5 shadow-sm">
                             <span className="text-[12px] font-bold">{selectedIds.size} aday seçildi</span>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                                 <button
-                                    onClick={() => setBulkModalOpen(true)}
+                                    onClick={() => openBulkModal('stage')}
                                     className="flex items-center gap-1.5 text-[11px] font-black bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-colors"
                                 >
-                                    <Layers className="w-3.5 h-3.5" /> Statü Değiştir
+                                    <Layers className="w-3.5 h-3.5" /> Aşama Değiştir
+                                </button>
+                                <button
+                                    onClick={() => openBulkModal('source')}
+                                    className="flex items-center gap-1.5 text-[11px] font-black bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-colors"
+                                >
+                                    <Share2 className="w-3.5 h-3.5" /> Kaynak Değiştir
+                                </button>
+                                <button
+                                    onClick={() => openBulkModal('department')}
+                                    className="flex items-center gap-1.5 text-[11px] font-black bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-colors"
+                                >
+                                    <Building2 className="w-3.5 h-3.5" /> Departmana Aç
                                 </button>
                                 <button
                                     onClick={() => setSelectedIds(new Set())}
@@ -414,7 +534,7 @@ export default function CandidatesTablePage() {
                     ) : (
                         <div className={`flex items-center gap-2 text-[11px] font-semibold rounded-xl px-4 py-2.5 border ${bulkResult.failed > 0 ? 'text-amber-700 bg-amber-50 border-amber-100' : 'text-emerald-700 bg-emerald-50 border-emerald-100'}`}>
                             <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                            {bulkResult.ok} aday "{bulkResult.stageLabel}" statüsüne taşındı{bulkResult.failed > 0 ? `, ${bulkResult.failed} güncelleme başarısız` : ''}.
+                            {bulkResult.message}{bulkResult.failed > 0 ? `, ${bulkResult.failed} güncelleme başarısız` : ''}.
                             <button onClick={() => setBulkResult(null)} className="ml-auto text-slate-400 hover:text-slate-600"><X className="w-3.5 h-3.5" /></button>
                         </div>
                     )}
@@ -439,6 +559,7 @@ export default function CandidatesTablePage() {
                                     </th>
                                     <SortableHeader label="Aday" sortKey="name" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                                     <SortableHeader label="Pozisyon" sortKey="position" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                                    <SortableHeader label="CV'ye Göre" sortKey="cvRole" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                                     <SortableHeader label="Departman" sortKey="department" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                                     <SortableHeader label="Aşama" sortKey="stage" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                                     <SortableHeader label="Kaynak" sortKey="source" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
@@ -455,14 +576,14 @@ export default function CandidatesTablePage() {
                             <tbody>
                                 {loading && (
                                     <tr>
-                                        <td colSpan={selectedPosition ? 12 : 11} className="px-4 py-12 text-center text-slate-400 text-[12px]">
+                                        <td colSpan={selectedPosition ? 13 : 12} className="px-4 py-12 text-center text-slate-400 text-[12px]">
                                             Adaylar yükleniyor…
                                         </td>
                                     </tr>
                                 )}
                                 {!loading && pageRows.length === 0 && (
                                     <tr>
-                                        <td colSpan={selectedPosition ? 12 : 11} className="px-4 py-12 text-center">
+                                        <td colSpan={selectedPosition ? 13 : 12} className="px-4 py-12 text-center">
                                             <p className="text-slate-400 text-[12px] font-semibold">
                                                 {hasActiveFilters ? 'Filtrelere uyan aday bulunamadı.' : 'Henüz aday yok.'}
                                             </p>
@@ -493,15 +614,9 @@ export default function CandidatesTablePage() {
                                             {c.matchedPositionTitle === null
                                                 ? <span className="italic text-amber-600 font-semibold">Uygun açık pozisyon yok</span>
                                                 : (c.bestTitle || c.position || '—')}
-                                            {/* CV'ye göre ideal rol — açık pozisyon eşleşmesinden ayrı bilgi */}
-                                            {(() => {
-                                                const cvRole = c.suggestedRole || c.position;
-                                                const shown = c.matchedPositionTitle === null ? null : (c.bestTitle || c.position);
-                                                return cvRole && cvRole !== shown
-                                                    ? <p className="text-[9px] text-slate-400 mt-0.5">CV'ye göre: {cvRole}</p>
-                                                    : null;
-                                            })()}
                                         </td>
+                                        {/* CV'ye göre ideal rol — açık pozisyon eşleşmesinden AYRI kolon */}
+                                        <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap">{c.suggestedRole || c.position || '—'}</td>
                                         <td className="px-3 py-2.5 text-slate-600 whitespace-nowrap">{c.department || '—'}</td>
                                         <td className="px-3 py-2.5"><StageChip status={c.status} /></td>
                                         <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap">{c.source || '—'}</td>
@@ -553,11 +668,12 @@ export default function CandidatesTablePage() {
                 </div>
             </div>
 
-            <BulkStageModal
+            <BulkActionModal
                 isOpen={bulkModalOpen}
+                type={bulkType}
                 count={selectedIds.size}
                 applying={bulkApplying}
-                onApply={handleBulkStage}
+                onApply={handleBulkApply}
                 onClose={() => setBulkModalOpen(false)}
             />
         </div>
