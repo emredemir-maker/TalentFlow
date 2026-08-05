@@ -57,6 +57,12 @@ Durum: Uygulama başladı — 2026-08-05
 - ✅ Yeni gereksinim R2 (PR #68): "CV'ye göre ideal rol" (`suggestedRole`) — açık pozisyonlardan BAĞIMSIZ serbest metin; bulk import + prescore prompt'larına eklendi, persist ediliyor; UI'da üç yerde ayrı bilgi olarak görünür (detay başlığı "CV'ye göre: X", Pozisyon Eşleşmeleri üst bandı, tablo Pozisyon kolonu ikinci satır). Mevcut adaylar için `position` (CV'deki rol) yedek olarak kullanılır.
 - Doğrulama: 219/219 vitest, eslint 0 hata, build başarılı
 
+**2026-08-05 — Tur 7 (Tablo geliştirmeleri, PR #68'e eklendi):**
+- ✅ "CV'ye Göre" AYRI kolon (sıralanabilir, Excel'e de eklendi); Pozisyon kolonundaki ikinci satır kaldırıldı
+- ✅ Detay sayfasına "Listeye Dön" butonu (tablo görünümüne döner)
+- ✅ Toplu işlemler genişletildi: Aşama Değiştir + **Kaynak Değiştir** (sources koleksiyonundan, alt mecra destekli) + **Departmana Aç** (departments koleksiyonundan; adayın `visibleToDepartments` listesine ekler — pozisyon tarafındaki mekanizmayla aynı, zaten açık olanlar atlanır)
+- Doğrulama: 219/219 vitest, eslint 0 hata, build başarılı
+
 **Kalan:** Faz 1.5 (opsiyonel kuyruk), 2/5 kalan yüzeyler (ComparisonModal, Analytics, SendMessage koruması), 2B/8 (içe aktarmada positionAnalyses hedef skoru), 3B/7-8+10-14 (experiences, PDF sentinel, kesme, retry, duplicate stratejisi, backfill).
 
 Bu plan, bildirilen 6 sorunun kod incelemesiyle doğrulanmış kök nedenlerine ve fazlara ayrılmış çözüm adımlarına dayanır.
