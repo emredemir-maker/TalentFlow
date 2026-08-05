@@ -45,11 +45,32 @@ export default function MaintenancePanel() {
     const unmountedRef = useRef(false);
     useEffect(() => () => { unmountedRef.current = true; }, []);
 
+    // Hosting rewrite istekleri 60 sn'de kesilir — 55 sn'de istemci tarafında
+    // iptal edip anlaşılır bir mesaj gösteriyoruz; tarayıcının bağlantıyı
+    // sessizce koparmasını beklemiyoruz.
+    const FETCH_TIMEOUT_MS = 55000;
     const authedFetch = async (url, init = {}) => {
         const tok = await user?.getIdToken?.() || '';
-        const resp = await fetch(url, { ...init, headers: { ...(init.headers || {}), 'Authorization': `Bearer ${tok}` } });
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+        let resp;
+        try {
+            resp = await fetch(url, { ...init, signal: controller.signal, headers: { ...(init.headers || {}), 'Authorization': `Bearer ${tok}` } });
+        } catch (err) {
+            if (err.name === 'AbortError') {
+                throw new Error('İstek 55 saniyede yanıt vermedi ve iptal edildi. Sunucu yoğun olabilir — biraz bekleyip tekrar deneyin.');
+            }
+            throw new Error('Sunucuya ulaşılamadı. Bağlantınızı kontrol edip tekrar deneyin.');
+        } finally {
+            clearTimeout(timer);
+        }
         const data = await resp.json().catch(() => ({}));
-        if (!resp.ok) throw new Error(data.error || `İstek başarısız (HTTP ${resp.status})`);
+        if (!resp.ok) {
+            if (resp.status === 502 || resp.status === 503 || resp.status === 504) {
+                throw new Error(`Sunucu geçici olarak yanıt veremiyor (HTTP ${resp.status}). Birkaç dakika bekleyip tekrar deneyin.`);
+            }
+            throw new Error(data.error || `İstek başarısız (HTTP ${resp.status})`);
+        }
         return data;
     };
 
@@ -59,16 +80,22 @@ export default function MaintenancePanel() {
         setError(null);
         setLastCleanResult(null);
         try {
-            const [jobsData, scanData] = await Promise.all([
+            // allSettled: iki uçtan biri düşerse diğerinin sonucu yine gösterilir
+            // (eski Promise.all iki sonucu birden çöpe atıyordu).
+            const [jobsRes, scanRes] = await Promise.allSettled([
                 authedFetch('/api/maintenance/bulk-jobs'),
                 authedFetch('/api/maintenance/duplicate-scan'),
             ]);
-            setJobs(jobsData.jobs || []);
-            setScan(scanData);
-            // Varsayılan seçim: tüm fazlalıklar (korunanlar asla listede değil)
-            setSelected(new Set((scanData.groups || []).flatMap(g => g.extras.map(e => e.id))));
-        } catch (err) {
-            setError(err.message);
+            if (jobsRes.status === 'fulfilled') setJobs(jobsRes.value.jobs || []);
+            if (scanRes.status === 'fulfilled') {
+                setScan(scanRes.value);
+                // Varsayılan seçim: tüm fazlalıklar (korunanlar asla listede değil)
+                setSelected(new Set((scanRes.value.groups || []).flatMap(g => g.extras.map(e => e.id))));
+            }
+            const failures = [jobsRes, scanRes].filter(r => r.status === 'rejected');
+            if (failures.length > 0) {
+                setError([...new Set(failures.map(f => f.reason?.message || 'Bilinmeyen hata'))].join(' · '));
+            }
         } finally {
             setLoading(false);
         }

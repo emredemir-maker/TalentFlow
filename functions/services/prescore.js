@@ -11,14 +11,22 @@
 //      anahtar-kelime skoru (kayıtlı position/skills alanları açık
 //      pozisyon başlıklarıyla karşılaştırılır) — kimse 0'da kalmaz.
 import { generateText } from './gemini.js';
-import { calculateSimpleMatchScore } from './bulkWorker.js';
+import { calculateSimpleMatchScore, matchOpenTitle } from './bulkWorker.js';
 
-/** Anahtar-kelime yedeği: açık pozisyonlardan en iyi skoru seç. */
+/**
+ * Anahtar-kelime yedeği: açık pozisyonlardan en iyi skoru seç. Hiçbiri
+ * eşleşmezse matchedTitle null döner ("uygun açık pozisyon yok") — CV'deki
+ * serbest pozisyon adı eşleşme diye yazılmaz.
+ */
 export function keywordPrescore(candidateData, openPositionTitles) {
-    let best = { score: 0, matchedTitle: candidateData?.position || '' };
+    let best = { score: 0, matchedTitle: null };
     for (const title of openPositionTitles || []) {
         const s = calculateSimpleMatchScore(candidateData, title);
         if (s > best.score) best = { score: s, matchedTitle: title };
+    }
+    if (!best.matchedTitle) {
+        const reason = openPositionTitles?.length ? 'Uygun açık pozisyon bulunamadı.' : '';
+        return { score: 0, matchedTitle: null, matchReason: reason, method: 'keyword' };
     }
     return { ...best, matchReason: '', method: 'keyword' };
 }
@@ -31,8 +39,8 @@ export async function computePrescore(candidateData, openPositionTitles) {
     const cvText = (candidateData?.cvText || '').trim();
     if (cvText.length >= 40) {
         const scoreContext = openPositionTitles?.length
-            ? `Şirketteki açık pozisyonlar: ${openPositionTitles.map((t) => `"${t}"`).join(', ')}. Adaya EN UYGUN pozisyonu seç ve skoru ona göre ver.`
-            : `Açık pozisyon listesi yok. Skoru adayın profil kalitesine ve istihdam edilebilirliğine göre ver.`;
+            ? `Şirketteki açık pozisyonlar: ${openPositionTitles.map((t) => `"${t}"`).join(', ')}. matchedPosition alanına SADECE bu listeden bir başlığı AYNEN yaz — listede olmayan bir başlık ASLA yazma. Aday hiçbirine uygun değilse matchedPosition alanına null yaz ve matchScore'u 0 ver.`
+            : `Açık pozisyon listesi yok. Skoru adayın profil kalitesine ve istihdam edilebilirliğine göre ver; matchedPosition alanına null yaz.`;
         const prompt = `Sen bir işe alım ön değerlendirme uzmanısın. Aşağıdaki CV metni için bir ön uyum skoru ver.
 ${scoreContext}
 Sadece şu JSON formatında yanıt ver (başka hiçbir şey yazma):
@@ -51,12 +59,28 @@ ${cvText.substring(0, 6000)}`;
                 const parsed = JSON.parse(match[0]);
                 const score = Number(parsed?.matchScore);
                 if (!isNaN(score) && score > 0) {
-                    return {
-                        score: Math.max(0, Math.min(100, Math.round(score))),
-                        matchedTitle: parsed?.matchedPosition || candidateData?.position || '',
-                        matchReason: parsed?.matchReason || '',
-                        method: 'ai',
-                    };
+                    // AI'nın başlığı yalnızca açık pozisyon listesinde birebir
+                    // karşılığı varsa kabul edilir; listede yoksa skor uydurma
+                    // bir pozisyona aittir → anahtar-kelime yedeğine düş.
+                    const validated = matchOpenTitle(parsed?.matchedPosition, openPositionTitles || []);
+                    if (validated) {
+                        return {
+                            score: Math.max(0, Math.min(100, Math.round(score))),
+                            matchedTitle: validated,
+                            matchReason: parsed?.matchReason || '',
+                            method: 'ai',
+                        };
+                    }
+                    // Açık pozisyon listesi hiç yoksa skor profil kalitesini
+                    // ölçer (prompt öyle ister) — başlıksız kabul edilir.
+                    if (!openPositionTitles?.length) {
+                        return {
+                            score: Math.max(0, Math.min(100, Math.round(score))),
+                            matchedTitle: null,
+                            matchReason: parsed?.matchReason || '',
+                            method: 'ai',
+                        };
+                    }
                 }
             }
         } catch {

@@ -28,7 +28,7 @@ vi.mock('../config/firebaseAdmin.js', () => ({
     },
 }));
 
-const { extractCvText, findDuplicateCandidate, resolvePreScore } = await import('./bulkWorker.js');
+const { extractCvText, findDuplicateCandidate, resolvePreScore, matchOpenTitle } = await import('./bulkWorker.js');
 
 beforeEach(() => {
     mockPdf.mockReset();
@@ -122,23 +122,50 @@ describe('findDuplicateCandidate', () => {
     });
 });
 
+describe('matchOpenTitle', () => {
+    it('matches case- and whitespace-insensitively, returning the canonical title', () => {
+        expect(matchOpenTitle('  frontend developer ', ['Frontend Developer', 'İK Uzmanı'])).toBe('Frontend Developer');
+        expect(matchOpenTitle('Backend Dev', ['Frontend Developer'])).toBeNull();
+        expect(matchOpenTitle('', ['Frontend Developer'])).toBeNull();
+        expect(matchOpenTitle(null, ['Frontend Developer'])).toBeNull();
+    });
+});
+
 describe('resolvePreScore', () => {
+    const OPEN = ['Frontend Dev', 'İK Uzmanı'];
+
     it('uses the Gemini score when valid and clamps to 0-100', () => {
-        expect(resolvePreScore({ matchScore: 82, matchedPosition: 'Frontend Dev' }, '')).toEqual({ score: 82, matchedTitle: 'Frontend Dev' });
-        expect(resolvePreScore({ matchScore: 140, matchedPosition: 'X' }, '').score).toBe(100);
-        expect(resolvePreScore({ matchScore: 76.6, matchedPosition: 'X' }, '').score).toBe(77);
+        expect(resolvePreScore({ matchScore: 82, matchedPosition: 'Frontend Dev' }, '', OPEN)).toEqual({ score: 82, matchedTitle: 'Frontend Dev' });
+        expect(resolvePreScore({ matchScore: 140, matchedPosition: 'Frontend Dev' }, '', OPEN).score).toBe(100);
+        expect(resolvePreScore({ matchScore: 76.6, matchedPosition: 'Frontend Dev' }, '', OPEN).score).toBe(77);
     });
 
-    it('prefers the Gemini-matched position over the upload selection', () => {
-        expect(resolvePreScore({ matchScore: 60, matchedPosition: 'Backend Dev' }, 'İK Uzmanı').matchedTitle).toBe('Backend Dev');
-        expect(resolvePreScore({ matchScore: 60 }, 'İK Uzmanı').matchedTitle).toBe('İK Uzmanı');
+    it('the upload selection is binding — Gemini cannot override it', () => {
+        expect(resolvePreScore({ matchScore: 60, matchedPosition: 'Backend Dev' }, 'İK Uzmanı', OPEN).matchedTitle).toBe('İK Uzmanı');
+        expect(resolvePreScore({ matchScore: 60 }, 'İK Uzmanı', OPEN).matchedTitle).toBe('İK Uzmanı');
+    });
+
+    it('rejects an AI title that is not an open position and falls back to the keyword best', () => {
+        const parsed = { matchScore: 60, matchedPosition: 'Uydurma Pozisyon', position: 'frontend developer', skills: ['react'] };
+        const { matchedTitle, score } = resolvePreScore(parsed, '', OPEN);
+        expect(matchedTitle).toBe('Frontend Dev'); // anahtar-kelime en iyisi, uydurma başlık değil
+        expect(score).toBeGreaterThan(0);
+    });
+
+    it('returns a null title when nothing matches any open position', () => {
+        const parsed = { matchScore: 60, matchedPosition: 'Uydurma Pozisyon', position: 'muhasebeci', skills: [] };
+        expect(resolvePreScore(parsed, '', OPEN)).toEqual({ score: 0, matchedTitle: null });
+    });
+
+    it('keeps the profile-quality score with a null title when there are no open positions', () => {
+        expect(resolvePreScore({ matchScore: 82, matchedPosition: 'Herhangi' }, '', [])).toEqual({ score: 82, matchedTitle: null });
     });
 
     it('falls back to the keyword score when the AI score is missing or zero', () => {
         const parsed = { position: 'frontend developer', skills: ['react'], matchScore: 0 };
-        const { score, matchedTitle } = resolvePreScore(parsed, 'Frontend Developer');
+        const { score, matchedTitle } = resolvePreScore(parsed, 'Frontend Developer', OPEN);
         expect(matchedTitle).toBe('Frontend Developer');
         expect(score).toBeGreaterThan(0); // anahtar-kelime eşleşmesi ('frontend', 'developer')
-        expect(resolvePreScore({ matchScore: 'abc', position: '' }, '').score).toBe(0);
+        expect(resolvePreScore({ matchScore: 'abc', position: '' }, '', []).score).toBe(0);
     });
 });

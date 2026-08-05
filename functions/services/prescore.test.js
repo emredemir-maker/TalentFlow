@@ -29,10 +29,11 @@ describe('keywordPrescore', () => {
         expect(result.method).toBe('keyword');
     });
 
-    it('returns zero with the stored position when nothing matches', () => {
+    it('returns zero with a null title and an explanatory reason when nothing matches', () => {
         const result = keywordPrescore({ position: 'muhasebeci', skills: [] }, ['Frontend Developer']);
         expect(result.score).toBe(0);
-        expect(result.matchedTitle).toBe('muhasebeci');
+        expect(result.matchedTitle).toBeNull();
+        expect(result.matchReason).toBe('Uygun açık pozisyon bulunamadı.');
     });
 });
 
@@ -41,6 +42,19 @@ describe('computePrescore', () => {
         mockGenerateText.mockResolvedValue('{"matchScore": 130, "matchedPosition": "Frontend Developer", "matchReason": "Güçlü React deneyimi"}');
         const result = await computePrescore(CANDIDATE, TITLES);
         expect(result).toEqual({ score: 100, matchedTitle: 'Frontend Developer', matchReason: 'Güçlü React deneyimi', method: 'ai' });
+    });
+
+    it('rejects an AI-invented position title and falls back to keyword scoring', async () => {
+        mockGenerateText.mockResolvedValue('{"matchScore": 88, "matchedPosition": "Growth Hacker Ninja", "matchReason": "..."}');
+        const result = await computePrescore(CANDIDATE, TITLES);
+        expect(result.method).toBe('keyword');
+        expect(result.matchedTitle).toBe('Frontend Developer'); // listedeki gerçek en iyi
+    });
+
+    it('accepts the AI title case-insensitively and returns the canonical spelling', async () => {
+        mockGenerateText.mockResolvedValue('{"matchScore": 70, "matchedPosition": "frontend developer", "matchReason": "ok"}');
+        const result = await computePrescore(CANDIDATE, TITLES);
+        expect(result).toEqual({ score: 70, matchedTitle: 'Frontend Developer', matchReason: 'ok', method: 'ai' });
     });
 
     it('falls back to keyword scoring when Gemini output is unparseable', async () => {

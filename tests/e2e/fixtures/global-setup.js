@@ -3,7 +3,12 @@
 // the emulators and seeds a known recruiter user so the tests have
 // a stable starting state.
 
-import { clearEmulators, createAuthUser, writeUserProfile } from './emulator.js';
+import {
+    clearEmulators,
+    createAuthUser,
+    seedAllowedDomains,
+    writeUserProfile,
+} from './emulator.js';
 
 export const TEST_USER = {
     email: 'recruiter@talentflow-e2e.local',
@@ -30,6 +35,9 @@ export default async function globalSetup() {
     }
 
     await clearEmulators();
+    // Firestore rules require role evidence at profile creation — allow-list
+    // the test domain so the recruiter profile write below passes the rules.
+    await seedAllowedDomains(['talentflow-e2e.local']);
     const { uid, idToken } = await createAuthUser(TEST_USER);
     await writeUserProfile({
         uid,

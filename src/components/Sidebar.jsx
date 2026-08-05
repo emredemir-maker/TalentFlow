@@ -33,8 +33,10 @@ export default function Sidebar({
     const menuItems = [
         { id: 'dashboard', label: 'Kontrol Paneli', icon: LayoutDashboard },
         { id: 'interviews', label: 'Mülakatlar', icon: Calendar },
-        { id: 'candidate-process', label: 'Adaylar', icon: Users },
-        { id: 'candidates-table', label: 'Aday Raporu', icon: Table2 },
+        // Birleşik Adaylar sayfası: liste + filtre + toplu işlem tabloda;
+        // detay/yükleme görünümü (candidate-process) satır tıklamasıyla açılır,
+        // menüde ayrıca listelenmez.
+        { id: 'candidates-table', label: 'Adaylar', icon: Users },
         { id: 'positions', label: 'Açık İlanlar', icon: Briefcase },
         { id: 'analytics', label: 'Analitik Raporlar', icon: BarChart3 },
         { id: 'messages', label: 'Mesajlaşma', icon: MessageSquare },

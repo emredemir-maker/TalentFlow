@@ -190,6 +190,9 @@ export function AuthProvider({ children }) {
                             role: invitation.role || 'recruiter',
                             departments: invitation.departments ? invitation.departments : (invitation.department ? [invitation.department] : []),
                             status: 'active',
+                            // Firestore rules verify the requested role against this
+                            // invitation doc — without it the create is denied.
+                            inviteId: inviteDoc.id,
                             createdAt: serverTimestamp()
                         };
                         await setDoc(userDocRef, newProfile);
@@ -328,6 +331,9 @@ export function AuthProvider({ children }) {
                 role: invitation?.role || 'recruiter',
                 departments: invitation?.departments ? invitation.departments : (invitation?.department ? [invitation.department] : [] ),
                 status: 'active',
+                // Firestore rules verify the requested role against this
+                // invitation doc; domain-allowed signups have no invite.
+                ...(inviteDocId ? { inviteId: inviteDocId } : {}),
                 createdAt: serverTimestamp()
             };
 

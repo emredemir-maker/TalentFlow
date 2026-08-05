@@ -58,6 +58,44 @@ service cloud.firestore {
          candidateData.department in getUserProfile().departments);
     }
 
+    // ── Registration validation ───────────────────────────────────────────────
+    // Self-registration may only mint non-admin roles, and the requested role
+    // must be backed by evidence the rules can verify: a pending invitation
+    // (the client stores its doc ID in the profile's `inviteId` field) or the
+    // allow-listed e-mail domain (recruiter only). super_admin is never
+    // creatable from the client — bootstrap via scripts/grant-super-admin.mjs.
+    function callerEmail() {
+      return request.auth.token.email.lower();
+    }
+
+    function isEmailDomainAllowed() {
+      return get(/databases/$(database)/documents/artifacts/talent-flow/public/data/settings/system)
+        .data.get('allowedDomains', [])
+        .hasAny([callerEmail().split('@')[1]]);
+    }
+
+    function hasValidInvite() {
+      return request.resource.data.get('inviteId', '') is string &&
+        request.resource.data.get('inviteId', '') != '' &&
+        inviteMatchesRequest(request.resource.data.inviteId);
+    }
+
+    function inviteMatchesRequest(inviteId) {
+      let inv = get(/databases/$(database)/documents/artifacts/talent-flow/public/data/invitations/$(inviteId)).data;
+      return inv.get('status', '') == 'pending' &&
+        inv.get('email', '') == callerEmail() &&
+        request.resource.data.role == inv.get('role', 'recruiter') &&
+        (request.resource.data.role != 'department_user' ||
+         request.resource.data.get('departments', []) == inviteDepartments(inv));
+    }
+
+    // Invitation department list, tolerating the legacy single `department`
+    // field (mirrors the fallback chain in AuthContext).
+    function inviteDepartments(inv) {
+      return inv.get('departments',
+        inv.get('department', null) != null ? [inv.department] : []);
+    }
+
     // ── Invitations ───────────────────────────────────────────────────────────
     // Open read is required: pre-auth registration checks need to verify
     // invitation by email before the account even exists.
@@ -104,16 +142,31 @@ service cloud.firestore {
     // ── Users ─────────────────────────────────────────────────────────────────
     // • read:   self, or any recruiter/super_admin (needed for user-management UI)
     //           department_users can only read their own profile
-    // • create: allow any authenticated user (registration flow)
-    // • update: super_admin (any user), or self (own profile only)
+    // • create: only the caller's own doc (uid match, non-anonymous), with a
+    //           non-admin role justified by a pending invitation or the
+    //           allow-listed e-mail domain — see Registration validation above
+    // • update: super_admin (any field) · self (own profile, but never the
+    //           privilege/identity fields) · recruiter (department assignment
+    //           only, used by the department management page)
     // • delete: super_admin only
     match /artifacts/talent-flow/public/data/users/{userId} {
       allow read:   if isSuperAdmin() ||
                        isRecruiter()  ||
                        (isStrictAuthenticated() && request.auth.uid == userId);
-      allow create: if isAuthenticatedIncAnon();
+      allow create: if isStrictAuthenticated() &&
+                       request.auth.uid == userId &&
+                       request.resource.data.get('uid', userId) == userId &&
+                       request.resource.data.get('role', '') in ['recruiter', 'department_user'] &&
+                       request.resource.data.get('email', '') == callerEmail() &&
+                       (hasValidInvite() ||
+                        (request.resource.data.role == 'recruiter' && isEmailDomainAllowed()));
       allow update: if isSuperAdmin() ||
-                       (isStrictAuthenticated() && request.auth.uid == userId);
+                       (isStrictAuthenticated() && request.auth.uid == userId &&
+                        !request.resource.data.diff(resource.data).affectedKeys()
+                          .hasAny(['role', 'status', 'department', 'departments', 'email', 'uid'])) ||
+                       (isRecruiter() &&
+                        request.resource.data.diff(resource.data).affectedKeys()
+                          .hasOnly(['department', 'departments']));
       allow delete: if isSuperAdmin();
 
       match /{allChildren=**} {
@@ -154,9 +207,12 @@ service cloud.firestore {
     }
 
     // ── Broad catch-all for any other talent-flow collections ─────────────────
+    // Overlapping matches are OR'd, so `users` must be carved out of the write
+    // grant here: user docs carry roles, and writes to them must only pass the
+    // dedicated users block above.
     match /artifacts/talent-flow/public/data/{collectionName}/{docId} {
       allow read:  if isStrictAuthenticated();
-      allow write: if isRecruiter();
+      allow write: if collectionName != 'users' && isRecruiter();
     }
 
     // Recursive catch-all for deeper talent-flow paths

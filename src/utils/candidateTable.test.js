@@ -3,6 +3,7 @@ import {
     resolveStageKey,
     getAppliedDate,
     applyTableFilters,
+    scoreForPosition,
     sortRows,
     buildExportRows,
     DEFAULT_FILTERS,
@@ -98,6 +99,55 @@ describe('applyTableFilters', () => {
         const input = [...CANDIDATES];
         applyTableFilters(input, { search: 'ayşe' });
         expect(input).toHaveLength(3);
+    });
+});
+
+describe('scoreForPosition', () => {
+    const POSITION = { id: 'p1', title: 'Frontend Developer' };
+
+    it('takes the max of the saved AI analysis and the keyword score', () => {
+        const c = { positionAnalyses: { 'Frontend Developer': { score: 62 } } };
+        expect(scoreForPosition(c, POSITION, () => 40)).toBe(62);
+        expect(scoreForPosition(c, POSITION, () => 80)).toBe(80);
+    });
+    it('works without a keyword function (saved analysis only)', () => {
+        const c = { positionAnalyses: { 'Frontend Developer': { score: 55 } } };
+        expect(scoreForPosition(c, POSITION)).toBe(55);
+    });
+    it('returns 0 for missing analysis, missing position, or empty candidate', () => {
+        expect(scoreForPosition({}, POSITION)).toBe(0);
+        expect(scoreForPosition({}, null, () => 90)).toBe(0);
+    });
+});
+
+describe('applyTableFilters — pozisyon uygunluk modu', () => {
+    const POSITION = { id: 'p1', title: 'Frontend Developer' };
+    // Aday 3'ün en-iyi skoru düşük ama SEÇİLİ pozisyondaki kayıtlı analizi yüksek;
+    // aday 1'in en-iyi skoru yüksek ama bu pozisyondaki skoru düşük.
+    const ROWS = [
+        { ...CANDIDATES[0], positionAnalyses: { 'Frontend Developer': { score: 40 } } },
+        { ...CANDIDATES[1], positionAnalyses: {} },
+        { ...CANDIDATES[2], positionAnalyses: { 'Frontend Developer': { score: 85 } } },
+    ];
+    const OPTS = { position: POSITION, keywordScoreFn: () => 0 };
+
+    it('applies the min-score threshold to the SELECTED position score, not the best-fit score', () => {
+        const rows = applyTableFilters(ROWS, { position: 'Frontend Developer', minScore: '80' }, OPTS);
+        // Eski davranış combinedScore'a bakıp ['1'] döndürürdü; doğrusu ['3'].
+        expect(rows.map((c) => c.id)).toEqual(['3']);
+    });
+    it('does not exclude candidates by label in position mode — everyone gets a score', () => {
+        const rows = applyTableFilters(ROWS, { position: 'Frontend Developer' }, OPTS);
+        expect(rows).toHaveLength(3);
+        expect(rows.map((c) => c.positionScore)).toEqual([40, 0, 85]);
+    });
+    it('falls back to label matching when no position object is supplied', () => {
+        const rows = applyTableFilters(ROWS, { position: 'Frontend Developer' });
+        expect(rows.map((c) => c.id)).toEqual(['1']);
+    });
+    it('sorts by positionScore with the standard sorter', () => {
+        const rows = applyTableFilters(ROWS, { position: 'Frontend Developer' }, OPTS);
+        expect(sortRows(rows, 'positionScore', 'desc').map((c) => c.id)).toEqual(['3', '1', '2']);
     });
 });
 

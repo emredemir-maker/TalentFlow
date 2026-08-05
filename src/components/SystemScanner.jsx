@@ -226,9 +226,21 @@ export default function SystemScanner() {
             // adayda ~1 sn yapay bekleme (50+80+800+80 ms sahne animasyonu)
             // vardı; artık beklemeler kaldırıldı ve adaylar 3'lü havuzda
             // paralel işleniyor — model ve prompt aynı, kalite değişmez.
+            let skippedNoCvCount = 0;
             const processOne = async (candidate) => {
                 if (!isScanningRef.current) return;
                 setCurrentCandidate(candidate);
+
+                // Kanıt kontrolü: CV gövdesi ve deneyim listesi boşsa derin
+                // analiz BOŞ girdiyle çalışır ve tek haneli skor üretir
+                // (%90'ın %4'e düşmesinin nedeni). Skoru çökertmek yerine
+                // adayı atla — yeniden ayrıştırma gerekiyor.
+                const cvBody = `${candidate.cvData || ''}${candidate.cvText || ''}`.trim();
+                const hasEvidence = cvBody.length >= 40 || (candidate.experiences?.length > 0);
+                if (!hasEvidence) {
+                    skippedNoCvCount += 1;
+                    return;
+                }
 
                 // ── Stage 1: Scout ─────────────────────────────────────────
                 setActiveStage('scout');
@@ -247,6 +259,12 @@ export default function SystemScanner() {
                 const hasManualOverride = candidate.manualScore && candidate.scoringStage !== 'initial';
                 const shouldAnalyze = forceAnalyze || !hasManualOverride;
 
+                // İşe alım uzmanının atadığı pozisyon (positionId) her zaman
+                // analiz kümesine dahil edilir ve başlık yazımında bağlayıcıdır.
+                const assignedPos = candidate.positionId
+                    ? openPositions.find(p => p.id === candidate.positionId) || null
+                    : null;
+
                 if (shouldAnalyze) {
                     setActiveStage('analyst');
 
@@ -261,17 +279,23 @@ export default function SystemScanner() {
                         // Force kapsamlarında akıllı sınır açıksa, ücretsiz
                         // anahtar-kelime skoruyla ön-sıralanıp yalnızca en iyi
                         // 5 pozisyon AI'a gönderilir.
+                        // calculateMatchScore bir OBJE döndürür ({score, ...});
+                        // .score alınmazsa sıralama NaN karşılaştırır ve "en iyi
+                        // 5" fiilen rastgele 5 olur.
                         const rankedForce = smartPositionLimit && compatiblePositions.length > 5
                             ? [...compatiblePositions]
-                                .map(p => ({ p, s: calculateMatchScore(candidate, p) || 0 }))
+                                .map(p => ({ p, s: calculateMatchScore(candidate, p)?.score || 0 }))
                                 .sort((a, b) => b.s - a.s)
                                 .slice(0, 5)
                                 .map(x => x.p)
                             : compatiblePositions;
-                        const positionsToAnalyze =
+                        let positionsToAnalyze =
                             scope === 'filtered' ? [targetPosition]
                             : forceAnalyze ? rankedForce
-                            : [bestMatch || compatiblePositions[0]].filter(Boolean);
+                            : [assignedPos || bestMatch || compatiblePositions[0]].filter(Boolean);
+                        if (assignedPos && !positionsToAnalyze.some(p => p?.id === assignedPos.id)) {
+                            positionsToAnalyze = [assignedPos, ...positionsToAnalyze];
+                        }
 
                         for (const pos of positionsToAnalyze) {
                             if (!pos) continue;
@@ -283,7 +307,10 @@ export default function SystemScanner() {
                                 updatedAnalyses[pos.title] = sanitizeForFirestore(result);
                                 setAiCount(prev => prev + 1);
 
-                                if (result.score > highestScore) {
+                                // 0 puanlı sonuç "en iyi" kabul edilmez — tek
+                                // pozisyonluk taramada 0'ın skor alanlarını
+                                // ezmesini engeller (positionAnalyses yine kaydeder).
+                                if (result.score > highestScore && result.score > 0) {
                                     highestScore = result.score;
                                     bestResult   = result;
                                     bestTitle    = pos.title;
@@ -299,11 +326,18 @@ export default function SystemScanner() {
                                 lastAnalyzedAt:      new Date().toISOString(),
                                 analyzedForPosition: bestTitle,
                             });
-                            updates.summary              = bestResult.summary ?? null;
-                            updates.matchScore           = bestResult.score;
-                            updates.aiScore              = bestResult.score;
-                            updates.matchedPositionTitle = bestTitle;
-                            updates.positionAnalyses     = updatedAnalyses;
+                            updates.summary          = bestResult.summary ?? null;
+                            updates.aiScore          = bestResult.score;
+                            updates.positionAnalyses = updatedAnalyses;
+                            // CandidateDrawer ile aynı kural: ortak matchScore
+                            // yalnızca 'initial' aşamada AI tarafından ezilebilir
+                            // (manuel/ileri aşama skorları korunur).
+                            if ((candidate.scoringStage || 'initial') === 'initial') {
+                                updates.matchScore = bestResult.score;
+                            }
+                            // İşe alım uzmanı ataması bağlayıcı: atanmış pozisyon
+                            // varken "en iyi eşleşme" başlığı onu ezemez.
+                            updates.matchedPositionTitle = assignedPos ? assignedPos.title : bestTitle;
                         }
 
                         updates.lastScannedAt = new Date().toISOString();
@@ -311,8 +345,10 @@ export default function SystemScanner() {
                     } catch (aiErr) {
                         console.error('AI Error:', aiErr);
                         if (bestMatch) {
-                            updates.matchScore           = bestMatch.matchScore;
-                            updates.matchedPositionTitle = bestMatch.title;
+                            if ((candidate.scoringStage || 'initial') === 'initial') {
+                                updates.matchScore = bestMatch.matchScore;
+                            }
+                            updates.matchedPositionTitle = assignedPos ? assignedPos.title : bestMatch.title;
                             needsUpdate = true;
                         }
                     }
@@ -365,7 +401,8 @@ export default function SystemScanner() {
 
             addNotification({
                 title: 'Sistem Taraması Tamamlandı',
-                message: `${queue.length} aday tarandı, ${aiCount} AI analizi gerçekleştirildi.`,
+                message: `${queue.length} aday tarandı, ${aiCount} AI analizi gerçekleştirildi.`
+                    + (skippedNoCvCount > 0 ? ` ${skippedNoCvCount} aday CV metni olmadığı için atlandı (yeniden ayrıştırma gerekli).` : ''),
                 type: 'success',
             });
 

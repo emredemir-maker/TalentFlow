@@ -16,7 +16,7 @@ import { roleLabel } from '../utils/roles';
 
 const PAGES = [
     { view: 'dashboard',         label: 'Kontrol Paneli',  icon: LayoutDashboard, desc: 'Ana ekran ve genel bakış' },
-    { view: 'candidate-process', label: 'Adaylar',         icon: Users,           desc: 'Aday listesi ve profilleri' },
+    { view: 'candidates-table',  label: 'Adaylar',         icon: Users,           desc: 'Aday listesi, filtre ve toplu işlemler' },
     { view: 'positions',         label: 'Açık İlanlar',    icon: Briefcase,       desc: 'Pozisyon yönetimi' },
     { view: 'interviews',        label: 'Mülakatlar',      icon: Calendar,        desc: 'Mülakat planlama' },
     { view: 'messages',          label: 'Mesajlar',        icon: MessageSquare,   desc: 'E-posta ve mesaj kuyruğu' },

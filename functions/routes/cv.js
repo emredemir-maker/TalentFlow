@@ -3,8 +3,9 @@
 // object.
 //
 //   POST /api/process-cv     — multipart upload of up to 20 PDF/DOCX files,
-//                               saved to the uploads dir, parsed, returned
-//                               with a public download URL per file.
+//                               parsed, persisted to Firebase Storage (cvs/),
+//                               returned with a permanent download URL per
+//                               file (local /uploads fallback in dev).
 //   POST /api/direct-add     — JSON { text, url } from the browser-extension
 //                               quick-add helper. No file saved.
 //   POST /api/check-duplicate — JSON { email, phone } — looks up the
@@ -14,7 +15,8 @@
 // All three are gated by aiLimiter where they hit Gemini.
 import { Router } from 'express';
 import fs from 'fs';
-import { readFile } from 'fs/promises';
+import { randomUUID } from 'crypto';
+import { readFile, unlink } from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
@@ -23,7 +25,7 @@ import { aiLimiter } from '../middleware/rateLimit.js';
 import { wrapMulter } from '../middleware/multipart.js';
 import { pdf } from '../services/pdf.js';
 import { parseProfile } from '../services/gemini.js';
-import { db } from '../config/firebaseAdmin.js';
+import { db, getStorageBucket } from '../config/firebaseAdmin.js';
 import { childLogger } from '../services/logger.js';
 const log = childLogger('cv');
 
@@ -36,7 +38,8 @@ const __dirname = path.dirname(__filename);
 
 // On Cloud Functions / serverless we can only write to /tmp. Locally we use
 // the functions/ directory so uploaded CVs persist across hot reloads.
-const isServerless = !!process.env.K_SERVICE || !!process.env.FUNCTION_NAME || !!process.env.FUNCTIONS_EMULATOR;
+const isServerlessRuntime = () => !!process.env.K_SERVICE || !!process.env.FUNCTION_NAME || !!process.env.FUNCTIONS_EMULATOR;
+const isServerless = isServerlessRuntime();
 // Three .. hops aren't needed here — we want functions/uploads, which is one
 // level up from routes/.
 const uploadBaseDir = isServerless ? '/tmp' : path.resolve(__dirname, '..');
@@ -74,6 +77,56 @@ const upload = multer({
 });
 
 const router = Router();
+
+// Same token-style download URL the client SDK's getDownloadURL() returns.
+// Built by hand because admin getSignedUrl() needs the signBlob IAM role,
+// which the default Functions service account doesn't have.
+export function buildCvDownloadUrl(bucketName, storagePath, token) {
+    return `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodeURIComponent(storagePath)}?alt=media&token=${token}`;
+}
+
+// Fallback: the express static /uploads mount (server.js). Only durable in
+// local dev — on Cloud Functions the file lives in /tmp and dies with the
+// instance, hence Storage is always tried first.
+export function buildLocalCvUrl(filename) {
+    const baseUrl = process.env.SERVER_URL || 'http://localhost:3001';
+    return `${baseUrl}/uploads/cvs/${filename}`;
+}
+
+// Persist an uploaded CV to Firebase Storage under cvs/ — the same prefix
+// AddCandidateModal.jsx uses for client-side uploads, covered by the
+// existing /cvs/{filename} block in storage.rules.
+// Exported for tests (see cv.test.js — Storage is mocked there).
+export async function storeCvFile(file) {
+    try {
+        const bucket = getStorageBucket();
+        const destination = `cvs/${file.filename}`;
+        const token = randomUUID();
+        await bucket.upload(file.path, {
+            destination,
+            metadata: {
+                contentType: file.mimetype,
+                metadata: { firebaseStorageDownloadTokens: token },
+            },
+        });
+        // Storage is the source of truth now — drop the multer temp copy
+        // so repeated requests don't fill the instance's /tmp.
+        await unlink(file.path).catch(() => {});
+        return buildCvDownloadUrl(bucket.name, destination, token);
+    } catch (err) {
+        if (isServerlessRuntime()) {
+            // An instance-local URL would be dead on arrival: /uploads
+            // serves /tmp (recycled with the instance) and hosting never
+            // rewrites /uploads/** to the function. Better no link than a
+            // broken one — the UI hides the CV button when cvUrl is empty.
+            log.error(`Storage upload failed for ${file.filename}: ${err.message}`);
+            await unlink(file.path).catch(() => {});
+            return '';
+        }
+        log.warn(`Storage upload failed for ${file.filename}, serving from local /uploads: ${err.message}`);
+        return buildLocalCvUrl(file.filename);
+    }
+}
 
 router.post('/api/direct-add', aiLimiter, async (req, res) => {
     try {
@@ -133,9 +186,7 @@ router.post('/api/process-cv', aiLimiter, wrapMulter(upload.array('cvs', 20)), a
                 const candidate = await parseProfile(text);
                 if (!candidate) return { fileName: file.originalname, error: 'AI ayrıştırma hatası' };
 
-                // Add the URL to the stored file
-                const baseUrl = process.env.SERVER_URL || 'http://localhost:3001';
-                candidate.cvUrl = `${baseUrl}/uploads/cvs/${file.filename}`;
+                candidate.cvUrl = await storeCvFile(file);
 
                 return { fileName: file.originalname, candidate, success: true };
             } catch (err) {

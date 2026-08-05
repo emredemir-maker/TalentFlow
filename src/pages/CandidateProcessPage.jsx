@@ -745,6 +745,20 @@ export default function CandidateProcessPage() {
 
     const filtered = useMemo(() => {
         const q = searchQuery.toLowerCase();
+        // Pozisyon filtresi "uygunluk modu": seçilen AÇIK pozisyon için her
+        // adayın skoru (kayıtlı AI analizi ↔ anahtar-kelime, büyük olan)
+        // hesaplanır; min skor eşiği ve sıralama BU skora uygulanır. Eski
+        // davranış adayın en-iyi-eşleşme skoruna bakıyordu — yanlış adayları
+        // geçirip doğru adayları eliyordu.
+        const selectedPos = filterPosition
+            ? (positions || []).find(p => p.status === 'open' && p.title === filterPosition) || null
+            : null;
+        const positionScores = selectedPos
+            ? new Map(candidates.map(c => [c.id, Math.max(
+                Number(c.positionAnalyses?.[selectedPos.title]?.score ?? 0),
+                Number(calculateMatchScore(c, selectedPos)?.score || 0),
+            )]))
+            : null;
         const results = candidates.filter(c => {
             // Position-related fields the candidate might be searched/filtered
             // by. matchedPositionTitle is the system's pick (highest-scoring
@@ -760,10 +774,22 @@ export default function CandidateProcessPage() {
             if (q && !c.name?.toLowerCase().includes(q) && !candidatePosForSearch.includes(q)) return false;
             if (filterSource && c.source !== filterSource) return false;
             if (filterStatus && normalizePipelineStatus(c.status) !== filterStatus) return false;
-            if (filterPosition && candidatePosForFilter !== filterPosition) return false;
-            if (filterMinScore > 0 && (c.bestScore || 0) < filterMinScore) return false;
+            if (filterPosition) {
+                if (positionScores) {
+                    if (filterMinScore > 0 && (positionScores.get(c.id) || 0) < filterMinScore) return false;
+                } else {
+                    // Seçilen başlık artık açık pozisyon değil — eski etiket eşleşmesi
+                    if (candidatePosForFilter !== filterPosition) return false;
+                    if (filterMinScore > 0 && (c.bestScore || 0) < filterMinScore) return false;
+                }
+            } else if (filterMinScore > 0 && (c.bestScore || 0) < filterMinScore) return false;
             return true;
         });
+        if (positionScores) {
+            // Seçili pozisyona uyum skoruna göre azalan — "en uygun aday" en üstte
+            results.sort((a, b) => (positionScores.get(b.id) || 0) - (positionScores.get(a.id) || 0));
+            return results;
+        }
         const hasScreening = results.some(c => c.screeningScore != null);
         if (hasScreening) {
             results.sort((a, b) => {
@@ -773,7 +799,7 @@ export default function CandidateProcessPage() {
             });
         }
         return results;
-    }, [candidates, searchQuery, filterSource, filterStatus, filterPosition, filterMinScore]);
+    }, [candidates, searchQuery, filterSource, filterStatus, filterPosition, filterMinScore, positions]);
 
     const parseFeedback = (text) => {
         if (!text) return { pos: '', neg: '' };

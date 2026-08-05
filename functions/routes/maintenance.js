@@ -29,7 +29,13 @@ const BULK_JOBS_COLL = 'artifacts/talent-flow/public/data/bulkImportJobs';
 const ROLES = ['super_admin', 'recruiter'];
 
 async function readCandidatesFlat() {
-    const snap = await db.collection(CANDIDATES_COLL).get();
+    // select(): yalnızca mükerrer tespitinde kullanılan küçük alanlar tel
+    // üzerinden gelir. Projeksiyonsuz tam koleksiyon okuması (cvText +
+    // positionAnalyses + aiAnalysis dahil) Hosting'in 60 sn sınırını aşıyor
+    // ve eşzamanlı isteklerde 2GiB belleği taşırıp 502'ye yol açıyordu.
+    const snap = await db.collection(CANDIDATES_COLL)
+        .select('name', 'email', 'phone', 'source', 'bulkJobId', 'createdAt')
+        .get();
     return snap.docs.map((d) => {
         const c = d.data();
         return {
@@ -46,7 +52,14 @@ async function readCandidatesFlat() {
 
 router.get('/api/maintenance/bulk-jobs', requireAuth(ROLES), async (req, res) => {
     try {
-        const snap = await db.collection(BULK_JOBS_COLL).get();
+        // Tüm iş geçmişini okumak yerine sorguyu sınırla: super_admin son 20
+        // işi, recruiter yalnızca kendi işlerini çeker (tek alanlı otomatik
+        // indeks yeterli; composite indeks gerekmesin diye recruiter tarafı
+        // bellekte sıralanır).
+        const query = req.user.role === 'super_admin'
+            ? db.collection(BULK_JOBS_COLL).orderBy('createdAt', 'desc').limit(20)
+            : db.collection(BULK_JOBS_COLL).where('createdBy', '==', req.user.uid);
+        const snap = await query.get();
         let jobs = snap.docs.map((d) => {
             const j = d.data();
             return {
@@ -62,9 +75,6 @@ router.get('/api/maintenance/bulk-jobs', requireAuth(ROLES), async (req, res) =>
                 createdAtMs: j.createdAt?.toMillis?.() || 0,
             };
         });
-        if (req.user.role !== 'super_admin') {
-            jobs = jobs.filter((j) => j.createdBy === req.user.uid);
-        }
         jobs.sort((a, b) => b.createdAtMs - a.createdAtMs);
         res.json({ jobs: jobs.slice(0, 20) });
     } catch (err) {
@@ -133,14 +143,23 @@ router.post('/api/maintenance/prescore', requireAuth(ROLES), async (req, res) =>
         const batchSize = Math.min(60, Math.max(1, parseInt(req.body?.batchSize, 10) || 40));
         const scoreOf = (c) => Number(c.initialAiScore || 0) || Number(c.matchScore || 0) || Number(c.aiScore || 0);
 
-        const snap = await db.collection(CANDIDATES_COLL).get();
-        const pendingDocs = snap.docs.filter((d) => scoreOf(d.data()) <= 0);
-        const batchDocs = pendingDocs.slice(0, batchSize);
+        // İki aşamalı okuma: önce yalnızca skor alanlarıyla (küçük) tüm
+        // koleksiyon taranır, sonra sadece bu partinin adayları gerekli
+        // alanlarla çekilir. Eski tam-koleksiyon okuması cvText dahil her
+        // şeyi belleğe alıp Gemini çağrıları boyunca tutuyordu (502/OOM).
+        const scoreSnap = await db.collection(CANDIDATES_COLL)
+            .select('initialAiScore', 'matchScore', 'aiScore')
+            .get();
+        const pendingRefs = scoreSnap.docs.filter((d) => scoreOf(d.data()) <= 0).map((d) => d.ref);
+        const batchRefs = pendingRefs.slice(0, batchSize);
+        const batchDocs = batchRefs.length > 0
+            ? await db.getAll(...batchRefs, { fieldMask: ['cvText', 'position', 'skills'] })
+            : [];
 
         let openPositionTitles = [];
         try {
             const posSnap = await db.collection(POSITIONS_COLL).where('status', '==', 'open').get();
-            openPositionTitles = posSnap.docs.map((d) => d.data().title).filter(Boolean).slice(0, 25);
+            openPositionTitles = posSnap.docs.map((d) => d.data().title).filter(Boolean);
         } catch (posErr) {
             log.warn(`[maintenance/prescore] open positions read failed: ${posErr.message}`);
         }
@@ -162,7 +181,10 @@ router.post('/api/maintenance/prescore', requireAuth(ROLES), async (req, res) =>
                             initialAiScore: result.score,
                             matchScore: result.score,
                             combinedScore: result.score,
-                            matchedPositionTitle: result.matchedTitle || data.position || '',
+                            // matchedTitle ya doğrulanmış bir açık pozisyon başlığıdır
+                            // ya da null ("uygun açık pozisyon yok") — CV'deki serbest
+                            // pozisyon adı asla eşleşme diye yazılmaz.
+                            matchedPositionTitle: result.matchedTitle ?? null,
                             matchReason: result.matchReason || '',
                             prescoreMethod: result.method,
                             prescoredAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -177,13 +199,13 @@ router.post('/api/maintenance/prescore', requireAuth(ROLES), async (req, res) =>
             })
         );
 
-        log.info(`[maintenance/prescore] batch done: ${updated} updated (${aiUsed} AI), ${failed} failed, ${pendingDocs.length - batchDocs.length} remaining`);
+        log.info(`[maintenance/prescore] batch done: ${updated} updated (${aiUsed} AI), ${failed} failed, ${pendingRefs.length - batchDocs.length} remaining`);
         res.json({
             processed: batchDocs.length,
             updated,
             failed,
             aiUsed,
-            remaining: pendingDocs.length - batchDocs.length,
+            remaining: pendingRefs.length - batchDocs.length,
         });
     } catch (err) {
         log.error(`[maintenance/prescore] ${err.message}`);
