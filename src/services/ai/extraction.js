@@ -37,7 +37,10 @@ export async function extractCandidateEvidence(jobDescription, candidateProfile,
         experience: candidateProfile.experience,
         skills: candidateProfile.skills,
         description: sanitizeForPrompt(candidateProfile.description || candidateProfile.about || ''),
-        cvData: sanitizeForPrompt(candidateProfile.cvData || ''),
+        // cvData'yı yalnızca manuel yükleme akışı yazar; toplu içe aktarma ve
+        // başvuru formu CV metnini cvText alanına koyar. cvText'e düşülmezse
+        // bu adayların derin analizi BOŞ CV ile çalışır ve skorlar çöker.
+        cvData: sanitizeForPrompt(candidateProfile.cvData || candidateProfile.cvText || ''),
         experiences: candidateProfile.experiences || []
     };
 

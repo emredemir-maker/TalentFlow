@@ -9,10 +9,13 @@
 import { useMemo, useState } from 'react';
 import {
     Search, Download, Users, ChevronUp, ChevronDown, ChevronLeft, ChevronRight,
-    FilterX, Table2, Wrench,
+    FilterX, Table2, Wrench, CheckSquare, Square, Layers, X, Loader2, AlertCircle, CheckCircle2,
 } from 'lucide-react';
 import MaintenancePanel from '../components/MaintenancePanel';
+import { useAuth } from '../context/AuthContext';
 import { useCandidates } from '../context/CandidatesContext';
+import { usePositions } from '../context/PositionsContext';
+import { calculateMatchScore } from '../services/matchService';
 import { STAGES, getStage } from '../utils/pipelineStages';
 import {
     DEFAULT_FILTERS, applyTableFilters, sortRows, buildExportRows,
@@ -61,11 +64,87 @@ function SortableHeader({ label, sortKey, activeKey, dir, onSort, align = 'left'
 
 const SELECT_CLS = 'text-[12px] border border-slate-200 rounded-lg bg-white px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-100 text-slate-700';
 
+// Toplu statü değişikliği modali — statü listesi tek kaynaktan (pipelineStages)
+// gelir; CandidateProcessPage'deki tekil değişiklikle aynı damgaları basar.
+function BulkStageModal({ isOpen, count, applying, onApply, onClose }) {
+    const [stageKey, setStageKey] = useState('');
+    if (!isOpen) return null;
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={applying ? undefined : onClose} />
+            <div className="relative w-full max-w-md bg-white rounded-2xl border border-slate-100 shadow-2xl p-5">
+                <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-[#13294E] flex items-center justify-center">
+                            <Layers className="w-4.5 h-4.5 text-white" />
+                        </div>
+                        <div>
+                            <h3 className="text-[14px] font-black text-slate-900">Toplu Statü Değişikliği</h3>
+                            <p className="text-[10px] text-slate-400 font-bold">{count} aday seçildi</p>
+                        </div>
+                    </div>
+                    <button onClick={onClose} disabled={applying} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 transition-colors">
+                        <X className="w-4 h-4" />
+                    </button>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                    {STAGES.map((s) => (
+                        <button
+                            key={s.key}
+                            type="button"
+                            onClick={() => setStageKey(s.key)}
+                            className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-left transition-all ${stageKey === s.key
+                                ? 'border-slate-400 bg-slate-50 shadow-sm'
+                                : 'border-slate-100 hover:border-slate-200'}`}
+                        >
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: s.color }} />
+                            <span className={`text-[12px] font-bold ${stageKey === s.key ? 'text-slate-900' : 'text-slate-600'}`}>{s.label}</span>
+                        </button>
+                    ))}
+                </div>
+                <div className="mt-4 flex items-start gap-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                    Seçili {count} adayın statüsü topluca değiştirilecek.
+                </div>
+                <div className="mt-4 flex gap-2">
+                    <button
+                        onClick={onClose}
+                        disabled={applying}
+                        className="flex-1 py-2.5 rounded-xl border border-slate-200 text-[12px] font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+                    >
+                        İptal
+                    </button>
+                    <button
+                        onClick={() => stageKey && onApply(stageKey)}
+                        disabled={!stageKey || applying}
+                        className="flex-[2] py-2.5 rounded-xl bg-[#13294E] hover:bg-[#1E3A6E] text-white text-[12px] font-black disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
+                    >
+                        {applying ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                        {applying ? 'Uygulanıyor…' : 'Uygula'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function CandidatesTablePage() {
+    const { role, user } = useAuth();
     const {
-        enrichedCandidates, loading, setViewCandidateId,
-        departments, matchPositions, sourcesOptions,
+        enrichedCandidates, loading, setViewCandidateId, updateCandidate,
+        departments, sourcesOptions,
     } = useCandidates();
+    const { positions } = usePositions();
+    // Pozisyon filtresi aday-türevli etiketlerden değil SİSTEMDEKİ açık
+    // pozisyonlardan beslenir — filtre "bu açık pozisyona uygunluk" sorusunu
+    // yanıtlar, adayın en iyi eşleştiği etiketi değil.
+    const openPositions = useMemo(
+        () => positions.filter((p) => p.status === 'open' && p.title),
+        [positions]
+    );
+    // Bakım uçları backend'de super_admin/recruiter ile korunuyor; butonu
+    // yetkisiz role gösterip 403 yedirmek yerine hiç göstermiyoruz.
+    const canMaintain = role === 'super_admin' || role === 'recruiter';
 
     const [filters, setFilters] = useState(DEFAULT_FILTERS);
     const [sortKey, setSortKey] = useState('appliedDate');
@@ -73,12 +152,30 @@ export default function CandidatesTablePage() {
     const [page, setPage] = useState(0);
     const [exporting, setExporting] = useState(false);
     const [showMaintenance, setShowMaintenance] = useState(false);
+    // Toplu seçim: filtre değişince temizlenir — görünmeyen adaylarda
+    // "gizli" toplu güncelleme yapılmasın.
+    const [selectedIds, setSelectedIds] = useState(() => new Set());
+    const [bulkModalOpen, setBulkModalOpen] = useState(false);
+    const [bulkApplying, setBulkApplying] = useState(false);
+    const [bulkResult, setBulkResult] = useState(null);
 
     const setFilter = (key, value) => {
         setFilters((prev) => ({ ...prev, [key]: value }));
         setPage(0);
+        setSelectedIds(new Set());
+        // Pozisyon seçilince varsayılan sıralama o pozisyonun uyum skoru olur
+        // ("işe alım için en uygun aday" akışı); seçim kalkınca eski varsayılana dön.
+        if (key === 'position') {
+            if (value !== 'all') {
+                setSortKey('positionScore');
+                setSortDir('desc');
+            } else if (sortKey === 'positionScore') {
+                setSortKey('appliedDate');
+                setSortDir('desc');
+            }
+        }
     };
-    const clearFilters = () => { setFilters(DEFAULT_FILTERS); setPage(0); };
+    const clearFilters = () => { setFilters(DEFAULT_FILTERS); setPage(0); setSelectedIds(new Set()); };
     const hasActiveFilters = useMemo(
         () => Object.keys(DEFAULT_FILTERS).some((k) => filters[k] !== DEFAULT_FILTERS[k]),
         [filters]
@@ -94,9 +191,18 @@ export default function CandidatesTablePage() {
         setPage(0);
     };
 
+    const selectedPosition = useMemo(
+        () => (filters.position !== 'all'
+            ? openPositions.find((p) => p.title === filters.position) || null
+            : null),
+        [filters.position, openPositions]
+    );
     const filteredRows = useMemo(
-        () => applyTableFilters(enrichedCandidates, filters),
-        [enrichedCandidates, filters]
+        () => applyTableFilters(enrichedCandidates, filters, {
+            position: selectedPosition,
+            keywordScoreFn: (c, p) => calculateMatchScore(c, p).score,
+        }),
+        [enrichedCandidates, filters, selectedPosition]
     );
     const sortedRows = useMemo(
         () => sortRows(filteredRows, sortKey, sortDir),
@@ -110,6 +216,46 @@ export default function CandidatesTablePage() {
     const openCandidate = (id) => {
         setViewCandidateId(id);
         window.dispatchEvent(new CustomEvent('changeView', { detail: 'candidate-process' }));
+    };
+
+    // ── Toplu seçim & statü değişikliği ───────────────────────────────────
+    const allFilteredSelected = sortedRows.length > 0 && sortedRows.every((c) => selectedIds.has(c.id));
+    const toggleRow = (id) => {
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
+    };
+    const toggleAllFiltered = () => {
+        setSelectedIds(allFilteredSelected ? new Set() : new Set(sortedRows.map((c) => c.id)));
+    };
+
+    const handleBulkStage = async (stageKey) => {
+        if (bulkApplying || selectedIds.size === 0) return;
+        setBulkApplying(true);
+        setBulkResult(null);
+        try {
+            // Tekil değişiklikle (CandidateProcessPage.handleStatusChange) aynı damgalar
+            const now = new Date().toISOString();
+            const by = user?.displayName || user?.email || 'HR';
+            const update = { status: stageKey, statusChangedAt: now, statusChangedBy: by };
+            if (stageKey === 'rejected') { update.rejectedAt = now; update.rejectedBy = by; }
+            if (stageKey === 'hired') { update.hiredAt = now; update.hiredBy = by; }
+
+            const ids = Array.from(selectedIds);
+            const results = await Promise.allSettled(ids.map((id) => updateCandidate(id, update)));
+            const failed = results.filter((r) => r.status === 'rejected').length;
+            setBulkResult({
+                ok: ids.length - failed,
+                failed,
+                stageLabel: getStage(stageKey).label,
+            });
+            setSelectedIds(new Set());
+            setBulkModalOpen(false);
+        } finally {
+            setBulkApplying(false);
+        }
     };
 
     const handleExport = async () => {
@@ -142,26 +288,30 @@ export default function CandidatesTablePage() {
                         <Table2 className="w-4.5 h-4.5 text-white" />
                     </div>
                     <div>
-                        <h1 className="text-xl font-black text-slate-900">Aday Raporu</h1>
+                        <h1 className="text-xl font-black text-slate-900">Adaylar</h1>
                         <p className="text-[11px] text-slate-400 mt-0.5">
                             {sortedRows.length === enrichedCandidates.length
                                 ? `${enrichedCandidates.length} aday`
                                 : `${sortedRows.length} / ${enrichedCandidates.length} aday (filtreli)`}
+                            {selectedIds.size > 0 ? ` · ${selectedIds.size} seçili` : ''}
                         </p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <button
-                        onClick={() => setShowMaintenance(v => !v)}
-                        className={`flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-lg transition-colors ${showMaintenance ? 'text-white bg-[#13294E]' : 'text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200'}`}
-                    >
-                        <Wrench className="w-3.5 h-3.5" /> Bakım
-                    </button>
+                    {canMaintain && (
+                        <button
+                            onClick={() => setShowMaintenance(v => !v)}
+                            className={`flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-lg transition-colors ${showMaintenance ? 'text-white bg-[#13294E]' : 'text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200'}`}
+                        >
+                            <Wrench className="w-3.5 h-3.5" /> Bakım
+                        </button>
+                    )}
                     <button
                         onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'candidate-process' }))}
                         className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors"
+                        title="Detay görünümü — CV yükleme, sistem taraması ve aday profilleri"
                     >
-                        <Users className="w-3.5 h-3.5" /> Aday Listesi
+                        <Users className="w-3.5 h-3.5" /> Detay & Yükleme
                     </button>
                     <button
                         onClick={handleExport}
@@ -175,7 +325,7 @@ export default function CandidatesTablePage() {
             </div>
 
             {/* ── Maintenance panel (toggle) ───────────────────────────────── */}
-            {showMaintenance && (
+            {canMaintain && showMaintenance && (
                 <div className="px-6 pt-4">
                     <MaintenancePanel />
                 </div>
@@ -198,9 +348,9 @@ export default function CandidatesTablePage() {
                         <option value="all">Tüm Aşamalar</option>
                         {STAGES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
                     </select>
-                    <select value={filters.position} onChange={(e) => setFilter('position', e.target.value)} className={SELECT_CLS}>
+                    <select value={filters.position} onChange={(e) => setFilter('position', e.target.value)} className={SELECT_CLS} title="Açık pozisyona uygunluk filtresi">
                         <option value="all">Tüm Pozisyonlar</option>
-                        {matchPositions.filter((p) => p !== 'all').map((p) => <option key={p} value={p}>{p}</option>)}
+                        {openPositions.map((p) => <option key={p.id} value={p.title}>{p.title}</option>)}
                     </select>
                     <select value={filters.department} onChange={(e) => setFilter('department', e.target.value)} className={SELECT_CLS}>
                         <option value="all">Tüm Departmanlar</option>
@@ -233,6 +383,37 @@ export default function CandidatesTablePage() {
                 </div>
             </div>
 
+            {/* ── Toplu işlem çubuğu / sonuç bildirimi ─────────────────────── */}
+            {(selectedIds.size > 0 || bulkResult) && (
+                <div className="px-6 pt-3">
+                    {selectedIds.size > 0 ? (
+                        <div className="flex items-center justify-between gap-3 bg-[#13294E] text-white rounded-xl px-4 py-2.5 shadow-sm">
+                            <span className="text-[12px] font-bold">{selectedIds.size} aday seçildi</span>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setBulkModalOpen(true)}
+                                    className="flex items-center gap-1.5 text-[11px] font-black bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-colors"
+                                >
+                                    <Layers className="w-3.5 h-3.5" /> Statü Değiştir
+                                </button>
+                                <button
+                                    onClick={() => setSelectedIds(new Set())}
+                                    className="flex items-center gap-1.5 text-[11px] font-bold text-white/70 hover:text-white px-2 py-1.5 transition-colors"
+                                >
+                                    <X className="w-3.5 h-3.5" /> Seçimi Temizle
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className={`flex items-center gap-2 text-[11px] font-semibold rounded-xl px-4 py-2.5 border ${bulkResult.failed > 0 ? 'text-amber-700 bg-amber-50 border-amber-100' : 'text-emerald-700 bg-emerald-50 border-emerald-100'}`}>
+                            <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                            {bulkResult.ok} aday "{bulkResult.stageLabel}" statüsüne taşındı{bulkResult.failed > 0 ? `, ${bulkResult.failed} güncelleme başarısız` : ''}.
+                            <button onClick={() => setBulkResult(null)} className="ml-auto text-slate-400 hover:text-slate-600"><X className="w-3.5 h-3.5" /></button>
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* ── Table ────────────────────────────────────────────────────── */}
             <div className="flex-1 px-6 py-4">
                 <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
@@ -240,12 +421,24 @@ export default function CandidatesTablePage() {
                         <table className="w-full text-[12px]">
                             <thead className="bg-slate-50 border-b border-slate-100">
                                 <tr>
+                                    <th className="px-3 py-2.5 w-9">
+                                        <button
+                                            onClick={toggleAllFiltered}
+                                            title={allFilteredSelected ? 'Seçimi kaldır' : 'Filtrelenen tüm adayları seç'}
+                                            className="text-slate-400 hover:text-slate-700 transition-colors flex items-center"
+                                        >
+                                            {allFilteredSelected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                                        </button>
+                                    </th>
                                     <SortableHeader label="Aday" sortKey="name" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                                     <SortableHeader label="Pozisyon" sortKey="position" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                                     <SortableHeader label="Departman" sortKey="department" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                                     <SortableHeader label="Aşama" sortKey="stage" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                                     <SortableHeader label="Kaynak" sortKey="source" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                                     <SortableHeader label="AI" sortKey="bestScore" activeKey={sortKey} dir={sortDir} onSort={handleSort} align="center" />
+                                    {selectedPosition && (
+                                        <SortableHeader label="Poz. Uyum" sortKey="positionScore" activeKey={sortKey} dir={sortDir} onSort={handleSort} align="center" />
+                                    )}
                                     <SortableHeader label="Mülakat" sortKey="interviewScore" activeKey={sortKey} dir={sortDir} onSort={handleSort} align="center" />
                                     <SortableHeader label="Genel" sortKey="combinedScore" activeKey={sortKey} dir={sortDir} onSort={handleSort} align="center" />
                                     <SortableHeader label="Deneyim" sortKey="experience" activeKey={sortKey} dir={sortDir} onSort={handleSort} align="center" />
@@ -255,14 +448,14 @@ export default function CandidatesTablePage() {
                             <tbody>
                                 {loading && (
                                     <tr>
-                                        <td colSpan={10} className="px-4 py-12 text-center text-slate-400 text-[12px]">
+                                        <td colSpan={selectedPosition ? 12 : 11} className="px-4 py-12 text-center text-slate-400 text-[12px]">
                                             Adaylar yükleniyor…
                                         </td>
                                     </tr>
                                 )}
                                 {!loading && pageRows.length === 0 && (
                                     <tr>
-                                        <td colSpan={10} className="px-4 py-12 text-center">
+                                        <td colSpan={selectedPosition ? 12 : 11} className="px-4 py-12 text-center">
                                             <p className="text-slate-400 text-[12px] font-semibold">
                                                 {hasActiveFilters ? 'Filtrelere uyan aday bulunamadı.' : 'Henüz aday yok.'}
                                             </p>
@@ -278,8 +471,13 @@ export default function CandidatesTablePage() {
                                     <tr
                                         key={c.id}
                                         onClick={() => openCandidate(c.id)}
-                                        className="border-b border-slate-50 last:border-0 hover:bg-slate-50/70 cursor-pointer transition-colors"
+                                        className={`border-b border-slate-50 last:border-0 hover:bg-slate-50/70 cursor-pointer transition-colors ${selectedIds.has(c.id) ? 'bg-blue-50/50' : ''}`}
                                     >
+                                        <td className="px-3 py-2.5" onClick={(e) => { e.stopPropagation(); toggleRow(c.id); }}>
+                                            <button className="text-slate-400 hover:text-slate-700 transition-colors flex items-center" aria-label="Adayı seç">
+                                                {selectedIds.has(c.id) ? <CheckSquare className="w-4 h-4 text-[#13294E]" /> : <Square className="w-4 h-4" />}
+                                            </button>
+                                        </td>
                                         <td className="px-3 py-2.5">
                                             <p className="font-bold text-slate-800 whitespace-nowrap">{c.name || 'İsimsiz'}</p>
                                             <p className="text-[10px] text-slate-400 whitespace-nowrap">{c.email || '—'}</p>
@@ -289,6 +487,9 @@ export default function CandidatesTablePage() {
                                         <td className="px-3 py-2.5"><StageChip status={c.status} /></td>
                                         <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap">{c.source || '—'}</td>
                                         <td className="px-3 py-2.5 text-center"><ScoreCell value={c.bestScore} /></td>
+                                        {selectedPosition && (
+                                            <td className="px-3 py-2.5 text-center"><ScoreCell value={c.positionScore} /></td>
+                                        )}
                                         <td className="px-3 py-2.5 text-center"><ScoreCell value={c.interviewScore} /></td>
                                         <td className="px-3 py-2.5 text-center"><ScoreCell value={c.combinedScore} /></td>
                                         <td className="px-3 py-2.5 text-center text-slate-600">
@@ -332,6 +533,14 @@ export default function CandidatesTablePage() {
                     )}
                 </div>
             </div>
+
+            <BulkStageModal
+                isOpen={bulkModalOpen}
+                count={selectedIds.size}
+                applying={bulkApplying}
+                onApply={handleBulkStage}
+                onClose={() => setBulkModalOpen(false)}
+            />
         </div>
     );
 }

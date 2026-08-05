@@ -35,18 +35,59 @@ export const BULK_JOBS_COLL = 'artifacts/talent-flow/public/data/bulkImportJobs'
 export const CANDIDATES_COLL = 'artifacts/talent-flow/public/data/candidates';
 export const POSITIONS_COLL = 'artifacts/talent-flow/public/data/positions';
 
+const normTitle = (s) => (s || '').trim().toLowerCase();
+
 /**
- * Ön skoru çözümle: Gemini geçerli bir matchScore verdiyse onu kullan
- * (0-100'e sıkıştırılır), vermediyse anahtar-kelime skoruna düş. Pozisyon
- * başlığı tercihi: Gemini'nin seçtiği > yüklemede seçilen.
+ * AI'nın döndürdüğü başlığı açık pozisyon listesindeki kanonik karşılığıyla
+ * eşle (büyük/küçük harf ve boşluk duyarsız). Listede yoksa null — AI'nın
+ * uydurduğu başlıklar asla olduğu gibi kabul edilmez.
  */
-export function resolvePreScore(parsed, positionTitle) {
+export function matchOpenTitle(title, openPositionTitles = []) {
+    const n = normTitle(title);
+    if (!n) return null;
+    return openPositionTitles.find((t) => normTitle(t) === n) || null;
+}
+
+const clampScore = (n) => Math.max(0, Math.min(100, Math.round(n)));
+
+/**
+ * Ön skoru çözümle. Pozisyon başlığı önceliği:
+ *   1. Yüklemede işe alım uzmanının seçtiği pozisyon BAĞLAYICIDIR — AI onu
+ *      asla ezemez.
+ *   2. Pozisyon seçilmediyse AI'nın önerisi ancak açık pozisyon listesinde
+ *      birebir karşılığı varsa kabul edilir.
+ *   3. Aksi halde açık pozisyonlar içinden en iyi anahtar-kelime eşleşmesi.
+ *   4. Hiçbir açık pozisyona eşleşme yoksa matchedTitle null döner
+ *      ("uygun açık pozisyon yok") — sistemde olmayan bir başlık yazılmaz.
+ */
+export function resolvePreScore(parsed, positionTitle, openPositionTitles = []) {
     const aiScore = Number(parsed?.matchScore);
-    const matchedTitle = parsed?.matchedPosition || positionTitle || '';
-    if (!isNaN(aiScore) && aiScore > 0) {
-        return { score: Math.max(0, Math.min(100, Math.round(aiScore))), matchedTitle };
+    const hasAiScore = !isNaN(aiScore) && aiScore > 0;
+
+    if (positionTitle) {
+        const score = hasAiScore ? clampScore(aiScore) : calculateSimpleMatchScore(parsed, positionTitle);
+        return { score, matchedTitle: positionTitle };
     }
-    return { score: calculateSimpleMatchScore(parsed, matchedTitle), matchedTitle };
+
+    const validated = matchOpenTitle(parsed?.matchedPosition, openPositionTitles);
+    if (validated && hasAiScore) {
+        return { score: clampScore(aiScore), matchedTitle: validated };
+    }
+
+    let best = { score: 0, matchedTitle: null };
+    for (const title of openPositionTitles) {
+        const s = calculateSimpleMatchScore(parsed, title);
+        if (s > best.score) best = { score: s, matchedTitle: title };
+    }
+    if (best.matchedTitle) return best;
+
+    // Açık pozisyon listesi hiç yokken skor profil kalitesini ölçer (prompt
+    // öyle ister); liste varken hiçbirine eşleşmemek gerçek bir "uygun
+    // pozisyon yok" durumudur ve skor 0'dır.
+    if (openPositionTitles.length === 0) {
+        return { score: hasAiScore ? clampScore(aiScore) : 0, matchedTitle: null };
+    }
+    return { score: 0, matchedTitle: null };
 }
 
 // Global single-worker flag — only one job runs at a time across all requests.
@@ -57,10 +98,10 @@ async function parseTextWithGemini(text, positionTitle, openPositionTitles = [])
     // açık pozisyonların en uygununa göre puanlanır. Böylece ayrıştırma ve
     // ön skor TEK Gemini çağrısında çıkar — aday başına ek AI maliyeti yok.
     const scoreContext = positionTitle
-        ? `Hedef pozisyon: "${positionTitle}". matchScore'u bu pozisyona uygunluğa göre ver ve matchedPosition alanına bu pozisyonu yaz.`
+        ? `Hedef pozisyon: "${positionTitle}". matchScore'u SADECE bu pozisyona uygunluğa göre ver ve matchedPosition alanına aynen "${positionTitle}" yaz.`
         : openPositionTitles.length > 0
-            ? `Şirketteki açık pozisyonlar: ${openPositionTitles.map((t) => `"${t}"`).join(', ')}. Adaya EN UYGUN pozisyonu seç, matchedPosition alanına yaz ve matchScore'u ona göre ver.`
-            : `Açık pozisyon listesi yok. matchScore'u adayın profil kalitesine ve istihdam edilebilirliğine göre ver; matchedPosition alanına adayın kendi pozisyonunu yaz.`;
+            ? `Şirketteki açık pozisyonlar: ${openPositionTitles.map((t) => `"${t}"`).join(', ')}. matchedPosition alanına SADECE bu listeden bir başlığı AYNEN yaz — listede olmayan bir başlık ASLA yazma. Aday hiçbirine uygun değilse matchedPosition alanına null yaz ve matchScore'u 0 ver.`
+            : `Açık pozisyon listesi yok. matchScore'u adayın profil kalitesine ve istihdam edilebilirliğine göre ver; matchedPosition alanına null yaz.`;
     const prompt = `Sen bir uzman CV ayrıştırıcısı ve işe alım ön değerlendirme uzmanısın. Aşağıdaki CV metninden aday bilgilerini JSON olarak çıkart ve bir ön uyum skoru ver.
 ${scoreContext}
 Sadece şu JSON formatında yanıt ver (başka hiçbir şey yazma):
@@ -288,13 +329,16 @@ async function executeJob(jobId) {
         // seçilmediyse Gemini ön skoru en uygun açık pozisyona göre verir.
         // Bu okuma başarısız olsa da içe aktarma devam eder — skor yalnızca
         // anahtar-kelime yedeğine düşer.
-        let openPositionTitles = [];
+        let openPositions = [];
         try {
             const posSnap = await db.collection(POSITIONS_COLL).where('status', '==', 'open').get();
-            openPositionTitles = posSnap.docs.map((d) => d.data().title).filter(Boolean).slice(0, 25);
+            openPositions = posSnap.docs
+                .map((d) => ({ id: d.id, title: d.data().title }))
+                .filter((p) => Boolean(p.title));
         } catch (posErr) {
             log.warn(`[bulk-import] open positions read failed: ${posErr.message}`);
         }
+        const openPositionTitles = openPositions.map((p) => p.title);
 
         const STALE_ITEM_MS = 10 * 60 * 1000;
         // Ortak kota soğuma penceresi: bir işçi Gemini'den 429 yediğinde
@@ -347,6 +391,11 @@ async function executeJob(jobId) {
                     const cooldownWait = quotaCooldownUntil - Date.now();
                     if (cooldownWait > 0) await new Promise((r) => setTimeout(r, cooldownWait));
                     const parsed = await parseTextWithGemini(cvText, positionTitle, openPositionTitles);
+                    // AI ayrıştıramadıysa aday YARATMA: eskiden null parsed ile
+                    // "içi boş" aday (adı PDF dosya adı, tüm alanlar boş)
+                    // kaydedilip item 'done' işaretleniyordu — hata görünmez
+                    // kalıyordu. Artık item 'error' olur ve iş raporunda görünür.
+                    if (!parsed) throw new Error('AI ayrıştırma başarısız — CV metni işlenemedi');
                     // Mükerrer koruması: aynı e-posta/telefon havuzda varsa yeni
                     // kayıt açma — item 'duplicate' işaretlenir, mevcut aday korunur.
                     let duplicate = null;
@@ -368,7 +417,11 @@ async function executeJob(jobId) {
                         await jobRef.update({ processedCount, failedCount, duplicateCount, lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp() });
                         break;
                     }
-                    const { score: matchScore, matchedTitle } = resolvePreScore(parsed, positionTitle);
+                    const { score: matchScore, matchedTitle } = resolvePreScore(parsed, positionTitle, openPositionTitles);
+                    // Eşleşen başlıktan pozisyon doc id'sini çöz — yüklemede
+                    // pozisyon seçilmediyse bile aday gerçek bir pozisyona bağlanır.
+                    const matchedPos = openPositions.find((p) => p.title === matchedTitle);
+                    const noOpenMatch = matchedTitle === null && openPositionTitles.length > 0;
                     await db.collection(CANDIDATES_COLL).add({
                         name: parsed?.name || item.name || item.originalName?.replace(/\.[^.]+$/, '') || '',
                         email: parsed?.email || item.email || '',
@@ -376,8 +429,8 @@ async function executeJob(jobId) {
                         position: positionTitle || parsed?.position || '',
                         matchedPositionTitle: matchedTitle,
                         initialAiScore: matchScore,
-                        matchReason: parsed?.matchReason || '',
-                        positionId: positionId || item.positionId || '',
+                        matchReason: noOpenMatch ? 'Uygun açık pozisyon bulunamadı.' : (parsed?.matchReason || ''),
+                        positionId: positionId || item.positionId || matchedPos?.id || '',
                         company: parsed?.company || '',
                         location: parsed?.location || '',
                         skills: parsed?.skills || [],

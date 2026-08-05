@@ -97,6 +97,34 @@ export async function writeUserProfile({ uid, idToken, email, displayName, role 
 }
 
 /**
+ * Seed settings/system with an e-mail domain allow-list. Firestore rules
+ * only let a user create their own recruiter profile when their e-mail
+ * domain is allow-listed (or a pending invitation exists), so this has to
+ * run before writeUserProfile. Uses the emulator-only "Bearer owner"
+ * token, which bypasses security rules for admin-style seeding.
+ */
+export async function seedAllowedDomains(domains) {
+    const docPath = 'artifacts/talent-flow/public/data/settings/system';
+    const res = await fetch(`${FIRESTORE_BASE}/${docPath}`, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer owner',
+        },
+        body: JSON.stringify({
+            fields: {
+                allowedDomains: {
+                    arrayValue: { values: domains.map((d) => ({ stringValue: d })) },
+                },
+            },
+        }),
+    });
+    if (!res.ok) {
+        throw new Error(`Allowed-domains seed failed: ${res.status} ${await res.text()}`);
+    }
+}
+
+/**
  * Quick health check — used by the webServer step to wait until both
  * emulators are listening before kicking off Playwright.
  */

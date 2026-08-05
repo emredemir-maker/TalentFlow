@@ -162,6 +162,15 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                 return;
             }
 
+            // Kanıt yokken derin analiz boş girdiyle çalışıp skoru çökertir —
+            // çalıştırma, kullanıcıya nedenini söyle.
+            const cvBody = `${candidate.cvData || ''}${candidate.cvText || ''}`.trim();
+            if (cvBody.length < 40 && !(candidate.experiences?.length > 0)) {
+                setAiError('CV metni bulunamadı — analiz için önce CV yeniden ayrıştırılmalı.');
+                setAiLoading(false);
+                return;
+            }
+
             const updatedAnalyses = { ...(candidate.positionAnalyses || {}) };
             let highestScore = -1;
             let bestResult = null;
@@ -188,10 +197,15 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
 
             setAiResult(bestResult);
 
+            // İşe alım uzmanının atadığı pozisyon bağlayıcı — "en iyi eşleşme"
+            // başlığı onu ezemez.
+            const assignedPos = candidate.positionId
+                ? openPositions.find(p => p.id === candidate.positionId) || null
+                : null;
             const updates = {
                 aiAnalysis: bestResult, // keep backward compat
                 aiScore: bestResult.score,
-                matchedPositionTitle: bestTitle,
+                matchedPositionTitle: assignedPos ? assignedPos.title : bestTitle,
                 summary: bestResult.summary,
                 positionAnalyses: updatedAnalyses,
                 lastScannedAt: new Date().toISOString()
