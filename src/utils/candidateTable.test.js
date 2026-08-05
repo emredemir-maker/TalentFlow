@@ -88,6 +88,25 @@ describe('applyTableFilters', () => {
         const rows = applyTableFilters(CANDIDATES, { minScore: '70' });
         expect(rows.map((c) => c.id).sort()).toEqual(['1', '2']);
     });
+    it('filters by autonomous-scan status', () => {
+        const rows = [
+            { ...CANDIDATES[0], aiAnalysis: { starAnalysis: { Situation: { score: 7 } } } },
+            CANDIDATES[1],
+            CANDIDATES[2],
+        ];
+        expect(applyTableFilters(rows, { scan: 'scanned' }).map((c) => c.id)).toEqual(['1']);
+        expect(applyTableFilters(rows, { scan: 'unscanned' }).map((c) => c.id).sort()).toEqual(['2', '3']);
+        expect(applyTableFilters(rows, { scan: 'all' })).toHaveLength(3);
+    });
+
+    it('sorts by scan status (scanned first when descending)', () => {
+        const rows = [
+            CANDIDATES[1],
+            { ...CANDIDATES[0], aiAnalysis: { starAnalysis: {} } },
+        ];
+        expect(sortRows(rows, 'scanStatus', 'desc')[0].id).toBe('1');
+    });
+
     it('filters by applied date range', () => {
         const rows = applyTableFilters(CANDIDATES, { dateFrom: '2026-07-01', dateTo: '2026-07-10' });
         expect(rows.map((c) => c.id)).toEqual(['1']);
@@ -238,6 +257,7 @@ describe('buildExportRows', () => {
             'Aşama': 'Mülakat',
             'Kaynak': 'LinkedIn',
             'Kaynak Detayı': 'Sponsorlu',
+            'Otonom Tarama': 'Yapılmadı',
             'AI Skoru': 85,
             'Mülakat Skoru': 90,
             'Genel Skor': 88,

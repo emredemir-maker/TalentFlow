@@ -24,12 +24,21 @@ export function getAppliedDate(candidate) {
     return '';
 }
 
+/**
+ * Otonom (derin) tarama yapılmış mı? Toplu tarama aksiyonuyla aynı ölçüt:
+ * STAR analizi kaydı varsa aday derin taramadan geçmiştir.
+ */
+export function isDeepScanned(candidate) {
+    return Boolean(candidate?.aiAnalysis?.starAnalysis);
+}
+
 export const DEFAULT_FILTERS = {
     search: '',
     stage: 'all',
     position: 'all',
     department: 'all',
     source: 'all',
+    scan: 'all', // 'all' | 'scanned' | 'unscanned'
     minScore: '',
     dateFrom: '',
     dateTo: '',
@@ -121,6 +130,9 @@ export function applyTableFilters(rows, filters, opts = {}) {
     if (f.source !== 'all') {
         result = result.filter((c) => c.source === f.source);
     }
+    if (f.scan !== 'all') {
+        result = result.filter((c) => (f.scan === 'scanned' ? isDeepScanned(c) : !isDeepScanned(c)));
+    }
     if (f.minScore !== '' && !isNaN(Number(f.minScore))) {
         const min = Number(f.minScore);
         // Pozisyon modunda eşik, adayın SEÇİLİ pozisyondaki skoruna uygulanır —
@@ -155,6 +167,7 @@ const SORT_ACCESSORS = {
     department: (c) => c.department || '',
     source: (c) => c.source || '',
     stage: (c) => getStage(resolveStageKey(c.status)).label,
+    scanStatus: (c) => (isDeepScanned(c) ? 1 : 0),
     bestScore: (c) => (c.bestScore ?? null),
     positionScore: (c) => (c.positionScore ?? null),
     interviewScore: (c) => (c.interviewScore ?? null),
@@ -191,6 +204,7 @@ export function buildExportRows(rows) {
         'Aşama': getStage(resolveStageKey(c.status)).label,
         'Kaynak': c.source || '',
         'Kaynak Detayı': c.sourceDetail || '',
+        'Otonom Tarama': isDeepScanned(c) ? 'Yapıldı' : 'Yapılmadı',
         'AI Skoru': c.bestScore ?? '',
         ...(c.positionScore !== undefined ? { 'Seçili Pozisyon Uyumu': c.positionScore } : {}),
         'Mülakat Skoru': c.interviewScore ?? '',

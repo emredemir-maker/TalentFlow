@@ -23,7 +23,7 @@ import { deepScanCandidate } from '../services/scanService';
 import { STAGES, getStage } from '../utils/pipelineStages';
 import {
     DEFAULT_FILTERS, applyTableFilters, withCoherentScores, sortRows, buildExportRows,
-    resolveStageKey, getAppliedDate,
+    resolveStageKey, getAppliedDate, isDeepScanned,
 } from '../utils/candidateTable';
 
 const PAGE_SIZE = 50;
@@ -539,6 +539,11 @@ export default function CandidatesTablePage() {
                         <option value="all">Tüm Kaynaklar</option>
                         {sourcesOptions.filter((s) => s !== 'all').map((s) => <option key={s} value={s}>{s}</option>)}
                     </select>
+                    <select value={filters.scan} onChange={(e) => setFilter('scan', e.target.value)} className={SELECT_CLS} title="Otonom (derin) tarama durumu">
+                        <option value="all">Tarama: Tümü</option>
+                        <option value="scanned">Taranmış</option>
+                        <option value="unscanned">Taranmamış</option>
+                    </select>
                     <input
                         type="number" min="0" max="100"
                         placeholder="Min skor"
@@ -644,6 +649,7 @@ export default function CandidatesTablePage() {
                                     <SortableHeader label="Departman" sortKey="department" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                                     <SortableHeader label="Aşama" sortKey="stage" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                                     <SortableHeader label="Kaynak" sortKey="source" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                                    <SortableHeader label="Tarama" sortKey="scanStatus" activeKey={sortKey} dir={sortDir} onSort={handleSort} align="center" />
                                     <SortableHeader label="AI" sortKey="bestScore" activeKey={sortKey} dir={sortDir} onSort={handleSort} align="center" />
                                     {selectedPosition && (
                                         <SortableHeader label="Poz. Uyum" sortKey="positionScore" activeKey={sortKey} dir={sortDir} onSort={handleSort} align="center" />
@@ -657,14 +663,14 @@ export default function CandidatesTablePage() {
                             <tbody>
                                 {loading && (
                                     <tr>
-                                        <td colSpan={selectedPosition ? 13 : 12} className="px-4 py-12 text-center text-slate-400 text-[12px]">
+                                        <td colSpan={selectedPosition ? 14 : 13} className="px-4 py-12 text-center text-slate-400 text-[12px]">
                                             Adaylar yükleniyor…
                                         </td>
                                     </tr>
                                 )}
                                 {!loading && pageRows.length === 0 && (
                                     <tr>
-                                        <td colSpan={selectedPosition ? 13 : 12} className="px-4 py-12 text-center">
+                                        <td colSpan={selectedPosition ? 14 : 13} className="px-4 py-12 text-center">
                                             <p className="text-slate-400 text-[12px] font-semibold">
                                                 {hasActiveFilters ? 'Filtrelere uyan aday bulunamadı.' : 'Henüz aday yok.'}
                                             </p>
@@ -701,6 +707,23 @@ export default function CandidatesTablePage() {
                                         <td className="px-3 py-2.5 text-slate-600 whitespace-nowrap">{c.department || '—'}</td>
                                         <td className="px-3 py-2.5"><StageChip status={c.status} /></td>
                                         <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap">{c.source || '—'}</td>
+                                        <td className="px-3 py-2.5 text-center">
+                                            {isDeepScanned(c) ? (
+                                                <span
+                                                    className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full text-emerald-700 bg-emerald-50 border border-emerald-100 whitespace-nowrap"
+                                                    title={c.lastScannedAt ? `Son tarama: ${new Date(c.lastScannedAt).toLocaleString('tr-TR')}` : 'Otonom tarama yapıldı'}
+                                                >
+                                                    <Brain className="w-3 h-3" /> Tarandı
+                                                </span>
+                                            ) : (
+                                                <span
+                                                    className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full text-amber-700 bg-amber-50 border border-amber-100 whitespace-nowrap"
+                                                    title="Henüz otonom tarama yapılmadı — seçip 'Otonom Tarama' ile başlatabilirsiniz"
+                                                >
+                                                    Taranmadı
+                                                </span>
+                                            )}
+                                        </td>
                                         <td className="px-3 py-2.5 text-center"><ScoreCell value={c.bestScore} /></td>
                                         {selectedPosition && (
                                             <td className="px-3 py-2.5 text-center"><ScoreCell value={c.positionScore} /></td>
