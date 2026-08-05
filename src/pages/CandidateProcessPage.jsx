@@ -8,6 +8,7 @@ import { analyzeCandidateMatch, parseExperiencesFromText, parseCandidateFromText
 import { extractTextFromFile } from '../services/cvParser';
 import { calculateMatchScore, filterPositionsByDomain, domainLabel, detectCandidateDomain, detectPositionDomain } from '../services/matchService';
 import { applyPiiMask, stripPiiForAI } from '../utils/pii';
+import { cleanRoleText } from '../utils/candidateTable';
 import { batchFilesBySize, formatBytes, totalBytes, MAX_REQUEST_BYTES } from '../utils/bulkUpload';
 import { getFeedbackEmail } from '../utils/templateService';
 import { db } from '../config/firebase';
@@ -1244,7 +1245,7 @@ export default function CandidateProcessPage() {
                                                 (yukarıda) + CV'ye göre ideal rol (açık pozisyonlardan
                                                 bağımsız) — farklıysa burada gösterilir. */}
                                             {(() => {
-                                                const cvRole = candidate.suggestedRole || candidate.position;
+                                                const cvRole = cleanRoleText(candidate.suggestedRole, candidate.position || '');
                                                 return cvRole && cvRole !== candidate.matchedPositionTitle ? (
                                                     <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">
                                                         CV'ye göre: <span className="font-bold text-slate-500">{cvRole}</span>
@@ -1609,10 +1610,10 @@ export default function CandidateProcessPage() {
                                                         <span className="ml-1.5 px-2 py-0.5 bg-[#13294E]/10 text-[#13294E] rounded-md">{domainLabel(candidateDomain)}</span>
                                                     </p>
                                                     <p className="text-[10px] text-slate-400 mt-0.5">Her açık pozisyon ayrı skorlanır; otomatik eşleştirme uyumlu meslek alanına öncelik verir.</p>
-                                                    {(candidate.suggestedRole || candidate.position) && (
+                                                    {cleanRoleText(candidate.suggestedRole, candidate.position || '') && (
                                                         <p className="text-[10px] text-slate-500 mt-1">
                                                             CV'ye göre ideal rol:
-                                                            <span className="ml-1 font-black text-slate-700">{candidate.suggestedRole || candidate.position}</span>
+                                                            <span className="ml-1 font-black text-slate-700">{cleanRoleText(candidate.suggestedRole, candidate.position || '')}</span>
                                                             <span className="ml-1 text-slate-300">(açık pozisyonlardan bağımsız)</span>
                                                         </p>
                                                     )}

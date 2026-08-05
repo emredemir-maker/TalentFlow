@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+    cleanRoleText,
     resolveStageKey,
     getAppliedDate,
     applyTableFilters,
@@ -119,6 +120,25 @@ describe('applyTableFilters', () => {
         const input = [...CANDIDATES];
         applyTableFilters(input, { search: 'ayşe' });
         expect(input).toHaveLength(3);
+    });
+});
+
+describe('cleanRoleText', () => {
+    it('keeps clean role titles as-is', () => {
+        expect(cleanRoleText('Growth Product Manager')).toBe('Growth Product Manager');
+        expect(cleanRoleText('  "Senior UI Engineer." ')).toBe('Senior UI Engineer');
+    });
+    it('joins up to 3 equally-suitable roles with commas', () => {
+        expect(cleanRoleText('Product Manager / Growth Lead')).toBe('Product Manager, Growth Lead');
+        expect(cleanRoleText('A Uzmani, B Uzmani, C Uzmani, D Uzmani')).toBe('A Uzmani, B Uzmani, C Uzmani');
+    });
+    it('rejects commentary sentences and falls back to the CV role', () => {
+        const yorum = 'Adayin profili dijital pazarlama alaninda cok guclu oldugu icin kendisine oncelikle growth odakli roller onerilir';
+        expect(cleanRoleText(yorum, 'Marketing Specialist')).toBe('Marketing Specialist');
+        expect(cleanRoleText('', 'Fallback Rol')).toBe('Fallback Rol');
+    });
+    it('takes only the first sentence when a title is followed by commentary', () => {
+        expect(cleanRoleText('Growth Product Manager. Aday ayrica satis rollerine de bakabilir.')).toBe('Growth Product Manager');
     });
 });
 

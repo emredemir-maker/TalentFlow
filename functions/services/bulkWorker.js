@@ -111,6 +111,24 @@ export function sanitizeExperiences(list) {
         .slice(0, 20);
 }
 
+/**
+ * suggestedRole temizliği: alan yalnızca rol BAŞLIĞI taşımalı — AI bazen
+ * yorum cümlesi yazıyor ("Adayın profili ... için uygundur" gibi). Kurallar:
+ * ilk cümle/satır alınır; virgül/eğik çizgi ayraçlı en fazla 3 başlık
+ * ", " ile birleştirilir; tek "başlık" 6 kelimeden uzunsa ya da toplam 80
+ * karakteri aşıyorsa bu bir yorumdur → fallback (CV'deki mevcut rol) döner.
+ * NOT: src/utils/candidateTable.js'teki cleanRoleText bunun kural ikizidir.
+ */
+export function sanitizeSuggestedRole(raw, fallback = '') {
+    let s = String(raw || '').trim().replace(/^["'`]+|["'`.!?]+$/g, '').trim();
+    if (!s) return fallback;
+    s = s.split(/[.!?\n]/)[0].trim();
+    const parts = s.split(/\s*(?:,|\/|;|\|| - )\s*/).map((p) => p.trim()).filter(Boolean).slice(0, 3);
+    if (parts.length === 0 || parts.some((p) => p.split(/\s+/).length > 6)) return fallback;
+    const joined = parts.join(', ');
+    return joined.length > 80 ? fallback : joined;
+}
+
 async function parseTextWithGemini(text, positionTitle, openPositionTitles = [], { useCache = true } = {}) {
     // Skor bağlamı: yüklemede pozisyon seçildiyse ona göre, seçilmediyse
     // açık pozisyonların en uygununa göre puanlanır. Böylece ayrıştırma ve
@@ -135,7 +153,7 @@ Sadece şu JSON formatında yanıt ver (başka hiçbir şey yazma):
   "education": "Son okul / Bölüm",
   "experiences": [{"role": "Pozisyon", "company": "Şirket adı (ZORUNLU)", "duration": "Tarih aralığı (ZORUNLU)", "desc": "1 cümle özet"}],
   "summary": "Kısa özet (Türkçe, max 300 karakter)",
-  "suggestedRole": "Adayın CV'sine göre EN UYGUN olacağı rol — açık pozisyon listesinden BAĞIMSIZ, serbest metin (Türkçe)",
+  "suggestedRole": "SADECE rol başlığı — yorum/cümle/açıklama YASAK. Eşit uygunlukta birden fazla rol varsa virgülle ayır (en fazla 3). Örn: 'Growth Product Manager' veya 'Product Manager, Growth Lead'",
   "matchScore": 75,
   "matchedPosition": "Skorun verildiği pozisyon başlığı",
   "matchReason": "1-2 cümlelik skor gerekçesi (Türkçe)"
@@ -477,7 +495,8 @@ async function executeJob(jobId) {
                         summary: parsed?.summary || '',
                         // CV'ye göre ideal rol — açık pozisyon eşleşmesinden ayrı
                         // bir bilgi olarak saklanır ve UI'da ayrıca gösterilir.
-                        suggestedRole: parsed?.suggestedRole || parsed?.position || '',
+                        // Süzgeç: yorum cümleleri persist edilmez, CV'deki role düşülür.
+                        suggestedRole: sanitizeSuggestedRole(parsed?.suggestedRole, parsed?.position || ''),
                         cvText: cvText.slice(0, 15000),
                         cvFileName: item.originalName || '',
                         matchScore,
