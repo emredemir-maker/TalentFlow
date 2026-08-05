@@ -482,7 +482,11 @@ export default function CandidatesTablePage() {
                                             <p className="font-bold text-slate-800 whitespace-nowrap">{c.name || 'İsimsiz'}</p>
                                             <p className="text-[10px] text-slate-400 whitespace-nowrap">{c.email || '—'}</p>
                                         </td>
-                                        <td className="px-3 py-2.5 text-slate-600 whitespace-nowrap">{c.bestTitle || c.position || '—'}</td>
+                                        <td className="px-3 py-2.5 text-slate-600 whitespace-nowrap">
+                                            {c.matchedPositionTitle === null
+                                                ? <span className="italic text-amber-600 font-semibold" title={c.position ? `CV'deki pozisyon: ${c.position}` : ''}>Uygun açık pozisyon yok</span>
+                                                : (c.bestTitle || c.position || '—')}
+                                        </td>
                                         <td className="px-3 py-2.5 text-slate-600 whitespace-nowrap">{c.department || '—'}</td>
                                         <td className="px-3 py-2.5"><StageChip status={c.status} /></td>
                                         <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap">{c.source || '—'}</td>
