@@ -63,7 +63,17 @@ Durum: Uygulama başladı — 2026-08-05
 - ✅ Toplu işlemler genişletildi: Aşama Değiştir + **Kaynak Değiştir** (sources koleksiyonundan, alt mecra destekli) + **Departmana Aç** (departments koleksiyonundan; adayın `visibleToDepartments` listesine ekler — pozisyon tarafındaki mekanizmayla aynı, zaten açık olanlar atlanır)
 - Doğrulama: 219/219 vitest, eslint 0 hata, build başarılı
 
-**Kalan:** Faz 1.5 (opsiyonel kuyruk), 2/5 kalan yüzeyler (ComparisonModal, Analytics, SendMessage koruması), 2B/8 (içe aktarmada positionAnalyses hedef skoru), 3B/7-8+10-14 (experiences, PDF sentinel, kesme, retry, duplicate stratejisi, backfill).
+**2026-08-05 — Tur 8 (CV bütünlüğü paketi, PR #70):**
+- ✅ 3B/7: Toplu içe aktarma prompt'u `experiences` istiyor ve `sanitizeExperiences` süzgecinden geçirip persist ediyor (şirket+tarih zorunlu, 20 kayıt sınırı); prompt CV metni 8000→15000
+- ✅ 3B/8: Başvuru→aday terfisinde `experiences` artık kopyalanıyor (PositionsPage allow-list)
+- ✅ 3B/10: `pdf.js` hata sentineli kaldırıldı — hata artık throw ediliyor; bulk worker'daki metin kapısı >5 → ≥200 karakter + "PDF Error" öneki reddi
+- ✅ 3B/11: Kesme sınırı 6000→15000 (bulk.js ön-çıkarım + aday dokümanı); geçici dosya YALNIZCA başarılı çıkarımda siliniyor (başarısızda worker tempPath yedeğinden dener)
+- ✅ 3B/12: Parse başarısızlığında tek seferlik önbelleksiz yeniden deneme (`useCache:false`) — 1 saatlik bozuk yanıt önbelleği artık kalıcı hasar veremiyor
+- ✅ 3B/13: Mükerrer temizliği "en eskiyi tut" → **"en dolu kaydı tut"** (`richnessOf`: deneyim×3 + yetenek(≤10) + özet + eğitim; eşitse en eski); bakım paneli metinleri güncellendi
+- ✅ 3B/14: "Eksik Profilleri Tamamla" backfill'i — `enrich.js` (needsEnrichment + extractExperiences), `POST /api/maintenance/enrich-profiles` (parti 10, 40 sn bütçe, kalan sayısı), bakım sürecine 5. adım olarak eklendi (`enrichedAt` damgası boş sonuçların sonsuz kuyruğunu önler); health-check `missingExperiences` sayacı
+- Doğrulama: 231/231 vitest (12 yeni), eslint 0 hata, build başarılı
+
+**Kalan:** Faz 1.5 (opsiyonel kuyruk), 2/5 kalan yüzeyler (ComparisonModal, Analytics, SendMessage koruması), 2B/8 (içe aktarmada positionAnalyses hedef skoru).
 
 Bu plan, bildirilen 6 sorunun kod incelemesiyle doğrulanmış kök nedenlerine ve fazlara ayrılmış çözüm adımlarına dayanır.
 

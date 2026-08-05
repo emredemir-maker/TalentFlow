@@ -12,7 +12,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
     Loader2, RefreshCw, Trash2, AlertTriangle, CheckCircle2, XCircle, Clock,
-    Gauge, Wrench, ClipboardCheck, ChevronRight, SkipForward, Sparkles,
+    Gauge, Wrench, ClipboardCheck, ChevronRight, SkipForward, Sparkles, FileText,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -46,7 +46,7 @@ const STEP_DEFS = [
         key: 'dup',
         title: 'Mükerrer Temizliği',
         icon: Trash2,
-        desc: 'Aynı e-posta/telefonlu kopya kayıtlar silinir; her grubun en eski kaydı korunur. Önce bunu yapmak, sonraki AI puanlamasının kopyalara harcanmasını önler.',
+        desc: 'Aynı e-posta/telefonlu kopya kayıtlar silinir; her grubun EN DOLU kaydı (kariyer geçmişi/yetenek/özet açısından en zengin, eşitse en eski) korunur. Önce bunu yapmak, sonraki AI puanlamasının kopyalara harcanmasını önler.',
         countLabel: (n) => `${n} fazlalık kayıt`,
         action: 'Seçilenleri Sil',
     },
@@ -57,6 +57,14 @@ const STEP_DEFS = [
         desc: 'Sistemde olmayan (AI\'nın uydurduğu) pozisyon başlıkları açık pozisyonlara bağlanır; bağlanamayanlar "uygun açık pozisyon yok" olarak işaretlenir. AI çağrısı yapmaz, skorlara dokunmaz.',
         countLabel: (n) => `${n} geçersiz eşleşme`,
         action: 'Onar',
+    },
+    {
+        key: 'enrich',
+        title: 'Eksik Profilleri Tamamla',
+        icon: FileText,
+        desc: 'CV metni kayıtlı olduğu hâlde kariyer geçmişi boş kalan adaylar için AI ile deneyim listesi çıkarılır (eski içe aktarma bu alanı hiç doldurmuyordu). Yalnızca boş olanlara dokunur.',
+        countLabel: (n) => `${n} eksik profil`,
+        action: 'Tamamla',
     },
     {
         key: 'score',
@@ -83,6 +91,7 @@ export default function MaintenancePanel() {
     const [running, setRunning] = useState(null); // çalışan adımın key'i
     const [stepResults, setStepResults] = useState({});
     const [prescoreProgress, setPrescoreProgress] = useState(null);
+    const [enrichProgress, setEnrichProgress] = useState(null);
     // Bileşen kapanınca zincirleme prescore döngüsünü durdur
     const unmountedRef = useRef(false);
     useEffect(() => () => { unmountedRef.current = true; }, []);
@@ -170,7 +179,7 @@ export default function MaintenancePanel() {
 
     const runDupClean = async () => {
         if (selected.size === 0) return;
-        const ok = window.confirm(`${selected.size} mükerrer kayıt silinecek. Her grubun en eski kaydı korunuyor. Devam edilsin mi?`);
+        const ok = window.confirm(`${selected.size} mükerrer kayıt silinecek. Her grubun en dolu kaydı korunuyor. Devam edilsin mi?`);
         if (!ok) return;
         setRunning('dup');
         setError(null);
@@ -268,7 +277,44 @@ export default function MaintenancePanel() {
         }
     };
 
-    const STEP_RUNNERS = { stuck: runStuck, dup: runDupClean, match: runMatchRepair, score: runPrescore };
+    // Eksik profil tamamlama — prescore ile aynı zincirleme desen: küçük
+    // parti, süre bütçeli sunucu, geçici hatada retry, kalan azalmazsa dur.
+    const runEnrich = async () => {
+        setRunning('enrich');
+        setError(null);
+        let totals = { updated: 0, failed: 0, remaining: 1 };
+        try {
+            let prevRemaining = Infinity;
+            while (totals.remaining > 0 && !unmountedRef.current) {
+                const data = await fetchWithRetry('/api/maintenance/enrich-profiles', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ batchSize: 10 }),
+                });
+                totals = {
+                    updated: totals.updated + (data.updated || 0),
+                    failed: totals.failed + (data.failed || 0),
+                    remaining: data.remaining || 0,
+                };
+                setEnrichProgress({ ...totals });
+                if ((data.processed || 0) === 0) break;
+                if (totals.remaining >= prevRemaining) break;
+                prevRemaining = totals.remaining;
+            }
+            markDone('enrich', `${totals.updated} adayın kariyer geçmişi tamamlandı`
+                + (totals.failed > 0 ? ` · ${totals.failed} hata` : '')
+                + (totals.remaining > 0 ? ` · ${totals.remaining} kaldı — adımı tekrar çalıştırabilirsiniz` : ''));
+            await refreshHealth();
+        } catch (err) {
+            setError(`${err.message}${totals.updated > 0 ? ` — Şu ana kadar ${totals.updated} profil tamamlandı; tekrar basınca kaldığı yerden devam eder.` : ''}`);
+            await refreshHealth();
+        } finally {
+            setRunning(null);
+            setEnrichProgress(null);
+        }
+    };
+
+    const STEP_RUNNERS = { stuck: runStuck, dup: runDupClean, match: runMatchRepair, enrich: runEnrich, score: runPrescore };
     const toggleDup = (id) => {
         setSelected(prev => {
             const next = new Set(prev);
@@ -282,6 +328,7 @@ export default function MaintenancePanel() {
         stuck: health?.stuckJobs ?? 0,
         dup: scan?.extrasCount ?? 0,
         match: health?.invalidMatches ?? 0,
+        enrich: health?.missingExperiences ?? 0,
         score: health?.zeroScore ?? 0,
     };
     const statusOf = (key) => {
@@ -366,6 +413,11 @@ export default function MaintenancePanel() {
                                         {s.key === 'score' && running === 'score' && prescoreProgress && (
                                             <p className="text-[10px] text-violet-600 font-semibold mt-0.5">
                                                 {prescoreProgress.updated} puanlandı · {prescoreProgress.remaining} kaldı…
+                                            </p>
+                                        )}
+                                        {s.key === 'enrich' && running === 'enrich' && enrichProgress && (
+                                            <p className="text-[10px] text-violet-600 font-semibold mt-0.5">
+                                                {enrichProgress.updated} profil tamamlandı · {enrichProgress.remaining} kaldı…
                                             </p>
                                         )}
                                     </div>

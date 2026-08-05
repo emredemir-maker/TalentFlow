@@ -128,6 +128,9 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                 location: app.parsedCandidate?.location || '',
                 skills: app.parsedCandidate?.skills || [],
                 experience: app.parsedCandidate?.experience || 0,
+                // Kariyer geçmişi başvuru dokümanında zaten var — terfide
+                // kopyalanmazsa aday "Kariyer bilgisi bulunamadı" görünüyordu.
+                experiences: app.parsedCandidate?.experiences || [],
                 education: app.parsedCandidate?.education || '',
                 summary: app.parsedCandidate?.summary || app.aiSummary || '',
                 cvData: app.parsedCandidate?.cvData || '',

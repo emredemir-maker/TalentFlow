@@ -124,13 +124,18 @@ export function createBulkRouter(uploadBaseDir) {
                     try {
                         const ext = path.extname(item.tempPath).replace(/^\./, '').toLowerCase();
                         const buf = await readFile(item.tempPath);
-                        item.cvText = (await extractCvText(buf, ext)).slice(0, 6000);
+                        // 15000 karakter ≈ 5-6 sayfa: tipik CV'nin kariyer geçmişi
+                        // dahil tamamı. Eski 6000 sınırı iş geçmişini kesiyordu.
+                        item.cvText = (await extractCvText(buf, ext)).slice(0, 15000);
+                        // Geçici dosya YALNIZCA başarılı çıkarımda silinir — metin
+                        // artık Firestore'da. Başarısız çıkarımda dosya kalır ki
+                        // worker tempPath yedeğinden yeniden deneyebilsin (eski kod
+                        // başarısızlıkta da silip tek kopyayı yok ediyordu).
+                        try { fs.unlinkSync(item.tempPath); } catch { /* temizlik hatası önemsiz */ }
+                        delete item.tempPath;
                     } catch (extractErr) {
                         log.warn(`[bulk-import] Pre-extract failed for ${item.originalName}: ${extractErr.message}`);
                     }
-                    // Clean up temp file — text is now stored in Firestore
-                    try { fs.unlinkSync(item.tempPath); } catch {}
-                    delete item.tempPath;
                 }
             }
             const jobRef = db.collection(BULK_JOBS_COLL).doc();

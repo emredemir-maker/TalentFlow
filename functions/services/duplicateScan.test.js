@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { groupDuplicateCandidates, normEmail, normPhone } from './duplicateScan.js';
+import { groupDuplicateCandidates, normEmail, normPhone, richnessOf } from './duplicateScan.js';
 
 const mk = (id, email, phone, createdAtMs, name = '') => ({ id, email, phone, createdAtMs, name });
 
@@ -14,8 +14,16 @@ describe('normalizers', () => {
     });
 });
 
+describe('richnessOf', () => {
+    it('scores career history heaviest, then skills/summary/education', () => {
+        expect(richnessOf({})).toBe(0);
+        expect(richnessOf({ experiences: [{}, {}], skills: ['a'], summary: 'x', education: 'y' })).toBe(2 * 3 + 1 + 2 + 1);
+        expect(richnessOf({ skills: Array(25).fill('s') })).toBe(10); // yetenek katkısı 10 ile sınırlı
+    });
+});
+
 describe('groupDuplicateCandidates', () => {
-    it('groups by normalized email and keeps the oldest', () => {
+    it('groups by normalized email and keeps the oldest when equally rich', () => {
         const groups = groupDuplicateCandidates([
             mk('new1', 'Ali@Firma.com', '', 2000),
             mk('old1', 'ali@firma.com', '', 1000),
@@ -24,6 +32,22 @@ describe('groupDuplicateCandidates', () => {
         expect(groups).toHaveLength(1);
         expect(groups[0].keep.id).toBe('old1');
         expect(groups[0].extras.map((e) => e.id)).toEqual(['new1']);
+    });
+
+    it('keeps the RICHEST record over the oldest — a full later record beats an empty first one', () => {
+        const hollow = { ...mk('hollow', 'ali@firma.com', '', 1000) }; // eski ama boş
+        const full = { ...mk('full', 'ali@firma.com', '', 2000), experiences: [{ company: 'X', duration: '2020' }], summary: 'dolu' };
+        const groups = groupDuplicateCandidates([hollow, full]);
+        expect(groups[0].keep.id).toBe('full');
+        expect(groups[0].extras.map((e) => e.id)).toEqual(['hollow']);
+    });
+
+    it('honours a precomputed richness field when present', () => {
+        const groups = groupDuplicateCandidates([
+            { ...mk('a', 'x@y.com', '', 1000), richness: 0 },
+            { ...mk('b', 'x@y.com', '', 2000), richness: 9 },
+        ]);
+        expect(groups[0].keep.id).toBe('b');
     });
 
     it('falls back to phone only when email is missing', () => {

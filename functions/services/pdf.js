@@ -7,9 +7,10 @@
 // class shape first, falls back to the function shape, and returns a uniform
 // `{ text }` object so callers never see the underlying mess.
 //
-// Errors are intentionally swallowed and converted to `{ text: 'PDF Error: ...' }`
-// so a single bad PDF in a bulk upload does not abort the entire batch — the
-// caller decides how to handle the sentinel string.
+// Errors PROPAGATE as exceptions. Eski davranış hatayı `{ text: 'PDF Error: …' }`
+// sentineliyle yutuyordu; bu string CV metni sanılıp Gemini'ye gönderiliyor ve
+// içi boş adaylar oluşuyordu. Çağıranların hepsi kendi try/catch'ine sahip —
+// tek bozuk PDF yine tüm partiyi durdurmaz, ama artık "hatalı" olarak görünür.
 import { createRequire } from 'module';
 import { childLogger } from './logger.js';
 const log = childLogger('pdf');
@@ -44,6 +45,6 @@ export async function pdf(buffer) {
         throw new Error('PDF parsing library not found or invalid');
     } catch (err) {
         log.error('PDF Error:', err);
-        return { text: 'PDF Error: ' + err.message };
+        throw new Error('PDF okunamadı: ' + err.message);
     }
 }
