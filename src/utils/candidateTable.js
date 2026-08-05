@@ -25,6 +25,25 @@ export function getAppliedDate(candidate) {
 }
 
 /**
+ * "CV'ye göre ideal rol" metni yalnızca rol BAŞLIĞI olmalı — AI bazen yorum
+ * cümlesi üretebiliyor ve eski kayıtlarda bunlar persist edilmiş olabilir.
+ * Kurallar: ilk cümle/satır; virgül/eğik çizgi ayraçlı en fazla 3 başlık
+ * ", " ile birleştirilir; tek "başlık" 6 kelimeden uzunsa ya da toplam 80
+ * karakteri aşıyorsa yorum sayılır → fallback (CV'deki mevcut rol) döner.
+ * NOT: functions/services/bulkWorker.js'teki sanitizeSuggestedRole bunun
+ * kural ikizidir — davranış değişikliği ikisine birden uygulanmalı.
+ */
+export function cleanRoleText(raw, fallback = '') {
+    let s = String(raw || '').trim().replace(/^["'`]+|["'`.!?]+$/g, '').trim();
+    if (!s) return fallback;
+    s = s.split(/[.!?\n]/)[0].trim();
+    const parts = s.split(/\s*(?:,|\/|;|\|| - )\s*/).map((p) => p.trim()).filter(Boolean).slice(0, 3);
+    if (parts.length === 0 || parts.some((p) => p.split(/\s+/).length > 6)) return fallback;
+    const joined = parts.join(', ');
+    return joined.length > 80 ? fallback : joined;
+}
+
+/**
  * Otonom (derin) tarama yapılmış mı? Toplu tarama aksiyonuyla aynı ölçüt:
  * STAR analizi kaydı varsa aday derin taramadan geçmiştir.
  */
@@ -163,7 +182,7 @@ const SORT_ACCESSORS = {
     name: (c) => c.name || '',
     email: (c) => c.email || '',
     position: (c) => c.bestTitle || c.position || '',
-    cvRole: (c) => c.suggestedRole || c.position || '',
+    cvRole: (c) => cleanRoleText(c.suggestedRole, c.position || '') || '',
     department: (c) => c.department || '',
     source: (c) => c.source || '',
     stage: (c) => getStage(resolveStageKey(c.status)).label,
@@ -199,7 +218,7 @@ export function buildExportRows(rows) {
         'E-posta': c.email || '',
         'Telefon': c.phone || '',
         'Pozisyon': c.bestTitle || c.position || '',
-        "CV'ye Göre İdeal Rol": c.suggestedRole || c.position || '',
+        "CV'ye Göre İdeal Rol": cleanRoleText(c.suggestedRole, c.position || '') || '',
         'Departman': c.department || '',
         'Aşama': getStage(resolveStageKey(c.status)).label,
         'Kaynak': c.source || '',

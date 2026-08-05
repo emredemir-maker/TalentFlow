@@ -11,7 +11,7 @@
 //      anahtar-kelime skoru (kayıtlı position/skills alanları açık
 //      pozisyon başlıklarıyla karşılaştırılır) — kimse 0'da kalmaz.
 import { generateText } from './gemini.js';
-import { calculateSimpleMatchScore, matchOpenTitle } from './bulkWorker.js';
+import { calculateSimpleMatchScore, matchOpenTitle, sanitizeSuggestedRole } from './bulkWorker.js';
 
 /**
  * Anahtar-kelime yedeği: açık pozisyonlardan en iyi skoru seç. Hiçbiri
@@ -48,7 +48,7 @@ Sadece şu JSON formatında yanıt ver (başka hiçbir şey yazma):
   "matchScore": 75,
   "matchedPosition": "Skorun verildiği pozisyon başlığı",
   "matchReason": "1-2 cümlelik skor gerekçesi (Türkçe)",
-  "suggestedRole": "Adayın CV'sine göre EN UYGUN olacağı rol — açık pozisyon listesinden BAĞIMSIZ, serbest metin (Türkçe)"
+  "suggestedRole": "SADECE rol başlığı — yorum/cümle/açıklama YASAK. Eşit uygunlukta birden fazla rol varsa virgülle ayır (en fazla 3)"
 }
 
 CV:
@@ -69,7 +69,7 @@ ${cvText.substring(0, 6000)}`;
                             score: Math.max(0, Math.min(100, Math.round(score))),
                             matchedTitle: validated,
                             matchReason: parsed?.matchReason || '',
-                            suggestedRole: parsed?.suggestedRole || '',
+                            suggestedRole: sanitizeSuggestedRole(parsed?.suggestedRole),
                             method: 'ai',
                         };
                     }
@@ -80,7 +80,7 @@ ${cvText.substring(0, 6000)}`;
                             score: Math.max(0, Math.min(100, Math.round(score))),
                             matchedTitle: null,
                             matchReason: parsed?.matchReason || '',
-                            suggestedRole: parsed?.suggestedRole || '',
+                            suggestedRole: sanitizeSuggestedRole(parsed?.suggestedRole),
                             method: 'ai',
                         };
                     }

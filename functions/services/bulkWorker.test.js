@@ -28,7 +28,7 @@ vi.mock('../config/firebaseAdmin.js', () => ({
     },
 }));
 
-const { extractCvText, findDuplicateCandidate, resolvePreScore, matchOpenTitle } = await import('./bulkWorker.js');
+const { extractCvText, findDuplicateCandidate, resolvePreScore, matchOpenTitle, sanitizeSuggestedRole } = await import('./bulkWorker.js');
 
 beforeEach(() => {
     mockPdf.mockReset();
@@ -119,6 +119,19 @@ describe('findDuplicateCandidate', () => {
         mockWhereGet.mockResolvedValue(emptySnap);
         const result = await findDuplicateCandidate({ email: 'yok@aday.com', phone: '+90 555 000 00 00' }, {});
         expect(result).toBeNull();
+    });
+});
+
+describe('sanitizeSuggestedRole', () => {
+    it('keeps titles, joins multi-role lists, strips punctuation', () => {
+        expect(sanitizeSuggestedRole('Growth Product Manager')).toBe('Growth Product Manager');
+        expect(sanitizeSuggestedRole('Product Manager / Growth Lead')).toBe('Product Manager, Growth Lead');
+        expect(sanitizeSuggestedRole('"Senior UI Engineer."')).toBe('Senior UI Engineer');
+    });
+    it('rejects commentary sentences → falls back to the CV role', () => {
+        const yorum = 'Adayin profili dijital pazarlama alaninda cok guclu oldugu icin kendisine growth odakli roller onerilir';
+        expect(sanitizeSuggestedRole(yorum, 'Marketing Specialist')).toBe('Marketing Specialist');
+        expect(sanitizeSuggestedRole(null, 'X')).toBe('X');
     });
 });
 

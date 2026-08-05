@@ -23,7 +23,7 @@ import { deepScanCandidate } from '../services/scanService';
 import { STAGES, getStage } from '../utils/pipelineStages';
 import {
     DEFAULT_FILTERS, applyTableFilters, withCoherentScores, sortRows, buildExportRows,
-    resolveStageKey, getAppliedDate, isDeepScanned,
+    resolveStageKey, getAppliedDate, isDeepScanned, cleanRoleText,
 } from '../utils/candidateTable';
 
 const PAGE_SIZE = 50;
@@ -707,7 +707,7 @@ export default function CandidatesTablePage() {
                                         </td>
                                         {/* CV'ye göre ideal rol — açık pozisyon eşleşmesinden AYRI kolon */}
                                         <td className="px-3 py-2.5 text-slate-500">
-                                            <p className="truncate max-w-[160px]" title={c.suggestedRole || c.position || ''}>{c.suggestedRole || c.position || '—'}</p>
+                                            <p className="truncate max-w-[160px]" title={cleanRoleText(c.suggestedRole, c.position || '')}>{cleanRoleText(c.suggestedRole, c.position || '') || '—'}</p>
                                         </td>
                                         <td className="px-3 py-2.5 text-slate-600">
                                             <p className="truncate max-w-[120px]" title={c.department || ''}>{c.department || '—'}</p>
