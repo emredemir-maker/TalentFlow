@@ -16,9 +16,10 @@ import { Router } from 'express';
 
 import { requireAuth } from '../middleware/auth.js';
 import { db, admin } from '../config/firebaseAdmin.js';
-import { groupDuplicateCandidates } from '../services/duplicateScan.js';
+import { groupDuplicateCandidates, richnessOf } from '../services/duplicateScan.js';
 import { computePrescore } from '../services/prescore.js';
 import { planMatchRepairs, collectJobIdsNeedingLookup } from '../services/matchRepair.js';
+import { needsEnrichment, extractExperiences } from '../services/enrich.js';
 import { POSITIONS_COLL } from '../services/bulkWorker.js';
 import { childLogger } from '../services/logger.js';
 
@@ -35,7 +36,8 @@ async function readCandidatesFlat() {
     // positionAnalyses + aiAnalysis dahil) Hosting'in 60 sn sınırını aşıyor
     // ve eşzamanlı isteklerde 2GiB belleği taşırıp 502'ye yol açıyordu.
     const snap = await db.collection(CANDIDATES_COLL)
-        .select('name', 'email', 'phone', 'source', 'bulkJobId', 'createdAt')
+        .select('name', 'email', 'phone', 'source', 'bulkJobId', 'createdAt',
+            'experiences', 'skills', 'summary', 'education')
         .get();
     return snap.docs.map((d) => {
         const c = d.data();
@@ -47,6 +49,9 @@ async function readCandidatesFlat() {
             source: c.source || '',
             bulkJobId: c.bulkJobId || null,
             createdAtMs: c.createdAt?.toMillis?.() || 0,
+            // Doluluk puanı burada türetilir; ağır alanlar (experiences vb.)
+            // yanıt gövdesine taşınmaz.
+            richness: richnessOf(c),
         };
     });
 }
@@ -243,7 +248,8 @@ router.get('/api/maintenance/health-check', requireAuth(ROLES), async (req, res)
         const candSnap = await db.collection(CANDIDATES_COLL)
             .select('name', 'email', 'phone', 'source', 'bulkJobId', 'createdAt',
                 'matchedPositionTitle', 'positionId', 'position', 'skills',
-                'initialAiScore', 'matchScore', 'aiScore')
+                'initialAiScore', 'matchScore', 'aiScore',
+                'experiences', 'summary', 'education', 'cvText', 'enrichedAt')
             .get();
         const candidates = candSnap.docs.map((d) => {
             const c = d.data();
@@ -276,6 +282,8 @@ router.get('/api/maintenance/health-check', requireAuth(ROLES), async (req, res)
             return (j.totalCount || 0) > 0 && (j.processedCount || 0) >= (j.totalCount || 0);
         }).length;
 
+        const missingExperiences = candidates.filter(needsEnrichment).length;
+
         res.json({
             totalCandidates: candidates.length,
             openPositions: openPositions.length,
@@ -283,6 +291,7 @@ router.get('/api/maintenance/health-check', requireAuth(ROLES), async (req, res)
             duplicates,
             invalidMatches,
             zeroScore,
+            missingExperiences,
         });
     } catch (err) {
         log.error(`[maintenance/health-check] ${err.message}`);
@@ -347,6 +356,66 @@ router.post('/api/maintenance/validate-matches', requireAuth(ROLES), async (req,
         });
     } catch (err) {
         log.error(`[maintenance/validate-matches] ${err.message}`);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Eksik profil tamamlama: kayıtlı cvText'i olan ama kariyer geçmişi boş
+// adaylara odaklı bir Gemini çağrısıyla experiences doldurur. prescore ile
+// aynı desende çalışır: küçük parti + 40 sn süre bütçesi + kalan sayısı,
+// istemci kalan 0 olana dek zincirler.
+router.post('/api/maintenance/enrich-profiles', requireAuth(ROLES), async (req, res) => {
+    try {
+        const batchSize = Math.min(20, Math.max(1, parseInt(req.body?.batchSize, 10) || 10));
+
+        const scoreSnap = await db.collection(CANDIDATES_COLL)
+            .select('experiences', 'cvText', 'enrichedAt')
+            .get();
+        const pendingRefs = scoreSnap.docs
+            .filter((d) => needsEnrichment(d.data()))
+            .map((d) => d.ref);
+        const batchRefs = pendingRefs.slice(0, batchSize);
+        const batchDocs = batchRefs.length > 0
+            ? await db.getAll(...batchRefs, { fieldMask: ['cvText'] })
+            : [];
+
+        const startedAt = Date.now();
+        const DEADLINE_MS = 40000;
+        let updated = 0;
+        let failed = 0;
+        let idx = 0;
+        await Promise.all(
+            Array.from({ length: Math.min(4, batchDocs.length) }, async () => {
+                while (idx < batchDocs.length) {
+                    if (Date.now() - startedAt > DEADLINE_MS) break;
+                    const docSnap = batchDocs[idx];
+                    idx += 1;
+                    try {
+                        const experiences = await extractExperiences(docSnap.data()?.cvText || '');
+                        if (experiences === null) { failed += 1; continue; }
+                        await docSnap.ref.update({
+                            experiences,
+                            enrichedAt: admin.firestore.FieldValue.serverTimestamp(),
+                        });
+                        updated += 1;
+                    } catch (err) {
+                        failed += 1;
+                        log.warn(`[maintenance/enrich] candidate ${docSnap.id} failed: ${err.message}`);
+                    }
+                }
+            })
+        );
+
+        const attempted = Math.min(idx, batchDocs.length);
+        log.info(`[maintenance/enrich] batch done: ${updated} updated, ${failed} failed, ${pendingRefs.length - attempted} remaining`);
+        res.json({
+            processed: attempted,
+            updated,
+            failed,
+            remaining: pendingRefs.length - attempted,
+        });
+    } catch (err) {
+        log.error(`[maintenance/enrich] ${err.message}`);
         res.status(500).json({ error: err.message });
     }
 });

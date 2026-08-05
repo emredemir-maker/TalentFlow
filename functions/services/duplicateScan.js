@@ -6,14 +6,25 @@
 //
 // Identity rule mirrors /api/check-duplicate and bulkWorker's
 // findDuplicateCandidate: normalized email first, normalized phone as
-// fallback when there is no email. The OLDEST record in each group is the
-// one to keep; everything after it is a deletable "extra".
+// fallback when there is no email.
+//
+// Korunacak kayıt: her grubun EN DOLU (en zengin) kaydı — kariyer geçmişi,
+// yetenekler, özet ve eğitim doluluk puanıyla ölçülür; eşitlikte en eski
+// kazanır. Eski "en eskiyi tut" kuralı, sonradan tam ayrıştırılmış bir
+// kaydı silip eksik olan ilk kaydı koruyabiliyordu.
 
 // E-posta: yalnızca trim + küçük harf — noktalar anlamlıdır (ali.veli@x.com
 // ≠ aliveli@x.com). Telefon: ayraçlar (boşluk, tire, parantez, nokta, artı)
 // atılır ki "+90 555 111 22 33" ile "05551112233" gibi yazımlar eşleşsin.
 export const normEmail = (s) => (s || '').trim().toLowerCase();
 export const normPhone = (s) => (s || '').trim().toLowerCase().replace(/[\s\-().+]/g, '');
+
+/** Kayıt doluluk puanı — hangi kopyanın korunacağını belirler. */
+export function richnessOf(c) {
+    const exp = Array.isArray(c?.experiences) ? c.experiences.length : 0;
+    const skills = Array.isArray(c?.skills) ? c.skills.length : 0;
+    return exp * 3 + Math.min(skills, 10) + (c?.summary ? 2 : 0) + (c?.education ? 1 : 0);
+}
 
 /**
  * @param {Array<{id: string, name?: string, email?: string, phone?: string, createdAtMs?: number}>} candidates
@@ -30,9 +41,15 @@ export function groupDuplicateCandidates(candidates) {
         groups.get(key).push(c);
     }
     const result = [];
+    // richness alanı çağıran tarafından önceden hesaplanmış olabilir
+    // (maintenance projeksiyonu ağır alanları UI'a taşımamak için sayıyı
+    // kendisi türetir); yoksa buradaki richnessOf devreye girer.
+    const rich = (c) => (typeof c.richness === 'number' ? c.richness : richnessOf(c));
     for (const [key, list] of groups) {
         if (list.length < 2) continue;
-        const sorted = [...list].sort((a, b) => (a.createdAtMs || 0) - (b.createdAtMs || 0));
+        const sorted = [...list].sort(
+            (a, b) => (rich(b) - rich(a)) || ((a.createdAtMs || 0) - (b.createdAtMs || 0))
+        );
         result.push({ key, keep: sorted[0], extras: sorted.slice(1) });
     }
     result.sort((a, b) => b.extras.length - a.extras.length);

@@ -93,7 +93,25 @@ export function resolvePreScore(parsed, positionTitle, openPositionTitles = []) 
 // Global single-worker flag — only one job runs at a time across all requests.
 let bulkWorkerActive = false;
 
-async function parseTextWithGemini(text, positionTitle, openPositionTitles = []) {
+/**
+ * AI'dan gelen kariyer geçmişini temizle: yalnızca şirket adı VE tarih
+ * aralığı olan gerçek iş deneyimleri kalır (halüsinasyon/eksik girdiler
+ * elenir), alanlar normalize edilir, liste 20 kayıtla sınırlanır.
+ */
+export function sanitizeExperiences(list) {
+    if (!Array.isArray(list)) return [];
+    return list
+        .filter((e) => e && typeof e === 'object' && e.company && e.duration)
+        .map((e) => ({
+            role: e.role || '',
+            company: e.company,
+            duration: e.duration,
+            desc: e.desc || '',
+        }))
+        .slice(0, 20);
+}
+
+async function parseTextWithGemini(text, positionTitle, openPositionTitles = [], { useCache = true } = {}) {
     // Skor bağlamı: yüklemede pozisyon seçildiyse ona göre, seçilmediyse
     // açık pozisyonların en uygununa göre puanlanır. Böylece ayrıştırma ve
     // ön skor TEK Gemini çağrısında çıkar — aday başına ek AI maliyeti yok.
@@ -115,19 +133,21 @@ Sadece şu JSON formatında yanıt ver (başka hiçbir şey yazma):
   "skills": ["yetenek1", "yetenek2"],
   "experience": 5,
   "education": "Son okul / Bölüm",
+  "experiences": [{"role": "Pozisyon", "company": "Şirket adı (ZORUNLU)", "duration": "Tarih aralığı (ZORUNLU)", "desc": "1 cümle özet"}],
   "summary": "Kısa özet (Türkçe, max 300 karakter)",
   "suggestedRole": "Adayın CV'sine göre EN UYGUN olacağı rol — açık pozisyon listesinden BAĞIMSIZ, serbest metin (Türkçe)",
   "matchScore": 75,
   "matchedPosition": "Skorun verildiği pozisyon başlığı",
   "matchReason": "1-2 cümlelik skor gerekçesi (Türkçe)"
 }
+experiences KURALI: SADECE gerçek iş deneyimleri; şirket adı veya tarih aralığı yoksa o girdiyi listeye EKLEME.
 
 CV:
-${text.substring(0, 8000)}`;
+${text.substring(0, 15000)}`;
     // generateText() handles retry/backoff and caches identical CV text
     // (same prompt -> same SHA256 key) so re-runs on transient errors
     // don't pay another quota tick.
-    const raw = (await generateText(prompt)).replace(/```json|```/gi, '').trim();
+    const raw = (await generateText(prompt, { useCache })).replace(/```json|```/gi, '').trim();
     const match = raw.match(/\{[\s\S]*\}/);
     if (!match) return null;
     try { return JSON.parse(match[0]); } catch { return null; }
@@ -372,9 +392,13 @@ async function executeJob(jobId) {
             while (retries <= MAX_RETRIES) {
                 try {
                     let cvText = '';
-                    if (item.cvText && item.cvText.trim().length > 5) {
+                    // 200 karakterlik alt sınır: eski >5 kapısı "PDF Error: ..."
+                    // gibi hata metinlerini ve yarım taranmış PDF kırıntılarını
+                    // CV sanıp Gemini'ye gönderiyordu.
+                    const preText = (item.cvText || '').trim();
+                    if (preText.length >= 200 && !preText.startsWith('PDF Error')) {
                         // Pre-extracted text (json_record or pre-processed file upload)
-                        cvText = item.cvText.trim();
+                        cvText = preText;
                     } else if (item.cvUrl) {
                         cvText = await extractCvTextFromUrl(item.cvUrl);
                         if (!cvText || cvText.length < 20) throw new Error('cvUrl içeriği okunamadı');
@@ -387,11 +411,20 @@ async function executeJob(jobId) {
                         cvText = await extractCvText(fileBuffer, ext);
                         if (!cvText || cvText.length < 30) throw new Error('CV içeriği okunamadı');
                     } else {
-                        throw new Error('cvText, cvUrl veya dosya yolu gereklidir');
+                        throw new Error(preText.length > 0
+                            ? `CV metni çok kısa ya da geçersiz (${preText.length} karakter, min 200) — dosya yeniden yüklenmeli`
+                            : 'cvText, cvUrl veya dosya yolu gereklidir');
                     }
                     const cooldownWait = quotaCooldownUntil - Date.now();
                     if (cooldownWait > 0) await new Promise((r) => setTimeout(r, cooldownWait));
-                    const parsed = await parseTextWithGemini(cvText, positionTitle, openPositionTitles);
+                    let parsed = await parseTextWithGemini(cvText, positionTitle, openPositionTitles);
+                    if (!parsed) {
+                        // Bozuk/yarım JSON 1 saatlik önbelleğe takılı kalabiliyor —
+                        // tek seferlik taze (önbelleksiz) deneme parse hatalarının
+                        // çoğunu kurtarır.
+                        log.warn(`[bulk-import] parse başarısız, önbelleksiz yeniden deneniyor: ${item.originalName}`);
+                        parsed = await parseTextWithGemini(cvText, positionTitle, openPositionTitles, { useCache: false });
+                    }
                     // AI ayrıştıramadıysa aday YARATMA: eskiden null parsed ile
                     // "içi boş" aday (adı PDF dosya adı, tüm alanlar boş)
                     // kaydedilip item 'done' işaretleniyordu — hata görünmez
@@ -437,11 +470,15 @@ async function executeJob(jobId) {
                         skills: parsed?.skills || [],
                         experience: parsed?.experience || 0,
                         education: parsed?.education || '',
+                        // Kariyer geçmişi — eski şema bu alanı hiç istemiyordu;
+                        // toplu yüklenen her aday "Kariyer bilgisi bulunamadı"
+                        // görünüyordu.
+                        experiences: sanitizeExperiences(parsed?.experiences),
                         summary: parsed?.summary || '',
                         // CV'ye göre ideal rol — açık pozisyon eşleşmesinden ayrı
                         // bir bilgi olarak saklanır ve UI'da ayrıca gösterilir.
                         suggestedRole: parsed?.suggestedRole || parsed?.position || '',
-                        cvText: cvText.slice(0, 6000),
+                        cvText: cvText.slice(0, 15000),
                         cvFileName: item.originalName || '',
                         matchScore,
                         combinedScore: matchScore,
