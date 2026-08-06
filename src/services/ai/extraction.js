@@ -3,13 +3,23 @@ import { getModel } from './config.js';
 import { parseAIJson, buildStructuredPrompt, sanitizeForPrompt } from './utils.js';
 
 const EXTRACTOR_PROMPT = `
-Sen kıdemli ve son derece analitik bir İşe Alım Yöneticisisin. Görevin, adayı derinlemesine analiz etmek.
+Sen kıdemli ve son derece analitik bir İşe Alım Yöneticisisin. Görevin, adayı İLANIN GEREKSİNİMLERİ karşısında değerlendirmek.
 
 ÇOK ÖNEMLİ KURALLAR:
-1. STAR Analizi: Her kategori (S, T, A, R) için 1-10 arası puan ver. 
-   - "reason" alanında mutlaka şunları belirt: "Pozitif (+): [Adayın öne çıkan güçlü yanı], Negatif (-): [Eksik veya geliştirilmesi gereken nokta]". 
-2. Öne Çıkan Tecrübeler: Adayın geçmişindeki spesifik projeleri, kullandığı teknolojileri veya başarılarını analizde mutlaka kullan.
-3. Özet (Summary): Sadece genel cümleler kurma. Somut kanıtlar sun.
+1. Gereksinim Karşılama (requirementCoverage): JOB_DESCRIPTION içindeki her bir
+   gereksinimi tek tek ele al ve YALNIZCA CV'deki kanıta dayanarak sınıflandır:
+   - "met": CV'de açık kanıt var
+   - "partial": Dolaylı/kısmi kanıt var
+   - "missing": Kanıt yok
+   Gereksinimi kısa ve tanınabilir biçimde yaz (ilanın cümlesini birebir kopyalama).
+   "coverageScore": karşılanma oranını 0-100 arası tek sayı olarak ver
+   (met tam, partial yarım sayılır). İyi yazılmış ama ilanla ilgisiz bir CV
+   DÜŞÜK coverageScore almalıdır — CV kalitesi bu alanı YÜKSELTMEZ.
+2. STAR Analizi: Her kategori (S, T, A, R) için 1-10 arası puan ver.
+   - "reason" alanında mutlaka şunları belirt: "Pozitif (+): [Adayın öne çıkan güçlü yanı], Negatif (-): [Eksik veya geliştirilmesi gereken nokta]".
+   - STAR, anlatım/kanıt KALİTESİNİ ölçer; ilana uygunluğu değil.
+3. Öne Çıkan Tecrübeler: Adayın geçmişindeki spesifik projeleri, kullandığı teknolojileri veya başarılarını analizde mutlaka kullan.
+4. Özet (Summary): Sadece genel cümleler kurma. Somut kanıtlar sun.
 
 ÇIKTI FORMATI (JSON):
 {
@@ -17,6 +27,12 @@ Sen kıdemli ve son derece analitik bir İşe Alım Yöneticisisin. Görevin, ad
     "totalYearsOfExperience": <integer>,
     "matchedKeywords": ["keyword1"],
     "missingKeywords": ["keyword2"],
+    "requirementCoverage": {
+        "met": ["karşılanan gereksinim"],
+        "partial": ["kısmen karşılanan gereksinim"],
+        "missing": ["karşılanmayan gereksinim"],
+        "coverageScore": <integer 0-100>
+    },
     "starAnalysis": {
         "Situation": { "score": <integer>, "reason": "..." },
         "Task": { "score": <integer>, "reason": "..." },

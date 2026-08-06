@@ -158,22 +158,69 @@ export async function getAvailableModels() {
 /**
  * Internal score calculator (mathematical logic) to ensure 100% determinism.
  */
-function calculateHybridScore(data) {
-    if (data.starAnalysis) {
-        const getScore = (val) => {
-            if (typeof val === 'number') return val;
-            if (typeof val === 'object' && val !== null && val.score !== undefined) return Number(val.score);
-            return 0;
-        };
+// Derin tarama skorunun ağırlıkları.
+//
+// Eskiden skor YALNIZCA STAR ortalamasıydı. STAR, CV'nin ne kadar iyi
+// anlatıldığını ölçer (durum-görev-eylem-sonuç kanıtı) — ilana uygunluğunu
+// DEĞİL. Sonuç: iyi yazılmış ama alakasız bir CV yüksek, ilana birebir uyan
+// ama sade yazılmış bir CV düşük alıyordu; ilanın gereksinimlerini
+// değiştirmek skoru neredeyse hiç oynatmıyordu.
+const COVERAGE_WEIGHT = 0.6;
+const STAR_WEIGHT = 0.4;
 
-        const s = getScore(data.starAnalysis.Situation);
-        const t = getScore(data.starAnalysis.Task);
-        const a = getScore(data.starAnalysis.Action);
-        const r = getScore(data.starAnalysis.Result);
+/** 0-100 aralığına kırpar; sayı değilse null döner. */
+function clampScore(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return null;
+    return Math.min(100, Math.max(0, Math.round(n)));
+}
 
-        const sum = s + t + a + r;
-        return Math.min(100, Math.max(0, Math.round((sum / 4) * 10)));
+/** STAR ortalaması → 0-100. Analiz yoksa null. */
+function starScoreOf(starAnalysis) {
+    if (!starAnalysis) return null;
+    const getScore = (val) => {
+        if (typeof val === 'number') return val;
+        if (typeof val === 'object' && val !== null && val.score !== undefined) return Number(val.score);
+        return 0;
+    };
+    const sum = getScore(starAnalysis.Situation) + getScore(starAnalysis.Task)
+        + getScore(starAnalysis.Action) + getScore(starAnalysis.Result);
+    return clampScore((sum / 4) * 10);
+}
+
+/**
+ * Gereksinim karşılama oranı → 0-100. Model coverageScore verdiyse onu,
+ * vermediyse met/partial/missing sayımından türetir. İkisi de yoksa null.
+ */
+function coverageScoreOf(coverage) {
+    if (!coverage) return null;
+    const explicit = clampScore(coverage.coverageScore);
+    if (explicit !== null) return explicit;
+    const met = Array.isArray(coverage.met) ? coverage.met.length : 0;
+    const partial = Array.isArray(coverage.partial) ? coverage.partial.length : 0;
+    const missing = Array.isArray(coverage.missing) ? coverage.missing.length : 0;
+    const total = met + partial + missing;
+    if (total === 0) return null;
+    return clampScore(((met + partial * 0.5) / total) * 100);
+}
+
+/**
+ * Derin tarama skoru = gereksinim karşılama (%60) + STAR kanıt kalitesi (%40).
+ *
+ * Geriye dönük uyumluluk: model requirementCoverage döndürmezse eski davranışa
+ * (yalnızca STAR) düşülür, o da yoksa deneyim + anahtar kelime yedeği çalışır.
+ * Böylece eski kayıtlar ve beklenmedik AI çıktıları skoru sıfırlamaz.
+ */
+export function calculateHybridScore(data) {
+    if (!data) return 0;
+    const star = starScoreOf(data.starAnalysis);
+    const coverage = coverageScoreOf(data.requirementCoverage);
+
+    if (coverage !== null && star !== null) {
+        return clampScore(coverage * COVERAGE_WEIGHT + star * STAR_WEIGHT);
     }
+    if (coverage !== null) return coverage;
+    if (star !== null) return star;
 
     let score = 0;
     const exp = Number(data.totalYearsOfExperience || 0);
@@ -198,6 +245,7 @@ export async function analyzeCandidateMatch(jobDescription, candidateProfile, mo
         scoreData: evidence.extractedData,
         score: score,
         starAnalysis: evidence.extractedData.starAnalysis ?? null,
+        requirementCoverage: evidence.extractedData.requirementCoverage ?? null,
         reasons: evidence.evidence.reasoning || [],
         summary: evidence.evidence.summary ?? null,
         agentReasoning: evidence.evidence.reasoning ?? null,
