@@ -16,34 +16,35 @@ const star = (n) => ({
 });
 
 describe('calculateHybridScore', () => {
-    it('weights requirement coverage at 60% and STAR at 40%', () => {
-        // %100 karşılama + 8/10 STAR → 100*0.6 + 80*0.4 = 92
+    it('weights requirement coverage and STAR equally', () => {
+        // %100 karşılama + 8/10 STAR → 100*0.5 + 80*0.5 = 90
         expect(calculateHybridScore({
             requirementCoverage: { coverageScore: 100 },
             starAnalysis: star(8),
-        })).toBe(92);
+        })).toBe(90);
     });
 
     it('keeps a well-written but irrelevant CV well below the hiring bar', () => {
-        // Mükemmele yakın anlatım (STAR 9) ama ilanla ilgisi yok → 36
+        // Mükemmele yakın anlatım (STAR 9) ama ilanla ilgisi yok → 45 (STAR ağırlığı %50 olduğu için yükseldi;
+        // yine de işe alım eşiğinin altında kalması testin asıl güvencesi)
         const score = calculateHybridScore({
             requirementCoverage: { coverageScore: 0 },
             starAnalysis: star(9),
         });
-        expect(score).toBe(36);
+        expect(score).toBe(45);
         expect(score).toBeLessThan(50);
     });
 
     it('rewards a plainly-written CV that actually meets the requirements', () => {
-        // İlana uyuyor (90) ama anlatımı zayıf (STAR 4) → 70
+        // İlana uyuyor (90) ama anlatımı zayıf (STAR 4) → 65
         expect(calculateHybridScore({
             requirementCoverage: { coverageScore: 90 },
             starAnalysis: star(4),
-        })).toBe(70);
+        })).toBe(65);
     });
 
     it('derives coverage from met/partial/missing when coverageScore is absent', () => {
-        // 2 tam + 1 yarım + 1 yok = 2.5/4 = %62.5 → 63; STAR 6 → 63*0.6+60*0.4 = 62
+        // 2 tam + 1 yarım + 1 yok = 2.5/4 = %62.5 → 63; STAR 6 → 63*0.5+60*0.5 = 62
         expect(calculateHybridScore({
             requirementCoverage: { met: ['a', 'b'], partial: ['c'], missing: ['d'] },
             starAnalysis: star(6),
@@ -96,17 +97,17 @@ describe('calculateHybridScore — zorunlu/tercihen ağırlıkları', () => {
     });
 
     it('rewards meeting every must-have', () => {
-        // zorunlu 2/2 → 85, tercihen 1/1 → 15 ⇒ coverage 100; STAR 80 ⇒ 92
-        expect(calculateHybridScore(assess(['met', 'met', 'met']), REQS)).toBe(92);
+        // zorunlu 2/2 → 85, tercihen 1/1 → 15 ⇒ coverage 100; STAR 80 ⇒ 90
+        expect(calculateHybridScore(assess(['met', 'met', 'met']), REQS)).toBe(90);
     });
 
     it('penalises a missing must-have far more than a missing nice-to-have', () => {
         const missingMust = calculateHybridScore(assess(['met', 'missing', 'met']), REQS);
         const missingNice = calculateHybridScore(assess(['met', 'met', 'missing']), REQS);
         expect(missingMust).toBeLessThan(missingNice);
-        // zorunlu yarısı eksik: 42.5 + 15 = 57.5 → 58; 58*0.6 + 80*0.4 = 67
-        expect(missingMust).toBe(67);
-        // yalnızca tercih edilen eksik: 85 → 85*0.6 + 80*0.4 = 83
+        // zorunlu yarısı eksik: 42.5 + 15 = 57.5 → 58; 58*0.5 + 80*0.5 = 69
+        expect(missingMust).toBe(69);
+        // yalnızca tercih edilen eksik: 85 → 85*0.5 + 80*0.5 = 83
         expect(missingNice).toBe(83);
     });
 
@@ -118,8 +119,8 @@ describe('calculateHybridScore — zorunlu/tercihen ağırlıkları', () => {
     });
 
     it('counts a partial as half', () => {
-        // zorunlu 1.5/2 = 0.75 → 63.75, tercihen 1 → 15 ⇒ 78.75 → 79; 79*0.6+80*0.4 = 79
-        expect(calculateHybridScore(assess(['met', 'partial', 'met']), REQS)).toBe(79);
+        // zorunlu 1.5/2 = 0.75 → 63.75, tercihen 1 → 15 ⇒ 78.75 → 79; 79*0.5+80*0.5 = 80
+        expect(calculateHybridScore(assess(['met', 'partial', 'met']), REQS)).toBe(80);
     });
 
     it('falls back to the model score when the position has no priorities', () => {
@@ -127,13 +128,75 @@ describe('calculateHybridScore — zorunlu/tercihen ağırlıkları', () => {
         expect(calculateHybridScore({
             requirementCoverage: { assessments: [{ index: 1, status: 'missing' }], coverageScore: 90 },
             starAnalysis: star(8),
-        }, legacy)).toBe(86); // 90*0.6 + 80*0.4
+        }, legacy)).toBe(85); // 90*0.5 + 80*0.5
     });
 
     it('falls back when the model omits assessments', () => {
         expect(calculateHybridScore({
             requirementCoverage: { coverageScore: 50 },
             starAnalysis: star(8),
-        }, REQS)).toBe(62); // 50*0.6 + 80*0.4
+        }, REQS)).toBe(65); // 50*0.5 + 80*0.5
+    });
+});
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Yetkinlik > araç.
+//
+// Kullanici bildirdi: "adayin bu isle alakali yapmis olduklari, arac
+// gereksinimlerinden oncelikli olmali". Ayni gereksinim kumesinde
+// "funnel sahipligi" (yetkinlik) ile "GA4 hakimiyeti" (arac) esit sayilinca,
+// isi yillarca yapmis ama CV'sinde arac adi gecmeyen aday gereksiz dusuyordu.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('calculateHybridScore — yetkinlik / araç ayrımı', () => {
+    const REQS_KIND = [
+        { text: 'Funnel sahipliği', must: true },
+        { text: 'A/B test kurgulama', must: true },
+        { text: 'GA4 / Amplitude hakimiyeti', must: true },
+    ];
+    const withKinds = (statuses, kinds) => ({
+        requirementCoverage: {
+            assessments: statuses.map((status, i) => ({ index: i + 1, status, kind: kinds[i] })),
+        },
+        starAnalysis: star(8),
+    });
+
+    it('scores a candidate who did the work but lacks the tool above one who only knows the tool', () => {
+        const didTheWork = calculateHybridScore(
+            withKinds(['met', 'met', 'missing'], ['deneyim', 'deneyim', 'arac']), REQS_KIND
+        );
+        const toolOnly = calculateHybridScore(
+            withKinds(['missing', 'missing', 'met'], ['deneyim', 'deneyim', 'arac']), REQS_KIND
+        );
+        expect(didTheWork).toBeGreaterThan(toolOnly);
+        expect(didTheWork - toolOnly).toBeGreaterThan(20);
+    });
+
+    it('costs less to miss a tool than to miss a capability', () => {
+        const missingTool = calculateHybridScore(
+            withKinds(['met', 'met', 'missing'], ['deneyim', 'deneyim', 'arac']), REQS_KIND
+        );
+        const missingCapability = calculateHybridScore(
+            withKinds(['met', 'missing', 'met'], ['deneyim', 'deneyim', 'arac']), REQS_KIND
+        );
+        expect(missingTool).toBeGreaterThan(missingCapability);
+    });
+
+    it('treats an unlabelled requirement as a capability (eski kayıtlar şişmesin)', () => {
+        const labelled = calculateHybridScore(
+            withKinds(['met', 'met', 'missing'], ['deneyim', 'deneyim', 'deneyim']), REQS_KIND
+        );
+        const unlabelled = calculateHybridScore(
+            withKinds(['met', 'met', 'missing'], [undefined, undefined, undefined]), REQS_KIND
+        );
+        expect(unlabelled).toBe(labelled);
+    });
+
+    it('falls back cleanly when every requirement is a tool', () => {
+        const allTools = calculateHybridScore(
+            withKinds(['met', 'met', 'met'], ['arac', 'arac', 'arac']), REQS_KIND
+        );
+        // Yetkinlik kümesi boşsa araç kümesi tüm ağırlığı alır → coverage 85
+        expect(allTools).toBe(90); // coverage 100 → 100*0.5 + 80*0.5
     });
 });
