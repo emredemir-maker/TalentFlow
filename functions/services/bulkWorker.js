@@ -60,12 +60,16 @@ const clampScore = (n) => Math.max(0, Math.min(100, Math.round(n)));
  *   4. Hiçbir açık pozisyona eşleşme yoksa matchedTitle null döner
  *      ("uygun açık pozisyon yok") — sistemde olmayan bir başlık yazılmaz.
  */
-export function resolvePreScore(parsed, positionTitle, openPositionTitles = []) {
+export function resolvePreScore(parsed, positionTitle, openPositions = []) {
     const aiScore = Number(parsed?.matchScore);
     const hasAiScore = !isNaN(aiScore) && aiScore > 0;
+    // Liste başlık dizisi ya da pozisyon dokümanı dizisi olabilir; doküman
+    // verildiğinde anahtar-kelime skoru gereksinimleri de dikkate alır.
+    const openPositionTitles = openPositions.map(positionTitleOf).filter(Boolean);
 
     if (positionTitle) {
-        const score = hasAiScore ? clampScore(aiScore) : calculateSimpleMatchScore(parsed, positionTitle);
+        const assigned = openPositions.find((p) => positionTitleOf(p) === positionTitle) || positionTitle;
+        const score = hasAiScore ? clampScore(aiScore) : calculateSimpleMatchScore(parsed, assigned);
         return { score, matchedTitle: positionTitle };
     }
 
@@ -75,9 +79,9 @@ export function resolvePreScore(parsed, positionTitle, openPositionTitles = []) 
     }
 
     let best = { score: 0, matchedTitle: null };
-    for (const title of openPositionTitles) {
-        const s = calculateSimpleMatchScore(parsed, title);
-        if (s > best.score) best = { score: s, matchedTitle: title };
+    for (const position of openPositions) {
+        const s = calculateSimpleMatchScore(parsed, position);
+        if (s > best.score) best = { score: s, matchedTitle: positionTitleOf(position) };
     }
     if (best.matchedTitle) return best;
 
@@ -171,15 +175,59 @@ ${text.substring(0, 15000)}`;
     try { return JSON.parse(match[0]); } catch { return null; }
 }
 
-export function calculateSimpleMatchScore(candidate, positionTitle) {
-    if (!positionTitle || !candidate) return 0;
-    const pLower = positionTitle.toLowerCase();
+/** Pozisyon başlığını string ya da doküman objesinden alır. */
+export function positionTitleOf(position) {
+    return typeof position === 'string' ? position : (position?.title || '');
+}
+
+/**
+ * Ücretsiz anahtar-kelime ön skoru.
+ *
+ * `position` bir STRING ise yalnızca başlık kelimeleri karşılaştırılır
+ * (eski davranış, geriye dönük uyumluluk). Pozisyon DOKÜMANI verilirse
+ * gereksinimler de hesaba katılır — eskiden ilanın gereksinimleri bu skora
+ * HİÇ girmiyordu; "Growth Product Manager" başlığındaki üç kelime tüm ön
+ * elemeyi belirliyordu ve gereksinimleri değiştirmek skoru oynatmıyordu.
+ *
+ * Ağırlık: başlık %40, gereksinimler %60 (gereksinim yoksa başlık %100).
+ */
+export function calculateSimpleMatchScore(candidate, position) {
+    const title = positionTitleOf(position);
+    if (!title || !candidate) return 0;
+
     const cPos = (candidate.position || '').toLowerCase();
-    const skills = (candidate.skills || []).map(s => s.toLowerCase()).join(' ');
-    const combined = `${cPos} ${skills}`;
-    const pWords = pLower.split(/\s+/).filter(w => w.length > 2);
-    const hits = pWords.filter(w => combined.includes(w)).length;
-    return Math.min(100, Math.round((hits / Math.max(pWords.length, 1)) * 100));
+    const skills = (candidate.skills || []).map((s) => String(s).toLowerCase()).join(' ');
+    const summary = String(candidate.summary || '').toLowerCase();
+    const haystack = `${cPos} ${skills} ${summary}`;
+
+    const ratio = (terms) => {
+        const valid = terms.filter((w) => w.length > 2);
+        if (valid.length === 0) return null;
+        const hits = valid.filter((w) => haystack.includes(w)).length;
+        return hits / valid.length;
+    };
+
+    const titleRatio = ratio(title.toLowerCase().split(/\s+/)) ?? 0;
+
+    const requirements = typeof position === 'string' ? [] : (position?.requirements || []);
+    // Gereksinim cümlelerinden anlamlı kelimeler. Eşik 3 karakter: 'ga4',
+    // 'plg', 'sql', 'a/b' gibi EN ayırt edici terimler tam da bu uzunlukta.
+    // Bağlaç/doldurma kelimeleri skoru şişirmesin diye ayrıca elenir.
+    const STOP = new Set([
+        've', 'ile', 'için', 'veya', 'gibi', 'olan', 'daha', 'çok', 'yıl', 'en', 'az',
+        'artı', 'tercihen', 'bir', 'her', 'şey', 'olma', 'olması', 'sahip', 'temel',
+    ]);
+    const reqTerms = requirements
+        .join(' ')
+        .toLowerCase()
+        .split(/[^\p{L}\p{N}+#./]+/u)
+        .filter((w) => w.length >= 3 && !STOP.has(w));
+    const reqRatio = ratio(reqTerms);
+
+    const score = reqRatio === null
+        ? titleRatio * 100
+        : (titleRatio * 40) + (reqRatio * 60);
+    return Math.min(100, Math.round(score));
 }
 
 export async function extractCvText(buffer, ext) {
@@ -372,7 +420,7 @@ async function executeJob(jobId) {
         try {
             const posSnap = await db.collection(POSITIONS_COLL).where('status', '==', 'open').get();
             openPositions = posSnap.docs
-                .map((d) => ({ id: d.id, title: d.data().title }))
+                .map((d) => ({ id: d.id, title: d.data().title, requirements: d.data().requirements || [] }))
                 .filter((p) => Boolean(p.title));
         } catch (posErr) {
             log.warn(`[bulk-import] open positions read failed: ${posErr.message}`);
@@ -469,7 +517,7 @@ async function executeJob(jobId) {
                         await jobRef.update({ processedCount, failedCount, duplicateCount, lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp() });
                         break;
                     }
-                    const { score: matchScore, matchedTitle } = resolvePreScore(parsed, positionTitle, openPositionTitles);
+                    const { score: matchScore, matchedTitle } = resolvePreScore(parsed, positionTitle, openPositions);
                     // Eşleşen başlıktan pozisyon doc id'sini çöz — yüklemede
                     // pozisyon seçilmediyse bile aday gerçek bir pozisyona bağlanır.
                     const matchedPos = openPositions.find((p) => p.title === matchedTitle);

@@ -11,21 +11,24 @@
 //      anahtar-kelime skoru (kayıtlı position/skills alanları açık
 //      pozisyon başlıklarıyla karşılaştırılır) — kimse 0'da kalmaz.
 import { generateText } from './gemini.js';
-import { calculateSimpleMatchScore, matchOpenTitle, sanitizeSuggestedRole } from './bulkWorker.js';
+import { calculateSimpleMatchScore, matchOpenTitle, sanitizeSuggestedRole, positionTitleOf } from './bulkWorker.js';
 
 /**
  * Anahtar-kelime yedeği: açık pozisyonlardan en iyi skoru seç. Hiçbiri
  * eşleşmezse matchedTitle null döner ("uygun açık pozisyon yok") — CV'deki
  * serbest pozisyon adı eşleşme diye yazılmaz.
+ *
+ * `openPositions` başlık dizisi ya da pozisyon dokümanı dizisi olabilir;
+ * doküman verildiğinde skor gereksinimleri de dikkate alır.
  */
-export function keywordPrescore(candidateData, openPositionTitles) {
+export function keywordPrescore(candidateData, openPositions) {
     let best = { score: 0, matchedTitle: null };
-    for (const title of openPositionTitles || []) {
-        const s = calculateSimpleMatchScore(candidateData, title);
-        if (s > best.score) best = { score: s, matchedTitle: title };
+    for (const position of openPositions || []) {
+        const s = calculateSimpleMatchScore(candidateData, position);
+        if (s > best.score) best = { score: s, matchedTitle: positionTitleOf(position) };
     }
     if (!best.matchedTitle) {
-        const reason = openPositionTitles?.length ? 'Uygun açık pozisyon bulunamadı.' : '';
+        const reason = openPositions?.length ? 'Uygun açık pozisyon bulunamadı.' : '';
         return { score: 0, matchedTitle: null, matchReason: reason, method: 'keyword' };
     }
     return { ...best, matchReason: '', method: 'keyword' };
@@ -35,7 +38,10 @@ export function keywordPrescore(candidateData, openPositionTitles) {
  * Tek aday için ön skor üret. AI yanıtı geçersizse/patlarsa sessizce
  * anahtar-kelime yedeğine düşer — endpoint akışını asla durdurmaz.
  */
-export async function computePrescore(candidateData, openPositionTitles) {
+export async function computePrescore(candidateData, openPositions) {
+    // AI prompt'u yalnızca başlık listesi ister; anahtar-kelime yedeği ise
+    // gereksinimleri de kullanabilsin diye asıl liste olduğu gibi taşınır.
+    const openPositionTitles = (openPositions || []).map(positionTitleOf).filter(Boolean);
     const cvText = (candidateData?.cvText || '').trim();
     if (cvText.length >= 40) {
         const scoreContext = openPositionTitles?.length
@@ -90,5 +96,5 @@ ${cvText.substring(0, 6000)}`;
             // AI hatası → anahtar-kelime yedeği
         }
     }
-    return keywordPrescore(candidateData, openPositionTitles);
+    return keywordPrescore(candidateData, openPositions);
 }
