@@ -431,11 +431,11 @@ export default function SystemScanner() {
                                 <Brain className="w-5 h-5 text-electric" />
                             </div>
                             <div>
-                                <h3 className="text-base font-bold text-text-primary">Sistem Taraması</h3>
+                                <h3 className="text-base font-bold text-white">Sistem Taraması</h3>
                                 <p className="text-xs text-navy-400">5 Aşamalı Otonom Ajan Sistemi</p>
                             </div>
                         </div>
-                        <button onClick={() => setShowConfirm(false)} className="p-1.5 hover:bg-white/5 rounded-lg text-navy-400 hover:text-text-primary transition-colors">
+                        <button onClick={() => setShowConfirm(false)} className="p-1.5 hover:bg-white/5 rounded-lg text-navy-400 hover:text-white transition-colors">
                             <X className="w-4 h-4" />
                         </button>
                     </div>
@@ -495,8 +495,8 @@ export default function SystemScanner() {
                                     onChange={e => setSmartPositionLimit(e.target.checked)}
                                     className="accent-emerald-400 mt-0.5"
                                 />
-                                <span className="text-xs text-navy-400 leading-relaxed">
-                                    <span className="font-bold text-navy-300">Akıllı pozisyon sınırı (önerilen).</span>{' '}
+                                <span className="text-xs text-navy-300 leading-relaxed">
+                                    <span className="font-bold text-navy-200">Akıllı pozisyon sınırı (önerilen).</span>{' '}
                                     Aday başına tüm uyumlu pozisyonlar yerine, ön eşleşmeye göre en iyi 5 pozisyon detaylı analize girer — süre ve AI maliyeti belirgin düşer, analiz kalitesi değişmez.
                                 </span>
                             </label>
@@ -509,7 +509,7 @@ export default function SystemScanner() {
                                 <select
                                     value={targetPositionId}
                                     onChange={e => setTargetPositionId(e.target.value)}
-                                    className="w-full px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-text-primary outline-none focus:border-emerald-400/40 transition-colors"
+                                    className="w-full px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-white outline-none focus:border-emerald-400/40 transition-colors"
                                 >
                                     <option value="" className="bg-navy-900">— Pozisyon seçin —</option>
                                     {positions.filter(p => p.status === 'open').map(p => (
@@ -523,7 +523,7 @@ export default function SystemScanner() {
                                             type="number" min="0" max="100"
                                             value={minPreScore}
                                             onChange={e => setMinPreScore(e.target.value)}
-                                            className="w-20 px-2 py-1.5 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-text-primary outline-none focus:border-emerald-400/40 transition-colors"
+                                            className="w-20 px-2 py-1.5 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-white outline-none focus:border-emerald-400/40 transition-colors"
                                         />
                                     </label>
                                 </div>
@@ -571,7 +571,7 @@ export default function SystemScanner() {
                                     </p>
                                     <button
                                         onClick={toggleAll}
-                                        className="text-[10px] font-bold text-navy-400 hover:text-text-primary transition-colors"
+                                        className="text-[10px] font-bold text-navy-400 hover:text-white transition-colors"
                                     >
                                         {allSelected ? 'Tümünü Kaldır' : 'Tümünü Seç'}
                                     </button>
@@ -585,7 +585,7 @@ export default function SystemScanner() {
                                         placeholder="Aday ara..."
                                         value={candidateSearch}
                                         onChange={e => setCandidateSearch(e.target.value)}
-                                        className="w-full pl-9 pr-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-text-primary placeholder:text-navy-500 outline-none focus:border-violet-400/40 transition-colors"
+                                        className="w-full pl-9 pr-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-white placeholder:text-navy-500 outline-none focus:border-violet-400/40 transition-colors"
                                     />
                                 </div>
 
@@ -610,11 +610,11 @@ export default function SystemScanner() {
                                                 <div className={`w-4 h-4 shrink-0 ${checked ? 'text-violet-400' : 'text-navy-500'}`}>
                                                     {checked ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
                                                 </div>
-                                                <div className="w-7 h-7 rounded-full bg-navy-800 flex items-center justify-center shrink-0 text-xs font-bold text-text-primary">
+                                                <div className="w-7 h-7 rounded-full bg-navy-800 flex items-center justify-center shrink-0 text-xs font-bold text-white">
                                                     {c.name?.[0] || '?'}
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <p className="text-sm font-medium text-text-primary truncate">{c.name}</p>
+                                                    <p className="text-sm font-medium text-white truncate">{c.name}</p>
                                                     <p className="text-xs text-navy-400 truncate">{c.position || '—'}</p>
                                                 </div>
                                                 <div className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full ${
@@ -634,8 +634,8 @@ export default function SystemScanner() {
                         {/* Summary strip */}
                         {queuedCount > 0 && (
                             <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-3 flex items-center justify-between">
-                                <span className="text-xs text-navy-400">İşlenecek aday</span>
-                                <span className="text-sm font-bold text-text-primary">{queuedCount} / {candidates.length}</span>
+                                <span className="text-xs text-navy-300">İşlenecek aday</span>
+                                <span className="text-sm font-bold text-white">{queuedCount} / {candidates.length}</span>
                             </div>
                         )}
                     </div>
@@ -644,7 +644,7 @@ export default function SystemScanner() {
                     <div className="p-5 border-t border-white/5 flex gap-3 shrink-0">
                         <button
                             onClick={() => setShowConfirm(false)}
-                            className="flex-1 py-2.5 rounded-xl border border-white/10 text-navy-300 hover:text-text-primary font-medium transition-all"
+                            className="flex-1 py-2.5 rounded-xl border border-white/10 text-navy-300 hover:text-white font-medium transition-all"
                         >
                             İptal
                         </button>
@@ -670,7 +670,7 @@ export default function SystemScanner() {
                 className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all relative group overflow-hidden ${
                     scanning
                         ? 'bg-electric/10 border-electric/30 text-electric'
-                        : 'bg-white/[0.04] border-white/[0.06] text-navy-400 hover:text-text-primary hover:bg-white/[0.08]'
+                        : 'bg-white/[0.04] border-white/[0.06] text-navy-400 hover:text-white hover:bg-white/[0.08]'
                 }`}
                 title="Sistem Taraması"
             >
@@ -686,7 +686,7 @@ export default function SystemScanner() {
                         {/* Status Header */}
                         <div className="p-6 border-b border-white/5 flex justify-between items-center bg-navy-800/50">
                             <div>
-                                <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
+                                <h2 className="text-lg font-bold text-white flex items-center gap-2">
                                     {scanning ? (
                                         <>
                                             <span className="relative flex h-3 w-3">
@@ -706,7 +706,7 @@ export default function SystemScanner() {
                                     {scanning ? 'Ajanlar aktif olarak analiz yapıyor.' : 'Tüm işlemler başarıyla tamamlandı.'}
                                 </p>
                             </div>
-                            <button onClick={handleStop} className="p-2 hover:bg-white/5 rounded-lg text-navy-400 hover:text-text-primary transition-colors">
+                            <button onClick={handleStop} className="p-2 hover:bg-white/5 rounded-lg text-navy-400 hover:text-white transition-colors">
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
@@ -724,7 +724,7 @@ export default function SystemScanner() {
                             {scanning && currentCandidate ? (
                                 <div className="flex flex-col items-center animate-in zoom-in-95 duration-300">
                                     <div className="w-20 h-20 rounded-full bg-navy-800 border-4 border-navy-700 flex items-center justify-center mb-4 relative">
-                                        <span className="text-2xl font-bold text-text-primary">{currentCandidate.name?.[0]}</span>
+                                        <span className="text-2xl font-bold text-white">{currentCandidate.name?.[0]}</span>
                                         <div className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-navy-900 border border-white/10 flex items-center justify-center shadow-lg">
                                             {activeStage === 'scout'      && <Eye         className="w-4 h-4 text-blue-400 animate-pulse" />}
                                             {activeStage === 'researcher' && <GitBranch   className="w-4 h-4 text-cyan-400 animate-pulse" />}
@@ -733,7 +733,7 @@ export default function SystemScanner() {
                                             {activeStage === 'recruiter'  && <Database    className="w-4 h-4 text-emerald-400 animate-pulse" />}
                                         </div>
                                     </div>
-                                    <h3 className="text-xl font-bold text-text-primary mb-1">{currentCandidate.name}</h3>
+                                    <h3 className="text-xl font-bold text-white mb-1">{currentCandidate.name}</h3>
                                     <p className="text-sm text-navy-400 mb-6">{currentCandidate.position}</p>
                                     <div className="flex items-center gap-3 px-4 py-2 rounded-full bg-white/5 border border-white/10">
                                         <Loader2 className="w-4 h-4 animate-spin text-electric" />
@@ -751,13 +751,13 @@ export default function SystemScanner() {
                                     <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
                                         <CheckCircle className="w-8 h-8 text-emerald-400" />
                                     </div>
-                                    <h3 className="text-2xl font-bold text-text-primary mb-2">İşlem Tamamlandı</h3>
+                                    <h3 className="text-2xl font-bold text-white mb-2">İşlem Tamamlandı</h3>
                                     <p className="text-navy-400 mb-8 max-w-sm">
                                         {totalQueued} aday tarandı. {aiCount} yeni AI analizi yapıldı ve {updatedCount} profil güncellendi.
                                     </p>
                                     <button
                                         onClick={handleStop}
-                                        className="px-8 py-3 rounded-xl bg-white/5 border border-white/10 text-text-primary font-bold hover:bg-white/10 transition-all"
+                                        className="px-8 py-3 rounded-xl bg-white/5 border border-white/10 text-white font-bold hover:bg-white/10 transition-all"
                                     >
                                         Kapat
                                     </button>
@@ -769,7 +769,7 @@ export default function SystemScanner() {
                         <div className="grid grid-cols-3 divide-x divide-white/5 border-t border-white/5 bg-navy-950/30">
                             <div className="p-4 text-center">
                                 <div className="text-xs text-navy-500 uppercase font-bold tracking-wider mb-1">Taranan</div>
-                                <div className="text-xl font-bold text-text-primary">{processedCount} / {totalQueued}</div>
+                                <div className="text-xl font-bold text-white">{processedCount} / {totalQueued}</div>
                             </div>
                             <div className="p-4 text-center">
                                 <div className="text-xs text-navy-500 uppercase font-bold tracking-wider mb-1">AI Analiz</div>

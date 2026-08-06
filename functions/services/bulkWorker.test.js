@@ -28,7 +28,9 @@ vi.mock('../config/firebaseAdmin.js', () => ({
     },
 }));
 
-const { extractCvText, findDuplicateCandidate, resolvePreScore, matchOpenTitle, sanitizeSuggestedRole } = await import('./bulkWorker.js');
+const {extractCvText, findDuplicateCandidate, resolvePreScore, matchOpenTitle, sanitizeSuggestedRole,
+    calculateSimpleMatchScore,
+} = await import('./bulkWorker.js');
 
 beforeEach(() => {
     mockPdf.mockReset();
@@ -180,5 +182,87 @@ describe('resolvePreScore', () => {
         expect(matchedTitle).toBe('Frontend Developer');
         expect(score).toBeGreaterThan(0); // anahtar-kelime eşleşmesi ('frontend', 'developer')
         expect(resolvePreScore({ matchScore: 'abc', position: '' }, '', []).score).toBe(0);
+    });
+});
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Ön skor artık ilanın GEREKSİNİMLERİNE de bakar.
+// Eskiden yalnızca pozisyon BAŞLIĞININ kelimeleri aday metninde aranıyordu:
+// "Growth Product Manager" başlığındaki üç kelime tüm ön elemeyi belirliyor,
+// gereksinimleri değiştirmek skoru hiç oynatmıyordu.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('calculateSimpleMatchScore — gereksinim duyarlılığı', () => {
+    const GROWTH_PM = {
+        title: 'Growth Product Manager',
+        requirements: [
+            'Funnel sahipliği: kayıt, aktivasyon, elde tutma',
+            'A/B test ve deney kurma deneyimi',
+            'Amplitude, Mixpanel, GA4 hakimiyeti',
+            'PLG ve self-servis akış deneyimi',
+        ],
+    };
+    const growthCandidate = {
+        position: 'Growth Product Manager',
+        skills: ['funnel', 'aktivasyon', 'retention', 'A/B test', 'Amplitude', 'Mixpanel', 'GA4', 'PLG'],
+    };
+    const titleOnlyCandidate = {
+        // Unvanı birebir aynı ama gereksinimlerden hiçbirine kanıtı yok
+        position: 'Growth Product Manager',
+        skills: ['Excel', 'SAP', 'Muhasebe'],
+    };
+
+    it('scores a candidate who actually meets the requirements higher than a title-only match', () => {
+        const real = calculateSimpleMatchScore(growthCandidate, GROWTH_PM);
+        const titleOnly = calculateSimpleMatchScore(titleOnlyCandidate, GROWTH_PM);
+        expect(real).toBeGreaterThan(titleOnly);
+        expect(real - titleOnly).toBeGreaterThan(20);
+    });
+
+    it('keeps the legacy title-only behaviour when given a plain string', () => {
+        // Eski çağrı biçimi bozulmamalı: başlık kelimeleri tam eşleşiyor
+        expect(calculateSimpleMatchScore(titleOnlyCandidate, 'Growth Product Manager')).toBe(100);
+    });
+
+    it('treats a position document with no requirements like the title-only case', () => {
+        expect(calculateSimpleMatchScore(titleOnlyCandidate, { title: 'Growth Product Manager', requirements: [] }))
+            .toBe(100);
+    });
+
+    it('reacts when the requirements change', () => {
+        const before = calculateSimpleMatchScore(growthCandidate, GROWTH_PM);
+        const after = calculateSimpleMatchScore(growthCandidate, {
+            title: 'Growth Product Manager',
+            requirements: ['Kurumsal satış kotası yönetimi', 'Saha ziyaretleri', 'Bayi ağı geliştirme'],
+        });
+        expect(after).toBeLessThan(before);
+    });
+
+    it('handles missing candidate/position input', () => {
+        expect(calculateSimpleMatchScore(null, GROWTH_PM)).toBe(0);
+        expect(calculateSimpleMatchScore(growthCandidate, null)).toBe(0);
+        expect(calculateSimpleMatchScore(growthCandidate, { requirements: ['x'] })).toBe(0);
+    });
+});
+
+describe('resolvePreScore — pozisyon dokümanı desteği', () => {
+    const OPEN = [
+        { title: 'Growth Product Manager', requirements: ['funnel', 'aktivasyon', 'A/B test'] },
+        { title: 'Backend Developer', requirements: ['Java', 'Spring', 'PostgreSQL'] },
+    ];
+
+    it('picks the position whose requirements the candidate actually matches', () => {
+        const parsed = { position: 'Yazılım Geliştirici', skills: ['Java', 'Spring', 'PostgreSQL'] };
+        expect(resolvePreScore(parsed, '', OPEN).matchedTitle).toBe('Backend Developer');
+    });
+
+    it('still honours a binding upload selection', () => {
+        const parsed = { position: 'Bir şey', skills: [] };
+        expect(resolvePreScore(parsed, 'Growth Product Manager', OPEN).matchedTitle).toBe('Growth Product Manager');
+    });
+
+    it('accepts a legacy array of title strings', () => {
+        const parsed = { position: 'Backend Developer', skills: ['Java'] };
+        expect(resolvePreScore(parsed, '', ['Backend Developer']).matchedTitle).toBe('Backend Developer');
     });
 });
