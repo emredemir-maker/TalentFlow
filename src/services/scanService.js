@@ -6,6 +6,7 @@
 // uygulanmalı; uzun vadede SystemScanner'ın bu servise taşınması planlı.
 import { analyzeCandidateMatch } from './geminiService';
 import { calculateMatchScore, filterPositionsByDomain, findBestPositionMatch } from './matchService';
+import { buildJobDescription, requirementsOf } from '../utils/positionRequirements';
 
 /**
  * Adayın analizinin BELİRLİ bir pozisyon için tazelenmesi gerekiyor mu?
@@ -83,9 +84,11 @@ export async function deepScanCandidate(candidate, openPositions, options = {}) 
 
     for (const pos of positionsToAnalyze) {
         if (!pos) continue;
-        const jobDesc = `${pos.title}\n${(pos.requirements || []).join(', ')}\n${pos.description || ''}`;
+        const jobDesc = buildJobDescription(pos);
         try {
-            const result = await analyzeCandidateMatch(jobDesc, candidate, 'gemini-2.5-flash');
+            const result = await analyzeCandidateMatch(jobDesc, candidate, 'gemini-2.5-flash', {
+                requirements: requirementsOf(pos),
+            });
             updatedAnalyses[pos.title] = sanitizeForFirestore(result);
             aiCalls += 1;
             // 0 puanlı sonuç "en iyi" kabul edilmez
@@ -143,10 +146,12 @@ export async function rescanCandidateForPosition(candidate, position, options = 
     if (!hasEvidence) return { status: 'skipped_no_cv', aiCalls: 0 };
     if (!position?.title) return { status: 'no_result', aiCalls: 0 };
 
-    const jobDesc = `${position.title}\n${(position.requirements || []).join(', ')}\n${position.description || ''}`;
+    const jobDesc = buildJobDescription(position);
     let result;
     try {
-        result = await analyzeCandidateMatch(jobDesc, candidate, 'gemini-2.5-flash');
+        result = await analyzeCandidateMatch(jobDesc, candidate, 'gemini-2.5-flash', {
+            requirements: requirementsOf(position),
+        });
     } catch {
         return { status: 'no_result', aiCalls: 1 };
     }
