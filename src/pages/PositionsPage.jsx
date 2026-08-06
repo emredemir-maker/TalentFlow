@@ -13,7 +13,7 @@ import {
     Search, Sparkles, Loader2, Cpu, ArrowUpRight, Building2,
     AlertCircle, Unlock, Edit2, X, Send, Link2, Copy, Check,
     ExternalLink, FileText, ChevronRight, TrendingUp, RefreshCw,
-    MoreHorizontal,
+    MoreHorizontal, Target,
 } from 'lucide-react';
 import {
     subscribeToApplications, getSourceColor, APP_STATUS_CONFIG, updateApplicationStatus, deleteApplication
@@ -24,6 +24,7 @@ import { useCandidates } from '../context/CandidatesContext';
 import { extractPositionFromJD } from '../services/geminiService';
 import { parseRequirementsInput, formatRequirementsInput } from '../utils/positionRequirements';
 import { rescanCandidateForPosition, hasAnalysisForPosition } from '../services/scanService';
+import RescanPositionModal from '../components/RescanPositionModal';
 import { getAuthHeaders } from '../services/ai/config';
 import { calculateMatchScore, filterCandidatesByDomain } from '../services/matchService';
 
@@ -39,7 +40,7 @@ const STATUS_CONFIG = {
 // ─────────────────────────────────────────────────────────────
 const APPLY_SOURCES = ['LinkedIn', 'Kariyer.net', 'Instagram', 'Twitter/X', 'Facebook', 'E-posta', 'Web'];
 
-function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onToggleStatus, onDelete, isRecruiterOrAdmin, releaseLoading, releasingPosId, onCandidateClick }) {
+function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onToggleStatus, onDelete, isRecruiterOrAdmin, releaseLoading, releasingPosId, onCandidateClick, onRescan }) {
     const sc = STATUS_CONFIG[pos.status] || STATUS_CONFIG.closed;
     const candidateCount = pos.matchedCandidates?.length || 0;
     const openDays = pos.createdAt ? Math.floor((Date.now() - pos.createdAt.toDate?.()?.getTime?.()) / 86400000) : null;
@@ -216,6 +217,15 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                             {sc.label}
                         </span>
                         <div className="flex items-center gap-1.5">
+                            {isRecruiterOrAdmin && (
+                                <button
+                                    onClick={onRescan}
+                                    className="p-2 rounded-lg bg-cyan-50 border border-cyan-200 text-cyan-500 hover:bg-cyan-100 transition-colors"
+                                    title="Bu ilan için adayları yeniden tara (skor eşiği seçebilirsiniz)"
+                                >
+                                    <Target size={16} />
+                                </button>
+                            )}
                             {isRecruiterOrAdmin && (
                                 <button onClick={onEdit} className="p-2 rounded-lg bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors" title="Düzenle">
                                     <Edit2 size={16} className="text-slate-400" />
@@ -1162,6 +1172,8 @@ export default function PositionsPage() {
     const [isExtracting, setIsExtracting]       = useState(false);
     // Pozisyon içeriği değişince etkilenen adayların yeniden taranma ilerlemesi
     const [rescanProgress, setRescanProgress]   = useState(null); // {done,total}
+    // Yeniden tarama diyaloğu: {position, previousTitle?, reason?}
+    const [rescanTarget, setRescanTarget]       = useState(null);
     // ID of the row whose "more actions" overflow menu is currently open.
     // Only one row can have an open menu at a time. Click-outside closes it.
     const [openActionMenuId, setOpenActionMenuId] = useState(null);
@@ -1284,37 +1296,34 @@ export default function PositionsPage() {
         }
 
         // Kayıtlı analizler ARTIK ESKİ metne ait — skorları olduğu gibi
-        // göstermek yanıltıcı. Etkilenen adaylar: bu pozisyon için analizi
-        // olanlar ve pozisyona atanmış olanlar.
-        const positionForScan = { ...editPos, ...nextPosition };
-        const affected = enrichedCandidates.filter(
-            (c) => hasAnalysisForPosition(c, previousTitle)
-                || hasAnalysisForPosition(c, nextPosition.title)
-                || c.positionId === editPos.id
-        );
+        // göstermek yanıltıcı. Kullanıcı eşik verip hangi adayların
+        // yeniden taranacağına karar verir.
+        setRescanTarget({
+            position: { ...editPos, ...nextPosition },
+            previousTitle,
+            reason: 'Gereksinimler değişti — bu pozisyon için kayıtlı aday analizleri artık eski metne ait.',
+        });
+    };
 
-        if (affected.length === 0) {
-            alert('✅ Pozisyon güncellendi. Bu pozisyon için kayıtlı aday analizi yok — tarama gerekmiyor.');
-            return;
-        }
+    // Bu pozisyonla ilgili adaylar: analizi olanlar + pozisyona atananlar.
+    const candidatesForPosition = (position, previousTitle) => enrichedCandidates.filter(
+        (c) => hasAnalysisForPosition(c, position.title)
+            || (previousTitle && hasAnalysisForPosition(c, previousTitle))
+            || c.positionId === position.id
+    );
 
-        const ok = window.confirm(
-            `✅ Pozisyon güncellendi.\n\n` +
-            `Gereksinimler değiştiği için ${affected.length} adayın kayıtlı analizi artık ESKİ metne ait.\n` +
-            `Bu adaylar yeni gereksinimlere göre şimdi yeniden taransın mı? (aday başına 1 AI çağrısı)\n\n` +
-            `Şimdi taramazsanız Adaylar sayfasından istediğiniz zaman yeniden tarayabilirsiniz.`
-        );
-        if (!ok) return;
-
-        setRescanProgress({ done: 0, total: affected.length });
+    const runRescan = async (selectedCandidates) => {
+        const { position, previousTitle } = rescanTarget || {};
+        if (!position || !selectedCandidates?.length) return;
+        setRescanProgress({ done: 0, total: selectedCandidates.length });
         let scanned = 0, skipped = 0, failed = 0;
         let nextIdx = 0;
-        await Promise.all(Array.from({ length: Math.min(3, affected.length) }, async () => {
-            while (nextIdx < affected.length) {
-                const candidate = affected[nextIdx];
+        await Promise.all(Array.from({ length: Math.min(3, selectedCandidates.length) }, async () => {
+            while (nextIdx < selectedCandidates.length) {
+                const candidate = selectedCandidates[nextIdx];
                 nextIdx += 1;
                 try {
-                    const result = await rescanCandidateForPosition(candidate, positionForScan, { previousTitle });
+                    const result = await rescanCandidateForPosition(candidate, position, { previousTitle });
                     if (result.status === 'scanned') { await updateCandidate(candidate.id, result.updates); scanned += 1; }
                     else skipped += 1;
                 } catch {
@@ -1324,6 +1333,7 @@ export default function PositionsPage() {
             }
         }));
         setRescanProgress(null);
+        setRescanTarget(null);
         addNotification({
             title: 'Yeniden Tarama Tamamlandı',
             message: `${scanned} aday yeni gereksinimlere göre yeniden puanlandı`
@@ -1666,8 +1676,22 @@ export default function PositionsPage() {
                         setViewCandidateId(c.id);
                         window.dispatchEvent(new CustomEvent('changeView', { detail: 'candidate-process' }));
                     }}
+                    onRescan={() => setRescanTarget({ position: detailPos })}
                 />
             )}
+
+            {/* Yeniden tarama: hem ilan kaydedildikten sonra hem de ilan
+                detayından açılır; eşiği kullanıcı belirler. */}
+            <RescanPositionModal
+                position={rescanTarget?.position}
+                candidates={rescanTarget ? candidatesForPosition(rescanTarget.position, rescanTarget.previousTitle) : []}
+                isOpen={Boolean(rescanTarget)}
+                running={Boolean(rescanProgress)}
+                progress={rescanProgress}
+                reason={rescanTarget?.reason}
+                onClose={() => { if (!rescanProgress) setRescanTarget(null); }}
+                onStart={runRescan}
+            />
         </div>
     );
 }
