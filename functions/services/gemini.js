@@ -28,6 +28,7 @@
 import crypto from 'crypto';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { db } from '../config/firebaseAdmin.js';
+import { buildStructuredPrompt } from './promptGuard.js';
 import { childLogger } from './logger.js';
 
 const log = childLogger('gemini');
@@ -179,8 +180,11 @@ export function getDefaultCvParsingModel() {
 
 export async function parseProfile(text, modelId) {
     const effectiveModelId = modelId || getDefaultCvParsingModel();
-    const prompt = `You are a strict JSON parser.
-    Extract the following fields from the LinkedIn profile text below:
+    // Profil metni güvenilmeyen girdidir (kazınmış sayfa / yüklenen CV) —
+    // buildStructuredPrompt onu sınırlandırılmış veri bloğuna alır.
+    const prompt = buildStructuredPrompt(
+        `You are a strict JSON parser.
+    Extract the following fields from the LinkedIn profile text in the PROFILE_TEXT block:
     - name (Full Name)
     - position (Current Job Title)
     - company (Current Company)
@@ -190,15 +194,13 @@ export async function parseProfile(text, modelId) {
     - education (Last school/degree)
     - summary (Professional summary in TURKISH, max 400 chars)
 
-
     Mark missing fields as null.
     Add "source": "Auto Scraper".
     IMPORTANT: The input text might be in any language, but ALL output text fields MUST be in TURKISH.
 
-    TEXT:
-    ${text.substring(0, 20000)}
-
-    Return ONLY raw JSON. No markdown.`;
+    Return ONLY raw JSON. No markdown.`,
+        { PROFILE_TEXT: String(text ?? '').slice(0, 20000) }
+    );
 
     try {
         log.info({ modelId: effectiveModelId }, '🤖 Parsing profile');

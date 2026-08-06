@@ -19,13 +19,15 @@
 import { Router } from 'express';
 
 import { requireAuth } from '../middleware/auth.js';
-import { admin } from '../config/firebaseAdmin.js';
+import { admin, db } from '../config/firebaseAdmin.js';
 import { integrationConfigs } from '../config/integrations.js';
-import { fsGet, fsPatch } from '../services/firestoreRest.js';
 import { childLogger } from '../services/logger.js';
 const log = childLogger('admin');
 
 const router = Router();
+
+const INTEGRATIONS_DOC = 'artifacts/talent-flow/public/data/settings/integrations';
+const API_KEYS_DOC = 'artifacts/talent-flow/public/data/settings/api_keys';
 
 router.delete('/api/admin/auth-user/:uid', requireAuth(['super_admin']), async (req, res) => {
     try {
@@ -42,28 +44,32 @@ router.delete('/api/admin/auth-user/:uid', requireAuth(['super_admin']), async (
     }
 });
 
+// Admin SDK ile okunur/yazılır: firestore.rules bu dokümanı client'a tamamen
+// kapatır (isSecretSetting) — kullanıcı tokenıyla REST erişimi artık mümkün
+// değil ve requireAuth zaten req.firebaseToken set etmiyordu (eski kod bu
+// yüzden her zaman 500 dönüyordu).
 router.get('/api/admin/integrations', requireAuth(['super_admin']), async (req, res) => {
     try {
-        const snap = await fsGet('artifacts/talent-flow/public/data/settings/integrations', req.firebaseToken);
-        if (!snap) return res.json({ microsoft365: null });
+        const snap = await db.doc(INTEGRATIONS_DOC).get();
+        if (!snap.exists) return res.json({ microsoft365: null });
+        const stored = snap.data() || {};
         const data = {};
-        const fields = snap.fields || {};
-        if (fields.microsoft365?.mapValue?.fields) {
-            const ms = fields.microsoft365.mapValue.fields;
+        if (stored.microsoft365) {
+            const ms = stored.microsoft365;
             data.microsoft365 = {
-                clientId: ms.clientId?.stringValue || '',
-                tenantId: ms.tenantId?.stringValue || '',
-                clientSecretSet: !!(ms.clientSecret?.stringValue),
-                redirectUri: ms.redirectUri?.stringValue || '',
-                enabled: ms.enabled?.booleanValue !== false,
-                configuredAt: ms.configuredAt?.stringValue || null,
-                configuredBy: ms.configuredBy?.stringValue || null,
+                clientId: ms.clientId || '',
+                tenantId: ms.tenantId || '',
+                clientSecretSet: !!ms.clientSecret,
+                redirectUri: ms.redirectUri || '',
+                enabled: ms.enabled !== false,
+                configuredAt: ms.configuredAt || null,
+                configuredBy: ms.configuredBy || null,
             };
         }
         res.json(data);
     } catch (err) {
-        log.error('[admin/integrations GET]', err.message);
-        res.status(500).json({ error: err.message });
+        log.error({ err }, '[admin/integrations GET]');
+        res.status(500).json({ error: 'Entegrasyon ayarları okunamadı.' });
     }
 });
 
@@ -71,20 +77,57 @@ router.post('/api/admin/integrations', requireAuth(['super_admin']), async (req,
     try {
         const { provider, config } = req.body;
         if (!provider || !config) return res.status(400).json({ error: 'provider and config required' });
-        if (provider === 'google') {
-            integrationConfigs.google = config;
-            log.info('[integrations] Google config updated in-memory');
+        if (provider !== 'google' && provider !== 'microsoft365') {
+            return res.status(400).json({ error: 'Geçersiz provider.' });
         }
-        if (provider === 'microsoft365') {
-            integrationConfigs.microsoft365 = config;
-            log.info('[integrations] Microsoft 365 config updated in-memory');
-        }
-        const docPath = 'artifacts/talent-flow/public/data/settings/integrations';
-        await fsPatch(docPath, { [provider]: config }, req.firebaseToken);
+        // Önce kalıcı yazım, sonra bellek içi cache — persist başarısızsa
+        // cache eski (doğru) değerlerde kalır.
+        await db.doc(INTEGRATIONS_DOC).set({ [provider]: config }, { merge: true });
+        integrationConfigs[provider === 'google' ? 'google' : 'microsoft365'] = config;
+        log.info(`[integrations] ${provider} config updated by ${req.user.uid}`);
         res.json({ success: true });
     } catch (err) {
-        log.error('[admin/integrations POST]', err.message);
-        res.status(500).json({ error: err.message });
+        log.error({ err }, '[admin/integrations POST]');
+        res.status(500).json({ error: 'Entegrasyon ayarları kaydedilemedi.' });
+    }
+});
+
+// ── Gemini API anahtarı yönetimi ─────────────────────────────────────────────
+// Anahtar client'a asla dönmez: GET yalnızca "ayarlı mı + son 4 hane" verir,
+// POST yeni anahtarı yazar. firestore.rules api_keys dokümanını client'a
+// kapattığı için tek erişim yolu budur.
+router.get('/api/admin/api-keys', requireAuth(['super_admin']), async (req, res) => {
+    try {
+        const snap = await db.doc(API_KEYS_DOC).get();
+        const key = snap.exists ? String(snap.data()?.gemini || '') : '';
+        res.json({
+            gemini: key
+                ? { set: true, last4: key.slice(-4) }
+                : { set: false, last4: null },
+        });
+    } catch (err) {
+        log.error({ err }, '[admin/api-keys GET]');
+        res.status(500).json({ error: 'Anahtar durumu okunamadı.' });
+    }
+});
+
+router.post('/api/admin/api-keys', requireAuth(['super_admin']), async (req, res) => {
+    try {
+        const raw = req.body?.gemini;
+        const key = typeof raw === 'string' ? raw.trim() : '';
+        if (key.length < 20 || /\s/.test(key)) {
+            return res.status(400).json({ error: 'Geçersiz anahtar formatı.' });
+        }
+        await db.doc(API_KEYS_DOC).set({
+            gemini: key,
+            updatedAt: new Date().toISOString(),
+            updatedBy: req.user.uid,
+        }, { merge: true });
+        log.info(`[api-keys] Gemini anahtarı güncellendi (by ${req.user.uid})`);
+        res.json({ success: true, last4: key.slice(-4) });
+    } catch (err) {
+        log.error({ err }, '[admin/api-keys POST]');
+        res.status(500).json({ error: 'Anahtar kaydedilemedi.' });
     }
 });
 

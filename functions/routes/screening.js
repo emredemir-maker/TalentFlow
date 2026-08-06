@@ -9,20 +9,30 @@
 import { Router } from 'express';
 
 import { aiLimiter } from '../middleware/rateLimit.js';
+import { verifyFirebaseToken, requireAuth } from '../middleware/auth.js';
 import { generateText } from '../services/gemini.js';
+import { buildStructuredPrompt, sanitizeForPrompt } from '../services/promptGuard.js';
 import { childLogger } from '../services/logger.js';
 const log = childLogger('screening');
 
 const router = Router();
 
-router.post('/api/score-screening-answers', aiLimiter, async (req, res) => {
+// Başvuru formu (anon oturum) çağırır → verifyFirebaseToken yeterli.
+router.post('/api/score-screening-answers', aiLimiter, verifyFirebaseToken, async (req, res) => {
     const { positionTitle, answers } = req.body || {};
     if (!Array.isArray(answers) || answers.length === 0) {
         return res.status(400).json({ error: 'answers[] is required.' });
     }
 
-    const qaPairs = answers.map((a, i) => `Soru ${i + 1}: ${a.question}\nCevap: ${a.answer || '(boş)'}`).join('\n\n');
-    const prompt = `Sen bir İK uzmanısın. Aşağıdaki pozisyon ön eleme sorularını ve adayın cevaplarını değerlendir.\n\nPozisyon: ${positionTitle || 'Genel Pozisyon'}\n\n${qaPairs}\n\nHer soru için 0-100 arası bir puan ver ve kısa Türkçe bir gerekçe yaz. Yanıtını YALNIZCA şu JSON formatında ver (başka hiçbir şey yazma):\n{"scores":[{"question":"...","score":85,"rationale":"..."}],"aggregateScore":85,"summary":"Kısa genel değerlendirme"}`;
+    // Cevaplar aday tarafından yazılır (halka açık başvuru formu) — puanı
+    // dayatmaya çalışan enjeksiyon denemelerine karşı veri bloğuna alınır.
+    const qaPairs = answers
+        .map((a, i) => `Soru ${i + 1}: ${sanitizeForPrompt(a.question, 2000)}\nCevap: ${sanitizeForPrompt(a.answer, 4000) || '(boş)'}`)
+        .join('\n\n');
+    const prompt = buildStructuredPrompt(
+        'Sen bir İK uzmanısın. SORU_CEVAPLAR bloğundaki pozisyon ön eleme sorularını ve adayın cevaplarını değerlendir. Her soru için 0-100 arası bir puan ver ve kısa Türkçe bir gerekçe yaz. Yanıtını YALNIZCA şu JSON formatında ver (başka hiçbir şey yazma):\n{"scores":[{"question":"...","score":85,"rationale":"..."}],"aggregateScore":85,"summary":"Kısa genel değerlendirme"}',
+        { POZISYON: positionTitle || 'Genel Pozisyon', SORU_CEVAPLAR: qaPairs }
+    );
     try {
         const rawText = (await generateText(prompt)).replace(/```json|```/gi, '').trim();
         const match = rawText.match(/\{[\s\S]*\}/);
@@ -44,13 +54,17 @@ router.post('/api/score-screening-answers', aiLimiter, async (req, res) => {
     }
 });
 
-router.post('/api/suggest-screening-questions', aiLimiter, async (req, res) => {
+// Pozisyon editörü (recruiter) çağırır → rol kapısı.
+router.post('/api/suggest-screening-questions', aiLimiter, requireAuth(), async (req, res) => {
     const { positionTitle, requirements } = req.body || {};
     if (!positionTitle && !requirements) {
         return res.status(400).json({ error: 'positionTitle or requirements is required.' });
     }
 
-    const prompt = `Sen bir kıdemli İK uzmanısın. Aşağıdaki pozisyon için başvuru formunda adaylara sorulacak en fazla 5 adet ön eleme sorusu öner. Sorular kısa, net ve pozisyona özel olmalı.\n\nPozisyon: ${positionTitle || 'Genel Pozisyon'}\nGereksinimler: ${requirements || ''}\n\nYalnızca şu JSON formatında yanıt ver (başka hiçbir şey yazma):\n{"questions": ["Soru 1", "Soru 2", "Soru 3"]}`;
+    const prompt = buildStructuredPrompt(
+        'Sen bir kıdemli İK uzmanısın. POZISYON ve GEREKSINIMLER bloklarındaki pozisyon için başvuru formunda adaylara sorulacak en fazla 5 adet ön eleme sorusu öner. Sorular kısa, net ve pozisyona özel olmalı.\n\nYalnızca şu JSON formatında yanıt ver (başka hiçbir şey yazma):\n{"questions": ["Soru 1", "Soru 2", "Soru 3"]}',
+        { POZISYON: positionTitle || 'Genel Pozisyon', GEREKSINIMLER: requirements || '' }
+    );
     try {
         const rawText = (await generateText(prompt)).replace(/```json|```/gi, '').trim();
         const match = rawText.match(/\{[\s\S]*\}/);
@@ -64,10 +78,17 @@ router.post('/api/suggest-screening-questions', aiLimiter, async (req, res) => {
     }
 });
 
-router.post('/api/improve-screening-question', aiLimiter, async (req, res) => {
+router.post('/api/improve-screening-question', aiLimiter, requireAuth(), async (req, res) => {
     const { question, positionTitle, requirements } = req.body || {};
     if (!question?.trim()) return res.status(400).json({ error: 'question is required.' });
-    const prompt = `Sen bir kıdemli İK uzmanısın. Aşağıdaki ön eleme sorusunu daha net, profesyonel ve ölçülebilir hale getir. Soruyu kısalt, anlaşılırlığını artır ve pozisyonla ilişkisini güçlendir.\n\nPozisyon: ${positionTitle || 'Genel Pozisyon'}\nGereksinimler: ${requirements || ''}\nMevcut soru: ${question}\n\nYalnızca şu JSON formatında yanıt ver (başka hiçbir şey yazma):\n{"improved": "Düzenlenmiş soru metni"}`;
+    const prompt = buildStructuredPrompt(
+        'Sen bir kıdemli İK uzmanısın. MEVCUT_SORU bloğundaki ön eleme sorusunu daha net, profesyonel ve ölçülebilir hale getir. Soruyu kısalt, anlaşılırlığını artır ve pozisyonla ilişkisini güçlendir.\n\nYalnızca şu JSON formatında yanıt ver (başka hiçbir şey yazma):\n{"improved": "Düzenlenmiş soru metni"}',
+        {
+            POZISYON: positionTitle || 'Genel Pozisyon',
+            GEREKSINIMLER: requirements || '',
+            MEVCUT_SORU: question,
+        }
+    );
     try {
         const rawText = (await generateText(prompt)).replace(/```json|```/gi, '').trim();
         const match = rawText.match(/\{[\s\S]*\}/);

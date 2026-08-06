@@ -33,6 +33,7 @@ export default function SuperAdminPage() {
     const [geminiKey, setGeminiKey] = useState('');
     const [showKey, setShowKey] = useState(false);
     const [savingSettings, setSavingSettings] = useState(false);
+    const [savedKeyLast4, setSavedKeyLast4] = useState(null);
     const [activeTab, setActiveTab] = useState('users');
 
     const [showEditModal, setShowEditModal] = useState(false);
@@ -66,16 +67,27 @@ export default function SuperAdminPage() {
             setInvitations(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
             setLoading(false);
         });
+        // settings koleksiyonu artık listelenemez (api_keys/integrations sır
+        // taşıdığından kurallar list'i kapatır) — dokümanlar tekil okunur.
+        // Gemini anahtarının kendisi client'a hiç inmez; yalnızca durum bilgisi
+        // super_admin korumalı /api/admin/api-keys ucundan alınır.
         const fetchSettings = async () => {
             try {
-                const docSnap = await getDocs(query(collection(db, 'artifacts/talent-flow/public/data/settings')));
-                const apiKeysDoc = docSnap.docs.find(d => d.id === 'api_keys');
-                if (apiKeysDoc?.data().gemini) setGeminiKey(apiKeysDoc.data().gemini);
-                const systemDoc = docSnap.docs.find(d => d.id === 'system');
-                if (systemDoc?.data().allowedDomains) setAllowedDomains(systemDoc.data().allowedDomains);
-                const brandingDoc = docSnap.docs.find(d => d.id === 'branding');
-                if (brandingDoc?.exists()) setBrandingLocal(b => ({ ...b, ...brandingDoc.data() }));
+                const [systemDoc, brandingDoc] = await Promise.all([
+                    getDoc(doc(db, 'artifacts/talent-flow/public/data/settings', 'system')),
+                    getDoc(doc(db, 'artifacts/talent-flow/public/data/settings', 'branding')),
+                ]);
+                if (systemDoc.exists() && systemDoc.data().allowedDomains) setAllowedDomains(systemDoc.data().allowedDomains);
+                if (brandingDoc.exists()) setBrandingLocal(b => ({ ...b, ...brandingDoc.data() }));
             } catch (err) { console.warn("Could not fetch settings:", err); }
+            try {
+                const token = await user.getIdToken();
+                const res = await fetch('/api/admin/api-keys', { headers: { Authorization: `Bearer ${token}` } });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data?.gemini?.set) setSavedKeyLast4(data.gemini.last4 || '????');
+                }
+            } catch (err) { console.warn("Could not fetch API key status:", err); }
         };
         fetchSettings();
         return () => { unsubUsers(); unsubInvites(); };
@@ -164,7 +176,7 @@ export default function SuperAdminPage() {
             try {
                 const res = await fetch('/api/send-invite', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` },
                     body: JSON.stringify({
                         email: inviteEmail.trim().toLowerCase(),
                         role: inviteRole,
@@ -209,7 +221,16 @@ export default function SuperAdminPage() {
         if (!geminiKey.trim()) return alert("Lütfen bir anahtar girin.");
         setSavingSettings(true);
         try {
-            await setDoc(doc(db, 'artifacts/talent-flow/public/data/settings', 'api_keys'), { gemini: geminiKey.trim() }, { merge: true });
+            const token = await user.getIdToken();
+            const res = await fetch('/api/admin/api-keys', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ gemini: geminiKey.trim() }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || `Sunucu hatası (${res.status})`);
+            setSavedKeyLast4(data.last4 || '????');
+            setGeminiKey('');
             alert("✅ Gemini API Key başarıyla kaydedildi.");
         } catch (err) { alert("❌ Hata: " + err.message); }
         finally { setSavingSettings(false); }
@@ -491,13 +512,18 @@ export default function SuperAdminPage() {
                     <div className="space-y-2">
                         <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
                             <Key className="w-2.5 h-2.5" /> Gemini API Key
+                            {savedKeyLast4 && (
+                                <span className="normal-case tracking-normal font-bold text-emerald-600 ml-1">
+                                    (kayıtlı: ••••{savedKeyLast4})
+                                </span>
+                            )}
                         </label>
                         <div className="relative">
                             <input
                                 type={showKey ? 'text' : 'password'}
                                 value={geminiKey}
                                 onChange={(e) => setGeminiKey(e.target.value)}
-                                placeholder="AI özellikleri için Gemini API anahtarı..."
+                                placeholder={savedKeyLast4 ? 'Yeni anahtar girin (mevcut anahtar görüntülenemez)' : 'AI özellikleri için Gemini API anahtarı...'}
                                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 pr-10 text-[12px] text-slate-700 font-mono outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition-all"
                             />
                             <button

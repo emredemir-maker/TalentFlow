@@ -9,6 +9,7 @@ import { usePositions } from '../context/PositionsContext';
 import { calculateMatchScore, filterPositionsByDomain, detectJobDomain } from '../services/matchService';
 import { analyzeCandidateMatch, parseCandidateFromText } from '../services/geminiService';
 import { extractTextFromFile } from '../services/cvParser';
+import { getAuthHeaders } from '../services/ai/config';
 import { storage } from '../config/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useNotifications } from '../context/NotificationContext';
@@ -66,7 +67,7 @@ async function checkDuplicateServer(parsedCandidate) {
     try {
         const res = await fetch('/api/check-duplicate', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
             body: JSON.stringify({ email, phone }),
         });
         if (!res.ok) return null;

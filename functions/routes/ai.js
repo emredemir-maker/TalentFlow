@@ -12,6 +12,7 @@ import { Router } from 'express';
 import { createRequire } from 'module';
 
 import { aiLimiter } from '../middleware/rateLimit.js';
+import { verifyFirebaseToken } from '../middleware/auth.js';
 import { wrapMulter } from '../middleware/multipart.js';
 import { getApiKeyDetailed, generateText } from '../services/gemini.js';
 import { childLogger } from '../services/logger.js';
@@ -22,7 +23,10 @@ const multer = require('multer');
 
 const router = Router();
 
-router.post('/api/ai/generate', aiLimiter, async (req, res) => {
+// verifyFirebaseToken: anonim oturumlar da geçer (başvuru formu ve canlı
+// mülakat adayı anon Firebase oturumuyla gelir) — ama tokensız dış çağrılar
+// (açık Gemini proxy kötüye kullanımı) 401 alır.
+router.post('/api/ai/generate', aiLimiter, verifyFirebaseToken, async (req, res) => {
     const { prompt, modelId = 'gemini-2.5-flash', mimeType, maxOutputTokens } = req.body || {};
     if (!prompt || typeof prompt !== 'string') {
         return res.status(400).json({ error: 'prompt is required' });
@@ -63,7 +67,7 @@ router.post('/api/ai/generate', aiLimiter, async (req, res) => {
     }
 });
 
-router.post('/api/ai/stt', aiLimiter, async (req, res) => {
+router.post('/api/ai/stt', aiLimiter, verifyFirebaseToken, async (req, res) => {
     const { audio, mimeType = 'audio/webm' } = req.body || {};
     if (!audio || typeof audio !== 'string') {
         return res.status(400).json({ error: 'audio (base64) is required' });
@@ -86,7 +90,7 @@ router.post('/api/ai/stt', aiLimiter, async (req, res) => {
 // Accepts both multipart/form-data (LiveInterviewPage) and base64 JSON (SettingsPage)
 const audioUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 
-router.post('/api/gemini-stt', aiLimiter, (req, res, next) => {
+router.post('/api/gemini-stt', aiLimiter, verifyFirebaseToken, (req, res, next) => {
     const ct = req.headers['content-type'] || '';
     if (ct.includes('multipart/form-data')) {
         wrapMulter(audioUpload.single('audio'))(req, res, next);

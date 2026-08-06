@@ -11,9 +11,6 @@ import {
 import { connectGoogleWorkspace, disconnectGoogleWorkspace } from '../services/integrationService';
 import { connectMicrosoftWorkspace, disconnectMicrosoftWorkspace } from '../services/microsoftIntegrationService';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { getGlobalGeminiKey } from '../services/ai/config.js';
-import { db } from '../config/firebase';
-import { doc, setDoc } from 'firebase/firestore';
 
 import SourceManagementPage from './SourceManagementPage';
 import DepartmentManagementPage from './DepartmentManagementPage';
@@ -27,7 +24,7 @@ const NAV_GROUPS = [
         group: 'Hesabım',
         items: [
             { id: 'account',   label: 'Hesabım',          icon: Settings,  adminOnly: false },
-            { id: 'api_keys',  label: 'API & Ses Motoru', icon: Key,       adminOnly: false },
+            { id: 'api_keys',  label: 'API & Ses Motoru', icon: Key,       adminOnly: true  },
         ],
     },
     {
@@ -50,7 +47,7 @@ const NAV_GROUPS = [
 
 export default function SettingsPage({ initialTab }) {
     const { settings, loading, updateSettings } = useUserSettings();
-    const { userProfile, userId } = useAuth();
+    const { user, userProfile, userId } = useAuth();
     const [activeSection, setActiveSection] = useState(initialTab || 'account');
     const [isConnectingGoogle, setIsConnectingGoogle] = useState(false);
     const [isConnectingMicrosoft, setIsConnectingMicrosoft] = useState(false);
@@ -65,29 +62,55 @@ export default function SettingsPage({ initialTab }) {
     const audioChunksRef = useRef([]);
     const sttActiveRef = useRef(false);
 
-    // Gemini API Key
+    // Gemini API Key — anahtar tarayıcıya asla inmez: sunucudan yalnızca
+    // "ayarlı mı + son 4 hane" okunur, kayıt super_admin korumalı
+    // /api/admin/api-keys ucundan yapılır.
     const [geminiKey, setGeminiKey] = useState('');
     const [showGeminiKey, setShowGeminiKey] = useState(false);
     const [savingGeminiKey, setSavingGeminiKey] = useState(false);
     const [geminiKeySaved, setGeminiKeySaved] = useState(false);
     const [hasSavedGeminiKey, setHasSavedGeminiKey] = useState(false);
+    const [savedKeyLast4, setSavedKeyLast4] = useState(null);
+
+    const isSuperAdmin = userProfile?.role === 'super_admin';
 
     useEffect(() => {
-        getGlobalGeminiKey().then(k => {
-            if (k) {
-                setGeminiKey(k);
-                setHasSavedGeminiKey(true);
-            }
-        });
-    }, []);
+        if (!isSuperAdmin || !user) return;
+        let cancelled = false;
+        (async () => {
+            try {
+                const token = await user.getIdToken();
+                const res = await fetch('/api/admin/api-keys', {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+                if (cancelled) return;
+                if (data?.gemini?.set) {
+                    setHasSavedGeminiKey(true);
+                    setSavedKeyLast4(data.gemini.last4 || null);
+                }
+            } catch { /* durum rozeti gösterilmez, sayfa çalışmaya devam eder */ }
+        })();
+        return () => { cancelled = true; };
+    }, [isSuperAdmin, user]);
 
     const handleSaveGeminiKey = async () => {
         if (!geminiKey.trim()) return;
         setSavingGeminiKey(true);
         try {
-            await setDoc(doc(db, 'artifacts/talent-flow/public/data/settings', 'api_keys'), { gemini: geminiKey.trim() }, { merge: true });
+            const token = await user.getIdToken();
+            const res = await fetch('/api/admin/api-keys', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ gemini: geminiKey.trim() }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || `Sunucu hatası (${res.status})`);
             setGeminiKeySaved(true);
             setHasSavedGeminiKey(true);
+            setSavedKeyLast4(data.last4 || null);
+            setGeminiKey('');
             setTimeout(() => setGeminiKeySaved(false), 3000);
         } catch (err) { alert('Kayıt hatası: ' + err.message); }
         finally { setSavingGeminiKey(false); }
@@ -225,7 +248,6 @@ export default function SettingsPage({ initialTab }) {
 
     const isGoogleConnected = userProfile?.integrations?.google?.connected;
     const isMicrosoftConnected = userProfile?.integrations?.microsoft?.connected;
-    const isSuperAdmin = userProfile?.role === 'super_admin';
 
     if (loading || !userProfile) {
         return (
@@ -410,7 +432,7 @@ export default function SettingsPage({ initialTab }) {
                                             <h2 className="text-sm font-bold text-slate-800">Gemini API Anahtarı</h2>
                                             {hasSavedGeminiKey && (
                                                 <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                                    <CheckCircle className="w-3 h-3" /> Aktif
+                                                    <CheckCircle className="w-3 h-3" /> Aktif{savedKeyLast4 ? ` ••••${savedKeyLast4}` : ''}
                                                 </span>
                                             )}
                                         </div>
@@ -423,7 +445,7 @@ export default function SettingsPage({ initialTab }) {
                                             type={showGeminiKey ? 'text' : 'password'}
                                             value={geminiKey}
                                             onChange={e => setGeminiKey(e.target.value)}
-                                            placeholder="AIzaSy..."
+                                            placeholder={hasSavedGeminiKey ? 'Yeni anahtar girin (mevcut anahtar güvenlik gereği görüntülenemez)' : 'AIzaSy...'}
                                             className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 pr-10 text-sm text-slate-700 font-mono outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition-all"
                                         />
                                         <button onClick={() => setShowGeminiKey(v => !v)}

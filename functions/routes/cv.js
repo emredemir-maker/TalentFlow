@@ -22,6 +22,7 @@ import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 
 import { aiLimiter } from '../middleware/rateLimit.js';
+import { requireAuth } from '../middleware/auth.js';
 import { wrapMulter } from '../middleware/multipart.js';
 import { pdf } from '../services/pdf.js';
 import { parseProfile } from '../services/gemini.js';
@@ -128,7 +129,7 @@ export async function storeCvFile(file) {
     }
 }
 
-router.post('/api/direct-add', aiLimiter, async (req, res) => {
+router.post('/api/direct-add', aiLimiter, requireAuth(), async (req, res) => {
     try {
         const { text, url } = req.body;
         log.info(`📥 Direct Add request for: ${url}`);
@@ -152,7 +153,7 @@ router.post('/api/direct-add', aiLimiter, async (req, res) => {
     }
 });
 
-router.post('/api/process-cv', aiLimiter, wrapMulter(upload.array('cvs', 20)), async (req, res) => {
+router.post('/api/process-cv', aiLimiter, requireAuth(), wrapMulter(upload.array('cvs', 20)), async (req, res) => {
     try {
         if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'Dosya seçilmedi' });
 
@@ -202,7 +203,7 @@ router.post('/api/process-cv', aiLimiter, wrapMulter(upload.array('cvs', 20)), a
     }
 });
 
-router.post('/api/check-duplicate', async (req, res) => {
+router.post('/api/check-duplicate', requireAuth(), async (req, res) => {
     try {
         const norm = (s) => (s || '').trim().toLowerCase().replace(/[\s\-().+]/g, '');
         const email = norm(req.body?.email);

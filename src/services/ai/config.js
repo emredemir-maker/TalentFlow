@@ -30,6 +30,21 @@ const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
  * Backend clamps maxOutputTokens to [512, 32768]; values above that are
  * silently capped, values below default to 8192.
  */
+/**
+ * Backend AI uçları kimlik doğrulaması ister (anonim oturumlar dahil —
+ * başvuru formu ve canlı mülakat adayı da Firebase anon oturumla gelir).
+ * Token alınamazsa header gönderilmez ve sunucu 401 döner.
+ */
+export async function getAuthHeaders() {
+    try {
+        const { auth } = await import('../../config/firebase');
+        const token = await auth.currentUser?.getIdToken();
+        return token ? { Authorization: `Bearer ${token}` } : {};
+    } catch {
+        return {};
+    }
+}
+
 export async function getModel(modelId = DEFAULT_GEMINI_MODEL) {
     return {
         generateContent: async (prompt, options = {}) => {
@@ -39,7 +54,7 @@ export async function getModel(modelId = DEFAULT_GEMINI_MODEL) {
 
             const res = await fetch('/api/ai/generate', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
                 body: JSON.stringify(body),
             });
 
@@ -53,28 +68,4 @@ export async function getModel(modelId = DEFAULT_GEMINI_MODEL) {
             return { response: { text: () => text } };
         },
     };
-}
-
-/**
- * Returns the admin-saved Gemini API key from Firestore (Settings → API).
- * Used by SettingsPage to populate the input so the admin can see whether
- * a key is currently saved and edit/replace it.  AI features themselves
- * never use this — they all go through /api/ai/generate, which fetches
- * the key on the server.
- *
- * Returns null if no key is saved or read fails (e.g., user not logged in).
- */
-export async function getGlobalGeminiKey() {
-    try {
-        const { db } = await import('../../config/firebase');
-        const { doc, getDoc } = await import('firebase/firestore');
-        const snap = await getDoc(doc(db, 'artifacts/talent-flow/public/data/settings', 'api_keys'));
-        if (snap.exists()) {
-            const k = snap.data()?.gemini;
-            if (k && typeof k === 'string') return k;
-        }
-    } catch (_err) {
-        // Silent fail — input simply stays empty
-    }
-    return null;
 }
