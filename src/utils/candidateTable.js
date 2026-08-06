@@ -58,10 +58,42 @@ export const DEFAULT_FILTERS = {
     department: 'all',
     source: 'all',
     scan: 'all', // 'all' | 'scanned' | 'unscanned'
+    location: 'all', // 'all' | 'istanbul' | 'outside' | 'unknown'
     minScore: '',
     dateFrom: '',
     dateTo: '',
 };
+
+/**
+ * Türkçe'ye duyarlı karşılaştırma anahtarı.
+ * 'İstanbul'.toLowerCase() JavaScript'te "i̇stanbul" üretir (i + birleşen nokta),
+ * bu yüzden düz includes('istanbul') İ ile yazılmış konumları KAÇIRIR.
+ * İ→I ve ı→i eşlemesinden sonra aksanlar ayrıştırılıp atılır.
+ */
+function foldTurkish(value) {
+    return String(value || '')
+        .replace(/İ/g, 'I')
+        .replace(/ı/g, 'i')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+}
+
+/** Konum metni İstanbul'u işaret ediyor mu? ("Kadıköy/İstanbul", "ISTANBUL, TR" …) */
+export function isIstanbulLocation(location) {
+    return foldTurkish(location).includes('istanbul');
+}
+
+/**
+ * Adayı konum kovasına yerleştirir: İstanbul içi / dışı / bilinmiyor.
+ * Konum alanı boşsa "outside" DEĞİL "unknown" döner — veri eksikliği,
+ * şehir dışı olmakla aynı şey değildir ve eleme kararını bozmamalıdır.
+ */
+export function locationBucket(candidate) {
+    const raw = String(candidate?.location || '').trim();
+    if (!raw) return 'unknown';
+    return isIstanbulLocation(raw) ? 'istanbul' : 'outside';
+}
 
 /**
  * Adayın SEÇİLİ pozisyona uyum skoru: kaydedilmiş AI analizi (positionAnalyses,
@@ -152,6 +184,9 @@ export function applyTableFilters(rows, filters, opts = {}) {
     if (f.scan !== 'all') {
         result = result.filter((c) => (f.scan === 'scanned' ? isDeepScanned(c) : !isDeepScanned(c)));
     }
+    if (f.location !== 'all') {
+        result = result.filter((c) => locationBucket(c) === f.location);
+    }
     if (f.minScore !== '' && !isNaN(Number(f.minScore))) {
         const min = Number(f.minScore);
         // Pozisyon modunda eşik, adayın SEÇİLİ pozisyondaki skoruna uygulanır —
@@ -184,6 +219,7 @@ const SORT_ACCESSORS = {
     position: (c) => c.bestTitle || c.position || '',
     cvRole: (c) => cleanRoleText(c.suggestedRole, c.position || '') || '',
     department: (c) => c.department || '',
+    location: (c) => c.location || '',
     source: (c) => c.source || '',
     stage: (c) => getStage(resolveStageKey(c.status)).label,
     scanStatus: (c) => (isDeepScanned(c) ? 1 : 0),

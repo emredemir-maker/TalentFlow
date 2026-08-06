@@ -9,6 +9,8 @@ import {
     sortRows,
     buildExportRows,
     DEFAULT_FILTERS,
+    isIstanbulLocation,
+    locationBucket,
 } from './candidateTable';
 
 const mkTs = (iso) => ({ toMillis: () => new Date(iso).getTime() });
@@ -294,5 +296,76 @@ describe('buildExportRows', () => {
         expect(row['Aşama']).toBe('Ön Eleme');
         expect(row['Mülakat Skoru']).toBe('');
         expect(row['Yetenekler']).toBe('');
+    });
+});
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Konum filtresi — CV'den okunan konum bilgisiyle İstanbul içi/dışı eleme.
+// Türkçe büyük İ tuzağı: 'İstanbul'.toLowerCase() "i̇stanbul" üretir
+// (i + birleşen nokta), bu yüzden düz includes('istanbul') kaçırır.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('isIstanbulLocation', () => {
+    it('matches the Turkish capital-İ spelling', () => {
+        expect(isIstanbulLocation('İstanbul')).toBe(true);
+        expect(isIstanbulLocation('İSTANBUL')).toBe(true);
+    });
+
+    it('matches ASCII and mixed spellings', () => {
+        expect(isIstanbulLocation('Istanbul, Türkiye')).toBe(true);
+        expect(isIstanbulLocation('istanbul')).toBe(true);
+    });
+
+    it('matches when a district or country wraps the city', () => {
+        expect(isIstanbulLocation('Kadıköy/İstanbul')).toBe(true);
+        expect(isIstanbulLocation('Ataşehir, İstanbul, Türkiye')).toBe(true);
+    });
+
+    it('rejects other cities and empty values', () => {
+        expect(isIstanbulLocation('Ankara')).toBe(false);
+        expect(isIstanbulLocation('İzmir, Türkiye')).toBe(false);
+        expect(isIstanbulLocation('')).toBe(false);
+        expect(isIstanbulLocation(null)).toBe(false);
+    });
+});
+
+describe('locationBucket', () => {
+    it('separates inside / outside / unknown', () => {
+        expect(locationBucket({ location: 'İstanbul' })).toBe('istanbul');
+        expect(locationBucket({ location: 'Bursa' })).toBe('outside');
+        expect(locationBucket({ location: '   ' })).toBe('unknown');
+        expect(locationBucket({})).toBe('unknown');
+    });
+
+    it('treats a missing location as unknown, never as "outside"', () => {
+        // Veri eksikliği şehir dışı olmakla aynı şey değil — aksi halde konumu
+        // okunamamış adaylar "İstanbul dışı" filtresinde elenirdi.
+        expect(locationBucket({ location: undefined })).not.toBe('outside');
+    });
+});
+
+describe('applyTableFilters — konum', () => {
+    const rows = [
+        { id: '1', name: 'A', location: 'İstanbul, Türkiye' },
+        { id: '2', name: 'B', location: 'Kadıköy/İstanbul' },
+        { id: '3', name: 'C', location: 'Ankara' },
+        { id: '4', name: 'D', location: '' },
+    ];
+    const ids = (out) => out.map((c) => c.id);
+
+    it('filters to İstanbul only', () => {
+        expect(ids(applyTableFilters(rows, { location: 'istanbul' }))).toEqual(['1', '2']);
+    });
+
+    it('filters to outside İstanbul without sweeping in unknown locations', () => {
+        expect(ids(applyTableFilters(rows, { location: 'outside' }))).toEqual(['3']);
+    });
+
+    it('can isolate candidates whose location could not be read', () => {
+        expect(ids(applyTableFilters(rows, { location: 'unknown' }))).toEqual(['4']);
+    });
+
+    it('is inactive by default', () => {
+        expect(ids(applyTableFilters(rows, {}))).toEqual(['1', '2', '3', '4']);
     });
 });
