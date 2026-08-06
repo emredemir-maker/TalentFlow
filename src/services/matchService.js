@@ -180,6 +180,26 @@ const JOB_DOMAINS = [
 ];
 
 /**
+ * ARAÇ terimleri: belirli ürün/teknoloji adları. Yetkinlik terimlerinden
+ * ("funnel", "aktivasyon", "ürün yönetimi") ayrı tutulur ve skorda daha az
+ * ağırlık taşır — bir aday işi yapmışsa, kullandığı aracın adını CV'sinde
+ * anmamış olması onu diskalifiye etmemeli. Derin taramadaki
+ * CAPABILITY_SHARE/TOOL_SHARE dengesinin anahtar-kelime karşılığıdır.
+ */
+const TOOL_TERMS = new Set([
+    'amplitude', 'mixpanel', 'ga4', 'google analytics', 'metabase', 'looker',
+    'jira', 'figma', 'sql', 'nosql', 'postgresql', 'redis', 'kafka', 'docker',
+    'kubernetes', 'aws', 'azure', 'gcp', 'jenkins', 'terraform', 'ci/cd',
+    'tableau', 'power bi', 'pandas', 'numpy', 'spark', 'hadoop',
+    '.net', 'c#', 'java', 'spring', 'node', 'python', 'django', 'react', 'vue',
+    'angular', 'javascript', 'typescript', 'next.js', 'tailwind', 'bootstrap',
+    'flutter', 'react native', 'swift', 'kotlin', 'go', 'golang',
+]);
+
+const CAPABILITY_SHARE = 0.75;
+const TOOL_SHARE = 0.25;
+
+/**
  * Terim, metinde GERÇEKTEN geçiyor mu?
  *
  * Düz `text.includes(term)` üç somut hataya yol açıyordu:
@@ -472,11 +492,24 @@ export function calculateMatchScore(candidate, position, options = {}) {
         return 0;
     };
 
+    // Oran, yetkinlik ve araç terimleri ayrı hesaplanıp ağırlıklı
+    // birleştirilir: araç adlarının eksikliği yetkinlik kadar ağır basmaz.
+    // Kümelerden biri boşsa diğeri tüm ağırlığı alır.
     const coverageOf = (terms) => {
         const list = Array.from(terms);
         if (list.length === 0) return null;
         const hits = list.reduce((sum, req) => sum + matchStrength(req), 0);
-        return { ratio: Math.min(hits / list.length, 1), hits, total: list.length };
+        const tools = list.filter((t) => TOOL_TERMS.has(t));
+        const capabilities = list.filter((t) => !TOOL_TERMS.has(t));
+        const partial = (subset) => (subset.length === 0
+            ? null
+            : Math.min(subset.reduce((sum, req) => sum + matchStrength(req), 0) / subset.length, 1));
+        const capRatio = partial(capabilities);
+        const toolRatio = partial(tools);
+        const ratio = capRatio === null ? toolRatio
+            : toolRatio === null ? capRatio
+            : capRatio * CAPABILITY_SHARE + toolRatio * TOOL_SHARE;
+        return { ratio, hits, total: list.length };
     };
 
     // Zorunlu / tercihen ayrımı yapılmışsa iki küme ayrı değerlendirilir.

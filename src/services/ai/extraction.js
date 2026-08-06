@@ -13,8 +13,17 @@ Sen kıdemli ve son derece analitik bir İşe Alım Yöneticisisin. Görevin, ad
    - "met": CV'de açık kanıt var
    - "partial": Dolaylı/kısmi kanıt var
    - "missing": Kanıt yok
-   "assessments" dizisinde her madde için maddenin NUMARASINI ("index") ve
-   durumunu ver. Listedeki HER madde için tam olarak bir kayıt olmalı.
+   "assessments" dizisinde her madde için maddenin NUMARASINI ("index"),
+   durumunu ve TÜRÜNÜ ("kind") ver. Listedeki HER madde için tam olarak bir
+   kayıt olmalı.
+   "kind" iki değerden biridir:
+   - "deneyim": adayın YAPTIĞI iş / sahiplendiği alan / ürettiği sonuç
+     (örn. "funnel sahipliği", "A/B test kurgulama", "B2B SaaS ürün yönetimi")
+   - "arac": belirli bir ürün, teknoloji, sertifika ya da dil bilgisi
+     (örn. "GA4", "Amplitude", "SQL", "İngilizce")
+   Emin olamazsan "deneyim" yaz. Araç maddeleri puanlamada daha az ağırlık
+   taşır: bir aday işi yapmışsa, aracın adını CV'de anmamış olması onu
+   diskalifiye etmez.
    Ayrıca "coverageScore": karşılanma oranını 0-100 arası tek sayı olarak ver
    (met tam, partial yarım sayılır; [ZORUNLU] maddeler çok daha ağır basar).
    İyi yazılmış ama ilanla ilgisiz bir CV DÜŞÜK coverageScore almalıdır —
@@ -41,7 +50,7 @@ Sen kıdemli ve son derece analitik bir İşe Alım Yöneticisisin. Görevin, ad
     "matchedKeywords": ["keyword1"],
     "missingKeywords": ["keyword2"],
     "requirementCoverage": {
-        "assessments": [{ "index": 1, "status": "met|partial|missing", "note": "kısa gerekçe" }],
+        "assessments": [{ "index": 1, "status": "met|partial|missing", "kind": "deneyim|arac", "note": "kısa gerekçe" }],
         "met": ["karşılanan gereksinim"],
         "partial": ["kısmen karşılanan gereksinim"],
         "missing": ["karşılanmayan gereksinim"],

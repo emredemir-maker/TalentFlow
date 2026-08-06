@@ -160,13 +160,22 @@ export async function getAvailableModels() {
  */
 // Derin tarama skorunun ağırlıkları.
 //
-// Eskiden skor YALNIZCA STAR ortalamasıydı. STAR, CV'nin ne kadar iyi
-// anlatıldığını ölçer (durum-görev-eylem-sonuç kanıtı) — ilana uygunluğunu
-// DEĞİL. Sonuç: iyi yazılmış ama alakasız bir CV yüksek, ilana birebir uyan
-// ama sade yazılmış bir CV düşük alıyordu; ilanın gereksinimlerini
-// değiştirmek skoru neredeyse hiç oynatmıyordu.
-const COVERAGE_WEIGHT = 0.6;
-const STAR_WEIGHT = 0.4;
+// Skor iki bileşenin bileşimidir:
+//   - coverage: ilanın gereksinimlerinin CV'de kanıtlanma oranı
+//   - STAR: adayın GERÇEKTEN yaptığı işin kanıt kalitesi (durum-görev-
+//     eylem-sonuç); "bu kişi bu işi yapmış mı" sorusunun karşılığı
+//
+// Tarihçe: skor bir dönem yalnızca STAR'dı (ilana hiç bakmıyordu), sonra
+// coverage %60 / STAR %40 oldu. İkincisi bu kez ters yöne kaçtı: gereksinim
+// listesindeki araç adları (GA4, Amplitude…) CV'de birebir geçmeyince
+// yıllarca o işi yapmış adaylar da düşük aldı.
+//
+// Şimdi %50/%50. Bu bilinçli bir denge: coverage tek başına "anahtar kelime
+// var mı" sorusuna, STAR tek başına "iyi yazılmış mı" sorusuna kayar.
+// Ağırlığı değiştirmek isterseniz tek yer burasıdır; sayı değiştikçe
+// geminiService.test.js'teki beklenen skorlar da güncellenmelidir.
+const COVERAGE_WEIGHT = 0.5;
+const STAR_WEIGHT = 0.5;
 
 /** 0-100 aralığına kırpar; sayı değilse null döner. */
 function clampScore(value) {
@@ -188,8 +197,18 @@ function starScoreOf(starAnalysis) {
     return clampScore((sum / 4) * 10);
 }
 
+// Öncelik ağırlıkları: zorunlu maddeler skorun gövdesini taşır, tercih
+// edilenler sınırlı avantaj sağlar.
 const MUST_WEIGHT = 85;
 const NICE_WEIGHT = 15;
+
+// Madde TÜRÜ ağırlıkları — "adayın yaptığı iş, araç bilgisinden önemlidir".
+// Bir gereksinim kümesi hem yetkinlik ("funnel sahipliği") hem araç ("GA4
+// hakimiyeti") maddeleri içerir. Bunları eşit saymak, işi yıllarca yapmış
+// ama CV'sinde araç adı geçmeyen adayı gereksiz yere düşürüyordu.
+// Kümelerden biri boşsa diğeri tüm ağırlığı alır.
+const CAPABILITY_SHARE = 0.75;
+const TOOL_SHARE = 0.25;
 
 /**
  * Madde numaralarına göre AĞIRLIKLI kapsama: olmazsa olmazların karşılanmaması
@@ -210,18 +229,37 @@ function weightedCoverageOf(coverage, requirements) {
     const nice = indexed.filter((r) => r.must === false);
     if (must.length === 0 && nice.length === 0) return null; // işaretlenmemiş ilan
 
-    const statusByIndex = new Map();
+    const byIndex = new Map();
     for (const a of assessments) {
         const idx = Number(a?.index);
-        if (Number.isFinite(idx)) statusByIndex.set(idx, String(a?.status || '').toLowerCase());
+        if (!Number.isFinite(idx)) continue;
+        byIndex.set(idx, {
+            status: String(a?.status || '').toLowerCase(),
+            // Tür belirtilmemişse "yetkinlik" sayılır: bilinmeyeni araç kabul
+            // edip sessizce ağırlığını düşürmek, eski kayıtların skorunu
+            // gerçek dışı biçimde yükseltirdi.
+            isTool: String(a?.kind || '').toLowerCase().startsWith('ara'),
+        });
     }
     const weightOf = (status) => (status === 'met' ? 1 : status === 'partial' ? 0.5 : 0);
     const ratioOf = (subset) => (subset.length === 0
         ? null
-        : subset.reduce((sum, r) => sum + weightOf(statusByIndex.get(r.index)), 0) / subset.length);
+        : subset.reduce((sum, r) => sum + weightOf(byIndex.get(r.index)?.status), 0) / subset.length);
 
-    const mustRatio = ratioOf(must);
-    const niceRatio = ratioOf(nice);
+    /** Bir öncelik kümesini yetkinlik/araç olarak ayırıp ağırlıklı orana çevirir. */
+    const tierRatio = (tier) => {
+        if (tier.length === 0) return null;
+        const tools = tier.filter((r) => byIndex.get(r.index)?.isTool);
+        const capabilities = tier.filter((r) => !byIndex.get(r.index)?.isTool);
+        const capRatio = ratioOf(capabilities);
+        const toolRatio = ratioOf(tools);
+        if (capRatio === null) return toolRatio;
+        if (toolRatio === null) return capRatio;
+        return capRatio * CAPABILITY_SHARE + toolRatio * TOOL_SHARE;
+    };
+
+    const mustRatio = tierRatio(must);
+    const niceRatio = tierRatio(nice);
     if (mustRatio === null) return clampScore(niceRatio * 100);
     if (niceRatio === null) return clampScore(mustRatio * 100);
     return clampScore(mustRatio * MUST_WEIGHT + niceRatio * NICE_WEIGHT);
