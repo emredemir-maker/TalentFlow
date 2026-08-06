@@ -9,7 +9,7 @@ import { deepScanCandidate } from '../services/scanService';
 import { extractTextFromFile } from '../services/cvParser';
 import { calculateMatchScore, domainLabel, detectCandidateDomain, detectPositionDomain } from '../services/matchService';
 import { applyPiiMask, stripPiiForAI } from '../utils/pii';
-import { cleanRoleText } from '../utils/candidateTable';
+import { cleanRoleText, analysisForPosition } from '../utils/candidateTable';
 import { batchFilesBySize, formatBytes, totalBytes, MAX_REQUEST_BYTES } from '../utils/bulkUpload';
 import { getFeedbackEmail } from '../utils/templateService';
 import { db } from '../config/firebase';
@@ -878,6 +878,11 @@ export default function CandidateProcessPage() {
     };
     const score = coherentScoreOf(candidate);
 
+    // Gösterilen pozisyonun analiz METNİ — skorla aynı kural: ne gösteriliyorsa
+    // onun analizi. Yoksa null döner ve arayüz "başka pozisyon için üretilmiş"
+    // uyarısıyla eldeki metni gösterir.
+    const displayedAnalysis = analysisForPosition(candidate, candidate?.matchedPositionTitle);
+
     // Gerçek STAR metodolojisi skoru (S+T+A+R ortalaması × 10). Yoksa null —
     // rozet '—' gösterir. Eskiden bu rozet bestScore*0.98 gösteriyordu: hem
     // belgesiz bir kırpmaydı hem de STAR ile ilgisi yoktu.
@@ -1426,13 +1431,19 @@ export default function CandidateProcessPage() {
                                                     <Link2 className="w-2 h-2" /> {getSourceLabel(candidate)}
                                                 </span>
                                             </div>
+                                            {/* Metin, GÖSTERİLEN pozisyonun analizinden gelir. Eskiden her
+                                                zaman tek bir aiAnalysis.summary basılıyordu; aday hangi
+                                                pozisyon bağlamında açılırsa açılsın aynı yorum görünüyordu. */}
                                             <p className="text-[12px] text-slate-600 leading-relaxed italic font-medium pr-16">
-                                                "{candidate.aiAnalysis?.summary || `${candidate.name} teknik profili, ${candidate.matchedPositionTitle || candidate.position || 'Hedef Pozisyon'} pozisyonu ile %${score} uyum göstermektedir.`}"
+                                                "{displayedAnalysis?.summary
+                                                    || candidate.aiAnalysis?.summary
+                                                    || `${candidate.name} teknik profili, ${candidate.matchedPositionTitle || candidate.position || 'Hedef Pozisyon'} pozisyonu ile %${score} uyum göstermektedir.`}"
                                             </p>
-                                            {/* Eski analiz uyarısı: metin başka bir pozisyon için üretildiyse
-                                                bunu açıkça söyle — skor rozeti her zaman GÜNCEL eşleşmenin
-                                                skorunu gösterir, eski analizin skorunu değil. */}
-                                            {candidate.aiAnalysis?.analyzedForPosition &&
+                                            {/* Gösterilen pozisyon için analiz YOKSA ve elde başka bir
+                                                pozisyona ait metin varsa, bunu açıkça söyle. */}
+                                            {!displayedAnalysis &&
+                                                candidate.aiAnalysis?.summary &&
+                                                candidate.aiAnalysis?.analyzedForPosition &&
                                                 candidate.matchedPositionTitle &&
                                                 candidate.aiAnalysis.analyzedForPosition !== candidate.matchedPositionTitle && (
                                                 <p className="mt-1.5 text-[10px] text-amber-600 font-semibold flex items-center gap-1">

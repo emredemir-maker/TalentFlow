@@ -11,6 +11,7 @@ import {
     DEFAULT_FILTERS,
     isIstanbulLocation,
     locationBucket,
+    analysisForPosition,
 } from './candidateTable';
 
 const mkTs = (iso) => ({ toMillis: () => new Date(iso).getTime() });
@@ -410,5 +411,56 @@ describe('scoreForPosition — skor fonksiyonunun dönüş şekli', () => {
 
     it('returns 0 for a position without a title', () => {
         expect(scoreForPosition(candidate, {}, () => ({ score: 90 }))).toBe(0);
+    });
+});
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// analysisForPosition — GÖSTERİLEN metin, GÖSTERİLEN pozisyonun metnidir.
+//
+// Arayüz analiz metnini tek bir aiAnalysis.summary alanından okuyordu; analizler
+// ise pozisyon başlığıyla anahtarlı positionAnalyses haritasında ayrı ayrı
+// duruyor. Sonuç: aday hangi pozisyon bağlamında açılırsa açılsın aynı yorum
+// görünüyordu ("bu yorum hep sabit kalıyor" bildirimi).
+// ─────────────────────────────────────────────────────────────────────────────
+describe('analysisForPosition', () => {
+    const candidate = {
+        positionAnalyses: {
+            'Growth PM': { summary: 'Growth PM için üretilmiş metin', score: 60 },
+            'Backend Dev': { summary: 'Backend için üretilmiş metin', score: 25 },
+        },
+        aiAnalysis: { summary: 'Backend için üretilmiş metin', analyzedForPosition: 'Backend Dev', score: 25 },
+    };
+
+    it('returns the analysis written for the position being displayed', () => {
+        expect(analysisForPosition(candidate, 'Growth PM')).toEqual({
+            summary: 'Growth PM için üretilmiş metin', analyzedFor: 'Growth PM', score: 60,
+        });
+    });
+
+    it('does not leak another position\'s narrative', () => {
+        const forGrowth = analysisForPosition(candidate, 'Growth PM');
+        expect(forGrowth.summary).not.toBe(candidate.aiAnalysis.summary);
+    });
+
+    it('falls back to aiAnalysis when it was produced for the same position', () => {
+        const onlyTopLevel = {
+            aiAnalysis: { summary: 'Tek metin', analyzedForPosition: 'Growth PM', score: 70 },
+        };
+        expect(analysisForPosition(onlyTopLevel, 'Growth PM')).toEqual({
+            summary: 'Tek metin', analyzedFor: 'Growth PM', score: 70,
+        });
+    });
+
+    it('returns null when nothing was written for this position', () => {
+        expect(analysisForPosition(candidate, 'Data Analyst')).toBeNull();
+        const otherPosition = { aiAnalysis: { summary: 'X', analyzedForPosition: 'Backend Dev' } };
+        expect(analysisForPosition(otherPosition, 'Growth PM')).toBeNull();
+    });
+
+    it('handles missing input', () => {
+        expect(analysisForPosition(null, 'Growth PM')).toBeNull();
+        expect(analysisForPosition(candidate, '')).toBeNull();
+        expect(analysisForPosition({}, 'Growth PM')).toBeNull();
     });
 });
