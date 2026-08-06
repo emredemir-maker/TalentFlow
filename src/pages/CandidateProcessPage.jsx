@@ -4,9 +4,10 @@ import { useNavigate } from 'react-router-dom';
 import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
 import { useAuth } from '../context/AuthContext';
-import { analyzeCandidateMatch, parseExperiencesFromText, parseCandidateFromText } from '../services/geminiService';
+import { parseExperiencesFromText, parseCandidateFromText } from '../services/geminiService';
+import { deepScanCandidate } from '../services/scanService';
 import { extractTextFromFile } from '../services/cvParser';
-import { calculateMatchScore, filterPositionsByDomain, domainLabel, detectCandidateDomain, detectPositionDomain } from '../services/matchService';
+import { calculateMatchScore, domainLabel, detectCandidateDomain, detectPositionDomain } from '../services/matchService';
 import { applyPiiMask, stripPiiForAI } from '../utils/pii';
 import { cleanRoleText } from '../utils/candidateTable';
 import { batchFilesBySize, formatBytes, totalBytes, MAX_REQUEST_BYTES } from '../utils/bulkUpload';
@@ -650,63 +651,36 @@ export default function CandidateProcessPage() {
         setAnalyzingIds(prev => new Set(prev).add(c.id));
         setAnalysisError(null);
         try {
-            // ── Stage 1: Scout — find best position match ──────────────────────
             const openPositions = positions?.filter(p => p.status === 'open') || [];
-
-            // Priority 1: candidate's stored positionId if it's still open
-            // (recruiter explicitly assigned the candidate to this position;
-            // respect that intent).
-            let matchedPosition = openPositions.find(p => p.id === c.positionId);
-
-            // Priority 2: among open positions in the candidate's domain,
-            // pick the highest-scoring one.
-            //
-            // Pre-fix this fallback was `openPositions[0]` — first-in-array,
-            // no fit check at all. Result: an HR candidate with no positionId
-            // would land on whatever happened to be index 0 (e.g. "Project
-            // Manager"), and STAR analysis would score them ~%55 — bad UX
-            // and misleading data.
-            if (!matchedPosition) {
-                const compatibleOpen = filterPositionsByDomain(c, openPositions);
-                const ranked = compatibleOpen
-                    .map(p => ({ position: p, score: calculateMatchScore(c, p).score }))
-                    .sort((a, b) => b.score - a.score);
-                matchedPosition = ranked[0]?.position;
+            if (openPositions.length === 0) {
+                throw new Error('Açık pozisyon yok. Önce bir pozisyon açın.');
             }
 
-            if (!matchedPosition) {
+            // Toplu tarama ile AYNI çekirdek (scanService.deepScanCandidate).
+            // Bu ekran eskiden kendi zayıf kopyasını çalıştırıyordu: yalnızca
+            // TEK pozisyonu analiz ediyor ve positionAnalyses'i hiç
+            // yazmıyordu — bu yüzden adayın profilinden analiz tazelense bile
+            // listedeki "Poz. Uyum" skoru ve pozisyon bazlı filtreler eski
+            // değerde kalıyordu.
+            const result = await deepScanCandidate(c, openPositions, { allowUnrelatedFallback: false });
+
+            if (result.status === 'no_compatible_position') {
                 throw new Error(
                     'Bu adayın domain\'ine uygun açık pozisyon yok. Açık pozisyon ekleyin veya mevcut pozisyonların durumunu kontrol edin.'
                 );
             }
+            if (result.status === 'skipped_no_cv') {
+                throw new Error('CV metni bulunamadı — Bakım > "Eksik Profilleri Tamamla" çalıştırın.');
+            }
+            if (result.status !== 'scanned') {
+                throw new Error('Analiz sonuç üretmedi. Adayın CV metnini kontrol edip tekrar deneyin.');
+            }
 
-            // ── Stage 2: Analyst — deep AI STAR analysis (otonom agent) ────────
-            const jobText = `${matchedPosition.title}\n${(matchedPosition.requirements || []).join(', ')}\n${matchedPosition.description || ''}`;
-            const result = await analyzeCandidateMatch(jobText, c);
-
-            // ── Stage 3: Recruiter — persist to Firestore ───────────────────────
-            const updatedAnalysis = {
-                ...(c.aiAnalysis || {}),
-                score: result.score,
-                summary: result.summary,
-                starAnalysis: result.starAnalysis,
-                reasons: result.reasons,
-                scoreData: result.scoreData,
-                lastAnalyzedAt: new Date().toISOString(),
-                analyzedForPosition: matchedPosition.title,
-            };
-
-            await updateCandidate(c.id, {
-                aiAnalysis: updatedAnalysis,
-                matchScore: result.score,
-                matchedPositionTitle: matchedPosition.title,
-                lastScannedAt: new Date().toISOString(),
-            });
-
+            await updateCandidate(c.id, result.updates);
             showSuccess('comment');
         } catch (err) {
             console.error('STAR Analysis error:', err);
-            setAnalysisError('Analiz sırasında bir hata oluştu. Tekrar deneyin.');
+            setAnalysisError(err.message || 'Analiz sırasında bir hata oluştu. Tekrar deneyin.');
         } finally {
             setAnalyzingIds(prev => {
                 const next = new Set(prev);

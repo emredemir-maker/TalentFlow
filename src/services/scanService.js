@@ -21,11 +21,18 @@ function sanitizeForFirestore(value) {
 
 /**
  * Adayı açık pozisyonlara karşı derinlemesine analiz eder.
- * @returns {Promise<{status: 'scanned'|'skipped_no_cv'|'no_result', updates?: object, aiCalls: number}>}
+ * @param {object} candidate
+ * @param {Array} openPositions
+ * @param {{allowUnrelatedFallback?: boolean}} [options] — uyumlu pozisyon
+ *   yokken en yakın pozisyona düşülsün mü (toplu tarama: evet, tekil
+ *   yeniden analiz: hayır)
+ * @returns {Promise<{status: 'scanned'|'skipped_no_cv'|'no_result'|'no_compatible_position', updates?: object, aiCalls: number}>}
  *   - skipped_no_cv: CV gövdesi yok — skor çökertmek yerine atlandı (yeniden ayrıştırma gerekli)
  *   - no_result: hiçbir pozisyon analizi >0 skor üretmedi (skor alanlarına dokunulmaz)
+ *   - no_compatible_position: adayın domain'ine uygun açık pozisyon yok
  */
-export async function deepScanCandidate(candidate, openPositions) {
+export async function deepScanCandidate(candidate, openPositions, options = {}) {
+    const { allowUnrelatedFallback = true } = options;
     // Kanıt kontrolü: boş girdiyle derin analiz tek haneli skor üretir
     const cvBody = `${candidate.cvData || ''}${candidate.cvText || ''}`.trim();
     const hasEvidence = cvBody.length >= 40 || (candidate.experiences?.length > 0);
@@ -50,6 +57,12 @@ export async function deepScanCandidate(candidate, openPositions) {
         positionsToAnalyze = [assignedPos, ...positionsToAnalyze];
     }
     if (positionsToAnalyze.length === 0) {
+        // Toplu taramada bir aday hiç sonuçsuz kalmasın diye en yakın
+        // pozisyona düşülür. Tekil "yeniden analiz" akışında bu istenmez:
+        // domain'ine uygun pozisyon yokken rastgele bir ilana karşı analiz,
+        // adayın profiline yanıltıcı bir skor yazar (İK adayının "Project
+        // Manager"a %55 alması vakası).
+        if (!allowUnrelatedFallback) return { status: 'no_compatible_position', aiCalls: 0 };
         positionsToAnalyze = [findBestPositionMatch(candidate, openPositions) || openPositions[0]].filter(Boolean);
     }
 

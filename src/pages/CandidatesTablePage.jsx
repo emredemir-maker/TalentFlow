@@ -389,34 +389,36 @@ export default function CandidatesTablePage() {
         }
     };
 
-    // Seçili adaylardan HENÜZ otonom taramadan geçmemiş olanları derinlemesine
-    // analiz eder (SystemScanner ile aynı kurallar — scanService). Zaten
-    // taranmışlara dokunmaz; CV metni olmayanlar atlanıp raporlanır.
+    // Seçili adayları derinlemesine analiz eder (SystemScanner ile aynı
+    // kurallar — scanService). CV metni olmayanlar atlanıp raporlanır.
+    //
+    // Zaten taranmış adaylar ESKİDEN sessizce dışarıda bırakılıyordu; bu,
+    // ilan gereksinimleri veya skorlama değiştiğinde havuzu yeniden
+    // değerlendirmeyi imkânsız kılıyordu. Artık seçim taranmış aday
+    // içeriyorsa onay metni bunu açıkça söyler ve hepsi yeniden taranır.
     const handleBulkScan = async () => {
         if (bulkApplying || scanProgress || selectedIds.size === 0) return;
         if (openPositions.length === 0) { setBulkResult({ message: 'Otonom tarama için açık pozisyon gerekli', failed: 1 }); return; }
         const rowById = new Map(coherentRows.map((c) => [c.id, c]));
         const rows = Array.from(selectedIds).map((id) => rowById.get(id)).filter(Boolean);
-        const unscanned = rows.filter((c) => !c.aiAnalysis?.starAnalysis);
-        if (unscanned.length === 0) {
-            setBulkResult({ message: `Seçili ${rows.length} adayın tümü zaten otonom taramadan geçmiş — yeniden tarama gerekmiyor`, failed: 0 });
-            setSelectedIds(new Set());
-            return;
-        }
+        const alreadyScanned = rows.filter((c) => c.aiAnalysis?.starAnalysis).length;
         const ok = window.confirm(
-            `${rows.length} seçili adaydan ${unscanned.length} tanesi henüz taranmamış.\n` +
-            `${unscanned.length} aday için otonom tarama başlatılsın mı? (aday başına 1-5 AI çağrısı yapılır)`
+            `${rows.length} aday için otonom tarama başlatılsın mı?` +
+            (alreadyScanned > 0
+                ? `\n\n${alreadyScanned} aday daha önce taranmış — mevcut analizleri YENİDEN üretilip güncellenecek.`
+                : '') +
+            `\n\nAday başına 1-5 AI çağrısı yapılır.`
         );
         if (!ok) return;
 
         setBulkResult(null);
-        setScanProgress({ done: 0, total: unscanned.length });
+        setScanProgress({ done: 0, total: rows.length });
         let scanned = 0, skippedNoCv = 0, noResult = 0, failed = 0;
         // 3'lü paralel havuz — SystemScanner ile aynı eşzamanlılık
         let nextIdx = 0;
-        await Promise.all(Array.from({ length: Math.min(3, unscanned.length) }, async () => {
-            while (nextIdx < unscanned.length) {
-                const candidate = unscanned[nextIdx];
+        await Promise.all(Array.from({ length: Math.min(3, rows.length) }, async () => {
+            while (nextIdx < rows.length) {
+                const candidate = rows[nextIdx];
                 nextIdx += 1;
                 try {
                     const result = await deepScanCandidate(candidate, openPositions);
