@@ -192,9 +192,24 @@ service cloud.firestore {
     }
 
     // ── Settings ─────────────────────────────────────────────────────────────
+    // api_keys ve integrations dokümanları SIR taşır (Gemini anahtarı, OAuth
+    // clientSecret) — client hiçbir rolde okuyamaz/yazamaz; sunucu Admin SDK
+    // ile /api/admin/* üzerinden yönetir.
+    // system ve branding sır içermez ve profil oluşmadan ÖNCE okunur
+    // (AuthContext kayıt akışı allowedDomains'i, sayfalar logoyu okur) —
+    // bu yüzden strict-auth yeterlidir.
+    // list DAİMA kapalı: koleksiyon sorgusu doküman bazlı istisnaları
+    // kanıtlayamayacağı için tüm listeler reddedilir; sayfalar tekil get yapar.
+    function isSecretSetting(settingId) {
+      return settingId == 'api_keys' || settingId == 'integrations';
+    }
     match /artifacts/talent-flow/public/data/settings/{settingId} {
-      allow read:  if isRecruiter();
-      allow write: if isSuperAdmin();
+      allow get:   if !isSecretSetting(settingId) &&
+                      ((settingId == 'system' || settingId == 'branding')
+                        ? isStrictAuthenticated()
+                        : isRecruiter());
+      allow list:  if false;
+      allow write: if !isSecretSetting(settingId) && isSuperAdmin();
     }
 
     // ── Info Requests (candidate respond link) ────────────────────────────────
@@ -206,31 +221,76 @@ service cloud.firestore {
       allow write: if isRecruiter();
     }
 
-    // ── Broad catch-all for any other talent-flow collections ─────────────────
-    // Overlapping matches are OR'd, so `users` must be carved out of the write
-    // grant here: user docs carry roles, and writes to them must only pass the
-    // dedicated users block above.
-    match /artifacts/talent-flow/public/data/{collectionName}/{docId} {
-      allow read:  if isStrictAuthenticated();
-      allow write: if collectionName != 'users' && isRecruiter();
+    // ── E-posta konuşmaları (Gmail thread takibi) ─────────────────────────────
+    // Aday yazışmalarının gövdesini taşır — yalnızca recruiter.
+    match /artifacts/talent-flow/public/data/emailThreads/{threadId} {
+      allow read, write: if isRecruiter();
     }
 
-    // Recursive catch-all for deeper talent-flow paths
-    match /artifacts/talent-flow/{allPaths=**} {
+    // ── Mesaj kuyruğu (planlı aday iletişimi) ─────────────────────────────────
+    // MessageQueueProvider uygulama genelinde bağlanır; department_user'ın
+    // dinleyicisi sessizce reddedilmesin diye okuma iç kullanıcıya açık,
+    // yazma recruiter'a özel.
+    match /artifacts/talent-flow/public/data/messageQueue/{messageId} {
       allow read:  if isStrictAuthenticated();
-      allow write: if isSuperAdmin();
+      allow write: if isRecruiter();
     }
+
+    // ── Canlı mülakat katılımcı davetleri ─────────────────────────────────────
+    // Bu koleksiyonun VARLIK NEDENİ department_user'ın kendi departmanı
+    // dışındaki mülakatlarını görebilmesi (InterviewManagementPage
+    // participantIds array-contains sorgusu) — okuma recruiter'a kısıtlanamaz.
+    match /artifacts/talent-flow/public/data/participantInvites/{inviteId} {
+      allow read:  if isStrictAuthenticated();
+      allow write: if isRecruiter();
+    }
+
+    // ── Toplu içe aktarma işleri ──────────────────────────────────────────────
+    // items alt koleksiyonu HAM CV METNİ taşır — okunması recruiter'a özel,
+    // yazma yalnızca sunucuda (Admin SDK, bulk worker).
+    match /artifacts/talent-flow/public/data/bulkImportJobs/{jobId} {
+      allow read:  if isRecruiter();
+      allow write: if false;
+
+      match /items/{itemId} {
+        allow read:  if isRecruiter();
+        allow write: if false;
+      }
+    }
+
+    // NOT: Önceden burada iki geniş catch-all kuralı vardı
+    // ({collectionName}/{docId} ve {allPaths=**}). Firestore çakışan
+    // kuralları OR'ladığı için bu kurallar yukarıdaki TÜM dar okuma
+    // kısıtlarını (settings sırları, kullanıcı tokenları, departman
+    // izolasyonu) etkisiz bırakıyordu. Kaldırıldılar; yeni koleksiyonlar
+    // buraya AÇIK kural eklemek zorundadır (varsayılan: en alttaki deny).
 
     // ── Live Interview Sessions ───────────────────────────────────────────────
     // • read:   open — sessionId (128-bit UUID) acts as capability token
-    // • create: recruiter initialises session; candidate may also create on
-    //           their first status write (setDoc merge:true on non-existing doc)
-    // • update: any authenticated user (recruiter or anon candidate)
+    // • create: yalnızca strict-auth (recruiter akışı); aday tarafı doküman
+    //           yoksa /api/init-interview-session fallback'ini kullanır
+    //           (LiveInterviewPage permission-denied dallarında mevcut)
+    // • update: recruiter serbest; anonim aday transkript/durum/WebRTC
+    //           sinyalleşme alanlarını yazabilir ama DEĞERLENDİRME ÇIKTISINA
+    //           ve soru akışı kontrolüne dokunamaz (aksi hâlde aday kendi
+    //           mülakat skorunu tarayıcıdan yeniden yazabiliyordu).
+    //           Aynı liste sunucuda da uygulanır — bkz.
+    //           functions/routes/interview.js PROTECTED_SESSION_FIELDS;
+    //           /api/init-interview-session kimlik istemediği için orada
+    //           süzülmezse bu kural atlatılabilirdi.
     // • delete: denied
     match /interviews/{sessionId} {
-      allow read:          if true;
-      allow create, update: if isAuthenticatedIncAnon();
-      allow delete:         if false;
+      allow read:   if true;
+      allow create: if isStrictAuthenticated();
+      allow update: if isRecruiter() ||
+                       (isAuthenticatedIncAnon() &&
+                        !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+                          'aiAnalysis', 'aggregateScore', 'recommendedOutcome',
+                          'interviewScore', 'aiOverallScore', 'aiSummary',
+                          'starScores', 'questions', 'currentQuestionIndex',
+                          'candidateResponse', 'candidateId'
+                        ]));
+      allow delete: if false;
     }
 
     // ── Default deny ──────────────────────────────────────────────────────────
