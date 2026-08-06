@@ -1340,12 +1340,24 @@ export default function PositionsPage() {
         });
     };
 
-    // Bu pozisyonla ilgili adaylar: analizi olanlar + pozisyona atananlar.
-    const candidatesForPosition = (position, previousTitle) => enrichedCandidates.filter(
-        (c) => hasAnalysisForPosition(c, position.title)
-            || (previousTitle && hasAnalysisForPosition(c, previousTitle))
-            || c.positionId === position.id
-    );
+    // Bu pozisyonla ilgili adaylar: analizi olanlar, pozisyona atananlar VE
+    // alanı pozisyonla uyumlu olanlar.
+    //
+    // Yalnızca "analizi olanlar" ile sınırlıyken, bu pozisyon için hiç
+    // taranmamış adaylar — yani tam da değerlendirilmek istenenler —
+    // listeye hiç girmiyordu. Eşik zaten kaç adayın taranacağını kontrol
+    // ediyor, havuzu dar tutmanın faydası yok.
+    const candidatesForPosition = (position, previousTitle) => {
+        const related = new Set(
+            filterCandidatesByDomain(position, enrichedCandidates).map((c) => c.id)
+        );
+        return enrichedCandidates.filter(
+            (c) => related.has(c.id)
+                || hasAnalysisForPosition(c, position.title)
+                || (previousTitle && hasAnalysisForPosition(c, previousTitle))
+                || c.positionId === position.id
+        );
+    };
 
     const runRescan = async (selectedCandidates) => {
         const { position, previousTitle } = rescanTarget || {};

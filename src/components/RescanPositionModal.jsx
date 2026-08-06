@@ -26,11 +26,14 @@ export default function RescanPositionModal({
     const [minScore, setMinScore] = useState('0');
 
     // Adayın bu pozisyondaki güncel skoru — eşik buna uygulanır.
+    // calculateMatchScore {score,...} objesi döndürür; ham geçilirse skor
+    // sessizce 0 olur (tabloda da aynı sarmalayıcı kullanılıyor).
     const scored = useMemo(() => {
         if (!position) return [];
+        const keywordScoreFn = (c, p) => calculateMatchScore(c, p).score;
         return (candidates || []).map((c) => ({
             candidate: c,
-            score: Math.round(scoreForPosition(c, position, calculateMatchScore)),
+            score: Math.round(scoreForPosition(c, position, keywordScoreFn)),
         }));
     }, [candidates, position]);
 
