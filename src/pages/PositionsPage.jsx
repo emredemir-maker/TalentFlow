@@ -22,6 +22,7 @@ import {
 import PotentialCandidatesTab from '../components/PotentialCandidatesTab';
 import { useCandidates } from '../context/CandidatesContext';
 import { extractPositionFromJD } from '../services/geminiService';
+import { parseRequirementsInput, formatRequirementsInput } from '../utils/positionRequirements';
 import { getAuthHeaders } from '../services/ai/config';
 import { calculateMatchScore, filterCandidatesByDomain } from '../services/matchService';
 
@@ -816,15 +817,17 @@ function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser,
                                 />
                             </Field>
                         </div>
-                        <Field label="Teknik Gereksinimler">
-                            <input
-                                type="text"
-                                placeholder="React, TypeScript, Node.js, SQL... (virgülle ayırın)"
+                        <Field label="Gereksinimler">
+                            <textarea
+                                placeholder={'Her satıra bir gereksinim yazın:\n3-5 yıl ürün yönetimi deneyimi, en az 1-2 yılı growth odaklı\nFunnel sahipliği: kayıt, aktivasyon, elde tutma\nA/B test ve deney kurma deneyimi'}
                                 value={formData.requirements}
                                 onChange={e => setFormData(p => ({ ...p, requirements: e.target.value }))}
-                                className={INPUT_CLS}
+                                className={INPUT_CLS + ' h-36 resize-y font-mono text-[12px] leading-relaxed'}
                             />
-                            <p className="text-[10px] text-slate-400 mt-1">Beceriler, teknolojiler veya sertifikalar</p>
+                            <p className="text-[10px] text-slate-400 mt-1">
+                                Satır başına bir madde — madde içindeki virgüller korunur. Yalnızca teknoloji adı değil,
+                                aranan yetkinliği yazın; otonom tarama bu maddelere göre puanlar.
+                            </p>
                         </Field>
                         <Field label="Pozisyon Açıklaması">
                             <textarea
@@ -956,12 +959,12 @@ function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser,
 // ─────────────────────────────────────────────────────────────
 // EDIT MODAL
 // ─────────────────────────────────────────────────────────────
-function PositionEditModal({ pos, candidates, departments, isDepartmentUser, userDepartments, onClose, onSubmit }) {
+function PositionEditModal({ pos, candidates, departments, isDepartmentUser, userDepartments, onClose, onSubmit, isExtracting, onExtract, jdText, setJdText }) {
     const [formData, setFormData] = useState({
         title: pos.title || '',
         department: pos.department || '',
         minExperience: pos.minExperience?.toString() || '0',
-        requirements: pos.requirements?.join(', ') || '',
+        requirements: formatRequirementsInput(pos.requirements),
         description: pos.description || '',
     });
     const candidateCount = pos.matchedCandidates?.length || 0;
@@ -1046,6 +1049,39 @@ function PositionEditModal({ pos, candidates, departments, isDepartmentUser, use
                     {/* Right: edit form */}
                     <form onSubmit={handleSubmit} className="p-6 flex flex-col">
                         <p className="text-[9px] font-black text-slate-400 tracking-widest uppercase mb-4">DEĞİŞTİRİLECEK ALANLAR</p>
+
+                        {/* Mevcut bir ilanı yeni bir metne göre güncellemek, alanları
+                            elle yeniden yazmayı gerektiriyordu — AI doldurma yalnızca
+                            pozisyon OLUŞTURMA ekranında vardı. */}
+                        <details className="mb-4 rounded-2xl border border-cyan-200 bg-cyan-50/50 overflow-hidden">
+                            <summary className="cursor-pointer select-none px-4 py-2.5 flex items-center gap-2 text-[11px] font-black text-cyan-700 uppercase tracking-widest">
+                                <Sparkles size={13} /> İlan metninden güncelle
+                            </summary>
+                            <div className="p-4 pt-0">
+                                <textarea
+                                    className="w-full min-h-[120px] bg-white border border-cyan-200 rounded-xl p-3 text-[12px] text-slate-600 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-100 resize-y"
+                                    placeholder="Güncel ilan / aranan profil metnini buraya yapıştırın... (en az 50 karakter)"
+                                    value={jdText}
+                                    onChange={(e) => setJdText(e.target.value)}
+                                />
+                                <div className="flex items-center justify-between mt-1 mb-2">
+                                    <p className="text-[10px] text-slate-400">{jdText.length} karakter</p>
+                                    {jdText.length >= 50 && <p className="text-[10px] text-emerald-500 font-bold">Hazır ✓</p>}
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => onExtract(formData, setFormData)}
+                                    disabled={isExtracting || jdText.length < 50}
+                                    className="w-full bg-cyan-500 hover:bg-cyan-600 text-white font-bold text-[11px] py-2.5 rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                    {isExtracting ? <><Loader2 size={13} className="animate-spin" />Analiz ediliyor...</> : <><Sparkles size={13} />Alanları Doldur</>}
+                                </button>
+                                <p className="text-[10px] text-slate-400 mt-2">
+                                    Alanlar dolduruluyor, kayıt otomatik değil — gözden geçirip
+                                    &quot;Değişiklikleri Kaydet&quot; demeniz gerekir.
+                                </p>
+                            </div>
+                        </details>
                         <div className="space-y-4 flex-1">
                             <Field label="Pozisyon Adı">
                                 <input type="text" value={formData.title} onChange={e => setFormData(p => ({ ...p, title: e.target.value }))} className={INPUT_CLS} />
@@ -1063,7 +1099,16 @@ function PositionEditModal({ pos, candidates, departments, isDepartmentUser, use
                                 <input type="number" min="0" value={formData.minExperience} onChange={e => setFormData(p => ({ ...p, minExperience: e.target.value }))} className={INPUT_CLS} />
                             </Field>
                             <Field label="Gereksinimler">
-                                <input type="text" value={formData.requirements} onChange={e => setFormData(p => ({ ...p, requirements: e.target.value }))} className={INPUT_CLS} />
+                                <textarea
+                                    value={formData.requirements}
+                                    onChange={e => setFormData(p => ({ ...p, requirements: e.target.value }))}
+                                    className={INPUT_CLS + ' h-40 resize-y font-mono text-[12px] leading-relaxed'}
+                                    placeholder={'Her satıra bir gereksinim yazın:\n3-5 yıl ürün yönetimi deneyimi, en az 1-2 yılı growth odaklı\nFunnel sahipliği: kayıt, aktivasyon, elde tutma\nA/B test ve deney kurma deneyimi'}
+                                />
+                                <p className="text-[10px] text-slate-400 mt-1">
+                                    Satır başına bir madde — madde içindeki virgüller korunur. Yalnızca teknoloji adı değil,
+                                    aranan yetkinliği yazın; otonom tarama bu maddelere göre puanlar.
+                                </p>
                             </Field>
                             <Field label="Açıklama">
                                 <textarea value={formData.description} onChange={e => setFormData(p => ({ ...p, description: e.target.value }))} className={INPUT_CLS + ' h-20 resize-none'} />
@@ -1164,7 +1209,7 @@ export default function PositionsPage() {
                 title: result.title || p.title,
                 department: isDepartmentUser ? (userDepartments?.[0] || '') : (result.department || p.department),
                 minExperience: result.minExperience?.toString() || p.minExperience,
-                requirements: result.requirements?.join(', ') || p.requirements,
+                requirements: formatRequirementsInput(result.requirements) || p.requirements,
                 description: result.description ? result.description.slice(0, 320) : p.description,
             }));
         } catch (err) {
@@ -1177,7 +1222,7 @@ export default function PositionsPage() {
 
     const handleCreate = async (formData) => {
         if (!formData.title || !formData.department) return;
-        const reqs = formData.requirements.split(',').map(r => r.trim()).filter(Boolean);
+        const reqs = parseRequirementsInput(formData.requirements);
         const positionObj = { ...formData, requirements: reqs };
         // Domain-filter first: only score candidates in the same job domain
         const domainCandidates = filterCandidatesByDomain(positionObj, candidates);
@@ -1209,7 +1254,7 @@ export default function PositionsPage() {
 
     const handleUpdate = async (formData) => {
         if (!editPos) return;
-        const reqs = formData.requirements.split(',').map(r => r.trim()).filter(Boolean);
+        const reqs = parseRequirementsInput(formData.requirements);
         await updatePosition(editPos.id, { title: formData.title, department: formData.department, minExperience: parseInt(formData.minExperience) || 0, requirements: reqs, description: formData.description || '' });
         alert('✅ Pozisyon güncellendi.');
         setEditPos(null);
@@ -1512,8 +1557,12 @@ export default function PositionsPage() {
                     departments={departments}
                     isDepartmentUser={isDepartmentUser}
                     userDepartments={userDepartments}
-                    onClose={() => setEditPos(null)}
+                    onClose={() => { setEditPos(null); setJdText(''); }}
                     onSubmit={handleUpdate}
+                    isExtracting={isExtracting}
+                    onExtract={handleExtract}
+                    jdText={jdText}
+                    setJdText={setJdText}
                 />
             )}
 

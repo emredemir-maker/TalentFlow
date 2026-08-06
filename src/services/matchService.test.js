@@ -17,11 +17,13 @@ vi.mock('./geminiService', () => ({
 
 const {
     areDomainsCompatible,
+    calculateMatchScore,
     detectCandidateDomain,
     detectJobDomain,
     detectPositionDomain,
     domainLabel,
     filterPositionsByDomain,
+    termMatches,
 } = await import('./matchService.js');
 
 describe('detectJobDomain', () => {
@@ -235,5 +237,115 @@ describe('filterPositionsByDomain', () => {
         const candidate = { position: 'Baker' }; // → general
         const out = filterPositionsByDomain(candidate, positions);
         expect(out).toHaveLength(positions.length);
+    });
+});
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Ürün/growth skorlaması — bir Growth PM ilanı, gereksinim metnindeki
+// "vibecoding" yüzünden Yazılım domainine düşüyordu ve ilanın ayırt edici
+// gereksinimleri (funnel, aktivasyon, A/B test, PLG, analitik araçlar)
+// skorlamaya hiç girmiyordu. Ölçüm: aranan profile birebir uyan aday 59,
+// alakasız bir backend geliştirici 40 alıyordu ve ikisi de derin taramaya
+// giriyordu.
+// ─────────────────────────────────────────────────────────────────────────────
+const GROWTH_PM = {
+    id: 'gpm',
+    title: 'Growth Product Manager',
+    department: 'Ürün',
+    minExperience: 3,
+    requirements: [
+        '3-5 yıl ürün yönetimi deneyimi, en az 1-2 yılı growth/funnel odaklı',
+        'Tercihen B2B SaaS',
+        'Funnel sahipliği: kayıt, aktivasyon, elde tutma, gelir',
+        'A/B test ve deney kurma deneyimi',
+        'Analitik araç hakimiyeti (GA4, Amplitude, Mixpanel, Metabase) ve temel SQL',
+        'AI ile çalışabiliyor olması; tercihen vibecoding ve AI ürünleştirme deneyimi',
+        'İyi seviye İngilizce',
+        'Artı: PLG/self-servis akış, fiyatlandırma-paketleme, CX-helpdesk-CRM ürün geçmişi',
+    ],
+    description: '',
+};
+
+const GROWTH_PM_CANDIDATE = {
+    position: 'Senior Product Manager',
+    experience: 5,
+    department: 'Ürün',
+    skills: ['Product Management', 'Growth', 'Funnel Optimization', 'A/B Testing',
+        'Amplitude', 'Mixpanel', 'GA4', 'SQL', 'PLG', 'B2B SaaS', 'Retention'],
+    about: 'B2B SaaS ürünlerinde growth ve funnel sahipliği, aktivasyon ve retention deneyleri.',
+    experiences: [{ title: 'Product Manager', company: 'SaaS Co', description: 'Funnel, aktivasyon, A/B test' }],
+};
+
+const BACKEND_CANDIDATE = {
+    position: 'Backend Developer',
+    experience: 5,
+    skills: ['Java', 'Spring', 'PostgreSQL', 'SQL', 'Docker', 'Kubernetes', 'Kafka', 'Microservices'],
+    about: 'Mikroservis mimarisi, distributed system, performance.',
+    experiences: [{ title: 'Backend Developer', company: 'Tech', description: 'Java, Spring, SQL' }],
+};
+
+describe('termMatches', () => {
+    it('does not match a term inside a longer word (vibecoding ≠ coding)', () => {
+        expect(termMatches('vibecoding ve ai ürünleştirme', 'coding')).toBe(false);
+    });
+
+    it('allows Turkish suffixes on a real occurrence', () => {
+        expect(termMatches('aktivasyonu artırdı', 'aktivasyon')).toBe(true);
+        expect(termMatches("funnel'ı optimize etti", 'funnel')).toBe(true);
+    });
+
+    it('is suffix-permissive by design, so prefix-colliding terms stay out of the vocabulary', () => {
+        // Türkçe ekleri yakalayabilmek için sondan sınır aranmaz — bunun bedeli
+        // 'deney' gibi terimlerin "deneyimi" içinde eşleşmesidir. Bu yüzden
+        // TECH_GROUPS'a 'deney' / 'gelir' / 'kayıt' gibi yaygın kelime önekleri
+        // EKLENMEZ; sözlük 'a/b test', 'revenue', 'signup' kullanır.
+        expect(termMatches('5 yıl deneyimi var', 'deney')).toBe(true);
+        // Sonuç olarak sıradan bir "deneyim" cümlesi ürün domainine düşmez:
+        expect(detectJobDomain('5 yıl deneyimi olan bir aday')).toBe('general');
+    });
+
+    it('requires a whole word for short terms (go ≠ good)', () => {
+        expect(termMatches('good communication', 'go')).toBe(false);
+        expect(termMatches('go ve rust deneyimi', 'go')).toBe(true);
+    });
+
+    it('falls back to substring for multi-word or punctuated terms', () => {
+        expect(termMatches('a/b test kurgusu', 'a/b test')).toBe(true);
+        expect(termMatches('node.js ile', 'node.js')).toBe(true);
+    });
+});
+
+describe('Growth PM ilanı — domain ve skor ayrımı', () => {
+    it('classifies a Growth Product Manager position as product, not engineering', () => {
+        expect(detectPositionDomain(GROWTH_PM)).toBe('product');
+    });
+
+    it('no longer lets "vibecoding" pull the position into engineering', () => {
+        const reqTextOnly = { title: '', department: '', requirements: GROWTH_PM.requirements };
+        expect(detectPositionDomain(reqTextOnly)).not.toBe('engineering');
+    });
+
+    it('feeds the differentiating requirements into scoring, not just SQL/AI', () => {
+        const { reasons } = calculateMatchScore(GROWTH_PM_CANDIDATE, GROWTH_PM);
+        // Eskiden yalnızca 4 token (sql/ai/analitik/yönetim) skorlanıyordu ve
+        // eşleşme sayısı 3'ü geçemiyordu.
+        const hit = reasons.find((r) => r.includes('teknik yetkinlik'));
+        expect(hit).toBeTruthy();
+        expect(parseInt(hit, 10)).toBeGreaterThan(3);
+    });
+
+    it('separates the matching candidate from an unrelated backend developer', () => {
+        const good = calculateMatchScore(GROWTH_PM_CANDIDATE, GROWTH_PM).score;
+        const bad = calculateMatchScore(BACKEND_CANDIDATE, GROWTH_PM).score;
+        expect(good).toBeGreaterThan(60);
+        expect(bad).toBeLessThan(20);
+        // Ölçülen eski davranış: 59 vs 40 (yalnızca 19 puan fark)
+        expect(good - bad).toBeGreaterThan(40);
+    });
+
+    it('keeps the unrelated backend developer out of the deep scan entirely', () => {
+        expect(filterPositionsByDomain(BACKEND_CANDIDATE, [GROWTH_PM])).toHaveLength(0);
+        expect(filterPositionsByDomain(GROWTH_PM_CANDIDATE, [GROWTH_PM])).toHaveLength(1);
     });
 });

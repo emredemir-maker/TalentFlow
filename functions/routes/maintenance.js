@@ -249,7 +249,7 @@ router.get('/api/maintenance/health-check', requireAuth(ROLES), async (req, res)
             .select('name', 'email', 'phone', 'source', 'bulkJobId', 'createdAt',
                 'matchedPositionTitle', 'positionId', 'position', 'skills',
                 'initialAiScore', 'matchScore', 'aiScore',
-                'experiences', 'summary', 'education', 'cvText', 'enrichedAt')
+                'experiences', 'summary', 'education', 'cvText', 'enrichedAt', 'location')
             .get();
         const candidates = candSnap.docs.map((d) => {
             const c = d.data();
@@ -369,14 +369,14 @@ router.post('/api/maintenance/enrich-profiles', requireAuth(ROLES), async (req, 
         const batchSize = Math.min(20, Math.max(1, parseInt(req.body?.batchSize, 10) || 10));
 
         const scoreSnap = await db.collection(CANDIDATES_COLL)
-            .select('experiences', 'cvText', 'enrichedAt')
+            .select('experiences', 'cvText', 'enrichedAt', 'location')
             .get();
         const pendingRefs = scoreSnap.docs
             .filter((d) => needsEnrichment(d.data()))
             .map((d) => d.ref);
         const batchRefs = pendingRefs.slice(0, batchSize);
         const batchDocs = batchRefs.length > 0
-            ? await db.getAll(...batchRefs, { fieldMask: ['cvText'] })
+            ? await db.getAll(...batchRefs, { fieldMask: ['cvText', 'location'] })
             : [];
 
         const startedAt = Date.now();
@@ -391,12 +391,18 @@ router.post('/api/maintenance/enrich-profiles', requireAuth(ROLES), async (req, 
                     const docSnap = batchDocs[idx];
                     idx += 1;
                     try {
-                        const experiences = await extractExperiences(docSnap.data()?.cvText || '');
-                        if (experiences === null) { failed += 1; continue; }
-                        await docSnap.ref.update({
-                            experiences,
+                        const enriched = await extractExperiences(docSnap.data()?.cvText || '');
+                        if (enriched === null) { failed += 1; continue; }
+                        const patch = {
+                            experiences: enriched.experiences,
                             enrichedAt: admin.firestore.FieldValue.serverTimestamp(),
-                        });
+                        };
+                        // Konum yalnızca boşsa yazılır — elle düzeltilmiş bir
+                        // değeri AI çıktısı ezmesin.
+                        if (enriched.location && !String(docSnap.data()?.location || '').trim()) {
+                            patch.location = enriched.location;
+                        }
+                        await docSnap.ref.update(patch);
                         updated += 1;
                     } catch (err) {
                         failed += 1;

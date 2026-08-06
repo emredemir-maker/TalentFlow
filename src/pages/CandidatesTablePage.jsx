@@ -24,7 +24,7 @@ import { deepScanCandidate } from '../services/scanService';
 import { STAGES, getStage } from '../utils/pipelineStages';
 import {
     DEFAULT_FILTERS, applyTableFilters, withCoherentScores, sortRows, buildExportRows,
-    resolveStageKey, getAppliedDate, isDeepScanned, cleanRoleText,
+    resolveStageKey, getAppliedDate, isDeepScanned, cleanRoleText, isIstanbulLocation,
 } from '../utils/candidateTable';
 
 const PAGE_SIZE = 50;
@@ -546,6 +546,12 @@ export default function CandidatesTablePage() {
                         <option value="scanned">Taranmış</option>
                         <option value="unscanned">Taranmamış</option>
                     </select>
+                    <select value={filters.location} onChange={(e) => setFilter('location', e.target.value)} className={SELECT_CLS} title="CV'den okunan konum bilgisi">
+                        <option value="all">Konum: Tümü</option>
+                        <option value="istanbul">İstanbul içi</option>
+                        <option value="outside">İstanbul dışı</option>
+                        <option value="unknown">Konum bilinmiyor</option>
+                    </select>
                     <input
                         type="number" min="0" max="100"
                         placeholder="Min skor"
@@ -657,6 +663,7 @@ export default function CandidatesTablePage() {
                                     <SortableHeader label="Pozisyon" sortKey="position" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                                     <SortableHeader label="CV'ye Göre" sortKey="cvRole" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                                     <SortableHeader label="Departman" sortKey="department" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                                    <SortableHeader label="Konum" sortKey="location" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                                     <SortableHeader label="Aşama" sortKey="stage" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                                     <SortableHeader label="Kaynak" sortKey="source" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                                     <SortableHeader label="Tarama" sortKey="scanStatus" activeKey={sortKey} dir={sortDir} onSort={handleSort} align="center" />
@@ -673,14 +680,14 @@ export default function CandidatesTablePage() {
                             <tbody>
                                 {loading && (
                                     <tr>
-                                        <td colSpan={selectedPosition ? 14 : 13} className="px-4 py-12 text-center text-slate-400 text-[12px]">
+                                        <td colSpan={selectedPosition ? 15 : 14} className="px-4 py-12 text-center text-slate-400 text-[12px]">
                                             Adaylar yükleniyor…
                                         </td>
                                     </tr>
                                 )}
                                 {!loading && pageRows.length === 0 && (
                                     <tr>
-                                        <td colSpan={selectedPosition ? 14 : 13} className="px-4 py-12 text-center">
+                                        <td colSpan={selectedPosition ? 15 : 14} className="px-4 py-12 text-center">
                                             <p className="text-slate-400 text-[12px] font-semibold">
                                                 {hasActiveFilters ? 'Filtrelere uyan aday bulunamadı.' : 'Henüz aday yok.'}
                                             </p>
@@ -721,6 +728,13 @@ export default function CandidatesTablePage() {
                                         </td>
                                         <td className="px-3 py-2.5 text-slate-600">
                                             <p className="truncate max-w-[120px]" title={c.department || ''}>{c.department || '—'}</p>
+                                        </td>
+                                        {/* Konum: CV'den okunur. İstanbul içi/dışı ayrımı üstteki
+                                            filtreyle yapılır; burada ham metin gösterilir. */}
+                                        <td className="px-3 py-2.5 text-slate-600">
+                                            {c.location
+                                                ? <p className={`truncate max-w-[130px] ${isIstanbulLocation(c.location) ? '' : 'text-amber-700'}`} title={c.location}>{c.location}</p>
+                                                : <span className="text-slate-300">—</span>}
                                         </td>
                                         <td className="px-3 py-2.5"><StageChip status={c.status} /></td>
                                         <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap">{c.source || '—'}</td>
