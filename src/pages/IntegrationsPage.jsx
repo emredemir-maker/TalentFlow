@@ -8,11 +8,13 @@ import {
     Eye, EyeOff, Save, Trash2, Copy, Shield,
     Users, Loader2, ExternalLink, Zap, Mail, Calendar, Video, Globe
 } from 'lucide-react';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 
-const INTEGRATIONS_PATH = 'artifacts/talent-flow/public/data/settings/integrations';
+// settings/integrations OAuth clientSecret'larını taşır ve firestore.rules
+// bu dokümanı istemciye tamamen kapatır — tüm okuma/yazma super_admin
+// korumalı /api/admin/integrations üzerinden yapılır. Sır hiçbir zaman
+// tarayıcıya inmez; "kayıtlı mı" bilgisi (clientSecretSet) yeterlidir.
+const API_PATH = '/api/admin/integrations';
 
 // ─── ICONS ────────────────────────────────────────────────────────────────────
 function GoogleIcon({ size = 22 }) {
@@ -71,7 +73,7 @@ function StatusBadge({ status }) {
 }
 
 // ─── CONFIG FIELD ─────────────────────────────────────────────────────────────
-function ConfigField({ label, hint, value, onChange, type = 'text', mono = false, readOnly = false, copyable = false }) {
+function ConfigField({ label, hint, value, onChange, type = 'text', mono = false, readOnly = false, copyable = false, placeholder }) {
     const [visible, setVisible] = useState(false);
     const [copied, setCopied] = useState(false);
     const isSecret = type === 'password';
@@ -97,7 +99,7 @@ function ConfigField({ label, hint, value, onChange, type = 'text', mono = false
                         ${mono ? 'font-mono' : ''}
                         ${readOnly ? 'cursor-default text-slate-500 select-all' : 'focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 text-slate-700'}
                         ${(isSecret || copyable) ? 'pr-16' : 'pr-3.5'}`}
-                    placeholder={readOnly ? '' : `${label} girin...`}
+                    placeholder={readOnly ? '' : (placeholder || `${label} girin...`)}
                 />
                 <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
                     {isSecret && (
@@ -254,72 +256,68 @@ export default function IntegrationsPage() {
     const googleRedirectUri = `${window.location.origin}/auth/google/callback`;
     const msRedirectUri = `${window.location.origin}/auth/microsoft/callback`;
 
-    // ── Load from Firestore ─────────────────────────────────────────────────
+    // ── Load via backend ────────────────────────────────────────────────────
+    const authFetch = useCallback(async (url, init = {}) => {
+        const idToken = await user.getIdToken();
+        const res = await fetch(url, {
+            ...init,
+            headers: { 'Content-Type': 'application/json', ...(init.headers || {}), Authorization: `Bearer ${idToken}` },
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body.error || `Sunucu hatası (${res.status})`);
+        return body;
+    }, [user]);
+
     const loadConfigs = useCallback(async () => {
         try {
             setLoading(true);
-            const snap = await getDoc(doc(db, INTEGRATIONS_PATH));
-            if (snap.exists()) {
-                const data = snap.data();
-                setConfigs(data);
-                if (data.google) {
-                    setGoog({
-                        clientId: data.google.clientId || '',
-                        clientSecret: data.google.clientSecret || '',
-                        enabled: data.google.enabled !== false,
-                    });
-                }
-                if (data.microsoft365) {
-                    setMs({
-                        clientId: data.microsoft365.clientId || '',
-                        tenantId: data.microsoft365.tenantId || '',
-                        clientSecret: data.microsoft365.clientSecret || '',
-                        enabled: data.microsoft365.enabled !== false,
-                    });
-                }
+            const data = await authFetch(API_PATH);
+            setConfigs(data || {});
+            if (data?.google) {
+                setGoog({ clientId: data.google.clientId || '', clientSecret: '', enabled: data.google.enabled !== false });
+            }
+            if (data?.microsoft365) {
+                setMs({
+                    clientId: data.microsoft365.clientId || '',
+                    tenantId: data.microsoft365.tenantId || '',
+                    clientSecret: '',
+                    enabled: data.microsoft365.enabled !== false,
+                });
             }
         } catch (err) {
             console.error('[IntegrationsPage] Load error:', err);
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [authFetch]);
 
     useEffect(() => { loadConfigs(); }, [loadConfigs]);
 
-    // ── Helpers ──────────────────────────────────────────────────────────────
-    const notifyServer = async (provider, config) => {
-        try {
-            const idToken = await user.getIdToken();
-            await fetch('/api/admin/integrations', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
-                body: JSON.stringify({ provider, config })
-            });
-        } catch { /* non-fatal */ }
-    };
-
     // ── Save Google ───────────────────────────────────────────────────────────
     const saveGoogle = async () => {
-        if (!goog.clientId || !goog.clientSecret) {
+        if (!goog.clientId || (!goog.clientSecret && !configs.google?.clientSecretSet)) {
             alert('Client ID ve Client Secret zorunludur.');
             return;
         }
         try {
             setGoogSaving(true);
-            const payload = {
-                google: {
-                    clientId: goog.clientId.trim(),
-                    clientSecret: goog.clientSecret.trim(),
-                    redirectUri: googleRedirectUri,
-                    enabled: goog.enabled,
-                    configuredAt: new Date().toISOString(),
-                    configuredBy: userProfile?.displayName || user?.email || 'admin',
-                }
-            };
-            await setDoc(doc(db, INTEGRATIONS_PATH), payload, { merge: true });
-            await notifyServer('google', payload.google);
-            setConfigs(prev => ({ ...prev, ...payload }));
+            // clientSecret boş bırakılırsa sunucu kayıtlı sırrı korur.
+            const { config } = await authFetch(API_PATH, {
+                method: 'POST',
+                body: JSON.stringify({
+                    provider: 'google',
+                    config: {
+                        clientId: goog.clientId.trim(),
+                        clientSecret: goog.clientSecret.trim(),
+                        redirectUri: googleRedirectUri,
+                        enabled: goog.enabled,
+                        configuredAt: new Date().toISOString(),
+                        configuredBy: userProfile?.displayName || user?.email || 'admin',
+                    },
+                }),
+            });
+            setConfigs(prev => ({ ...prev, google: config }));
+            setGoog(p => ({ ...p, clientSecret: '' }));
             setGoogSaved(true);
             setTimeout(() => setGoogSaved(false), 3000);
         } catch (err) {
@@ -331,33 +329,40 @@ export default function IntegrationsPage() {
 
     const removeGoogle = async () => {
         if (!window.confirm('Google Workspace yapılandırmasını silmek istediğinizden emin misiniz?')) return;
-        await setDoc(doc(db, INTEGRATIONS_PATH), { google: null }, { merge: true });
-        setGoog({ clientId: '', clientSecret: '', enabled: true });
-        setConfigs(prev => { const n = { ...prev }; delete n.google; return n; });
+        try {
+            await authFetch(`${API_PATH}/google`, { method: 'DELETE' });
+            setGoog({ clientId: '', clientSecret: '', enabled: true });
+            setConfigs(prev => ({ ...prev, google: null }));
+        } catch (err) {
+            alert('Silme hatası: ' + err.message);
+        }
     };
 
     // ── Save Microsoft ────────────────────────────────────────────────────────
     const saveMicrosoft = async () => {
-        if (!ms.clientId || !ms.tenantId || !ms.clientSecret) {
+        if (!ms.clientId || !ms.tenantId || (!ms.clientSecret && !configs.microsoft365?.clientSecretSet)) {
             alert('Client ID, Tenant ID ve Client Secret zorunludur.');
             return;
         }
         try {
             setMsSaving(true);
-            const payload = {
-                microsoft365: {
-                    clientId: ms.clientId.trim(),
-                    tenantId: ms.tenantId.trim(),
-                    clientSecret: ms.clientSecret.trim(),
-                    redirectUri: msRedirectUri,
-                    enabled: ms.enabled,
-                    configuredAt: new Date().toISOString(),
-                    configuredBy: userProfile?.displayName || user?.email || 'admin',
-                }
-            };
-            await setDoc(doc(db, INTEGRATIONS_PATH), payload, { merge: true });
-            await notifyServer('microsoft365', payload.microsoft365);
-            setConfigs(prev => ({ ...prev, ...payload }));
+            const { config } = await authFetch(API_PATH, {
+                method: 'POST',
+                body: JSON.stringify({
+                    provider: 'microsoft365',
+                    config: {
+                        clientId: ms.clientId.trim(),
+                        tenantId: ms.tenantId.trim(),
+                        clientSecret: ms.clientSecret.trim(),
+                        redirectUri: msRedirectUri,
+                        enabled: ms.enabled,
+                        configuredAt: new Date().toISOString(),
+                        configuredBy: userProfile?.displayName || user?.email || 'admin',
+                    },
+                }),
+            });
+            setConfigs(prev => ({ ...prev, microsoft365: config }));
+            setMs(p => ({ ...p, clientSecret: '' }));
             setMsSaved(true);
             setTimeout(() => setMsSaved(false), 3000);
         } catch (err) {
@@ -369,17 +374,21 @@ export default function IntegrationsPage() {
 
     const removeMicrosoft = async () => {
         if (!window.confirm('Microsoft 365 yapılandırmasını silmek istediğinizden emin misiniz?')) return;
-        await setDoc(doc(db, INTEGRATIONS_PATH), { microsoft365: null }, { merge: true });
-        setMs({ clientId: '', tenantId: '', clientSecret: '', enabled: true });
-        setConfigs(prev => { const n = { ...prev }; delete n.microsoft365; return n; });
+        try {
+            await authFetch(`${API_PATH}/microsoft365`, { method: 'DELETE' });
+            setMs({ clientId: '', tenantId: '', clientSecret: '', enabled: true });
+            setConfigs(prev => ({ ...prev, microsoft365: null }));
+        } catch (err) {
+            alert('Silme hatası: ' + err.message);
+        }
     };
 
     const googStatus = configs.google?.clientId
-        ? (configs.google?.clientSecret ? 'configured' : 'partial')
+        ? (configs.google?.clientSecretSet ? 'configured' : 'partial')
         : 'unconfigured';
 
     const msStatus = configs.microsoft365?.clientId
-        ? (configs.microsoft365?.tenantId && configs.microsoft365?.clientSecret ? 'configured' : 'partial')
+        ? (configs.microsoft365?.tenantId && configs.microsoft365?.clientSecretSet ? 'configured' : 'partial')
         : 'unconfigured';
 
     if (loading) {
@@ -502,6 +511,10 @@ export default function IntegrationsPage() {
                                             />
                                             <ConfigField
                                                 label="Client Secret"
+                                                hint={configs.google?.clientSecretSet
+                                                    ? 'Kayıtlı sır güvenlik gereği görüntülenemez — boş bırakırsanız korunur.'
+                                                    : undefined}
+                                                placeholder={configs.google?.clientSecretSet ? '•••••••• (kayıtlı)' : undefined}
                                                 value={goog.clientSecret}
                                                 onChange={v => setGoog(p => ({ ...p, clientSecret: v }))}
                                                 type="password"
@@ -588,7 +601,10 @@ export default function IntegrationsPage() {
                                         />
                                         <ConfigField
                                             label="Client Secret"
-                                            hint="Azure AD → Uygulamanız → Sertifikalar ve Gizlilikler → Yeni istemci gizli anahtarı"
+                                            hint={configs.microsoft365?.clientSecretSet
+                                                ? 'Kayıtlı sır güvenlik gereği görüntülenemez — boş bırakırsanız korunur.'
+                                                : 'Azure AD → Uygulamanız → Sertifikalar ve Gizlilikler → Yeni istemci gizli anahtarı'}
+                                            placeholder={configs.microsoft365?.clientSecretSet ? '•••••••• (kayıtlı)' : undefined}
                                             value={ms.clientSecret}
                                             onChange={v => setMs(p => ({ ...p, clientSecret: v }))}
                                             type="password"

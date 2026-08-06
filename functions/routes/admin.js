@@ -48,25 +48,30 @@ router.delete('/api/admin/auth-user/:uid', requireAuth(['super_admin']), async (
 // kapatır (isSecretSetting) — kullanıcı tokenıyla REST erişimi artık mümkün
 // değil ve requireAuth zaten req.firebaseToken set etmiyordu (eski kod bu
 // yüzden her zaman 500 dönüyordu).
+const PROVIDERS = ['google', 'microsoft365'];
+
+// clientSecret ASLA istemciye dönmez — yalnızca "ayarlı mı" bilgisi verilir.
+function maskProvider(cfg) {
+    if (!cfg) return null;
+    return {
+        clientId: cfg.clientId || '',
+        tenantId: cfg.tenantId || '',
+        clientSecretSet: !!cfg.clientSecret,
+        redirectUri: cfg.redirectUri || '',
+        enabled: cfg.enabled !== false,
+        configuredAt: cfg.configuredAt || null,
+        configuredBy: cfg.configuredBy || null,
+    };
+}
+
 router.get('/api/admin/integrations', requireAuth(['super_admin']), async (req, res) => {
     try {
         const snap = await db.doc(INTEGRATIONS_DOC).get();
-        if (!snap.exists) return res.json({ microsoft365: null });
-        const stored = snap.data() || {};
-        const data = {};
-        if (stored.microsoft365) {
-            const ms = stored.microsoft365;
-            data.microsoft365 = {
-                clientId: ms.clientId || '',
-                tenantId: ms.tenantId || '',
-                clientSecretSet: !!ms.clientSecret,
-                redirectUri: ms.redirectUri || '',
-                enabled: ms.enabled !== false,
-                configuredAt: ms.configuredAt || null,
-                configuredBy: ms.configuredBy || null,
-            };
-        }
-        res.json(data);
+        const stored = snap.exists ? snap.data() || {} : {};
+        res.json({
+            google: maskProvider(stored.google),
+            microsoft365: maskProvider(stored.microsoft365),
+        });
     } catch (err) {
         log.error({ err }, '[admin/integrations GET]');
         res.status(500).json({ error: 'Entegrasyon ayarları okunamadı.' });
@@ -77,18 +82,43 @@ router.post('/api/admin/integrations', requireAuth(['super_admin']), async (req,
     try {
         const { provider, config } = req.body;
         if (!provider || !config) return res.status(400).json({ error: 'provider and config required' });
-        if (provider !== 'google' && provider !== 'microsoft365') {
-            return res.status(400).json({ error: 'Geçersiz provider.' });
+        if (!PROVIDERS.includes(provider)) return res.status(400).json({ error: 'Geçersiz provider.' });
+
+        // Sır istemciye hiç inmediği için, kullanıcı yeni bir değer girmediğinde
+        // istek boş clientSecret ile gelir — o durumda kayıtlı sır korunur.
+        const next = { ...config };
+        if (!next.clientSecret) {
+            const snap = await db.doc(INTEGRATIONS_DOC).get();
+            const existing = snap.exists ? snap.data()?.[provider] : null;
+            if (!existing?.clientSecret) {
+                return res.status(400).json({ error: 'Client Secret gereklidir.' });
+            }
+            next.clientSecret = existing.clientSecret;
         }
+
         // Önce kalıcı yazım, sonra bellek içi cache — persist başarısızsa
         // cache eski (doğru) değerlerde kalır.
-        await db.doc(INTEGRATIONS_DOC).set({ [provider]: config }, { merge: true });
-        integrationConfigs[provider === 'google' ? 'google' : 'microsoft365'] = config;
+        await db.doc(INTEGRATIONS_DOC).set({ [provider]: next }, { merge: true });
+        integrationConfigs[provider] = next;
         log.info(`[integrations] ${provider} config updated by ${req.user.uid}`);
-        res.json({ success: true });
+        res.json({ success: true, config: maskProvider(next) });
     } catch (err) {
         log.error({ err }, '[admin/integrations POST]');
         res.status(500).json({ error: 'Entegrasyon ayarları kaydedilemedi.' });
+    }
+});
+
+router.delete('/api/admin/integrations/:provider', requireAuth(['super_admin']), async (req, res) => {
+    try {
+        const { provider } = req.params;
+        if (!PROVIDERS.includes(provider)) return res.status(400).json({ error: 'Geçersiz provider.' });
+        await db.doc(INTEGRATIONS_DOC).set({ [provider]: admin.firestore.FieldValue.delete() }, { merge: true });
+        integrationConfigs[provider] = null;
+        log.info(`[integrations] ${provider} config removed by ${req.user.uid}`);
+        res.json({ success: true });
+    } catch (err) {
+        log.error({ err }, '[admin/integrations DELETE]');
+        res.status(500).json({ error: 'Entegrasyon ayarı silinemedi.' });
     }
 });
 
