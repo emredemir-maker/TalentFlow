@@ -7,6 +7,7 @@ import { db, auth } from '../config/firebase';
 import { extractTextFromFile } from '../services/cvParser';
 import { getAuthHeaders } from '../services/ai/config';
 import { parseCandidateFromText, analyzeCandidateMatch } from '../services/geminiService';
+import { buildJobDescription, requirementsOf } from '../utils/positionRequirements';
 import { calculateMatchScore } from '../services/matchService';
 import { detectSource } from '../services/applicationService';
 import {
@@ -286,12 +287,14 @@ export default function ApplyPage() {
             let starAiAnalysis = null;
             if (parsedCandidate && position) {
                 try {
-                    const jobText = `${position.title}\n${(position.requirements || []).join(', ')}\n${position.description || ''}`;
+                    const jobText = buildJobDescription(position);
                     const timeoutPromise = new Promise((_, reject) =>
                         setTimeout(() => reject(new Error('STAR analysis timed out after 30s')), 30000)
                     );
                     const aiResult = await Promise.race([
-                        analyzeCandidateMatch(jobText, parsedCandidate),
+                        analyzeCandidateMatch(jobText, parsedCandidate, 'gemini-2.5-flash', {
+                            requirements: requirementsOf(position),
+                        }),
                         timeoutPromise,
                     ]);
                     starAiAnalysis = {

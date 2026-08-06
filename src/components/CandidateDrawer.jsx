@@ -11,6 +11,7 @@ import {
 import MatchScoreRing from './MatchScoreRing';
 import AIAnalysisPanel from './AIAnalysisPanel';
 import { analyzeCandidateMatch } from '../services/geminiService';
+import { buildJobDescription, requirementsOf } from '../utils/positionRequirements';
 import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
 import { calculateMatchScore, filterPositionsByDomain, detectJobDomain, domainLabel } from '../services/matchService';
@@ -178,9 +179,11 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
 
             // Analyze all open positions in parallel
             await Promise.all(openPositions.map(async (pos) => {
-                const descToUse = `${pos.title}\n${(pos.requirements || []).join(', ')}\n${pos.description || ''}`;
+                const descToUse = buildJobDescription(pos);
                 try {
-                    const result = await analyzeCandidateMatch(descToUse, candidate, 'gemini-2.5-flash');
+                    const result = await analyzeCandidateMatch(descToUse, candidate, 'gemini-2.5-flash', {
+                        requirements: requirementsOf(pos),
+                    });
                     updatedAnalyses[pos.title] = result;
 
                     if (result.score > highestScore) {

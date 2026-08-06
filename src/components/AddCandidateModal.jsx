@@ -8,6 +8,7 @@ import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
 import { calculateMatchScore, filterPositionsByDomain, detectJobDomain } from '../services/matchService';
 import { analyzeCandidateMatch, parseCandidateFromText } from '../services/geminiService';
+import { buildJobDescription, requirementsOf } from '../utils/positionRequirements';
 import { extractTextFromFile } from '../services/cvParser';
 import { getAuthHeaders } from '../services/ai/config';
 import { storage } from '../config/firebase';
@@ -202,8 +203,10 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                 const topCandidate = ranked[0];
                 if (topCandidate && topCandidate.static.score > 0) {
                     try {
-                        const jobText = `${topCandidate.pos.title}\n${topCandidate.pos.requirements?.join(', ')}`;
-                        const aiQuick = await analyzeCandidateMatch(jobText, res.candidate);
+                        const jobText = buildJobDescription(topCandidate.pos);
+                        const aiQuick = await analyzeCandidateMatch(jobText, res.candidate, 'gemini-2.5-flash', {
+                            requirements: requirementsOf(topCandidate.pos),
+                        });
                         processedResults.push({
                             ...res,
                             match: { ...topCandidate.pos, score: aiQuick.score, aiInsight: aiQuick.summary },

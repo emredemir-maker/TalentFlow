@@ -8,6 +8,7 @@ import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
 import { findBestPositionMatch, filterPositionsByDomain, calculateMatchScore } from '../services/matchService';
 import { analyzeCandidateMatch } from '../services/geminiService';
+import { buildJobDescription, requirementsOf } from '../utils/positionRequirements';
 import { useNotifications } from '../context/NotificationContext';
 
 /**
@@ -299,9 +300,18 @@ export default function SystemScanner() {
 
                         for (const pos of positionsToAnalyze) {
                             if (!pos) continue;
-                            const jobDesc = `${pos.title}\n${(pos.requirements || []).join(', ')}\n${pos.description || ''}`;
+                            // İlan metni gereksinimleri NUMARALI ve
+                            // [ZORUNLU]/[TERCİHEN] etiketli verir; requirements
+                            // ayrıca geçilir ki kapsama skoru ağırlıklı
+                            // hesaplansın. Bu satırlar eskiden düz birleştirme
+                            // yapıyordu: otonom tarama zorunlu/tercihen ayrımını
+                            // NE skorda NE de anlatımda kullanabiliyordu —
+                            // scanService güncellenirken burası atlanmıştı.
+                            const jobDesc = buildJobDescription(pos);
                             try {
-                                const result = await analyzeCandidateMatch(jobDesc, candidate, 'gemini-2.5-flash');
+                                const result = await analyzeCandidateMatch(jobDesc, candidate, 'gemini-2.5-flash', {
+                                    requirements: requirementsOf(pos),
+                                });
                                 // Sanitize undefined → null at the write boundary; the AI
                                 // sometimes omits fields and Firestore rejects undefined.
                                 updatedAnalyses[pos.title] = sanitizeForFirestore(result);
