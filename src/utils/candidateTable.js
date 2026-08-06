@@ -100,12 +100,22 @@ export function locationBucket(candidate) {
  * pozisyon başlığıyla anahtarlı) ile ücretsiz anahtar-kelime skorunun büyüğü.
  * keywordScoreFn dışarıdan verilir (matchService.calculateMatchScore) — bu
  * modül UI/servis bağımlılığı almadan test edilebilir kalır.
+ *
+ * keywordScoreFn HEM sayı HEM de {score} objesi döndürebilir: calculateMatchScore
+ * obje döndürür ve çağıranların `.score` almayı unutması sessizce her adaya 0
+ * yazıyordu (Number(obje) → NaN → 0). Bu, "min skor 56 üstünde 0 aday" gibi
+ * gerçek bir hataya yol açtı; sınır artık burada toleranslı.
  */
+function numericScore(value) {
+    const n = typeof value === 'object' && value !== null ? Number(value.score) : Number(value);
+    return Number.isFinite(n) ? n : 0;
+}
+
 export function scoreForPosition(candidate, position, keywordScoreFn) {
     if (!position?.title) return 0;
     const saved = Number(candidate?.positionAnalyses?.[position.title]?.score ?? 0);
-    const keyword = keywordScoreFn ? Number(keywordScoreFn(candidate, position) || 0) : 0;
-    return Math.max(saved, keyword);
+    const keyword = keywordScoreFn ? numericScore(keywordScoreFn(candidate, position)) : 0;
+    return Math.max(Number.isFinite(saved) ? saved : 0, keyword);
 }
 
 /**

@@ -369,3 +369,46 @@ describe('applyTableFilters — konum', () => {
         expect(ids(applyTableFilters(rows, {}))).toEqual(['1', '2', '3', '4']);
     });
 });
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// scoreForPosition — keywordScoreFn'in dönüş ŞEKLİ.
+//
+// Gerçek hata: matchService.calculateMatchScore {score, reasons, ...} objesi
+// döndürür. Bir çağıran fonksiyonu ham geçince Number(obje) → NaN → 0 oldu ve
+// TÜM adayların anahtar-kelime skoru sessizce sıfırlandı; kullanıcı "min skor
+// 56 üstünde 0 aday" gördü. Sınır artık iki şekli de kabul ediyor.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('scoreForPosition — skor fonksiyonunun dönüş şekli', () => {
+    const position = { title: 'Growth PM' };
+    const candidate = { positionAnalyses: {} };
+
+    it('accepts a plain number', () => {
+        expect(scoreForPosition(candidate, position, () => 62)).toBe(62);
+    });
+
+    it('accepts calculateMatchScore\'s object shape instead of silently scoring 0', () => {
+        expect(scoreForPosition(candidate, position, () => ({ score: 62, reasons: [] }))).toBe(62);
+    });
+
+    it('still prefers the saved analysis when it is higher', () => {
+        const analysed = { positionAnalyses: { 'Growth PM': { score: 80 } } };
+        expect(scoreForPosition(analysed, position, () => ({ score: 62 }))).toBe(80);
+    });
+
+    it('uses the keyword score when it beats a stale saved analysis', () => {
+        const analysed = { positionAnalyses: { 'Growth PM': { score: 30 } } };
+        expect(scoreForPosition(analysed, position, () => ({ score: 62 }))).toBe(62);
+    });
+
+    it('treats unusable values as 0 rather than NaN', () => {
+        expect(scoreForPosition(candidate, position, () => ({}))).toBe(0);
+        expect(scoreForPosition(candidate, position, () => undefined)).toBe(0);
+        expect(scoreForPosition(candidate, position, () => 'çok iyi')).toBe(0);
+        expect(scoreForPosition(candidate, position, null)).toBe(0);
+    });
+
+    it('returns 0 for a position without a title', () => {
+        expect(scoreForPosition(candidate, {}, () => ({ score: 90 }))).toBe(0);
+    });
+});
