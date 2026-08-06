@@ -18,6 +18,7 @@ import Header from '../components/Header';
 import SystemScanner from '../components/SystemScanner';
 import AddCandidateModal from '../components/AddCandidateModal';
 import CandidateAvatar from '../components/CandidateAvatar';
+import CandidateCvPanel from '../components/CandidateCvPanel';
 import {
     Plus, Search, Zap, Brain, X,
     Target, ShieldCheck, ArrowRight, FileText, Clock,
@@ -933,6 +934,7 @@ export default function CandidateProcessPage() {
     // ── TABS ──────────────────────────────────────────────────────────────────
     const TABS = [
         { id: 'ai_analysis',      label: 'STAR Analizi',        icon: <Brain className="w-3.5 h-3.5" /> },
+        { id: 'cv_file',          label: 'CV',                  icon: <FileQuestion className="w-3.5 h-3.5" /> },
         { id: 'cv_match',         label: 'CV & Uyum',           icon: <FileText className="w-3.5 h-3.5" /> },
         { id: 'pos_matches',      label: 'Pozisyon Eşleşmeleri', icon: <Layers className="w-3.5 h-3.5" /> },
         { id: 'sessions',         label: 'Mülakatlar',          icon: <Video className="w-3.5 h-3.5" /> },
@@ -1412,6 +1414,9 @@ export default function CandidateProcessPage() {
                                         )}
                                     </div>
                                 )}
+
+                                {/* ── CV (orijinal dosya / form) ── */}
+                                {activeTab === 'cv_file' && <CandidateCvPanel candidate={candidate} />}
 
                                 {/* ── CV & UYUM ── */}
                                 {activeTab === 'cv_match' && (
