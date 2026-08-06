@@ -37,3 +37,79 @@ export function formatRequirementsInput(requirements) {
     if (!Array.isArray(requirements)) return String(requirements ?? '');
     return requirements.join('\n');
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Zorunlu / tercihen ayrımı
+//
+// Kaynak alan `requirementsMeta`: [{ text, must }]. Düz `requirements` listesi
+// ondan TÜRETİLİR ve yazılmaya devam eder — skorlama dışındaki tüm okuyucular
+// (AI ilan metni, Excel, eski kayıtlar) hiç değişmeden çalışsın diye.
+//
+// GERİYE DÖNÜK NÖTRLÜK: meta yoksa hiçbir madde zorunlu/tercihen sayılmaz ve
+// skorlama bugünkü davranışını birebir korur. Mevcut ilanların puanları,
+// kullanıcı açıkça işaretleme yapana kadar değişmez.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * İki metin kutusunu tek bir meta listesine çevirir.
+ * @param {{mustText?: string, niceText?: string}} input
+ * @returns {Array<{text: string, must: boolean}>}
+ */
+export function parseRequirementGroups({ mustText = '', niceText = '' } = {}) {
+    const must = parseRequirementsInput(mustText).map((text) => ({ text, must: true }));
+    const nice = parseRequirementsInput(niceText).map((text) => ({ text, must: false }));
+    return [...must, ...nice].slice(0, 30);
+}
+
+/** Meta listesini iki düzenlenebilir metne böler. */
+export function formatRequirementGroups(meta) {
+    const list = Array.isArray(meta) ? meta : [];
+    return {
+        mustText: list.filter((r) => r?.must).map((r) => r.text).join('\n'),
+        niceText: list.filter((r) => r && !r.must).map((r) => r.text).join('\n'),
+    };
+}
+
+/**
+ * Pozisyonun gereksinimlerini normalize eder.
+ *
+ * `requirementsMeta` varsa öncelikler onunla gelir. Yoksa (eski kayıtlar)
+ * düz `requirements` listesi `must: null` ile döner — "işaretlenmemiş"
+ * demektir ve skorlama bunu bugünkü nötr davranışla ele alır.
+ *
+ * @returns {Array<{text: string, must: boolean|null}>}
+ */
+export function requirementsOf(position) {
+    const meta = position?.requirementsMeta;
+    if (Array.isArray(meta) && meta.length > 0) {
+        return meta
+            .filter((r) => r && typeof r.text === 'string' && r.text.trim())
+            .map((r) => ({ text: r.text.trim(), must: Boolean(r.must) }));
+    }
+    return (position?.requirements || [])
+        .filter((t) => typeof t === 'string' && t.trim())
+        .map((t) => ({ text: t.trim(), must: null }));
+}
+
+/** Meta işaretlenmiş mi? Skorlama nötr kalacak mı buna bakar. */
+export function hasPrioritizedRequirements(position) {
+    return requirementsOf(position).some((r) => r.must !== null);
+}
+
+/**
+ * AI'a gidecek ilan metni. Gereksinimler NUMARALI ve etiketli verilir; model
+ * karşılama durumunu madde numarasıyla döndürür ve kapsama skoru kodda
+ * deterministik hesaplanır (modelin serbest metin eşleştirmesine güvenilmez).
+ */
+export function buildJobDescription(position) {
+    const reqs = requirementsOf(position);
+    const lines = reqs.map((r, i) => {
+        const label = r.must === true ? '[ZORUNLU] ' : r.must === false ? '[TERCİHEN] ' : '';
+        return `${i + 1}. ${label}${r.text}`;
+    });
+    return [
+        position?.title || '',
+        lines.length > 0 ? `GEREKSİNİMLER:\n${lines.join('\n')}` : '',
+        position?.description || '',
+    ].filter(Boolean).join('\n');
+}
