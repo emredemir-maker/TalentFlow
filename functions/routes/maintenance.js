@@ -162,10 +162,14 @@ router.post('/api/maintenance/prescore', requireAuth(ROLES), async (req, res) =>
             ? await db.getAll(...batchRefs, { fieldMask: ['cvText', 'position', 'skills'] })
             : [];
 
-        let openPositionTitles = [];
+        // Gereksinimler de taşınır: anahtar-kelime ön skoru artık yalnızca
+        // başlık kelimelerine değil, ilanın gereksinimlerine de bakar.
+        let openPositions = [];
         try {
             const posSnap = await db.collection(POSITIONS_COLL).where('status', '==', 'open').get();
-            openPositionTitles = posSnap.docs.map((d) => d.data().title).filter(Boolean);
+            openPositions = posSnap.docs
+                .map((d) => ({ title: d.data().title, requirements: d.data().requirements || [] }))
+                .filter((p) => Boolean(p.title));
         } catch (posErr) {
             log.warn(`[maintenance/prescore] open positions read failed: ${posErr.message}`);
         }
@@ -190,7 +194,7 @@ router.post('/api/maintenance/prescore', requireAuth(ROLES), async (req, res) =>
                     idx += 1;
                     try {
                         const data = docSnap.data();
-                        const result = await computePrescore(data, openPositionTitles);
+                        const result = await computePrescore(data, openPositions);
                         await docSnap.ref.update({
                             initialAiScore: result.score,
                             matchScore: result.score,
