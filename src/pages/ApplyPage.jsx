@@ -5,6 +5,7 @@ import { doc, getDoc, collection, addDoc, getDocs, query, where, serverTimestamp
 import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { db, auth } from '../config/firebase';
 import { extractTextFromFile } from '../services/cvParser';
+import { getAuthHeaders } from '../services/ai/config';
 import { parseCandidateFromText, analyzeCandidateMatch } from '../services/geminiService';
 import { calculateMatchScore } from '../services/matchService';
 import { detectSource } from '../services/applicationService';
@@ -320,7 +321,7 @@ export default function ApplyPage() {
                     const resp = await Promise.race([
                         fetch('/api/score-screening-answers', {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
                             body: JSON.stringify({
                                 positionTitle: position.title,
                                 answers: rawScreeningAnswers,

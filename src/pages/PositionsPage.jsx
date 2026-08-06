@@ -22,6 +22,7 @@ import {
 import PotentialCandidatesTab from '../components/PotentialCandidatesTab';
 import { useCandidates } from '../context/CandidatesContext';
 import { extractPositionFromJD } from '../services/geminiService';
+import { getAuthHeaders } from '../services/ai/config';
 import { calculateMatchScore, filterCandidatesByDomain } from '../services/matchService';
 
 const STATUS_CONFIG = {
@@ -676,7 +677,7 @@ function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser,
         try {
             const res = await fetch('/api/suggest-screening-questions', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
                 body: JSON.stringify({
                     positionTitle: formData.title.trim() || 'Genel Pozisyon',
                     requirements: formData.requirements.trim() || '',
@@ -699,7 +700,7 @@ function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser,
         try {
             const res = await fetch('/api/improve-screening-question', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
                 body: JSON.stringify({
                     question: q,
                     positionTitle: formData.title.trim() || 'Genel Pozisyon',

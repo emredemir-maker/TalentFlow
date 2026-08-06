@@ -14,6 +14,7 @@ import {
 } from '../services/geminiService';
 import { doc, updateDoc, arrayUnion, setDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { getAuthHeaders } from '../services/ai/config';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -264,7 +265,7 @@ export default function FaceToFacePage() {
             const base64 = btoa(bin);
             const res = await fetch('/api/ai/stt', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
                 body: JSON.stringify({ audio: base64, mimeType: blob.type.split(';')[0] || 'audio/webm' }),
             });
             if (!res.ok) return;

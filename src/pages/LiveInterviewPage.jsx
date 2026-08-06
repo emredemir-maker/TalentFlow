@@ -17,6 +17,7 @@ import LoadingScreen from '../components/LoadingScreen';
 import CandidateExitPage from './CandidateExitPage';
 import { db } from '../config/firebase';
 import { doc, onSnapshot, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { getAuthHeaders } from '../services/ai/config';
 
 export default function LiveInterviewPage() {
     const { sessionId } = useParams();
@@ -960,7 +961,7 @@ export default function LiveInterviewPage() {
 
             const sttRes = await fetch('/api/ai/stt', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
                 body: JSON.stringify({ audio: base64Audio, mimeType }),
             });
             if (!sttRes.ok) { console.warn('[STT] Backend error:', sttRes.status); return; }

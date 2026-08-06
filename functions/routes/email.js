@@ -35,7 +35,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { generalLimiter } from '../middleware/rateLimit.js';
-import { verifyFirebaseToken } from '../middleware/auth.js';
+import { verifyFirebaseToken, requireAuth } from '../middleware/auth.js';
 import { db, admin } from '../config/firebaseAdmin.js';
 // fsGet/fsPatch/fsSet are caller-token Firestore REST helpers — they hit
 // Firestore impersonating the end user so security rules apply, vs. the
@@ -154,14 +154,20 @@ function buildInviteEmailHtml({ companyName = 'Talent-Inn' }, { inviteLink, role
 </body></html>`;
 }
 
-// Invite Email Endpoint
-router.post('/api/send-invite', async (req, res) => {
+// Invite Email Endpoint — davetleri yalnızca super_admin yönetir (davet
+// oluşturma UI'ı SuperAdminPage; firestore.rules'ta invitations yazımı da
+// super_admin'e özel). Kimlik doğrulamasız hali markalı phishing relay'i
+// olarak kullanılabiliyordu.
+router.post('/api/send-invite', generalLimiter, requireAuth(['super_admin']), async (req, res) => {
     const { email, role, inviteLink, branding, invitedByName } = req.body;
     log.info(`✉️ Received invite request for: ${email}, role: ${role}`);
 
     if (!email || !inviteLink) {
         log.warn('❌ Missing email or inviteLink in request');
         return res.status(400).json({ error: 'Email ve davet linki gereklidir.' });
+    }
+    if (!EMAIL_RE.test(email)) {
+        return res.status(400).json({ error: 'Geçersiz email adresi.' });
     }
 
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
@@ -658,10 +664,14 @@ router.post('/api/check-info-replies', generalLimiter, verifyFirebaseToken, asyn
 });
 
 // ── Send participant invite emails when a quick-start interview goes live
-router.post('/api/send-participant-invite', generalLimiter, async (req, res) => {
+// requireAuth: mülakatı başlatan recruiter çağırır; alıcı listesi doğrulanır.
+router.post('/api/send-participant-invite', generalLimiter, requireAuth(), async (req, res) => {
     const { participants, joinLink, sessionId, candidateName, recruiterName } = req.body;
     if (!participants || !Array.isArray(participants) || participants.length === 0) {
         return res.status(400).json({ error: 'participants listesi gereklidir.' });
+    }
+    if (participants.length > 10 || participants.some(p => typeof p !== 'string' || !EMAIL_RE.test(p))) {
+        return res.status(400).json({ error: 'Geçersiz katılımcı listesi (en fazla 10 geçerli e-posta).' });
     }
     if (!joinLink) return res.status(400).json({ error: 'joinLink gereklidir.' });
     try {

@@ -18,6 +18,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 import { aiLimiter } from '../middleware/rateLimit.js';
+import { requireAuth } from '../middleware/auth.js';
 import { isSafeLinkedInUrl } from '../services/scrape.js';
 import { parseProfile, getApiKey } from '../services/gemini.js';
 import { childLogger } from '../services/logger.js';
@@ -31,7 +32,7 @@ const sessionPath = path.resolve(__dirname, '..', '..', 'chrome-session');
 
 const router = Router();
 
-router.get('/api/scrape', aiLimiter, async (req, res) => {
+router.get('/api/scrape', aiLimiter, requireAuth(), async (req, res) => {
     const query = req.query.q;
     if (!query) return res.status(400).json({ error: 'Query parameter "q" is required.' });
 

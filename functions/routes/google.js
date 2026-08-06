@@ -15,11 +15,23 @@
 // applies as a defense-in-depth guard.
 import { Router } from 'express';
 
+import { requireAuth } from '../middleware/auth.js';
+
 const router = Router();
 
-router.post('/api/google/send-email', async (req, res) => {
+// RFC2822 başlıklarına ham interpolasyon yapıldığı için alıcı adresi katı
+// doğrulanır — CRLF/başlık enjeksiyonunu ve rastgele alıcıya göndermeyi keser.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+router.post('/api/google/send-email', requireAuth(), async (req, res) => {
     const { token, to, subject, body } = req.body;
     if (!token || !to) return res.status(400).json({ success: false, error: 'Token and recipient are required.' });
+    if (typeof to !== 'string' || !EMAIL_RE.test(to)) {
+        return res.status(400).json({ success: false, error: 'Geçersiz alıcı adresi.' });
+    }
+    if (typeof subject === 'string' && /[\r\n]/.test(subject)) {
+        return res.status(400).json({ success: false, error: 'Geçersiz konu satırı.' });
+    }
 
     try {
         // Construct the RFC2822 message
@@ -52,7 +64,7 @@ router.post('/api/google/send-email', async (req, res) => {
     }
 });
 
-router.get('/api/google/check-messages', async (req, res) => {
+router.get('/api/google/check-messages', requireAuth(), async (req, res) => {
     const { token, q } = req.query;
     if (!token || !q) return res.status(400).json({ success: false, error: 'Token and query are required.' });
 
@@ -105,9 +117,12 @@ router.get('/api/google/check-messages', async (req, res) => {
     }
 });
 
-router.post('/api/google/create-calendar-event', async (req, res) => {
+router.post('/api/google/create-calendar-event', requireAuth(), async (req, res) => {
     const { token, summary, description, startDateTime, endDateTime, location, guestEmail } = req.body;
     if (!token || !summary || !startDateTime) return res.status(400).json({ success: false, error: 'Missing parameters.' });
+    if (guestEmail && (typeof guestEmail !== 'string' || !EMAIL_RE.test(guestEmail))) {
+        return res.status(400).json({ success: false, error: 'Geçersiz davetli adresi.' });
+    }
 
     try {
         const event = {
