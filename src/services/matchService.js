@@ -5,6 +5,24 @@ import { analyzeCandidateMatch } from './geminiService';
  * Semantic Technology Groups to improve matching without LLM for every call
  */
 const TECH_GROUPS = {
+    // Ürün/growth sözlüğü — bu grup olmadan bir Growth PM ilanının ayırt edici
+    // gereksinimleri (funnel, aktivasyon, retention, A/B test, PLG, analitik
+    // araçlar) skorlamaya HİÇ girmiyordu; yalnızca ilanda geçen birkaç yazılım
+    // terimi ('sql', 'ai') skorun tamamını belirliyordu.
+    // Not: Türkçe eklemeler nedeniyle 'deney' (deneyim), 'gelir' (gelirse),
+    // 'kayıt' (kayıtsız) gibi yaygın kelimelerin ÖNEKİ olan terimler bilinçli
+    // olarak dışarıda bırakıldı — bkz. termMatches().
+    product: [
+        'product management', 'ürün yönetimi', 'product manager', 'ürün müdürü', 'ürün yöneticisi',
+        'product owner', 'product lead', 'growth', 'funnel', 'huni',
+        'aktivasyon', 'activation', 'retention', 'elde tutma', 'churn', 'kohort', 'cohort',
+        'a/b test', 'ab test', 'a/b testi', 'experiment', 'hipotez',
+        'plg', 'product-led', 'self-servis', 'self-serve', 'saas',
+        'amplitude', 'mixpanel', 'ga4', 'google analytics', 'metabase', 'looker',
+        'roadmap', 'yol haritası', 'discovery', 'fiyatlandırma', 'pricing', 'paketleme', 'packaging',
+        'onboarding', 'north star', 'signup', 'sign-up', 'mrr', 'arr', 'arpu',
+        'user research', 'kullanıcı araştırması',
+    ],
     backend: ['.net', 'c#', 'java', 'spring', 'node', 'python', 'django', 'backend', 'postgresql', 'sql', 'redis', 'kafka', 'go', 'golang', 'architecture', 'distributed', 'system', 'microservices', 'performance', 'security'],
     frontend: ['react', 'vue', 'angular', 'javascript', 'typescript', 'frontend', 'css', 'html', 'next.js', 'tailwind', 'bootstrap', 'ui', 'ux', 'tasarım', 'arayüz'],
     mobile: ['flutter', 'react native', 'swift', 'kotlin', 'ios', 'android', 'mobile', 'mobil'],
@@ -21,6 +39,19 @@ const TECH_GROUPS = {
  * This prevents a single generic word (e.g. "crm") from hijacking the result.
  */
 const JOB_DOMAINS = [
+    {
+        id: 'product', label: 'Ürün',
+        // Bu alan yokken "Product Manager" başlığı HİÇBİR domaine düşmüyordu:
+        // sistem gereksinim metnine geri düşüyor ve "vibecoding" içindeki
+        // 'coding' yüzünden ilanı Yazılım sayıyordu.
+        keywords: [
+            'product manager', 'ürün müdürü', 'ürün yöneticisi', 'product owner',
+            'growth product manager', 'growth pm', 'technical product manager',
+            'product lead', 'ürün lideri', 'head of product', 'cpo',
+            'ürün yönetimi', 'product management', 'product analyst', 'ürün analisti',
+            'product-led growth', 'plg',
+        ],
+    },
     {
         id: 'engineering', label: 'Yazılım',
         // Role titles + strong tech signals — very unlikely in other domains
@@ -148,6 +179,30 @@ const JOB_DOMAINS = [
 ];
 
 /**
+ * Terim, metinde GERÇEKTEN geçiyor mu?
+ *
+ * Düz `text.includes(term)` üç somut hataya yol açıyordu:
+ *   - 'coding' → "vibecoding" içinde eşleşip ürün ilanını Yazılım sayıyordu
+ *   - 'deney'  → "deneyimi" içinde eşleşiyordu
+ *   - 'go'/'ai'→ rastgele kelimelerin içinde eşleşiyordu (kodda da not düşülmüş)
+ *
+ * Kural:
+ *   - Boşluk/noktalama içeren terimler ('a/b test', 'node.js'): düz substring
+ *   - ≤3 karakter ('ai', 'go', 'ui', 'sql'): tam kelime
+ *   - Diğerleri: baştan sınır, sondan serbest — Türkçe ekleri korur
+ *     ("aktivasyonu", "funnel'ı" eşleşir; "deneyimi" 'deney'e eşleşmez)
+ */
+export function termMatches(text, term) {
+    if (!text || !term) return false;
+    if (/[\s./+#-]/.test(term)) return text.includes(term);
+    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = term.length <= 3
+        ? `(^|[^\\p{L}\\p{N}])${escaped}([^\\p{L}\\p{N}]|$)`
+        : `(^|[^\\p{L}\\p{N}])${escaped}`;
+    return new RegExp(pattern, 'u').test(text);
+}
+
+/**
  * Detect the primary job domain from any freeform text.
  * Uses COUNT-BASED scoring: counts keyword hits per domain and returns
  * the domain with the most matches. Falls back to 'general' if no hits.
@@ -161,7 +216,7 @@ export function detectJobDomain(text) {
     let bestCount = 0;
 
     for (const domain of JOB_DOMAINS) {
-        const count = domain.keywords.reduce((acc, kw) => acc + (lower.includes(kw) ? 1 : 0), 0);
+        const count = domain.keywords.reduce((acc, kw) => acc + (termMatches(lower, kw) ? 1 : 0), 0);
         if (count > bestCount) {
             bestCount = count;
             bestDomain = domain.id;
@@ -183,7 +238,7 @@ function detectDomainFromTitle(title) {
     let best = 'general';
     let bestCount = 0;
     for (const domain of JOB_DOMAINS) {
-        const count = domain.keywords.reduce((acc, kw) => acc + (lower.includes(kw) ? 1 : 0), 0);
+        const count = domain.keywords.reduce((acc, kw) => acc + (termMatches(lower, kw) ? 1 : 0), 0);
         if (count > bestCount) {
             bestCount = count;
             best = domain.id;
@@ -368,7 +423,7 @@ export function calculateMatchScore(candidate, position, options = {}) {
 
     // Scan for any missed keywords
     Object.values(TECH_GROUPS).flat().forEach(tech => {
-        if (candidateText.includes(tech) && !cSkills.includes(tech)) {
+        if (termMatches(candidateText, tech) && !cSkills.includes(tech)) {
             cSkills.push(tech);
         }
     });
@@ -380,7 +435,7 @@ export function calculateMatchScore(candidate, position, options = {}) {
         const desc = (position.description || position.jobDescription).toLowerCase();
         // Auto-detect tech stacks from description based on known groups
         Object.values(TECH_GROUPS).flat().forEach(tech => {
-            if (desc.includes(tech) && !pReqs.includes(tech)) {
+            if (termMatches(desc, tech) && !pReqs.includes(tech)) {
                 pReqs.push(tech);
             }
         });
@@ -397,11 +452,10 @@ export function calculateMatchScore(candidate, position, options = {}) {
 
     const requiredKeywords = new Set();
 
-    // Scan text for known technologies
+    // Scan text for known skill terms (kelime sınırlı — 'go' artık "good"
+    // içinde, 'coding' "vibecoding" içinde eşleşmez)
     Object.values(TECH_GROUPS).flat().forEach(tech => {
-        // Simple check: does the text contain this tech?
-        // Note: This might false match 'go' in 'good', but strictly for scoring it's better than 0 matches.
-        if (allReqText.includes(tech)) {
+        if (termMatches(allReqText, tech)) {
             requiredKeywords.add(tech);
         }
     });
@@ -421,7 +475,12 @@ export function calculateMatchScore(candidate, position, options = {}) {
             // Does candidate have this specific keyword?
             // "C#" vs ".NET" handling via Groups is implicit if we matched the Group keywords?
             // No, strictly check if candidate skill overlaps with req.
-            const directMatch = cSkills.some(skill => skill.includes(req) || req.includes(skill));
+            // req.includes(skill) yönü yalnızca 3+ karakterlik yetenekler için
+            // geçerli — aksi halde "R" gibi tek harflik bir yetenek her
+            // gereksinimle eşleşiyordu.
+            const directMatch = cSkills.some(
+                skill => skill.includes(req) || (skill.length >= 3 && req.includes(skill))
+            );
 
             if (directMatch) {
                 matchCount++;
