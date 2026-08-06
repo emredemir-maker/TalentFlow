@@ -7,6 +7,15 @@
 import { analyzeCandidateMatch } from './geminiService';
 import { calculateMatchScore, filterPositionsByDomain, findBestPositionMatch } from './matchService';
 
+/**
+ * Adayın analizinin BELİRLİ bir pozisyon için tazelenmesi gerekiyor mu?
+ * Pozisyonun içeriği (gereksinimler/başlık) değiştiğinde kayıtlı analiz
+ * artık eski metne aittir; skoru olduğu gibi göstermek yanıltıcıdır.
+ */
+export function hasAnalysisForPosition(candidate, positionTitle) {
+    return Boolean(candidate?.positionAnalyses?.[positionTitle]);
+}
+
 /** Firestore `undefined` kabul etmez — AI'nın eksik alanları null'a çevrilir. */
 function sanitizeForFirestore(value) {
     if (value === undefined || value === null) return null;
@@ -110,4 +119,65 @@ export async function deepScanCandidate(candidate, openPositions, options = {}) 
         updates.matchScore = bestResult.score;
     }
     return { status: 'scanned', updates, aiCalls };
+}
+
+/**
+ * Adayı TEK bir pozisyona karşı yeniden analiz eder.
+ *
+ * Pozisyonun gereksinimleri değiştiğinde tüm havuzu `deepScanCandidate` ile
+ * taramak gereksiz pahalıdır (aday başına 5'e kadar AI çağrısı); değişen
+ * yalnızca o pozisyondur. Bu primitif aday başına TEK çağrı yapar ve
+ * `positionAnalyses[title]` kaydını tazeler.
+ *
+ * @param {object} candidate
+ * @param {object} position — güncel (kaydedilmiş) pozisyon objesi
+ * @param {{previousTitle?: string}} [options] — başlık değiştiyse eski
+ *   anahtar altındaki bayat analiz silinir; aksi halde tabloda iki farklı
+ *   skor yan yana yaşamaya devam eder.
+ * @returns {Promise<{status: 'scanned'|'skipped_no_cv'|'no_result', updates?: object, aiCalls: number}>}
+ */
+export async function rescanCandidateForPosition(candidate, position, options = {}) {
+    const { previousTitle } = options;
+    const cvBody = `${candidate.cvData || ''}${candidate.cvText || ''}`.trim();
+    const hasEvidence = cvBody.length >= 40 || (candidate.experiences?.length > 0);
+    if (!hasEvidence) return { status: 'skipped_no_cv', aiCalls: 0 };
+    if (!position?.title) return { status: 'no_result', aiCalls: 0 };
+
+    const jobDesc = `${position.title}\n${(position.requirements || []).join(', ')}\n${position.description || ''}`;
+    let result;
+    try {
+        result = await analyzeCandidateMatch(jobDesc, candidate, 'gemini-2.5-flash');
+    } catch {
+        return { status: 'no_result', aiCalls: 1 };
+    }
+    if (!result || !(result.score > 0)) return { status: 'no_result', aiCalls: 1 };
+
+    const updatedAnalyses = { ...(candidate.positionAnalyses || {}) };
+    if (previousTitle && previousTitle !== position.title) delete updatedAnalyses[previousTitle];
+    updatedAnalyses[position.title] = sanitizeForFirestore(result);
+
+    const updates = {
+        positionAnalyses: updatedAnalyses,
+        lastScannedAt: new Date().toISOString(),
+    };
+
+    // Adayın GÖSTERİLEN pozisyonu bu ise başlıktaki skor da tazelenir;
+    // başka bir pozisyona bakıyorsa onun analizine dokunulmaz.
+    const showsThisPosition = candidate.matchedPositionTitle === position.title
+        || candidate.matchedPositionTitle === previousTitle
+        || candidate.positionId === position.id;
+    if (showsThisPosition) {
+        updates.aiAnalysis = sanitizeForFirestore({
+            ...result,
+            lastAnalyzedAt: new Date().toISOString(),
+            analyzedForPosition: position.title,
+        });
+        updates.summary = result.summary ?? null;
+        updates.aiScore = result.score;
+        updates.matchedPositionTitle = position.title;
+        if ((candidate.scoringStage || 'initial') === 'initial') {
+            updates.matchScore = result.score;
+        }
+    }
+    return { status: 'scanned', updates, aiCalls: 1 };
 }
