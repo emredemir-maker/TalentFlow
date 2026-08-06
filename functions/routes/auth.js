@@ -2,24 +2,26 @@
 //
 // Each provider exposes the same three-step pattern:
 //   GET  /api/auth/<provider>/url       — build the consent URL the SPA opens
-//                                         in a popup. Embeds an HMAC-less
-//                                         state blob (just userId+ts; the
-//                                         exchange endpoint re-validates).
+//                                         in a popup. State blob yalnızca
+//                                         popup yönlendirmesi içindir; sunucu
+//                                         kimlik için ASLA kullanmaz.
 //   POST /api/auth/<provider>/exchange  — swap the auth code for tokens, fetch
 //                                         the user's email, and persist the
 //                                         tokens onto users/{uid}.integrations.
-//                                         Falls back to the Firestore REST API
-//                                         (fsPatch) when Admin SDK writes are
-//                                         blocked by GCP auth issues in dev.
+//                                         uid DOĞRULANMIŞ Firebase tokenından
+//                                         gelir (req.authUser.uid); anonim
+//                                         oturumlar reddedilir. Falls back to
+//                                         the Firestore REST API (fsPatch) when
+//                                         Admin SDK writes are blocked in dev.
 //   POST /api/auth/<provider>/refresh   — exchange refreshToken for a fresh
 //                                         accessToken; persist the new
-//                                         expiresAt in-place.
+//                                         expiresAt in-place (kendi profiline).
 //
 // integrationConfigs (clientId/clientSecret/tenantId/redirectUri) is loaded
 // from Firestore at startup and updated via /api/admin/integrations.
 import { Router } from 'express';
 
-import { verifyFirebaseToken } from '../middleware/auth.js';
+import { verifyFirebaseToken, rejectAnonymous } from '../middleware/auth.js';
 import { db } from '../config/firebaseAdmin.js';
 import { integrationConfigs } from '../config/integrations.js';
 import { fsPatch } from '../services/firestoreRest.js';
@@ -57,23 +59,18 @@ router.get('/api/auth/microsoft/url', async (req, res) => {
     }
 });
 
-router.post('/api/auth/microsoft/exchange', verifyFirebaseToken, async (req, res) => {
+router.post('/api/auth/microsoft/exchange', verifyFirebaseToken, rejectAnonymous, async (req, res) => {
     try {
         const cfg = integrationConfigs.microsoft365;
         if (!cfg?.clientId || !cfg?.tenantId || !cfg?.clientSecret) {
             return res.status(400).json({ error: 'Microsoft 365 yapılandırması eksik.' });
         }
-        const { code, state, redirectUri } = req.body;
+        const { code, redirectUri } = req.body;
         if (!code) return res.status(400).json({ error: 'OAuth kodu eksik.' });
 
-        let userId;
-        try {
-            const decoded = JSON.parse(Buffer.from(state || '', 'base64url').toString());
-            userId = decoded.userId;
-        } catch {
-            return res.status(400).json({ error: 'Geçersiz state parametresi.' });
-        }
-        if (!userId) return res.status(400).json({ error: 'userId eksik.' });
+        // Tokenlar YALNIZCA çağıranın kendi profiline yazılır — userId asla
+        // istemci verisinden (state blob / body) alınmaz (IDOR düzeltmesi).
+        const userId = req.authUser.uid;
 
         const redirect = redirectUri || cfg.redirectUri || `${req.protocol}://${req.get('host')}/auth/microsoft/callback`;
 
@@ -139,13 +136,14 @@ router.post('/api/auth/microsoft/exchange', verifyFirebaseToken, async (req, res
     }
 });
 
-router.post('/api/auth/microsoft/refresh', verifyFirebaseToken, async (req, res) => {
+router.post('/api/auth/microsoft/refresh', verifyFirebaseToken, rejectAnonymous, async (req, res) => {
     try {
         const cfg = integrationConfigs.microsoft365;
         if (!cfg?.clientId || !cfg?.tenantId || !cfg?.clientSecret) {
             return res.status(400).json({ error: 'Microsoft 365 yapılandırması eksik.' });
         }
-        const { userId, refreshToken } = req.body;
+        const { refreshToken } = req.body;
+        const userId = req.authUser.uid; // IDOR düzeltmesi: body'deki userId yok sayılır
         if (!refreshToken) return res.status(400).json({ error: 'refreshToken gerekli.' });
 
         const tokenRes = await fetch(
@@ -219,23 +217,17 @@ router.get('/api/auth/google/url', async (req, res) => {
     }
 });
 
-router.post('/api/auth/google/exchange', verifyFirebaseToken, async (req, res) => {
+router.post('/api/auth/google/exchange', verifyFirebaseToken, rejectAnonymous, async (req, res) => {
     try {
         const cfg = integrationConfigs.google;
         if (!cfg?.clientId || !cfg?.clientSecret) {
             return res.status(400).json({ error: 'Google yapılandırması eksik.' });
         }
-        const { code, state, redirectUri } = req.body;
+        const { code, redirectUri } = req.body;
         if (!code) return res.status(400).json({ error: 'OAuth kodu eksik.' });
 
-        let userId;
-        try {
-            const decoded = JSON.parse(Buffer.from(state || '', 'base64url').toString());
-            userId = decoded.userId;
-        } catch {
-            return res.status(400).json({ error: 'Geçersiz state.' });
-        }
-        if (!userId) return res.status(400).json({ error: 'userId eksik.' });
+        // IDOR düzeltmesi: userId doğrulanmış tokendan gelir, state yok sayılır.
+        const userId = req.authUser.uid;
 
         const redirect = redirectUri || cfg.redirectUri || `${req.protocol}://${req.get('host')}/auth/google/callback`;
 
@@ -290,13 +282,14 @@ router.post('/api/auth/google/exchange', verifyFirebaseToken, async (req, res) =
     }
 });
 
-router.post('/api/auth/google/refresh', verifyFirebaseToken, async (req, res) => {
+router.post('/api/auth/google/refresh', verifyFirebaseToken, rejectAnonymous, async (req, res) => {
     try {
         const cfg = integrationConfigs.google;
         if (!cfg?.clientId || !cfg?.clientSecret) {
             return res.status(400).json({ error: 'Google yapılandırması eksik.' });
         }
-        const { userId, refreshToken } = req.body;
+        const { refreshToken } = req.body;
+        const userId = req.authUser.uid; // IDOR düzeltmesi: body'deki userId yok sayılır
         if (!refreshToken) return res.status(400).json({ error: 'refreshToken gerekli.' });
 
         const tokenRes = await fetch('https://oauth2.googleapis.com/token', {

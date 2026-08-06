@@ -18,29 +18,37 @@
 //   The no-arg form accepts any of the three default roles (super_admin,
 //   recruiter, department_user).
 import { db, admin } from '../config/firebaseAdmin.js';
-import { childLogger } from '../services/logger.js';
-const log = childLogger('auth-mw');
 
 export async function verifyFirebaseToken(req, res, next) {
     const authHeader = req.headers.authorization || '';
     const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
     if (!token) return res.status(401).json({ error: 'Kimlik doğrulama gereklidir.' });
-    const apiKey = process.env.VITE_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY;
-    if (!apiKey) {
-        log.error('[verifyFirebaseToken] Firebase API key not configured — rejecting request.');
-        return res.status(500).json({ error: 'Sunucu yapılandırma hatası.' });
-    }
     try {
-        const resp = await fetch(
-            `https://www.googleapis.com/identitytoolkit/v3/relyingparty/getAccountInfo?key=${apiKey}`,
-            { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken: token }) }
-        );
-        if (!resp.ok) return res.status(401).json({ error: 'Geçersiz kimlik bilgileri.' });
+        // Admin SDK imza + audience doğrular ve token içeriğini çözümler.
+        // Eski Identity Toolkit REST kontrolü tokenı yalnızca doğruluyor,
+        // uid'yi ÇIKARMIYORDU — bu yüzden /api/auth/* uçları userId'yi
+        // istemcinin gönderdiği değerden almak zorunda kalıyordu (IDOR).
+        const decoded = await admin.auth().verifyIdToken(token);
         req.firebaseToken = token;
+        req.authUser = {
+            uid: decoded.uid,
+            provider: decoded.firebase?.sign_in_provider || '',
+            email: decoded.email || '',
+        };
         return next();
     } catch {
-        return res.status(401).json({ error: 'Kimlik doğrulama başarısız.' });
+        return res.status(401).json({ error: 'Geçersiz kimlik bilgileri.' });
     }
+}
+
+// Anonim oturumları reddeden ek katman — verifyFirebaseToken'dan SONRA
+// kullanılır. Kullanıcı hesabına veri yazan uçlar (OAuth token persist)
+// public sayfaların otomatik anon oturumlarıyla çağrılamamalıdır.
+export function rejectAnonymous(req, res, next) {
+    if (!req.authUser || req.authUser.provider === 'anonymous') {
+        return res.status(403).json({ error: 'Bu işlem için hesapla giriş yapılmalıdır.' });
+    }
+    return next();
 }
 
 export const ALLOWED_ROLES = ['super_admin', 'recruiter', 'department_user'];
