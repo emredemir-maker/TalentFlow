@@ -29,7 +29,7 @@ vi.mock('../config/firebaseAdmin.js', () => ({
 }));
 
 const {extractCvText, findDuplicateCandidate, resolvePreScore, matchOpenTitle, sanitizeSuggestedRole,
-    calculateSimpleMatchScore,
+    calculateSimpleMatchScore, positionRequirements,
 } = await import('./bulkWorker.js');
 
 beforeEach(() => {
@@ -264,5 +264,81 @@ describe('resolvePreScore — pozisyon dokümanı desteği', () => {
     it('accepts a legacy array of title strings', () => {
         const parsed = { position: 'Backend Developer', skills: ['Java'] };
         expect(resolvePreScore(parsed, '', ['Backend Developer']).matchedTitle).toBe('Backend Developer');
+    });
+});
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Ön skor da zorunlu/tercihen ayrımına uymalı.
+//
+// Dengesizlik: derin tarama zorunlu %85 / tercihen %15 agirlikliyordu ama ilk
+// yuklemedeki on skor iki kefeyi ESIT sayiyordu. Ayni aday iki asamada farkli
+// mantikla puanlaniyordu.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('positionRequirements (sunucu)', () => {
+    it('reads priorities from requirementsMeta', () => {
+        expect(positionRequirements({
+            title: 'X',
+            requirementsMeta: [{ text: 'A', must: true }, { text: 'B', must: false }],
+        })).toEqual([{ text: 'A', must: true }, { text: 'B', must: false }]);
+    });
+
+    it('returns must:null for legacy positions', () => {
+        expect(positionRequirements({ title: 'X', requirements: ['A'] }))
+            .toEqual([{ text: 'A', must: null }]);
+    });
+
+    it('returns [] for a plain title string', () => {
+        expect(positionRequirements('Growth PM')).toEqual([]);
+    });
+});
+
+describe('calculateSimpleMatchScore — zorunlu/tercihen', () => {
+    const PRIORITIZED = {
+        title: 'Growth Product Manager',
+        requirementsMeta: [
+            { text: 'Funnel sahipliği aktivasyon retention', must: true },
+            { text: 'A/B test deneyimi', must: true },
+            { text: 'Amplitude Mixpanel GA4 hakimiyeti', must: false },
+        ],
+    };
+
+    const mustCandidate = {
+        position: 'Growth Product Manager',
+        skills: ['funnel', 'aktivasyon', 'retention', 'A/B', 'test'],
+    };
+    const niceOnlyCandidate = {
+        position: 'Growth Product Manager',
+        skills: ['Amplitude', 'Mixpanel', 'GA4', 'hakimiyeti'],
+    };
+
+    it('rates meeting the must-haves above meeting only the nice-to-haves', () => {
+        const must = calculateSimpleMatchScore(mustCandidate, PRIORITIZED);
+        const nice = calculateSimpleMatchScore(niceOnlyCandidate, PRIORITIZED);
+        expect(must).toBeGreaterThan(nice);
+        expect(must - nice).toBeGreaterThan(20);
+    });
+
+    it('caps the nice-to-have contribution', () => {
+        const titleOnly = calculateSimpleMatchScore(
+            { position: 'Growth Product Manager', skills: [] }, PRIORITIZED
+        );
+        const withNice = calculateSimpleMatchScore(niceOnlyCandidate, PRIORITIZED);
+        expect(withNice - titleOnly).toBeLessThanOrEqual(15);
+    });
+
+    it('keeps the legacy 40/60 behaviour when the position has no priorities', () => {
+        const legacy = { title: 'Growth Product Manager', requirements: ['Funnel sahipliği aktivasyon retention'] };
+        // Başlık tam + gereksinim tam → 100
+        expect(calculateSimpleMatchScore(
+            { position: 'Growth Product Manager', skills: ['funnel', 'aktivasyon', 'retention', 'sahipliği'] },
+            legacy
+        )).toBe(100);
+    });
+
+    it('still scores a title-only string exactly as before', () => {
+        expect(calculateSimpleMatchScore(
+            { position: 'Growth Product Manager', skills: [] }, 'Growth Product Manager'
+        )).toBe(100);
     });
 });

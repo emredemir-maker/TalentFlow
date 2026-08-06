@@ -180,6 +180,41 @@ export function positionTitleOf(position) {
     return typeof position === 'string' ? position : (position?.title || '');
 }
 
+// Gereksinim cümlelerinden anlamlı kelimeler. Eşik 3 karakter: 'ga4', 'plg',
+// 'sql', 'a/b' gibi EN ayırt edici terimler tam da bu uzunlukta. Bağlaç ve
+// doldurma kelimeleri skoru şişirmesin diye ayrıca elenir.
+const STOP_WORDS = new Set([
+    've', 'ile', 'için', 'veya', 'gibi', 'olan', 'daha', 'çok', 'yıl', 'en', 'az',
+    'artı', 'tercihen', 'bir', 'her', 'şey', 'olma', 'olması', 'sahip', 'temel',
+]);
+
+function requirementTerms(texts) {
+    return texts
+        .join(' ')
+        .toLowerCase()
+        .split(/[^\p{L}\p{N}+#./]+/u)
+        .filter((w) => w.length >= 3 && !STOP_WORDS.has(w));
+}
+
+/**
+ * Pozisyonun gereksinimlerini {text, must} biçiminde döndürür.
+ * `requirementsMeta` yoksa (eski ilanlar) must: null — işaretlenmemiş
+ * demektir ve skorlama nötr davranır. src/utils/positionRequirements.js
+ * içindeki requirementsOf'un sunucu ikizidir.
+ */
+export function positionRequirements(position) {
+    if (typeof position === 'string' || !position) return [];
+    const meta = position.requirementsMeta;
+    if (Array.isArray(meta) && meta.length > 0) {
+        return meta
+            .filter((r) => r && typeof r.text === 'string' && r.text.trim())
+            .map((r) => ({ text: r.text.trim(), must: Boolean(r.must) }));
+    }
+    return (position.requirements || [])
+        .filter((t) => typeof t === 'string' && t.trim())
+        .map((t) => ({ text: t.trim(), must: null }));
+}
+
 /**
  * Ücretsiz anahtar-kelime ön skoru.
  *
@@ -187,9 +222,14 @@ export function positionTitleOf(position) {
  * (eski davranış, geriye dönük uyumluluk). Pozisyon DOKÜMANI verilirse
  * gereksinimler de hesaba katılır — eskiden ilanın gereksinimleri bu skora
  * HİÇ girmiyordu; "Growth Product Manager" başlığındaki üç kelime tüm ön
- * elemeyi belirliyordu ve gereksinimleri değiştirmek skoru oynatmıyordu.
+ * elemeyi belirliyordu.
  *
- * Ağırlık: başlık %40, gereksinimler %60 (gereksinim yoksa başlık %100).
+ * Ağırlıklar:
+ *   - Zorunlu/tercihen İŞARETLİYSE: başlık %25, zorunlu %60, tercihen %15.
+ *     Derin taramadaki 85/15 dengesiyle aynı yönde — ön skor ile derin skor
+ *     birbiriyle çelişmesin.
+ *   - İşaretlenmemişse: başlık %40, gereksinimler %60 (önceki davranış).
+ *   - Gereksinim yoksa: başlık %100.
  */
 export function calculateSimpleMatchScore(candidate, position) {
     const title = positionTitleOf(position);
@@ -209,24 +249,21 @@ export function calculateSimpleMatchScore(candidate, position) {
 
     const titleRatio = ratio(title.toLowerCase().split(/\s+/)) ?? 0;
 
-    const requirements = typeof position === 'string' ? [] : (position?.requirements || []);
-    // Gereksinim cümlelerinden anlamlı kelimeler. Eşik 3 karakter: 'ga4',
-    // 'plg', 'sql', 'a/b' gibi EN ayırt edici terimler tam da bu uzunlukta.
-    // Bağlaç/doldurma kelimeleri skoru şişirmesin diye ayrıca elenir.
-    const STOP = new Set([
-        've', 'ile', 'için', 'veya', 'gibi', 'olan', 'daha', 'çok', 'yıl', 'en', 'az',
-        'artı', 'tercihen', 'bir', 'her', 'şey', 'olma', 'olması', 'sahip', 'temel',
-    ]);
-    const reqTerms = requirements
-        .join(' ')
-        .toLowerCase()
-        .split(/[^\p{L}\p{N}+#./]+/u)
-        .filter((w) => w.length >= 3 && !STOP.has(w));
-    const reqRatio = ratio(reqTerms);
+    const reqs = positionRequirements(position);
+    if (reqs.length === 0) return Math.min(100, Math.round(titleRatio * 100));
 
-    const score = reqRatio === null
-        ? titleRatio * 100
-        : (titleRatio * 40) + (reqRatio * 60);
+    const prioritized = reqs.some((r) => r.must !== null);
+    if (!prioritized) {
+        const reqRatio = ratio(requirementTerms(reqs.map((r) => r.text)));
+        const score = reqRatio === null ? titleRatio * 100 : (titleRatio * 40) + (reqRatio * 60);
+        return Math.min(100, Math.round(score));
+    }
+
+    const mustRatio = ratio(requirementTerms(reqs.filter((r) => r.must).map((r) => r.text)));
+    const niceRatio = ratio(requirementTerms(reqs.filter((r) => r.must === false).map((r) => r.text)));
+    // Kefelerden biri boşsa ağırlığı diğerine devredilmez; eksik kefe
+    // yalnızca puan üretmez (tercih edilen yoksa tavan %85'te kalır).
+    const score = (titleRatio * 25) + ((mustRatio ?? 0) * 60) + ((niceRatio ?? 0) * 15);
     return Math.min(100, Math.round(score));
 }
 
@@ -420,7 +457,12 @@ async function executeJob(jobId) {
         try {
             const posSnap = await db.collection(POSITIONS_COLL).where('status', '==', 'open').get();
             openPositions = posSnap.docs
-                .map((d) => ({ id: d.id, title: d.data().title, requirements: d.data().requirements || [] }))
+                .map((d) => ({
+                    id: d.id,
+                    title: d.data().title,
+                    requirements: d.data().requirements || [],
+                    requirementsMeta: d.data().requirementsMeta || null,
+                }))
                 .filter((p) => Boolean(p.title));
         } catch (posErr) {
             log.warn(`[bulk-import] open positions read failed: ${posErr.message}`);
