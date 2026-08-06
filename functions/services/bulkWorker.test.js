@@ -342,3 +342,83 @@ describe('calculateSimpleMatchScore — zorunlu/tercihen', () => {
         )).toBe(100);
     });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Ön skorda da yetkinlik > araç.
+//
+// Derin tarama bu dengeye geçtikten sonra ön skor eski haliyle kalmıştı:
+// toplu CV yüklemesinde ve "Tümünü Yeniden Puanla"da "GA4 hakimiyeti" ile
+// "funnel sahipliği" hâlâ eşit sayılıyordu. Bir adayın aldığı İLK skor
+// buradan geldiği için, derin taramaya hiç ulaşamadan eleniyordu.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('calculateSimpleMatchScore — yetkinlik / araç dengesi', () => {
+    const POSITION = {
+        title: 'Growth Product Manager',
+        requirementsMeta: [
+            { text: 'Funnel sahipliği ve aktivasyon deneyimi', must: true },
+            { text: 'A/B test kurgulama deneyimi', must: true },
+            { text: 'Amplitude Mixpanel GA4 hakimiyeti', must: true },
+            { text: 'SQL bilgisi', must: true },
+            { text: 'PLG ve fiyatlandırma deneyimi', must: false },
+        ],
+    };
+
+    const didTheWork = {
+        position: 'Growth Product Manager',
+        skills: ['funnel', 'aktivasyon', 'A/B', 'test', 'kurgulama'],
+        summary: 'Funnel sahipliği ve aktivasyon deneyimi. A/B test kurgulama. PLG fiyatlandırma.',
+    };
+    const knowsToolsOnly = {
+        position: 'Data Analyst',
+        skills: ['Amplitude', 'Mixpanel', 'GA4', 'SQL'],
+        summary: 'Amplitude Mixpanel GA4 hakimiyeti ve SQL bilgisi.',
+    };
+
+    it('scores a candidate who did the work far above one who only knows the tools', () => {
+        const worked = calculateSimpleMatchScore(didTheWork, POSITION);
+        const tools = calculateSimpleMatchScore(knowsToolsOnly, POSITION);
+        expect(worked).toBeGreaterThan(tools);
+        // Ağırlıklandırma öncesi bu fark 48'di; yetkinlik %75 / araç %25 ve
+        // dolgu kelimelerinin elenmesiyle 70'e çıktı.
+        expect(worked - tools).toBeGreaterThan(60);
+    });
+
+    it('costs less to miss a tool than to miss a capability', () => {
+        const missingTool = {
+            position: 'Growth Product Manager',
+            skills: ['funnel', 'aktivasyon', 'A/B', 'test', 'kurgulama'],
+        };
+        const missingCapability = {
+            position: 'Growth Product Manager',
+            skills: ['Amplitude', 'Mixpanel', 'GA4', 'SQL'],
+        };
+        expect(calculateSimpleMatchScore(missingTool, POSITION))
+            .toBeGreaterThan(calculateSimpleMatchScore(missingCapability, POSITION));
+    });
+
+    it('gives the tool bucket full weight when every requirement is a tool', () => {
+        const allTools = {
+            title: 'Data Analyst',
+            requirementsMeta: [
+                { text: 'SQL', must: true },
+                { text: 'Amplitude', must: true },
+            ],
+        };
+        // Yetkinlik kefesi boşsa araç kefesi cezalandırılmaz: başlık 25 +
+        // zorunlu 60 = 85.
+        expect(calculateSimpleMatchScore(
+            { position: 'Data Analyst', skills: ['SQL', 'Amplitude'] }, allTools
+        )).toBe(85);
+    });
+
+    it('ignores carrier nouns so writing "deneyimi" is not a match on its own', () => {
+        const position = {
+            title: 'Growth Product Manager',
+            requirementsMeta: [{ text: 'Funnel sahipliği deneyimi', must: true }],
+        };
+        // "deneyimi" ve "bilgisi" gereksinimin NE olduğunu söylemez; adayın
+        // özetinde geçmeleri isabet sayılmamalı.
+        const filler = { position: 'Barista', skills: [], summary: 'Kahve deneyimi ve bilgisi vardır.' };
+        expect(calculateSimpleMatchScore(filler, position)).toBe(0);
+    });
+});
