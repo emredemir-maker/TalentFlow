@@ -23,6 +23,7 @@ import PotentialCandidatesTab from '../components/PotentialCandidatesTab';
 import { useCandidates } from '../context/CandidatesContext';
 import { extractPositionFromJD } from '../services/geminiService';
 import { parseRequirementsInput, formatRequirementsInput } from '../utils/positionRequirements';
+import { rescanCandidateForPosition, hasAnalysisForPosition } from '../services/scanService';
 import { getAuthHeaders } from '../services/ai/config';
 import { calculateMatchScore, filterCandidatesByDomain } from '../services/matchService';
 
@@ -1159,6 +1160,8 @@ export default function PositionsPage() {
     const [departments, setDepartments]         = useState([]);
     const [jdText, setJdText]                   = useState('');
     const [isExtracting, setIsExtracting]       = useState(false);
+    // Pozisyon içeriği değişince etkilenen adayların yeniden taranma ilerlemesi
+    const [rescanProgress, setRescanProgress]   = useState(null); // {done,total}
     // ID of the row whose "more actions" overflow menu is currently open.
     // Only one row can have an open menu at a time. Click-outside closes it.
     const [openActionMenuId, setOpenActionMenuId] = useState(null);
@@ -1255,10 +1258,79 @@ export default function PositionsPage() {
     const handleUpdate = async (formData) => {
         if (!editPos) return;
         const reqs = parseRequirementsInput(formData.requirements);
-        await updatePosition(editPos.id, { title: formData.title, department: formData.department, minExperience: parseInt(formData.minExperience) || 0, requirements: reqs, description: formData.description || '' });
-        alert('✅ Pozisyon güncellendi.');
+        const previousTitle = editPos.title;
+        const nextPosition = {
+            title: formData.title,
+            department: formData.department,
+            minExperience: parseInt(formData.minExperience) || 0,
+            requirements: reqs,
+            description: formData.description || '',
+        };
+
+        // İçerik gerçekten değişti mi? Yalnızca departman/isim düzeltmesi
+        // yapıldığında adayları yeniden taramaya gerek yok.
+        const contentChanged =
+            previousTitle !== nextPosition.title
+            || (editPos.description || '') !== nextPosition.description
+            || JSON.stringify(editPos.requirements || []) !== JSON.stringify(reqs);
+
+        await updatePosition(editPos.id, nextPosition);
         setEditPos(null);
         setDetailPos(null);
+
+        if (!contentChanged) {
+            alert('✅ Pozisyon güncellendi.');
+            return;
+        }
+
+        // Kayıtlı analizler ARTIK ESKİ metne ait — skorları olduğu gibi
+        // göstermek yanıltıcı. Etkilenen adaylar: bu pozisyon için analizi
+        // olanlar ve pozisyona atanmış olanlar.
+        const positionForScan = { ...editPos, ...nextPosition };
+        const affected = enrichedCandidates.filter(
+            (c) => hasAnalysisForPosition(c, previousTitle)
+                || hasAnalysisForPosition(c, nextPosition.title)
+                || c.positionId === editPos.id
+        );
+
+        if (affected.length === 0) {
+            alert('✅ Pozisyon güncellendi. Bu pozisyon için kayıtlı aday analizi yok — tarama gerekmiyor.');
+            return;
+        }
+
+        const ok = window.confirm(
+            `✅ Pozisyon güncellendi.\n\n` +
+            `Gereksinimler değiştiği için ${affected.length} adayın kayıtlı analizi artık ESKİ metne ait.\n` +
+            `Bu adaylar yeni gereksinimlere göre şimdi yeniden taransın mı? (aday başına 1 AI çağrısı)\n\n` +
+            `Şimdi taramazsanız Adaylar sayfasından istediğiniz zaman yeniden tarayabilirsiniz.`
+        );
+        if (!ok) return;
+
+        setRescanProgress({ done: 0, total: affected.length });
+        let scanned = 0, skipped = 0, failed = 0;
+        let nextIdx = 0;
+        await Promise.all(Array.from({ length: Math.min(3, affected.length) }, async () => {
+            while (nextIdx < affected.length) {
+                const candidate = affected[nextIdx];
+                nextIdx += 1;
+                try {
+                    const result = await rescanCandidateForPosition(candidate, positionForScan, { previousTitle });
+                    if (result.status === 'scanned') { await updateCandidate(candidate.id, result.updates); scanned += 1; }
+                    else skipped += 1;
+                } catch {
+                    failed += 1;
+                }
+                setRescanProgress((p) => (p ? { ...p, done: p.done + 1 } : p));
+            }
+        }));
+        setRescanProgress(null);
+        addNotification({
+            title: 'Yeniden Tarama Tamamlandı',
+            message: `${scanned} aday yeni gereksinimlere göre yeniden puanlandı`
+                + (skipped > 0 ? ` · ${skipped} aday atlandı (CV metni yok/sonuç alınamadı)` : '')
+                + (failed > 0 ? ` · ${failed} hata` : ''),
+            type: failed > 0 ? 'warning' : 'success',
+        });
     };
 
     const handleRelease = async (pos) => {
@@ -1311,6 +1383,18 @@ export default function PositionsPage() {
     return (
         <div className="min-h-screen flex flex-col bg-slate-50">
             <Header title="Pozisyon Bankası" />
+
+            {/* Gereksinimler değişince etkilenen adaylar yeniden taranırken —
+                işlem sayfadan ayrılınca durur, bu yüzden görünür tutulur. */}
+            {rescanProgress && (
+                <div className="mx-6 mt-4 px-5 py-3 rounded-2xl border border-blue-200 bg-blue-50 flex items-center gap-3">
+                    <Loader2 className="w-4 h-4 text-blue-500 animate-spin shrink-0" />
+                    <p className="text-sm font-semibold text-blue-700">
+                        Adaylar yeni gereksinimlere göre yeniden taranıyor — {rescanProgress.done} / {rescanProgress.total}
+                    </p>
+                    <span className="text-[11px] text-blue-500">Bu sayfadan ayrılmayın</span>
+                </div>
+            )}
 
             {/* Pending banner */}
             {isRecruiterOrAdmin && pendingCount > 0 && (
