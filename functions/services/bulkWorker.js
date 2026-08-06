@@ -186,6 +186,14 @@ export function positionTitleOf(position) {
 const STOP_WORDS = new Set([
     've', 'ile', 'için', 'veya', 'gibi', 'olan', 'daha', 'çok', 'yıl', 'en', 'az',
     'artı', 'tercihen', 'bir', 'her', 'şey', 'olma', 'olması', 'sahip', 'temel',
+    // Gereksinim cümlelerinin taşıyıcı isimleri. Bunlar İŞİN NE OLDUĞUNU
+    // söylemez ("... deneyimi", "... bilgisi") ama her ilanda geçtikleri için
+    // yetkinlik kefesini şişirip gerçek sinyali sulandırıyorlardı. Daha
+    // kötüsü: adayın özetinde "deneyimi" yazması tek başına isabet sayılıyordu.
+    'deneyim', 'deneyimi', 'deneyimli', 'bilgi', 'bilgisi', 'hakimiyet',
+    'hakimiyeti', 'tecrübe', 'tecrübesi', 'yetkinlik', 'yetkinliği',
+    'seviye', 'seviyesi', 'seviyede', 'konusunda', 'alanında', 'üzeri',
+    'minimum', 'tercih', 'edilir', 'olmak', 'yapabilme', 'becerisi',
 ]);
 
 function requirementTerms(texts) {
@@ -195,6 +203,32 @@ function requirementTerms(texts) {
         .split(/[^\p{L}\p{N}+#./]+/u)
         .filter((w) => w.length >= 3 && !STOP_WORDS.has(w));
 }
+
+/**
+ * ARAÇ terimleri: belirli ürün/teknoloji adları. Yetkinlik terimlerinden
+ * ("funnel", "aktivasyon", "büyüme") ayrı tutulur ve skorda daha az ağırlık
+ * taşır — aday işi yapmışsa, kullandığı aracın adını CV'sinde anmamış olması
+ * onu ön elemede diskalifiye etmemeli.
+ *
+ * src/services/matchService.js içindeki TOOL_TERMS'in sunucu ikizidir; tek
+ * fark, buradaki liste TEK KELİMELİK olmak zorunda: requirementTerms cümleyi
+ * kelimelere böler, dolayısıyla "google analytics" / "power bi" gibi çok
+ * kelimeli adlar bu kümede eşleşemez. Tek başına 'google' ya da 'analytics'
+ * eklemedik — ikisi de yetkinlik cümlelerinde geçebilir ve yanlış tarafa
+ * düşerdi.
+ */
+const TOOL_TERMS = new Set([
+    'amplitude', 'mixpanel', 'ga4', 'metabase', 'looker', 'tableau',
+    'jira', 'figma', 'sql', 'nosql', 'postgresql', 'redis', 'kafka',
+    'docker', 'kubernetes', 'aws', 'azure', 'gcp', 'jenkins', 'terraform',
+    'ci/cd', 'pandas', 'numpy', 'spark', 'hadoop',
+    '.net', 'c#', 'java', 'spring', 'node', 'python', 'django',
+    'react', 'vue', 'angular', 'javascript', 'typescript', 'next.js',
+    'tailwind', 'bootstrap', 'flutter', 'swift', 'kotlin', 'golang',
+]);
+
+const CAPABILITY_SHARE = 0.75;
+const TOOL_SHARE = 0.25;
 
 /**
  * Pozisyonun gereksinimlerini {text, must} biçiminde döndürür.
@@ -230,6 +264,10 @@ export function positionRequirements(position) {
  *     birbiriyle çelişmesin.
  *   - İşaretlenmemişse: başlık %40, gereksinimler %60 (önceki davranış).
  *   - Gereksinim yoksa: başlık %100.
+ *
+ * Her gereksinim kefesi kendi içinde yetkinlik %75 / araç %25 olarak
+ * ağırlıklandırılır (TOOL_TERMS). Derin taramadaki CAPABILITY_SHARE/TOOL_SHARE
+ * ile aynı denge — ön skor ile derin skor birbiriyle çelişmesin.
  */
 export function calculateSimpleMatchScore(candidate, position) {
     const title = positionTitleOf(position);
@@ -247,6 +285,22 @@ export function calculateSimpleMatchScore(candidate, position) {
         return hits / valid.length;
     };
 
+    // Gereksinim terimleri için yetkinlik/araç ağırlıklı oran. Başlıkta
+    // kullanılmaz: başlıktaki her kelime aynı derecede belirleyicidir.
+    // Kümelerden biri boşsa diğeri tüm ağırlığı alır.
+    const weightedRatio = (terms) => {
+        const valid = terms.filter((w) => w.length > 2);
+        if (valid.length === 0) return null;
+        const hitRatio = (subset) => (subset.length === 0
+            ? null
+            : subset.filter((w) => haystack.includes(w)).length / subset.length);
+        const capRatio = hitRatio(valid.filter((w) => !TOOL_TERMS.has(w)));
+        const toolRatio = hitRatio(valid.filter((w) => TOOL_TERMS.has(w)));
+        if (capRatio === null) return toolRatio;
+        if (toolRatio === null) return capRatio;
+        return (capRatio * CAPABILITY_SHARE) + (toolRatio * TOOL_SHARE);
+    };
+
     const titleRatio = ratio(title.toLowerCase().split(/\s+/)) ?? 0;
 
     const reqs = positionRequirements(position);
@@ -254,13 +308,13 @@ export function calculateSimpleMatchScore(candidate, position) {
 
     const prioritized = reqs.some((r) => r.must !== null);
     if (!prioritized) {
-        const reqRatio = ratio(requirementTerms(reqs.map((r) => r.text)));
+        const reqRatio = weightedRatio(requirementTerms(reqs.map((r) => r.text)));
         const score = reqRatio === null ? titleRatio * 100 : (titleRatio * 40) + (reqRatio * 60);
         return Math.min(100, Math.round(score));
     }
 
-    const mustRatio = ratio(requirementTerms(reqs.filter((r) => r.must).map((r) => r.text)));
-    const niceRatio = ratio(requirementTerms(reqs.filter((r) => r.must === false).map((r) => r.text)));
+    const mustRatio = weightedRatio(requirementTerms(reqs.filter((r) => r.must).map((r) => r.text)));
+    const niceRatio = weightedRatio(requirementTerms(reqs.filter((r) => r.must === false).map((r) => r.text)));
     // Kefelerden biri boşsa ağırlığı diğerine devredilmez; eksik kefe
     // yalnızca puan üretmez (tercih edilen yoksa tavan %85'te kalır).
     const score = (titleRatio * 25) + ((mustRatio ?? 0) * 60) + ((niceRatio ?? 0) * 15);
