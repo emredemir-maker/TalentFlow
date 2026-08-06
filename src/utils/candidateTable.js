@@ -119,6 +119,41 @@ export function scoreForPosition(candidate, position, keywordScoreFn) {
 }
 
 /**
+ * GÖSTERİLEN metin de GÖSTERİLEN pozisyonun metnidir.
+ *
+ * Arayüz analiz metnini tek bir `aiAnalysis.summary` alanından okuyordu; oysa
+ * analizler pozisyon BAŞLIĞIYLA anahtarlı `positionAnalyses` haritasında ayrı
+ * ayrı duruyor. Sonuç: aday hangi pozisyon bağlamında açılırsa açılsın aynı
+ * yorum görünüyordu — kullanıcı "bu yorum hep sabit kalıyor" diye bildirdi.
+ *
+ * Öncelik: gösterilen pozisyonun kayıtlı analizi → aynı pozisyon için
+ * üretilmiş `aiAnalysis` → (yoksa) null. Null dönerse çağıran, elindeki
+ * `aiAnalysis`'i "başka pozisyon için üretilmiş" uyarısıyla gösterebilir.
+ *
+ * @returns {{summary: string, analyzedFor: string, score: number|null}|null}
+ */
+export function analysisForPosition(candidate, positionTitle) {
+    if (!candidate || !positionTitle) return null;
+    const saved = candidate.positionAnalyses?.[positionTitle];
+    if (saved?.summary) {
+        return {
+            summary: saved.summary,
+            analyzedFor: positionTitle,
+            score: Number.isFinite(Number(saved.score)) ? Number(saved.score) : null,
+        };
+    }
+    const ai = candidate.aiAnalysis;
+    if (ai?.summary && ai.analyzedForPosition === positionTitle) {
+        return {
+            summary: ai.summary,
+            analyzedFor: positionTitle,
+            score: Number.isFinite(Number(ai.score)) ? Number(ai.score) : null,
+        };
+    }
+    return null;
+}
+
+/**
  * Skor tutarlılığı kuralı: GÖSTERİLEN skor, GÖSTERİLEN pozisyonun skorudur.
  *
  * Adayın matchedPositionTitle'ı açık bir pozisyona işaret ediyorsa satırdaki
