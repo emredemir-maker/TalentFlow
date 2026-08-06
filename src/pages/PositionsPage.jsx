@@ -22,7 +22,10 @@ import {
 import PotentialCandidatesTab from '../components/PotentialCandidatesTab';
 import { useCandidates } from '../context/CandidatesContext';
 import { extractPositionFromJD } from '../services/geminiService';
-import { parseRequirementsInput, formatRequirementsInput } from '../utils/positionRequirements';
+import {
+    formatRequirementsInput, parseRequirementGroups, formatRequirementGroups,
+    requirementsOf, hasPrioritizedRequirements,
+} from '../utils/positionRequirements';
 import { rescanCandidateForPosition, hasAnalysisForPosition } from '../services/scanService';
 import RescanPositionModal from '../components/RescanPositionModal';
 import { getAuthHeaders } from '../services/ai/config';
@@ -677,7 +680,7 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
 // ─────────────────────────────────────────────────────────────
 function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser, userDepartments, isExtracting, onExtract, jdText, setJdText }) {
     const [formData, setFormData] = useState({
-        title: '', department: isDepartmentUser ? (userDepartments?.[0] || '') : '', minExperience: '', requirements: '', description: '',
+        title: '', department: isDepartmentUser ? (userDepartments?.[0] || '') : '', minExperience: '', requirements: '', niceToHave: '', description: '',
         screeningEnabled: false, screeningQuestions: [''],
     });
     const [suggestingQuestions, setSuggestingQuestions] = useState(false);
@@ -828,16 +831,27 @@ function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser,
                                 />
                             </Field>
                         </div>
-                        <Field label="Gereksinimler">
+                        <Field label="Olmazsa olmaz gereksinimler">
                             <textarea
-                                placeholder={'Her satıra bir gereksinim yazın:\n3-5 yıl ürün yönetimi deneyimi, en az 1-2 yılı growth odaklı\nFunnel sahipliği: kayıt, aktivasyon, elde tutma\nA/B test ve deney kurma deneyimi'}
+                                placeholder={'Her satıra bir madde:\n3-5 yıl ürün yönetimi deneyimi, en az 1-2 yılı growth odaklı\nFunnel sahipliği: kayıt, aktivasyon, elde tutma\nA/B test ve deney kurma deneyimi'}
                                 value={formData.requirements}
                                 onChange={e => setFormData(p => ({ ...p, requirements: e.target.value }))}
-                                className={INPUT_CLS + ' h-36 resize-y font-mono text-[12px] leading-relaxed'}
+                                className={INPUT_CLS + ' h-32 resize-y font-mono text-[12px] leading-relaxed'}
                             />
                             <p className="text-[10px] text-slate-400 mt-1">
-                                Satır başına bir madde — madde içindeki virgüller korunur. Yalnızca teknoloji adı değil,
-                                aranan yetkinliği yazın; otonom tarama bu maddelere göre puanlar.
+                                Karşılanmaması <strong>skoru düşürür</strong>. Satır başına bir madde — madde içindeki
+                                virgüller korunur. Teknoloji adı değil, aranan yetkinliği yazın.
+                            </p>
+                        </Field>
+                        <Field label="Olursa iyi olur (tercih edilen)">
+                            <textarea
+                                placeholder={'Her satıra bir madde:\nTercihen B2B SaaS geçmişi\nPLG / self-servis akış deneyimi\nFiyatlandırma-paketleme çalışmaları'}
+                                value={formData.niceToHave}
+                                onChange={e => setFormData(p => ({ ...p, niceToHave: e.target.value }))}
+                                className={INPUT_CLS + ' h-24 resize-y font-mono text-[12px] leading-relaxed'}
+                            />
+                            <p className="text-[10px] text-slate-400 mt-1">
+                                Karşılanmaması ceza üretmez; karşılanması <strong>sınırlı bir avantaj</strong> sağlar.
                             </p>
                         </Field>
                         <Field label="Pozisyon Açıklaması">
@@ -975,7 +989,11 @@ function PositionEditModal({ pos, candidates, departments, isDepartmentUser, use
         title: pos.title || '',
         department: pos.department || '',
         minExperience: pos.minExperience?.toString() || '0',
-        requirements: formatRequirementsInput(pos.requirements),
+        // İşaretlenmemiş eski ilanlarda tüm maddeler "olmazsa olmaz" kutusuna
+        // gelir; kullanıcı tercih edilenleri alt kutuya taşıyabilir.
+        ...(hasPrioritizedRequirements(pos)
+            ? (({ mustText, niceText }) => ({ requirements: mustText, niceToHave: niceText }))(formatRequirementGroups(requirementsOf(pos)))
+            : { requirements: formatRequirementsInput(pos.requirements), niceToHave: '' }),
         description: pos.description || '',
     });
     const candidateCount = pos.matchedCandidates?.length || 0;
@@ -1109,16 +1127,26 @@ function PositionEditModal({ pos, candidates, departments, isDepartmentUser, use
                             <Field label="Min. Tecrübe (yıl)">
                                 <input type="number" min="0" value={formData.minExperience} onChange={e => setFormData(p => ({ ...p, minExperience: e.target.value }))} className={INPUT_CLS} />
                             </Field>
-                            <Field label="Gereksinimler">
+                            <Field label="Olmazsa olmaz gereksinimler">
                                 <textarea
                                     value={formData.requirements}
                                     onChange={e => setFormData(p => ({ ...p, requirements: e.target.value }))}
-                                    className={INPUT_CLS + ' h-40 resize-y font-mono text-[12px] leading-relaxed'}
-                                    placeholder={'Her satıra bir gereksinim yazın:\n3-5 yıl ürün yönetimi deneyimi, en az 1-2 yılı growth odaklı\nFunnel sahipliği: kayıt, aktivasyon, elde tutma\nA/B test ve deney kurma deneyimi'}
+                                    className={INPUT_CLS + ' h-32 resize-y font-mono text-[12px] leading-relaxed'}
+                                    placeholder={'Her satıra bir madde:\n3-5 yıl ürün yönetimi deneyimi, en az 1-2 yılı growth odaklı\nFunnel sahipliği: kayıt, aktivasyon, elde tutma'}
                                 />
                                 <p className="text-[10px] text-slate-400 mt-1">
-                                    Satır başına bir madde — madde içindeki virgüller korunur. Yalnızca teknoloji adı değil,
-                                    aranan yetkinliği yazın; otonom tarama bu maddelere göre puanlar.
+                                    Karşılanmaması <strong>skoru düşürür</strong>. Satır başına bir madde.
+                                </p>
+                            </Field>
+                            <Field label="Olursa iyi olur (tercih edilen)">
+                                <textarea
+                                    value={formData.niceToHave}
+                                    onChange={e => setFormData(p => ({ ...p, niceToHave: e.target.value }))}
+                                    className={INPUT_CLS + ' h-24 resize-y font-mono text-[12px] leading-relaxed'}
+                                    placeholder={'Tercihen B2B SaaS geçmişi\nPLG / self-servis akış deneyimi'}
+                                />
+                                <p className="text-[10px] text-slate-400 mt-1">
+                                    Ceza üretmez; karşılanması <strong>sınırlı avantaj</strong> sağlar.
                                 </p>
                             </Field>
                             <Field label="Açıklama">
@@ -1237,8 +1265,11 @@ export default function PositionsPage() {
 
     const handleCreate = async (formData) => {
         if (!formData.title || !formData.department) return;
-        const reqs = parseRequirementsInput(formData.requirements);
-        const positionObj = { ...formData, requirements: reqs };
+        // requirementsMeta kaynak; düz `requirements` ondan türetilir ve
+        // yazılmaya devam eder (Excel, eski okuyucular, AI ilan metni).
+        const meta = parseRequirementGroups({ mustText: formData.requirements, niceText: formData.niceToHave });
+        const reqs = meta.map((r) => r.text);
+        const positionObj = { ...formData, requirements: reqs, requirementsMeta: meta };
         // Domain-filter first: only score candidates in the same job domain
         const domainCandidates = filterCandidatesByDomain(positionObj, candidates);
         const matchedCandidates = domainCandidates
@@ -1253,7 +1284,7 @@ export default function PositionsPage() {
             title: formData.title, department: formData.department,
             description: formData.description || '',
             minExperience: parseInt(formData.minExperience) || 0,
-            requirements: reqs, matchedCandidates,
+            requirements: reqs, requirementsMeta: meta, matchedCandidates,
             screeningEnabled: formData.screeningEnabled && cleanedQuestions.length > 0,
             screeningQuestions: cleanedQuestions,
         };
@@ -1269,22 +1300,26 @@ export default function PositionsPage() {
 
     const handleUpdate = async (formData) => {
         if (!editPos) return;
-        const reqs = parseRequirementsInput(formData.requirements);
+        const meta = parseRequirementGroups({ mustText: formData.requirements, niceText: formData.niceToHave });
+        const reqs = meta.map((r) => r.text);
         const previousTitle = editPos.title;
         const nextPosition = {
             title: formData.title,
             department: formData.department,
             minExperience: parseInt(formData.minExperience) || 0,
             requirements: reqs,
+            requirementsMeta: meta,
             description: formData.description || '',
         };
 
         // İçerik gerçekten değişti mi? Yalnızca departman/isim düzeltmesi
-        // yapıldığında adayları yeniden taramaya gerek yok.
+        // yapıldığında adayları yeniden taramaya gerek yok. Zorunlu/tercihen
+        // işaretlemesinin değişmesi de skoru etkiler — o da içerik sayılır.
         const contentChanged =
             previousTitle !== nextPosition.title
             || (editPos.description || '') !== nextPosition.description
-            || JSON.stringify(editPos.requirements || []) !== JSON.stringify(reqs);
+            || JSON.stringify(editPos.requirements || []) !== JSON.stringify(reqs)
+            || JSON.stringify(editPos.requirementsMeta || []) !== JSON.stringify(meta);
 
         await updatePosition(editPos.id, nextPosition);
         setEditPos(null);

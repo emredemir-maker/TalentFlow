@@ -188,6 +188,45 @@ function starScoreOf(starAnalysis) {
     return clampScore((sum / 4) * 10);
 }
 
+const MUST_WEIGHT = 85;
+const NICE_WEIGHT = 15;
+
+/**
+ * Madde numaralarına göre AĞIRLIKLI kapsama: olmazsa olmazların karşılanmaması
+ * skoru sert düşürür, "olursa iyi olur" maddeleri yalnızca sınırlı bir avantaj
+ * sağlar. Modelin tek bir coverageScore sayısına güvenmek yerine, madde
+ * durumları koda göre toplanır.
+ *
+ * @param {object} coverage — extractedData.requirementCoverage
+ * @param {Array<{text: string, must: boolean|null}>} requirements
+ * @returns {number|null} işaretlenmiş gereksinim yoksa null (nötr davranış)
+ */
+function weightedCoverageOf(coverage, requirements) {
+    const assessments = coverage?.assessments;
+    if (!Array.isArray(assessments) || !Array.isArray(requirements) || requirements.length === 0) return null;
+
+    const indexed = requirements.map((r, i) => ({ ...r, index: i + 1 }));
+    const must = indexed.filter((r) => r.must === true);
+    const nice = indexed.filter((r) => r.must === false);
+    if (must.length === 0 && nice.length === 0) return null; // işaretlenmemiş ilan
+
+    const statusByIndex = new Map();
+    for (const a of assessments) {
+        const idx = Number(a?.index);
+        if (Number.isFinite(idx)) statusByIndex.set(idx, String(a?.status || '').toLowerCase());
+    }
+    const weightOf = (status) => (status === 'met' ? 1 : status === 'partial' ? 0.5 : 0);
+    const ratioOf = (subset) => (subset.length === 0
+        ? null
+        : subset.reduce((sum, r) => sum + weightOf(statusByIndex.get(r.index)), 0) / subset.length);
+
+    const mustRatio = ratioOf(must);
+    const niceRatio = ratioOf(nice);
+    if (mustRatio === null) return clampScore(niceRatio * 100);
+    if (niceRatio === null) return clampScore(mustRatio * 100);
+    return clampScore(mustRatio * MUST_WEIGHT + niceRatio * NICE_WEIGHT);
+}
+
 /**
  * Gereksinim karşılama oranı → 0-100. Model coverageScore verdiyse onu,
  * vermediyse met/partial/missing sayımından türetir. İkisi de yoksa null.
@@ -211,10 +250,13 @@ function coverageScoreOf(coverage) {
  * (yalnızca STAR) düşülür, o da yoksa deneyim + anahtar kelime yedeği çalışır.
  * Böylece eski kayıtlar ve beklenmedik AI çıktıları skoru sıfırlamaz.
  */
-export function calculateHybridScore(data) {
+export function calculateHybridScore(data, requirements) {
     if (!data) return 0;
     const star = starScoreOf(data.starAnalysis);
-    const coverage = coverageScoreOf(data.requirementCoverage);
+    // Zorunlu/tercihen işaretlemesi varsa ağırlıklı kapsama kullanılır;
+    // yoksa modelin verdiği tek sayıya düşülür (eski davranış).
+    const coverage = weightedCoverageOf(data.requirementCoverage, requirements)
+        ?? coverageScoreOf(data.requirementCoverage);
 
     if (coverage !== null && star !== null) {
         return clampScore(coverage * COVERAGE_WEIGHT + star * STAR_WEIGHT);
@@ -232,10 +274,12 @@ export function calculateHybridScore(data) {
     return Math.min(score, 100);
 }
 
-export async function analyzeCandidateMatch(jobDescription, candidateProfile, modelId = 'gemini-2.5-flash') {
+export async function analyzeCandidateMatch(jobDescription, candidateProfile, modelId = 'gemini-2.5-flash', options = {}) {
     const safeCandidateProfile = stripPiiForAI(candidateProfile);
     const evidence = await extractCandidateEvidence(jobDescription, safeCandidateProfile, modelId);
-    const score = calculateHybridScore(evidence.extractedData);
+    // options.requirements verilirse (zorunlu/tercihen işaretli liste) kapsama
+    // skoru madde ağırlıklarıyla hesaplanır.
+    const score = calculateHybridScore(evidence.extractedData, options.requirements);
 
     // Coerce undefined → null so Firestore writes don't reject. The AI
     // sometimes omits starAnalysis or summary fields entirely; downstream

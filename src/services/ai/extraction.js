@@ -6,15 +6,19 @@ const EXTRACTOR_PROMPT = `
 Sen kıdemli ve son derece analitik bir İşe Alım Yöneticisisin. Görevin, adayı İLANIN GEREKSİNİMLERİ karşısında değerlendirmek.
 
 ÇOK ÖNEMLİ KURALLAR:
-1. Gereksinim Karşılama (requirementCoverage): JOB_DESCRIPTION içindeki her bir
-   gereksinimi tek tek ele al ve YALNIZCA CV'deki kanıta dayanarak sınıflandır:
+1. Gereksinim Karşılama (requirementCoverage): JOB_DESCRIPTION içinde
+   gereksinimler NUMARALI bir liste olarak verilir; bazıları [ZORUNLU],
+   bazıları [TERCİHEN] etiketlidir. Her maddeyi tek tek ele al ve YALNIZCA
+   CV'deki kanıta dayanarak sınıflandır:
    - "met": CV'de açık kanıt var
    - "partial": Dolaylı/kısmi kanıt var
    - "missing": Kanıt yok
-   Gereksinimi kısa ve tanınabilir biçimde yaz (ilanın cümlesini birebir kopyalama).
-   "coverageScore": karşılanma oranını 0-100 arası tek sayı olarak ver
-   (met tam, partial yarım sayılır). İyi yazılmış ama ilanla ilgisiz bir CV
-   DÜŞÜK coverageScore almalıdır — CV kalitesi bu alanı YÜKSELTMEZ.
+   "assessments" dizisinde her madde için maddenin NUMARASINI ("index") ve
+   durumunu ver. Listedeki HER madde için tam olarak bir kayıt olmalı.
+   Ayrıca "coverageScore": karşılanma oranını 0-100 arası tek sayı olarak ver
+   (met tam, partial yarım sayılır; [ZORUNLU] maddeler çok daha ağır basar).
+   İyi yazılmış ama ilanla ilgisiz bir CV DÜŞÜK coverageScore almalıdır —
+   CV kalitesi bu alanı YÜKSELTMEZ.
 2. STAR Analizi: Her kategori (S, T, A, R) için 1-10 arası puan ver.
    - "reason" alanında mutlaka şunları belirt: "Pozitif (+): [Adayın öne çıkan güçlü yanı], Negatif (-): [Eksik veya geliştirilmesi gereken nokta]".
    - STAR, anlatım/kanıt KALİTESİNİ ölçer; ilana uygunluğu değil.
@@ -28,6 +32,7 @@ Sen kıdemli ve son derece analitik bir İşe Alım Yöneticisisin. Görevin, ad
     "matchedKeywords": ["keyword1"],
     "missingKeywords": ["keyword2"],
     "requirementCoverage": {
+        "assessments": [{ "index": 1, "status": "met|partial|missing", "note": "kısa gerekçe" }],
         "met": ["karşılanan gereksinim"],
         "partial": ["kısmen karşılanan gereksinim"],
         "missing": ["karşılanmayan gereksinim"],

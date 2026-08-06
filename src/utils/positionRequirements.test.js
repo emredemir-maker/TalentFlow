@@ -6,7 +6,11 @@
 // hem de AI'a giden ilan metni bozuluyordu.
 import { describe, expect, it } from 'vitest';
 
-import { parseRequirementsInput, formatRequirementsInput } from './positionRequirements';
+import {
+    parseRequirementsInput, formatRequirementsInput,
+    parseRequirementGroups, formatRequirementGroups,
+    requirementsOf, hasPrioritizedRequirements, buildJobDescription,
+} from './positionRequirements';
 
 describe('parseRequirementsInput', () => {
     it('splits on lines and keeps commas inside a requirement', () => {
@@ -67,5 +71,74 @@ describe('formatRequirementsInput', () => {
         expect(formatRequirementsInput(null)).toBe('');
         expect(formatRequirementsInput(undefined)).toBe('');
         expect(formatRequirementsInput('Growth')).toBe('Growth');
+    });
+});
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Zorunlu / tercihen ayrımı.
+// GERİYE DÖNÜK NÖTRLÜK kuralı: meta yoksa hiçbir madde işaretli sayılmaz ve
+// skorlama bugünkü davranışını korur — mevcut ilanların puanları kullanıcı
+// açıkça işaretleme yapana kadar değişmemeli.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('parseRequirementGroups / formatRequirementGroups', () => {
+    it('marks the two boxes as must and nice', () => {
+        const meta = parseRequirementGroups({
+            mustText: '3-5 yıl ürün yönetimi, growth odaklı\nA/B test kurma',
+            niceText: 'Tercihen B2B SaaS',
+        });
+        expect(meta).toEqual([
+            { text: '3-5 yıl ürün yönetimi, growth odaklı', must: true },
+            { text: 'A/B test kurma', must: true },
+            { text: 'Tercihen B2B SaaS', must: false },
+        ]);
+    });
+
+    it('round-trips back into the two boxes', () => {
+        const groups = { mustText: 'A\nB', niceText: 'C' };
+        expect(formatRequirementGroups(parseRequirementGroups(groups))).toEqual(groups);
+    });
+
+    it('handles empty boxes', () => {
+        expect(parseRequirementGroups({})).toEqual([]);
+        expect(formatRequirementGroups(null)).toEqual({ mustText: '', niceText: '' });
+    });
+});
+
+describe('requirementsOf', () => {
+    it('reads priorities from requirementsMeta', () => {
+        expect(requirementsOf({ requirementsMeta: [{ text: 'A', must: true }, { text: 'B', must: false }] }))
+            .toEqual([{ text: 'A', must: true }, { text: 'B', must: false }]);
+    });
+
+    it('returns must:null for legacy positions so scoring stays neutral', () => {
+        expect(requirementsOf({ requirements: ['A', 'B'] }))
+            .toEqual([{ text: 'A', must: null }, { text: 'B', must: null }]);
+        expect(hasPrioritizedRequirements({ requirements: ['A'] })).toBe(false);
+        expect(hasPrioritizedRequirements({ requirementsMeta: [{ text: 'A', must: true }] })).toBe(true);
+    });
+
+    it('tolerates a missing/empty position', () => {
+        expect(requirementsOf(null)).toEqual([]);
+        expect(requirementsOf({})).toEqual([]);
+    });
+});
+
+describe('buildJobDescription', () => {
+    it('numbers the requirements and labels their priority', () => {
+        const text = buildJobDescription({
+            title: 'Growth PM',
+            requirementsMeta: [{ text: 'Funnel sahipliği', must: true }, { text: 'B2B SaaS', must: false }],
+            description: 'Kısa açıklama',
+        });
+        expect(text).toContain('1. [ZORUNLU] Funnel sahipliği');
+        expect(text).toContain('2. [TERCİHEN] B2B SaaS');
+        expect(text).toContain('Kısa açıklama');
+    });
+
+    it('leaves legacy requirements unlabelled', () => {
+        const text = buildJobDescription({ title: 'X', requirements: ['A'] });
+        expect(text).toContain('1. A');
+        expect(text).not.toContain('ZORUNLU');
     });
 });

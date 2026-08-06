@@ -1,5 +1,6 @@
 // src/services/matchService.js
 import { analyzeCandidateMatch } from './geminiService';
+import { requirementsOf, hasPrioritizedRequirements } from '../utils/positionRequirements';
 
 /**
  * Semantic Technology Groups to improve matching without LLM for every call
@@ -442,65 +443,99 @@ export function calculateMatchScore(candidate, position, options = {}) {
     }
 
 
-    // NEW: Extract actual tech keywords from requirements + description
-    // This solves the issue where requirements are long sentences.
-    const allReqText = [
-        ...(position.requirements || []),
-        position.description || '',
-        position.jobDescription || ''
-    ].join(' ').toLowerCase();
+    // Gereksinim metninden bilinen yetkinlik terimlerini çıkar — gereksinimler
+    // uzun cümleler olduğu için doğrudan karşılaştırma işe yaramıyor.
+    const termsIn = (text) => {
+        const lower = String(text || '').toLowerCase();
+        const found = new Set();
+        Object.values(TECH_GROUPS).flat().forEach(tech => {
+            if (termMatches(lower, tech)) found.add(tech);
+        });
+        return found;
+    };
 
-    const requiredKeywords = new Set();
-
-    // Scan text for known skill terms (kelime sınırlı — 'go' artık "good"
-    // içinde, 'coding' "vibecoding" içinde eşleşmez)
-    Object.values(TECH_GROUPS).flat().forEach(tech => {
-        if (termMatches(allReqText, tech)) {
-            requiredKeywords.add(tech);
+    /** Aday bu terime sahip mi? Tam eşleşme 1, aynı gruptan bir yakınlık 0.5. */
+    const matchStrength = (req) => {
+        // req.includes(skill) yönü yalnızca 3+ karakterlik yetenekler için
+        // geçerli — aksi halde "R" gibi tek harflik bir yetenek her
+        // gereksinimle eşleşiyordu.
+        const directMatch = cSkills.some(
+            skill => skill.includes(req) || (skill.length >= 3 && req.includes(skill))
+        );
+        if (directMatch) return 1;
+        for (const group in TECH_GROUPS) {
+            if (TECH_GROUPS[group].includes(req) &&
+                TECH_GROUPS[group].some(g => cSkills.some(skill => skill.includes(g)))) {
+                return 0.5;
+            }
         }
-    });
+        return 0;
+    };
 
-    // Fallback: If no known tech found, try to use title words as keywords
-    if (requiredKeywords.size === 0 && position.title) {
-        const titleWords = position.title.toLowerCase().split(' ').filter(w => w.length > 2);
-        titleWords.forEach(w => requiredKeywords.add(w));
-    }
+    const coverageOf = (terms) => {
+        const list = Array.from(terms);
+        if (list.length === 0) return null;
+        const hits = list.reduce((sum, req) => sum + matchStrength(req), 0);
+        return { ratio: Math.min(hits / list.length, 1), hits, total: list.length };
+    };
 
-    const validReqs = Array.from(requiredKeywords);
-    let matchCount = 0;
+    // Zorunlu / tercihen ayrımı yapılmışsa iki küme ayrı değerlendirilir.
+    // Ayrım YOKSA (eski ilanlar) tek küme üzerinden bugünkü davranış korunur.
+    const prioritized = hasPrioritizedRequirements(position);
+    const reqList = requirementsOf(position);
+    const descText = `${position.description || ''} ${position.jobDescription || ''}`;
+
     let skillRatio = 0;
 
-    if (validReqs.length > 0) {
-        validReqs.forEach(req => {
-            // Does candidate have this specific keyword?
-            // "C#" vs ".NET" handling via Groups is implicit if we matched the Group keywords?
-            // No, strictly check if candidate skill overlaps with req.
-            // req.includes(skill) yönü yalnızca 3+ karakterlik yetenekler için
-            // geçerli — aksi halde "R" gibi tek harflik bir yetenek her
-            // gereksinimle eşleşiyordu.
-            const directMatch = cSkills.some(
-                skill => skill.includes(req) || (skill.length >= 3 && req.includes(skill))
-            );
+    if (prioritized) {
+        const mustTerms = termsIn(reqList.filter(r => r.must).map(r => r.text).join(' '));
+        // Açıklama metni "tercihen" kefesine yazılır: ilanı renklendiren
+        // ifadeler zorunluluk gibi cezalandırılmamalı.
+        const niceTerms = termsIn(
+            `${reqList.filter(r => !r.must).map(r => r.text).join(' ')} ${descText}`
+        );
+        mustTerms.forEach(t => niceTerms.delete(t));
 
-            if (directMatch) {
-                matchCount++;
-            } else {
-                // Check if related tech exists (Semantic Group fallback)
-                for (const group in TECH_GROUPS) {
-                    if (TECH_GROUPS[group].includes(req) &&
-                        TECH_GROUPS[group].some(g => cSkills.some(skill => skill.includes(g)))) {
-                        matchCount += 0.5;
-                        break;
-                    }
-                }
+        const must = coverageOf(mustTerms);
+        const nice = coverageOf(niceTerms);
+
+        if (must) {
+            skillRatio = must.ratio;
+            score += Math.round(must.ratio * 70);
+            const missing = must.total - must.hits;
+            if (must.hits > 0) reasons.push(`${Math.ceil(must.hits)}/${must.total} olmazsa olmaz karşılanıyor`);
+            if (missing >= 1) reasons.push(`${Math.round(missing)} olmazsa olmaz eksik`);
+        }
+        if (nice) {
+            // "Olursa iyi olur" tarafı ceza üretmez, yalnızca avantaj sağlar.
+            const bonus = Math.round(nice.ratio * 10);
+            if (bonus > 0) {
+                score += bonus;
+                reasons.push(`Tercih edilen yetkinliklerde +${bonus}`);
             }
-        });
-
-        skillRatio = Math.min(matchCount / validReqs.length, 1);
-        score += Math.round(skillRatio * 70);
-
-        if (matchCount > 0) reasons.push(`${Math.ceil(matchCount)} teknik yetkinlik eşleşmesi`);
+        }
+        if (!must && nice) skillRatio = nice.ratio;
+    } else {
+        const allTerms = termsIn([
+            ...(position.requirements || []),
+            position.description || '',
+            position.jobDescription || '',
+        ].join(' '));
+        // Bilinen terim yoksa başlık kelimelerine düşülür
+        if (allTerms.size === 0 && position.title) {
+            position.title.toLowerCase().split(' ').filter(w => w.length > 2).forEach(w => allTerms.add(w));
+        }
+        const all = coverageOf(allTerms);
+        if (all) {
+            skillRatio = all.ratio;
+            score += Math.round(all.ratio * 70);
+            if (all.hits > 0) reasons.push(`${Math.ceil(all.hits)} teknik yetkinlik eşleşmesi`);
+        }
     }
+
+    const validReqs = prioritized
+        ? requirementsOf(position).filter(r => r.must)
+        : (position.requirements || []);
 
 
 
@@ -550,14 +585,13 @@ export function calculateMatchScore(candidate, position, options = {}) {
     }
 
     // --- PENALTIES ---
-    // Critical: If skill overlap is very low (less than 25%), slash the score.
-    // This solves "Backend Developer matches Frontend Job because of Title+Years"
-    // We use skillRatio calculated from keywords.
+    // Örtüşme çok düşükse (%25 altı) skor kırpılır. "Backend Developer,
+    // unvan+kıdem sayesinde Frontend ilanına yüksek puan alıyor" vakasını
+    // çözer. Zorunlu/tercihen ayrımı yapılmışsa oran ZORUNLU maddelerden
+    // hesaplanır — tercih edilenleri karşılamamak ceza üretmez.
     if (validReqs.length > 0 && skillRatio < 0.25) {
-        // However, be careful not to penalize if matchCount > 0 but low ratio?
-        // Let's stick to the plan: if relevant tech is missing, penalty.
         score = Math.round(score * 0.4);
-        reasons.push('Yetersiz teknik yetkinlik eşleşmesi');
+        reasons.push(prioritized ? 'Olmazsa olmaz gereksinimler karşılanmıyor' : 'Yetersiz teknik yetkinlik eşleşmesi');
     }
 
 

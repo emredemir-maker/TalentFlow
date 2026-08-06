@@ -82,3 +82,58 @@ describe('calculateHybridScore', () => {
         })).toBe(80);
     });
 });
+
+
+describe('calculateHybridScore — zorunlu/tercihen ağırlıkları', () => {
+    const REQS = [
+        { text: 'Funnel sahipliği', must: true },
+        { text: 'A/B test', must: true },
+        { text: 'B2B SaaS', must: false },
+    ];
+    const assess = (statuses) => ({
+        requirementCoverage: { assessments: statuses.map((status, i) => ({ index: i + 1, status })) },
+        starAnalysis: star(8),
+    });
+
+    it('rewards meeting every must-have', () => {
+        // zorunlu 2/2 → 85, tercihen 1/1 → 15 ⇒ coverage 100; STAR 80 ⇒ 92
+        expect(calculateHybridScore(assess(['met', 'met', 'met']), REQS)).toBe(92);
+    });
+
+    it('penalises a missing must-have far more than a missing nice-to-have', () => {
+        const missingMust = calculateHybridScore(assess(['met', 'missing', 'met']), REQS);
+        const missingNice = calculateHybridScore(assess(['met', 'met', 'missing']), REQS);
+        expect(missingMust).toBeLessThan(missingNice);
+        // zorunlu yarısı eksik: 42.5 + 15 = 57.5 → 58; 58*0.6 + 80*0.4 = 67
+        expect(missingMust).toBe(67);
+        // yalnızca tercih edilen eksik: 85 → 85*0.6 + 80*0.4 = 83
+        expect(missingNice).toBe(83);
+    });
+
+    it('gives a nice-to-have only a limited advantage', () => {
+        const withNice = calculateHybridScore(assess(['met', 'met', 'met']), REQS);
+        const withoutNice = calculateHybridScore(assess(['met', 'met', 'missing']), REQS);
+        expect(withNice - withoutNice).toBeLessThanOrEqual(10);
+        expect(withNice).toBeGreaterThan(withoutNice);
+    });
+
+    it('counts a partial as half', () => {
+        // zorunlu 1.5/2 = 0.75 → 63.75, tercihen 1 → 15 ⇒ 78.75 → 79; 79*0.6+80*0.4 = 79
+        expect(calculateHybridScore(assess(['met', 'partial', 'met']), REQS)).toBe(79);
+    });
+
+    it('falls back to the model score when the position has no priorities', () => {
+        const legacy = [{ text: 'A', must: null }];
+        expect(calculateHybridScore({
+            requirementCoverage: { assessments: [{ index: 1, status: 'missing' }], coverageScore: 90 },
+            starAnalysis: star(8),
+        }, legacy)).toBe(86); // 90*0.6 + 80*0.4
+    });
+
+    it('falls back when the model omits assessments', () => {
+        expect(calculateHybridScore({
+            requirementCoverage: { coverageScore: 50 },
+            starAnalysis: star(8),
+        }, REQS)).toBe(62); // 50*0.6 + 80*0.4
+    });
+});
