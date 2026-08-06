@@ -70,7 +70,7 @@ const STEP_DEFS = [
         key: 'score',
         title: 'Ön Skor Basma',
         icon: Gauge,
-        desc: 'Skoru hiç olmayan adaylar hafif bir AI çağrısıyla puanlanır (CV metni yoksa anahtar-kelime skoru). Dolu skorların üzerine yazılmaz.',
+        desc: 'Skoru hiç olmayan adaylar hafif bir AI çağrısıyla puanlanır (CV metni yoksa anahtar-kelime skoru). Dolu skorların üzerine yazılmaz. İlan gereksinimlerini ya da zorunlu/tercihen işaretlerini değiştirdiyseniz "Tümünü Yeniden Puanla" ile mevcut skorları da tazeleyebilirsiniz.',
         countLabel: (n) => `${n} skorsuz aday`,
         action: 'Puanla',
     },
@@ -238,17 +238,25 @@ export default function MaintenancePanel() {
     // takılmaz. Puanlanan her aday kalıcıdır: yarıda kalırsa tekrar
     // basıldığında kaldığı yerden devam eder.
     const PRESCORE_BATCH = 15;
-    const runPrescore = async () => {
+    /**
+     * @param {boolean} recompute — true ise skoru OLAN adaylar da yeniden
+     *   puanlanır. İlanın gereksinimleri ya da zorunlu/tercihen işaretleri
+     *   değiştiğinde mevcut ön skorlar eskir; varsayılan mod onlara dokunmaz.
+     */
+    const runPrescore = async (recompute = false) => {
         setRunning('score');
         setError(null);
         let totals = { updated: 0, aiUsed: 0, failed: 0, remaining: 1 };
+        // Tur kimliği: yeniden hesaplamada aynı adayın sonraki partilerde
+        // tekrar seçilmesini önler (sunucu prescoreRunId damgasına bakar).
+        const runId = recompute ? `rc-${Date.now()}` : '';
         try {
             let prevRemaining = Infinity;
             while (totals.remaining > 0 && !unmountedRef.current) {
                 const data = await fetchWithRetry('/api/maintenance/prescore', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ batchSize: PRESCORE_BATCH }),
+                    body: JSON.stringify({ batchSize: PRESCORE_BATCH, recompute, runId }),
                 });
                 totals = {
                     updated: totals.updated + (data.updated || 0),
@@ -423,6 +431,23 @@ export default function MaintenancePanel() {
                                     </div>
                                     {isCurrent && (
                                         <div className="flex items-center gap-1.5 shrink-0">
+                                            {/* Gereksinimler/öncelikler değişince mevcut ön skorlar
+                                                da eskir — varsayılan adım yalnızca skorsuzlara
+                                                dokunduğu için ayrı bir yeniden puanlama yolu gerekli. */}
+                                            {s.key === 'score' && (
+                                                <button
+                                                    onClick={() => {
+                                                        if (window.confirm('TÜM adayların ön skoru yeniden hesaplanacak (mevcut skorlar güncellenecek). Devam edilsin mi?')) {
+                                                            runPrescore(true);
+                                                        }
+                                                    }}
+                                                    disabled={Boolean(running)}
+                                                    className="text-[11px] font-bold text-[#13294E] bg-slate-100 hover:bg-slate-200 disabled:opacity-60 px-3 py-1.5 rounded-lg transition-colors"
+                                                    title="İlan gereksinimleri değiştiyse mevcut skorları da tazele"
+                                                >
+                                                    Tümünü Yeniden Puanla
+                                                </button>
+                                            )}
                                             <button
                                                 onClick={STEP_RUNNERS[s.key]}
                                                 disabled={Boolean(running) || (s.key === 'dup' && selected.size === 0)}

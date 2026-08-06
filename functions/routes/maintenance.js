@@ -148,15 +148,26 @@ router.post('/api/maintenance/prescore', requireAuth(ROLES), async (req, res) =>
     try {
         const batchSize = Math.min(60, Math.max(1, parseInt(req.body?.batchSize, 10) || 40));
         const scoreOf = (c) => Number(c.initialAiScore || 0) || Number(c.matchScore || 0) || Number(c.aiScore || 0);
+        // recompute: ilanın gereksinimleri ya da zorunlu/tercihen işaretleri
+        // değiştiğinde MEVCUT ön skorlar da eskir. Varsayılan davranış hâlâ
+        // "yalnızca skoru olmayanlar" — bu bayrak açıkça istendiğinde tüm
+        // havuz yeniden puanlanır (prescoredAt damgası partiler arasında
+        // aynı adayın tekrar tekrar işlenmesini önler).
+        const recompute = req.body?.recompute === true;
+        const runId = String(req.body?.runId || '').slice(0, 40);
 
         // İki aşamalı okuma: önce yalnızca skor alanlarıyla (küçük) tüm
         // koleksiyon taranır, sonra sadece bu partinin adayları gerekli
         // alanlarla çekilir. Eski tam-koleksiyon okuması cvText dahil her
         // şeyi belleğe alıp Gemini çağrıları boyunca tutuyordu (502/OOM).
         const scoreSnap = await db.collection(CANDIDATES_COLL)
-            .select('initialAiScore', 'matchScore', 'aiScore')
+            .select('initialAiScore', 'matchScore', 'aiScore', 'prescoreRunId')
             .get();
-        const pendingRefs = scoreSnap.docs.filter((d) => scoreOf(d.data()) <= 0).map((d) => d.ref);
+        const pendingRefs = scoreSnap.docs
+            .filter((d) => (recompute
+                ? (!runId || d.data().prescoreRunId !== runId)
+                : scoreOf(d.data()) <= 0))
+            .map((d) => d.ref);
         const batchRefs = pendingRefs.slice(0, batchSize);
         const batchDocs = batchRefs.length > 0
             ? await db.getAll(...batchRefs, { fieldMask: ['cvText', 'position', 'skills'] })
@@ -168,7 +179,11 @@ router.post('/api/maintenance/prescore', requireAuth(ROLES), async (req, res) =>
         try {
             const posSnap = await db.collection(POSITIONS_COLL).where('status', '==', 'open').get();
             openPositions = posSnap.docs
-                .map((d) => ({ title: d.data().title, requirements: d.data().requirements || [] }))
+                .map((d) => ({
+                    title: d.data().title,
+                    requirements: d.data().requirements || [],
+                    requirementsMeta: d.data().requirementsMeta || null,
+                }))
                 .filter((p) => Boolean(p.title));
         } catch (posErr) {
             log.warn(`[maintenance/prescore] open positions read failed: ${posErr.message}`);
@@ -209,6 +224,9 @@ router.post('/api/maintenance/prescore', requireAuth(ROLES), async (req, res) =>
                             ...(result.suggestedRole ? { suggestedRole: result.suggestedRole } : {}),
                             prescoreMethod: result.method,
                             prescoredAt: admin.firestore.FieldValue.serverTimestamp(),
+                            // Yeniden hesaplama turunda aynı adayın sonraki
+                            // partilerde tekrar seçilmesini önler.
+                            ...(recompute && runId ? { prescoreRunId: runId } : {}),
                         });
                         if (result.method === 'ai') aiUsed += 1;
                         updated += 1;
