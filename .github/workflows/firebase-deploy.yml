@@ -4,6 +4,19 @@ on:
   push:
     branches:
       - main
+  # Elle tetikleme. 2026-08-06 Actions arızasında bir merge'ün push webhook'u
+  # düştü ve o commit için hiç koşu oluşmadı; deploy'u yeniden başlatmanın
+  # hiçbir yolu kalmadı, main'e yeni bir push atmak gerekti.
+  workflow_dispatch:
+
+# Aynı anda tek deploy. cancel-in-progress: false bilinçli — çalışan bir
+# deploy'u ortasında kesmek Hosting ile Functions'ı farklı sürümlerde
+# bırakabilir. Bu ayarla çalışan koşu bitene kadar beklenir, kuyrukta ise
+# yalnızca EN YENİ koşu hayatta kalır. Böylece gecikmiş eski bir koşu, yeni
+# sürümün üzerine eski kodu yazamaz.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   deploy:
