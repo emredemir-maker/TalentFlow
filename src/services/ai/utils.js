@@ -50,6 +50,91 @@ function sanitizeControlChars(text) {
 }
 
 /**
+ * Kaçışsız çift tırnakları onarır.
+ *
+ * Model bir dizi DEĞERİNİN içinde ham `"` yazdığında JSON kırılır ve
+ * sanitizeControlChars bunu kurtaramaz: o fonksiyon her `"` karakterini
+ * dizi aç/kapa sayar, dolayısıyla kaçışsız bir tırnak durumu ters çevirip
+ * yanıtın geri kalanını da bozar.
+ *
+ * Sezgi: dizi içindeyken bir `"` görürsek ileriye bakarız. Sonraki
+ * boşluksuz karakter `,` `:` `}` `]` ya da metin sonuysa bu GERÇEK bir
+ * kapanış tırnağıdır; değilse metnin içinde kalmış bir tırnaktır ve
+ * kaçırılır.
+ *
+ * SINIR: `"o dedi ki: "tamam", sonra gitti"` gibi, içteki tırnağın hemen
+ * ardından virgül gelen durumda sezgi yanılır ve orayı kapanış sayar. Tam
+ * doğru çözüm değildir; son çare olarak, tamamen başarısız olmaktansa
+ * kurtarma denemesidir. Bu yüzden parseAIJson'da EN SON denenir.
+ */
+export function repairUnescapedQuotes(text) {
+    const CLOSERS = new Set([',', ':', '}', ']']);
+    let inString = false;
+    let escaped = false;
+    let result = '';
+
+    for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+
+        if (escaped) {
+            result += char;
+            escaped = false;
+            continue;
+        }
+        if (char === '\\') {
+            escaped = true;
+            result += char;
+            continue;
+        }
+        if (char === '"') {
+            if (!inString) {
+                inString = true;
+                result += char;
+                continue;
+            }
+            // Kapanış mı, metnin içinde kalmış tırnak mı?
+            let j = i + 1;
+            while (j < text.length && /\s/.test(text[j])) j++;
+            if (j >= text.length || CLOSERS.has(text[j])) {
+                inString = false;
+                result += char;
+            } else {
+                result += '\\"';
+            }
+            continue;
+        }
+        result += char;
+    }
+
+    return result;
+}
+
+/**
+ * JSON.parse hatasının GERÇEKTE nerede olduğunu gösterir.
+ *
+ * Yanıtın sonunu göstermek yetmiyordu: yanıt eksiksiz görünüp ortasındaki
+ * tek bir karakter yüzünden kırılabiliyor. V8 hata mesajında konum verir;
+ * o konumun etrafını kesip döndürmek teşhisi tek bakışta yapılır kılıyor.
+ */
+export function jsonFailureContext(text) {
+    const raw = String(text || '');
+    try {
+        JSON.parse(raw);
+        return null;
+    } catch (err) {
+        const message = err?.message || 'bilinmeyen ayrıştırma hatası';
+        const match = /position (\d+)/i.exec(message);
+        if (!match) return { message, snippet: raw.slice(-160), position: null };
+        const pos = Number(match[1]);
+        return {
+            message,
+            position: pos,
+            snippet: raw.slice(Math.max(0, pos - 90), pos + 90),
+        };
+    }
+}
+
+/**
  * Robustly cleans and parses JSON from AI responses.
  * Handles markdown code blocks, control characters, and various
  * formatting inconsistencies.
@@ -79,6 +164,17 @@ export function parseAIJson(text, defaultValue = null) {
         }
     } catch (innerE) {
         console.error('Critical AI JSON Parsing Failure');
+    }
+
+    // Attempt 4 (son çare): metnin içinde kalmış kaçışsız tırnakları onar.
+    // Sezgisel olduğu için EN SONA konuldu — yukarıdaki denemelerden biri
+    // tutuyorsa buraya hiç gelinmez.
+    try {
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        const body = jsonMatch ? jsonMatch[0] : strip(text);
+        return JSON.parse(repairUnescapedQuotes(sanitizeControlChars(body)));
+    } catch {
+        // Onarım da tutmadı — çağıran defaultValue ile ilerler
     }
 
     return defaultValue;

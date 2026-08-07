@@ -49,6 +49,14 @@ describe('EXTRACTOR_PROMPT — STAR gerekçeleri', () => {
         expect(promptSource).toContain('kusur icat etme');
     });
 
+    it('forbids raw double quotes inside string values', () => {
+        // #89 modelden "CV'den alıntı" isteyince model alıntıyı çift tırnakla
+        // yazdı ve JSON kırıldı (2026-08-07, 7572 karakterlik sağlam yanıt
+        // okunamadı). Kural düşerse aynı hata geri gelir.
+        expect(promptSource).toMatch(/TIRNAK KURALI/);
+        expect(promptSource).toMatch(/TEK tırnak/);
+    });
+
     it('keeps the Pozitif/Negatif shape the UI parses', () => {
         // CandidateProcessPage.parseFeedback bu iki etikete göre bölüyor;
         // biçim değişirse ekranda tek blok halinde görünür

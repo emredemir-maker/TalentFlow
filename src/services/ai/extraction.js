@@ -1,6 +1,6 @@
 // src/services/ai/extraction.js
 import { getModel } from './config.js';
-import { parseAIJson, buildStructuredPrompt, sanitizeForPrompt } from './utils.js';
+import { parseAIJson, buildStructuredPrompt, sanitizeForPrompt, jsonFailureContext } from './utils.js';
 
 const EXTRACTOR_PROMPT = `
 Sen kıdemli ve son derece analitik bir İşe Alım Yöneticisisin. Görevin, adayı İLANIN GEREKSİNİMLERİ karşısında değerlendirmek.
@@ -60,6 +60,13 @@ Sen kıdemli ve son derece analitik bir İşe Alım Yöneticisisin. Görevin, ad
      ifadelerle anlatma. Karşılanıyorsa artı olarak yaz; karşılanmıyorsa en
      fazla ayrı bir cümlede "şu alanlar ek avantaj sağlayabilirdi" de.
    - Etiketsiz (ne [ZORUNLU] ne [TERCİHEN]) maddeler varsa onları nötr ele al.
+5. TIRNAK KURALI (JSON'ı bozmamak için ZORUNLU): Hiçbir metin alanının
+   İÇİNDE düz çift tırnak (") KULLANMA. Gereksinim adı, CV alıntısı ya da
+   vurgu için TEK tırnak (') kullan.
+   DOĞRU:  "note": "CV'de 'funnel sahipliği' açıkça yazılmış."
+   YANLIŞ: "note": "CV'de "funnel sahipliği" açıkça yazılmış."
+   Kaçışsız bir çift tırnak tüm yanıtı okunamaz hâle getirir ve analiz
+   tamamen boşa gider.
 
 ÇIKTI FORMATI (JSON):
 {
@@ -118,11 +125,15 @@ export async function extractCandidateEvidence(jobDescription, candidateProfile,
     const raw = result.response.text();
     const parsed = parseAIJson(raw);
     if (!parsed) {
-        // Ham yanıtın kuyruğu teşhis için kritik: kesilme mi, güvenlik
-        // engeli mi, boş yanıt mı olduğu ancak buradan anlaşılıyor.
-        const tail = String(raw || '').slice(-160);
+        // Yanıtın SONUNU göstermek yetmiyordu: yanıt eksiksiz görünüp
+        // ortasındaki tek bir karakter yüzünden kırılabiliyor (2026-08-07'de
+        // tam olarak bu yaşandı — 7572 karakterlik, düzgün kapanmış bir
+        // yanıt). Artık kırılmanın olduğu YER gösteriliyor.
+        const ctx = jsonFailureContext(raw);
         throw new Error(
-            `AI yanıtı JSON olarak okunamadı (uzunluk: ${String(raw || '').length}). Yanıt sonu: …${tail}`
+            `AI yanıtı JSON olarak okunamadı (uzunluk: ${String(raw || '').length}`
+            + (ctx?.position != null ? `, kırılma: ${ctx.position}` : '')
+            + `). ${ctx?.message || ''} Bozuk kısım: …${ctx?.snippet || ''}…`
         );
     }
     return parsed;
