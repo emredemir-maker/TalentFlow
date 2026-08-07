@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 // Gemini/Firebase bağımlılıklarını yükletmeden saf fonksiyonu test et
 vi.mock('./ai/config.js', () => ({ getModel: vi.fn(), getAuthHeaders: vi.fn() }));
 
-const { calculateHybridScore } = await import('./geminiService.js');
+const { calculateHybridScore, explainHybridScore } = await import('./geminiService.js');
 
 const star = (n) => ({
     Situation: { score: n }, Task: { score: n }, Action: { score: n }, Result: { score: n },
@@ -198,5 +198,99 @@ describe('calculateHybridScore — yetkinlik / araç ayrımı', () => {
         );
         // Yetkinlik kümesi boşsa araç kümesi tüm ağırlığı alır → coverage 85
         expect(allTools).toBe(90); // coverage 100 → 100*0.5 + 80*0.5
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Skor kırılımı GERÇEK hesabı göstermeli.
+//
+// Şeffaflık ekranının tek değeri, gösterdiği sayıların gerçekten skoru
+// üretmesi. Kırılım ayrı bir yerde yeniden hesaplansaydı ekran zamanla
+// gerçek skordan sapar ve "neden 54?" sorusuna yanlış cevap verirdi.
+// Bu testler toplamın skora eşit kaldığını sabitler.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('explainHybridScore', () => {
+    const REQS_X = [
+        { text: 'Funnel sahipliği', must: true },
+        { text: 'A/B test kurgulama', must: true },
+        { text: 'GA4 hakimiyeti', must: true },
+        { text: 'PLG deneyimi', must: false },
+    ];
+    const build = (statuses, kinds) => ({
+        requirementCoverage: {
+            assessments: statuses.map((status, i) => ({
+                index: i + 1, status, kind: kinds[i], note: `not ${i + 1}`,
+            })),
+        },
+        starAnalysis: star(7),
+    });
+
+    const sumEarned = (exp) => exp.coverage.tiers
+        .flatMap((t) => t.groups)
+        .flatMap((g) => g.items)
+        .reduce((s, it) => s + it.earned, 0);
+
+    it('breaks the score down into parts that add back up to it', () => {
+        const data = build(['met', 'partial', 'missing', 'met'], ['deneyim', 'deneyim', 'arac', 'deneyim']);
+        const exp = explainHybridScore(data, REQS_X);
+        const total = sumEarned(exp) + exp.star.points;
+        expect(Math.round(total)).toBe(exp.score);
+    });
+
+    it('adds up for a perfect candidate too', () => {
+        const data = build(['met', 'met', 'met', 'met'], ['deneyim', 'deneyim', 'arac', 'deneyim']);
+        const exp = explainHybridScore(data, REQS_X);
+        expect(Math.round(sumEarned(exp) + exp.star.points)).toBe(exp.score);
+    });
+
+    it('adds up when nothing is met', () => {
+        const data = build(['missing', 'missing', 'missing', 'missing'], ['deneyim', 'deneyim', 'arac', 'deneyim']);
+        const exp = explainHybridScore(data, REQS_X);
+        expect(sumEarned(exp)).toBe(0);
+        expect(Math.round(exp.star.points)).toBe(exp.score);
+    });
+
+    it('agrees with calculateHybridScore', () => {
+        const data = build(['met', 'partial', 'missing', 'met'], ['deneyim', 'deneyim', 'arac', 'deneyim']);
+        expect(explainHybridScore(data, REQS_X).score).toBe(calculateHybridScore(data, REQS_X));
+    });
+
+    it('shows a missing tool as costing less than a missing capability', () => {
+        const missTool = explainHybridScore(
+            build(['met', 'met', 'missing', 'met'], ['deneyim', 'deneyim', 'arac', 'deneyim']), REQS_X
+        );
+        const missCap = explainHybridScore(
+            build(['met', 'missing', 'met', 'met'], ['deneyim', 'deneyim', 'arac', 'deneyim']), REQS_X
+        );
+        const lost = (exp) => exp.coverage.tiers.flatMap((t) => t.groups).flatMap((g) => g.items)
+            .filter((i) => i.status === 'missing').reduce((s, i) => s + i.max, 0);
+        expect(lost(missTool)).toBeLessThan(lost(missCap));
+    });
+
+    it('carries the AI note for every requirement so the user sees the reasoning', () => {
+        const exp = explainHybridScore(
+            build(['met', 'met', 'met', 'met'], ['deneyim', 'deneyim', 'arac', 'deneyim']), REQS_X
+        );
+        const items = exp.coverage.tiers.flatMap((t) => t.groups).flatMap((g) => g.items);
+        expect(items).toHaveLength(4);
+        expect(items.every((i) => i.note.startsWith('not '))).toBe(true);
+    });
+
+    it('still explains legacy records that have no per-requirement assessments', () => {
+        const exp = explainHybridScore(
+            { requirementCoverage: { coverageScore: 80 }, starAnalysis: star(6) }, REQS_X
+        );
+        expect(exp.coverage.score).toBe(80);
+        expect(exp.coverage.tiers).toEqual([]);
+        expect(exp.score).toBe(calculateHybridScore(
+            { requirementCoverage: { coverageScore: 80 }, starAnalysis: star(6) }, REQS_X
+        ));
+    });
+
+    it('gives STAR the whole weight when there is no coverage data', () => {
+        const exp = explainHybridScore({ starAnalysis: star(8) }, REQS_X);
+        expect(exp.coverage).toBeNull();
+        expect(exp.star.weight).toBe(1);
+        expect(exp.score).toBe(80);
     });
 });

@@ -220,7 +220,7 @@ const TOOL_SHARE = 0.25;
  * @param {Array<{text: string, must: boolean|null}>} requirements
  * @returns {number|null} işaretlenmiş gereksinim yoksa null (nötr davranış)
  */
-function weightedCoverageOf(coverage, requirements) {
+function coverageBreakdown(coverage, requirements) {
     const assessments = coverage?.assessments;
     if (!Array.isArray(assessments) || !Array.isArray(requirements) || requirements.length === 0) return null;
 
@@ -239,6 +239,7 @@ function weightedCoverageOf(coverage, requirements) {
             // edip sessizce ağırlığını düşürmek, eski kayıtların skorunu
             // gerçek dışı biçimde yükseltirdi.
             isTool: String(a?.kind || '').toLowerCase().startsWith('ara'),
+            note: typeof a?.note === 'string' ? a.note : '',
         });
     }
     const weightOf = (status) => (status === 'met' ? 1 : status === 'partial' ? 0.5 : 0);
@@ -246,23 +247,50 @@ function weightedCoverageOf(coverage, requirements) {
         ? null
         : subset.reduce((sum, r) => sum + weightOf(byIndex.get(r.index)?.status), 0) / subset.length);
 
-    /** Bir öncelik kümesini yetkinlik/araç olarak ayırıp ağırlıklı orana çevirir. */
-    const tierRatio = (tier) => {
+    // Her kümenin PAYI ayrıca döndürülür: şeffaflık ekranı madde başına
+    // katkıyı buradan türetiyor. Ayrı bir yerde yeniden hesaplansaydı ekran
+    // ile gerçek skor zamanla birbirinden ayrılırdı.
+    const tierDetail = (tier) => {
         if (tier.length === 0) return null;
         const tools = tier.filter((r) => byIndex.get(r.index)?.isTool);
         const capabilities = tier.filter((r) => !byIndex.get(r.index)?.isTool);
         const capRatio = ratioOf(capabilities);
         const toolRatio = ratioOf(tools);
-        if (capRatio === null) return toolRatio;
-        if (toolRatio === null) return capRatio;
-        return capRatio * CAPABILITY_SHARE + toolRatio * TOOL_SHARE;
+
+        // Kümelerden biri boşsa diğeri tüm payı alır
+        const capShare = capRatio === null ? 0 : (toolRatio === null ? 1 : CAPABILITY_SHARE);
+        const toolShare = toolRatio === null ? 0 : (capRatio === null ? 1 : TOOL_SHARE);
+        const ratio = (capRatio ?? 0) * capShare + (toolRatio ?? 0) * toolShare;
+
+        return {
+            ratio,
+            groups: [
+                { kind: 'deneyim', label: 'Yetkinlik', share: capShare, ratio: capRatio, items: capabilities },
+                { kind: 'arac', label: 'Araç', share: toolShare, ratio: toolRatio, items: tools },
+            ].filter((g) => g.items.length > 0),
+        };
     };
 
-    const mustRatio = tierRatio(must);
-    const niceRatio = tierRatio(nice);
-    if (mustRatio === null) return clampScore(niceRatio * 100);
-    if (niceRatio === null) return clampScore(mustRatio * 100);
-    return clampScore(mustRatio * MUST_WEIGHT + niceRatio * NICE_WEIGHT);
+    const mustDetail = tierDetail(must);
+    const niceDetail = tierDetail(nice);
+
+    // Kefelerden biri boşsa diğeri tüm ağırlığı alır (eski davranış korunur)
+    const mustWeight = mustDetail === null ? 0 : (niceDetail === null ? 100 : MUST_WEIGHT);
+    const niceWeight = niceDetail === null ? 0 : (mustDetail === null ? 100 : NICE_WEIGHT);
+    const raw = (mustDetail?.ratio ?? 0) * mustWeight + (niceDetail?.ratio ?? 0) * niceWeight;
+    const score = clampScore(raw);
+
+    const tiers = [
+        { key: 'must', label: 'Zorunlu', weight: mustWeight, detail: mustDetail },
+        { key: 'nice', label: 'Tercihen', weight: niceWeight, detail: niceDetail },
+    ].filter((t) => t.detail !== null);
+
+    return { score, raw, tiers, byIndex, weightOf };
+}
+
+/** Geriye dönük ince sarmalayıcı — skor yolu yalnızca sayıyı kullanır. */
+function weightedCoverageOf(coverage, requirements) {
+    return coverageBreakdown(coverage, requirements)?.score ?? null;
 }
 
 /**
@@ -288,6 +316,104 @@ function coverageScoreOf(coverage) {
  * (yalnızca STAR) düşülür, o da yoksa deneyim + anahtar kelime yedeği çalışır.
  * Böylece eski kayıtlar ve beklenmedik AI çıktıları skoru sıfırlamaz.
  */
+/**
+ * Skorun TAM kırılımı — şeffaflık ekranı için.
+ *
+ * "Neden 54?" sorusunun kara kutu kalmaması gerekiyor. Burada üretilen
+ * `earned`/`max` puanları toplandığında calculateHybridScore'un döndürdüğü
+ * sayıyı verir; ekran yaklaşık bir açıklama değil, GERÇEK hesabı gösterir.
+ * Bu yüzden aynı `coverageBreakdown` üzerinden türetilir — ayrı bir hesap
+ * yazılsaydı ikisi zamanla birbirinden ayrılırdı.
+ *
+ * @returns {{score: number, coverage: object|null, star: object|null, weights: object}}
+ */
+export function explainHybridScore(data, requirements) {
+    const score = calculateHybridScore(data, requirements);
+    if (!data) return { score: 0, coverage: null, star: null, weights: null };
+
+    const star = starScoreOf(data.starAnalysis);
+    const breakdown = coverageBreakdown(data.requirementCoverage, requirements);
+    const coverageScore = breakdown?.score ?? coverageScoreOf(data.requirementCoverage);
+
+    // Kapsama ve STAR birlikte varsa 50/50; yalnızca biri varsa o tek başına
+    // skoru belirler (calculateHybridScore ile aynı kural).
+    const both = coverageScore !== null && star !== null;
+    const coverageWeight = coverageScore === null ? 0 : (both ? COVERAGE_WEIGHT : 1);
+    const starWeight = star === null ? 0 : (both ? STAR_WEIGHT : 1);
+
+    let coverage = null;
+    if (breakdown) {
+        const { byIndex, weightOf, tiers } = breakdown;
+        // Skor yolu kapsamayı ÖNCE yuvarlayıp sonra ağırlıklandırıyor. Madde
+        // puanları ham orandan türetilirse toplam, gösterilen skordan 1 puan
+        // sapabiliyor. Aynı yuvarlamayı maddelere de yansıtıyoruz ki ekrandaki
+        // sayılar birebir toplansın.
+        const roundScale = breakdown.raw === 0 ? 1 : breakdown.score / breakdown.raw;
+        coverage = {
+            score: breakdown.score,
+            weight: coverageWeight,
+            points: breakdown.score * coverageWeight,
+            tiers: tiers.map((tier) => ({
+                key: tier.key,
+                label: tier.label,
+                weight: tier.weight,
+                ratio: tier.detail.ratio,
+                groups: tier.detail.groups.map((group) => {
+                    // Bir maddenin alabileceği en yüksek puan: kapsama payı ×
+                    // kefe ağırlığı × küme payı, küme içinde eşit bölüşülür.
+                    const maxPerItem = group.items.length === 0
+                        ? 0
+                        : (tier.weight * group.share * coverageWeight * roundScale) / group.items.length;
+                    return {
+                        kind: group.kind,
+                        label: group.label,
+                        share: group.share,
+                        ratio: group.ratio,
+                        items: group.items.map((req) => {
+                            const a = byIndex.get(req.index);
+                            const status = a?.status || 'unknown';
+                            return {
+                                index: req.index,
+                                text: req.text,
+                                must: req.must,
+                                kind: group.kind,
+                                status,
+                                note: a?.note || '',
+                                max: maxPerItem,
+                                earned: maxPerItem * weightOf(status),
+                            };
+                        }),
+                    };
+                }),
+            })),
+        };
+    } else if (coverageScore !== null) {
+        // Eski kayıt: madde bazlı değerlendirme yok, yalnızca tek sayı
+        coverage = { score: coverageScore, weight: coverageWeight, points: coverageScore * coverageWeight, tiers: [] };
+    }
+
+    const starDetail = star === null ? null : {
+        score: star,
+        weight: starWeight,
+        points: star * starWeight,
+        dimensions: ['Situation', 'Task', 'Action', 'Result'].map((key) => {
+            const raw = data.starAnalysis?.[key];
+            return {
+                key,
+                score: typeof raw === 'number' ? raw : Number(raw?.score ?? 0),
+                reason: typeof raw === 'object' && raw !== null ? String(raw.reason || '') : '',
+            };
+        }),
+    };
+
+    return {
+        score,
+        coverage,
+        star: starDetail,
+        weights: { coverage: coverageWeight, star: starWeight },
+    };
+}
+
 export function calculateHybridScore(data, requirements) {
     if (!data) return 0;
     const star = starScoreOf(data.starAnalysis);

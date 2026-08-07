@@ -19,6 +19,7 @@ import SystemScanner from '../components/SystemScanner';
 import AddCandidateModal from '../components/AddCandidateModal';
 import CandidateAvatar from '../components/CandidateAvatar';
 import CandidateCvPanel from '../components/CandidateCvPanel';
+import ScoreBreakdownPanel from '../components/ScoreBreakdownPanel';
 import {
     Plus, Search, Zap, Brain, X,
     Target, ShieldCheck, ArrowRight, FileText, Clock,
@@ -896,6 +897,11 @@ export default function CandidateProcessPage() {
     // onun analizi. Yoksa null döner ve arayüz "başka pozisyon için üretilmiş"
     // uyarısıyla eldeki metni gösterir.
     const displayedAnalysis = analysisForPosition(candidate, candidate?.matchedPositionTitle);
+    // Kırılım, gösterilen analizin AİT OLDUĞU pozisyonun gereksinimleriyle
+    // hesaplanmalı; başka bir ilanın maddeleriyle açıklamak yanlış olurdu.
+    const displayedPosition = candidate?.matchedPositionTitle
+        ? openByTitle.get(candidate.matchedPositionTitle) || null
+        : null;
 
     // Gerçek STAR metodolojisi skoru (S+T+A+R ortalaması × 10). Yoksa null —
     // rozet '—' gösterir. Eskiden bu rozet bestScore*0.98 gösteriyordu: hem
@@ -1336,6 +1342,14 @@ export default function CandidateProcessPage() {
                                                 </span>
                                             )}
                                         </div>
+
+                                        {/* Skorun tam kırılımı — "neden bu puan?" */}
+                                        {!analyzingIds.has(candidate.id) && displayedAnalysis && (
+                                            <ScoreBreakdownPanel
+                                                analysis={displayedAnalysis}
+                                                position={displayedPosition}
+                                            />
+                                        )}
 
                                         {/* Error banner */}
                                         {analysisError && (
