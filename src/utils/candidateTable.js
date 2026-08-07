@@ -154,6 +154,26 @@ export function analysisForPosition(candidate, positionTitle) {
 }
 
 /**
+ * Gösterilen pozisyonun TAM analiz kaydı.
+ *
+ * analysisForPosition yalnızca {summary, analyzedFor, score} döndürür — metin
+ * göstermeye yeter ama `requirementCoverage` / `starAnalysis` taşımaz. Skor
+ * kırılımı ve zorunlu-gereksinim kapısı bu alanlara ihtiyaç duyuyor;
+ * daraltılmış nesne verilirse ikisi de sessizce boş kalır.
+ *
+ * Öncelik analysisForPosition ile AYNI: pozisyonun kayıtlı analizi → aynı
+ * pozisyon için üretilmiş aiAnalysis → null.
+ */
+export function fullAnalysisForPosition(candidate, positionTitle) {
+    if (!candidate || !positionTitle) return null;
+    const saved = candidate.positionAnalyses?.[positionTitle];
+    if (saved) return saved;
+    const ai = candidate.aiAnalysis;
+    if (ai && ai.analyzedForPosition === positionTitle) return ai;
+    return null;
+}
+
+/**
  * Skor tutarlılığı kuralı: GÖSTERİLEN skor, GÖSTERİLEN pozisyonun skorudur.
  *
  * Adayın matchedPositionTitle'ı açık bir pozisyona işaret ediyorsa satırdaki

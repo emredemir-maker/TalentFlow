@@ -9,7 +9,8 @@ import { deepScanCandidate } from '../services/scanService';
 import { extractTextFromFile } from '../services/cvParser';
 import { calculateMatchScore, domainLabel, detectCandidateDomain, detectPositionDomain } from '../services/matchService';
 import { applyPiiMask, stripPiiForAI } from '../utils/pii';
-import { cleanRoleText, analysisForPosition } from '../utils/candidateTable';
+import { cleanRoleText, analysisForPosition, fullAnalysisForPosition } from '../utils/candidateTable';
+import { mustHaveGate, gateLabel, gateRank } from '../utils/mustHaveGate';
 import { batchFilesBySize, formatBytes, totalBytes, MAX_REQUEST_BYTES } from '../utils/bulkUpload';
 import { getFeedbackEmail } from '../utils/templateService';
 import { db } from '../config/firebase';
@@ -20,6 +21,7 @@ import AddCandidateModal from '../components/AddCandidateModal';
 import CandidateAvatar from '../components/CandidateAvatar';
 import CandidateCvPanel from '../components/CandidateCvPanel';
 import ScoreBreakdownPanel from '../components/ScoreBreakdownPanel';
+import MustHaveBadge from '../components/MustHaveBadge';
 import {
     Plus, Search, Zap, Brain, X,
     Target, ShieldCheck, ArrowRight, FileText, Clock,
@@ -794,8 +796,22 @@ export default function CandidateProcessPage() {
             return true;
         });
         if (positionScores) {
-            // Seçili pozisyona uyum skoruna göre azalan — "en uygun aday" en üstte
-            results.sort((a, b) => (positionScores.get(b.id) || 0) - (positionScores.get(a.id) || 0));
+            // Önce ZORUNLU gereksinim kapısı, sonra skor.
+            //
+            // Zorunlu bir maddeyi karşılamayan aday, puanı ne olursa olsun
+            // karşılayanların altında kalır. Cezayı skorun içinde eritmek
+            // yerine ayrı bir kademe kullanmak, "85 puanlık aday neden altta?"
+            // sorusunu ortadan kaldırıyor: sebep aday kartındaki rozette yazıyor.
+            const rankOf = new Map(results.map((c) => [
+                c.id,
+                gateRank(mustHaveGate(fullAnalysisForPosition(c, selectedPos.title), selectedPos).status),
+            ]));
+            results.sort((a, b) => {
+                const ra = rankOf.get(a.id) ?? 2;
+                const rb = rankOf.get(b.id) ?? 2;
+                if (ra !== rb) return rb - ra;
+                return (positionScores.get(b.id) || 0) - (positionScores.get(a.id) || 0);
+            });
             return results;
         }
         const hasScreening = results.some(c => c.screeningScore != null);
@@ -902,6 +918,12 @@ export default function CandidateProcessPage() {
     const displayedPosition = candidate?.matchedPositionTitle
         ? openByTitle.get(candidate.matchedPositionTitle) || null
         : null;
+    // Kırılım ve zorunlu kapısı TAM analiz kaydına ihtiyaç duyar;
+    // analysisForPosition yalnızca {summary, analyzedFor, score} döndürüyor ve
+    // requirementCoverage taşımıyor.
+    const displayedFullAnalysis = fullAnalysisForPosition(candidate, candidate?.matchedPositionTitle);
+    const displayedGate = mustHaveGate(displayedFullAnalysis, displayedPosition);
+    const displayedGateLabel = gateLabel(displayedGate);
 
     // Gerçek STAR metodolojisi skoru (S+T+A+R ortalaması × 10). Yoksa null —
     // rozet '—' gösterir. Eskiden bu rozet bestScore*0.98 gösteriyordu: hem
@@ -1343,10 +1365,17 @@ export default function CandidateProcessPage() {
                                             )}
                                         </div>
 
+                                        {/* Zorunlu gereksinim kapısı — skordan ÖNCE okunmalı:
+                                            85 puanlık bir aday zorunlu bir maddeyi
+                                            karşılamıyorsa bu, puandan daha belirleyici. */}
+                                        {!analyzingIds.has(candidate.id) && displayedGateLabel && (
+                                            <MustHaveBadge gate={displayedGate} label={displayedGateLabel} />
+                                        )}
+
                                         {/* Skorun tam kırılımı — "neden bu puan?" */}
-                                        {!analyzingIds.has(candidate.id) && displayedAnalysis && (
+                                        {!analyzingIds.has(candidate.id) && displayedFullAnalysis && (
                                             <ScoreBreakdownPanel
-                                                analysis={displayedAnalysis}
+                                                analysis={displayedFullAnalysis}
                                                 position={displayedPosition}
                                             />
                                         )}
