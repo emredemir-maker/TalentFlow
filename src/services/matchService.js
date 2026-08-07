@@ -1,6 +1,7 @@
 // src/services/matchService.js
 import { analyzeCandidateMatch } from './geminiService';
 import { requirementsOf, hasPrioritizedRequirements } from '../utils/positionRequirements';
+import { skillAffinity, SKILL_VOCABULARY } from '../utils/skillGraph';
 
 /**
  * Semantic Technology Groups to improve matching without LLM for every call
@@ -442,8 +443,10 @@ export function calculateMatchScore(candidate, position, options = {}) {
         Array.isArray(candidate.experiences) ? candidate.experiences.map(e => (e.title + ' ' + e.description)).join(' ') : ''
     ].join(' ').toLowerCase();
 
-    // Scan for any missed keywords
-    Object.values(TECH_GROUPS).flat().forEach(tech => {
+    // Scan for any missed keywords. TECH_GROUPS yalnizca yazilim alanini
+    // tanidigi icin graf sozlugu de taranir; aksi halde "Salesforce" yazan
+    // bir satis adayinin bu yetenegi hic gorulmuyordu.
+    [...Object.values(TECH_GROUPS).flat(), ...SKILL_VOCABULARY].forEach(tech => {
         if (termMatches(candidateText, tech) && !cSkills.includes(tech)) {
             cSkills.push(tech);
         }
@@ -468,7 +471,10 @@ export function calculateMatchScore(candidate, position, options = {}) {
     const termsIn = (text) => {
         const lower = String(text || '').toLowerCase();
         const found = new Set();
-        Object.values(TECH_GROUPS).flat().forEach(tech => {
+        // Sozluk = TECH_GROUPS + yetkinlik grafi. Graf olmadan "CRM deneyimi"
+        // gibi bir gereksinim HIC terim uretmiyor, o ilan kapsama yoluna hic
+        // girmiyor ve skor birebir kelime eslesmesine kaliyordu.
+        [...Object.values(TECH_GROUPS).flat(), ...SKILL_VOCABULARY].forEach(tech => {
             if (termMatches(lower, tech)) found.add(tech);
         });
         return found;
@@ -483,6 +489,15 @@ export function calculateMatchScore(candidate, position, options = {}) {
             skill => skill.includes(req) || (skill.length >= 3 && req.includes(skill))
         );
         if (directMatch) return 1;
+
+        // Yetkinlik grafı: yönlü ve alan bağımsız yakınlık. React bilen
+        // JavaScript'i karşılar (0.9); Salesforce bilen CRM'i karşılar;
+        // Amplitude bilen Mixpanel'e yakındır (0.6). Düz TECH_GROUPS'un
+        // veremediği iki şeyi verir: ilişkinin TÜRÜ ve yazılım dışı alanlar.
+        const affinity = skillAffinity(req, cSkills);
+        if (affinity > 0) return affinity;
+
+        // Geri düşüş: grafta olmayan terimler için eski grup yakınlığı.
         for (const group in TECH_GROUPS) {
             if (TECH_GROUPS[group].includes(req) &&
                 TECH_GROUPS[group].some(g => cSkills.some(skill => skill.includes(g)))) {

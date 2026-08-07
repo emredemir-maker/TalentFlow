@@ -349,3 +349,64 @@ describe('Growth PM ilanı — domain ve skor ayrımı', () => {
         expect(filterPositionsByDomain(GROWTH_PM_CANDIDATE, [GROWTH_PM])).toHaveLength(1);
     });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Yetkinlik grafının anahtar-kelime skoruna etkisi.
+//
+// Kullanıcı açıkça istedi: yakınlık "tek bir pozisyon için olmasın". Eski düz
+// TECH_GROUPS yalnızca yazılım alanını tanıyordu; satış, İK, finans gibi
+// ilanlarda aday aracın adını birebir yazmadıysa hiçbir kredi alamıyordu.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('calculateMatchScore — yetkinlik grafı', () => {
+    const position = (title, requirements) => ({
+        id: 'p1', title, status: 'open',
+        requirementsMeta: requirements.map((text) => ({ text, must: true })),
+    });
+
+    it('credits a sales candidate who names the tool, not the category', () => {
+        // İlan "CRM" istiyor, aday "Salesforce" yazmış — aynı şey
+        const pos = position('Satış Yöneticisi', ['crm']);
+        const withTool = calculateMatchScore(
+            { position: 'Satış Yöneticisi', skills: ['salesforce'], cvData: 'Satış yönetimi deneyimi.' }, pos
+        );
+        const without = calculateMatchScore(
+            { position: 'Satış Yöneticisi', skills: ['kahve'], cvData: 'Satış yönetimi deneyimi.' }, pos
+        );
+        expect(withTool.score).toBeGreaterThan(without.score);
+    });
+
+    it('credits an HR candidate through the category chain', () => {
+        // İlan "insan kaynakları" istiyor, aday "bordro" yazmış
+        const pos = position('İK Uzmanı', ['insan kaynakları']);
+        const withSkill = calculateMatchScore(
+            { position: 'İK Uzmanı', skills: ['bordro'], cvData: 'Özlük işleri.' }, pos
+        );
+        const without = calculateMatchScore(
+            { position: 'İK Uzmanı', skills: ['kahve'], cvData: 'Özlük işleri.' }, pos
+        );
+        expect(withSkill.score).toBeGreaterThan(without.score);
+    });
+
+    it('credits a finance candidate through the category chain', () => {
+        const pos = position('Finans Uzmanı', ['finans']);
+        const withSkill = calculateMatchScore(
+            { position: 'Finans Uzmanı', skills: ['muhasebe'], cvData: 'Raporlama.' }, pos
+        );
+        const without = calculateMatchScore(
+            { position: 'Finans Uzmanı', skills: ['kahve'], cvData: 'Raporlama.' }, pos
+        );
+        expect(withSkill.score).toBeGreaterThan(without.score);
+    });
+
+    it('still separates genuinely unrelated skills', () => {
+        // Graf her şeyi birbirine bağlamamalı
+        const pos = position('Bordro Uzmanı', ['bordro']);
+        const unrelated = calculateMatchScore(
+            { position: 'DevOps', skills: ['kubernetes', 'terraform'], cvData: 'Altyapı.' }, pos
+        );
+        const related = calculateMatchScore(
+            { position: 'İK', skills: ['bordro'], cvData: 'Bordro işleri.' }, pos
+        );
+        expect(related.score).toBeGreaterThan(unrelated.score);
+    });
+});
