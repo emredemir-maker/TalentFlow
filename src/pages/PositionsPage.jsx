@@ -1364,6 +1364,9 @@ export default function PositionsPage() {
         if (!position || !selectedCandidates?.length) return;
         setRescanProgress({ done: 0, total: selectedCandidates.length });
         let scanned = 0, skipped = 0, failed = 0;
+        // İlk teknik hatanın metni: "atlandı" ile "AI patladı" ayrımı
+        // yapılmadığında kullanıcı kota aşımını CV eksikliği sanıyordu.
+        let firstFailure = '';
         let nextIdx = 0;
         await Promise.all(Array.from({ length: Math.min(3, selectedCandidates.length) }, async () => {
             while (nextIdx < selectedCandidates.length) {
@@ -1372,9 +1375,13 @@ export default function PositionsPage() {
                 try {
                     const result = await rescanCandidateForPosition(candidate, position, { previousTitle });
                     if (result.status === 'scanned') { await updateCandidate(candidate.id, result.updates); scanned += 1; }
-                    else skipped += 1;
-                } catch {
+                    else if (result.status === 'analysis_failed') {
+                        failed += 1;
+                        if (!firstFailure) firstFailure = result.failures?.[0]?.message || '';
+                    } else skipped += 1;
+                } catch (err) {
                     failed += 1;
+                    if (!firstFailure) firstFailure = err?.message || '';
                 }
                 setRescanProgress((p) => (p ? { ...p, done: p.done + 1 } : p));
             }
@@ -1385,7 +1392,7 @@ export default function PositionsPage() {
             title: 'Yeniden Tarama Tamamlandı',
             message: `${scanned} aday yeni gereksinimlere göre yeniden puanlandı`
                 + (skipped > 0 ? ` · ${skipped} aday atlandı (CV metni yok/sonuç alınamadı)` : '')
-                + (failed > 0 ? ` · ${failed} hata` : ''),
+                + (failed > 0 ? ` · ${failed} adayda AI hatası: ${firstFailure.slice(0, 120)}` : ''),
             type: failed > 0 ? 'warning' : 'success',
         });
     };

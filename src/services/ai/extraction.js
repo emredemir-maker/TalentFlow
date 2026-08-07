@@ -107,9 +107,24 @@ export async function extractCandidateEvidence(jobDescription, candidateProfile,
     });
 
     const model = await getModel(modelId);
-    const result = await model.generateContent(prompt);
-    const parsed = parseAIJson(result.response.text());
-    if (!parsed) throw new Error("AI extraction failed to parse JSON.");
+    // Varsayılan 8192 token bu çıktı için artık dar: her gereksinim için
+    // kind + note taşıyan assessments dizisi ve CV'den alıntı isteyen STAR
+    // gerekçeleri toplamı büyüttü. Kesilen yanıt GEÇERSİZ JSON üretir ve
+    // parseAIJson'ın son çaresi olan /\{[\s\S]*\}/ kapanış parantezi
+    // bulamadığı için hiçbir kurtarma denemesi tutmaz — analiz sessizce
+    // "sonuç üretmedi"ye düşerdi. Cap'tir, hedef değil: kısa yanıtlar için
+    // maliyeti yok.
+    const result = await model.generateContent(prompt, { maxOutputTokens: 16384 });
+    const raw = result.response.text();
+    const parsed = parseAIJson(raw);
+    if (!parsed) {
+        // Ham yanıtın kuyruğu teşhis için kritik: kesilme mi, güvenlik
+        // engeli mi, boş yanıt mı olduğu ancak buradan anlaşılıyor.
+        const tail = String(raw || '').slice(-160);
+        throw new Error(
+            `AI yanıtı JSON olarak okunamadı (uzunluk: ${String(raw || '').length}). Yanıt sonu: …${tail}`
+        );
+    }
     return parsed;
 }
 

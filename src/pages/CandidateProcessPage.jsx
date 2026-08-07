@@ -673,8 +673,21 @@ export default function CandidateProcessPage() {
             if (result.status === 'skipped_no_cv') {
                 throw new Error('CV metni bulunamadı — Bakım > "Eksik Profilleri Tamamla" çalıştırın.');
             }
+            if (result.status === 'analysis_failed') {
+                // Teknik hata: CV'yi suçlamak yanlış yönlendiriyordu.
+                const first = result.failures?.[0]?.message || 'bilinmeyen hata';
+                throw new Error(
+                    `AI analizi başarısız oldu (CV sorunu değil): ${first}` +
+                    (/429|kota|quota|rate/i.test(first)
+                        ? ' — Dakikalık istek sınırına takılmış olabilirsiniz, 1 dakika bekleyip tekrar deneyin.'
+                        : '')
+                );
+            }
             if (result.status !== 'scanned') {
-                throw new Error('Analiz sonuç üretmedi. Adayın CV metnini kontrol edip tekrar deneyin.');
+                throw new Error(
+                    'Analiz tamamlandı ancak hiçbir açık pozisyon için 0\'dan büyük skor çıkmadı. ' +
+                    'Adayın alanına uygun bir pozisyon açık mı, kontrol edin.'
+                );
             }
 
             await updateCandidate(c.id, result.updates);

@@ -36,9 +36,11 @@ function sanitizeForFirestore(value) {
  * @param {{allowUnrelatedFallback?: boolean}} [options] — uyumlu pozisyon
  *   yokken en yakın pozisyona düşülsün mü (toplu tarama: evet, tekil
  *   yeniden analiz: hayır)
- * @returns {Promise<{status: 'scanned'|'skipped_no_cv'|'no_result'|'no_compatible_position', updates?: object, aiCalls: number}>}
+ * @returns {Promise<{status: 'scanned'|'skipped_no_cv'|'no_result'|'no_compatible_position'|'analysis_failed', updates?: object, failures?: Array<{position: string, message: string}>, aiCalls: number}>}
  *   - skipped_no_cv: CV gövdesi yok — skor çökertmek yerine atlandı (yeniden ayrıştırma gerekli)
- *   - no_result: hiçbir pozisyon analizi >0 skor üretmedi (skor alanlarına dokunulmaz)
+ *   - analysis_failed: denenen TÜM pozisyonlarda AI çağrısı hata verdi
+ *     (kota, bozuk yanıt, ağ). Teknik hatadır; adayın uygunluğuyla ilgisi yok.
+ *   - no_result: çağrılar döndü ama hiçbiri >0 skor üretmedi (skor alanlarına dokunulmaz)
  *   - no_compatible_position: adayın domain'ine uygun açık pozisyon yok
  */
 export async function deepScanCandidate(candidate, openPositions, options = {}) {
@@ -81,9 +83,12 @@ export async function deepScanCandidate(candidate, openPositions, options = {}) 
     let bestResult = null;
     let bestTitle = candidate.matchedPositionTitle;
     let aiCalls = 0;
+    let attempted = 0;
+    const failures = [];
 
     for (const pos of positionsToAnalyze) {
         if (!pos) continue;
+        attempted += 1;
         const jobDesc = buildJobDescription(pos);
         try {
             const result = await analyzeCandidateMatch(jobDesc, candidate, 'gemini-2.5-flash', {
@@ -97,12 +102,23 @@ export async function deepScanCandidate(candidate, openPositions, options = {}) 
                 bestResult = result;
                 bestTitle = pos.title;
             }
-        } catch {
-            // Tek pozisyonun analiz hatası taramayı durdurmaz
+        } catch (err) {
+            // Tek pozisyonun analiz hatası taramayı durdurmaz — ama SEBEBİ
+            // kaybolmamalı. Eskiden buradaki boş catch, kota aşımını ve
+            // bozuk AI yanıtını "CV metnini kontrol edin" mesajına
+            // çeviriyordu; CV kusursuzken kullanıcı CV'de hata arıyordu.
+            failures.push({ position: pos.title, message: err?.message || String(err) });
         }
     }
 
-    if (!bestResult) return { status: 'no_result', aiCalls };
+    if (!bestResult) {
+        // Hepsi patladıysa bu bir CV/uygunluk sorunu DEĞİL, teknik hatadır.
+        if (attempted > 0 && failures.length === attempted) {
+            return { status: 'analysis_failed', failures, aiCalls };
+        }
+        // Çağrılar döndü ama hiçbiri 0'dan büyük skor üretmedi.
+        return { status: 'no_result', failures, aiCalls };
+    }
 
     const updates = {
         aiAnalysis: sanitizeForFirestore({
@@ -137,7 +153,7 @@ export async function deepScanCandidate(candidate, openPositions, options = {}) 
  * @param {{previousTitle?: string}} [options] — başlık değiştiyse eski
  *   anahtar altındaki bayat analiz silinir; aksi halde tabloda iki farklı
  *   skor yan yana yaşamaya devam eder.
- * @returns {Promise<{status: 'scanned'|'skipped_no_cv'|'no_result', updates?: object, aiCalls: number}>}
+ * @returns {Promise<{status: 'scanned'|'skipped_no_cv'|'no_result'|'analysis_failed', updates?: object, failures?: Array<{position: string, message: string}>, aiCalls: number}>}
  */
 export async function rescanCandidateForPosition(candidate, position, options = {}) {
     const { previousTitle } = options;
@@ -152,10 +168,15 @@ export async function rescanCandidateForPosition(candidate, position, options = 
         result = await analyzeCandidateMatch(jobDesc, candidate, 'gemini-2.5-flash', {
             requirements: requirementsOf(position),
         });
-    } catch {
-        return { status: 'no_result', aiCalls: 1 };
+    } catch (err) {
+        // deepScanCandidate ile aynı ayrım: teknik hata ≠ düşük uygunluk
+        return {
+            status: 'analysis_failed',
+            failures: [{ position: position.title, message: err?.message || String(err) }],
+            aiCalls: 1,
+        };
     }
-    if (!result || !(result.score > 0)) return { status: 'no_result', aiCalls: 1 };
+    if (!result || !(result.score > 0)) return { status: 'no_result', failures: [], aiCalls: 1 };
 
     const updatedAnalyses = { ...(candidate.positionAnalyses || {}) };
     if (previousTitle && previousTitle !== position.title) delete updatedAnalyses[previousTitle];
