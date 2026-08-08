@@ -70,7 +70,7 @@ const STEP_DEFS = [
         key: 'score',
         title: 'Ön Skor Basma',
         icon: Gauge,
-        desc: 'Skoru hiç olmayan adaylar hafif bir AI çağrısıyla puanlanır (CV metni yoksa anahtar-kelime skoru). Dolu skorların üzerine yazılmaz. İlan gereksinimlerini ya da zorunlu/tercihen işaretlerini değiştirdiyseniz "Tümünü Yeniden Puanla" ile mevcut skorları da tazeleyebilirsiniz.',
+        desc: 'Henüz puanlanmamış adaylar hafif bir AI çağrısıyla puanlanır (CV metni yoksa anahtar-kelime skoru). Dolu skorların üzerine yazılmaz. İlan gereksinimlerini ya da zorunlu/tercihen işaretlerini değiştirdiyseniz "Tümünü Yeniden Puanla" ile mevcut skorları da tazeleyebilirsiniz.',
         countLabel: (n) => `${n} skorsuz aday`,
         action: 'Puanla',
     },
@@ -348,6 +348,11 @@ export default function MaintenancePanel() {
         enrich: health?.missingExperiences ?? 0,
         score: health?.zeroScore ?? 0,
     };
+    // Denenmiş ama puanlanamayan adaylar. Bunlar countOf'a GİRMEZ: puanlama
+    // onları işliyor ve meşru olarak 0 hesaplıyor (CV metni yok ya da hiçbir
+    // açık pozisyonla örtüşmüyor). Sayaca dahil edilince adım asla
+    // "Gerek yok" olamıyor ve kullanıcı "niye puanlanmıyor?" diye soruyordu.
+    const unscorable = health?.unscorable ?? 0;
     const statusOf = (key) => {
         if (doneSteps.has(key)) return 'done';
         if (skippedSteps.has(key)) return 'skipped';
@@ -426,6 +431,13 @@ export default function MaintenancePanel() {
                                         {isCurrent && <p className="text-[10px] text-slate-400 mt-0.5">{s.desc}</p>}
                                         {stepResults[s.key] && (
                                             <p className="text-[10px] text-emerald-600 font-semibold mt-0.5">{stepResults[s.key]}</p>
+                                        )}
+                                        {s.key === 'score' && unscorable > 0 && (
+                                            <p className="text-[10px] text-slate-400 mt-0.5">
+                                                Ayrıca {unscorable} aday puanlanamıyor: denendi ama CV metni yok
+                                                ya da hiçbir açık pozisyonla örtüşmüyor. Bunlar için yapılacak
+                                                bir şey yok — CV yükleyin ya da uygun bir pozisyon açın.
+                                            </p>
                                         )}
                                         {s.key === 'score' && running === 'score' && prescoreProgress && (
                                             <p className="text-[10px] text-violet-600 font-semibold mt-0.5">
