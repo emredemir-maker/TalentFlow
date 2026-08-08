@@ -22,6 +22,7 @@ import CandidateAvatar from '../components/CandidateAvatar';
 import CandidateCvPanel from '../components/CandidateCvPanel';
 import ScoreBreakdownPanel from '../components/ScoreBreakdownPanel';
 import MustHaveBadge from '../components/MustHaveBadge';
+import StarEvidenceCards from '../components/StarEvidenceCards';
 import {
     Plus, Search, Zap, Brain, X,
     Target, ShieldCheck, ArrowRight, FileText, Clock,
@@ -825,20 +826,14 @@ export default function CandidateProcessPage() {
         return results;
     }, [candidates, searchQuery, filterSource, filterStatus, filterPosition, filterMinScore, positions]);
 
-    const parseFeedback = (text) => {
-        if (!text) return { pos: '', neg: '' };
-        const parts = text.split('Negatif (-):');
-        return {
-            pos: parts[0].replace('Pozitif (+):', '').trim(),
-            neg: parts[1]?.trim() || ''
-        };
-    };
-
+    // parseFeedback kaldırıldı: "Pozitif (+)/Negatif (-)" ayrıştırması artık
+    // starDimensions.normalizeStarDimension içinde, eski ve yeni biçimi
+    // birlikte ele alacak şekilde yapılıyor.
     const starAnalysis = candidate?.aiAnalysis?.starAnalysis || {
-        Situation: { reason: 'Mülakat verisi bekleniyor.', score: 0 },
-        Task:      { reason: 'Mülakat verisi bekleniyor.', score: 0 },
-        Action:    { reason: 'Mülakat verisi bekleniyor.', score: 0 },
-        Result:    { reason: 'Mülakat verisi bekleniyor.', score: 0 },
+        Situation: { evidence: '', score: 0 },
+        Task:      { evidence: '', score: 0 },
+        Action:    { evidence: '', score: 0 },
+        Result:    { evidence: '', score: 0 },
     };
 
     const rawExperiences = candidate?.experiences || candidate?.careerHistory || [];
@@ -1443,48 +1438,13 @@ export default function CandidateProcessPage() {
                                             </div>
                                         )}
 
-                                        {/* STAR cards — shown only when analysis data exists and not currently re-analyzing */}
+                                        {/* STAR kartlari — kanit olcegi (uc kova).
+                                            Eski "Pozitif/Negatif" ikilisi kaldirildi: olctugumuz
+                                            sey tek kutuplu oldugu icin negatif tarafta yazacak
+                                            gercek bir sey cogu zaman yoktu ve model kacamak
+                                            uretiyordu. Ayrinti icin StarEvidenceCards. */}
                                         {!analyzingIds.has(candidate.id) && candidate.aiAnalysis?.starAnalysis && (
-                                            <div className="space-y-2">
-                                                {[
-                                                    { k: 'S', l: 'DURUM', sub: 'Situation', bg: 'bg-blue-50',   border: 'border-blue-100',   tc: 'text-blue-700',   r: starAnalysis.Situation.reason },
-                                                    { k: 'T', l: 'GÖREV', sub: 'Task',      bg: 'bg-teal-50',   border: 'border-teal-100',   tc: 'text-teal-700',   r: starAnalysis.Task.reason },
-                                                    { k: 'A', l: 'EYLEM', sub: 'Action',    bg: 'bg-violet-50', border: 'border-violet-100', tc: 'text-violet-700', r: starAnalysis.Action.reason },
-                                                    { k: 'R', l: 'SONUÇ', sub: 'Result',    bg: 'bg-emerald-50',border: 'border-emerald-100',tc: 'text-emerald-700',r: starAnalysis.Result.reason },
-                                                ].map((step, idx) => {
-                                                    const { pos, neg } = parseFeedback(step.r);
-                                                    return (
-                                                        <div key={idx} className={`rounded-xl border ${step.border} ${step.bg} p-3`}>
-                                                            <div className="flex items-center gap-2 mb-2">
-                                                                <div className={`w-6 h-6 rounded-md bg-white border ${step.border} flex items-center justify-center text-[11px] font-black ${step.tc} shadow-sm shrink-0`}>{step.k}</div>
-                                                                <h4 className={`text-[11px] font-black uppercase tracking-wider ${step.tc}`}>{step.l}</h4>
-                                                                <span className={`text-[10px] font-medium opacity-60 ${step.tc}`}>({step.sub})</span>
-                                                            </div>
-                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                                                {pos && (
-                                                                    <div className="bg-white border border-emerald-100 px-3 py-2 rounded-lg">
-                                                                        <div className="flex items-center gap-1 text-[9px] font-black text-emerald-600 uppercase mb-1">
-                                                                            <ShieldCheck className="w-3 h-3" /> Pozitif
-                                                                        </div>
-                                                                        <p className="text-[12px] text-slate-600 leading-relaxed">{pos}</p>
-                                                                    </div>
-                                                                )}
-                                                                {neg && (
-                                                                    <div className="bg-white border border-red-100 px-3 py-2 rounded-lg">
-                                                                        <div className="flex items-center gap-1 text-[9px] font-black text-red-500 uppercase mb-1">
-                                                                            <AlertCircle className="w-3 h-3" /> Negatif
-                                                                        </div>
-                                                                        <p className="text-[12px] text-slate-600 leading-relaxed">{neg}</p>
-                                                                    </div>
-                                                                )}
-                                                                {!pos && !neg && (
-                                                                    <p className="text-[12px] text-slate-400 italic col-span-2">{step.r || '—'}</p>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
+                                            <StarEvidenceCards starAnalysis={starAnalysis} />
                                         )}
                                     </div>
                                 )}
