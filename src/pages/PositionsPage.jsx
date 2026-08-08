@@ -28,6 +28,7 @@ import {
 } from '../utils/positionRequirements';
 import { rescanCandidateForPosition, hasAnalysisForPosition } from '../services/scanService';
 import RescanPositionModal from '../components/RescanPositionModal';
+import RequirementReviewPanel from '../components/RequirementReviewPanel';
 import { getAuthHeaders } from '../services/ai/config';
 import { calculateMatchScore, filterCandidatesByDomain } from '../services/matchService';
 
@@ -301,6 +302,14 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                                     ))}
                                 </div>
                             </div>
+                        )}
+
+                        {/* Gereksinim gozden gecirme — sayilar taranmis adaylardan
+                            olculur, AI yalnizca isaretli maddeler icin alternatif
+                            ifade onerir. Gereksinimler skorun en buyuk kaldiraci
+                            oldugu icin denetlenmeleri gerekiyor. */}
+                        {isRecruiterOrAdmin && pos.status === 'open' && (
+                            <RequirementReviewPanel position={pos} candidates={candidates} />
                         )}
 
                         {/* Description */}
