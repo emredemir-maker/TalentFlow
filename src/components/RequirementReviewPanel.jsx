@@ -4,6 +4,10 @@ import {
     reviewRequirements, flaggedRequirements, FLAG_LABELS, MIN_SAMPLE, candidatesByRequirements,
 } from '../utils/requirementReview';
 import { suggestRequirementRewrites } from '../services/ai/requirementAdvisor';
+import { normalizeAction, ACTION_LABELS, DEMOTE, REMOVE } from '../utils/requirementEdit';
+
+/** Danışmanın kararı — tanınmayan/boş değer "yeniden yaz" sayılır. */
+const actionOf = (s) => normalizeAction(s?.action);
 
 /**
  * "Bu gereksinimi neden istiyoruz?"
@@ -188,6 +192,18 @@ export default function RequirementReviewPanel({ position, candidates, onCandida
 
                             {s && (
                                 <div className="mt-2 rounded-lg border border-cyan-100 bg-white px-2.5 py-2 space-y-1">
+                                    {/* Danışmanın KARARI. Önce görünmüyordu ve
+                                        uygulanmıyordu: kullanıcı "tercihene al"
+                                        önerisini uyguluyor, madde zorunlu kalıyordu. */}
+                                    <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${
+                                        actionOf(s) === REMOVE
+                                            ? 'bg-red-50 text-red-600 border border-red-100'
+                                            : actionOf(s) === DEMOTE
+                                                ? 'bg-amber-50 text-amber-700 border border-amber-100'
+                                                : 'bg-slate-100 text-slate-500 border border-slate-200'
+                                    }`}>
+                                        {ACTION_LABELS[actionOf(s)]}
+                                    </span>
                                     {s.why && (
                                         <p className="text-[10px] text-slate-500">
                                             <span className="font-black uppercase text-[9px] text-slate-400">Aslında ölçtüğü: </span>
@@ -203,12 +219,16 @@ export default function RequirementReviewPanel({ position, candidates, onCandida
                                     {s.rationale && (
                                         <p className="text-[10px] text-slate-400 italic leading-relaxed">{s.rationale}</p>
                                     )}
-                                    {s.suggestion && onApplySuggestion && (
+                                    {onApplySuggestion && (s.suggestion || actionOf(s) === REMOVE) && (
                                         <button
-                                            onClick={() => onApplySuggestion(it.index, s.suggestion)}
-                                            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-cyan-500 hover:bg-cyan-600 text-white text-[9px] font-black uppercase tracking-wider transition-colors"
+                                            onClick={() => onApplySuggestion(it.index, s)}
+                                            className={`flex items-center gap-1 px-2 py-1 rounded-lg text-white text-[9px] font-black uppercase tracking-wider transition-colors ${
+                                                actionOf(s) === REMOVE
+                                                    ? 'bg-red-500 hover:bg-red-600'
+                                                    : 'bg-cyan-500 hover:bg-cyan-600'
+                                            }`}
                                         >
-                                            <Check className="w-3 h-3" /> Öneriyi uygula
+                                            <Check className="w-3 h-3" /> {ACTION_LABELS[actionOf(s)]}
                                         </button>
                                     )}
                                 </div>
