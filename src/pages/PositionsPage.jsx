@@ -26,6 +26,7 @@ import {
     formatRequirementsInput, parseRequirementGroups, formatRequirementGroups,
     requirementsOf, hasPrioritizedRequirements,
 } from '../utils/positionRequirements';
+import { applyRequirementAction, REMOVE } from '../utils/requirementEdit';
 import { rescanCandidateForPosition, hasAnalysisForPosition } from '../services/scanService';
 import RescanPositionModal from '../components/RescanPositionModal';
 import RequirementReviewPanel from '../components/RequirementReviewPanel';
@@ -1374,36 +1375,37 @@ export default function PositionsPage() {
     };
 
     /**
-     * Öneriyi ilana uygula: yalnızca o maddenin METNİ değişir; zorunlu/tercihen
-     * işareti ve diğer maddeler olduğu gibi kalır.
+     * Öneriyi ilana uygula.
+     *
+     * Danışman iki şey döndürüyor: yeni metin ve bir KARAR (yeniden-yaz /
+     * tercihene-al / kaldır). İlk sürüm yalnızca metni değiştiriyordu, karar
+     * uygulanmıyordu — "tercihene al" önerisinden sonra madde zorunlu kalıyor,
+     * "kaldır" önerisinden sonra madde ilanda duruyordu. Kullanıcı haklı olarak
+     * "öneriyi uygulamıyor" dedi. Kararı da uyguluyoruz.
      *
      * Uyguladıktan SONRA yeniden tarama akışı açılır. Bu şart: kayıtlı aday
      * analizleri eski metne ait ve tazelenmezse panel aynı bulguyu — dolayısıyla
-     * aynı öneriyi — tekrar üretir. Kullanıcının bildirdiği sorun tam buydu.
+     * aynı öneriyi — tekrar üretir.
      */
-    const handleApplySuggestion = async (position, index, newText) => {
-        if (!position || !newText) return;
-        const current = requirementsOf(position);
-        const target = current[index - 1];
-        if (!target) return;
-        if (!window.confirm(
-            `${index}. madde şu metinle değiştirilecek:
+    const handleApplySuggestion = async (position, index, review) => {
+        const plan = applyRequirementAction(position, index, review);
+        if (!plan) return;
+        if (!window.confirm(plan.confirmText)) return;
 
-${newText}
-
-`
-            + 'Zorunlu/tercihen işareti korunur. Sonrasında yeniden tarama önerilecek.'
-        )) return;
-
-        const meta = current.map((r, i) => (
-            i === index - 1 ? { text: newText, must: r.must } : { text: r.text, must: r.must }
-        ));
-        const reqs = meta.map((r) => r.text);
-        await updatePosition(position.id, { requirements: reqs, requirementsMeta: meta });
+        try {
+            await updatePosition(position.id, plan.updates);
+        } catch (err) {
+            // Sessiz başarısızlık en kötüsü: kullanıcı uyguladığını sanıp
+            // aynı öneriyi tekrar görüyor.
+            window.alert(`Öneri uygulanamadı: ${err?.message || 'bilinmeyen hata'}`);
+            return;
+        }
         setDetailPos(null);
         setRescanTarget({
-            position: { ...position, requirements: reqs, requirementsMeta: meta },
-            reason: 'Gereksinim metni değişti — kayıtlı aday analizleri artık eski metne ait.',
+            position: plan.nextPosition,
+            reason: plan.action === REMOVE
+                ? 'Bir gereksinim kaldırıldı — kayıtlı aday analizleri artık eski listeye ait.'
+                : 'Gereksinim değişti — kayıtlı aday analizleri artık eski metne ait.',
         });
     };
 
@@ -1779,7 +1781,7 @@ ${newText}
                         window.dispatchEvent(new CustomEvent('changeView', { detail: 'candidate-process' }));
                     }}
                     onRescan={() => setRescanTarget({ position: detailPos })}
-                    onApplySuggestion={(index, text) => handleApplySuggestion(detailPos, index, text)}
+                    onApplySuggestion={(index, review) => handleApplySuggestion(detailPos, index, review)}
                 />
             )}
 
