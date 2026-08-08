@@ -25,6 +25,7 @@ import {
     generatePersonalizedDM,
     analyzeResponseEmail
 } from './ai/communication.js';
+import { starPercent } from '../utils/starDimensions';
 
 export {
     getModel,
@@ -189,33 +190,11 @@ function clampScore(value) {
     return Math.min(100, Math.max(0, Math.round(n)));
 }
 
-/** STAR ortalaması → 0-100. Analiz yoksa null. */
-/**
- * STAR = KANIT yoğunluğu, 0-100.
- *
- * Yeni model her boyutu 0-3 çapalı ölçekle puanlar (0 bilgi yok, 1 anılmış,
- * 2 anlatılmış, 3 ölçülmüş). Eski kayıtlar 1-10 ölçeğindeydi.
- *
- * Ölçek OTOMATİK algılanır: herhangi bir boyut 3'ten büyükse kayıt eskidir ve
- * 0-10 kabul edilir. Sabit bir bölen kullanmak eski kayıtları ya tavana
- * yapıştırırdı (8 → 8/3) ya da yenileri yok sayardı.
- */
-function starScoreOf(starAnalysis) {
-    if (!starAnalysis) return null;
-    const getScore = (val) => {
-        if (typeof val === 'number') return val;
-        if (typeof val === 'object' && val !== null && val.score !== undefined) return Number(val.score);
-        return 0;
-    };
-    const scores = [
-        getScore(starAnalysis.Situation), getScore(starAnalysis.Task),
-        getScore(starAnalysis.Action), getScore(starAnalysis.Result),
-    ].map((n) => (Number.isFinite(n) ? n : 0));
-
-    const max = scores.some((n) => n > 3) ? 10 : 3;
-    const sum = scores.reduce((a, b) => a + b, 0);
-    return clampScore((sum / (4 * max)) * 100);
-}
+// STAR = KANIT yoğunluğu, 0-100. Hesap starDimensions.starPercent'te — TEK
+// yerde. Burada ayrı bir kopya tutmak 2026-08-08'de gerçek bir hataya yol
+// açtı: ekrandaki rozet kendi kopyasıyla eski 0-10 ölçeğini varsayıp %25
+// gösterirken doğru değer %83'tü. Üçüncü kopyayı bırakmıyoruz.
+const starScoreOf = starPercent;
 
 // Öncelik ağırlıkları: zorunlu maddeler skorun gövdesini taşır, tercih
 // edilenler sınırlı avantaj sağlar.
