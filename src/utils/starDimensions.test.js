@@ -4,6 +4,7 @@ import {
     normalizeStarAnalysis,
     anchorLabel,
     starConflicts,
+    confidentialDimensions,
 } from './starDimensions.js';
 
 describe('normalizeStarDimension — yeni biçim', () => {
@@ -133,5 +134,47 @@ describe('starConflicts', () => {
         expect(starConflicts({
             Situation: { score: 8, reason: 'Pozitif (+): A. Negatif (-): B.' },
         })).toEqual([]);
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Gizlilik beyanı.
+//
+// En nitelikli adaylar genellikle en sıkı NDA'ye sahip projelerde çalışır;
+// rakam paylaşamadıkları için sistem onları eliyordu. Bayrak bu durumu
+// GÖRÜNÜR kılar — ama puan KAZANDIRMAZ. Bayrağa puan bağlamak "NDA yazan
+// herkes yüksek alır" oyununu açardı; kredi kanıttan gelmeli.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('gizlilik beyanı', () => {
+    it('reads the flag from a new record', () => {
+        const d = normalizeStarDimension({
+            score: 2, evidence: '8 kişilik ekiple çalışmış', missing: '', confidentiality: true,
+        });
+        expect(d.confidentiality).toBe(true);
+    });
+
+    it('defaults to false when the flag is absent', () => {
+        expect(normalizeStarDimension({ score: 2, evidence: 'x' }).confidentiality).toBe(false);
+        expect(normalizeStarDimension({ score: 8, reason: 'Pozitif (+): x' }).confidentiality).toBe(false);
+    });
+
+    it('does not change the score — credit comes from evidence alone', () => {
+        const withFlag = normalizeStarDimension({ score: 1, evidence: 'az', confidentiality: true });
+        const without = normalizeStarDimension({ score: 1, evidence: 'az', confidentiality: false });
+        expect(withFlag.score).toBe(without.score);
+    });
+
+    it('lists the dimensions where confidentiality was declared', () => {
+        const analysis = {
+            Situation: { score: 2, evidence: 'a', confidentiality: true },
+            Task: { score: 2, evidence: 'b' },
+            Action: { score: 1, evidence: 'c', confidentiality: true },
+            Result: { score: 0 },
+        };
+        expect(confidentialDimensions(analysis)).toEqual(['Situation', 'Action']);
+    });
+
+    it('finds none in a legacy record', () => {
+        expect(confidentialDimensions({ Situation: { score: 8, reason: 'x' } })).toEqual([]);
     });
 });

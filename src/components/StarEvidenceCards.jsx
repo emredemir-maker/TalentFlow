@@ -1,4 +1,4 @@
-import { ShieldCheck, HelpCircle, AlertTriangle, Info } from 'lucide-react';
+import { ShieldCheck, HelpCircle, AlertTriangle, Info, Lock } from 'lucide-react';
 import { normalizeStarAnalysis, anchorLabel } from '../utils/starDimensions';
 
 const STEPS = {
@@ -54,6 +54,14 @@ export default function StarEvidenceCards({ starAnalysis }) {
                             <h4 className={`text-[11px] font-black uppercase tracking-wider ${step.tc}`}>{step.l}</h4>
                             <span className={`text-[10px] font-medium opacity-60 ${step.tc}`}>({d.key})</span>
                             <span className="ml-auto flex items-center gap-1.5">
+                                {d.confidentiality && (
+                                    <span
+                                        title="Aday gizlilik yükümlülüğü nedeniyle ayrıntı vermediğini belirtmiş. Bu bir eksiklik değildir ve puanı etkilemez."
+                                        className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-white border border-slate-200 text-[9px] font-black text-slate-500 uppercase"
+                                    >
+                                        <Lock className="w-2.5 h-2.5" /> Gizlilik
+                                    </span>
+                                )}
                                 {label && (
                                     <span className="px-1.5 py-0.5 rounded bg-white border border-slate-200 text-[9px] font-black text-slate-500 uppercase">
                                         {label}
@@ -101,7 +109,8 @@ export default function StarEvidenceCards({ starAnalysis }) {
             <p className="text-[9px] text-slate-400 leading-relaxed pt-1">
                 Bu bölüm adayın niteliğini değil, CV&apos;de ne kadar kanıt bulunduğunu ölçer.
                 Bilginin CV&apos;de olmaması bir kusur değildir — gizlilik yükümlülüğü, yer kısıtı
-                ya da yazım alışkanlığı olabilir.
+                ya da yazım alışkanlığı olabilir. Kesin rakam şart değildir: aralık, oran ve
+                ölçek bilgisi (ekip boyutu, kullanıcı mertebesi) de kanıt sayılır.
             </p>
         </div>
     );

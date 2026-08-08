@@ -104,3 +104,42 @@ describe('EXTRACTOR_PROMPT — genel kurallar', () => {
         expect(promptSource).toMatch(/\[TERCİHEN\] maddeleri ASLA/);
     });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Gizlilik paradoksu.
+//
+// En nitelikli adaylar genellikle en sıkı NDA'ye sahip projelerde çalışır ve
+// kesin rakam paylaşamaz. Yalnızca kesin rakam arayan bir ölçek, tam da bu
+// adayları eler — sistem "gizleyecek bir şeyi olmayan" ortalama adayı
+// ödüllendiren bir mekanizmaya döner.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('EXTRACTOR_PROMPT — gizlilik ve ölçek vekilleri', () => {
+    it('accepts ranges and relative change as measured evidence', () => {
+        expect(promptSource).toMatch(/kesin rakam ŞART DEĞİL/);
+        expect(promptSource).toMatch(/Aralık ya da yaklaşık değer/);
+        expect(promptSource).toMatch(/Göreli değişim/);
+    });
+
+    it('counts scope proxies as evidence', () => {
+        expect(promptSource).toMatch(/ÖLÇEK VEKİLLERİ/);
+        for (const proxy of ['kişilik ekip', 'kaç ülke', 'sistem/mimari karmaşıklığı']) {
+            expect(promptSource).toContain(proxy);
+        }
+    });
+
+    it('has a confidentiality flag that is set only on an explicit statement', () => {
+        expect(promptSource).toMatch(/"confidentiality"/);
+        expect(promptSource).toMatch(/sessiz kalmak gizlilik beyanı değildir/);
+    });
+
+    it('makes the flag change the question, not the score', () => {
+        // Bayraga puan baglamak "NDA yazan herkes yuksek alir" oyununu acardi
+        expect(promptSource).toMatch(/Bu bayrak PUAN KAZANDIRMAZ/);
+        expect(promptSource).toMatch(/Yine de puanı "evidence" belirler/);
+    });
+
+    it('asks the follow-up in an NDA-safe way', () => {
+        expect(promptSource).toMatch(/NDA-GÜVENLİ/);
+        expect(promptSource).toMatch(/gizli bilgiyi ifşa etmesini ISTEME/);
+    });
+});

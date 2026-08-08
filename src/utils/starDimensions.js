@@ -37,11 +37,12 @@ function splitLegacyReason(text) {
  *            conflict: string, legacy: boolean}}
  */
 export function normalizeStarDimension(raw, { scaleMax } = {}) {
+    const blank = { evidence: '', missing: '', conflict: '', confidentiality: false, legacy: false };
     if (raw === null || raw === undefined) {
-        return { score: 0, max: scaleMax || 3, evidence: '', missing: '', conflict: '', legacy: false };
+        return { score: 0, max: scaleMax || 3, ...blank };
     }
     if (typeof raw === 'number') {
-        return { score: raw, max: scaleMax || (raw > 3 ? 10 : 3), evidence: '', missing: '', conflict: '', legacy: false };
+        return { score: raw, max: scaleMax || (raw > 3 ? 10 : 3), ...blank };
     }
 
     const score = Number(raw.score ?? 0) || 0;
@@ -54,6 +55,10 @@ export function normalizeStarDimension(raw, { scaleMax } = {}) {
             evidence: String(raw.evidence || '').trim(),
             missing: String(raw.missing || '').trim(),
             conflict: String(raw.conflict || '').trim(),
+            // Gizlilik beyanı PUANA ETKİ ETMEZ. Yalnızca sorunun nasıl
+            // sorulacağını ve ekrandaki çerçeveyi değiştirir. Bayrağa puan
+            // bağlamak "NDA yazan herkes yüksek alır" oyununu açardı.
+            confidentiality: Boolean(raw.confidentiality),
             legacy: false,
         };
     }
@@ -69,6 +74,7 @@ export function normalizeStarDimension(raw, { scaleMax } = {}) {
         evidence: positive,
         missing: meaningless ? '' : negative,
         conflict: '',
+        confidentiality: false,
         legacy: true,
     };
 }
@@ -105,4 +111,11 @@ export function starConflicts(starAnalysis) {
     const dims = normalizeStarAnalysis(starAnalysis);
     if (!dims) return [];
     return dims.filter((d) => d.conflict).map((d) => ({ key: d.key, text: d.conflict }));
+}
+
+/** Gizlilik beyanı bulunan boyutlar. */
+export function confidentialDimensions(starAnalysis) {
+    const dims = normalizeStarAnalysis(starAnalysis);
+    if (!dims) return [];
+    return dims.filter((d) => d.confidentiality).map((d) => d.key);
 }
