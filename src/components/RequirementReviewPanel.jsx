@@ -18,13 +18,17 @@ const actionOf = (s) => normalizeAction(s?.action);
  *
  * Hiçbir şeyi otomatik değiştirmez — öneri sunar, düzenlemeyi kullanıcı yapar.
  */
-export default function RequirementReviewPanel({ position, candidates, onCandidateClick, onApplySuggestion }) {
+export default function RequirementReviewPanel({
+    position, candidates, onCandidateClick, onApplySuggestions, onRescan,
+}) {
     const [suggestions, setSuggestions] = useState(null);
     // Seçilen gereksinimler → canlı aday listesi. Asıl kullanım "bu maddeyi
     // kaldırsam kim geri gelir?" sorusunu görmek.
     const [picked, setPicked] = useState(() => new Set());
     const [mode, setMode] = useState('meets');
     const [loading, setLoading] = useState(false);
+    const [applying, setApplying] = useState(false);
+    const [appliedCount, setAppliedCount] = useState(0);
     const [error, setError] = useState(null);
 
     const review = useMemo(
@@ -53,12 +57,53 @@ export default function RequirementReviewPanel({ position, candidates, onCandida
         setError(null);
         try {
             setSuggestions(await suggestRequirementRewrites(position, flagged));
+            setAppliedCount(0);
         } catch (err) {
             setError(err?.message || 'Öneri alınamadı.');
         } finally {
             setLoading(false);
         }
     };
+
+    /**
+     * Öneri(ler)i uygula.
+     *
+     * Panel AÇIK kalır ve yeniden tarama SONA bırakılır. Önceki davranış her
+     * uygulamada paneli kapatıp tarama ekranını açıyordu; üç öneri gelen bir
+     * ilanda kullanıcı öneriyi üç kez baştan istemek zorunda kalıyordu.
+     *
+     * Uygulanan öneriler listeden düşer, kalanlar YENİDEN NUMARALANIR — madde
+     * kaldırıldığında numaralar kayar ve eski numarayla duran bir öneri yanlış
+     * maddeye yapışırdı.
+     */
+    const applyNow = async (reviews) => {
+        if (!onApplySuggestions || reviews.length === 0) return;
+        setApplying(true);
+        setError(null);
+        try {
+            const plan = await onApplySuggestions(reviews);
+            if (!plan) return;
+            const done = new Set(plan.changes.map((c) => c.index));
+            setSuggestions((prev) => (prev || [])
+                .filter((s) => !done.has(Number(s.index)))
+                .map((s) => {
+                    const next = plan.indexMap.get(Number(s.index));
+                    return next ? { ...s, index: next } : null;
+                })
+                .filter(Boolean));
+            setPicked(new Set());
+            setAppliedCount((n) => n + plan.changes.length);
+        } catch (err) {
+            setError(err?.message || 'Öneri uygulanamadı.');
+        } finally {
+            setApplying(false);
+        }
+    };
+
+    // Uygulanabilir öneriler: metni olan ya da "kaldır" diyen.
+    const applicable = (suggestions || []).filter(
+        (s) => s.suggestion || actionOf(s) === REMOVE
+    );
 
     return (
         <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
@@ -219,10 +264,11 @@ export default function RequirementReviewPanel({ position, candidates, onCandida
                                     {s.rationale && (
                                         <p className="text-[10px] text-slate-400 italic leading-relaxed">{s.rationale}</p>
                                     )}
-                                    {onApplySuggestion && (s.suggestion || actionOf(s) === REMOVE) && (
+                                    {onApplySuggestions && (s.suggestion || actionOf(s) === REMOVE) && (
                                         <button
-                                            onClick={() => onApplySuggestion(it.index, s)}
-                                            className={`flex items-center gap-1 px-2 py-1 rounded-lg text-white text-[9px] font-black uppercase tracking-wider transition-colors ${
+                                            onClick={() => applyNow([{ ...s, index: it.index }])}
+                                            disabled={applying}
+                                            className={`flex items-center gap-1 px-2 py-1 rounded-lg text-white text-[9px] font-black uppercase tracking-wider transition-colors disabled:opacity-40 ${
                                                 actionOf(s) === REMOVE
                                                     ? 'bg-red-500 hover:bg-red-600'
                                                     : 'bg-cyan-500 hover:bg-cyan-600'
@@ -322,6 +368,47 @@ export default function RequirementReviewPanel({ position, candidates, onCandida
 
             {error && (
                 <p className="text-[11px] text-red-600">{error}</p>
+            )}
+
+            {/* TOPLU UYGULAMA.
+                Önceki davranış her uygulamada paneli kapatıp tarama ekranını
+                açıyordu; üç öneri gelen bir ilanda kullanıcı öneriyi üç kez
+                baştan istemek zorunda kalıyordu. Artık hepsi tek yazmada
+                uygulanıyor ve tarama sona bırakılıyor. */}
+            {onApplySuggestions && applicable.length > 1 && (
+                <div className="flex items-center justify-between gap-2 rounded-lg border border-cyan-100 bg-cyan-50/40 px-3 py-2 flex-wrap">
+                    <p className="text-[10px] text-slate-600">
+                        <strong>{applicable.length}</strong> öneri uygulanabilir. Hepsini bir kerede
+                        uygularsanız yeniden taramayı yalnızca bir kez çalıştırırsınız.
+                    </p>
+                    <button
+                        onClick={() => applyNow(applicable)}
+                        disabled={applying}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-600 text-white text-[10px] font-black uppercase tracking-wider transition-colors disabled:opacity-40 shrink-0"
+                    >
+                        {applying
+                            ? <><Loader2 className="w-3 h-3 animate-spin" /> Uygulanıyor…</>
+                            : <><Check className="w-3 h-3" /> Tümünü uygula ({applicable.length})</>}
+                    </button>
+                </div>
+            )}
+
+            {/* Tarama artık uygulamanın yan etkisi değil, ayrı bir adım.
+                Tazelenmeden panel aynı bulguyu — dolayısıyla aynı öneriyi —
+                tekrar üretir; o yüzden bu düğmeyi görünür tutuyoruz. */}
+            {appliedCount > 0 && onRescan && (
+                <div className="flex items-center justify-between gap-2 rounded-lg border border-emerald-100 bg-emerald-50/60 px-3 py-2 flex-wrap">
+                    <p className="text-[10px] text-emerald-800">
+                        <strong>{appliedCount}</strong> değişiklik ilana yazıldı. Aday
+                        değerlendirmeleri hâlâ eski metne ait — yeniden taramayı çalıştırın.
+                    </p>
+                    <button
+                        onClick={onRescan}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black uppercase tracking-wider transition-colors shrink-0"
+                    >
+                        <RotateCcw className="w-3 h-3" /> Yeniden taramayı başlat
+                    </button>
+                </div>
             )}
 
             <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 flex-wrap">
