@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { skillAffinity, canonicalSkill, skillGraphSize, danglingImplications } from './skillGraph.js';
+import { skillAffinity, canonicalSkill, skillGraphSize, danglingImplications, detectSkillTags } from './skillGraph.js';
 
 describe('graf bütünlüğü', () => {
     it('has no implication pointing at a term that is not a node', () => {
@@ -97,5 +97,53 @@ describe('skillAffinity — alan bağımsızlığı', () => {
 
     it('covers a meaningful number of skills', () => {
         expect(skillGraphSize()).toBeGreaterThan(80);
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Etiket algılama.
+//
+// Kullanıcının önerisi: gereksinimler serbest metin olarak girilince aynı şey
+// ilandan ilana farklı yazılıyor ("GA4 hakimiyeti" / "Google Analytics
+// bilgisi") ve skorlama tutarsızlaşıyor. Kanonik etiket bu farkı siler.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('detectSkillTags', () => {
+    it('collapses different wordings of the same requirement', () => {
+        const a = detectSkillTags('GA4 hakimiyeti');
+        const b = detectSkillTags('Google Analytics bilgisi şart');
+        expect(a).toEqual(['ga4']);
+        expect(b).toEqual(['ga4']);
+    });
+
+    it('finds several skills in one sentence', () => {
+        const tags = detectSkillTags('SQL ve Amplitude ile funnel analizi');
+        expect(tags).toContain('sql');
+        expect(tags).toContain('amplitude');
+        expect(tags).toContain('funnel');
+    });
+
+    it('tolerates Turkish suffixes', () => {
+        expect(detectSkillTags("Figma'da prototipleme")).toContain('figma');
+        expect(detectSkillTags('aktivasyonu iyileştirme')).toContain('aktivasyon');
+    });
+
+    it('does not match a term buried inside another word', () => {
+        // termMatches kuralı: 'sql' postgresql içinde eşleşmemeli
+        expect(detectSkillTags('postgresql yönetimi')).toEqual(['postgresql']);
+    });
+
+    it('returns nothing for text with no known skill', () => {
+        expect(detectSkillTags('Takım içi iletişimi güçlü olmalı')).toEqual([]);
+        expect(detectSkillTags('')).toEqual([]);
+        expect(detectSkillTags(null)).toEqual([]);
+    });
+
+    it('leaves compound requirements partly untagged — by design', () => {
+        // "3-5 yıl B2B SaaS ürün yönetimi" üç boyut taşıyor (süre, sektör,
+        // fonksiyon). Etiket yalnızca fonksiyonu yakalar; süre ve sektör
+        // serbest metinde kalmalı. Etiketin metnin YERİNE geçmemesinin sebebi.
+        const tags = detectSkillTags('3-5 yıl B2B SaaS ürün yönetimi deneyimi');
+        expect(tags).toContain('ürün yönetimi');
+        expect(tags.join(' ')).not.toContain('yıl');
     });
 });

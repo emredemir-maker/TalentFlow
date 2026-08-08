@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
 import {
     parseRequirementsInput, formatRequirementsInput,
     parseRequirementGroups, formatRequirementGroups,
-    requirementsOf, hasPrioritizedRequirements, buildJobDescription,
+    requirementsOf, hasPrioritizedRequirements, buildJobDescription, positionTags,
 } from './positionRequirements';
 
 describe('parseRequirementsInput', () => {
@@ -87,10 +87,13 @@ describe('parseRequirementGroups / formatRequirementGroups', () => {
             mustText: '3-5 yıl ürün yönetimi, growth odaklı\nA/B test kurma',
             niceText: 'Tercihen B2B SaaS',
         });
+        // tags: serbest metnin yanına eklenen kanonik etiketler. Bileşik
+        // madde ("3-5 yıl ... growth odaklı") yalnızca tanınan kısmı etiketler;
+        // süre ve bağlam metinde kalır.
         expect(meta).toEqual([
-            { text: '3-5 yıl ürün yönetimi, growth odaklı', must: true },
-            { text: 'A/B test kurma', must: true },
-            { text: 'Tercihen B2B SaaS', must: false },
+            { text: '3-5 yıl ürün yönetimi, growth odaklı', must: true, tags: ['growth', 'ürün yönetimi'] },
+            { text: 'A/B test kurma', must: true, tags: ['a/b test'] },
+            { text: 'Tercihen B2B SaaS', must: false, tags: [] },
         ]);
     });
 
@@ -108,12 +111,12 @@ describe('parseRequirementGroups / formatRequirementGroups', () => {
 describe('requirementsOf', () => {
     it('reads priorities from requirementsMeta', () => {
         expect(requirementsOf({ requirementsMeta: [{ text: 'A', must: true }, { text: 'B', must: false }] }))
-            .toEqual([{ text: 'A', must: true }, { text: 'B', must: false }]);
+            .toEqual([{ text: 'A', must: true, tags: [] }, { text: 'B', must: false, tags: [] }]);
     });
 
     it('returns must:null for legacy positions so scoring stays neutral', () => {
         expect(requirementsOf({ requirements: ['A', 'B'] }))
-            .toEqual([{ text: 'A', must: null }, { text: 'B', must: null }]);
+            .toEqual([{ text: 'A', must: null, tags: [] }, { text: 'B', must: null, tags: [] }]);
         expect(hasPrioritizedRequirements({ requirements: ['A'] })).toBe(false);
         expect(hasPrioritizedRequirements({ requirementsMeta: [{ text: 'A', must: true }] })).toBe(true);
     });
@@ -140,5 +143,39 @@ describe('buildJobDescription', () => {
         const text = buildJobDescription({ title: 'X', requirements: ['A'] });
         expect(text).toContain('1. A');
         expect(text).not.toContain('ZORUNLU');
+    });
+});
+
+
+describe('etiketler', () => {
+    it('derives tags for legacy records that were saved before tagging existed', () => {
+        // Kullanıcı ilanı yeniden kaydetmeden de etiketleri görebilmeli
+        const legacy = { requirementsMeta: [{ text: 'GA4 hakimiyeti', must: true }] };
+        expect(requirementsOf(legacy)[0].tags).toEqual(['ga4']);
+    });
+
+    it('keeps stored tags when they exist', () => {
+        const stored = { requirementsMeta: [{ text: 'GA4 hakimiyeti', must: true, tags: ['elle-eklenen'] }] };
+        expect(requirementsOf(stored)[0].tags).toEqual(['elle-eklenen']);
+    });
+
+    it('collapses the same skill written differently across two positions', () => {
+        const a = parseRequirementGroups({ mustText: 'GA4 hakimiyeti' });
+        const b = parseRequirementGroups({ mustText: 'Google Analytics bilgisi' });
+        expect(a[0].tags).toEqual(b[0].tags);
+    });
+
+    it('lists position tags with must winning over nice', () => {
+        const pos = { requirementsMeta: [
+            { text: 'SQL bilgisi', must: false },
+            { text: 'SQL ile raporlama', must: true },
+            { text: 'Figma', must: false },
+        ] };
+        const tags = positionTags(pos);
+        expect(tags).toEqual([{ tag: 'sql', must: true }, { tag: 'figma', must: false }]);
+    });
+
+    it('returns no tags for a position without requirements', () => {
+        expect(positionTags({})).toEqual([]);
     });
 });

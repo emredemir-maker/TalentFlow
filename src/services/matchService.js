@@ -2,6 +2,7 @@
 import { analyzeCandidateMatch } from './geminiService';
 import { requirementsOf, hasPrioritizedRequirements } from '../utils/positionRequirements';
 import { skillAffinity, SKILL_VOCABULARY } from '../utils/skillGraph';
+import { termMatches } from '../utils/textMatch';
 
 /**
  * Semantic Technology Groups to improve matching without LLM for every call
@@ -200,29 +201,10 @@ const TOOL_TERMS = new Set([
 const CAPABILITY_SHARE = 0.75;
 const TOOL_SHARE = 0.25;
 
-/**
- * Terim, metinde GERÇEKTEN geçiyor mu?
- *
- * Düz `text.includes(term)` üç somut hataya yol açıyordu:
- *   - 'coding' → "vibecoding" içinde eşleşip ürün ilanını Yazılım sayıyordu
- *   - 'deney'  → "deneyimi" içinde eşleşiyordu
- *   - 'go'/'ai'→ rastgele kelimelerin içinde eşleşiyordu (kodda da not düşülmüş)
- *
- * Kural:
- *   - Boşluk/noktalama içeren terimler ('a/b test', 'node.js'): düz substring
- *   - ≤3 karakter ('ai', 'go', 'ui', 'sql'): tam kelime
- *   - Diğerleri: baştan sınır, sondan serbest — Türkçe ekleri korur
- *     ("aktivasyonu", "funnel'ı" eşleşir; "deneyimi" 'deney'e eşleşmez)
- */
-export function termMatches(text, term) {
-    if (!text || !term) return false;
-    if (/[\s./+#-]/.test(term)) return text.includes(term);
-    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const pattern = term.length <= 3
-        ? `(^|[^\\p{L}\\p{N}])${escaped}([^\\p{L}\\p{N}]|$)`
-        : `(^|[^\\p{L}\\p{N}])${escaped}`;
-    return new RegExp(pattern, 'u').test(text);
-}
+// termMatches src/utils/textMatch.js'e taşındı (skillGraph de kullanıyor;
+// ters import döngü yaratırdı). Mevcut içe aktarmalar kırılmasın diye
+// buradan yeniden dışa verilir.
+export { termMatches };
 
 /**
  * Detect the primary job domain from any freeform text.

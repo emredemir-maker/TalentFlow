@@ -16,6 +16,8 @@
 // Yön önemli: React bilen JavaScript bilir, ama JavaScript bilen React
 // bilmek zorunda değildir. Simetrik bir model bu farkı yok sayardı.
 
+import { termMatches } from './textMatch';
+
 /**
  * Düğümler: kanonik terim → { aliases, implies }
  * Kısa ve Türkçe eklerle çakışabilecek terimler bilinçli olarak dışarıda
@@ -233,6 +235,31 @@ export function skillAffinity(requirement, candidateSkills) {
     }
 
     return best;
+}
+
+/**
+ * Serbest metinde geçen bilinen yetkinlikleri KANONİK etiketlere çevirir.
+ *
+ * Amaç, gereksinim yazımındaki keyfî farkları ortadan kaldırmak: "GA4
+ * hakimiyeti", "Google Analytics bilgisi" ve "GA4 deneyimi" üçü de tek bir
+ * `ga4` etiketine düşer. Böylece aynı gereksinim ilandan ilana farklı
+ * yazıldığında skorlama farklı davranmaz.
+ *
+ * Serbest metnin YERİNE geçmez, yanına eklenir — "3-5 yıl B2B SaaS ürün
+ * yönetimi deneyimi" gibi bileşik bir gereksinim (süre + sektör + fonksiyon)
+ * tek etikete sığmaz ve zorlanırsa anlam kaybeder.
+ *
+ * @param {string} text
+ * @returns {string[]} kanonik etiketler (tekilleştirilmiş, alfabetik)
+ */
+export function detectSkillTags(text) {
+    const lower = String(text || '').toLowerCase();
+    if (!lower.trim()) return [];
+    const found = new Set();
+    for (const term of ALIAS_INDEX.keys()) {
+        if (termMatches(lower, term)) found.add(ALIAS_INDEX.get(term));
+    }
+    return [...found].sort((a, b) => a.localeCompare(b, 'tr'));
 }
 
 /** Test ve bakım için: graf kaç düğüm kapsıyor. */

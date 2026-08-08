@@ -27,6 +27,7 @@ import {
     requirementsOf, hasPrioritizedRequirements,
 } from '../utils/positionRequirements';
 import { rescanCandidateForPosition, hasAnalysisForPosition } from '../services/scanService';
+import RequirementTagHint from '../components/RequirementTagHint';
 import RescanPositionModal from '../components/RescanPositionModal';
 import { getAuthHeaders } from '../services/ai/config';
 import { calculateMatchScore, filterCandidatesByDomain } from '../services/matchService';
@@ -842,6 +843,7 @@ function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser,
                                 Karşılanmaması <strong>skoru düşürür</strong>. Satır başına bir madde — madde içindeki
                                 virgüller korunur. Teknoloji adı değil, aranan yetkinliği yazın.
                             </p>
+                            <RequirementTagHint text={formData.requirements} />
                         </Field>
                         <Field label="Olursa iyi olur (tercih edilen)">
                             <textarea
@@ -853,6 +855,7 @@ function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser,
                             <p className="text-[10px] text-slate-400 mt-1">
                                 Karşılanmaması ceza üretmez; karşılanması <strong>sınırlı bir avantaj</strong> sağlar.
                             </p>
+                            <RequirementTagHint text={formData.niceToHave} />
                         </Field>
                         <Field label="Pozisyon Açıklaması">
                             <textarea
@@ -1137,6 +1140,7 @@ function PositionEditModal({ pos, candidates, departments, isDepartmentUser, use
                                 <p className="text-[10px] text-slate-400 mt-1">
                                     Karşılanmaması <strong>skoru düşürür</strong>. Satır başına bir madde.
                                 </p>
+                                <RequirementTagHint text={formData.requirements} />
                             </Field>
                             <Field label="Olursa iyi olur (tercih edilen)">
                                 <textarea
@@ -1148,6 +1152,7 @@ function PositionEditModal({ pos, candidates, departments, isDepartmentUser, use
                                 <p className="text-[10px] text-slate-400 mt-1">
                                     Ceza üretmez; karşılanması <strong>sınırlı avantaj</strong> sağlar.
                                 </p>
+                                <RequirementTagHint text={formData.niceToHave} />
                             </Field>
                             <Field label="Açıklama">
                                 <textarea value={formData.description} onChange={e => setFormData(p => ({ ...p, description: e.target.value }))} className={INPUT_CLS + ' h-20 resize-none'} />
