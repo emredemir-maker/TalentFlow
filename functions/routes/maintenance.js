@@ -358,10 +358,13 @@ router.post('/api/maintenance/validate-matches', requireAuth(ROLES), async (req,
             const chunk = toApply.slice(applied, applied + 400);
             const batch = db.batch();
             for (const p of chunk) {
-                batch.update(db.collection(CANDIDATES_COLL).doc(p.id), {
+                // set(merge) — update() DEĞİL. update(), belgelerden biri
+                // silinmişse TÜM batch'i düşürür; 400 kaydın onarımı tek bir
+                // eksik belge yüzünden sessizce boşa giderdi.
+                batch.set(db.collection(CANDIDATES_COLL).doc(p.id), {
                     ...p.update,
                     matchRepairedAt: admin.firestore.FieldValue.serverTimestamp(),
-                });
+                }, { merge: true });
             }
             await batch.commit();
             applied += chunk.length;
@@ -369,12 +372,32 @@ router.post('/api/maintenance/validate-matches', requireAuth(ROLES), async (req,
 
         const byRule = {};
         for (const p of toApply) byRule[p.rule] = (byRule[p.rule] || 0) + 1;
-        log.info(`[maintenance/validate-matches] ${candSnap.size} tarandı, ${applied} onarıldı: ${JSON.stringify(byRule)}`);
+
+        // DOĞRULAMA: yazdıktan sonra aynı kayıtları tekrar okuyup yeniden
+        // planla. "N kayıt onarıldı" demek yetmiyor — kullanıcı sayacın
+        // düşmediğini bildirdi ve yazmanın gerçekten işe yarayıp yaramadığını
+        // ayırt etmenin yolu yoktu. Kalan varsa bu, kuralın o kayıtlarda
+        // yakınsamadığı anlamına gelir ve mesajda açıkça söylenir.
+        let stillBroken = 0;
+        if (toApply.length > 0) {
+            const recheckRefs = toApply.map((p) => db.collection(CANDIDATES_COLL).doc(p.id));
+            const rechecked = [];
+            for (let i = 0; i < recheckRefs.length; i += 300) {
+                const docs = await db.getAll(...recheckRefs.slice(i, i + 300), {
+                    fieldMask: ['matchedPositionTitle', 'positionId', 'bulkJobId', 'position', 'skills'],
+                });
+                for (const d of docs) if (d.exists) rechecked.push({ id: d.id, ...d.data() });
+            }
+            stillBroken = planMatchRepairs(rechecked, openPositions, jobsById).length;
+        }
+
+        log.info(`[maintenance/validate-matches] ${candSnap.size} tarandı, ${applied} onarıldı, ${stillBroken} hâlâ geçersiz: ${JSON.stringify(byRule)}`);
         res.json({
             scanned: candSnap.size,
             repaired: applied,
             byRule,
             remaining: plans.length - toApply.length,
+            stillBroken,
         });
     } catch (err) {
         log.error(`[maintenance/validate-matches] ${err.message}`);

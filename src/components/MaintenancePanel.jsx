@@ -208,7 +208,16 @@ export default function MaintenancePanel() {
             const RULE_LABELS = { assignment: 'atamadan', canonical: 'yazım düzeltme', job: 'iş hedefinden', keyword: 'anahtar-kelime', none: '"uygun pozisyon yok"' };
             const data = await authedFetch('/api/maintenance/validate-matches', { method: 'POST' });
             const detail = Object.entries(data.byRule || {}).map(([r, n]) => `${n} ${RULE_LABELS[r] || r}`).join(', ');
-            markDone('match', `${data.repaired} kayıt onarıldı${detail ? ` (${detail})` : ''}${data.remaining > 0 ? ` · ${data.remaining} kaldı — adımı tekrar çalıştırın` : ''}`);
+            // stillBroken: yazdıktan SONRA yeniden sayılan geçersiz kayıt.
+            // >0 ise onarım o kayıtlarda yakınsamıyor demektir; bunu
+            // söylememek kullanıcıyı "onardım ama sayaç düşmüyor" ile baş
+            // başa bırakıyordu.
+            const stuck = Number(data.stillBroken || 0);
+            markDone('match',
+                `${data.repaired} kayıt onarıldı${detail ? ` (${detail})` : ''}`
+                + (data.remaining > 0 ? ` · ${data.remaining} kaldı — adımı tekrar çalıştırın` : '')
+                + (stuck > 0 ? ` · ⚠ ${stuck} kayıt yazıldığı hâlde hâlâ geçersiz görünüyor — bunu bildirin` : '')
+            );
             await refreshHealth();
         } catch (err) {
             setError(err.message);
