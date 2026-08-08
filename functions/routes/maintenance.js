@@ -270,7 +270,7 @@ router.get('/api/maintenance/health-check', requireAuth(ROLES), async (req, res)
         const candSnap = await db.collection(CANDIDATES_COLL)
             .select('name', 'email', 'phone', 'source', 'bulkJobId', 'createdAt',
                 'matchedPositionTitle', 'positionId', 'position', 'skills',
-                'initialAiScore', 'matchScore', 'aiScore',
+                'initialAiScore', 'matchScore', 'aiScore', 'prescoredAt',
                 'experiences', 'summary', 'education', 'cvText', 'enrichedAt', 'location')
             .get();
         const candidates = candSnap.docs.map((d) => {
@@ -281,8 +281,20 @@ router.get('/api/maintenance/health-check', requireAuth(ROLES), async (req, res)
         const dupGroups = groupDuplicateCandidates(candidates);
         const duplicates = dupGroups.reduce((s, g) => s + g.extras.length, 0);
 
+        // Skorsuz aday sayaci IKIYE ayrilir.
+        //
+        // Eskiden tek sayacti ve adim asla "Gerek yok" olamiyordu: puanlama
+        // bu adaylari ISLIYOR ama CV metni yoksa ya da hicbir acik pozisyonla
+        // ortusmuyorsa mesru olarak 0 hesaplayip 0 yaziyor. Sayac onlari
+        // tekrar sayinca kullanici "niye puanlanmiyor?" diye soruyordu —
+        // hakliydi, cunku yapilabilecek bir sey kalmamisti.
+        //
+        // prescoredAt damgasi ayrimi verir: damga yoksa henuz denenmemistir
+        // (eylem gerektirir), damga varsa denenmis ve puanlanamamistir.
         const scoreOf = (c) => Number(c.initialAiScore || 0) || Number(c.matchScore || 0) || Number(c.aiScore || 0);
-        const zeroScore = candidates.filter((c) => scoreOf(c) <= 0).length;
+        const unscored = candidates.filter((c) => scoreOf(c) <= 0);
+        const zeroScore = unscored.filter((c) => !c.prescoredAt).length;
+        const unscorable = unscored.length - zeroScore;
 
         let invalidMatches = 0;
         if (openPositions.length > 0) {
@@ -313,6 +325,7 @@ router.get('/api/maintenance/health-check', requireAuth(ROLES), async (req, res)
             duplicates,
             invalidMatches,
             zeroScore,
+            unscorable,
             missingExperiences,
         });
     } catch (err) {
