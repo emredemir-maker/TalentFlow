@@ -16,6 +16,7 @@
 // Burası saf: pozisyonu değiştirmez, yazılacak alanları döndürür.
 
 import { requirementsOf, hasPrioritizedRequirements } from './positionRequirements';
+import { foldTr } from './turkishText';
 
 /** Danışmanın verebileceği kararlar. */
 export const REWRITE = 'yeniden-yaz';
@@ -30,23 +31,14 @@ export const ACTION_LABELS = {
 };
 
 /**
- * Türkçe katlama.
+ * Kararı karşılaştırılabilir hâle getirir.
  *
  * `'KALDIR'.toLowerCase()` JS'te 'kaldir' üretir (noktasız ı kaybolur), model
- * ise bazen 'kaldır' bazen 'Kaldir' yazıyor. Karşılaştırmadan önce ı/İ/ş/ç…
- * hepsini ASCII'ye indiriyoruz ki eşleşme bu tuzağa takılmasın.
+ * ise bazen 'kaldır' bazen 'Kaldir' yazıyor. Türkçe katlama [[turkishText]]'te
+ * tek yerde duruyor; buradaki ek iş yalnızca boşlukları tireye çevirmek.
  */
 function fold(raw) {
-    return String(raw ?? '')
-        .replace(/[İıIi]/g, 'i')
-        .replace(/[ŞşSs]/g, 's')
-        .replace(/[ĞğGg]/g, 'g')
-        .replace(/[ÜüUu]/g, 'u')
-        .replace(/[ÖöOo]/g, 'o')
-        .replace(/[ÇçCc]/g, 'c')
-        .toLowerCase()
-        .replace(/[\s_]+/g, '-')
-        .trim();
+    return foldTr(raw).replace(/[\s_]+/g, '-').trim();
 }
 
 /**
