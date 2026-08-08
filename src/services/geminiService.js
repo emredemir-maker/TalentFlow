@@ -170,12 +170,17 @@ export async function getAvailableModels() {
 // listesindeki araç adları (GA4, Amplitude…) CV'de birebir geçmeyince
 // yıllarca o işi yapmış adaylar da düşük aldı.
 //
-// Şimdi %50/%50. Bu bilinçli bir denge: coverage tek başına "anahtar kelime
-// var mı" sorusuna, STAR tek başına "iyi yazılmış mı" sorusuna kayar.
-// Ağırlığı değiştirmek isterseniz tek yer burasıdır; sayı değiştikçe
-// geminiService.test.js'teki beklenen skorlar da güncellenmelidir.
-const COVERAGE_WEIGHT = 0.5;
-const STAR_WEIGHT = 0.5;
+// %50/%50 da fazla kaçtı. STAR bir MÜLAKAT aracıdır; CV'ye uygulandığında
+// ölçtüğü şey adayın niteliği değil, ne kadar açık edebildiğidir. Gizlilik
+// yükümlülüğü olan (ciro, dönüşüm, churn paylaşamayan), CV'yi kısa tutan ya
+// da çıktısı kolay sayısallaşmayan rollerdeki adaylar sistematik olarak
+// düşük alıyordu. Bu, kimsenin niyeti olmadan dolaylı ayrımcılık üretir.
+//
+// Uygunluğu asıl gereksinim karşılama belirlemeli; kanıt zenginliği ikincil
+// bir sinyal olmalı. Ağırlığı değiştirmek isterseniz tek yer burasıdır;
+// sayı değiştikçe geminiService.test.js'teki beklenen skorlar da güncellenir.
+const COVERAGE_WEIGHT = 0.7;
+const STAR_WEIGHT = 0.3;
 
 /** 0-100 aralığına kırpar; sayı değilse null döner. */
 function clampScore(value) {
@@ -185,6 +190,16 @@ function clampScore(value) {
 }
 
 /** STAR ortalaması → 0-100. Analiz yoksa null. */
+/**
+ * STAR = KANIT yoğunluğu, 0-100.
+ *
+ * Yeni model her boyutu 0-3 çapalı ölçekle puanlar (0 bilgi yok, 1 anılmış,
+ * 2 anlatılmış, 3 ölçülmüş). Eski kayıtlar 1-10 ölçeğindeydi.
+ *
+ * Ölçek OTOMATİK algılanır: herhangi bir boyut 3'ten büyükse kayıt eskidir ve
+ * 0-10 kabul edilir. Sabit bir bölen kullanmak eski kayıtları ya tavana
+ * yapıştırırdı (8 → 8/3) ya da yenileri yok sayardı.
+ */
 function starScoreOf(starAnalysis) {
     if (!starAnalysis) return null;
     const getScore = (val) => {
@@ -192,9 +207,14 @@ function starScoreOf(starAnalysis) {
         if (typeof val === 'object' && val !== null && val.score !== undefined) return Number(val.score);
         return 0;
     };
-    const sum = getScore(starAnalysis.Situation) + getScore(starAnalysis.Task)
-        + getScore(starAnalysis.Action) + getScore(starAnalysis.Result);
-    return clampScore((sum / 4) * 10);
+    const scores = [
+        getScore(starAnalysis.Situation), getScore(starAnalysis.Task),
+        getScore(starAnalysis.Action), getScore(starAnalysis.Result),
+    ].map((n) => (Number.isFinite(n) ? n : 0));
+
+    const max = scores.some((n) => n > 3) ? 10 : 3;
+    const sum = scores.reduce((a, b) => a + b, 0);
+    return clampScore((sum / (4 * max)) * 100);
 }
 
 // Öncelik ağırlıkları: zorunlu maddeler skorun gövdesini taşır, tercih

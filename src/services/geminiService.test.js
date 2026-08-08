@@ -3,7 +3,9 @@
 // Eskiden skor YALNIZCA STAR ortalamasıydı: iyi yazılmış ama ilanla ilgisiz bir
 // CV yüksek, ilana birebir uyan ama sade yazılmış bir CV düşük alıyordu ve
 // ilanın gereksinimlerini değiştirmek skoru neredeyse hiç oynatmıyordu.
-// Artık skor = gereksinim karşılama (%60) + STAR kanıt kalitesi (%40).
+// Artık skor = gereksinim karşılama (%70) + STAR kanıt yoğunluğu (%30).
+// STAR ağırlığı bilerek düşük: bir MÜLAKAT aracı olduğu için CV'ye
+// uygulandığında adayın niteliğini değil, ne kadar açık edebildiğini ölçer.
 import { describe, expect, it, vi } from 'vitest';
 
 // Gemini/Firebase bağımlılıklarını yükletmeden saf fonksiyonu test et
@@ -16,35 +18,36 @@ const star = (n) => ({
 });
 
 describe('calculateHybridScore', () => {
-    it('weights requirement coverage and STAR equally', () => {
-        // %100 karşılama + 8/10 STAR → 100*0.5 + 80*0.5 = 90
+    it('weights requirement coverage above STAR', () => {
+        // %100 karşılama + 8/10 STAR → 100*0.7 + 80*0.3 = 94
         expect(calculateHybridScore({
             requirementCoverage: { coverageScore: 100 },
             starAnalysis: star(8),
-        })).toBe(90);
+        })).toBe(94);
     });
 
     it('keeps a well-written but irrelevant CV well below the hiring bar', () => {
-        // Mükemmele yakın anlatım (STAR 9) ama ilanla ilgisi yok → 45 (STAR ağırlığı %50 olduğu için yükseldi;
-        // yine de işe alım eşiğinin altında kalması testin asıl güvencesi)
+        // Mükemmele yakın anlatım (STAR 9) ama ilanla ilgisi yok → 27.
+        // İyi yazılmış olmak tek başına uygunluk üretmemeli; testin asıl
+        // güvencesi bu adayın işe alım eşiğinin altında kalması.
         const score = calculateHybridScore({
             requirementCoverage: { coverageScore: 0 },
             starAnalysis: star(9),
         });
-        expect(score).toBe(45);
+        expect(score).toBe(27);
         expect(score).toBeLessThan(50);
     });
 
     it('rewards a plainly-written CV that actually meets the requirements', () => {
-        // İlana uyuyor (90) ama anlatımı zayıf (STAR 4) → 65
+        // İlana uyuyor (90) ama anlatımı zayıf (STAR 4) → 75
         expect(calculateHybridScore({
             requirementCoverage: { coverageScore: 90 },
             starAnalysis: star(4),
-        })).toBe(65);
+        })).toBe(75);
     });
 
     it('derives coverage from met/partial/missing when coverageScore is absent', () => {
-        // 2 tam + 1 yarım + 1 yok = 2.5/4 = %62.5 → 63; STAR 6 → 63*0.5+60*0.5 = 62
+        // 2 tam + 1 yarım + 1 yok = 2.5/4 = %62.5 → 63; STAR 6 → 63*0.7+60*0.3 = 62
         expect(calculateHybridScore({
             requirementCoverage: { met: ['a', 'b'], partial: ['c'], missing: ['d'] },
             starAnalysis: star(6),
@@ -97,18 +100,18 @@ describe('calculateHybridScore — zorunlu/tercihen ağırlıkları', () => {
     });
 
     it('rewards meeting every must-have', () => {
-        // zorunlu 2/2 → 85, tercihen 1/1 → 15 ⇒ coverage 100; STAR 80 ⇒ 90
-        expect(calculateHybridScore(assess(['met', 'met', 'met']), REQS)).toBe(90);
+        // zorunlu 2/2 → 85, tercihen 1/1 → 15 ⇒ coverage 100; STAR 80 ⇒ 94
+        expect(calculateHybridScore(assess(['met', 'met', 'met']), REQS)).toBe(94);
     });
 
     it('penalises a missing must-have far more than a missing nice-to-have', () => {
         const missingMust = calculateHybridScore(assess(['met', 'missing', 'met']), REQS);
         const missingNice = calculateHybridScore(assess(['met', 'met', 'missing']), REQS);
         expect(missingMust).toBeLessThan(missingNice);
-        // zorunlu yarısı eksik: 42.5 + 15 = 57.5 → 58; 58*0.5 + 80*0.5 = 69
-        expect(missingMust).toBe(69);
-        // yalnızca tercih edilen eksik: 85 → 85*0.5 + 80*0.5 = 83
-        expect(missingNice).toBe(83);
+        // zorunlu yarısı eksik: 42.5 + 15 = 57.5 → 58; 58*0.7 + 80*0.3 = 65
+        expect(missingMust).toBe(65);
+        // yalnızca tercih edilen eksik: 85 → 85*0.7 + 80*0.3 = 84
+        expect(missingNice).toBe(84);
     });
 
     it('gives a nice-to-have only a limited advantage', () => {
@@ -119,8 +122,8 @@ describe('calculateHybridScore — zorunlu/tercihen ağırlıkları', () => {
     });
 
     it('counts a partial as half', () => {
-        // zorunlu 1.5/2 = 0.75 → 63.75, tercihen 1 → 15 ⇒ 78.75 → 79; 79*0.5+80*0.5 = 80
-        expect(calculateHybridScore(assess(['met', 'partial', 'met']), REQS)).toBe(80);
+        // zorunlu 1.5/2 = 0.75 → 63.75, tercihen 1 → 15 ⇒ 78.75 → 79; 79*0.7+80*0.3 = 79
+        expect(calculateHybridScore(assess(['met', 'partial', 'met']), REQS)).toBe(79);
     });
 
     it('falls back to the model score when the position has no priorities', () => {
@@ -128,14 +131,14 @@ describe('calculateHybridScore — zorunlu/tercihen ağırlıkları', () => {
         expect(calculateHybridScore({
             requirementCoverage: { assessments: [{ index: 1, status: 'missing' }], coverageScore: 90 },
             starAnalysis: star(8),
-        }, legacy)).toBe(85); // 90*0.5 + 80*0.5
+        }, legacy)).toBe(87); // 90*0.7 + 80*0.3
     });
 
     it('falls back when the model omits assessments', () => {
         expect(calculateHybridScore({
             requirementCoverage: { coverageScore: 50 },
             starAnalysis: star(8),
-        }, REQS)).toBe(65); // 50*0.5 + 80*0.5
+        }, REQS)).toBe(59); // 50*0.7 + 80*0.3
     });
 });
 
@@ -197,7 +200,7 @@ describe('calculateHybridScore — yetkinlik / araç ayrımı', () => {
             withKinds(['met', 'met', 'met'], ['arac', 'arac', 'arac']), REQS_KIND
         );
         // Yetkinlik kümesi boşsa araç kümesi tüm ağırlığı alır → coverage 85
-        expect(allTools).toBe(90); // coverage 100 → 100*0.5 + 80*0.5
+        expect(allTools).toBe(94); // coverage 100 → 100*0.7 + 80*0.3
     });
 });
 
@@ -292,5 +295,42 @@ describe('explainHybridScore', () => {
         expect(exp.coverage).toBeNull();
         expect(exp.star.weight).toBe(1);
         expect(exp.score).toBe(80);
+    });
+});
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STAR ölçek geçişi.
+//
+// Yeni model boyutları 0-3 çapalı ölçekle puanlıyor (0 bilgi yok, 1 anılmış,
+// 2 anlatılmış, 3 ölçülmüş). Eski kayıtlar 1-10'du. Sabit bir bölen kullanmak
+// eskileri tavana yapıştırır ya da yenileri yok sayardı.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('starScoreOf — ölçek algılama', () => {
+    const only = (analysis) => calculateHybridScore({ starAnalysis: analysis });
+    const dims = (a, b, c, d) => ({
+        Situation: { score: a }, Task: { score: b }, Action: { score: c }, Result: { score: d },
+    });
+
+    it('reads a new 0-3 record on the 0-3 scale', () => {
+        expect(only(dims(3, 3, 3, 3))).toBe(100);
+        expect(only(dims(0, 0, 0, 0))).toBe(0);
+        // 2+2+1+1 = 6 / 12 → %50
+        expect(only(dims(2, 2, 1, 1))).toBe(50);
+    });
+
+    it('still reads a legacy 0-10 record correctly', () => {
+        expect(only(dims(8, 8, 8, 8))).toBe(80);
+        expect(only(dims(10, 10, 10, 10))).toBe(100);
+    });
+
+    it('decides the scale from the whole record, not one dimension', () => {
+        // Result 2 almış ama kayıt eski (diğerleri 7-9). Boyut boyut bakılsaydı
+        // bu kayıt 0-3 sanılıp şişirilirdi.
+        expect(only(dims(9, 8, 7, 2))).toBe(65);
+    });
+
+    it('treats a malformed score as zero instead of NaN', () => {
+        expect(only(dims(3, 3, 'çok iyi', 3))).toBe(75);
     });
 });

@@ -28,27 +28,48 @@ Sen kıdemli ve son derece analitik bir İşe Alım Yöneticisisin. Görevin, ad
    (met tam, partial yarım sayılır; [ZORUNLU] maddeler çok daha ağır basar).
    İyi yazılmış ama ilanla ilgisiz bir CV DÜŞÜK coverageScore almalıdır —
    CV kalitesi bu alanı YÜKSELTMEZ.
-2. STAR Analizi: Her kategori (S, T, A, R) için 1-10 arası puan ver.
-   - "reason" biçimi: "Pozitif (+): ..., Negatif (-): ...".
-   - HER İKİ TARAF DA CV'DEN SOMUT KANIT İÇERMELİ. Şirket adı, proje/ürün
-     adı, rol, dönem, sayı ya da CV'den kısa bir alıntı geçir.
-     ÖRNEK (iyi): "Pozitif (+): Trendyol'da checkout funnel'ını devraldığında
-     dönüşümün %2,1 olduğunu ve 8 kişilik ekiple çalıştığını yazmış."
-     ÖRNEK (kötü, YASAK): "Aday, üstlendiği sorumlulukların bağlamını net bir
-     şekilde ortaya koyuyor."
+2. STAR Analizi — KANIT ÖLÇEĞİ (0-3), tek yönlü.
+   Bu bölüm adayın NİTELİĞİNİ değil, CV'de NE KADAR KANIT bulunduğunu ölçer.
+   Bilginin CV'de olmaması bir KUSUR DEĞİLDİR: aday gizlilik yükümlülüğü,
+   yer kısıtı ya da yazım alışkanlığı nedeniyle yazmamış olabilir.
+
+   Her kategori (Situation, Task, Action, Result) için 0-3 arası puan ver.
+   Çapalar (ARADA DEĞER YOK, tam olarak bu tanımlara bak):
+     0 = CV'de bu boyuta dair hiçbir bilgi yok
+     1 = anılmış — rol/görev adı geçiyor ama içerik yok
+     2 = anlatılmış — ne yapıldığı somut biçimde yazılmış
+     3 = ölçülmüş — sayısal sonuç ya da doğrulanabilir çıktı var
+
+   Her kategori için ÜÇ AYRI alan doldur:
+   - "evidence": CV'de GERÇEKTEN yazan kanıt. Şirket adı, proje, rol, dönem,
+     sayı ya da kısa alıntı geçir.
+     ÖRNEK: "Trendyol'da checkout funnel'ını devralıp dönüşümü %2,1'den
+     %3,4'e çıkardığını yazmış."
+     Kanıt yoksa BOŞ BIRAK ("").
+   - "missing": CV'de OLMAYAN ve mülakatta sorulması gereken bilgi. Bunu bir
+     kusur gibi DEĞİL, bir SORU gibi yaz.
+     ÖRNEK: "Getir'deki büyüme rolünde başlangıç metrikleri yazılmamış —
+     devraldığında dönüşüm neydi?"
+     Sorulacak bir şey yoksa BOŞ BIRAK ("").
+   - "conflict": YALNIZCA gerçek bir tutarsızlık varsa doldur. Örnekler:
+     tarihler çakışıyor, iddia ile sayı uyuşmuyor, aynı başarı iki farklı
+     şirkette anlatılmış, açıklanmamış uzun boşluk.
+     Neredeyse her CV'de bu alan BOŞ olacaktır ("") — bu normaldir.
+
+   MUTLAK KURALLAR:
+   - "missing" alanına yazdığın şey puanı düşürmez; yalnızca "evidence"ın
+     zenginliği puanı belirler. Bilgi yokluğu zaten düşük çapa demektir,
+     ayrıca cezalandırılmaz.
+   - "conflict" alanını DOLDURMAK İÇİN ZORLAMA. Kusur icat etme.
+   - Bir boyut hakkında hem "iyi anlatmış" hem "daha detaylı olabilirdi"
+     yazma. Bu bir çelişkidir; çapa hangi seviyeyse onu yaz ve geç.
+   - "Net bir şekilde ortaya koyuyor", "daha fazla vurgulanabilir",
+     "zenginleştirilebilir", "detaylı ve somut" gibi HERHANGİ bir adaya
+     yapıştırılabilecek kalıpları KULLANMA.
    - TEST: Yazdığın cümle BAŞKA bir adayın CV'sine de aynen uyuyorsa o cümle
-     YANLIŞTIR, yeniden yaz. "Net bir şekilde ortaya koyuyor", "detaylı ve
-     somut", "daha fazla vurgulanabilir", "zenginleştirilebilir" gibi
-     herhangi bir adaya yapıştırılabilecek kalıpları KULLANMA.
-   - Negatif tarafta da somut ol: HANGİ deneyimde NEYİN eksik olduğunu söyle
-     ("Getir'deki büyüme rolünde hiçbir sonuç sayısal verilmemiş" gibi),
-     soyut tavsiye verme.
-   - KANIT UYDURMA. CV'de gerçekten yoksa bunu somut biçimde yaz:
-     "CV'de X rolü için başlangıç durumu hiç anlatılmamış". Kanıt yokluğu da
-     bir bulgudur; uydurulmuş örnekten iyidir.
-   - Negatif için gerçekten söylenecek bir şey yoksa "Yok." yaz; kusur icat
-     etme.
-   - STAR, anlatım/kanıt KALİTESİNİ ölçer; ilana uygunluğu değil.
+     YANLIŞTIR, yeniden yaz.
+   - KANIT UYDURMA.
+   - STAR, ilana uygunluğu ölçmez; uygunluk requirementCoverage'ın işidir.
 3. Öne Çıkan Tecrübeler: Adayın geçmişindeki spesifik projeleri, kullandığı teknolojileri veya başarılarını analizde mutlaka kullan.
 4. Özet (Summary): Sadece genel cümleler kurma. Somut kanıtlar sun.
    ZORUNLU/TERCİHEN AYRIMINA UY:
@@ -82,10 +103,10 @@ Sen kıdemli ve son derece analitik bir İşe Alım Yöneticisisin. Görevin, ad
         "coverageScore": <integer 0-100>
     },
     "starAnalysis": {
-        "Situation": { "score": <integer>, "reason": "..." },
-        "Task": { "score": <integer>, "reason": "..." },
-        "Action": { "score": <integer>, "reason": "..." },
-        "Result": { "score": <integer>, "reason": "..." }
+        "Situation": { "score": <0-3>, "evidence": "...", "missing": "...", "conflict": "" },
+        "Task":      { "score": <0-3>, "evidence": "...", "missing": "...", "conflict": "" },
+        "Action":    { "score": <0-3>, "evidence": "...", "missing": "...", "conflict": "" },
+        "Result":    { "score": <0-3>, "evidence": "...", "missing": "...", "conflict": "" }
     }
   },
   "evidence": {
