@@ -39,6 +39,20 @@ HER İŞARETLİ MADDE İÇİN ŞUNLARI ÜRET:
 
 MUTLAK KURALLAR:
 - "rationale" içinde SANA VERİLEN SAYIYI kullan. Sayı uydurma.
+- SANA VERİLMEYEN BULGUYU İDDİA ETME. Her maddenin "bulgular" listesinde ne
+  varsa yalnızca onu söyleyebilirsin:
+    * "havuzu daraltıyor / gereksiz yere daraltıyor" diyebilmek için
+      bulgularda "over-restrictive" OLMALI.
+    * "ayırt etmiyor" diyebilmek için "no-signal" OLMALI.
+    * "başka maddeyle örtüşüyor" diyebilmek için "redundant" OLMALI.
+  Yalnızca "tool-must" verilmişse, gerekçen ARAÇ-YETKİNLİK ayrımıyla sınırlı
+  kalmalı; eleme sayısını bilgi olarak anabilirsin ama onu "daraltıyor"
+  yargısına ÇEVİREMEZSİN.
+  YANLIŞ (bulgularda over-restrictive yokken): '17 adayı elemiş; bu havuzu
+  gereksiz yere daralttığını göstermektedir.'
+  DOĞRU: '17 aday bu maddede elenmiş. Madde bir araç adı; yetkinliğe
+  çevirmek aynı şeyi aracı bilmeyen ama işi yapmış adayları kaybetmeden
+  ölçer.'
 - Genel geçer cümle YASAK. 'Bu madde gözden geçirilebilir', 'pozisyonun
   gereklilikleri doğrultusunda değerlendirilmelidir' gibi HERHANGİ bir ilana
   yapıştırılabilecek ifadeler kullanma.

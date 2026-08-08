@@ -152,3 +152,88 @@ describe('flaggedRequirements', () => {
         expect(flaggedRequirements(null)).toEqual([]);
     });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Birleşik geçiş.
+//
+// Tek tek eleme oranları ilanin gerçek darlığını göstermiyor. Gerçek bir
+// ilanda en çok eleyen zorunlu madde %63'te kaldı ve hiçbir madde "havuzu
+// daraltıyor" diye işaretlenmedi — ama adaylar FARKLI maddelerde elendiği
+// için hepsini birden geçen aday sayısı çok daha düşüktü. Kullanıcının
+// aslında ihtiyaç duyduğu sayı bu.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('birleşik zorunlu geçişi', () => {
+    it('counts only candidates who pass EVERY must-have', () => {
+        // Her aday tek bir zorunluda eleniyor; tek tek oranlar düşük görünür
+        // ama hiçbiri hepsini geçmiyor.
+        const pool = [
+            ...many(4, ['missing', 'met', 'met', 'met']),
+            ...many(4, ['met', 'missing', 'met', 'met']),
+            ...many(4, ['met', 'met', 'missing', 'met']),
+        ];
+        const r = reviewRequirements(POSITION, pool);
+        expect(r.mustCount).toBe(3);
+        expect(r.mustEvaluated).toBe(12);
+        expect(r.mustPass).toBe(0);
+        // Tek tek oranlar yalnızca 1/3 — ama birleşik geçiş sıfır
+        expect(r.items[0].eliminationRate).toBeCloseTo(4 / 12);
+    });
+
+    it('ignores the nice-to-have when deciding who passes', () => {
+        const pool = many(10, ['met', 'met', 'met', 'missing']);
+        const r = reviewRequirements(POSITION, pool);
+        expect(r.mustPass).toBe(10);
+        expect(r.mustPassRate).toBe(1);
+    });
+
+    it('counts partial as passing, same as the coverage model', () => {
+        const pool = many(10, ['partial', 'met', 'met', 'met']);
+        expect(reviewRequirements(POSITION, pool).mustPass).toBe(10);
+    });
+
+    it('excludes candidates whose must-haves were not all assessed', () => {
+        // Bir zorunlusu hiç degerlendirilmemis adaya "gecti" de "kaldi" da
+        // diyemeyiz; sayima girmemeli
+        const partialAssessment = {
+            id: 'x',
+            positionAnalyses: {
+                'Growth Product Manager': {
+                    requirementCoverage: { assessments: [{ index: 1, status: 'met' }] },
+                },
+            },
+        };
+        const r = reviewRequirements(POSITION, [...many(6, ['met', 'met', 'met', 'met']), partialAssessment]);
+        expect(r.scanned).toBe(7);
+        expect(r.mustEvaluated).toBe(6);
+    });
+
+    it('withholds the rate below the minimum sample', () => {
+        expect(reviewRequirements(POSITION, many(3, ['met', 'met', 'met', 'met'])).mustPassRate).toBeNull();
+    });
+
+    it('reports nothing when the position marks no must-haves', () => {
+        const legacy = { title: 'Growth Product Manager', requirements: ['A', 'B'] };
+        const r = reviewRequirements(legacy, many(10, ['met', 'met']));
+        expect(r.mustCount).toBe(0);
+        expect(r.mustPassRate).toBeNull();
+    });
+});
+
+describe('over-restrictive eşiği', () => {
+    it('flags a must-have that eliminates two thirds of the pool', () => {
+        // %80 esigiyle bu yakalanmiyordu; gercek ilanda en yuksek deger %63'tu
+        const pool = [
+            ...many(7, ['missing', 'met', 'met', 'met']),
+            ...many(3, ['met', 'met', 'met', 'met']),
+        ];
+        expect(reviewRequirements(POSITION, pool).items[0].flags).toContain('over-restrictive');
+    });
+
+    it('leaves a moderately selective requirement alone', () => {
+        const pool = [
+            ...many(4, ['missing', 'met', 'met', 'met']),
+            ...many(6, ['met', 'met', 'met', 'met']),
+        ];
+        expect(reviewRequirements(POSITION, pool).items[0].flags).not.toContain('over-restrictive');
+    });
+});

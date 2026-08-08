@@ -16,6 +16,15 @@ import { requirementsOf } from './positionRequirements';
 /** Anlamlı oran üretmek için gereken en az değerlendirilmiş aday sayısı. */
 export const MIN_SAMPLE = 5;
 
+/**
+ * Bir zorunlu maddeyi "havuzu daraltıyor" saymak için eleme eşiği.
+ *
+ * Önce %80'di ve pratikte hiçbir şey yakalamıyordu: gerçek bir ilanda en çok
+ * eleyen zorunlu madde %63'te kaldı ve işaretlenmedi. Adayların üçte ikisini
+ * eleyen bir madde kesinlikle bakılmayı hak ediyor.
+ */
+export const OVER_RESTRICTIVE_RATE = 0.6;
+
 /** Bir maddeyi "karşılıyor" saymak: met ve partial. */
 const isMet = (status) => status === 'met' || status === 'partial';
 
@@ -47,7 +56,7 @@ export function reviewRequirements(position, candidates) {
     const reqs = requirementsOf(position).map((r, i) => ({ ...r, index: i + 1 }));
     const title = position?.title;
     if (reqs.length === 0 || !title) {
-        return { scanned: 0, enoughData: false, items: [] };
+        return { scanned: 0, enoughData: false, items: [], mustCount: 0, mustEvaluated: 0, mustPass: null, mustPassRate: null };
     }
 
     // index → aday başına durum. Yalnızca değerlendirilmiş adaylar sayılır;
@@ -117,13 +126,48 @@ export function reviewRequirements(position, candidates) {
         // yapmış olmakla aynı şey değil ve araç öğrenilebilir.
         if (it.must === true && it.kind === 'arac') it.flags.push('tool-must');
         if (it.eliminationRate !== null) {
-            if (it.must === true && it.eliminationRate >= 0.8) it.flags.push('over-restrictive');
+            if (it.must === true && it.eliminationRate >= OVER_RESTRICTIVE_RATE) it.flags.push('over-restrictive');
             if (it.eliminationRate === 0) it.flags.push('no-signal');
         }
         if (it.redundantWith.length > 0) it.flags.push('redundant');
     }
 
-    return { scanned, enoughData, items };
+    // ── BİRLEŞİK GEÇİŞ: tüm zorunlu maddeleri karşılayan aday sayısı.
+    //
+    // Tek tek eleme oranları ilanın gerçek darlığını göstermiyor. Adaylar
+    // FARKLI maddelerde elendiği için, hiçbir madde tek başına yüksek
+    // görünmese bile hepsini birden geçen aday sayısı çok düşük olabilir.
+    // Kullanıcının aslında ihtiyaç duyduğu sayı bu.
+    const mustIndexes = reqs.filter((r) => r.must === true).map((r) => r.index);
+    let mustPass = null;
+    let mustEvaluated = 0;
+    if (mustIndexes.length > 0) {
+        mustPass = 0;
+        for (const c of candidates || []) {
+            const assessments = assessmentsFor(c, title);
+            if (!assessments) continue;
+            const byIdx = new Map(
+                assessments
+                    .filter((a) => Number.isFinite(Number(a?.index)))
+                    .map((a) => [Number(a.index), String(a?.status || '').toLowerCase()])
+            );
+            // Değerlendirilmemiş zorunlu maddesi olan aday sayıma girmez —
+            // "geçti" de "kaldı" da diyemeyiz.
+            if (!mustIndexes.every((i) => byIdx.has(i))) continue;
+            mustEvaluated += 1;
+            if (mustIndexes.every((i) => isMet(byIdx.get(i)))) mustPass += 1;
+        }
+    }
+
+    return {
+        scanned,
+        enoughData,
+        items,
+        mustCount: mustIndexes.length,
+        mustEvaluated,
+        mustPass,
+        mustPassRate: mustEvaluated >= MIN_SAMPLE ? mustPass / mustEvaluated : null,
+    };
 }
 
 /** Gözden geçirmeye değer maddeler — AI önerisi yalnızca bunlar için istenir. */
@@ -139,7 +183,7 @@ export const FLAG_LABELS = {
     },
     'over-restrictive': {
         title: 'Havuzu çok daraltıyor',
-        detail: 'Değerlendirilen adayların büyük bölümü bu zorunlu maddede eleniyor.',
+        detail: 'Değerlendirilen adayların büyük bölümü yalnızca bu zorunlu madde yüzünden eleniyor.',
     },
     'no-signal': {
         title: 'Ayırt etmiyor',
