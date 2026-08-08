@@ -54,6 +54,28 @@ export default function RequirementReviewPanel({ position, candidates }) {
                 </span>
             </div>
 
+            {/* BİRLEŞİK GEÇİŞ — ilanın gerçek darlığı.
+                Tek tek eleme oranları bunu göstermiyor: adaylar FARKLI
+                maddelerde elendiği için hiçbir madde yüksek görünmese bile
+                hepsini birden geçen aday sayısı çok düşük olabilir. */}
+            {review.mustCount > 0 && review.mustPassRate !== null && (
+                <div className={`rounded-lg border px-3 py-2 ${
+                    review.mustPassRate < 0.1
+                        ? 'bg-red-50 border-red-100 text-red-700'
+                        : review.mustPassRate < 0.25
+                            ? 'bg-amber-50 border-amber-100 text-amber-700'
+                            : 'bg-emerald-50 border-emerald-100 text-emerald-700'
+                }`}>
+                    <p className="text-[11px] leading-relaxed">
+                        Değerlendirilen <strong>{review.mustEvaluated}</strong> adayın{' '}
+                        <strong>{review.mustPass}</strong> tanesi{' '}
+                        <strong>{review.mustCount} zorunlu maddenin tamamını</strong> karşılıyor
+                        {' '}(%{Math.round(review.mustPassRate * 100)}).
+                        {review.mustPassRate < 0.1 && ' Bu ilan pratikte neredeyse hiç aday geçirmiyor — zorunluların bir kısmını tercihene almayı düşünün.'}
+                    </p>
+                </div>
+            )}
+
             {/* Örneklem uyarısı — oran üretmeden önce bunu söylemek şart.
                 Az veriyle üretilmiş bir "havuzun %90'ını eliyor" cümlesi
                 kullanıcıyı ilanını yanlış değiştirmeye iter. */}
