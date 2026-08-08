@@ -5,7 +5,9 @@
 // eleme oranını tamamen uydurma yapardı ve kullanıcı gerçek olmayan bir
 // veriye bakıp ilanını değiştirirdi.
 import { describe, expect, it } from 'vitest';
-import { reviewRequirements, flaggedRequirements, MIN_SAMPLE } from './requirementReview.js';
+import {
+    reviewRequirements, flaggedRequirements, MIN_SAMPLE, candidatesByRequirements,
+} from './requirementReview.js';
 
 const POSITION = {
     title: 'Growth Product Manager',
@@ -235,5 +237,70 @@ describe('over-restrictive eşiği', () => {
             ...many(6, ['met', 'met', 'met', 'met']),
         ];
         expect(reviewRequirements(POSITION, pool).items[0].flags).not.toContain('over-restrictive');
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Gereksinime göre aday listesi.
+//
+// "31/86 eleniyor" sayısı tek başına karar verdirmiyor; kullanıcı KİMLER
+// olduğunu görmek istiyor. Asıl kullanım: birkaç maddeyi seçip "bunları
+// kaldırsam kim havuza geri girer?" sorusunu canlı görmek.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('candidatesByRequirements', () => {
+    const pool = [
+        cand('hepsi', ['met', 'met', 'met', 'met']),
+        cand('bir-eksik', ['met', 'missing', 'met', 'met']),
+        cand('iki-eksik', ['missing', 'missing', 'met', 'met']),
+        cand('kismi', ['partial', 'partial', 'met', 'met']),
+    ];
+
+    it('lists candidates who meet ALL selected requirements', () => {
+        const r = candidatesByRequirements(POSITION, pool, { indexes: [1, 2] });
+        expect(r.matched.map((c) => c.id)).toEqual(['hepsi', 'kismi']);
+    });
+
+    it('counts partial as meeting, same as everywhere else', () => {
+        const r = candidatesByRequirements(POSITION, pool, { indexes: [1] });
+        expect(r.matched.map((c) => c.id)).toContain('kismi');
+    });
+
+    it('lists who fails at least one when asked the other way', () => {
+        const r = candidatesByRequirements(POSITION, pool, { indexes: [1, 2], mode: 'misses' });
+        expect(r.matched.map((c) => c.id)).toEqual(['bir-eksik', 'iki-eksik']);
+    });
+
+    it('shows the pool growing when a requirement is dropped', () => {
+        // Asıl kullanım: 2. maddeyi çıkarınca kim geri geliyor?
+        const withBoth = candidatesByRequirements(POSITION, pool, { indexes: [1, 2] });
+        const withoutSecond = candidatesByRequirements(POSITION, pool, { indexes: [1] });
+        expect(withoutSecond.matched.length).toBeGreaterThan(withBoth.matched.length);
+        expect(withoutSecond.matched.map((c) => c.id)).toContain('bir-eksik');
+    });
+
+    it('skips candidates whose selected requirements were not all assessed', () => {
+        // Değerlendirilmemiş maddeye "karşılıyor" da "karşılamıyor" da diyemeyiz
+        const partial = {
+            id: 'yarim',
+            positionAnalyses: {
+                'Growth Product Manager': {
+                    requirementCoverage: { assessments: [{ index: 1, status: 'met' }] },
+                },
+            },
+        };
+        const r = candidatesByRequirements(POSITION, [...pool, partial], { indexes: [1, 2] });
+        expect(r.skipped).toBe(1);
+        expect(r.evaluated).toBe(4);
+        expect(r.matched.map((c) => c.id)).not.toContain('yarim');
+    });
+
+    it('returns nothing when no requirement is selected', () => {
+        const r = candidatesByRequirements(POSITION, pool, { indexes: [] });
+        expect(r.matched).toEqual([]);
+        expect(r.evaluated).toBe(0);
+    });
+
+    it('handles a missing position safely', () => {
+        expect(candidatesByRequirements(null, pool, { indexes: [1] }).matched).toEqual([]);
     });
 });

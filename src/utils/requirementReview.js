@@ -194,3 +194,44 @@ export const FLAG_LABELS = {
         detail: 'Bu madde adayları başka bir maddeyle neredeyse aynı biçimde ayırıyor; yeni bilgi taşımıyor.',
     },
 };
+
+/**
+ * Seçilen gereksinimlere göre aday listesi.
+ *
+ * Panel "31/86 eleniyor" diyor ama KİMLER olduğunu göstermiyordu. Asıl
+ * kullanım şu: birkaç maddeyi seçip "bunları kaldırsam kim havuza geri
+ * girer?" sorusunu canlı görmek. Sayı tek başına bu kararı verdirmiyor.
+ *
+ * @param {object} position
+ * @param {Array} candidates
+ * @param {{indexes: number[], mode?: 'meets'|'misses'}} options
+ *   - meets  : SEÇİLEN MADDELERİN TAMAMINI karşılayanlar
+ *   - misses : seçilenlerden EN AZ BİRİNİ karşılamayanlar
+ * @returns {{matched: Array, evaluated: number, skipped: number}}
+ *   skipped: seçilen maddelerden biri hiç değerlendirilmemiş adaylar —
+ *   onlara "karşılıyor" da "karşılamıyor" da diyemeyiz, sayıma girmezler.
+ */
+export function candidatesByRequirements(position, candidates, { indexes = [], mode = 'meets' } = {}) {
+    const title = position?.title;
+    if (!title || indexes.length === 0) return { matched: [], evaluated: 0, skipped: 0 };
+
+    const matched = [];
+    let evaluated = 0;
+    let skipped = 0;
+
+    for (const c of candidates || []) {
+        const assessments = assessmentsFor(c, title);
+        if (!assessments) continue;
+        const byIdx = new Map(
+            assessments
+                .filter((a) => Number.isFinite(Number(a?.index)))
+                .map((a) => [Number(a.index), String(a?.status || '').toLowerCase()])
+        );
+        if (!indexes.every((i) => byIdx.has(i))) { skipped += 1; continue; }
+        evaluated += 1;
+        const meetsAll = indexes.every((i) => isMet(byIdx.get(i)));
+        if (mode === 'meets' ? meetsAll : !meetsAll) matched.push(c);
+    }
+
+    return { matched, evaluated, skipped };
+}

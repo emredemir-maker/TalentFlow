@@ -309,7 +309,7 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                             ifade onerir. Gereksinimler skorun en buyuk kaldiraci
                             oldugu icin denetlenmeleri gerekiyor. */}
                         {isRecruiterOrAdmin && pos.status === 'open' && (
-                            <RequirementReviewPanel position={pos} candidates={candidates} />
+                            <RequirementReviewPanel position={pos} candidates={candidates} onCandidateClick={onCandidateClick} />
                         )}
 
                         {/* Description */}
