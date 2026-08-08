@@ -23,6 +23,7 @@ import CandidateCvPanel from '../components/CandidateCvPanel';
 import ScoreBreakdownPanel from '../components/ScoreBreakdownPanel';
 import MustHaveBadge from '../components/MustHaveBadge';
 import StarEvidenceCards from '../components/StarEvidenceCards';
+import { starPercent } from '../utils/starDimensions';
 import {
     Plus, Search, Zap, Brain, X,
     Target, ShieldCheck, ArrowRight, FileText, Clock,
@@ -920,17 +921,12 @@ export default function CandidateProcessPage() {
     const displayedGate = mustHaveGate(displayedFullAnalysis, displayedPosition);
     const displayedGateLabel = gateLabel(displayedGate);
 
-    // Gerçek STAR metodolojisi skoru (S+T+A+R ortalaması × 10). Yoksa null —
-    // rozet '—' gösterir. Eskiden bu rozet bestScore*0.98 gösteriyordu: hem
-    // belgesiz bir kırpmaydı hem de STAR ile ilgisi yoktu.
-    const starScoreOf = (c) => {
-        const sa = c?.aiAnalysis?.starAnalysis;
-        if (!sa) return null;
-        const val = (k) => Number(sa[k]?.score ?? sa[k] ?? 0);
-        const sum = val('Situation') + val('Task') + val('Action') + val('Result');
-        return Math.min(100, Math.max(0, Math.round((sum / 4) * 10)));
-    };
-    const starScore = starScoreOf(candidate);
+    // STAR rozeti. Hesap starDimensions.starPercent'te — TEK yerde.
+    //
+    // Burada kendi kopyası vardı ve `(toplam / 4) * 10` ile eski 0-10 ölçeğini
+    // varsayıyordu. Yeni 0-3 ölçeğine geçilince rozet gerçeğin çok altını
+    // gösterdi: S3+T2+A2+R3 için %25 yazarken doğru değer %83'tü.
+    const starScore = starPercent(candidate?.aiAnalysis?.starAnalysis);
 
     // ── TOP 2% BADGE ────────────────────────────────────────────────────────────
     const isTop2Percent = useMemo(() => {

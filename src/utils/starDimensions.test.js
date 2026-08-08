@@ -5,6 +5,7 @@ import {
     anchorLabel,
     starConflicts,
     confidentialDimensions,
+    starPercent,
 } from './starDimensions.js';
 
 describe('normalizeStarDimension — yeni biçim', () => {
@@ -176,5 +177,45 @@ describe('gizlilik beyanı', () => {
 
     it('finds none in a legacy record', () => {
         expect(confidentialDimensions({ Situation: { score: 8, reason: 'x' } })).toEqual([]);
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// starPercent — TEK kaynak.
+//
+// 2026-08-08: CandidateProcessPage başlığındaki STAR rozeti kendi kopyasını
+// taşıyordu ve `(toplam / 4) * 10` ile eski 0-10 ölçeğini varsayıyordu. Yeni
+// 0-3 ölçeğine geçince S3+T2+A2+R3 için rozet %25 gösterdi; doğrusu %83'tü.
+// Sayı tesadüfen STAR'ın skora KATKISINA eşitti ((toplam/4)*10 ile
+// (toplam/12)*100*0.3 cebirsel olarak aynı) — bu da hatayı gizliyordu.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('starPercent', () => {
+    const dims = (a, b, c, d) => ({
+        Situation: { score: a, evidence: 'x' }, Task: { score: b, evidence: 'x' },
+        Action: { score: c, evidence: 'x' }, Result: { score: d, evidence: 'x' },
+    });
+
+    it('reads the new 0-3 scale out of 12, not out of 40', () => {
+        // Onur Kayan'ın gerçek verisi: 3+2+2+3 = 10/12
+        expect(starPercent(dims(3, 2, 2, 3))).toBe(83);
+        expect(starPercent(dims(3, 3, 3, 3))).toBe(100);
+        expect(starPercent(dims(0, 0, 0, 0))).toBe(0);
+    });
+
+    it('still reads a legacy 0-10 record correctly', () => {
+        const legacy = {
+            Situation: { score: 8, reason: 'a' }, Task: { score: 8, reason: 'a' },
+            Action: { score: 8, reason: 'a' }, Result: { score: 8, reason: 'a' },
+        };
+        expect(starPercent(legacy)).toBe(80);
+    });
+
+    it('returns null when there is no analysis so the badge can show a dash', () => {
+        expect(starPercent(null)).toBeNull();
+        expect(starPercent(undefined)).toBeNull();
+    });
+
+    it('never exceeds 100 on malformed input', () => {
+        expect(starPercent(dims(99, 99, 99, 99))).toBe(100);
     });
 });

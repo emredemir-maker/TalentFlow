@@ -113,6 +113,28 @@ export function starConflicts(starAnalysis) {
     return dims.filter((d) => d.conflict).map((d) => ({ key: d.key, text: d.conflict }));
 }
 
+/**
+ * STAR yüzdesi (0-100) — TEK kaynak.
+ *
+ * Bunu ayrı yerlerde yeniden hesaplamak 2026-08-08'de gerçek bir hataya yol
+ * açtı: CandidateProcessPage başlığındaki rozet kendi kopyasını taşıyordu ve
+ * `(toplam / 4) * 10` ile eski 0-10 ölçeğini varsayıyordu. Yeni 0-3 ölçeğinde
+ * S3+T2+A2+R3 = 10 için rozet %25 gösterirken gerçek değer %83'tü.
+ *
+ * (Sayı tesadüfen skora KATKIYA eşitti: (toplam/4)*10 ile
+ * (toplam/12)*100*0.3 cebirsel olarak aynı — ikisi de toplam × 2,5. Bu da
+ * hatayı fark etmeyi zorlaştırıyordu.)
+ *
+ * @returns {number|null} analiz yoksa null
+ */
+export function starPercent(starAnalysis) {
+    const dims = normalizeStarAnalysis(starAnalysis);
+    if (!dims) return null;
+    const max = dims[0]?.max || 3;
+    const sum = dims.reduce((acc, d) => acc + d.score, 0);
+    return Math.min(100, Math.max(0, Math.round((sum / (dims.length * max)) * 100)));
+}
+
 /** Gizlilik beyanı bulunan boyutlar. */
 export function confidentialDimensions(starAnalysis) {
     const dims = normalizeStarAnalysis(starAnalysis);
