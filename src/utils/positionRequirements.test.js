@@ -10,6 +10,7 @@ import {
     parseRequirementsInput, formatRequirementsInput,
     parseRequirementGroups, formatRequirementGroups,
     requirementsOf, hasPrioritizedRequirements, buildJobDescription,
+    requirementsFingerprint,
 } from './positionRequirements';
 
 describe('parseRequirementsInput', () => {
@@ -140,5 +141,54 @@ describe('buildJobDescription', () => {
         const text = buildJobDescription({ title: 'X', requirements: ['A'] });
         expect(text).toContain('1. A');
         expect(text).not.toContain('ZORUNLU');
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Gereksinim parmak izi.
+//
+// Aday analizleri gereksinim METNİNE göre üretiliyor. Metin değişince kayıtlı
+// değerlendirmeler eskiyor ama görünüşte hiçbir şey değişmiyor: gözden
+// geçirme paneli eski yargıyı göstermeye devam ediyor ve kullanıcı uyguladığı
+// öneriyi tekrar tekrar alıyor. Damga bunu görünür kılar.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('requirementsFingerprint', () => {
+    const pos = (meta) => ({ title: 'X', requirementsMeta: meta });
+
+    it('is stable for the same requirements', () => {
+        const a = pos([{ text: 'GA4 hakimiyeti', must: true }]);
+        const b = pos([{ text: 'GA4 hakimiyeti', must: true }]);
+        expect(requirementsFingerprint(a)).toBe(requirementsFingerprint(b));
+    });
+
+    it('changes when the text changes', () => {
+        const before = pos([{ text: 'GA4 hakimiyeti', must: true }]);
+        const after = pos([{ text: 'Ürün analitiği ile funnel analizi', must: true }]);
+        expect(requirementsFingerprint(before)).not.toBe(requirementsFingerprint(after));
+    });
+
+    it('changes when must/nice is toggled', () => {
+        // Öncelik değişimi de skoru etkiler; damga bunu da yakalamalı
+        const must = pos([{ text: 'GA4', must: true }]);
+        const nice = pos([{ text: 'GA4', must: false }]);
+        expect(requirementsFingerprint(must)).not.toBe(requirementsFingerprint(nice));
+    });
+
+    it('changes when a requirement is added or removed', () => {
+        const one = pos([{ text: 'A', must: true }]);
+        const two = pos([{ text: 'A', must: true }, { text: 'B', must: true }]);
+        expect(requirementsFingerprint(one)).not.toBe(requirementsFingerprint(two));
+    });
+
+    it('is order-sensitive — indexes matter for stored assessments', () => {
+        // Değerlendirmeler madde NUMARASINA bağlı; sıra değişirse eski
+        // kayıtlar yanlış maddeyi işaret eder
+        const ab = pos([{ text: 'A', must: true }, { text: 'B', must: true }]);
+        const ba = pos([{ text: 'B', must: true }, { text: 'A', must: true }]);
+        expect(requirementsFingerprint(ab)).not.toBe(requirementsFingerprint(ba));
+    });
+
+    it('handles an empty position', () => {
+        expect(typeof requirementsFingerprint({})).toBe('string');
     });
 });

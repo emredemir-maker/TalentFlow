@@ -6,7 +6,7 @@
 // uygulanmalı; uzun vadede SystemScanner'ın bu servise taşınması planlı.
 import { analyzeCandidateMatch } from './geminiService';
 import { calculateMatchScore, filterPositionsByDomain, findBestPositionMatch } from './matchService';
-import { buildJobDescription, requirementsOf } from '../utils/positionRequirements';
+import { buildJobDescription, requirementsOf, requirementsFingerprint } from '../utils/positionRequirements';
 
 /**
  * Adayın analizinin BELİRLİ bir pozisyon için tazelenmesi gerekiyor mu?
@@ -94,7 +94,11 @@ export async function deepScanCandidate(candidate, openPositions, options = {}) 
             const result = await analyzeCandidateMatch(jobDesc, candidate, 'gemini-2.5-flash', {
                 requirements: requirementsOf(pos),
             });
-            updatedAnalyses[pos.title] = sanitizeForFirestore(result);
+            // Damga: bu analiz HANGİ gereksinim metnine ait. Metin sonradan
+            // değişirse gözden geçirme paneli bunu fark edebilsin.
+            updatedAnalyses[pos.title] = sanitizeForFirestore({
+                ...result, requirementsFingerprint: requirementsFingerprint(pos),
+            });
             aiCalls += 1;
             // 0 puanlı sonuç "en iyi" kabul edilmez
             if (result.score > highestScore && result.score > 0) {
@@ -180,7 +184,9 @@ export async function rescanCandidateForPosition(candidate, position, options = 
 
     const updatedAnalyses = { ...(candidate.positionAnalyses || {}) };
     if (previousTitle && previousTitle !== position.title) delete updatedAnalyses[previousTitle];
-    updatedAnalyses[position.title] = sanitizeForFirestore(result);
+    updatedAnalyses[position.title] = sanitizeForFirestore({
+        ...result, requirementsFingerprint: requirementsFingerprint(position),
+    });
 
     const updates = {
         positionAnalyses: updatedAnalyses,

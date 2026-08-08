@@ -44,7 +44,7 @@ const STATUS_CONFIG = {
 // ─────────────────────────────────────────────────────────────
 const APPLY_SOURCES = ['LinkedIn', 'Kariyer.net', 'Instagram', 'Twitter/X', 'Facebook', 'E-posta', 'Web'];
 
-function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onToggleStatus, onDelete, isRecruiterOrAdmin, releaseLoading, releasingPosId, onCandidateClick, onRescan }) {
+function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onToggleStatus, onDelete, isRecruiterOrAdmin, releaseLoading, releasingPosId, onCandidateClick, onRescan, onApplySuggestion }) {
     const sc = STATUS_CONFIG[pos.status] || STATUS_CONFIG.closed;
     const candidateCount = pos.matchedCandidates?.length || 0;
     const openDays = pos.createdAt ? Math.floor((Date.now() - pos.createdAt.toDate?.()?.getTime?.()) / 86400000) : null;
@@ -309,7 +309,12 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                             ifade onerir. Gereksinimler skorun en buyuk kaldiraci
                             oldugu icin denetlenmeleri gerekiyor. */}
                         {isRecruiterOrAdmin && pos.status === 'open' && (
-                            <RequirementReviewPanel position={pos} candidates={candidates} onCandidateClick={onCandidateClick} />
+                            <RequirementReviewPanel
+                                position={pos}
+                                candidates={candidates}
+                                onCandidateClick={onCandidateClick}
+                                onApplySuggestion={onApplySuggestion}
+                            />
                         )}
 
                         {/* Description */}
@@ -1368,6 +1373,40 @@ export default function PositionsPage() {
         );
     };
 
+    /**
+     * Öneriyi ilana uygula: yalnızca o maddenin METNİ değişir; zorunlu/tercihen
+     * işareti ve diğer maddeler olduğu gibi kalır.
+     *
+     * Uyguladıktan SONRA yeniden tarama akışı açılır. Bu şart: kayıtlı aday
+     * analizleri eski metne ait ve tazelenmezse panel aynı bulguyu — dolayısıyla
+     * aynı öneriyi — tekrar üretir. Kullanıcının bildirdiği sorun tam buydu.
+     */
+    const handleApplySuggestion = async (position, index, newText) => {
+        if (!position || !newText) return;
+        const current = requirementsOf(position);
+        const target = current[index - 1];
+        if (!target) return;
+        if (!window.confirm(
+            `${index}. madde şu metinle değiştirilecek:
+
+${newText}
+
+`
+            + 'Zorunlu/tercihen işareti korunur. Sonrasında yeniden tarama önerilecek.'
+        )) return;
+
+        const meta = current.map((r, i) => (
+            i === index - 1 ? { text: newText, must: r.must } : { text: r.text, must: r.must }
+        ));
+        const reqs = meta.map((r) => r.text);
+        await updatePosition(position.id, { requirements: reqs, requirementsMeta: meta });
+        setDetailPos(null);
+        setRescanTarget({
+            position: { ...position, requirements: reqs, requirementsMeta: meta },
+            reason: 'Gereksinim metni değişti — kayıtlı aday analizleri artık eski metne ait.',
+        });
+    };
+
     const runRescan = async (selectedCandidates) => {
         const { position, previousTitle } = rescanTarget || {};
         if (!position || !selectedCandidates?.length) return;
@@ -1740,6 +1779,7 @@ export default function PositionsPage() {
                         window.dispatchEvent(new CustomEvent('changeView', { detail: 'candidate-process' }));
                     }}
                     onRescan={() => setRescanTarget({ position: detailPos })}
+                    onApplySuggestion={(index, text) => handleApplySuggestion(detailPos, index, text)}
                 />
             )}
 

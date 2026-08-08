@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import {
     reviewRequirements, flaggedRequirements, MIN_SAMPLE, candidatesByRequirements,
 } from './requirementReview.js';
+import { requirementsFingerprint } from './positionRequirements.js';
 
 const POSITION = {
     title: 'Growth Product Manager',
@@ -302,5 +303,59 @@ describe('candidatesByRequirements', () => {
 
     it('handles a missing position safely', () => {
         expect(candidatesByRequirements(null, pool, { indexes: [1] }).matched).toEqual([]);
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bayat analiz tespiti.
+//
+// Kullanıcı öneriyi uygulayıp AYNI öneriyi tekrar aldığını bildirdi. Sebep:
+// panel kayıtlı analizlerden okuyor ve o analizler ESKİ gereksinim metnine
+// ait. Metni değiştirmek yargıyı değiştirmiyor; yeniden tarama gerekiyor.
+// Panel bunu artık sayıp söyleyebiliyor.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('bayat analiz tespiti', () => {
+    const withStamp = (id, stamp) => ({
+        id,
+        positionAnalyses: {
+            'Growth Product Manager': {
+                requirementsFingerprint: stamp,
+                requirementCoverage: {
+                    assessments: [1, 2, 3, 4].map((i) => ({ index: i, status: 'met' })),
+                },
+            },
+        },
+    });
+
+    it('counts an analysis stamped with the current requirements as fresh', () => {
+        const stamp = requirementsFingerprint(POSITION);
+        const r = reviewRequirements(POSITION, [withStamp('a', stamp), withStamp('b', stamp)]);
+        expect(r.fresh).toBe(2);
+        expect(r.stale).toBe(0);
+    });
+
+    it('counts an analysis from an older wording as stale', () => {
+        const r = reviewRequirements(POSITION, [withStamp('a', 'reski'), withStamp('b', 'reski')]);
+        expect(r.stale).toBe(2);
+        expect(r.fresh).toBe(0);
+    });
+
+    it('treats an unstamped legacy analysis as stale', () => {
+        // Damga eklenmeden önce yazılmış kayıtlar; güncel olduklarını
+        // varsaymak kullanıcıyı yanıltırdı
+        const r = reviewRequirements(POSITION, [cand('eski', ['met', 'met', 'met', 'met'])]);
+        expect(r.stale).toBe(1);
+    });
+
+    it('reports the mix when only some candidates were rescanned', () => {
+        // Eşikli tarama yalnızca bir kısmını tazeler — gerçek senaryo
+        const stamp = requirementsFingerprint(POSITION);
+        const r = reviewRequirements(POSITION, [
+            withStamp('taze1', stamp), withStamp('taze2', stamp),
+            withStamp('bayat1', 'reski'), withStamp('bayat2', 'reski'), withStamp('bayat3', 'reski'),
+        ]);
+        expect(r.fresh).toBe(2);
+        expect(r.stale).toBe(3);
+        expect(r.scanned).toBe(5);
     });
 });
