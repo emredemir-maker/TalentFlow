@@ -5,7 +5,13 @@
 // değiştiriyordu; karar ne ekranda görünüyordu ne de uygulanıyordu. Sonuç:
 // "tercihene al" önerisini uygulayan kullanıcının maddesi zorunlu kalıyor,
 // "kaldır" önerisini uygulayınca madde duruyordu — yani öneri uygulanmış
-// olmuyordu. Kullanıcının bildirdiği sorun buydu.
+// olmuyordu.
+//
+// İkinci sorun: her uygulama ayrı bir yazma + ayrı bir yeniden tarama
+// demekti. Üç öneri gelen bir ilanda kullanıcı üç kez öneri istemek zorunda
+// kalıyordu, çünkü uygulama anında panel kapanıyordu. Bu yüzden çekirdek
+// fonksiyon ÇOĞUL: bir seferde birden çok maddeyi planlar, tarama en sonda
+// bir kez çalışır.
 //
 // Burası saf: pozisyonu değiştirmez, yazılacak alanları döndürür.
 
@@ -57,29 +63,15 @@ export function normalizeAction(raw) {
 }
 
 /**
- * Öneriyi uygulanmış hâle çevirir.
- *
- * @param {object} position
- * @param {number} index — 1 tabanlı madde numarası (panelin gösterdiği numara)
- * @param {{action?: string, suggestion?: string}} review — danışman çıktısı
- * @returns {null | {
- *   action: string,            // gerçekten uygulanan karar
- *   requested: string,         // danışmanın istediği karar
- *   downgradeNote: string|null,// istenen uygulanamadıysa nedeni
- *   updates: object,           // updatePosition'a verilecek alanlar
- *   nextPosition: object,      // güncel hâliyle pozisyon (yeniden tarama için)
- *   confirmText: string,
- * }}
- *   null: madde yok ya da uygulanacak bir değişiklik yok.
+ * Tek bir öneriyi uygulanabilir bir değişikliğe çevirir.
+ * @returns {null | {index, action, requested, downgradeNote, from, to}}
  */
-export function applyRequirementAction(position, index, review = {}) {
-    const current = requirementsOf(position);
+function resolveChange(current, index, review, prioritized) {
     const target = current[index - 1];
     if (!target) return null;
 
-    const requested = normalizeAction(review.action);
-    const suggestion = String(review.suggestion || '').trim();
-    const prioritized = hasPrioritizedRequirements(position);
+    const requested = normalizeAction(review?.action);
+    const suggestion = String(review?.suggestion || '').trim();
 
     let action = requested;
     let downgradeNote = null;
@@ -90,28 +82,81 @@ export function applyRequirementAction(position, index, review = {}) {
     // Bu, ilanın tamamını bozan sessiz bir veri kaybı olurdu.
     if (action === DEMOTE && !prioritized) {
         action = REWRITE;
-        downgradeNote = 'Bu ilanda zorunlu/tercihen ayrımı yapılmamış; yalnızca metin güncellendi. '
+        downgradeNote = `${index}. madde: bu ilanda zorunlu/tercihen ayrımı yapılmamış, yalnızca metin güncellendi. `
             + 'Önceliği değiştirmek için ilanı düzenleyip maddeleri iki kutuya ayırın.';
     }
     // Tercihen olan bir maddeyi tercihene almak bir şey değiştirmez.
     if (action === DEMOTE && target.must === false) {
         action = REWRITE;
-        downgradeNote = 'Madde zaten tercihen; yalnızca metin güncellendi.';
+        downgradeNote = `${index}. madde zaten tercihen; yalnızca metin güncellendi.`;
     }
+
     // Yeni metin yoksa yazacak bir şey yok. Kaldırma metne muhtaç değil.
     if (action !== REMOVE && !suggestion) return null;
     // Hiçbir şey değişmiyorsa onay kutusu çıkarmanın anlamı yok.
-    const textUnchanged = suggestion === target.text;
-    const priorityUnchanged = action !== DEMOTE;
-    if (action !== REMOVE && textUnchanged && priorityUnchanged) return null;
+    if (action === REWRITE && suggestion === target.text) return null;
 
-    const next = current
-        .map((r, i) => {
-            if (i !== index - 1) return { text: r.text, must: r.must };
-            if (action === REMOVE) return null;
-            return { text: suggestion || r.text, must: action === DEMOTE ? false : r.must };
-        })
-        .filter(Boolean);
+    return {
+        index,
+        action,
+        requested,
+        downgradeNote,
+        from: target.text,
+        to: action === REMOVE ? null : suggestion,
+    };
+}
+
+/** Onay kutusunda görünecek tek satır. */
+function changeLine(c) {
+    if (c.action === REMOVE) return `${c.index}. madde KALDIRILACAK: ${c.from}`;
+    const demoted = c.action === DEMOTE ? "\n   (ZORUNLU'dan TERCİHEN'e alınacak)" : '';
+    return `${c.index}. madde → ${c.to}${demoted}`;
+}
+
+/**
+ * Birden çok öneriyi TEK yazmada uygulanacak hâle getirir.
+ *
+ * Tek geçişte kurulduğu için madde kaldırmak numaraları kaydırmaz; kaydırma
+ * sonrası eşleştirme hatası (öneri 3'ün 2 numaralı maddeye yapışması) mümkün
+ * değil.
+ *
+ * @param {object} position
+ * @param {Array<{index:number, action?:string, suggestion?:string}>} reviews
+ * @returns {null | {
+ *   changes: Array,            // uygulanacak değişiklikler
+ *   notes: string[],           // istenen karar uygulanamadıysa nedenleri
+ *   updates: object,           // updatePosition'a verilecek alanlar
+ *   nextPosition: object,      // güncel hâliyle pozisyon
+ *   indexMap: Map<number, number|null>, // eski numara → yeni numara (null: kaldırıldı)
+ *   confirmText: string,
+ * }}
+ */
+export function planRequirementChanges(position, reviews) {
+    const current = requirementsOf(position);
+    if (current.length === 0) return null;
+    const prioritized = hasPrioritizedRequirements(position);
+
+    const byIndex = new Map();
+    for (const r of reviews || []) {
+        const idx = Number(r?.index);
+        if (!Number.isInteger(idx) || byIndex.has(idx)) continue;
+        const change = resolveChange(current, idx, r, prioritized);
+        if (change) byIndex.set(idx, change);
+    }
+    if (byIndex.size === 0) return null;
+
+    const indexMap = new Map();
+    const next = [];
+    current.forEach((r, i) => {
+        const oldIndex = i + 1;
+        const c = byIndex.get(oldIndex);
+        if (c?.action === REMOVE) { indexMap.set(oldIndex, null); return; }
+        next.push({
+            text: c?.to || r.text,
+            must: c?.action === DEMOTE ? false : r.must,
+        });
+        indexMap.set(oldIndex, next.length);
+    });
 
     const requirements = next.map((r) => r.text);
     // Meta yalnızca ilan zaten önceliklendirilmişse yazılır; aksi hâlde
@@ -120,22 +165,17 @@ export function applyRequirementAction(position, index, review = {}) {
         ? { requirements, requirementsMeta: next.map((r) => ({ text: r.text, must: Boolean(r.must) })) }
         : { requirements };
 
-    const confirmText = action === REMOVE
-        ? `${index}. madde ilandan KALDIRILACAK:\n\n${target.text}\n\n`
-            + 'Sonrasında yeniden tarama önerilecek.'
-        : `${index}. madde şu metinle değiştirilecek:\n\n${suggestion}\n\n`
-            + (action === DEMOTE
-                ? 'Madde ayrıca ZORUNLU\'dan TERCİHEN\'e alınacak. '
-                : 'Zorunlu/tercihen işareti korunur. ')
-            + (downgradeNote ? `\n\nNot: ${downgradeNote}\n\n` : '')
-            + 'Sonrasında yeniden tarama önerilecek.';
+    const changes = [...byIndex.values()].sort((a, b) => a.index - b.index);
+    const notes = changes.map((c) => c.downgradeNote).filter(Boolean);
 
-    return {
-        action,
-        requested,
-        downgradeNote,
-        updates,
-        nextPosition: { ...position, ...updates },
-        confirmText,
-    };
+    const confirmText = [
+        `${changes.length} gereksinim güncellenecek:`,
+        '',
+        changes.map(changeLine).join('\n'),
+        '',
+        notes.length > 0 ? `Not:\n${notes.join('\n')}\n` : null,
+        'Sonrasında yeniden tarama gerekecek — kayıtlı aday analizleri eski metne ait.',
+    ].filter((line) => line !== null).join('\n');
+
+    return { changes, notes, updates, nextPosition: { ...position, ...updates }, indexMap, confirmText };
 }

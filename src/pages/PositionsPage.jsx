@@ -26,7 +26,7 @@ import {
     formatRequirementsInput, parseRequirementGroups, formatRequirementGroups,
     requirementsOf, hasPrioritizedRequirements,
 } from '../utils/positionRequirements';
-import { applyRequirementAction, REMOVE } from '../utils/requirementEdit';
+import { planRequirementChanges } from '../utils/requirementEdit';
 import { rescanCandidateForPosition, hasAnalysisForPosition } from '../services/scanService';
 import RescanPositionModal from '../components/RescanPositionModal';
 import RequirementReviewPanel from '../components/RequirementReviewPanel';
@@ -45,7 +45,7 @@ const STATUS_CONFIG = {
 // ─────────────────────────────────────────────────────────────
 const APPLY_SOURCES = ['LinkedIn', 'Kariyer.net', 'Instagram', 'Twitter/X', 'Facebook', 'E-posta', 'Web'];
 
-function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onToggleStatus, onDelete, isRecruiterOrAdmin, releaseLoading, releasingPosId, onCandidateClick, onRescan, onApplySuggestion }) {
+function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onToggleStatus, onDelete, isRecruiterOrAdmin, releaseLoading, releasingPosId, onCandidateClick, onRescan, onApplySuggestions, onRescanAfterEdit }) {
     const sc = STATUS_CONFIG[pos.status] || STATUS_CONFIG.closed;
     const candidateCount = pos.matchedCandidates?.length || 0;
     const openDays = pos.createdAt ? Math.floor((Date.now() - pos.createdAt.toDate?.()?.getTime?.()) / 86400000) : null;
@@ -314,7 +314,8 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                                 position={pos}
                                 candidates={candidates}
                                 onCandidateClick={onCandidateClick}
-                                onApplySuggestion={onApplySuggestion}
+                                onApplySuggestions={onApplySuggestions}
+                                onRescan={onRescanAfterEdit}
                             />
                         )}
 
@@ -1387,26 +1388,18 @@ export default function PositionsPage() {
      * analizleri eski metne ait ve tazelenmezse panel aynı bulguyu — dolayısıyla
      * aynı öneriyi — tekrar üretir.
      */
-    const handleApplySuggestion = async (position, index, review) => {
-        const plan = applyRequirementAction(position, index, review);
-        if (!plan) return;
-        if (!window.confirm(plan.confirmText)) return;
+    const handleApplySuggestions = async (position, reviews) => {
+        const plan = planRequirementChanges(position, reviews);
+        if (!plan) return null;
+        if (!window.confirm(plan.confirmText)) return null;
 
-        try {
-            await updatePosition(position.id, plan.updates);
-        } catch (err) {
-            // Sessiz başarısızlık en kötüsü: kullanıcı uyguladığını sanıp
-            // aynı öneriyi tekrar görüyor.
-            window.alert(`Öneri uygulanamadı: ${err?.message || 'bilinmeyen hata'}`);
-            return;
-        }
-        setDetailPos(null);
-        setRescanTarget({
-            position: plan.nextPosition,
-            reason: plan.action === REMOVE
-                ? 'Bir gereksinim kaldırıldı — kayıtlı aday analizleri artık eski listeye ait.'
-                : 'Gereksinim değişti — kayıtlı aday analizleri artık eski metne ait.',
-        });
+        await updatePosition(position.id, plan.updates);
+        // Panel AÇIK kalır ve güncel gereksinimlerle yeniden çizilir; tarama
+        // ayrı bir adım. Eskiden uygulama anında drawer kapanıp tarama ekranı
+        // açılıyordu, üç öneri gelen ilanda kullanıcı öneriyi üç kez baştan
+        // istemek zorunda kalıyordu.
+        setDetailPos(plan.nextPosition);
+        return plan;
     };
 
     const runRescan = async (selectedCandidates) => {
@@ -1781,7 +1774,14 @@ export default function PositionsPage() {
                         window.dispatchEvent(new CustomEvent('changeView', { detail: 'candidate-process' }));
                     }}
                     onRescan={() => setRescanTarget({ position: detailPos })}
-                    onApplySuggestion={(index, review) => handleApplySuggestion(detailPos, index, review)}
+                    onApplySuggestions={(reviews) => handleApplySuggestions(detailPos, reviews)}
+                    onRescanAfterEdit={() => {
+                        setDetailPos(null);
+                        setRescanTarget({
+                            position: detailPos,
+                            reason: 'Gereksinimler değişti — kayıtlı aday analizleri artık eski metne ait.',
+                        });
+                    }}
                 />
             )}
 
