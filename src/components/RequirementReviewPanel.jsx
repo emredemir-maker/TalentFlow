@@ -9,6 +9,9 @@ import { normalizeAction, ACTION_LABELS, DEMOTE, REMOVE } from '../utils/require
 /** Danışmanın kararı — tanınmayan/boş değer "yeniden yaz" sayılır. */
 const actionOf = (s) => normalizeAction(s?.action);
 
+/** Uygulanabilir öneri: yeni metni olan ya da "kaldır" diyen. */
+const canApply = (s) => Boolean(s?.suggestion) || actionOf(s) === REMOVE;
+
 /**
  * "Bu gereksinimi neden istiyoruz?"
  *
@@ -28,6 +31,9 @@ export default function RequirementReviewPanel({
     const [mode, setMode] = useState('meets');
     const [loading, setLoading] = useState(false);
     const [applying, setApplying] = useState(false);
+    // Hangi öneriler uygulanacak. Önce yalnızca "hepsi" ya da "tek tek" vardı;
+    // üç öneriden ikisini seçmenin yolu yoktu.
+    const [toApply, setToApply] = useState(() => new Set());
     const [appliedCount, setAppliedCount] = useState(0);
     const [error, setError] = useState(null);
 
@@ -56,7 +62,11 @@ export default function RequirementReviewPanel({
         setLoading(true);
         setError(null);
         try {
-            setSuggestions(await suggestRequirementRewrites(position, flagged));
+            const fresh = await suggestRequirementRewrites(position, flagged);
+            setSuggestions(fresh);
+            // Hepsi seçili gelir: yaygın durum "hepsini uygula". İstemediğini
+            // çıkarmak, istediğini tek tek işaretlemekten az tıklama.
+            setToApply(new Set(fresh.filter(canApply).map((s) => Number(s.index))));
             setAppliedCount(0);
         } catch (err) {
             setError(err?.message || 'Öneri alınamadı.');
@@ -64,6 +74,12 @@ export default function RequirementReviewPanel({
             setLoading(false);
         }
     };
+
+    const toggleApply = (index) => setToApply((prev) => {
+        const next = new Set(prev);
+        if (next.has(index)) next.delete(index); else next.add(index);
+        return next;
+    });
 
     /**
      * Öneri(ler)i uygula.
@@ -84,13 +100,16 @@ export default function RequirementReviewPanel({
             const plan = await onApplySuggestions(reviews);
             if (!plan) return;
             const done = new Set(plan.changes.map((c) => c.index));
-            setSuggestions((prev) => (prev || [])
+            const remaining = (suggestions || [])
                 .filter((s) => !done.has(Number(s.index)))
                 .map((s) => {
                     const next = plan.indexMap.get(Number(s.index));
                     return next ? { ...s, index: next } : null;
                 })
-                .filter(Boolean));
+                .filter(Boolean);
+            setSuggestions(remaining);
+            // Seçim de yeni numaralara taşınır; uygulananlar düşer.
+            setToApply(new Set(remaining.filter(canApply).map((s) => Number(s.index))));
             setPicked(new Set());
             setAppliedCount((n) => n + plan.changes.length);
         } catch (err) {
@@ -100,10 +119,9 @@ export default function RequirementReviewPanel({
         }
     };
 
-    // Uygulanabilir öneriler: metni olan ya da "kaldır" diyen.
-    const applicable = (suggestions || []).filter(
-        (s) => s.suggestion || actionOf(s) === REMOVE
-    );
+    // Uygulanabilir öneriler ve bunlardan seçili olanlar.
+    const applicable = (suggestions || []).filter(canApply);
+    const selected = applicable.filter((s) => toApply.has(Number(s.index)));
 
     return (
         <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
@@ -237,18 +255,37 @@ export default function RequirementReviewPanel({
 
                             {s && (
                                 <div className="mt-2 rounded-lg border border-cyan-100 bg-white px-2.5 py-2 space-y-1">
-                                    {/* Danışmanın KARARI. Önce görünmüyordu ve
-                                        uygulanmıyordu: kullanıcı "tercihene al"
-                                        önerisini uyguluyor, madde zorunlu kalıyordu. */}
-                                    <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${
-                                        actionOf(s) === REMOVE
-                                            ? 'bg-red-50 text-red-600 border border-red-100'
-                                            : actionOf(s) === DEMOTE
-                                                ? 'bg-amber-50 text-amber-700 border border-amber-100'
-                                                : 'bg-slate-100 text-slate-500 border border-slate-200'
-                                    }`}>
-                                        {ACTION_LABELS[actionOf(s)]}
-                                    </span>
+                                    {/* Danışmanın KARARI + bu öneriyi uygulayacak
+                                        mıyız. Önce karar hiç görünmüyordu ve
+                                        uygulanmıyordu; sonra da yalnızca "hepsi"
+                                        ya da "tek tek" vardı, üç öneriden ikisini
+                                        seçmenin yolu yoktu. */}
+                                    {canApply(s) && onApplySuggestions ? (
+                                        <label className="flex items-center gap-1.5 cursor-pointer w-fit">
+                                            <input
+                                                type="checkbox"
+                                                checked={toApply.has(it.index)}
+                                                onChange={() => toggleApply(it.index)}
+                                                disabled={applying}
+                                                className="accent-cyan-500"
+                                            />
+                                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${
+                                                !toApply.has(it.index)
+                                                    ? 'bg-white text-slate-400 border border-slate-200'
+                                                    : actionOf(s) === REMOVE
+                                                        ? 'bg-red-50 text-red-600 border border-red-100'
+                                                        : actionOf(s) === DEMOTE
+                                                            ? 'bg-amber-50 text-amber-700 border border-amber-100'
+                                                            : 'bg-cyan-50 text-cyan-700 border border-cyan-100'
+                                            }`}>
+                                                {ACTION_LABELS[actionOf(s)]}
+                                            </span>
+                                        </label>
+                                    ) : (
+                                        <span className="inline-block px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 border border-slate-200 text-[9px] font-black uppercase tracking-wider">
+                                            {ACTION_LABELS[actionOf(s)]}
+                                        </span>
+                                    )}
                                     {s.why && (
                                         <p className="text-[10px] text-slate-500">
                                             <span className="font-black uppercase text-[9px] text-slate-400">Aslında ölçtüğü: </span>
@@ -263,19 +300,6 @@ export default function RequirementReviewPanel({
                                     )}
                                     {s.rationale && (
                                         <p className="text-[10px] text-slate-400 italic leading-relaxed">{s.rationale}</p>
-                                    )}
-                                    {onApplySuggestions && (s.suggestion || actionOf(s) === REMOVE) && (
-                                        <button
-                                            onClick={() => applyNow([{ ...s, index: it.index }])}
-                                            disabled={applying}
-                                            className={`flex items-center gap-1 px-2 py-1 rounded-lg text-white text-[9px] font-black uppercase tracking-wider transition-colors disabled:opacity-40 ${
-                                                actionOf(s) === REMOVE
-                                                    ? 'bg-red-500 hover:bg-red-600'
-                                                    : 'bg-cyan-500 hover:bg-cyan-600'
-                                            }`}
-                                        >
-                                            <Check className="w-3 h-3" /> {ACTION_LABELS[actionOf(s)]}
-                                        </button>
                                     )}
                                 </div>
                             )}
@@ -370,25 +394,38 @@ export default function RequirementReviewPanel({
                 <p className="text-[11px] text-red-600">{error}</p>
             )}
 
-            {/* TOPLU UYGULAMA.
-                Önceki davranış her uygulamada paneli kapatıp tarama ekranını
-                açıyordu; üç öneri gelen bir ilanda kullanıcı öneriyi üç kez
-                baştan istemek zorunda kalıyordu. Artık hepsi tek yazmada
-                uygulanıyor ve tarama sona bırakılıyor. */}
-            {onApplySuggestions && applicable.length > 1 && (
+            {/* SEÇİLENLERİ UYGULA.
+                Önce her uygulama paneli kapatıp tarama ekranını açıyordu; üç
+                öneri gelen ilanda kullanıcı öneriyi üç kez baştan istiyordu.
+                Sonraki hâlde yalnızca "hepsi" ya da "tek tek" vardı — üçten
+                ikisini seçmenin yolu yoktu. Artık her öneri kendi kutucuğuyla
+                seçilir, seçilenler tek yazmada uygulanır. */}
+            {onApplySuggestions && applicable.length > 0 && (
                 <div className="flex items-center justify-between gap-2 rounded-lg border border-cyan-100 bg-cyan-50/40 px-3 py-2 flex-wrap">
                     <p className="text-[10px] text-slate-600">
-                        <strong>{applicable.length}</strong> öneri uygulanabilir. Hepsini bir kerede
-                        uygularsanız yeniden taramayı yalnızca bir kez çalıştırırsınız.
+                        <strong>{selected.length}</strong> / {applicable.length} öneri seçili.
+                        {applicable.length > 1 && ' Seçilenler tek seferde uygulanır — yeniden tarama bir kez çalışır.'}
+                        {applicable.length > 1 && (
+                            <button
+                                onClick={() => setToApply(
+                                    selected.length === applicable.length
+                                        ? new Set()
+                                        : new Set(applicable.map((s) => Number(s.index)))
+                                )}
+                                className="ml-1.5 underline text-cyan-700 hover:text-cyan-800 font-bold"
+                            >
+                                {selected.length === applicable.length ? 'Seçimi temizle' : 'Tümünü seç'}
+                            </button>
+                        )}
                     </p>
                     <button
-                        onClick={() => applyNow(applicable)}
-                        disabled={applying}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-600 text-white text-[10px] font-black uppercase tracking-wider transition-colors disabled:opacity-40 shrink-0"
+                        onClick={() => applyNow(selected)}
+                        disabled={applying || selected.length === 0}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-600 text-white text-[10px] font-black uppercase tracking-wider transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
                     >
                         {applying
                             ? <><Loader2 className="w-3 h-3 animate-spin" /> Uygulanıyor…</>
-                            : <><Check className="w-3 h-3" /> Tümünü uygula ({applicable.length})</>}
+                            : <><Check className="w-3 h-3" /> Seçilenleri uygula ({selected.length})</>}
                     </button>
                 </div>
             )}
