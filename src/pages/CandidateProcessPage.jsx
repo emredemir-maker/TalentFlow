@@ -1359,9 +1359,27 @@ export default function CandidateProcessPage() {
                                             </div>
                                             {/* Already analyzed: point to SystemScanner for re-analysis */}
                                             {candidate.aiAnalysis?.starAnalysis && (
-                                                <span className="text-[9px] text-slate-400 italic">
-                                                    Toplu yenileme için Sistem Taraması kullanın
-                                                </span>
+                                                <div className="flex items-center gap-2">
+                                                    {/* Analizi OLAN adayda yeniden çalıştırma yolu yoktu:
+                                                        ekranda yalnızca "Sistem Taraması kullanın" yazıyordu,
+                                                        hatta aşağıdaki bayat-analiz uyarısı "yeniden
+                                                        çalıştırın" diyordu ama düğme mevcut değildi. Prompt
+                                                        iyileştirmelerinin etkisini tek adayda görmek
+                                                        imkânsızdı. */}
+                                                    <button
+                                                        onClick={() => handleRunStarAnalysis(candidate)}
+                                                        disabled={analyzingIds.has(candidate.id)}
+                                                        title="Bu aday için analizi güncel modelle yeniden çalıştır"
+                                                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 text-[9px] font-black text-slate-500 hover:border-cyan-300 hover:text-cyan-600 hover:bg-cyan-50 transition-colors disabled:opacity-50"
+                                                    >
+                                                        {analyzingIds.has(candidate.id)
+                                                            ? <><Loader2 size={10} className="animate-spin" /> Analiz ediliyor…</>
+                                                            : <><RefreshCw size={10} /> Yeniden Analiz Et</>}
+                                                    </button>
+                                                    <span className="text-[9px] text-slate-400 italic hidden sm:inline">
+                                                        Toplu yenileme için Sistem Taraması
+                                                    </span>
+                                                </div>
                                             )}
                                         </div>
 
