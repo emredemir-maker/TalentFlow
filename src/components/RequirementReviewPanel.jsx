@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Sparkles, AlertTriangle, Info, Loader2, Wrench, Users, ChevronRight } from 'lucide-react';
+import { Sparkles, AlertTriangle, Info, Loader2, Wrench, Users, ChevronRight, Check, RotateCcw } from 'lucide-react';
 import {
     reviewRequirements, flaggedRequirements, FLAG_LABELS, MIN_SAMPLE, candidatesByRequirements,
 } from '../utils/requirementReview';
@@ -14,7 +14,7 @@ import { suggestRequirementRewrites } from '../services/ai/requirementAdvisor';
  *
  * Hiçbir şeyi otomatik değiştirmez — öneri sunar, düzenlemeyi kullanıcı yapar.
  */
-export default function RequirementReviewPanel({ position, candidates, onCandidateClick }) {
+export default function RequirementReviewPanel({ position, candidates, onCandidateClick, onApplySuggestion }) {
     const [suggestions, setSuggestions] = useState(null);
     // Seçilen gereksinimler → canlı aday listesi. Asıl kullanım "bu maddeyi
     // kaldırsam kim geri gelir?" sorusunu görmek.
@@ -89,6 +89,24 @@ export default function RequirementReviewPanel({ position, candidates, onCandida
                         <strong>{review.mustCount} zorunlu maddenin tamamını</strong> karşılıyor
                         {' '}(%{Math.round(review.mustPassRate * 100)}).
                         {review.mustPassRate < 0.1 && ' Bu ilan pratikte neredeyse hiç aday geçirmiyor — zorunluların bir kısmını tercihene almayı düşünün.'}
+                    </p>
+                </div>
+            )}
+
+            {/* BAYAT ANALİZ UYARISI.
+                Kullanıcı öneriyi uygulayıp aynı öneriyi tekrar aldığını
+                bildirdi. Sebebi buydu: panel kayıtlı analizlerden okuyor ve o
+                analizler ESKİ gereksinim metnine ait. Metni değiştirmek
+                yargıyı değiştirmiyor — yeniden tarama gerekiyor. */}
+            {review.stale > 0 && (
+                <div className="flex items-start gap-2 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                    <RotateCcw className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                    <p className="text-[11px] text-amber-700 leading-relaxed">
+                        <strong>{review.stale}</strong> adayın analizi gereksinimlerin ESKİ hâline ait
+                        {review.fresh > 0 ? <> (yalnızca {review.fresh} tanesi güncel)</> : null}.
+                        Aşağıdaki bulgular ve öneriler o eski metne göre hesaplandı —
+                        gereksinimleri değiştirdiyseniz <strong>derin taramayı yeniden çalıştırın</strong>,
+                        aksi hâlde aynı öneriyi tekrar alırsınız.
                     </p>
                 </div>
             )}
@@ -184,6 +202,14 @@ export default function RequirementReviewPanel({ position, candidates, onCandida
                                     )}
                                     {s.rationale && (
                                         <p className="text-[10px] text-slate-400 italic leading-relaxed">{s.rationale}</p>
+                                    )}
+                                    {s.suggestion && onApplySuggestion && (
+                                        <button
+                                            onClick={() => onApplySuggestion(it.index, s.suggestion)}
+                                            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-cyan-500 hover:bg-cyan-600 text-white text-[9px] font-black uppercase tracking-wider transition-colors"
+                                        >
+                                            <Check className="w-3 h-3" /> Öneriyi uygula
+                                        </button>
                                     )}
                                 </div>
                             )}

@@ -11,7 +11,7 @@
 // "bu gereksinim gerekli mi?" diye modele sormak, bugün iki kez yaşadığımız
 // genel-cevap tuzağına düşerdi.
 
-import { requirementsOf } from './positionRequirements';
+import { requirementsOf, requirementsFingerprint } from './positionRequirements';
 
 /** Anlamlı oran üretmek için gereken en az değerlendirilmiş aday sayısı. */
 export const MIN_SAMPLE = 5;
@@ -28,9 +28,14 @@ export const OVER_RESTRICTIVE_RATE = 0.6;
 /** Bir maddeyi "karşılıyor" saymak: met ve partial. */
 const isMet = (status) => status === 'met' || status === 'partial';
 
+/** Adayın BU pozisyon için kayıtlı analizi. */
+function analysisFor(candidate, positionTitle) {
+    return candidate?.positionAnalyses?.[positionTitle] || null;
+}
+
 /** Adayın BU pozisyon için kayıtlı madde değerlendirmeleri. */
 function assessmentsFor(candidate, positionTitle) {
-    const analysis = candidate?.positionAnalyses?.[positionTitle];
+    const analysis = analysisFor(candidate, positionTitle);
     const direct = analysis?.requirementCoverage?.assessments;
     if (Array.isArray(direct)) return direct;
     const nested = analysis?.scoreData?.requirementCoverage?.assessments;
@@ -56,7 +61,7 @@ export function reviewRequirements(position, candidates) {
     const reqs = requirementsOf(position).map((r, i) => ({ ...r, index: i + 1 }));
     const title = position?.title;
     if (reqs.length === 0 || !title) {
-        return { scanned: 0, enoughData: false, items: [], mustCount: 0, mustEvaluated: 0, mustPass: null, mustPassRate: null };
+        return { scanned: 0, fresh: 0, stale: 0, enoughData: false, items: [], mustCount: 0, mustEvaluated: 0, mustPass: null, mustPassRate: null };
     }
 
     // index → aday başına durum. Yalnızca değerlendirilmiş adaylar sayılır;
@@ -79,6 +84,19 @@ export function reviewRequirements(position, candidates) {
             }
         }
     }
+
+    // Analizler HANGİ gereksinim metnine ait? Metin değişince kayıtlı
+    // değerlendirmeler eskir ama görünüşte hiçbir şey değişmez: panel eski
+    // yargıyı göstermeye devam eder ve kullanıcı uyguladığı öneriyi tekrar
+    // tekrar alır. Damgayı karşılaştırıp bunu söyleyebiliyoruz.
+    const currentFingerprint = requirementsFingerprint(position);
+    let fresh = 0;
+    for (const c of candidates || []) {
+        const a = analysisFor(c, title);
+        if (!a || !assessmentsFor(c, title)) continue;
+        if (a.requirementsFingerprint === currentFingerprint) fresh += 1;
+    }
+    const stale = scanned - fresh;
 
     const enoughData = scanned >= MIN_SAMPLE;
 
@@ -161,6 +179,8 @@ export function reviewRequirements(position, candidates) {
 
     return {
         scanned,
+        fresh,
+        stale,
         enoughData,
         items,
         mustCount: mustIndexes.length,

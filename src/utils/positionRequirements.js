@@ -113,3 +113,27 @@ export function buildJobDescription(position) {
         position?.description || '',
     ].filter(Boolean).join('\n');
 }
+
+/**
+ * Gereksinim listesinin parmak izi.
+ *
+ * Aday analizleri gereksinim METNİNE göre üretiliyor. Metin değişince kayıtlı
+ * değerlendirmeler eskiyor ama görünüşte hiçbir şey değişmiyor: gözden
+ * geçirme paneli "bu madde bir araç" demeye devam ediyor, çünkü o yargı eski
+ * metne ait. Kullanıcı öneriyi uyguluyor, aynı öneriyi tekrar alıyor.
+ *
+ * Analiz yazılırken bu damga da yazılır; panel karşılaştırıp hangi
+ * değerlendirmelerin güncel olduğunu söyleyebilir.
+ *
+ * Kripto değil, çakışma direnci gerekmiyor — yalnızca "değişti mi?" sorusu.
+ */
+export function requirementsFingerprint(position) {
+    const payload = JSON.stringify(
+        requirementsOf(position).map((r) => [r.text, r.must])
+    );
+    let h = 5381;
+    for (let i = 0; i < payload.length; i++) {
+        h = ((h << 5) + h + payload.charCodeAt(i)) | 0;
+    }
+    return `r${(h >>> 0).toString(36)}`;
+}
