@@ -9,6 +9,7 @@ import { MessageQueueProvider } from './context/MessageQueueContext';
 import { NotificationProvider } from './context/NotificationContext';
 
 import Sidebar from './components/Sidebar';
+import HrAssistantPanel from './components/HrAssistantPanel';
 import LoadingScreen from './components/LoadingScreen';
 // LoginPage stays eager — it's the first paint before auth resolves so
 // shipping a separate chunk just to wait for it on cold start hurts TTI.
@@ -179,6 +180,8 @@ function AuthenticatedApp() {
           {renderPage()}
         </Suspense>
       </main>
+      {/* Her ekranda erişilebilir; yalnızca okur, hiçbir şeyi değiştirmez. */}
+      <HrAssistantPanel />
     </div>
   );
 }

@@ -1207,6 +1207,15 @@ export default function PositionsPage() {
     const [statusFilter, setStatusFilter]       = useState('all');
     const [deptFilter, setDeptFilter]           = useState('all');
     const [detailPos, setDetailPos]             = useState(null);
+
+    // İK asistanına sayfa bağlamını bildir: ilan detayı açıkken kullanıcı
+    // "bu pozisyonda kaç aday…" diyebilsin, başlığı tekrar yazmak zorunda
+    // kalmasın. Uygulamanın başka yerlerinde de kullanılan olay yöntemi.
+    useEffect(() => {
+        window.dispatchEvent(new CustomEvent('assistant-context', {
+            detail: detailPos ? { positionTitle: detailPos.title } : null,
+        }));
+    }, [detailPos]);
     const [createOpen, setCreateOpen]           = useState(false);
     const [editPos, setEditPos]                 = useState(null);
     const [releasingPosId, setReleasingPosId]   = useState(null);
