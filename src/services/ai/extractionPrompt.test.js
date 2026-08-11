@@ -32,11 +32,17 @@ const rawSource = fs.readFileSync(
 const promptSource = rawSource.replace(/\s+/g, ' ');
 
 describe('EXTRACTOR_PROMPT — STAR kanıt ölçeği', () => {
-    it('uses an anchored 0-3 scale instead of a free 1-10 judgement', () => {
-        expect(promptSource).toMatch(/KANIT ÖLÇEĞİ \(0-3\)/);
-        for (const anchor of ['0 = CV\'de bu boyuta dair hiçbir bilgi yok', '1 = anılmış', '2 = anlatılmış', '3 = ölçülmüş']) {
-            expect(promptSource).toContain(anchor);
-        }
+    it('leaves the STAR score to the scoring call and says so', () => {
+        // Çapalar artık coverageScorer.js'te: skoru belirleyen çıktı küçük ve
+        // ayrı bir çağrıda üretiliyor. Bu istem yalnızca metin yazıyor.
+        expect(promptSource).toMatch(/puanı ayrı çağrı verir, sen PUAN YAZMA/);
+        expect(promptSource).toMatch(/0 = bilgi yok · 1 = anılmış · 2 = anlatılmış · 3 = ölçülmüş/);
+    });
+
+    it('states that this call does not decide any status', () => {
+        // Damganın iki yerden gelmesi, kararsızlığın geri dönmesi demekti
+        expect(promptSource).toMatch(/BU ÇAĞRI DAMGA VERMEZ/);
+        expect(promptSource).toMatch(/senin yazdıkların skoru DEĞİŞTİRMEZ/);
     });
 
     it('separates evidence, missing information and conflict', () => {

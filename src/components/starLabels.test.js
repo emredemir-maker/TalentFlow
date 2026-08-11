@@ -54,9 +54,12 @@ describe('STAR etiketleri', () => {
         expect(read('components/ScoreBreakdownPanel.jsx')).toMatch(/CV'deki Kanıt \(STAR\)/);
     });
 
-    it('keeps the extractor prompt anchored to evidence, not quality', () => {
-        // Etiketin doğru olması, ölçümün de o kalmasına bağlı
-        const prompt = read('services/ai/extraction.js');
-        expect(prompt).toMatch(/adayın NİTELİĞİNİ değil, CV'de NE KADAR KANIT bulunduğunu ölçer/);
+    it('keeps the measurement anchored to evidence, not quality', () => {
+        // Etiketin doğru olması, ölçümün de o kalmasına bağlı. Ölçüm artık
+        // skor çağrısında; anlatım çağrısı aynı tanımı tekrar ediyor.
+        expect(read('services/ai/coverageScorer.js'))
+            .toMatch(/CV'de NE KADAR KANIT var \(adayın niteliği DEĞİL\)/);
+        expect(read('services/ai/extraction.js'))
+            .toMatch(/adayın NİTELİĞİNİ değil, CV'de NE KADAR KANIT bulunduğunu anlatır/);
     });
 });
