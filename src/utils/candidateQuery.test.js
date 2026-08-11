@@ -59,6 +59,13 @@ const POOL = [
     unscanned('Emre', { location: 'İstanbul', skills: ['SQL'] }),
 ];
 
+// Skorlar artık SAKLANAN sayıdan değil, kayıtlı analizden yeniden hesaplanıyor
+// (bkz. positionScore.js). Havuzun gerçek skorları:
+//   Ayşe  : uyum 100 (2/2 zorunlu + 1/1 tercihen), STAR 100 → güven 1,00 → 100
+//   Burak : uyum  85 (2/2 zorunlu, tercihen yok),  STAR  67 → güven 0,90 →  77
+//   Deniz : uyum  79 (1,5/2 zorunlu + tercihen),   STAR  67 → güven 0,90 →  71
+//   Ceren : uyum  58 (1/2 zorunlu + tercihen),     STAR  33 → güven 0,80 →  46
+//   Emre  : bu pozisyon için taranmamış
 const run = (spec) => runCandidateQuery(spec, { candidates: POOL, positions: [position] });
 const names = (r) => r.rows.map((v) => v.candidate.name);
 
@@ -80,9 +87,16 @@ describe('resolvePosition', () => {
 
 describe('score filtresi', () => {
     it('filters by the position score, not the global best score', () => {
-        const r = run({ position: 'Growth PM', filters: [{ field: 'score', op: 'gte', value: 70 }] });
+        const r = run({ position: 'Growth PM', filters: [{ field: 'score', op: 'gte', value: 75 }] });
         expect(names(r)).toEqual(['Ayşe', 'Burak']);
         expect(r.total).toBe(2);
+    });
+
+    it('uses the live formula, not the number stored at scan time', () => {
+        // Ayşe'nin kaydında score: 88 yazıyor; bugünkü kurala göre 100.
+        // Liste ile skor kırılımının ayrışmaması buna bağlı.
+        const r = run({ position: 'Growth PM', filters: [{ field: 'score', op: 'gte', value: 95 }] });
+        expect(names(r)).toEqual(['Ayşe']);
     });
 
     it('leaves unscanned candidates out of the count and SAYS so', () => {
@@ -96,7 +110,7 @@ describe('score filtresi', () => {
 
     it('supports lte and eq', () => {
         expect(names(run({ position: 'Growth PM', filters: [{ field: 'score', op: 'lte', value: 60 }] }))).toEqual(['Ceren']);
-        expect(names(run({ position: 'Growth PM', filters: [{ field: 'score', op: 'eq', value: 72 }] }))).toEqual(['Burak']);
+        expect(names(run({ position: 'Growth PM', filters: [{ field: 'score', op: 'eq', value: 77 }] }))).toEqual(['Burak']);
     });
 });
 
@@ -255,7 +269,7 @@ describe('modelin uydurduğu sorgular', () => {
     });
 
     it('falls back to a sane comparison when the operator is unknown', () => {
-        const r = run({ position: 'Growth PM', filters: [{ field: 'score', op: 'yaklasik', value: 70 }] });
+        const r = run({ position: 'Growth PM', filters: [{ field: 'score', op: 'yaklasik', value: 75 }] });
         expect(names(r)).toEqual(['Ayşe', 'Burak']);
     });
 

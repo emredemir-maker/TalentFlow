@@ -11,6 +11,7 @@
 // karşılıyor" da "karşılamıyor" da diyemeyiz. Böyle adaylar sonuçtan düşer ama
 // SESSİZCE değil — `skipped` olarak sayılır ve arayüzde söylenir.
 
+import { analysisScoreFor } from './positionScore';
 import { requirementsOf, requirementsFingerprint } from './positionRequirements';
 import { mustHaveGate } from './mustHaveGate';
 import { starPercent } from './starDimensions';
@@ -107,7 +108,7 @@ function viewOf(candidate, position, fingerprint) {
         scanned,
         fresh: scanned && analysis.requirementsFingerprint === fingerprint,
         score: position
-            ? (scanned ? Number(analysis?.score) : NaN)
+            ? (scanned ? analysisScoreFor(candidate, position) : NaN)
             : Number(candidate?.bestScore ?? 0),
         gate: scanned ? mustHaveGate(analysis, position).status : 'unknown',
         star: scanned ? starPercent(analysis?.starAnalysis) : null,

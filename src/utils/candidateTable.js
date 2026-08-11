@@ -3,6 +3,7 @@
 // Kept UI-free so filtering, sorting and export-row mapping are unit-testable
 // without rendering. The page component owns filter STATE; this module owns
 // filter BEHAVIOR.
+import { analysisScoreFor } from './positionScore';
 import { STAGES, getStage } from './pipelineStages';
 
 /** Map any raw/legacy candidate status onto a canonical stage key. */
@@ -113,7 +114,9 @@ function numericScore(value) {
 
 export function scoreForPosition(candidate, position, keywordScoreFn) {
     if (!position?.title) return 0;
-    const saved = Number(candidate?.positionAnalyses?.[position.title]?.score ?? 0);
+    // Saklanan sayı değil, YENİDEN HESAPLANAN analiz skoru: ağırlık
+    // değişince liste ile skor kırılımı ayrışmasın.
+    const saved = analysisScoreFor(candidate, position);
     const keyword = keywordScoreFn ? numericScore(keywordScoreFn(candidate, position)) : 0;
     return Math.max(Number.isFinite(saved) ? saved : 0, keyword);
 }
