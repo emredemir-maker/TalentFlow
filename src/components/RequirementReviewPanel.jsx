@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react';
-import { Sparkles, AlertTriangle, Info, Loader2, Wrench, Users, ChevronRight, Check, RotateCcw } from 'lucide-react';
+import { Sparkles, AlertTriangle, Info, Loader2, Wrench, Users, ChevronRight, Check, RotateCcw, BookOpen } from 'lucide-react';
 import {
     reviewRequirements, flaggedRequirements, FLAG_LABELS, MIN_SAMPLE, candidatesByRequirements,
 } from '../utils/requirementReview';
 import { suggestRequirementRewrites } from '../services/ai/requirementAdvisor';
 import { normalizeAction, ACTION_LABELS, DEMOTE, REMOVE } from '../utils/requirementEdit';
+import { glossaryFor } from '../utils/requirementGlossary';
+import RequirementGlossaryHint from './RequirementGlossaryHint';
 
 /** Danışmanın kararı — tanınmayan/boş değer "yeniden yaz" sayılır. */
 const actionOf = (s) => normalizeAction(s?.action);
@@ -22,7 +24,7 @@ const canApply = (s) => Boolean(s?.suggestion) || actionOf(s) === REMOVE;
  * Hiçbir şeyi otomatik değiştirmez — öneri sunar, düzenlemeyi kullanıcı yapar.
  */
 export default function RequirementReviewPanel({
-    position, candidates, onCandidateClick, onApplySuggestions, onRescan,
+    position, candidates, onCandidateClick, onApplySuggestions, onRescan, onBuildGlossary,
 }) {
     const [suggestions, setSuggestions] = useState(null);
     // Seçilen gereksinimler → canlı aday listesi. Asıl kullanım "bu maddeyi
@@ -37,10 +39,13 @@ export default function RequirementReviewPanel({
     const [appliedCount, setAppliedCount] = useState(0);
     const [error, setError] = useState(null);
 
+    const [glossaryBusy, setGlossaryBusy] = useState(false);
+
     const review = useMemo(
         () => reviewRequirements(position, candidates),
         [position, candidates]
     );
+    const glossary = useMemo(() => glossaryFor(position), [position]);
     const flagged = useMemo(() => flaggedRequirements(review), [review]);
     const pickedList = useMemo(() => [...picked].sort((a, b) => a - b), [picked]);
     const filtered = useMemo(
@@ -213,6 +218,12 @@ export default function RequirementReviewPanel({
                                         {it.index}. {it.text}
                                     </span>
                                 </label>
+                                <span className="w-full order-last pl-5">
+                                    <RequirementGlossaryHint
+                                        entry={glossary.byIndex.get(it.index)}
+                                        stale={glossary.stale}
+                                    />
+                                </span>
                                 <span className="flex items-center gap-1 shrink-0">
                                     {it.must === true && (
                                         <span className="px-1.5 py-0.5 rounded bg-white border border-slate-200 text-[9px] font-black text-slate-500 uppercase">
@@ -387,6 +398,35 @@ export default function RequirementReviewPanel({
                             )}
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* SÖZLÜK — "bu madde bu işte neyi ölçüyor?"
+                Pozisyon başına bir kez üretilip saklanır: her açılışta yeniden
+                üretmek hem pahalı hem de tutarsız olurdu (aynı maddeye her
+                seferinde biraz farklı tanım). */}
+            {onBuildGlossary && (glossary.missing || glossary.stale) && (
+                <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 flex-wrap">
+                    <p className="text-[10px] text-slate-600 leading-relaxed">
+                        {glossary.missing
+                            ? 'Maddelerin bu işte neyi ölçtüğü henüz tanımlanmadı.'
+                            : 'Tanımlar gereksinimlerin ESKİ hâline ait; metin o günden beri değişti.'}
+                    </p>
+                    <button
+                        onClick={async () => {
+                            setGlossaryBusy(true);
+                            setError(null);
+                            try { await onBuildGlossary(); }
+                            catch (err) { setError(err?.message || 'Sözlük oluşturulamadı.'); }
+                            finally { setGlossaryBusy(false); }
+                        }}
+                        disabled={glossaryBusy}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-[10px] font-black text-slate-600 uppercase tracking-wider transition-colors disabled:opacity-40 shrink-0"
+                    >
+                        {glossaryBusy
+                            ? <><Loader2 className="w-3 h-3 animate-spin" /> Hazırlanıyor…</>
+                            : <><BookOpen className="w-3 h-3" /> {glossary.missing ? 'Sözlüğü oluştur' : 'Sözlüğü yenile'}</>}
+                    </button>
                 </div>
             )}
 

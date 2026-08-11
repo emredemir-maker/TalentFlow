@@ -27,6 +27,8 @@ import {
     requirementsOf, hasPrioritizedRequirements,
 } from '../utils/positionRequirements';
 import { planRequirementChanges } from '../utils/requirementEdit';
+import { buildGlossaryRecord } from '../utils/requirementGlossary';
+import { buildRequirementGlossary } from '../services/ai/requirementGlossary';
 import { rescanCandidateForPosition, hasAnalysisForPosition } from '../services/scanService';
 import RescanPositionModal from '../components/RescanPositionModal';
 import RequirementReviewPanel from '../components/RequirementReviewPanel';
@@ -45,7 +47,7 @@ const STATUS_CONFIG = {
 // ─────────────────────────────────────────────────────────────
 const APPLY_SOURCES = ['LinkedIn', 'Kariyer.net', 'Instagram', 'Twitter/X', 'Facebook', 'E-posta', 'Web'];
 
-function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onToggleStatus, onDelete, isRecruiterOrAdmin, releaseLoading, releasingPosId, onCandidateClick, onRescan, onApplySuggestions, onRescanAfterEdit }) {
+function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onToggleStatus, onDelete, isRecruiterOrAdmin, releaseLoading, releasingPosId, onCandidateClick, onRescan, onApplySuggestions, onRescanAfterEdit, onBuildGlossary }) {
     const sc = STATUS_CONFIG[pos.status] || STATUS_CONFIG.closed;
     const candidateCount = pos.matchedCandidates?.length || 0;
     const openDays = pos.createdAt ? Math.floor((Date.now() - pos.createdAt.toDate?.()?.getTime?.()) / 86400000) : null;
@@ -316,6 +318,7 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                                 onCandidateClick={onCandidateClick}
                                 onApplySuggestions={onApplySuggestions}
                                 onRescan={onRescanAfterEdit}
+                                onBuildGlossary={onBuildGlossary}
                             />
                         )}
 
@@ -1397,6 +1400,22 @@ export default function PositionsPage() {
      * analizleri eski metne ait ve tazelenmezse panel aynı bulguyu — dolayısıyla
      * aynı öneriyi — tekrar üretir.
      */
+    /**
+     * Gereksinim sözlüğünü üret ve ilana yaz.
+     *
+     * Bir kez üretilip saklanıyor: her açılışta yeniden üretmek hem pahalı
+     * hem de tutarsız olurdu. Parmak izi damgalandığı için gereksinim metni
+     * değişince eskidiği görünür.
+     */
+    const handleBuildGlossary = async (position) => {
+        if (!position?.id) return;
+        const entries = await buildRequirementGlossary(position);
+        if (entries.length === 0) throw new Error('Sözlük üretilemedi, tekrar deneyin.');
+        const record = buildGlossaryRecord(position, entries, new Date().toISOString());
+        await updatePosition(position.id, { requirementGlossary: record });
+        setDetailPos((prev) => (prev?.id === position.id ? { ...prev, requirementGlossary: record } : prev));
+    };
+
     const handleApplySuggestions = async (position, reviews) => {
         const plan = planRequirementChanges(position, reviews);
         if (!plan) return null;
@@ -1784,6 +1803,7 @@ export default function PositionsPage() {
                     }}
                     onRescan={() => setRescanTarget({ position: detailPos })}
                     onApplySuggestions={(reviews) => handleApplySuggestions(detailPos, reviews)}
+                    onBuildGlossary={() => handleBuildGlossary(detailPos)}
                     onRescanAfterEdit={() => {
                         setDetailPos(null);
                         setRescanTarget({
