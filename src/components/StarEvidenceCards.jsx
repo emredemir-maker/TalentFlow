@@ -1,5 +1,6 @@
 import { ShieldCheck, HelpCircle, AlertTriangle, Info, Lock } from 'lucide-react';
 import { normalizeStarAnalysis, anchorLabel } from '../utils/starDimensions';
+import TermText from './TermText';
 
 const STEPS = {
     Situation: { k: 'S', l: 'DURUM', bg: 'bg-blue-50',    border: 'border-blue-100',    tc: 'text-blue-700' },
@@ -22,7 +23,7 @@ const STEPS = {
  *                      ya da yer kısıtı yüzünden yazmamış olabilir.
  *   Tutarsızlık      — yalnızca gerçek çelişki. Nadir olmalı.
  */
-export default function StarEvidenceCards({ starAnalysis }) {
+export default function StarEvidenceCards({ starAnalysis, position }) {
     const dims = normalizeStarAnalysis(starAnalysis);
     if (!dims) return null;
 
@@ -78,6 +79,7 @@ export default function StarEvidenceCards({ starAnalysis }) {
                                     title="Kanıt"
                                     tone="border-emerald-100 text-emerald-600"
                                     text={d.evidence}
+                                    position={position}
                                 />
                             )}
                             {d.missing && (
@@ -86,6 +88,7 @@ export default function StarEvidenceCards({ starAnalysis }) {
                                     title="Mülakatta Sorulacak"
                                     tone="border-amber-100 text-amber-600"
                                     text={d.missing}
+                                    position={position}
                                 />
                             )}
                             {d.conflict && (
@@ -116,13 +119,15 @@ export default function StarEvidenceCards({ starAnalysis }) {
     );
 }
 
-function Bucket({ icon, title, tone, text }) {
+function Bucket({ icon, title, tone, text, position }) {
     return (
         <div className={`bg-white border px-3 py-2 rounded-lg ${tone.split(' ')[0]}`}>
             <div className={`flex items-center gap-1 text-[9px] font-black uppercase mb-1 ${tone.split(' ')[1]}`}>
                 {icon} {title}
             </div>
-            <p className="text-[12px] text-slate-600 leading-relaxed">{text}</p>
+            {/* Metindeki terimler tıklanabilir: okuyan kişi "PLG neymiş"
+                diye merak edince ayrılmadan öğrenebilsin. */}
+            <TermText text={text} position={position} />
         </div>
     );
 }

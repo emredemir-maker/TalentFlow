@@ -1441,7 +1441,10 @@ export default function CandidateProcessPage() {
                                             gercek bir sey cogu zaman yoktu ve model kacamak
                                             uretiyordu. Ayrinti icin StarEvidenceCards. */}
                                         {!analyzingIds.has(candidate.id) && candidate.aiAnalysis?.starAnalysis && (
-                                            <StarEvidenceCards starAnalysis={starAnalysis} />
+                                            <StarEvidenceCards
+                                                starAnalysis={starAnalysis}
+                                                position={displayedPosition}
+                                            />
                                         )}
                                     </div>
                                 )}
