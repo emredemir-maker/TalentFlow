@@ -32,6 +32,7 @@ import { buildRequirementGlossary } from '../services/ai/requirementGlossary';
 import { rescanCandidateForPosition, hasAnalysisForPosition } from '../services/scanService';
 import RescanPositionModal from '../components/RescanPositionModal';
 import RequirementReviewPanel from '../components/RequirementReviewPanel';
+import { RequirementNormalizeButton } from '../components/RequirementNormalizeModal';
 import { getAuthHeaders } from '../services/ai/config';
 import { calculateMatchScore, filterCandidatesByDomain } from '../services/matchService';
 
@@ -873,6 +874,18 @@ function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser,
                                 Karşılanmaması ceza üretmez; karşılanması <strong>sınırlı bir avantaj</strong> sağlar.
                             </p>
                         </Field>
+                        <div className="flex items-center justify-between gap-2 -mt-1">
+                            <p className="text-[10px] text-slate-400 leading-relaxed">
+                                Bir madde birden çok şey soruyorsa puanlama onu yarım kabul eder ve
+                                kritik eksik görünmez olur.
+                            </p>
+                            <RequirementNormalizeButton
+                                mustText={formData.requirements}
+                                niceText={formData.niceToHave}
+                                title={formData.title}
+                                onApply={({ mustText, niceText }) => setFormData(p => ({ ...p, requirements: mustText, niceToHave: niceText }))}
+                            />
+                        </div>
                         <Field label="Pozisyon Açıklaması">
                             <textarea
                                 placeholder="Bu pozisyon neden açıldı? Ekibe nasıl katkı sağlayacak? (2-3 cümle)"
@@ -1168,6 +1181,18 @@ function PositionEditModal({ pos, candidates, departments, isDepartmentUser, use
                                     Ceza üretmez; karşılanması <strong>sınırlı avantaj</strong> sağlar.
                                 </p>
                             </Field>
+                        <div className="flex items-center justify-between gap-2 -mt-1">
+                                <p className="text-[10px] text-slate-400 leading-relaxed">
+                                    Bir madde birden çok şey soruyorsa puanlama onu yarım kabul eder ve
+                                    kritik eksik görünmez olur.
+                                </p>
+                                <RequirementNormalizeButton
+                                    mustText={formData.requirements}
+                                    niceText={formData.niceToHave}
+                                    title={formData.title}
+                                    onApply={({ mustText, niceText }) => setFormData(p => ({ ...p, requirements: mustText, niceToHave: niceText }))}
+                                />
+                            </div>
                             <Field label="Açıklama">
                                 <textarea value={formData.description} onChange={e => setFormData(p => ({ ...p, description: e.target.value }))} className={INPUT_CLS + ' h-20 resize-none'} />
                             </Field>

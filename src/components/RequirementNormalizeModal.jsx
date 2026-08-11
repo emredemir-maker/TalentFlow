@@ -1,0 +1,222 @@
+import { useState } from 'react';
+import { X, Check, AlertTriangle, Wand2, ArrowRight, Loader2 } from 'lucide-react';
+import { verifyNormalization } from '../utils/requirementNormalize';
+import { normalizeRequirements } from '../services/ai/requirementNormalizer';
+import { formatRequirementGroups } from '../utils/positionRequirements';
+
+/**
+ * İki gereksinim kutusunun üstünde duran düğme.
+ *
+ * Durumu burada tutuyoruz ki hem yeni ilan hem düzenleme formu aynı davranışı
+ * paylaşsın; iki yerde ayrı state tutmak ikisinin ayrışmasına davetiye olurdu.
+ */
+export function RequirementNormalizeButton({ mustText, niceText, title, onApply }) {
+    const [open, setOpen] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+    const [proposal, setProposal] = useState(null);
+
+    const hasText = Boolean(String(mustText || '').trim() || String(niceText || '').trim());
+
+    const run = async () => {
+        setOpen(true);
+        setLoading(true);
+        setError(null);
+        setProposal(null);
+        try {
+            setProposal(await normalizeRequirements({ mustText, niceText, title }));
+        } catch (err) {
+            setError(err?.message || 'Maddeler ayrıştırılamadı.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <>
+            <button
+                type="button"
+                onClick={run}
+                disabled={!hasText || loading}
+                title="Serbest metni puanlanabilir maddelere ayır"
+                className="flex items-center gap-1 px-2 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-[9px] font-black text-slate-500 uppercase tracking-wider transition-colors disabled:opacity-40"
+            >
+                {loading
+                    ? <><Loader2 className="w-2.5 h-2.5 animate-spin" /> Ayrıştırılıyor…</>
+                    : <><Wand2 className="w-2.5 h-2.5" /> Maddelere ayır</>}
+            </button>
+
+            <RequirementNormalizeModal
+                isOpen={open}
+                loading={loading}
+                error={error}
+                original={`${mustText || ''}\n${niceText || ''}`}
+                proposal={proposal}
+                onCancel={() => setOpen(false)}
+                onApply={(items) => {
+                    // İki kutuya geri yazılır; kullanıcı hâlâ elle düzenleyebilir.
+                    onApply(formatRequirementGroups(items.map((r) => ({ text: r.text, must: r.must }))));
+                    setOpen(false);
+                }}
+            />
+        </>
+    );
+}
+
+/**
+ * Düzenleyicinin ÖNİZLEMESİ.
+ *
+ * Bu akış ilanın metnini değiştiriyor, yani skorları ve kimin elendiğini
+ * değiştiriyor. Onaysız uygulamak kabul edilemez: kullanıcı önce/sonra
+ * görmeli ve istemediği maddeyi çıkarabilmeli.
+ *
+ * Denetim de burada gösteriliyor. Model bir gereksinim uydurduysa ya da bir
+ * konuyu düşürdüyse kod bunu yakalar ve KIRMIZI olarak yazar — sessizce
+ * uygulamak, ilan metnini fark edilmeden bozmak olurdu.
+ */
+export default function RequirementNormalizeModal({
+    isOpen, loading, error, original, proposal, onCancel, onApply,
+}) {
+    const [dropped, setDropped] = useState(() => new Set());
+
+    if (!isOpen) return null;
+
+    const items = proposal?.items || [];
+    const kept = items.filter((_, i) => !dropped.has(i));
+    const check = verifyNormalization(original || '', kept);
+
+    const toggle = (i) => setDropped((prev) => {
+        const next = new Set(prev);
+        if (next.has(i)) next.delete(i); else next.add(i);
+        return next;
+    });
+
+    return (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/40 p-4">
+            <div className="w-full max-w-2xl max-h-[85vh] flex flex-col rounded-2xl bg-white border border-slate-200 shadow-2xl overflow-hidden">
+                <header className="flex items-center justify-between gap-2 px-4 py-3 border-b border-slate-100 shrink-0">
+                    <h2 className="flex items-center gap-1.5 text-[11px] font-black text-slate-700 uppercase tracking-widest">
+                        <Wand2 className="w-3.5 h-3.5 text-cyan-500" /> Maddelere Ayır — Önizleme
+                    </h2>
+                    <button onClick={onCancel} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
+                        <X className="w-4 h-4" />
+                    </button>
+                </header>
+
+                <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+                    {loading && (
+                        <p className="text-[11px] text-slate-500">Maddeler ayrıştırılıyor…</p>
+                    )}
+                    {error && <p className="text-[11px] text-red-600">{error}</p>}
+
+                    {!loading && !error && items.length === 0 && (
+                        <p className="text-[11px] text-slate-500 italic">
+                            Ayrılacak bir şey bulunamadı — maddeler zaten tekil görünüyor.
+                        </p>
+                    )}
+
+                    {items.length > 0 && (
+                        <>
+                            <p className="text-[10px] text-slate-500 leading-relaxed">
+                                <strong>{kept.length}</strong> madde önerildi. İstemediğinizin işaretini
+                                kaldırın; onaylamadan hiçbir şey değişmez.
+                            </p>
+
+                            {/* Denetim: model uydurduysa ya da düşürdüyse burada yazar */}
+                            {check.invented.length > 0 && (
+                                <Alert tone="red" title="Girdide olmayan madde">
+                                    {check.invented.map((v) => (
+                                        <p key={v.text} className="text-[10px] leading-relaxed">
+                                            “{v.text}” — bu metinde geçmeyen ifadeler içeriyor
+                                            ({v.unknownWords.slice(0, 5).join(', ')}). Uydurulmuş bir şart
+                                            gerçek adayları eler; onaylamadan önce kontrol edin.
+                                        </p>
+                                    ))}
+                                </Alert>
+                            )}
+                            {check.dropped.length > 0 && (
+                                <Alert tone="amber" title="Kaybolan içerik">
+                                    <p className="text-[10px] leading-relaxed">
+                                        Girdideki şu ifadeler hiçbir maddeye girmedi:{' '}
+                                        <strong>{check.dropped.slice(0, 8).join(', ')}</strong>.
+                                        Eksik bir gereksinim, kritik bir eksiği görünmez kılar.
+                                    </p>
+                                </Alert>
+                            )}
+
+                            <div className="space-y-1.5">
+                                {items.map((it, i) => (
+                                    <label
+                                        key={`${it.text}-${i}`}
+                                        className={`flex items-start gap-2 rounded-lg border px-2.5 py-2 cursor-pointer transition-colors ${
+                                            dropped.has(i) ? 'border-slate-100 bg-slate-50 opacity-50' : 'border-slate-200'
+                                        }`}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={!dropped.has(i)}
+                                            onChange={() => toggle(i)}
+                                            className="mt-0.5 accent-cyan-500 shrink-0"
+                                        />
+                                        <span className="min-w-0 flex-1">
+                                            <span className="text-[11px] text-slate-700 leading-relaxed">{it.text}</span>
+                                        </span>
+                                        <span className={`shrink-0 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${
+                                            it.must
+                                                ? 'bg-slate-100 text-slate-600 border border-slate-200'
+                                                : 'bg-white text-slate-400 border border-slate-200'
+                                        }`}>
+                                            {it.must ? 'Zorunlu' : 'Tercihen'}
+                                        </span>
+                                    </label>
+                                ))}
+                            </div>
+
+                            {proposal?.notes?.length > 0 && (
+                                <ul className="space-y-0.5 pt-1">
+                                    {proposal.notes.map((n) => (
+                                        <li key={n} className="flex items-start gap-1 text-[10px] text-slate-500">
+                                            <ArrowRight className="w-2.5 h-2.5 shrink-0 mt-0.5 text-slate-300" />
+                                            {n}
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </>
+                    )}
+                </div>
+
+                <footer className="flex items-center justify-end gap-2 px-4 py-3 border-t border-slate-100 shrink-0">
+                    <button
+                        onClick={onCancel}
+                        className="px-3 py-1.5 rounded-lg border border-slate-200 text-[10px] font-black text-slate-500 uppercase tracking-wider hover:bg-slate-50"
+                    >
+                        Vazgeç
+                    </button>
+                    <button
+                        onClick={() => onApply(kept)}
+                        disabled={loading || kept.length === 0}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-600 text-white text-[10px] font-black uppercase tracking-wider disabled:opacity-40"
+                    >
+                        <Check className="w-3 h-3" /> Kutulara yaz ({kept.length})
+                    </button>
+                </footer>
+            </div>
+        </div>
+    );
+}
+
+function Alert({ tone, title, children }) {
+    const cls = tone === 'red'
+        ? 'border-red-100 bg-red-50 text-red-700'
+        : 'border-amber-100 bg-amber-50 text-amber-800';
+    return (
+        <div className={`flex items-start gap-2 rounded-lg border px-3 py-2 ${cls}`}>
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+            <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-wider">{title}</p>
+                {children}
+            </div>
+        </div>
+    );
+}
