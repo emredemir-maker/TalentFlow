@@ -19,7 +19,7 @@ const star = (n) => ({
 
 describe('calculateHybridScore', () => {
     it('weights requirement coverage above STAR', () => {
-        // %100 karşılama + 8/10 STAR → 100*0.7 + 80*0.3 = 94
+        // uyum 100, STAR 80 → güven 0,94 ⇒ 100 × 0,94 = 94
         expect(calculateHybridScore({
             requirementCoverage: { coverageScore: 100 },
             starAnalysis: star(8),
@@ -27,31 +27,33 @@ describe('calculateHybridScore', () => {
     });
 
     it('keeps a well-written but irrelevant CV well below the hiring bar', () => {
-        // Mükemmele yakın anlatım (STAR 9) ama ilanla ilgisi yok → 27.
-        // İyi yazılmış olmak tek başına uygunluk üretmemeli; testin asıl
-        // güvencesi bu adayın işe alım eşiğinin altında kalması.
+        // STAR artık çarpan: uyum 0 ise anlatım ne olursa olsun sonuç 0.
+        // Eski toplamalı modelde bu aday 27 alıyordu — yani ilanla hiç ilgisi
+        // olmayan bir CV yalnızca iyi yazıldığı için puan topluyordu.
         const score = calculateHybridScore({
             requirementCoverage: { coverageScore: 0 },
             starAnalysis: star(9),
         });
-        expect(score).toBe(27);
+        expect(score).toBe(0);
         expect(score).toBeLessThan(50);
     });
 
     it('rewards a plainly-written CV that actually meets the requirements', () => {
-        // İlana uyuyor (90) ama anlatımı zayıf (STAR 4) → 75
+        // uyum 90, STAR 40 → güven 0,82 ⇒ 90 × 0,82 = 73,8 → 74
+        // Zayıf anlatım cezalandırıyor ama uyumu silmiyor: taban 0,70.
         expect(calculateHybridScore({
             requirementCoverage: { coverageScore: 90 },
             starAnalysis: star(4),
-        })).toBe(75);
+        })).toBe(74);
     });
 
     it('derives coverage from met/partial/missing when coverageScore is absent', () => {
-        // 2 tam + 1 yarım + 1 yok = 2.5/4 = %62.5 → 63; STAR 6 → 63*0.7+60*0.3 = 62
+        // 2 tam + 1 yarım + 1 yok = 2,5/4 = %62,5 → 63; STAR 60 → güven 0,88
+        // ⇒ 63 × 0,88 = 55,4 → 55
         expect(calculateHybridScore({
             requirementCoverage: { met: ['a', 'b'], partial: ['c'], missing: ['d'] },
             starAnalysis: star(6),
-        })).toBe(62);
+        })).toBe(55);
     });
 
     it('falls back to STAR-only when the model returns no coverage (eski kayıtlar)', () => {
@@ -100,7 +102,7 @@ describe('calculateHybridScore — zorunlu/tercihen ağırlıkları', () => {
     });
 
     it('rewards meeting every must-have', () => {
-        // zorunlu 2/2 → 85, tercihen 1/1 → 15 ⇒ coverage 100; STAR 80 ⇒ 94
+        // zorunlu 2/2 → 85, tercihen 1/1 → 15 ⇒ uyum 100; güven 0,94 ⇒ 94
         expect(calculateHybridScore(assess(['met', 'met', 'met']), REQS)).toBe(94);
     });
 
@@ -108,22 +110,26 @@ describe('calculateHybridScore — zorunlu/tercihen ağırlıkları', () => {
         const missingMust = calculateHybridScore(assess(['met', 'missing', 'met']), REQS);
         const missingNice = calculateHybridScore(assess(['met', 'met', 'missing']), REQS);
         expect(missingMust).toBeLessThan(missingNice);
-        // zorunlu yarısı eksik: 42.5 + 15 = 57.5 → 58; 58*0.7 + 80*0.3 = 65
-        expect(missingMust).toBe(65);
-        // yalnızca tercih edilen eksik: 85 → 85*0.7 + 80*0.3 = 84
-        expect(missingNice).toBe(84);
+        // zorunlu yarısı eksik: 42,5 + 15 = 57,5 → 58; 58 × 0,94 = 54,5 → 55
+        expect(missingMust).toBe(55);
+        // yalnızca tercih edilen eksik: 85 → 85 × 0,94 = 79,9 → 80
+        expect(missingNice).toBe(80);
     });
 
     it('gives a nice-to-have only a limited advantage', () => {
+        // Tercihen kefesi kapsamanın %15'i. Eski toplamalı modelde bu pay
+        // 0,7 ile çarpılıp ~10 puana iniyordu: ilan 15 diyor, sistem 10
+        // uyguluyordu. Çarpan modelinde madde ne diyorsa o kadar ediyor.
         const withNice = calculateHybridScore(assess(['met', 'met', 'met']), REQS);
         const withoutNice = calculateHybridScore(assess(['met', 'met', 'missing']), REQS);
-        expect(withNice - withoutNice).toBeLessThanOrEqual(10);
+        expect(withNice - withoutNice).toBeLessThanOrEqual(15);
         expect(withNice).toBeGreaterThan(withoutNice);
     });
 
     it('counts a partial as half', () => {
-        // zorunlu 1.5/2 = 0.75 → 63.75, tercihen 1 → 15 ⇒ 78.75 → 79; 79*0.7+80*0.3 = 79
-        expect(calculateHybridScore(assess(['met', 'partial', 'met']), REQS)).toBe(79);
+        // zorunlu 1,5/2 = 0,75 → 63,75, tercihen 1 → 15 ⇒ 78,75 → 79
+        // 79 × 0,94 = 74,3 → 74
+        expect(calculateHybridScore(assess(['met', 'partial', 'met']), REQS)).toBe(74);
     });
 
     it('falls back to the model score when the position has no priorities', () => {
@@ -131,14 +137,14 @@ describe('calculateHybridScore — zorunlu/tercihen ağırlıkları', () => {
         expect(calculateHybridScore({
             requirementCoverage: { assessments: [{ index: 1, status: 'missing' }], coverageScore: 90 },
             starAnalysis: star(8),
-        }, legacy)).toBe(87); // 90*0.7 + 80*0.3
+        }, legacy)).toBe(85); // 90 × 0,94 = 84,6
     });
 
     it('falls back when the model omits assessments', () => {
         expect(calculateHybridScore({
             requirementCoverage: { coverageScore: 50 },
             starAnalysis: star(8),
-        }, REQS)).toBe(59); // 50*0.7 + 80*0.3
+        }, REQS)).toBe(47); // 50 × 0,94 = 47
     });
 });
 
@@ -233,24 +239,39 @@ describe('explainHybridScore', () => {
         .flatMap((g) => g.items)
         .reduce((s, it) => s + it.earned, 0);
 
+    // STAR artık toplanan bir parça değil, madde puanlarına uygulanmış bir
+    // çarpan. Değişmez bu yüzden daha güçlü: madde puanları TEK BAŞINA skora
+    // eşit olmalı.
     it('breaks the score down into parts that add back up to it', () => {
         const data = build(['met', 'partial', 'missing', 'met'], ['deneyim', 'deneyim', 'arac', 'deneyim']);
         const exp = explainHybridScore(data, REQS_X);
-        const total = sumEarned(exp) + exp.star.points;
-        expect(Math.round(total)).toBe(exp.score);
+        expect(Math.round(sumEarned(exp))).toBe(exp.score);
     });
 
     it('adds up for a perfect candidate too', () => {
         const data = build(['met', 'met', 'met', 'met'], ['deneyim', 'deneyim', 'arac', 'deneyim']);
         const exp = explainHybridScore(data, REQS_X);
-        expect(Math.round(sumEarned(exp) + exp.star.points)).toBe(exp.score);
+        expect(Math.round(sumEarned(exp))).toBe(exp.score);
     });
 
-    it('adds up when nothing is met', () => {
+    it('scores zero when nothing is met — STAR cannot carry an unfit candidate', () => {
+        // Eski modelde bu aday hiçbir gereksinimi karşılamadığı hâlde STAR'ın
+        // getirdiği puanı alıyordu
         const data = build(['missing', 'missing', 'missing', 'missing'], ['deneyim', 'deneyim', 'arac', 'deneyim']);
         const exp = explainHybridScore(data, REQS_X);
         expect(sumEarned(exp)).toBe(0);
-        expect(Math.round(exp.star.points)).toBe(exp.score);
+        expect(exp.score).toBe(0);
+    });
+
+    it('reports STAR as a confidence multiplier, not a component', () => {
+        const data = build(['met', 'met', 'met', 'met'], ['deneyim', 'deneyim', 'arac', 'deneyim']);
+        const exp = explainHybridScore(data, REQS_X);
+        // STAR 70 → güven 0,7 + 0,3 × 0,70 = 0,91
+        expect(exp.confidence).toBeCloseTo(0.91, 5);
+        expect(exp.star.confidence).toBeCloseTo(0.91, 5);
+        expect(exp.star.points).toBeUndefined();
+        // Kanıt eksikliğinin götürdüğü puan: 100 × 0,09
+        expect(Math.round(exp.star.penalty)).toBe(9);
     });
 
     it('agrees with calculateHybridScore', () => {
@@ -290,10 +311,14 @@ describe('explainHybridScore', () => {
         ));
     });
 
-    it('gives STAR the whole weight when there is no coverage data', () => {
+    it('falls back to STAR alone when there is no coverage data at all', () => {
+        // Çarpacak bir uyum skoru yoksa çarpan da uygulanmaz; eski kayıtların
+        // skoru olduğu gibi kalır. Bu adayı 0'a çekmek, ölçülmemiş bir şey
+        // yüzünden cezalandırmak olurdu.
         const exp = explainHybridScore({ starAnalysis: star(8) }, REQS_X);
         expect(exp.coverage).toBeNull();
-        expect(exp.star.weight).toBe(1);
+        expect(exp.confidence).toBe(1);
+        expect(exp.star.penalty).toBe(0);
         expect(exp.score).toBe(80);
     });
 });

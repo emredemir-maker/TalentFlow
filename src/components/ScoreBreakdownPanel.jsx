@@ -41,27 +41,40 @@ export default function ScoreBreakdownPanel({ analysis, position }) {
 
             {open && (
                 <div className="px-4 pb-4 space-y-4 border-t border-slate-100 pt-3">
-                    {/* Üst düzey bileşim */}
-                    <div className="flex flex-wrap gap-2">
+                    {/* Üst düzey bileşim.
+                        STAR toplanan bir parça DEĞİL, çarpan: uyum skoruna
+                        duyulan güveni ifade ediyor. Eskiden iki kutu yan yana
+                        toplanıyordu ve alana kör bir ölçüm kötü uyumu telafi
+                        edebiliyordu. */}
+                    <div className="flex flex-wrap items-center gap-2">
                         {exp.coverage && (
-                            <Chip
-                                label="Gereksinim Uyumu"
-                                value={`${exp.coverage.score}`}
-                                weight={pct(exp.coverage.weight)}
-                                points={exp.coverage.points}
-                                tone="cyan"
-                            />
+                            <Chip label="Gereksinim Uyumu" value={`${exp.coverage.score}`} tone="cyan" />
                         )}
-                        {exp.star && (
-                            <Chip
-                                label="CV'deki Kanıt (STAR)"
-                                value={`${exp.star.score}`}
-                                weight={pct(exp.star.weight)}
-                                points={exp.star.points}
-                                tone="violet"
-                            />
+                        {exp.coverage && exp.star && (
+                            <>
+                                <span className="text-[13px] font-black text-slate-300">×</span>
+                                <Chip
+                                    label={`CV'deki Kanıt · STAR %${exp.star.score}`}
+                                    value={exp.confidence.toFixed(2).replace('.', ',')}
+                                    tone="violet"
+                                />
+                                <span className="text-[13px] font-black text-slate-300">=</span>
+                                <Chip label="Skor" value={`${exp.score}`} tone="slate" />
+                            </>
+                        )}
+                        {!exp.coverage && exp.star && (
+                            <Chip label="CV'deki Kanıt (STAR)" value={`${exp.star.score}`} tone="violet" />
                         )}
                     </div>
+
+                    {exp.star && exp.star.penalty > 0.5 && (
+                        <p className="text-[10px] text-slate-500 leading-relaxed">
+                            CV'de kanıt eksik olduğu için uyum skorundan{' '}
+                            <strong>{Math.round(exp.star.penalty)} puan</strong> düşüldü. Bu bir
+                            nitelik yargısı değil: adayın ne yaptığını CV'den yeterince
+                            göremediğimiz anlamına geliyor.
+                        </p>
+                    )}
 
                     {/* "Henüz sorulmadı" ile "soruldu, bulunamadı" farklı şeyler.
                         Dayanak alanları sonradan eklendi; gereksinim metni
@@ -145,18 +158,16 @@ export default function ScoreBreakdownPanel({ analysis, position }) {
     );
 }
 
-function Chip({ label, value, weight, points, tone }) {
+function Chip({ label, value, tone }) {
     const tones = {
         cyan: 'border-cyan-100 bg-cyan-50 text-cyan-700',
         violet: 'border-violet-100 bg-violet-50 text-violet-700',
+        slate: 'border-slate-200 bg-slate-50 text-slate-700',
     };
     return (
         <div className={`rounded-lg border px-3 py-2 ${tones[tone]}`}>
             <p className="text-[9px] font-black uppercase tracking-wider opacity-70">{label}</p>
-            <p className="text-[13px] font-black">
-                {value} <span className="text-[10px] font-bold opacity-70">× %{weight}</span>
-                <span className="text-[10px] font-bold opacity-70"> = {Math.round(points)} puan</span>
-            </p>
+            <p className="text-[13px] font-black">{value}</p>
         </div>
     );
 }
