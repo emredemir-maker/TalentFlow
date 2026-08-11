@@ -10,7 +10,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../services/ai/config.js', () => ({ getModel: vi.fn(), getAuthHeaders: vi.fn() }));
 
-const { analysisScoreFor, analysisScoreForTitle, analysisFor } = await import('./positionScore.js');
+const { analysisScoreFor, analysisScoreForTitle, analysisFor, analysisScoreDetail, isStaleFor } = await import('./positionScore.js');
+const { requirementsFingerprint } = await import('./positionRequirements.js');
 const { calculateHybridScore } = await import('../services/geminiService.js');
 
 const star = (n) => ({
@@ -26,12 +27,16 @@ const position = {
     ],
 };
 
+// Değerlendirmeler madde NUMARASINA bağlı; damga hangi listeye ait
+// olduklarını söyler. Damgasız ya da damgası tutmayan kayıt BAYATtır.
+const FRESH = () => requirementsFingerprint(position);
 const candidate = (analysis) => ({ id: 'c1', name: 'Aday', positionAnalyses: { 'Growth PM': analysis } });
+const fresh = (analysis) => candidate({ requirementsFingerprint: FRESH(), ...analysis });
 
 describe('analysisScoreFor', () => {
     it('ignores a stale stored score and recomputes from the raw analysis', () => {
         // Asıl hata buydu: saklanan 80, bugünkü formüle göre 55
-        const c = candidate({
+        const c = fresh({
             score: 80, // eski formülle yazılmış
             starAnalysis: star(8),
             requirementCoverage: {
@@ -49,6 +54,7 @@ describe('analysisScoreFor', () => {
     it('agrees with the score the breakdown panel computes', () => {
         // İki ekranın ayrışmaması bu testin tek işi
         const analysis = {
+            requirementsFingerprint: FRESH(),
             score: 999,
             starAnalysis: star(7),
             requirementCoverage: { assessments: [{ index: 1, status: 'met' }, { index: 2, status: 'met' }, { index: 3, status: 'met' }] },
@@ -60,21 +66,23 @@ describe('analysisScoreFor', () => {
     });
 
     it('applies must/nice weights from the CURRENT position, not the stored ones', () => {
-        const analysis = {
-            score: 50,
-            starAnalysis: star(10),
-            requirementCoverage: { assessments: [{ index: 1, status: 'met' }, { index: 2, status: 'met' }, { index: 3, status: 'missing' }] },
-        };
-        const c = candidate(analysis);
+        const coverage = { assessments: [{ index: 1, status: 'met' }, { index: 2, status: 'met' }, { index: 3, status: 'missing' }] };
+        const c = fresh({ score: 50, starAnalysis: star(10), requirementCoverage: coverage });
         // Zorunlular tam, tercihen eksik → uyum 85, güven 1,00
         expect(analysisScoreFor(c, position)).toBe(85);
 
-        // Aynı analiz, 3. madde artık ZORUNLU → uyum düşer
+        // Aynı analiz, 3. madde artık ZORUNLU. Liste değiştiği için damga da
+        // tutmaz; aday YENİDEN TARANMALI. Ağırlıkları eski yargılara
+        // uygulamak sessiz bir hata olurdu.
         const stricter = {
             ...position,
             requirementsMeta: position.requirementsMeta.map((r, i) => (i === 2 ? { ...r, must: true } : r)),
         };
-        expect(analysisScoreFor(c, stricter)).toBeLessThan(85);
+        const rescanned = candidate({
+            requirementsFingerprint: requirementsFingerprint(stricter),
+            score: 50, starAnalysis: star(10), requirementCoverage: coverage,
+        });
+        expect(analysisScoreFor(rescanned, stricter)).toBeLessThan(85);
     });
 
     it('keeps the stored score for records with no raw data to recompute from', () => {
@@ -95,6 +103,73 @@ describe('analysisScoreFor', () => {
     it('survives a malformed stored score', () => {
         expect(analysisScoreFor(candidate({ score: 'çok iyi' }), position)).toBe(0);
         expect(analysisScoreFor(candidate({}), position)).toBe(0);
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BAYATLIK.
+//
+// Canlıda ölçüldü: aynı aday, aynı formül — bayat değerlendirmeyle 77, taze
+// taramayla 65. Kayıtlı değerlendirmeler madde NUMARASINA bağlı; gereksinim
+// listesi değişince o numara başka bir maddeye denk geliyor ve eski yargı
+// yanlış maddeye yapışıyor. Sessiz, on iki puanlık bir hata.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('bayat analiz', () => {
+    const coverage = {
+        assessments: [{ index: 1, status: 'met' }, { index: 2, status: 'met' }, { index: 3, status: 'met' }],
+    };
+
+    it('treats a fingerprint mismatch as stale', () => {
+        const c = candidate({ requirementsFingerprint: 'rESKI', score: 70, starAnalysis: star(8), requirementCoverage: coverage });
+        expect(analysisScoreDetail(c, position).stale).toBe(true);
+    });
+
+    it('treats an unstamped record as stale — we cannot know which list it belongs to', () => {
+        const c = candidate({ score: 70, starAnalysis: star(8), requirementCoverage: coverage });
+        expect(analysisScoreDetail(c, position).stale).toBe(true);
+    });
+
+    it('does NOT map old judgements onto the new requirement numbers', () => {
+        // Taze olsaydı 3/3 zorunlu+tercihen → 100. Bayat olduğu için madde
+        // bazlı ağırlıklandırma uygulanmaz.
+        const staleC = candidate({ requirementsFingerprint: 'rESKI', score: 77, starAnalysis: star(10), requirementCoverage: coverage });
+        const freshC = fresh({ score: 77, starAnalysis: star(10), requirementCoverage: coverage });
+        expect(analysisScoreFor(freshC, position)).toBe(100);
+        expect(analysisScoreFor(staleC, position)).toBe(77);
+    });
+
+    it('shows the stored score for a stale record, not a STAR-only number', () => {
+        // STAR'a düşmek, yeni kaldırdığımız alana kör sayıya geri dönmek olurdu
+        const c = candidate({ requirementsFingerprint: 'rESKI', score: 65, starAnalysis: star(10), requirementCoverage: coverage });
+        expect(analysisScoreFor(c, position)).toBe(65);
+        expect(analysisScoreFor(c, position)).not.toBe(100);
+    });
+
+    it('is not stale when there are no item-level assessments to mismap', () => {
+        const c = candidate({ score: 55, requirementCoverage: { coverageScore: 55 }, starAnalysis: star(8) });
+        expect(analysisScoreDetail(c, position).stale).toBe(false);
+    });
+
+    it('reports scanned=false when the candidate has no analysis here', () => {
+        expect(analysisScoreDetail(candidate({ score: 1 }), { title: 'Yok' })).toEqual({ score: 0, stale: false, scanned: false });
+    });
+});
+
+describe('isStaleFor', () => {
+    const coverage = { assessments: [{ index: 1, status: 'met' }] };
+
+    it('compares the stamp against the CURRENT requirements', () => {
+        expect(isStaleFor({ requirementsFingerprint: FRESH(), requirementCoverage: coverage }, position)).toBe(false);
+        expect(isStaleFor({ requirementsFingerprint: 'rESKI', requirementCoverage: coverage }, position)).toBe(true);
+    });
+
+    it('says stale when there is no position to compare against', () => {
+        expect(isStaleFor({ requirementsFingerprint: FRESH(), requirementCoverage: coverage }, null)).toBe(true);
+    });
+
+    it('handles missing input', () => {
+        expect(isStaleFor(null, position)).toBe(false);
+        expect(isStaleFor({}, position)).toBe(false);
     });
 });
 
