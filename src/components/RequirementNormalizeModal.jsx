@@ -1,67 +1,6 @@
 import { useState } from 'react';
-import { X, Check, AlertTriangle, Wand2, ArrowRight, Loader2 } from 'lucide-react';
+import { X, Check, AlertTriangle, Wand2, ArrowRight } from 'lucide-react';
 import { verifyNormalization } from '../utils/requirementNormalize';
-import { normalizeRequirements } from '../services/ai/requirementNormalizer';
-import { formatRequirementGroups } from '../utils/positionRequirements';
-
-/**
- * İki gereksinim kutusunun üstünde duran düğme.
- *
- * Durumu burada tutuyoruz ki hem yeni ilan hem düzenleme formu aynı davranışı
- * paylaşsın; iki yerde ayrı state tutmak ikisinin ayrışmasına davetiye olurdu.
- */
-export function RequirementNormalizeButton({ mustText, niceText, title, onApply }) {
-    const [open, setOpen] = useState(false);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
-    const [proposal, setProposal] = useState(null);
-
-    const hasText = Boolean(String(mustText || '').trim() || String(niceText || '').trim());
-
-    const run = async () => {
-        setOpen(true);
-        setLoading(true);
-        setError(null);
-        setProposal(null);
-        try {
-            setProposal(await normalizeRequirements({ mustText, niceText, title }));
-        } catch (err) {
-            setError(err?.message || 'Maddeler ayrıştırılamadı.');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    return (
-        <>
-            <button
-                type="button"
-                onClick={run}
-                disabled={!hasText || loading}
-                title="Serbest metni puanlanabilir maddelere ayır"
-                className="flex items-center gap-1 px-2 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-[9px] font-black text-slate-500 uppercase tracking-wider transition-colors disabled:opacity-40"
-            >
-                {loading
-                    ? <><Loader2 className="w-2.5 h-2.5 animate-spin" /> Ayrıştırılıyor…</>
-                    : <><Wand2 className="w-2.5 h-2.5" /> Maddelere ayır</>}
-            </button>
-
-            <RequirementNormalizeModal
-                isOpen={open}
-                loading={loading}
-                error={error}
-                original={`${mustText || ''}\n${niceText || ''}`}
-                proposal={proposal}
-                onCancel={() => setOpen(false)}
-                onApply={(items) => {
-                    // İki kutuya geri yazılır; kullanıcı hâlâ elle düzenleyebilir.
-                    onApply(formatRequirementGroups(items.map((r) => ({ text: r.text, must: r.must }))));
-                    setOpen(false);
-                }}
-            />
-        </>
-    );
-}
 
 /**
  * Düzenleyicinin ÖNİZLEMESİ.
@@ -78,18 +17,28 @@ export default function RequirementNormalizeModal({
     isOpen, loading, error, original, proposal, onCancel, onApply,
 }) {
     const [dropped, setDropped] = useState(() => new Set());
+    // Maddeler burada DÜZENLENEBİLİR tutuluyor: model bazen yanlış kefeye
+    // koyuyor ve kullanıcı bunu listeye yazmadan önce düzeltebilmeli.
+    //
+    // Öneri geldiğinde bileşen çağıran tarafından YENİDEN MOUNT ediliyor
+    // (key), o yüzden effect ile eşitlemeye gerek yok — effect içinde state
+    // kurmak gereksiz bir render turu ve kaçırılması kolay bir bağımlılık
+    // listesi demekti.
+    const [items, setItems] = useState(() => (proposal?.items || []).map((r) => ({ ...r })));
 
     if (!isOpen) return null;
 
-    const items = proposal?.items || [];
     const kept = items.filter((_, i) => !dropped.has(i));
     const check = verifyNormalization(original || '', kept);
+    const mustCount = kept.filter((r) => r.must).length;
 
     const toggle = (i) => setDropped((prev) => {
         const next = new Set(prev);
         if (next.has(i)) next.delete(i); else next.add(i);
         return next;
     });
+
+    const setMust = (i, must) => setItems((prev) => prev.map((r, j) => (j === i ? { ...r, must } : r)));
 
     return (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/40 p-4">
@@ -98,7 +47,7 @@ export default function RequirementNormalizeModal({
                     <h2 className="flex items-center gap-1.5 text-[11px] font-black text-slate-700 uppercase tracking-widest">
                         <Wand2 className="w-3.5 h-3.5 text-cyan-500" /> Maddelere Ayır — Önizleme
                     </h2>
-                    <button onClick={onCancel} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
+                    <button type="button" onClick={onCancel} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
                         <X className="w-4 h-4" />
                     </button>
                 </header>
@@ -118,8 +67,10 @@ export default function RequirementNormalizeModal({
                     {items.length > 0 && (
                         <>
                             <p className="text-[10px] text-slate-500 leading-relaxed">
-                                <strong>{kept.length}</strong> madde önerildi. İstemediğinizin işaretini
-                                kaldırın; onaylamadan hiçbir şey değişmez.
+                                <strong>{kept.length}</strong> madde ·{' '}
+                                <strong>{mustCount}</strong> zorunlu, <strong>{kept.length - mustCount}</strong> tercihen.
+                                Kefeyi değiştirebilir, istemediğinizin işaretini kaldırabilirsiniz;
+                                onaylamadan hiçbir şey değişmez.
                             </p>
 
                             {/* Denetim: model uydurduysa ya da düşürdüyse burada yazar */}
@@ -146,29 +97,42 @@ export default function RequirementNormalizeModal({
 
                             <div className="space-y-1.5">
                                 {items.map((it, i) => (
-                                    <label
+                                    <div
                                         key={`${it.text}-${i}`}
-                                        className={`flex items-start gap-2 rounded-lg border px-2.5 py-2 cursor-pointer transition-colors ${
+                                        className={`flex items-start gap-2 rounded-lg border px-2.5 py-2 transition-colors ${
                                             dropped.has(i) ? 'border-slate-100 bg-slate-50 opacity-50' : 'border-slate-200'
                                         }`}
                                     >
-                                        <input
-                                            type="checkbox"
-                                            checked={!dropped.has(i)}
-                                            onChange={() => toggle(i)}
-                                            className="mt-0.5 accent-cyan-500 shrink-0"
-                                        />
-                                        <span className="min-w-0 flex-1">
+                                        <label className="flex items-start gap-2 min-w-0 flex-1 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={!dropped.has(i)}
+                                                onChange={() => toggle(i)}
+                                                className="mt-0.5 accent-cyan-500 shrink-0"
+                                            />
                                             <span className="text-[11px] text-slate-700 leading-relaxed">{it.text}</span>
+                                        </label>
+                                        {/* Öncelik burada DEĞİŞTİRİLEBİLİR: model kefeyi yanlış
+                                            seçebiliyor ve bunu kutulara yazmadan önce düzeltmek,
+                                            sonradan ilanı tekrar açıp düzenlemekten kolay. */}
+                                        <span className="flex rounded-lg border border-slate-200 overflow-hidden shrink-0">
+                                            {[[true, 'Zorunlu'], [false, 'Tercihen']].map(([value, label]) => (
+                                                <button
+                                                    key={label}
+                                                    type="button"
+                                                    onClick={() => setMust(i, value)}
+                                                    disabled={dropped.has(i)}
+                                                    className={`px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider transition-colors ${
+                                                        it.must === value
+                                                            ? 'bg-cyan-500 text-white'
+                                                            : 'bg-white text-slate-400 hover:bg-slate-50'
+                                                    }`}
+                                                >
+                                                    {label}
+                                                </button>
+                                            ))}
                                         </span>
-                                        <span className={`shrink-0 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${
-                                            it.must
-                                                ? 'bg-slate-100 text-slate-600 border border-slate-200'
-                                                : 'bg-white text-slate-400 border border-slate-200'
-                                        }`}>
-                                            {it.must ? 'Zorunlu' : 'Tercihen'}
-                                        </span>
-                                    </label>
+                                    </div>
                                 ))}
                             </div>
 
@@ -188,12 +152,14 @@ export default function RequirementNormalizeModal({
 
                 <footer className="flex items-center justify-end gap-2 px-4 py-3 border-t border-slate-100 shrink-0">
                     <button
+                        type="button"
                         onClick={onCancel}
                         className="px-3 py-1.5 rounded-lg border border-slate-200 text-[10px] font-black text-slate-500 uppercase tracking-wider hover:bg-slate-50"
                     >
                         Vazgeç
                     </button>
                     <button
+                        type="button"
                         onClick={() => onApply(kept)}
                         disabled={loading || kept.length === 0}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-600 text-white text-[10px] font-black uppercase tracking-wider disabled:opacity-40"
