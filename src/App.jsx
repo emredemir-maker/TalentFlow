@@ -15,6 +15,41 @@ import LoadingScreen from './components/LoadingScreen';
 // shipping a separate chunk just to wait for it on cold start hurts TTI.
 import LoginPage from './pages/LoginPage';
 
+/**
+ * Deploy sırasında AÇIK kalan sekmeler için sayfa yükleyici.
+ *
+ * Yeni deploy eski parça dosyalarını siler. Açık sekme hâlâ eski
+ * index.html'i çalıştırdığı için artık var olmayan bir dosya ister;
+ * Hosting de SPA kuralı gereği index.html döndürür ve tarayıcı patlar:
+ *   "Failed to load module script ... MIME type of text/html"
+ * Kullanıcı bunu "sayfaya girilemiyor" olarak görür — canlıda yaşandı.
+ *
+ * Böyle bir hatada BİR KEZ yenileriz: yeni index.html gelir, doğru
+ * parçalar yüklenir. Tek seferlik, çünkü yenileme de çözmüyorsa sorun
+ * başka yerdedir ve sonsuz döngüye girmek en kötüsü olurdu.
+ *
+ * Kalıcı çözüm firebase.json'daki cache başlıkları; bu, o başlıklar
+ * doğruyken bile açık kalan sekmeler için ikinci savunma hattı.
+ */
+const RELOAD_KEY = 'tf-chunk-reload';
+
+const readFlag = () => { try { return sessionStorage.getItem(RELOAD_KEY); } catch { return null; } };
+const writeFlag = (v) => { try { v ? sessionStorage.setItem(RELOAD_KEY, v) : sessionStorage.removeItem(RELOAD_KEY); } catch { /* özel mod */ } };
+
+function lazyPage(factory) {
+    return lazy(() => factory().then(
+        (mod) => { writeFlag(null); return mod; },
+        (err) => {
+            if (readFlag()) throw err;
+            writeFlag('1');
+            window.location.reload();
+            // Yenileme başlarken Suspense beklemede kalsın; hata ekranı
+            // görünüp hemen kaybolmasın.
+            return new Promise(() => {});
+        }
+    ));
+}
+
 // Every other page is route-level code-split via React.lazy. The page
 // chunks are produced as separate JS files by Vite/Rollup, so the
 // initial bundle no longer includes ~700KB of inactive screen code
@@ -22,25 +57,25 @@ import LoginPage from './pages/LoginPage';
 // CandidateProcessPage 2484, etc.). Each page now only loads when its
 // route is hit. Suspense fallback below renders LoadingScreen while
 // the chunk is in flight.
-const Dashboard               = lazy(() => import('./pages/Dashboard'));
-const SettingsPage            = lazy(() => import('./pages/SettingsPage'));
-const MessagesPage            = lazy(() => import('./pages/MessagesPage'));
-const CandidateProcessPage    = lazy(() => import('./pages/CandidateProcessPage'));
-const CandidatesTablePage     = lazy(() => import('./pages/CandidatesTablePage'));
-const PositionsPage           = lazy(() => import('./pages/PositionsPage'));
-const AnalyticsPage           = lazy(() => import('./pages/AnalyticsPage'));
-const InterviewManagementPage = lazy(() => import('./pages/InterviewManagementPage'));
-const LiveInterviewPage       = lazy(() => import('./pages/LiveInterviewPage'));
-const FaceToFacePage          = lazy(() => import('./pages/FaceToFacePage'));
-const InterviewReportPage     = lazy(() => import('./pages/InterviewReportPage'));
-const CandidateExitPage       = lazy(() => import('./pages/CandidateExitPage'));
-const ApplyPage               = lazy(() => import('./pages/ApplyPage'));
-const TechDocsPage            = lazy(() => import('./pages/TechDocsPage'));
-const PipelinePage            = lazy(() => import('./pages/PipelinePage'));
-const CandidateRespondPage    = lazy(() => import('./pages/CandidateRespondPage'));
-const IntegrationsPage        = lazy(() => import('./pages/IntegrationsPage'));
-const MicrosoftCallbackPage   = lazy(() => import('./pages/MicrosoftCallbackPage'));
-const GoogleCallbackPage      = lazy(() => import('./pages/GoogleCallbackPage'));
+const Dashboard               = lazyPage(() => import('./pages/Dashboard'));
+const SettingsPage            = lazyPage(() => import('./pages/SettingsPage'));
+const MessagesPage            = lazyPage(() => import('./pages/MessagesPage'));
+const CandidateProcessPage    = lazyPage(() => import('./pages/CandidateProcessPage'));
+const CandidatesTablePage     = lazyPage(() => import('./pages/CandidatesTablePage'));
+const PositionsPage           = lazyPage(() => import('./pages/PositionsPage'));
+const AnalyticsPage           = lazyPage(() => import('./pages/AnalyticsPage'));
+const InterviewManagementPage = lazyPage(() => import('./pages/InterviewManagementPage'));
+const LiveInterviewPage       = lazyPage(() => import('./pages/LiveInterviewPage'));
+const FaceToFacePage          = lazyPage(() => import('./pages/FaceToFacePage'));
+const InterviewReportPage     = lazyPage(() => import('./pages/InterviewReportPage'));
+const CandidateExitPage       = lazyPage(() => import('./pages/CandidateExitPage'));
+const ApplyPage               = lazyPage(() => import('./pages/ApplyPage'));
+const TechDocsPage            = lazyPage(() => import('./pages/TechDocsPage'));
+const PipelinePage            = lazyPage(() => import('./pages/PipelinePage'));
+const CandidateRespondPage    = lazyPage(() => import('./pages/CandidateRespondPage'));
+const IntegrationsPage        = lazyPage(() => import('./pages/IntegrationsPage'));
+const MicrosoftCallbackPage   = lazyPage(() => import('./pages/MicrosoftCallbackPage'));
+const GoogleCallbackPage      = lazyPage(() => import('./pages/GoogleCallbackPage'));
 
 // Tiny inline fallback for in-app route transitions — a full LoadingScreen
 // flashes too aggressively for sub-second chunk fetches. Used only for
