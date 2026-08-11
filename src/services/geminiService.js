@@ -180,8 +180,34 @@ export async function getAvailableModels() {
 // Uygunluğu asıl gereksinim karşılama belirlemeli; kanıt zenginliği ikincil
 // bir sinyal olmalı. Ağırlığı değiştirmek isterseniz tek yer burasıdır;
 // sayı değiştikçe geminiService.test.js'teki beklenen skorlar da güncellenir.
-const COVERAGE_WEIGHT = 0.7;
-const STAR_WEIGHT = 0.3;
+// STAR artık skora EKLENMİYOR, skoru ÇARPIYOR.
+//
+// Eski model: skor = 0,7 × uyum + 0,3 × STAR. STAR alana kör bir ölçüm
+// (CV'de ne kadar kanıt var) olduğu için 30 puanı KOŞULSUZ geliyordu: iyi
+// yazılmış ama ilanla ilgisiz bir CV, zorunlulukların üçte birini kaçırsa
+// bile 80 alabiliyordu. Canlıda tam olarak bu yaşandı — CX ve CRM deneyimi
+// hiç olmayan bir aday 80 puanla listenin üstünde kaldı.
+//
+// STAR aslında bir LİYAKAT ölçüsü değil, uyum yargısına duyulan GÜVEN
+// ölçüsü: "bu adayın ne yaptığını CV'den ne kadar net görebiliyoruz?"
+// Doğru yeri çarpan:
+//
+//   güven = STAR_FLOOR + (1 - STAR_FLOOR) × STAR/100      → 0,70 … 1,00
+//   skor  = uyum × güven
+//
+// Sonuçlar:
+//   uyum 100, STAR 100 → 100   (tam uyum, tam kanıt)
+//   uyum 100, STAR   0 →  70   (uyuyor ama CV'den doğrulayamıyoruz)
+//   uyum  30, STAR 100 →  30   ← güzel yazılmış CV kötü uyumu KURTARAMAZ
+//
+// Taban 0,70: kanıtsız bir CV'yi sıfırlamak da yanlış olurdu, gizlilik
+// yükümlülüğü olan adaylar zaten az yazıyor (STAR prompt'undaki NDA notu).
+const STAR_FLOOR = 0.7;
+
+/** STAR yüzdesinden güven katsayısı. */
+function confidenceFrom(star) {
+    return STAR_FLOOR + (1 - STAR_FLOOR) * (Math.max(0, Math.min(100, star)) / 100);
+}
 
 /** 0-100 aralığına kırpar; sayı değilse null döner. */
 function clampScore(value) {
@@ -338,11 +364,10 @@ export function explainHybridScore(data, requirements) {
     const breakdown = coverageBreakdown(data.requirementCoverage, requirements);
     const coverageScore = breakdown?.score ?? coverageScoreOf(data.requirementCoverage);
 
-    // Kapsama ve STAR birlikte varsa 50/50; yalnızca biri varsa o tek başına
-    // skoru belirler (calculateHybridScore ile aynı kural).
+    // STAR bir bileşen değil, ÇARPAN. Kırılım da öyle gösterilmeli; iki
+    // ayrı ağırlık göstermek ekranı gerçek hesaptan ayırırdı.
     const both = coverageScore !== null && star !== null;
-    const coverageWeight = coverageScore === null ? 0 : (both ? COVERAGE_WEIGHT : 1);
-    const starWeight = star === null ? 0 : (both ? STAR_WEIGHT : 1);
+    const confidence = both ? confidenceFrom(star) : 1;
 
     let coverage = null;
     if (breakdown) {
@@ -354,8 +379,8 @@ export function explainHybridScore(data, requirements) {
         const roundScale = breakdown.raw === 0 ? 1 : breakdown.score / breakdown.raw;
         coverage = {
             score: breakdown.score,
-            weight: coverageWeight,
-            points: breakdown.score * coverageWeight,
+            confidence,
+            points: breakdown.score * confidence,
             tiers: tiers.map((tier) => ({
                 key: tier.key,
                 label: tier.label,
@@ -366,7 +391,7 @@ export function explainHybridScore(data, requirements) {
                     // kefe ağırlığı × küme payı, küme içinde eşit bölüşülür.
                     const maxPerItem = group.items.length === 0
                         ? 0
-                        : (tier.weight * group.share * coverageWeight * roundScale) / group.items.length;
+                        : (tier.weight * group.share * confidence * roundScale) / group.items.length;
                     return {
                         kind: group.kind,
                         label: group.label,
@@ -394,13 +419,14 @@ export function explainHybridScore(data, requirements) {
         };
     } else if (coverageScore !== null) {
         // Eski kayıt: madde bazlı değerlendirme yok, yalnızca tek sayı
-        coverage = { score: coverageScore, weight: coverageWeight, points: coverageScore * coverageWeight, tiers: [] };
+        coverage = { score: coverageScore, confidence, points: coverageScore * confidence, tiers: [] };
     }
 
     const starDetail = star === null ? null : {
         score: star,
-        weight: starWeight,
-        points: star * starWeight,
+        confidence,
+        // Kanıt eksikliğinin götürdüğü puan — "STAR'ın kattığı" değil.
+        penalty: coverageScore === null ? 0 : coverageScore * (1 - confidence),
         dimensions: ['Situation', 'Task', 'Action', 'Result'].map((key) => {
             const raw = data.starAnalysis?.[key];
             return {
@@ -415,7 +441,7 @@ export function explainHybridScore(data, requirements) {
         score,
         coverage,
         star: starDetail,
-        weights: { coverage: coverageWeight, star: starWeight },
+        confidence,
     };
 }
 
@@ -428,8 +454,11 @@ export function calculateHybridScore(data, requirements) {
         ?? coverageScoreOf(data.requirementCoverage);
 
     if (coverage !== null && star !== null) {
-        return clampScore(coverage * COVERAGE_WEIGHT + star * STAR_WEIGHT);
+        return clampScore(coverage * confidenceFrom(star));
     }
+    // STAR yoksa güven katsayısı uygulanmaz: ölçmediğimiz bir şey yüzünden
+    // adayı cezalandırmak, STAR analizi olmayan tüm kayıtları haksızca
+    // aşağı çekerdi.
     if (coverage !== null) return coverage;
     if (star !== null) return star;
 
