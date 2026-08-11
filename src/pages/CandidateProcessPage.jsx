@@ -1300,7 +1300,7 @@ export default function CandidateProcessPage() {
                                     via colour + percentage; dropped it. STAR (methodology score)
                                     and Eleme (screening) stay because they're distinct metrics. */}
                                 <div className="flex items-center gap-2">
-                                    <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5" title={starScore == null ? 'STAR analizi henüz çalıştırılmadı' : 'STAR metodolojisi skoru (S+T+A+R ortalaması)'}>
+                                    <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5" title={starScore == null ? 'STAR analizi henüz çalıştırılmadı' : "CV'de ne kadar kanıt bulunduğunu ölçer — adayın ne kadar iyi olduğunu değil. Yüksek değer, iyi belgelenmiş bir CV demektir."}>
                                         <span className="text-[9px] font-bold text-slate-400 uppercase">STAR</span>
                                         <span className="text-[13px] font-black text-slate-800">{starScore != null ? `${starScore}%` : '—'}</span>
                                     </div>
@@ -1341,7 +1341,7 @@ export default function CandidateProcessPage() {
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-2">
                                                 <div className="w-1 h-3.5 rounded-full bg-cyan-500" />
-                                                <h3 className="text-[10px] font-black text-slate-700 uppercase tracking-widest">STAR Değerlendirmesi</h3>
+                                                <h3 className="text-[10px] font-black text-slate-700 uppercase tracking-widest">STAR Kanıt Değerlendirmesi</h3>
                                                 {candidate.aiAnalysis?.lastAnalyzedAt && (
                                                     <span className="text-[9px] text-slate-400">
                                                         · {new Date(candidate.aiAnalysis.lastAnalyzedAt).toLocaleDateString('tr-TR')}

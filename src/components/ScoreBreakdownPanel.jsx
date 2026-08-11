@@ -54,7 +54,7 @@ export default function ScoreBreakdownPanel({ analysis, position }) {
                         )}
                         {exp.star && (
                             <Chip
-                                label="Anlatım Kalitesi (STAR)"
+                                label="CV'deki Kanıt (STAR)"
                                 value={`${exp.star.score}`}
                                 weight={pct(exp.star.weight)}
                                 points={exp.star.points}
