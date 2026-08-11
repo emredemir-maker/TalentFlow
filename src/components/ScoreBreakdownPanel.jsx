@@ -174,9 +174,13 @@ export default function ScoreBreakdownPanel({ analysis, position }) {
                         </div>
                     )}
 
+                    {/* Bayatken "madde puanları toplandığında bu skoru verir"
+                        demek yanlış olur: o puanlar zaten gösterilmiyor ve
+                        başlıktaki sayı saklanan skor. */}
                     <p className="text-[9px] text-slate-400 leading-relaxed border-t border-slate-100 pt-2">
-                        Bu skor bir öneridir, karar değildir. Madde puanları toplandığında yukarıdaki
-                        skoru verir; ekran gerçek hesabı gösterir, yaklaşık bir açıklama değil.
+                        {staleRequirements
+                            ? 'Bu skor bir öneridir, karar değildir. Yukarıdaki sayı, ilanın ESKİ hâline göre ölçülmüş kayıtlı skordur; güncel gereksinimlere göre kırılım ancak yeniden taramadan sonra gösterilebilir.'
+                            : 'Bu skor bir öneridir, karar değildir. Madde puanları toplandığında yukarıdaki skoru verir; ekran gerçek hesabı gösterir, yaklaşık bir açıklama değil.'}
                     </p>
                 </div>
             )}
