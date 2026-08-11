@@ -1,29 +1,21 @@
 // src/services/ai/extraction.js
 import { getModel } from './config.js';
 import { parseAIJson, buildStructuredPrompt, sanitizeForPrompt, jsonFailureContext } from './utils.js';
+import { scoreCoverage, mergeNarrative } from './coverageScorer.js';
 
 const EXTRACTOR_PROMPT = `
-Sen kıdemli ve son derece analitik bir İşe Alım Yöneticisisin. Görevin, adayı İLANIN GEREKSİNİMLERİ karşısında değerlendirmek.
+Sen kıdemli ve son derece analitik bir İşe Alım Yöneticisisin. Görevin, adayı
+İLANIN GEREKSİNİMLERİ karşısında ANLATMAK.
+
+BU ÇAĞRI DAMGA VERMEZ. Hangi maddenin karşılandığına ayrı bir çağrı karar
+veriyor ve senin yazdıkların skoru DEĞİŞTİRMEZ. Senin işin, o kararın
+arkasındaki CV kanıtını ve farkı yazmak. "Karşılıyor / karşılamıyor" gibi
+bir hüküm cümlesi kurma; kanıtı göster, yorumu okuyan yapsın.
 
 ÇOK ÖNEMLİ KURALLAR:
-1. Gereksinim Karşılama (requirementCoverage): JOB_DESCRIPTION içinde
-   gereksinimler NUMARALI bir liste olarak verilir; bazıları [ZORUNLU],
-   bazıları [TERCİHEN] etiketlidir. Her maddeyi tek tek ele al ve YALNIZCA
-   CV'deki kanıta dayanarak sınıflandır:
-   - "met": CV'de açık kanıt var
-   - "partial": Dolaylı/kısmi kanıt var
-   - "missing": Kanıt yok
-   "assessments" dizisinde her madde için maddenin NUMARASINI ("index"),
-   durumunu ve TÜRÜNÜ ("kind") ver. Listedeki HER madde için tam olarak bir
-   kayıt olmalı.
-   "kind" iki değerden biridir:
-   - "deneyim": adayın YAPTIĞI iş / sahiplendiği alan / ürettiği sonuç
-     (örn. "funnel sahipliği", "A/B test kurgulama", "B2B SaaS ürün yönetimi")
-   - "arac": belirli bir ürün, teknoloji, sertifika ya da dil bilgisi
-     (örn. "GA4", "Amplitude", "SQL", "İngilizce")
-   Emin olamazsan "deneyim" yaz. Araç maddeleri puanlamada daha az ağırlık
-   taşır: bir aday işi yapmışsa, aracın adını CV'de anmamış olması onu
-   diskalifiye etmez.
+1. Madde bazlı anlatım ("notes"): JOB_DESCRIPTION içinde gereksinimler
+   NUMARALI bir liste olarak verilir. HER madde için maddenin NUMARASINI
+   ("index") ve aşağıdaki metinleri üret.
 
    NASIL KARŞILIYOR — "evidence" ve "gap".
    "met" ve "partial" damgası tek başına yetmez: işe alım uzmanı adayın bu
@@ -46,23 +38,16 @@ Sen kıdemli ve son derece analitik bir İşe Alım Yöneticisisin. Görevin, ad
 
    İKİSİ DE CV'YE DAYANMAK ZORUNDA. CV'de olmayan bir şeyi çıkarsama yoluyla
    yazma; emin değilsen boş bırak. Boş alan, uydurulmuş alandan iyidir.
-   Ayrıca "coverageScore": karşılanma oranını 0-100 arası tek sayı olarak ver
-   (met tam, partial yarım sayılır; [ZORUNLU] maddeler çok daha ağır basar).
-   İyi yazılmış ama ilanla ilgisiz bir CV DÜŞÜK coverageScore almalıdır —
-   CV kalitesi bu alanı YÜKSELTMEZ.
-2. STAR Analizi — KANIT ÖLÇEĞİ (0-3), tek yönlü.
-   Bu bölüm adayın NİTELİĞİNİ değil, CV'de NE KADAR KANIT bulunduğunu ölçer.
+2. STAR Analizi — METİNLER (puanı ayrı çağrı verir, sen PUAN YAZMA).
+   Bu bölüm adayın NİTELİĞİNİ değil, CV'de NE KADAR KANIT bulunduğunu anlatır.
    Bilginin CV'de olmaması bir KUSUR DEĞİLDİR: aday gizlilik yükümlülüğü,
    yer kısıtı ya da yazım alışkanlığı nedeniyle yazmamış olabilir.
 
-   Her kategori (Situation, Task, Action, Result) için 0-3 arası puan ver.
-   Çapalar (ARADA DEĞER YOK, tam olarak bu tanımlara bak):
-     0 = CV'de bu boyuta dair hiçbir bilgi yok
-     1 = anılmış — rol/görev adı geçiyor ama içerik yok
-     2 = anlatılmış — ne yapıldığı somut biçimde yazılmış
-     3 = ölçülmüş — büyüklük belirtilmiş
+   Puanlama ayrı çağrıda yapılıyor; oradaki çapalar şunlar (aynı ölçüyü
+   kullan ki metinlerin puanla çelişmesin):
+     0 = bilgi yok · 1 = anılmış · 2 = anlatılmış · 3 = ölçülmüş
 
-   "3 = ölçülmüş" İÇİN NELER SAYILIR (kesin rakam ŞART DEĞİL):
+   "ölçülmüş" İÇİN NELER SAYILIR (kesin rakam ŞART DEĞİL):
    - Aralık ya da yaklaşık değer: "%15-20 iyileştirdi", "yaklaşık 2 kat"
    - Göreli değişim: "dönüşümü iki katına çıkardı", "süreyi yarıya indirdi"
    - ÖLÇEK VEKİLLERİ — büyüklüğü gösteren her somut bilgi:
@@ -149,17 +134,17 @@ Sen kıdemli ve son derece analitik bir İşe Alım Yöneticisisin. Görevin, ad
     "matchedKeywords": ["keyword1"],
     "missingKeywords": ["keyword2"],
     "requirementCoverage": {
-        "assessments": [{ "index": 1, "status": "met|partial|missing", "kind": "deneyim|arac", "note": "kısa gerekçe", "evidence": "CV'deki somut dayanak", "gap": "" }],
+        "notes": [{ "index": 1, "note": "kısa gerekçe", "evidence": "CV'deki somut dayanak", "gap": "" }],
         "met": ["karşılanan gereksinim"],
         "partial": ["kısmen karşılanan gereksinim"],
         "missing": ["karşılanmayan gereksinim"],
         "coverageScore": <integer 0-100>
     },
     "starAnalysis": {
-        "Situation": { "score": <0-3>, "evidence": "...", "missing": "...", "conflict": "", "confidentiality": false },
-        "Task":      { "score": <0-3>, "evidence": "...", "missing": "...", "conflict": "", "confidentiality": false },
-        "Action":    { "score": <0-3>, "evidence": "...", "missing": "...", "conflict": "", "confidentiality": false },
-        "Result":    { "score": <0-3>, "evidence": "...", "missing": "...", "conflict": "", "confidentiality": false }
+        "Situation": { "evidence": "...", "missing": "...", "conflict": "", "confidentiality": false },
+        "Task":      { "evidence": "...", "missing": "...", "conflict": "", "confidentiality": false },
+        "Action":    { "evidence": "...", "missing": "...", "conflict": "", "confidentiality": false },
+        "Result":    { "evidence": "...", "missing": "...", "conflict": "", "confidentiality": false }
     }
   },
   "evidence": {
@@ -169,6 +154,20 @@ Sen kıdemli ve son derece analitik bir İşe Alım Yöneticisisin. Görevin, ad
 }
 `;
 
+// İKİ AŞAMALI DERİN TARAMA.
+//
+// Canlıda ölçüldü: aynı aday, aynı ilan, sıcaklık 0 — skor 80'den 65'e
+// düştü. İki maddenin damgası değişmişti. Sebep tek çağrıda 16 bin token'lık
+// belge üretmemizdi; o uzunlukta sınırdaki yargılar her seferinde başka
+// tarafa düşüyor.
+//
+// Artık skoru belirleyen çıktı (damgalar + STAR puanları) AYRI ve minik bir
+// çağrıda üretiliyor. Bu dosyadaki büyük istem yalnızca ANLATIM üretiyor ve
+// skoru etkilemiyor.
+//
+// İkisi PARALEL çalışıyor, yani süre neredeyse aynı. Anlatım çağrısı
+// patlarsa skor yine de ayakta kalır — eskiden tek hata tüm analizi
+// düşürüyordu.
 export async function extractCandidateEvidence(jobDescription, candidateProfile, modelId = 'gemini-2.5-flash') {
     const sanitizedCandidate = {
         position: candidateProfile.position,
@@ -187,6 +186,39 @@ export async function extractCandidateEvidence(jobDescription, candidateProfile,
         "CANDIDATE_DATA": JSON.stringify(sanitizedCandidate, null, 2)
     });
 
+    // Skor çağrısı ile anlatım çağrısı birbirine bağlı değil; paralel
+    // gidiyorlar. allSettled: anlatım düşse bile skor kurtulsun.
+    const [scoreResult, narrativeResult] = await Promise.allSettled([
+        scoreCoverage(jobDescription, sanitizedCandidate, modelId),
+        runNarrative(prompt, modelId),
+    ]);
+
+    if (scoreResult.status === 'rejected') throw scoreResult.reason;
+    const scored = scoreResult.value;
+    const narrative = narrativeResult.status === 'fulfilled' ? narrativeResult.value : null;
+    const { assessments, starAnalysis } = mergeNarrative(scored, narrative?.extractedData);
+
+    const data = narrative?.extractedData || {};
+    return {
+        extractedData: {
+            totalYearsOfExperience: Number(data.totalYearsOfExperience) || 0,
+            matchedKeywords: Array.isArray(data.matchedKeywords) ? data.matchedKeywords : [],
+            missingKeywords: Array.isArray(data.missingKeywords) ? data.missingKeywords : [],
+            requirementCoverage: {
+                assessments,
+                met: Array.isArray(data.requirementCoverage?.met) ? data.requirementCoverage.met : [],
+                partial: Array.isArray(data.requirementCoverage?.partial) ? data.requirementCoverage.partial : [],
+                missing: Array.isArray(data.requirementCoverage?.missing) ? data.requirementCoverage.missing : [],
+                coverageScore: Number(data.requirementCoverage?.coverageScore) || null,
+            },
+            starAnalysis,
+        },
+        evidence: narrative?.evidence || { reasoning: [], summary: '' },
+    };
+}
+
+/** Büyük anlatım çağrısı — skoru ETKİLEMEZ. */
+async function runNarrative(prompt, modelId) {
     const model = await getModel(modelId);
     // Varsayılan 8192 token bu çıktı için artık dar: her gereksinim için
     // kind + note taşıyan assessments dizisi ve CV'den alıntı isteyen STAR
