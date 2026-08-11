@@ -49,8 +49,13 @@ export default function StarScoreCard({ analysis, candidate, onRefresh }) {
                         <Star className="w-5 h-5 text-primary fill-primary/10" />
                     </div>
                     <div>
-                        <h3 className="text-[13px] font-bold text-on-surface tracking-tight">STAR Yetkinlik Analizi</h3>
-                        <p className="text-[8px] text-text-muted font-black uppercase mt-0.5 tracking-[0.2em] opacity-60">Davranışsal Değerlendirme Protokolü</p>
+                        {/* "Yetkinlik" burada yanlış kelimeydi: bu ölçüm adayın ne
+                            kadar yetkin olduğunu değil, CV'sinde NE KADAR KANIT
+                            bulunduğunu söylüyor. Yöneticiler %100 görüp "çok iyi
+                            aday" diye okuyor, sonra CV'ye bakıp haklı olarak
+                            "bize uymaz" diyorlardı. */}
+                        <h3 className="text-[13px] font-bold text-on-surface tracking-tight">STAR Kanıt Analizi</h3>
+                        <p className="text-[8px] text-text-muted font-black uppercase mt-0.5 tracking-[0.2em] opacity-60">CV'de bulunan kanıtın yoğunluğu</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-5">
@@ -63,7 +68,7 @@ export default function StarScoreCard({ analysis, candidate, onRefresh }) {
                     </button>
                     <div className="text-right">
                         <div className="text-3xl font-black text-primary tracking-tighter leading-none">{totalScore}</div>
-                        <div className="text-[8px] font-black text-text-muted uppercase tracking-[0.2em] mt-1.5">GENEL SKOR</div>
+                        <div className="text-[8px] font-black text-text-muted uppercase tracking-[0.2em] mt-1.5">KANIT SKORU</div>
                     </div>
                 </div>
             </div>
