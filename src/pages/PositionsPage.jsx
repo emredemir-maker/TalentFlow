@@ -23,8 +23,7 @@ import PotentialCandidatesTab from '../components/PotentialCandidatesTab';
 import { useCandidates } from '../context/CandidatesContext';
 import { extractPositionFromJD } from '../services/geminiService';
 import {
-    formatRequirementsInput, parseRequirementGroups, formatRequirementGroups,
-    requirementsOf, hasPrioritizedRequirements,
+    requirementsOf,
 } from '../utils/positionRequirements';
 import { planRequirementChanges } from '../utils/requirementEdit';
 import { buildGlossaryRecord } from '../utils/requirementGlossary';
@@ -32,7 +31,7 @@ import { buildRequirementGlossary } from '../services/ai/requirementGlossary';
 import { rescanCandidateForPosition, hasAnalysisForPosition } from '../services/scanService';
 import RescanPositionModal from '../components/RescanPositionModal';
 import RequirementReviewPanel from '../components/RequirementReviewPanel';
-import { RequirementNormalizeButton } from '../components/RequirementNormalizeModal';
+import RequirementListEditor from '../components/RequirementListEditor';
 import { getAuthHeaders } from '../services/ai/config';
 import { calculateMatchScore, filterCandidatesByDomain } from '../services/matchService';
 
@@ -700,7 +699,7 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
 // ─────────────────────────────────────────────────────────────
 function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser, userDepartments, isExtracting, onExtract, jdText, setJdText }) {
     const [formData, setFormData] = useState({
-        title: '', department: isDepartmentUser ? (userDepartments?.[0] || '') : '', minExperience: '', requirements: '', niceToHave: '', description: '',
+        title: '', department: isDepartmentUser ? (userDepartments?.[0] || '') : '', minExperience: '', reqItems: [], description: '',
         screeningEnabled: false, screeningQuestions: [''],
     });
     const [suggestingQuestions, setSuggestingQuestions] = useState(false);
@@ -851,41 +850,13 @@ function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser,
                                 />
                             </Field>
                         </div>
-                        <Field label="Olmazsa olmaz gereksinimler">
-                            <textarea
-                                placeholder={'Her satıra bir madde:\n3-5 yıl ürün yönetimi deneyimi, en az 1-2 yılı growth odaklı\nFunnel sahipliği: kayıt, aktivasyon, elde tutma\nA/B test ve deney kurma deneyimi'}
-                                value={formData.requirements}
-                                onChange={e => setFormData(p => ({ ...p, requirements: e.target.value }))}
-                                className={INPUT_CLS + ' h-32 resize-y font-mono text-[12px] leading-relaxed'}
-                            />
-                            <p className="text-[10px] text-slate-400 mt-1">
-                                Karşılanmaması <strong>skoru düşürür</strong>. Satır başına bir madde — madde içindeki
-                                virgüller korunur. Teknoloji adı değil, aranan yetkinliği yazın.
-                            </p>
-                        </Field>
-                        <Field label="Olursa iyi olur (tercih edilen)">
-                            <textarea
-                                placeholder={'Her satıra bir madde:\nTercihen B2B SaaS geçmişi\nPLG / self-servis akış deneyimi\nFiyatlandırma-paketleme çalışmaları'}
-                                value={formData.niceToHave}
-                                onChange={e => setFormData(p => ({ ...p, niceToHave: e.target.value }))}
-                                className={INPUT_CLS + ' h-24 resize-y font-mono text-[12px] leading-relaxed'}
-                            />
-                            <p className="text-[10px] text-slate-400 mt-1">
-                                Karşılanmaması ceza üretmez; karşılanması <strong>sınırlı bir avantaj</strong> sağlar.
-                            </p>
-                        </Field>
-                        <div className="flex items-center justify-between gap-2 -mt-1">
-                            <p className="text-[10px] text-slate-400 leading-relaxed">
-                                Bir madde birden çok şey soruyorsa puanlama onu yarım kabul eder ve
-                                kritik eksik görünmez olur.
-                            </p>
-                            <RequirementNormalizeButton
-                                mustText={formData.requirements}
-                                niceText={formData.niceToHave}
+                        <Field label="Gereksinimler">
+                            <RequirementListEditor
+                                items={formData.reqItems}
+                                onChange={(reqItems) => setFormData(p => ({ ...p, reqItems }))}
                                 title={formData.title}
-                                onApply={({ mustText, niceText }) => setFormData(p => ({ ...p, requirements: mustText, niceToHave: niceText }))}
                             />
-                        </div>
+                        </Field>
                         <Field label="Pozisyon Açıklaması">
                             <textarea
                                 placeholder="Bu pozisyon neden açıldı? Ekibe nasıl katkı sağlayacak? (2-3 cümle)"
@@ -1021,11 +992,9 @@ function PositionEditModal({ pos, candidates, departments, isDepartmentUser, use
         title: pos.title || '',
         department: pos.department || '',
         minExperience: pos.minExperience?.toString() || '0',
-        // İşaretlenmemiş eski ilanlarda tüm maddeler "olmazsa olmaz" kutusuna
-        // gelir; kullanıcı tercih edilenleri alt kutuya taşıyabilir.
-        ...(hasPrioritizedRequirements(pos)
-            ? (({ mustText, niceText }) => ({ requirements: mustText, niceToHave: niceText }))(formatRequirementGroups(requirementsOf(pos)))
-            : { requirements: formatRequirementsInput(pos.requirements), niceToHave: '' }),
+        // İşaretlenmemiş eski ilanlarda maddeler zorunlu sayılır — formun
+        // önceki davranışı da buydu (hepsi "olmazsa olmaz" kutusuna gelirdi).
+        reqItems: requirementsOf(pos).map((r) => ({ text: r.text, must: r.must !== false })),
         description: pos.description || '',
     });
     const candidateCount = pos.matchedCandidates?.length || 0;
@@ -1159,40 +1128,13 @@ function PositionEditModal({ pos, candidates, departments, isDepartmentUser, use
                             <Field label="Min. Tecrübe (yıl)">
                                 <input type="number" min="0" value={formData.minExperience} onChange={e => setFormData(p => ({ ...p, minExperience: e.target.value }))} className={INPUT_CLS} />
                             </Field>
-                            <Field label="Olmazsa olmaz gereksinimler">
-                                <textarea
-                                    value={formData.requirements}
-                                    onChange={e => setFormData(p => ({ ...p, requirements: e.target.value }))}
-                                    className={INPUT_CLS + ' h-32 resize-y font-mono text-[12px] leading-relaxed'}
-                                    placeholder={'Her satıra bir madde:\n3-5 yıl ürün yönetimi deneyimi, en az 1-2 yılı growth odaklı\nFunnel sahipliği: kayıt, aktivasyon, elde tutma'}
-                                />
-                                <p className="text-[10px] text-slate-400 mt-1">
-                                    Karşılanmaması <strong>skoru düşürür</strong>. Satır başına bir madde.
-                                </p>
-                            </Field>
-                            <Field label="Olursa iyi olur (tercih edilen)">
-                                <textarea
-                                    value={formData.niceToHave}
-                                    onChange={e => setFormData(p => ({ ...p, niceToHave: e.target.value }))}
-                                    className={INPUT_CLS + ' h-24 resize-y font-mono text-[12px] leading-relaxed'}
-                                    placeholder={'Tercihen B2B SaaS geçmişi\nPLG / self-servis akış deneyimi'}
-                                />
-                                <p className="text-[10px] text-slate-400 mt-1">
-                                    Ceza üretmez; karşılanması <strong>sınırlı avantaj</strong> sağlar.
-                                </p>
-                            </Field>
-                        <div className="flex items-center justify-between gap-2 -mt-1">
-                                <p className="text-[10px] text-slate-400 leading-relaxed">
-                                    Bir madde birden çok şey soruyorsa puanlama onu yarım kabul eder ve
-                                    kritik eksik görünmez olur.
-                                </p>
-                                <RequirementNormalizeButton
-                                    mustText={formData.requirements}
-                                    niceText={formData.niceToHave}
+                            <Field label="Gereksinimler">
+                                <RequirementListEditor
+                                    items={formData.reqItems}
+                                    onChange={(reqItems) => setFormData(p => ({ ...p, reqItems }))}
                                     title={formData.title}
-                                    onApply={({ mustText, niceText }) => setFormData(p => ({ ...p, requirements: mustText, niceToHave: niceText }))}
                                 />
-                            </div>
+                            </Field>
                             <Field label="Açıklama">
                                 <textarea value={formData.description} onChange={e => setFormData(p => ({ ...p, description: e.target.value }))} className={INPUT_CLS + ' h-20 resize-none'} />
                             </Field>
@@ -1305,7 +1247,9 @@ export default function PositionsPage() {
                 title: result.title || p.title,
                 department: isDepartmentUser ? (userDepartments?.[0] || '') : (result.department || p.department),
                 minExperience: result.minExperience?.toString() || p.minExperience,
-                requirements: formatRequirementsInput(result.requirements) || p.requirements,
+                reqItems: (result.requirements || []).length > 0
+                    ? result.requirements.map((t) => ({ text: t, must: true }))
+                    : p.reqItems,
                 description: result.description ? result.description.slice(0, 320) : p.description,
             }));
         } catch (err) {
@@ -1320,7 +1264,12 @@ export default function PositionsPage() {
         if (!formData.title || !formData.department) return;
         // requirementsMeta kaynak; düz `requirements` ondan türetilir ve
         // yazılmaya devam eder (Excel, eski okuyucular, AI ilan metni).
-        const meta = parseRequirementGroups({ mustText: formData.requirements, niceText: formData.niceToHave });
+        // Liste zaten kaynak biçimde: [{text, must}]. İki kutuyu birleştiren
+        // ara adım kalktı.
+        const meta = (formData.reqItems || [])
+            .map((r) => ({ text: String(r?.text || '').trim(), must: Boolean(r?.must) }))
+            .filter((r) => r.text)
+            .slice(0, 30);
         const reqs = meta.map((r) => r.text);
         const positionObj = { ...formData, requirements: reqs, requirementsMeta: meta };
         // Domain-filter first: only score candidates in the same job domain
@@ -1353,7 +1302,12 @@ export default function PositionsPage() {
 
     const handleUpdate = async (formData) => {
         if (!editPos) return;
-        const meta = parseRequirementGroups({ mustText: formData.requirements, niceText: formData.niceToHave });
+        // Liste zaten kaynak biçimde: [{text, must}]. İki kutuyu birleştiren
+        // ara adım kalktı.
+        const meta = (formData.reqItems || [])
+            .map((r) => ({ text: String(r?.text || '').trim(), must: Boolean(r?.must) }))
+            .filter((r) => r.text)
+            .slice(0, 30);
         const reqs = meta.map((r) => r.text);
         const previousTitle = editPos.title;
         const nextPosition = {
