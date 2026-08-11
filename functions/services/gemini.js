@@ -105,7 +105,11 @@ export async function getApiKey() {
     return info.key;
 }
 
-const TRANSIENT_ERR = /429|RESOURCE_EXHAUSTED|quota|503|UNAVAILABLE|overloaded/i;
+// 502/500/504 eksikti: Gemini'nin kendisi de bunlari dondurebiliyor ve
+// yeniden denenmedigi icin cagri tek seferde dusuyordu. Durum kodlari
+// kelime siniriyla aranir ki sayi baska bir baglamda gectiginde
+// eslesmesin ("500 tokens" gibi bir metin gecici hata sayilmamali).
+const TRANSIENT_ERR = /\b(429|500|502|503|504)\b|RESOURCE_EXHAUSTED|quota|UNAVAILABLE|overloaded|ECONNRESET|ETIMEDOUT|socket hang up|fetch failed/i;
 const MAX_RETRIES = 4;
 
 /**

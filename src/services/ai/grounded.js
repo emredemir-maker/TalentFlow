@@ -12,6 +12,7 @@
 // gösterilmek zorunda. Süs değil, kullanım şartı.
 
 import { getAuthHeaders } from './config.js';
+import { fetchWithRetry } from './retry.js';
 
 /**
  * @param {string} prompt
@@ -27,7 +28,7 @@ import { getAuthHeaders } from './config.js';
  *   sunmak, kaynaksız cevaptan daha kötü.
  */
 export async function askGrounded(prompt, { maxOutputTokens = 1024 } = {}) {
-    const res = await fetch('/api/ai/ask', {
+    const res = await fetchWithRetry('/api/ai/ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
         body: JSON.stringify({ prompt, maxOutputTokens }),

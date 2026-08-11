@@ -35,6 +35,8 @@ const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
  * başvuru formu ve canlı mülakat adayı da Firebase anon oturumla gelir).
  * Token alınamazsa header gönderilmez ve sunucu 401 döner.
  */
+import { fetchWithRetry } from './retry.js';
+
 export async function getAuthHeaders() {
     try {
         const { auth } = await import('../../config/firebase');
@@ -52,7 +54,11 @@ export async function getModel(modelId = DEFAULT_GEMINI_MODEL) {
             if (options.maxOutputTokens != null) body.maxOutputTokens = options.maxOutputTokens;
             if (options.mimeType) body.mimeType = options.mimeType;
 
-            const res = await fetch('/api/ai/generate', {
+            // 502'yi Gemini degil, onundeki ag gecidi uretiyor: backend'in
+            // kendi yeniden deneme dongusune istek hic ulasmiyor. Bu yuzden
+            // tekrar deneme ISTEMCIDE olmak zorunda. Canlida 70 adaylik bir
+            // taramada 3 aday bu yuzden sessizce atlanmisti.
+            const res = await fetchWithRetry('/api/ai/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
                 body: JSON.stringify(body),
