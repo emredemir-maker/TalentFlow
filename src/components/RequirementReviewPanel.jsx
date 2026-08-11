@@ -7,6 +7,8 @@ import {
 import { suggestRequirementRewrites } from '../services/ai/requirementAdvisor';
 import { normalizeAction, ACTION_LABELS, DEMOTE, REMOVE } from '../utils/requirementEdit';
 import { glossaryFor } from '../utils/requirementGlossary';
+import { priorityInText } from '../utils/requirementNormalize';
+import { requirementsOf } from '../utils/positionRequirements';
 import RequirementGlossaryHint from './RequirementGlossaryHint';
 
 /** Danışmanın kararı — tanınmayan/boş değer "yeniden yaz" sayılır. */
@@ -47,6 +49,14 @@ export default function RequirementReviewPanel({
         [position, candidates]
     );
     const glossary = useMemo(() => glossaryFor(position), [position]);
+    // Metninde "tercihen / tercih sebebi / artı olur" geçen maddeler.
+    // Canlıda görüldü: metni "Tercihen B2B SaaS deneyimi" olan bir madde
+    // ZORUNLU işaretliydi ve tam zorunlu ağırlığıyla puanlanıyordu. İşaret
+    // bir şey, metin başka bir şey söylüyor; değerlendiren model metni okuyor.
+    const priorityConflicts = useMemo(
+        () => priorityInText(requirementsOf(position)),
+        [position]
+    );
     const flagged = useMemo(() => flaggedRequirements(review), [review]);
     const pickedList = useMemo(() => [...picked].sort((a, b) => a - b), [picked]);
     const filtered = useMemo(
@@ -398,6 +408,28 @@ export default function RequirementReviewPanel({
                             )}
                         </div>
                     )}
+                </div>
+            )}
+
+            {priorityConflicts.length > 0 && (
+                <div className="flex items-start gap-2 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                        <p className="text-[11px] text-amber-800 leading-relaxed">
+                            <strong>Metin ile işaret çelişiyor.</strong> Aşağıdaki maddelerin metninde
+                            öncelik ifadesi geçiyor; değerlendirme yapan model işarete değil{' '}
+                            <strong>metne inanıyor</strong>. Öncelik yalnızca Zorunlu/Tercihen
+                            işaretiyle söylenmeli, metinden çıkarılmalı.
+                        </p>
+                        <ul className="mt-1 space-y-0.5">
+                            {priorityConflicts.map((c) => (
+                                <li key={c.index} className="text-[10px] text-amber-700 leading-relaxed">
+                                    <strong>{c.index}.</strong> “{c.text}” — metinde “{c.phrase}”,
+                                    işaret <strong>{c.must === true ? 'ZORUNLU' : c.must === false ? 'TERCİHEN' : 'işaretsiz'}</strong>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
                 </div>
             )}
 
