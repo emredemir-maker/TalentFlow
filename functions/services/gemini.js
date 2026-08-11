@@ -161,6 +161,112 @@ export async function generateText(prompt, options = {}) {
     throw lastErr;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// GROUNDED ANSWERS — Gemini + Google Search
+//
+// generateText() answers from the model's memory: plausible, undated, and
+// unciteable. For "what is CAC" or "what does the EU AI Act require" that is
+// not good enough — a hiring decision needs a claim you can trace.
+//
+// Grounding runs a real Google Search and returns the sources it used. The
+// caller gets them back and MUST display them.
+//
+// GOOGLE'S DISPLAY REQUIREMENT: when Grounding with Google Search is used,
+// the Search Suggestions block (groundingMetadata.searchEntryPoint) has to be
+// shown to the end user as-is. It is not optional decoration; it is a term of
+// use. We return it verbatim so the UI can render it.
+//
+// TOOL NAME COMPATIBILITY: Gemini 2.x expects `google_search`; the 1.5-era
+// name was `google_search_retrieval` and this SDK (0.24.x) still types only
+// the old one. We try the new name first and fall back, because guessing
+// wrong should degrade to an ungrounded answer — never break the feature.
+const SEARCH_TOOLS = [
+    [{ google_search: {} }],
+    [{ googleSearchRetrieval: {} }],
+];
+
+/** Grounding metadata → the few fields the UI actually needs. */
+function readGrounding(response) {
+    const meta = response?.candidates?.[0]?.groundingMetadata;
+    if (!meta) return { sources: [], searchSuggestionHtml: '' };
+
+    const seen = new Set();
+    const sources = [];
+    for (const chunk of meta.groundingChunks || []) {
+        const web = chunk?.web;
+        if (!web?.uri || seen.has(web.uri)) continue;
+        seen.add(web.uri);
+        sources.push({ title: String(web.title || web.uri), uri: String(web.uri) });
+    }
+    return {
+        sources: sources.slice(0, 8),
+        searchSuggestionHtml: String(meta.searchEntryPoint?.renderedContent || ''),
+    };
+}
+
+/**
+ * Ask Gemini with Google Search grounding.
+ *
+ * Returns prose, not JSON: response schemas and search tools do not combine,
+ * and a cited answer is worth more here than a parseable one.
+ *
+ * @returns {Promise<{text: string, sources: Array, searchSuggestionHtml: string, grounded: boolean}>}
+ *   grounded=false means the search tool was unavailable and this is the
+ *   model's own recollection — the UI has to say so.
+ */
+export async function generateGrounded(prompt, options = {}) {
+    const { modelId = 'gemini-2.5-flash', maxOutputTokens = 1024, useCache = true } = options;
+
+    const key = useCache ? cacheKey(('grounded-search:' + prompt), modelId, { maxOutputTokens }) : null;
+    if (key) {
+        const cached = cacheGet(key);
+        if (cached !== null) {
+            log.debug('grounded cache hit');
+            return cached;
+        }
+    }
+
+    const apiKey = await getApiKey();
+    if (!apiKey) throw new Error('AI service unavailable — API key missing');
+    const genAI = new GoogleGenerativeAI(apiKey);
+
+    let lastErr = null;
+    for (const tools of SEARCH_TOOLS) {
+        try {
+            const model = genAI.getGenerativeModel({
+                model: modelId,
+                tools,
+                generationConfig: { temperature: 0.2, maxOutputTokens },
+            });
+            const result = await model.generateContent(prompt);
+            const value = {
+                text: result.response.text(),
+                ...readGrounding(result.response),
+                grounded: true,
+            };
+            if (key) cacheSet(key, value);
+            return value;
+        } catch (err) {
+            lastErr = err;
+            // Transient failures are not a tool-name problem; stop trying
+            // alternatives and let the ungrounded fallback handle it.
+            if (TRANSIENT_ERR.test(err?.message || '')) break;
+            log.warn({ error: (err?.message || '').slice(0, 160) }, 'search tool rejected, trying next shape');
+        }
+    }
+
+    // Son çare: aramasız cevap. Kullanıcıya "kaynaksız" olarak gösterilir —
+    // sessizce kaynaklıymış gibi sunmak en kötüsü olurdu.
+    log.warn({ error: (lastErr?.message || '').slice(0, 160) }, 'grounding unavailable, answering without search');
+    const text = await generateText(prompt, {
+        modelId,
+        generationConfig: { temperature: 0.2, maxOutputTokens },
+    });
+    const value = { text, sources: [], searchSuggestionHtml: '', grounded: false };
+    if (key) cacheSet(key, value);
+    return value;
+}
+
 // CV parsing model — defaults to Gemini, but operators can flip to Gemma
 // (or any other Google AI Studio model id) without redeploy by setting the
 // CV_PARSING_MODEL env var. Per-call modelId still wins if explicitly

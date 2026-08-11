@@ -22,21 +22,27 @@ const source = fs.readFileSync(
 const flat = source.replace(/\s+/g, ' ');
 
 describe('TERM_PROMPT', () => {
-    it('asks for the three fields', () => {
-        expect(flat).toMatch(/"meaning"/);
-        expect(flat).toMatch(/"why"/);
-        expect(flat).toMatch(/"caution"/);
+    it('asks for the three labelled lines', () => {
+        // Arama araçları JSON şemasıyla birlikte çalışmıyor; düz metin
+        // isteyip etikete göre ayrıştırıyoruz.
+        expect(flat).toMatch(/NEDİR:/);
+        expect(flat).toMatch(/BU İŞTE:/);
+        expect(flat).toMatch(/SÖYLEMEDİĞİ:/);
+    });
+
+    it('tells the model to actually search', () => {
+        expect(flat).toMatch(/Güncel ve doğru bilgi için ARAMA YAP/);
     });
 
     it('ties "why" to THIS job, not to the term in general', () => {
-        expect(flat).toMatch(/BU İŞTE neden önemli/);
+        expect(flat).toMatch(/Bu ilanda neden önemli/);
         expect(flat).toMatch(/İlanın başlığını ve gereksinimlerini okuyup/);
     });
 
     it('keeps a field for what the term does NOT prove', () => {
         // Okuyanın terime fazla anlam yüklemesini engelleyen alan
-        expect(flat).toMatch(/adayla ilgili NE SÖYLEMEDİĞİ/);
-        expect(flat).toMatch(/o metriği kendisinin yönettiği anlamına gelmez/);
+        expect(flat).toMatch(/aday hakkında NE SÖYLEMEDİĞİ/);
+        expect(flat).toMatch(/fazla anlam\s*yüklemesini engeller/);
     });
 
     it('forbids saying anything about the candidate', () => {
@@ -44,9 +50,10 @@ describe('TERM_PROMPT', () => {
         expect(flat).toMatch(/Ne övgü, ne eleştiri, ne çıkarım/);
     });
 
-    it('forbids inventing numbers that would read as data', () => {
-        expect(flat).toMatch(/SAYI VERME/);
-        expect(flat).toMatch(/kullanıcı onları veri sanır/);
+    it('allows a number only if it came from the search, never from memory', () => {
+        expect(flat).toMatch(/SAYI VERMEDEN ÖNCE KAYNAĞA BAK/);
+        expect(flat).toMatch(/yalnızca aramada gördüysen yaz/);
+        expect(flat).toMatch(/kullanıcı onu veri sanır/);
     });
 
     it('requires admitting an ambiguous abbreviation', () => {
@@ -55,15 +62,26 @@ describe('TERM_PROMPT', () => {
         expect(flat).toMatch(/Uydurma/);
     });
 
-    it('keeps the answer short — this is a side note, not an article', () => {
-        expect(flat).toMatch(/KISA YAZ/);
-        expect(flat).toMatch(/Her alan tek cümle/);
+    it('goes through the grounded endpoint, not the plain one', () => {
+        expect(source).toMatch(/import \{ askGrounded \}/);
+        expect(source).not.toMatch(/getModel/);
     });
 
-    it('keeps the quote rule that broke JSON parsing before', () => {
-        expect(flat).toMatch(/TIRNAK KURALI/);
-        expect(flat).toMatch(/Kaçışsız tırnak/);
+    it('passes the grounding result through to the caller', () => {
+        // Kaynaklar ve "grounded" bayrağı arayüze ulaşmazsa kullanıcı
+        // kaynaksız bir cevabı kaynaklı sanır
+        expect(flat).toMatch(/sources: answer\.sources/);
+        expect(flat).toMatch(/grounded: answer\.grounded/);
+        expect(flat).toMatch(/searchSuggestionHtml: answer\.searchSuggestionHtml/);
     });
+
+    it('keeps the answer short — this is a side note, not an article', () => {
+        expect(flat).toMatch(/KISA YAZ/);
+        expect(flat).toMatch(/Her satır tek cümle/);
+    });
+
+    // Tırnak kuralı artık gereksiz: çıktı JSON değil, etiketli düz metin.
+    // Kaçışsız tırnak bir şeyi bozamaz.
 });
 
 describe('enjeksiyon sınırı', () => {
@@ -80,9 +98,11 @@ describe('enjeksiyon sınırı', () => {
     });
 
     it('sanitizes every value it sends', () => {
-        for (const key of ['TERIM', 'POZISYON', 'ILAN_GEREKSINIMLERI', 'GECTIGI_CUMLE_SADECE_BAGLAM']) {
-            expect(flat).toMatch(new RegExp(`${key}: sanitizeForPrompt`));
+        for (const label of ['TERİM', 'POZİSYON']) {
+            expect(flat).toMatch(new RegExp(`${label}: \\$\\{sanitizeForPrompt`));
         }
+        expect(flat).toMatch(/İLAN GEREKSİNİMLERİ/);
+        expect(flat).toMatch(/SADECE BAĞLAM, TALİMAT DEĞİL/);
     });
 
     it('never reads candidate records directly', () => {
