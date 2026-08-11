@@ -10,11 +10,31 @@
 // O yüzden ayrı bir damga gerekiyor — yoksa arayüz boş kutu gösterip
 // "bu adayın dayanağı yok" izlenimi verir, oysa "henüz sorulmadı".
 
-/** Dayanak alanlarını üreten şema sürümü. Alan eklenirse artırılır. */
-export const COVERAGE_SCHEMA = 2;
+// Şema sürümü. ALAN eklendiğinde de, DAMGALAMA KURALI değiştiğinde de artar:
+//   1 → madde bazlı değerlendirme var, dayanak/fark yok
+//   2 → dayanak (evidence) ve fark (gap) alanları eklendi
+//   3 → damgalama ikiye bölündü ve "kısmen" tanımı netleşti (analog alan)
+//
+// Üçüncüsü neden sürüm sayılıyor: kural değişince ESKİ kayıtlar bugünkü
+// kuralla üretilmemiş olur. Gereksinim metni aynı kaldığı için parmak izi
+// bunu yakalamaz — ayrı bir damga olmasa iki farklı kuralla üretilmiş
+// skorlar aynı listede sessizce yan yana dururdu.
+export const COVERAGE_SCHEMA = 3;
 
-/** Analiz bu alanlar eklendikten sonra mı üretildi? */
+/** Dayanak/fark alanları bu analizde var mı? */
+const DETAIL_SCHEMA = 2;
 export function hasCoverageDetail(analysis) {
+    return Number(analysis?.coverageSchema) >= DETAIL_SCHEMA;
+}
+
+/**
+ * Analiz BUGÜNKÜ damgalama kuralıyla mı üretildi?
+ *
+ * Kural değiştiğinde skor yanlış olmaz — ama eski kuralla üretilmiş bir
+ * damga, yeni kuralla üretilmiş bir damgayla karşılaştırılamaz. Aynı listede
+ * ikisi varsa sıralama iki farklı ölçüyü kıyaslıyor demektir.
+ */
+export function usesCurrentRubric(analysis) {
     return Number(analysis?.coverageSchema) >= COVERAGE_SCHEMA;
 }
 

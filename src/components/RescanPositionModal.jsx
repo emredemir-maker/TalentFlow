@@ -21,10 +21,11 @@ import { Target, Loader2, X, AlertCircle } from 'lucide-react';
 import { scoreForPosition } from '../utils/candidateTable';
 import { calculateMatchScore } from '../services/matchService';
 import { analysisFor, isStaleFor } from '../utils/positionScore';
+import { usesCurrentRubric } from '../utils/coverageDetail';
 
 /** Tarama kapsamı. */
 const SCOPES = {
-    stale: { label: 'Analizi eskimiş olanlar', hint: 'Gereksinimler değiştiği için skoru güvenilmez olanlar. Düzeltilmesi gereken küme bu.' },
+    stale: { label: 'Analizi eskimiş olanlar', hint: 'Gereksinimler ya da damgalama kuralı değiştiği için skoru güncel ölçüyle uyumsuz olanlar. Düzeltilmesi gereken küme bu.' },
     scanned: { label: 'Bu pozisyon için taranmış herkes', hint: 'Analizi güncel olanlar da yeniden üretilir.' },
     all: { label: 'İlgili tüm adaylar', hint: 'Hiç taranmamışlar da dahil — en pahalısı.' },
 };
@@ -54,7 +55,10 @@ export default function RescanPositionModal({
                 candidate: c,
                 score: Math.round(scoreForPosition(c, position, keywordScoreFn)),
                 scanned: Boolean(analysis),
-                stale: Boolean(analysis) && isStaleFor(analysis, position),
+                // İki ayrı sebep, aynı sonuç: bu analiz yeniden üretilmeli.
+                // (a) gereksinim listesi değişti → damgalar yanlış maddeye ait
+                // (b) damgalama kuralı değişti → damga bugünkü ölçüyle uyumsuz
+                stale: Boolean(analysis) && (isStaleFor(analysis, position) || !usesCurrentRubric(analysis)),
             };
         });
     }, [candidates, position]);

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ChevronDown, ChevronRight, Check, Minus, X, Wrench, Brain, Calculator, Quote, GitCompareArrows, RotateCcw, AlertTriangle } from 'lucide-react';
 import { explainHybridScore } from '../services/geminiService';
 import { requirementsOf } from '../utils/positionRequirements';
-import { coverageDetailState } from '../utils/coverageDetail';
+import { coverageDetailState, usesCurrentRubric } from '../utils/coverageDetail';
 import { isStaleFor, analysisScoreDetail } from '../utils/positionScore';
 
 /**
@@ -22,6 +22,9 @@ export default function ScoreBreakdownPanel({ analysis, position }) {
 
     const detail = coverageDetailState(analysis);
     const staleRequirements = isStaleFor(analysis, position);
+    // Gereksinimler aynı ama damgalama kuralı değişmişse skor yanlış değil —
+    // yalnızca bugünkü ölçüyle üretilmemiş. Kırılım geçerli, uyarı yeterli.
+    const oldRubric = !staleRequirements && !usesCurrentRubric(analysis);
     // Bayat kayıtta explainHybridScore hâlâ madde numaralarını eşleştirir;
     // listede gösterilen sayı ise saklanan skor. İkisi ayrışmasın diye
     // başlıktaki sayı da listedekiyle aynı kaynaktan gelir.
@@ -63,6 +66,17 @@ export default function ScoreBreakdownPanel({ analysis, position }) {
                                 günden beri değişti; kayıtlı değerlendirmeler madde numaralarına bağlı
                                 olduğu için yeni listeye uygulanamaz. Güncel skoru görmek istiyorsanız
                                 adayı <strong>yeniden tarayın</strong>.
+                            </p>
+                        </div>
+                    )}
+
+                    {oldRubric && (
+                        <div className="flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                            <RotateCcw className="w-3 h-3 text-slate-400 shrink-0 mt-0.5" />
+                            <p className="text-[10px] text-slate-600 leading-relaxed">
+                                Bu analiz, damgalama kuralı netleştirilmeden önce üretildi. Skor yanlış
+                                değil ama <strong>bugünkü ölçüyle üretilmiş skorlarla kıyaslanamaz</strong> —
+                                aynı listede iki farklı ölçü var demektir. Adayı yeniden tarayın.
                             </p>
                         </div>
                     )}
