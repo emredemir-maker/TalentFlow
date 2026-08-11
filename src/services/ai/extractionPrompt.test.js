@@ -143,3 +143,49 @@ describe('EXTRACTOR_PROMPT — gizlilik ve ölçek vekilleri', () => {
         expect(promptSource).toMatch(/gizli bilgiyi ifşa etmesini ISTEME/);
     });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NASIL KARŞILIYOR — evidence / gap.
+//
+// "met" damgası tek başına yetmiyordu: iki aday aynı damgayı alıp bambaşka
+// insanlar olabilir. Bu iki alanın tek riski, modelin CV'de olmayan bir şeyi
+// çıkarsama yoluyla yazması ya da her maddeye zorlama bir kusur uydurması.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('madde bazlı dayanak', () => {
+    it('asks for both fields in the output schema', () => {
+        expect(promptSource).toMatch(/"evidence": "CV'deki somut dayanak"/);
+        expect(promptSource).toMatch(/"gap": ""/);
+    });
+
+    it('explains why the status alone is not enough', () => {
+        expect(promptSource).toMatch(/İki aday aynı damgayı alıp bambaşka insanlar olabilir/);
+    });
+
+    it('demands evidence that actually carries something from the CV', () => {
+        expect(promptSource).toMatch(/CV'de YAZANI kullan/);
+        expect(promptSource).toMatch(/YANLIŞ: 'Bu alanda güçlü deneyime sahip\.' \(CV'den hiçbir şey taşımıyor\)/);
+    });
+
+    it('leaves evidence empty for a missing requirement', () => {
+        expect(promptSource).toMatch(/"missing" ise BOŞ BIRAK/);
+    });
+
+    it('forbids inventing a gap on every requirement', () => {
+        // Her maddeye kusur yazmak, GERÇEK farkların görünmesini engeller
+        expect(promptSource).toMatch(/Fark YOKSA BOŞ BIRAK/);
+        expect(promptSource).toMatch(/Zorlama fark uydurma/);
+        expect(promptSource).toMatch(/gerçek farkların görünmesini engeller/);
+    });
+
+    it('grounds both fields in the CV and prefers empty over invented', () => {
+        expect(promptSource).toMatch(/İKİSİ DE CV'YE DAYANMAK ZORUNDA/);
+        expect(promptSource).toMatch(/Boş alan, uydurulmuş alandan iyidir/);
+    });
+
+    it('caps each field at one sentence so the JSON does not blow up', () => {
+        // 7572 karakterlik yanıt bir kez okunamadı; alanlar sınırsız uzarsa
+        // aynı sorun geri gelir
+        const gapSection = promptSource.slice(promptSource.indexOf('NASIL KARŞILIYOR'));
+        expect(gapSection.match(/En fazla bir cümle/g)?.length).toBeGreaterThanOrEqual(2);
+    });
+});

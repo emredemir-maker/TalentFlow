@@ -239,6 +239,10 @@ function coverageBreakdown(coverage, requirements) {
             // gerçek dışı biçimde yükseltirdi.
             isTool: String(a?.kind || '').toLowerCase().startsWith('ara'),
             note: typeof a?.note === 'string' ? a.note : '',
+            // "Nasıl karşılıyor": damga tek başına yetmiyor, iki aday aynı
+            // damgayı alıp bambaşka insanlar olabilir.
+            evidence: typeof a?.evidence === 'string' ? a.evidence : '',
+            gap: typeof a?.gap === 'string' ? a.gap : '',
         });
     }
     const weightOf = (status) => (status === 'met' ? 1 : status === 'partial' ? 0.5 : 0);
@@ -378,6 +382,8 @@ export function explainHybridScore(data, requirements) {
                                 kind: group.kind,
                                 status,
                                 note: a?.note || '',
+                                evidence: a?.evidence || '',
+                                gap: a?.gap || '',
                                 max: maxPerItem,
                                 earned: maxPerItem * weightOf(status),
                             };
