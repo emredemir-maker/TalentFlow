@@ -1,6 +1,7 @@
 // src/pages/PositionsPage.jsx
 // Command Table layout — with redesigned Create / Detail / Edit screens
 
+import { analysisScoreFor } from '../utils/positionScore';
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import Header from '../components/Header';
 import { usePositions } from '../context/PositionsContext';
@@ -73,7 +74,7 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
         const domainFiltered = filterCandidatesByDomain(pos, candidates);
         return domainFiltered
             .map(c => {
-                const savedScore = c.positionAnalyses?.[pos.title]?.score || 0;
+                const savedScore = analysisScoreFor(c, pos);
                 const staticScore = calculateMatchScore(c, pos).score;
                 const score = Math.max(savedScore, staticScore);
                 return { id: c.id, name: c.name || '—', score, reason: c.positionAnalyses?.[pos.title]?.summary || (score >= 70 ? 'Yüksek Uyumluluk' : 'Potansiyel Eşleşme') };
@@ -1453,7 +1454,7 @@ export default function PositionsPage() {
         setReleaseLoading(true);
         try {
             const matches = candidates
-                .map(c => { const ps = c.positionAnalyses?.[pos.title]?.score || 0; const ms = calculateMatchScore(c, pos).score; return { ...c, effectiveScore: Math.max(ps, ms) }; })
+                .map(c => { const ps = analysisScoreFor(c, pos); const ms = calculateMatchScore(c, pos).score; return { ...c, effectiveScore: Math.max(ps, ms) }; })
                 .filter(c => c.effectiveScore >= 60)
                 .sort((a, b) => b.effectiveScore - a.effectiveScore);
             if (!matches.length) { alert('Uygun aday bulunamadı. Önce adayları analiz edin.'); return; }

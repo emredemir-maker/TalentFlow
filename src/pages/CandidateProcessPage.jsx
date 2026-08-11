@@ -1,4 +1,5 @@
 // src/pages/CandidateProcessPage.jsx
+import { analysisScoreFor } from '../utils/positionScore';
 import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCandidates } from '../context/CandidatesContext';
@@ -767,7 +768,7 @@ export default function CandidateProcessPage() {
             : null;
         const positionScores = selectedPos
             ? new Map(candidates.map(c => [c.id, Math.max(
-                Number(c.positionAnalyses?.[selectedPos.title]?.score ?? 0),
+                analysisScoreFor(c, selectedPos),
                 Number(calculateMatchScore(c, selectedPos)?.score || 0),
             )]))
             : null;
@@ -898,7 +899,7 @@ export default function CandidateProcessPage() {
         if (!c) return 0;
         const pos = c.matchedPositionTitle ? openByTitle.get(c.matchedPositionTitle) : null;
         if (!pos) return Math.round(c.bestScore || 0);
-        const saved = Number(c.positionAnalyses?.[pos.title]?.score ?? 0);
+        const saved = analysisScoreFor(c, pos);
         const fromAnalysis = c.aiAnalysis?.analyzedForPosition === pos.title ? Number(c.aiAnalysis?.score || 0) : 0;
         const keyword = Number(calculateMatchScore(c, pos)?.score || 0);
         return Math.round(Math.max(saved, fromAnalysis, keyword));

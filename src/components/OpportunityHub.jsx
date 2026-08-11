@@ -2,6 +2,7 @@
 // "Smart Match" Notifications & Opportunity Hub
 // Groups candidates and shows all qualifying positions per candidate
 
+import { analysisScoreFor } from '../utils/positionScore';
 import { useState, useMemo } from 'react';
 import {
     Sparkles,
@@ -35,7 +36,7 @@ export default function OpportunityHub({ isCompact, onSelectCandidate }) {
         openPositions.forEach(pos => {
             pool.forEach(c => {
                 // Check position-specific AI score
-                const posAiScore = c.positionAnalyses?.[pos.title]?.score || 0;
+                const posAiScore = analysisScoreFor(c, pos);
 
                 // Also check if the candidate's best match IS this position
                 const isBestMatch = c.matchedPositionTitle === pos.title && (c.matchScore || 0) >= THRESHOLD;

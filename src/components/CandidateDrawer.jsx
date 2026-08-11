@@ -1,6 +1,7 @@
 // src/components/CandidateDrawer.jsx
 // Context-aware Candidate Management + Assessment + Reporting
 
+import { analysisScoreFor, analysisScoreForTitle } from '../utils/positionScore';
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
     X, Mail, Phone, MapPin, Briefcase, GraduationCap, Calendar, Globe,
@@ -76,12 +77,13 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
         let bestTitle = candidate.matchedPositionTitle || null;
 
         if (positionContext && candidate.positionAnalyses?.[positionContext.title]) {
-            bestPosAiScore = candidate.positionAnalyses[positionContext.title].score;
+            bestPosAiScore = analysisScoreFor(candidate, positionContext);
             bestTitle = positionContext.title;
         } else if (candidate.positionAnalyses) {
             Object.entries(candidate.positionAnalyses).forEach(([title, analysis]) => {
-                if (analysis && analysis.score > bestPosAiScore) {
-                    bestPosAiScore = analysis.score;
+                const posScore = analysisScoreForTitle(candidate, title);
+                if (analysis && posScore > bestPosAiScore) {
+                    bestPosAiScore = posScore;
                     bestTitle = title;
                 }
             });

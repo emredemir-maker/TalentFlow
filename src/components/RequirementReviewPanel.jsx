@@ -1,3 +1,4 @@
+import { analysisScoreFor } from '../utils/positionScore';
 import { useMemo, useState } from 'react';
 import { Sparkles, AlertTriangle, Info, Loader2, Wrench, Users, ChevronRight, Check, RotateCcw, BookOpen } from 'lucide-react';
 import {
@@ -383,8 +384,7 @@ export default function RequirementReviewPanel({
                                         )}
                                         <span className="text-[10px] font-black text-slate-600 tabular-nums">
                                             {Math.round(
-                                                Number(c.positionAnalyses?.[position.title]?.score)
-                                                || Number(c.bestScore) || 0
+                                                analysisScoreFor(c, position) || Number(c.bestScore) || 0
                                             )}
                                         </span>
                                         {onCandidateClick && <ChevronRight className="w-3 h-3 text-slate-300" />}
