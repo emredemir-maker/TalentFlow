@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-    coverageDetail, coverageDetailState, hasCoverageDetail, COVERAGE_SCHEMA,
+    coverageDetail, coverageDetailState, hasCoverageDetail, usesCurrentRubric, COVERAGE_SCHEMA,
 } from './coverageDetail';
 
 const analysis = (assessments, extra = {}) => ({
@@ -106,5 +106,34 @@ describe('coverageDetailState', () => {
     it('handles an analysis with no assessments at all', () => {
         expect(coverageDetailState(null)).toMatchObject({ empty: true, total: 0 });
         expect(coverageDetailState({ coverageSchema: COVERAGE_SCHEMA })).toMatchObject({ total: 0 });
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// KURAL SÜRÜMÜ.
+//
+// Damgalama kuralı değişti: "kısmen" artık analog alanı da kapsıyor ve skor
+// ayrı bir çağrıda üretiliyor. Eski kayıtların skoru YANLIŞ değil — ama
+// bugünkü ölçüyle üretilmemiş. Aynı listede iki farklı ölçü varsa sıralama
+// elmayla armudu kıyaslıyor demektir ve bunu gereksinim parmak izi yakalamaz.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('usesCurrentRubric', () => {
+    it('accepts an analysis produced with the current rubric', () => {
+        expect(usesCurrentRubric({ coverageSchema: COVERAGE_SCHEMA })).toBe(true);
+    });
+
+    it('rejects one produced before the rubric was sharpened', () => {
+        // Şema 2: dayanak/fark alanları vardı ama damgalama kuralı muğlaktı
+        expect(usesCurrentRubric({ coverageSchema: 2 })).toBe(false);
+        expect(usesCurrentRubric({ coverageSchema: 1 })).toBe(false);
+        expect(usesCurrentRubric({})).toBe(false);
+        expect(usesCurrentRubric(null)).toBe(false);
+    });
+
+    it('is separate from having evidence fields', () => {
+        // Şema 2 kaydında dayanak VAR ama kural ESKİ — ikisi farklı sorular
+        const schema2 = { coverageSchema: 2 };
+        expect(hasCoverageDetail(schema2)).toBe(true);
+        expect(usesCurrentRubric(schema2)).toBe(false);
     });
 });
