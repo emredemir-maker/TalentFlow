@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, Check, Minus, X, Wrench, Brain, Calculator } from 'lucide-react';
+import { ChevronDown, ChevronRight, Check, Minus, X, Wrench, Brain, Calculator, Quote, GitCompareArrows, RotateCcw } from 'lucide-react';
 import { explainHybridScore } from '../services/geminiService';
 import { requirementsOf } from '../utils/positionRequirements';
+import { coverageDetailState } from '../utils/coverageDetail';
 
 /**
  * "Bu skor neden 54?" — skorun tam kırılımı.
@@ -17,6 +18,8 @@ export default function ScoreBreakdownPanel({ analysis, position }) {
     if (!analysis) return null;
     const exp = explainHybridScore(analysis, requirementsOf(position));
     if (!exp.coverage && !exp.star) return null;
+
+    const detail = coverageDetailState(analysis);
 
     const pct = (n) => Math.round(n * 100);
 
@@ -59,6 +62,22 @@ export default function ScoreBreakdownPanel({ analysis, position }) {
                             />
                         )}
                     </div>
+
+                    {/* "Henüz sorulmadı" ile "soruldu, bulunamadı" farklı şeyler.
+                        Dayanak alanları sonradan eklendi; gereksinim metni
+                        değişmediği için parmak izi bu analizleri bayat
+                        göstermez. Ayrı damga olmasa boş kutu "bu adayın
+                        dayanağı yok" izlenimi verirdi. */}
+                    {detail.outdated && (
+                        <div className="flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                            <RotateCcw className="w-3 h-3 text-slate-400 shrink-0 mt-0.5" />
+                            <p className="text-[10px] text-slate-600 leading-relaxed">
+                                Bu analiz, madde bazlı dayanak alanları eklenmeden önce yapıldı.
+                                Her maddenin CV'deki dayanağını ve ilanla farkını görmek için
+                                adayı yeniden tarayın.
+                            </p>
+                        </div>
+                    )}
 
                     {exp.coverage?.tiers?.length > 0 && (
                         <div className="space-y-3">
@@ -166,6 +185,26 @@ function RequirementRow({ item }) {
                     )}
                 </div>
                 {item.note && <p className="text-[10px] text-slate-500 leading-relaxed mt-0.5">{item.note}</p>}
+
+                {/* NASIL KARŞILIYOR.
+                    Damga tek başına yetmiyordu: iki aday aynı "karşılıyor"
+                    damgasını alıp bambaşka insanlar olabilir. Dayanak CV'den
+                    gelir; fark, adayın ilanla NEREDE ayrıştığıdır. */}
+                {item.evidence && (
+                    <p className="flex items-start gap-1 text-[10px] text-slate-600 leading-relaxed mt-1">
+                        <Quote className="w-2.5 h-2.5 text-slate-300 shrink-0 mt-0.5" />
+                        <span>{item.evidence}</span>
+                    </p>
+                )}
+                {item.gap && (
+                    <p className="flex items-start gap-1 text-[10px] text-amber-700 leading-relaxed mt-0.5">
+                        <GitCompareArrows className="w-2.5 h-2.5 text-amber-500 shrink-0 mt-0.5" />
+                        <span>
+                            <span className="font-black uppercase text-[9px] text-amber-600">Fark: </span>
+                            {item.gap}
+                        </span>
+                    </p>
+                )}
             </div>
             <span className="shrink-0 text-[10px] font-black text-slate-600 tabular-nums">
                 {item.earned.toFixed(1)}

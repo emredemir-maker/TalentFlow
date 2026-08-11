@@ -7,6 +7,7 @@
 import { analyzeCandidateMatch } from './geminiService';
 import { calculateMatchScore, filterPositionsByDomain, findBestPositionMatch } from './matchService';
 import { buildJobDescription, requirementsOf, requirementsFingerprint } from '../utils/positionRequirements';
+import { COVERAGE_SCHEMA } from '../utils/coverageDetail';
 
 /**
  * Adayın analizinin BELİRLİ bir pozisyon için tazelenmesi gerekiyor mu?
@@ -97,7 +98,9 @@ export async function deepScanCandidate(candidate, openPositions, options = {}) 
             // Damga: bu analiz HANGİ gereksinim metnine ait. Metin sonradan
             // değişirse gözden geçirme paneli bunu fark edebilsin.
             updatedAnalyses[pos.title] = sanitizeForFirestore({
-                ...result, requirementsFingerprint: requirementsFingerprint(pos),
+                ...result,
+                requirementsFingerprint: requirementsFingerprint(pos),
+                coverageSchema: COVERAGE_SCHEMA,
             });
             aiCalls += 1;
             // 0 puanlı sonuç "en iyi" kabul edilmez
@@ -185,7 +188,9 @@ export async function rescanCandidateForPosition(candidate, position, options = 
     const updatedAnalyses = { ...(candidate.positionAnalyses || {}) };
     if (previousTitle && previousTitle !== position.title) delete updatedAnalyses[previousTitle];
     updatedAnalyses[position.title] = sanitizeForFirestore({
-        ...result, requirementsFingerprint: requirementsFingerprint(position),
+        ...result,
+        requirementsFingerprint: requirementsFingerprint(position),
+        coverageSchema: COVERAGE_SCHEMA,
     });
 
     const updates = {
