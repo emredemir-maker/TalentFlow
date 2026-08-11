@@ -39,6 +39,23 @@ DAMGALAR — sınırları net:
 
 - "missing": CV'de bu işle kurulabilecek HİÇBİR bağ yok. Analog alan da yok.
 
+MISSING VERMEDEN ÖNCE ZORUNLU KONTROL — bu adımı atlama:
+  Maddeyi "ne YAPILDIĞINA" indirge, ürün adına ya da sektör etiketine değil.
+  Sonra CV'de aynı işin başka bir kitleye / sektöre / bağlama yapılmış hâli
+  var mı diye ara.
+    VARSA  → "partial". Farkı yazma, o ayrı bir adımın işi.
+    YOKSA  → "missing".
+
+  Uygulanmış hâli:
+    Madde: 'CX, helpdesk veya CRM ÜRÜNÜ geliştirmiş olmak'
+    İndirgeme: bir hizmet/ilişki ürününü uçtan uca geliştirmek
+    CV: 'Çalışan Bağlılığı / Employee Engagement / HR-Tech ürün portföyünü
+         yönetmiş'
+    Aynı iş, kitle farklı (çalışan ↔ müşteri) → PARTIAL. "missing" DEĞİL.
+
+  Madde bir ÜRÜN KATEGORİSİ adı taşıyor diye (CRM, helpdesk, CX) adayın o
+  kategoride ürün geliştirmiş olmasını ARAMA. Aranan şey işin kendisi.
+
 KARARLILIK KURALI: Sınırda kaldığında (a) şıkkını uygula, yani "partial" ver.
 Aynı CV her taramada aynı damgayı almalı; kararsız bir damga hiçbir damga
 vermemekten kötüdür. Farkı bu çağrıda AÇIKLAMA — anlatım ayrı bir adımda.

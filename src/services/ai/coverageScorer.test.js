@@ -122,3 +122,49 @@ describe('SCORER_PROMPT', async () => {
         expect(flat).toMatch(/kesin rakam ŞART DEĞİL/);
     });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ANALOG ALAN KURALI — ikinci deneme.
+//
+// İlk sürümde kural bir ÖRNEK olarak yazılmıştı ve tutmadı: canlıda CX
+// maddesi yine "missing" aldı ("Employee Engagement / HR-Tech ürün portföyü"
+// CV'de açıkça yazdığı hâlde). Modelin bir kuralı okuması ile uygulaması
+// farklı şeyler; kural artık missing vermeden ÖNCE çalışan zorunlu bir
+// karar adımı.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('analog alan kuralı — zorunlu kontrol', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const { fileURLToPath } = await import('node:url');
+    const src = fs.readFileSync(
+        path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'coverageScorer.js'),
+        'utf8'
+    );
+    const flat = src.replace(/\s+/g, ' ');
+
+    it('makes the check a required step before missing, not an example', () => {
+        expect(flat).toMatch(/MISSING VERMEDEN ÖNCE ZORUNLU KONTROL/);
+        expect(flat).toMatch(/bu adımı atlama/);
+    });
+
+    it('tells the model to reduce the requirement to the WORK, not the product name', () => {
+        // Canlıdaki hata tam buydu: madde 'CRM ürünü' dediği için model
+        // adayın CRM kategorisinde ürün aradı, işin kendisini değil
+        expect(flat).toMatch(/ne YAPILDIĞINA.{0,60}ürün adına ya da sektör etiketine değil/);
+        expect(flat).toMatch(/ÜRÜN KATEGORİSİ adı taşıyor diye.{0,120}ARAMA/);
+    });
+
+    it('gives the decision as a two-branch rule with an explicit outcome', () => {
+        expect(flat).toMatch(/VARSA → "partial"/);
+        expect(flat).toMatch(/YOKSA → "missing"/);
+    });
+
+    it('walks through the live case that failed', () => {
+        expect(flat).toMatch(/Çalışan Bağlılığı \/ Employee Engagement \/ HR-Tech/);
+        expect(flat).toMatch(/kitle farklı \(çalışan ↔ müşteri\) → PARTIAL\. "missing" DEĞİL/);
+    });
+
+    it('keeps the gap explanation out of this call', () => {
+        expect(flat).toMatch(/Farkı yazma, o ayrı bir adımın işi/);
+    });
+});
