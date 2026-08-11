@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Loader2, Info, X } from 'lucide-react';
+import { Loader2, Info, X, Globe } from 'lucide-react';
 import { splitByTerms } from '../utils/termSpotting';
 import { explainTerm } from '../services/ai/termExplainer';
 
@@ -67,9 +67,17 @@ export default function TermText({ text, position }) {
             {open && (
                 <div className="mt-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 space-y-1">
                     <div className="flex items-start justify-between gap-2">
-                        <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-amber-600">
-                            <Info className="w-2.5 h-2.5" /> Genel bilgi · doğrulanmadı
-                        </span>
+                        {/* Kaynaklıysa "aramayla bulundu", değilse "modelin
+                            hafızası" — ikisi aynı rozeti taşıyamaz. */}
+                        {shown?.grounded ? (
+                            <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-emerald-600">
+                                <Globe className="w-2.5 h-2.5" /> Google aramasıyla · kaynaklı
+                            </span>
+                        ) : (
+                            <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-amber-600">
+                                <Info className="w-2.5 h-2.5" /> Genel bilgi · doğrulanmadı
+                            </span>
+                        )}
                         <button
                             type="button"
                             onClick={() => setOpen(null)}
@@ -109,6 +117,34 @@ export default function TermText({ text, position }) {
                                 <p className="text-[11px] text-slate-500 italic">
                                     Bu terim için güvenilir bir açıklama üretilemedi.
                                 </p>
+                            )}
+
+                            {/* Kaynaklar — kullanıcı iddiayı izleyebilsin */}
+                            {shown.sources?.length > 0 && (
+                                <div className="pt-1 border-t border-slate-200 space-y-0.5">
+                                    <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Kaynaklar</p>
+                                    {shown.sources.slice(0, 4).map((s) => (
+                                        <a
+                                            key={s.uri}
+                                            href={s.uri}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="block text-[10px] text-cyan-700 hover:underline truncate"
+                                        >
+                                            {s.title}
+                                        </a>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Google'ın gösterim şartı: arama önerisi bloğu
+                                grounding kullanıldığında OLDUĞU GİBİ gösterilmek
+                                zorunda. Süs değil, kullanım koşulu. */}
+                            {shown.searchSuggestionHtml && (
+                                <div
+                                    className="pt-1 overflow-x-auto"
+                                    dangerouslySetInnerHTML={{ __html: shown.searchSuggestionHtml }}
+                                />
                             )}
                         </>
                     )}

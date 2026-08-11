@@ -14,7 +14,7 @@ import { createRequire } from 'module';
 import { aiLimiter } from '../middleware/rateLimit.js';
 import { verifyFirebaseToken } from '../middleware/auth.js';
 import { wrapMulter } from '../middleware/multipart.js';
-import { getApiKeyDetailed, generateText } from '../services/gemini.js';
+import { getApiKeyDetailed, generateText, generateGrounded } from '../services/gemini.js';
 import { childLogger } from '../services/logger.js';
 const log = childLogger('ai');
 
@@ -63,6 +63,38 @@ router.post('/api/ai/generate', aiLimiter, verifyFirebaseToken, async (req, res)
         res.json({ text });
     } catch (err) {
         log.error(`[ai/generate] failed (key source=${keyInfo.source}):`, err?.message);
+        res.status(500).json({ error: err?.message || 'AI request failed' });
+    }
+});
+
+// Grounded question answering — Gemini + Google Search.
+//
+// /api/ai/generate answers from the model's memory. This one searches and
+// returns the sources it used, so the UI can show where a claim came from.
+// Kept separate because the response shape differs (text + sources) and
+// because grounded calls are slower and cost more: the caller opts in.
+router.post('/api/ai/ask', aiLimiter, verifyFirebaseToken, async (req, res) => {
+    const { prompt, modelId = 'gemini-2.5-flash', maxOutputTokens } = req.body || {};
+    if (!prompt || typeof prompt !== 'string') {
+        return res.status(400).json({ error: 'prompt is required' });
+    }
+
+    const keyInfo = await getApiKeyDetailed();
+    if (!keyInfo.key) {
+        return res.status(503).json({
+            error: 'AI servisi kullanılamıyor — API anahtarı yok (Settings → API ekranından kaydedin).',
+        });
+    }
+
+    // Bu uç kısa açıklamalar için; uzun metin istenirse maliyet ve gecikme
+    // hızla artar. 2048 bilinçli bir tavan.
+    const tokenCap = Math.min(Math.max(parseInt(maxOutputTokens, 10) || 1024, 256), 2048);
+
+    try {
+        const result = await generateGrounded(prompt, { modelId, maxOutputTokens: tokenCap });
+        res.json(result);
+    } catch (err) {
+        log.error(`[ai/ask] failed (key source=${keyInfo.source}):`, err?.message);
         res.status(500).json({ error: err?.message || 'AI request failed' });
     }
 });

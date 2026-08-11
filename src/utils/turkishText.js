@@ -18,12 +18,13 @@
  */
 export function foldTr(raw) {
     return String(raw ?? '')
+        // Noktalı/noktasız i ayrı harflerdir, aksan değil — önce onlar.
         .replace(/[İIı]/g, 'i')
-        .replace(/[Şş]/g, 's')
-        .replace(/[Ğğ]/g, 'g')
-        .replace(/[Üü]/g, 'u')
-        .replace(/[Öö]/g, 'o')
-        .replace(/[Çç]/g, 'c')
+        // Kalan aksanları ayrıştırıp at. Bu satır olmadan METİN İÇİNDE ayrık
+        // yazılmış hâller ('i' + birleşik nokta) eşleşmiyordu: kopyala-yapıştır
+        // ve bazı model çıktıları bu biçimde geliyor.
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
         .toLowerCase();
 }
 
