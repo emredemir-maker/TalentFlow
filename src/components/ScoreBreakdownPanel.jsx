@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, Check, Minus, X, Wrench, Brain, Calculator, Quote, GitCompareArrows, RotateCcw } from 'lucide-react';
+import { ChevronDown, ChevronRight, Check, Minus, X, Wrench, Brain, Calculator, Quote, GitCompareArrows, RotateCcw, AlertTriangle } from 'lucide-react';
 import { explainHybridScore } from '../services/geminiService';
 import { requirementsOf } from '../utils/positionRequirements';
 import { coverageDetailState } from '../utils/coverageDetail';
+import { isStaleFor, analysisScoreDetail } from '../utils/positionScore';
 
 /**
  * "Bu skor neden 54?" — skorun tam kırılımı.
@@ -20,6 +21,13 @@ export default function ScoreBreakdownPanel({ analysis, position }) {
     if (!exp.coverage && !exp.star) return null;
 
     const detail = coverageDetailState(analysis);
+    const staleRequirements = isStaleFor(analysis, position);
+    // Bayat kayıtta explainHybridScore hâlâ madde numaralarını eşleştirir;
+    // listede gösterilen sayı ise saklanan skor. İkisi ayrışmasın diye
+    // başlıktaki sayı da listedekiyle aynı kaynaktan gelir.
+    const headlineScore = staleRequirements
+        ? analysisScoreDetail({ positionAnalyses: { [position?.title]: analysis } }, position).score
+        : exp.score;
 
     const pct = (n) => Math.round(n * 100);
 
@@ -34,23 +42,41 @@ export default function ScoreBreakdownPanel({ analysis, position }) {
                     <span className="text-[10px] font-black text-slate-700 uppercase tracking-widest">
                         Skor Nasıl Hesaplandı
                     </span>
-                    <span className="text-[11px] font-black text-cyan-600">{exp.score}</span>
+                    <span className="text-[11px] font-black text-cyan-600">{headlineScore}</span>
                 </div>
                 {open ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
             </button>
 
             {open && (
                 <div className="px-4 pb-4 space-y-4 border-t border-slate-100 pt-3">
+                    {/* GEREKSİNİM LİSTESİ DEĞİŞMİŞ.
+                        Kayıtlı değerlendirmeler madde NUMARASINA bağlı; liste
+                        değişince o numara başka bir maddeye denk gelir.
+                        Canlıda ölçüldü: bayat değerlendirmeyle 77, taze
+                        taramayla 65. Bu yüzden madde bazlı kırılım
+                        gösterilmiyor ve skor "o günkü ilana göre" damgalı. */}
+                    {staleRequirements && (
+                        <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                            <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                            <p className="text-[10px] text-amber-800 leading-relaxed">
+                                <strong>Bu skor eski gereksinim listesine göre hesaplandı.</strong> İlan o
+                                günden beri değişti; kayıtlı değerlendirmeler madde numaralarına bağlı
+                                olduğu için yeni listeye uygulanamaz. Güncel skoru görmek istiyorsanız
+                                adayı <strong>yeniden tarayın</strong>.
+                            </p>
+                        </div>
+                    )}
+
                     {/* Üst düzey bileşim.
                         STAR toplanan bir parça DEĞİL, çarpan: uyum skoruna
                         duyulan güveni ifade ediyor. Eskiden iki kutu yan yana
                         toplanıyordu ve alana kör bir ölçüm kötü uyumu telafi
                         edebiliyordu. */}
                     <div className="flex flex-wrap items-center gap-2">
-                        {exp.coverage && (
+                        {!staleRequirements && exp.coverage && (
                             <Chip label="Gereksinim Uyumu" value={`${exp.coverage.score}`} tone="cyan" />
                         )}
-                        {exp.coverage && exp.star && (
+                        {!staleRequirements && exp.coverage && exp.star && (
                             <>
                                 <span className="text-[13px] font-black text-slate-300">×</span>
                                 <Chip
@@ -67,7 +93,7 @@ export default function ScoreBreakdownPanel({ analysis, position }) {
                         )}
                     </div>
 
-                    {exp.star && exp.star.penalty > 0.5 && (
+                    {!staleRequirements && exp.star && exp.star.penalty > 0.5 && (
                         <p className="text-[10px] text-slate-500 leading-relaxed">
                             CV'de kanıt eksik olduğu için uyum skorundan{' '}
                             <strong>{Math.round(exp.star.penalty)} puan</strong> düşüldü. Bu bir
@@ -92,7 +118,7 @@ export default function ScoreBreakdownPanel({ analysis, position }) {
                         </div>
                     )}
 
-                    {exp.coverage?.tiers?.length > 0 && (
+                    {!staleRequirements && exp.coverage?.tiers?.length > 0 && (
                         <div className="space-y-3">
                             {exp.coverage.tiers.map((tier) => (
                                 <div key={tier.key} className="space-y-1.5">
@@ -148,9 +174,13 @@ export default function ScoreBreakdownPanel({ analysis, position }) {
                         </div>
                     )}
 
+                    {/* Bayatken "madde puanları toplandığında bu skoru verir"
+                        demek yanlış olur: o puanlar zaten gösterilmiyor ve
+                        başlıktaki sayı saklanan skor. */}
                     <p className="text-[9px] text-slate-400 leading-relaxed border-t border-slate-100 pt-2">
-                        Bu skor bir öneridir, karar değildir. Madde puanları toplandığında yukarıdaki
-                        skoru verir; ekran gerçek hesabı gösterir, yaklaşık bir açıklama değil.
+                        {staleRequirements
+                            ? 'Bu skor bir öneridir, karar değildir. Yukarıdaki sayı, ilanın ESKİ hâline göre ölçülmüş kayıtlı skordur; güncel gereksinimlere göre kırılım ancak yeniden taramadan sonra gösterilebilir.'
+                            : 'Bu skor bir öneridir, karar değildir. Madde puanları toplandığında yukarıdaki skoru verir; ekran gerçek hesabı gösterir, yaklaşık bir açıklama değil.'}
                     </p>
                 </div>
             )}

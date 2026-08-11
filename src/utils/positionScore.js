@@ -15,7 +15,7 @@
 // gereksinim metni değişti, yeni alan eklendi, CV güncellendi.
 
 import { calculateHybridScore } from '../services/geminiService';
-import { requirementsOf } from './positionRequirements';
+import { requirementsOf, requirementsFingerprint } from './positionRequirements';
 
 /** Adayın bu pozisyon için kayıtlı analizi. */
 export function analysisFor(candidate, positionTitle) {
@@ -36,6 +36,56 @@ function canRecompute(analysis) {
 }
 
 /**
+ * Değerlendirmeler GÜNCEL gereksinim listesine mi ait?
+ *
+ * Kayıtlı değerlendirmeler madde NUMARASINA bağlı: {index: 6, status:
+ * 'partial'}. Gereksinim listesi değişince o numara başka bir maddeye denk
+ * gelir ve eski yargı yanlış maddeye yapışır.
+ *
+ * Canlıda ölçüldü: aynı aday, aynı formül — bayat değerlendirmeyle 77, taze
+ * taramayla 65. On iki puanlık hata, hem de sessiz.
+ *
+ * Damgası olmayan eski kayıtlar da bayat sayılır: hangi listeye ait
+ * olduklarını bilmiyoruz, varsaymak da aynı hatayı üretir.
+ */
+export function isStaleFor(analysis, position) {
+    const assessments = analysis?.requirementCoverage?.assessments
+        || analysis?.scoreData?.requirementCoverage?.assessments;
+    // Madde bazlı değerlendirme yoksa eşleştirilecek numara da yok — bayatlık
+    // kavramı burada anlamsız.
+    if (!Array.isArray(assessments)) return false;
+    if (!position?.title) return true;
+    return analysis?.requirementsFingerprint !== requirementsFingerprint(position);
+}
+
+/**
+ * Adayın bu pozisyondaki skoru — bayatlık bilgisiyle.
+ *
+ * Bayat bir analizde madde bazlı ağırlıklandırma UYGULANMAZ. Eski yargıları
+ * yeni listenin numaralarına dizmek, olmayan bir bilgiyi varmış gibi
+ * göstermek olur.
+ *
+ * Bayat kayıtta SAKLANAN skor gösterilir: o sayı, üretildiği gün geçerli olan
+ * gereksinimlere göre tutarlıydı. Alternatifi STAR'a düşmekti — yani yeni
+ * kaldırdığımız alana kör sayıya geri dönmek. "Eski ilana göre ölçülmüş bir
+ * sayı" en azından bir şeyin ölçümü; arayüz bunu bayat olarak işaretler.
+ *
+ * @returns {{score: number, stale: boolean, scanned: boolean}}
+ */
+export function analysisScoreDetail(candidate, position) {
+    const analysis = analysisFor(candidate, position?.title);
+    if (!analysis) return { score: 0, stale: false, scanned: false };
+    if (!canRecompute(analysis)) {
+        return { score: Number(analysis.score) || 0, stale: false, scanned: true };
+    }
+
+    if (isStaleFor(analysis, position)) {
+        return { score: Number(analysis.score) || 0, stale: true, scanned: true };
+    }
+    return { score: calculateHybridScore(analysis, requirementsOf(position)), stale: false, scanned: true };
+}
+
+/**
  * Adayın bu pozisyondaki skoru.
  *
  * @param {object} candidate
@@ -43,10 +93,7 @@ function canRecompute(analysis) {
  * @returns {number} 0-100; analiz yoksa 0
  */
 export function analysisScoreFor(candidate, position) {
-    const analysis = analysisFor(candidate, position?.title);
-    if (!analysis) return 0;
-    if (!canRecompute(analysis)) return Number(analysis.score) || 0;
-    return calculateHybridScore(analysis, requirementsOf(position));
+    return analysisScoreDetail(candidate, position).score;
 }
 
 /**
