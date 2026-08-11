@@ -6,6 +6,7 @@
 // utils/candidateTable.js so it stays unit-testable; this component only
 // owns filter state and rendering. The xlsx library is imported lazily on
 // the first export click so it never enters the initial bundle.
+import { gateLabel } from '../utils/mustHaveGate';
 import { useEffect, useMemo, useState } from 'react';
 import {
     Search, Download, Users, ChevronUp, ChevronDown, ChevronLeft, ChevronRight,
@@ -50,12 +51,36 @@ function StageChip({ status }) {
     );
 }
 
-function ScoreCell({ value }) {
+function ScoreCell({ value, gate }) {
     if (value === null || value === undefined || value === '') {
         return <span className="text-slate-300">—</span>;
     }
     const color = value >= 75 ? '#059669' : value >= 50 ? '#D97706' : '#DC2626';
-    return <span style={{ color }} className="font-black">%{value}</span>;
+    // Zorunlu bir madde karşılanmıyorsa çıplak yüzde yanıltıcı: aday yüksek
+    // puanlı görünüyor ama ilanın olmazsa olmazını sağlamıyor. Skoru
+    // düşürmüyoruz — kararı insan verecek — ama saklamıyoruz da.
+    const label = gate ? gateLabel(gate) : null;
+    return (
+        <span className="inline-flex flex-col items-center leading-tight">
+            <span style={{ color }} className="font-black">%{value}</span>
+            {label && label.tone === 'red' && (
+                <span
+                    title={gate.missing.map((m) => m.text).join(' · ')}
+                    className="mt-0.5 px-1 py-px rounded bg-red-50 border border-red-200 text-[8px] font-black text-red-600 uppercase tracking-wide whitespace-nowrap"
+                >
+                    {label.text}
+                </span>
+            )}
+            {label && label.tone === 'amber' && (
+                <span
+                    title={gate.partial.map((m) => m.text).join(' · ')}
+                    className="mt-0.5 px-1 py-px rounded bg-amber-50 border border-amber-200 text-[8px] font-black text-amber-700 uppercase tracking-wide whitespace-nowrap"
+                >
+                    {label.text}
+                </span>
+            )}
+        </span>
+    );
 }
 
 function SortableHeader({ label, sortKey, activeKey, dir, onSort, align = 'left' }) {
@@ -759,7 +784,7 @@ export default function CandidatesTablePage() {
                                         </td>
                                         <td className="px-3 py-2.5 text-center"><ScoreCell value={c.bestScore} /></td>
                                         {selectedPosition && (
-                                            <td className="px-3 py-2.5 text-center"><ScoreCell value={c.positionScore} /></td>
+                                            <td className="px-3 py-2.5 text-center"><ScoreCell value={c.positionScore} gate={c.positionGate} /></td>
                                         )}
                                         <td className="px-3 py-2.5 text-center"><ScoreCell value={c.interviewScore} /></td>
                                         <td className="px-3 py-2.5 text-center"><ScoreCell value={c.combinedScore} /></td>

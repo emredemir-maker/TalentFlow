@@ -3,7 +3,8 @@
 // Kept UI-free so filtering, sorting and export-row mapping are unit-testable
 // without rendering. The page component owns filter STATE; this module owns
 // filter BEHAVIOR.
-import { analysisScoreFor } from './positionScore';
+import { analysisScoreFor, analysisFor } from './positionScore';
+import { mustHaveGate } from './mustHaveGate';
 import { STAGES, getStage } from './pipelineStages';
 
 /** Map any raw/legacy candidate status onto a canonical stage key. */
@@ -235,9 +236,14 @@ export function applyTableFilters(rows, filters, opts = {}) {
     }
     if (f.position !== 'all') {
         if (positionMode) {
+            // Zorunlu kapısı skorla BİRLİKTE taşınır. Kod bunu zaten
+            // hesaplıyordu ama yalnızca aday sayfasında gösteriliyordu:
+            // listede %80 gören kullanıcı, adayın bir zorunlu maddeyi hiç
+            // karşılamadığını göremiyordu.
             result = result.map((c) => ({
                 ...c,
                 positionScore: scoreForPosition(c, opts.position, opts.keywordScoreFn),
+                positionGate: mustHaveGate(analysisFor(c, opts.position?.title), opts.position),
             }));
         } else {
             result = result.filter((c) => (c.bestTitle || c.position) === f.position);
