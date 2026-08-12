@@ -173,7 +173,7 @@ export async function generateProbeQuestions(plan, candidate, position) {
 
     try {
         const model = await getModel();
-        const result = await model.generateContent(prompt, { maxOutputTokens: 4096 });
+        const result = await model.generateContent(prompt, { maxOutputTokens: 4096, label: 'interview-plan' });
         const parsed = parseAIJson(result.response.text(), { questions: [] });
         return mergeProbeQuestions(probes, parsed?.questions);
     } catch (e) {

@@ -53,6 +53,10 @@ export async function getModel(modelId = DEFAULT_GEMINI_MODEL) {
             const body = { prompt, modelId };
             if (options.maxOutputTokens != null) body.maxOutputTokens = options.maxOutputTokens;
             if (options.mimeType) body.mimeType = options.mimeType;
+            // Etiket ölçüm içindir: hangi özelliğin ne yaktığını sunucu
+            // ancak bununla ayırt edebiliyor. Etiketsiz çağrılar 'other'a
+            // düşer ve toplamı bozmaz, yalnızca kırılımdan kaybolur.
+            if (options.label) body.label = options.label;
 
             // 502'yi Gemini degil, onundeki ag gecidi uretiyor: backend'in
             // kendi yeniden deneme dongusune istek hic ulasmiyor. Bu yuzden
