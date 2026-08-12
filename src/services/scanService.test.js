@@ -50,14 +50,20 @@ describe('deepScanCandidate — teknik hata ayrımı', () => {
         expect(out.failures[0].position).toBeTruthy();
     });
 
-    it('still says no_result when the calls succeed but nothing scores above zero', async () => {
-        // Bu GERÇEKTEN bir uygunluk sonucudur; teknik hata değil
+    it('treats an all-zero scan as a RESULT, not a failure', async () => {
+        // BU TEST ESKİDEN TERSİNİ SABİTLİYORDU ('no_result' bekliyordu) ve
+        // böylece bir hatayı "istenen davranış" diye pinlemişti. Canlıda
+        // bedeli görüldü: tüm analizler çöpe gidiyor, aday bayat kalıyor ve
+        // kullanıcı yapılandırma hatası sanıp ilan arıyordu.
+        //
+        // 0 puan bir uygunluk SONUCUDUR ve teknik hata değildir — ama bu,
+        // sonucu atmak için değil SAKLAMAK için bir sebep.
         analyzeCandidateMatch.mockResolvedValue({ score: 0, summary: 's' });
 
         const out = await deepScanCandidate(CANDIDATE, POSITIONS, { allowUnrelatedFallback: false });
 
-        expect(out.status).toBe('no_result');
-        expect(out.failures).toEqual([]);
+        expect(out.status).toBe('scanned');
+        expect(out.noneScored).toBe(true);
     });
 
     it('succeeds when at least one position works, even if others fail', async () => {
@@ -107,5 +113,81 @@ describe('rescanCandidateForPosition — teknik hata ayrımı', () => {
 
         expect(out.status).toBe('scanned');
         expect(out.updates.positionAnalyses['Growth Product Manager'].score).toBe(64);
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SIFIR BİR SONUÇTUR, HATA DEĞİL.
+//
+// Canlıda görüldü: kullanıcı bir adayı yeniden analiz etti ve ekranda
+// "Analiz tamamlandı ancak hiçbir açık pozisyon için 0'dan büyük skor
+// çıkmadı. Adayın alanına uygun bir pozisyon açık mı, kontrol edin." yazdı.
+// Kullanıcı bunu bir yapılandırma sorunu sanıp ilan aradı.
+//
+// Oysa ölçüm YAPILMIŞTI. AI çağrıları gitmiş, para ödenmiş, madde damgaları
+// üretilmişti — ve hepsi çöpe atılıyordu, çünkü `bestResult` yalnızca skor
+// 0'dan büyükse yazılıyordu. Aday bayat analiziyle kalıyor, kullanıcı tekrar
+// tarayıp aynı parayı yeniden ödüyordu.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('deepScanCandidate — sıfır puanlı sonuç', () => {
+    const zeroResult = {
+        score: 0,
+        summary: 'Aday bu ilanın hiçbir maddesini karşılamıyor.',
+        starAnalysis: { Situation: { score: 2 }, Task: { score: 2 }, Action: { score: 1 }, Result: { score: 1 } },
+        requirementCoverage: { assessments: [{ index: 1, status: 'missing' }] },
+    };
+
+    it('saves the analyses instead of throwing the paid work away', async () => {
+        analyzeCandidateMatch.mockResolvedValue(zeroResult);
+
+        const out = await deepScanCandidate(CANDIDATE, POSITIONS, { allowUnrelatedFallback: false });
+
+        expect(out.status).toBe('scanned');
+        expect(out.updates.positionAnalyses['Growth Product Manager']).toBeTruthy();
+        expect(out.updates.positionAnalyses['Product Manager']).toBeTruthy();
+    });
+
+    it('tells the caller this was a measurement, not a misconfiguration', () => {
+        // Arayüz doğru cümleyi ancak bu bayrakla kurabiliyor
+        analyzeCandidateMatch.mockResolvedValue(zeroResult);
+        return deepScanCandidate(CANDIDATE, POSITIONS, { allowUnrelatedFallback: false })
+            .then((out) => {
+                expect(out.noneScored).toBe(true);
+                expect(out.produced).toBe(2);
+            });
+    });
+
+    it('does NOT promote a zero-scoring position to "best match"', async () => {
+        // 0 alan bir ilanı en iyi eşleşme diye yazmak, olmayan bir uyumu
+        // varmış gibi göstermek olurdu
+        analyzeCandidateMatch.mockResolvedValue(zeroResult);
+        const withMatch = { ...CANDIDATE, matchedPositionTitle: 'Eski Eşleşme' };
+
+        const out = await deepScanCandidate(withMatch, POSITIONS, { allowUnrelatedFallback: false });
+
+        expect(out.updates.matchedPositionTitle).toBe('Eski Eşleşme');
+    });
+
+    it('still promotes the best position when something actually scored', async () => {
+        analyzeCandidateMatch
+            .mockResolvedValueOnce({ ...zeroResult, score: 0 })
+            .mockResolvedValueOnce({ ...zeroResult, score: 42 });
+
+        const out = await deepScanCandidate(CANDIDATE, POSITIONS, { allowUnrelatedFallback: false });
+
+        expect(out.noneScored).toBe(false);
+        expect(out.updates.matchedPositionTitle).toBe('Product Manager');
+        expect(out.updates.aiScore).toBe(42);
+    });
+
+    it('keeps analysis_failed distinct — a thrown call is not a zero', async () => {
+        // İkisini karıştırmak, kota aşımını "aday uygun değil" diye
+        // göstermek olurdu
+        analyzeCandidateMatch.mockRejectedValue(new Error('429 RESOURCE_EXHAUSTED'));
+
+        const out = await deepScanCandidate(CANDIDATE, POSITIONS, { allowUnrelatedFallback: false });
+
+        expect(out.status).toBe('analysis_failed');
+        expect(out.noneScored).toBeUndefined();
     });
 });

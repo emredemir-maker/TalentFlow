@@ -696,12 +696,27 @@ export default function CandidateProcessPage() {
             }
             if (result.status !== 'scanned') {
                 throw new Error(
-                    'Analiz tamamlandı ancak hiçbir açık pozisyon için 0\'dan büyük skor çıkmadı. ' +
-                    'Adayın alanına uygun bir pozisyon açık mı, kontrol edin.'
+                    'Analiz hiçbir sonuç üretmedi. Adayın alanına uygun bir pozisyon açık mı, kontrol edin.'
                 );
             }
 
             await updateCandidate(c.id, result.updates);
+
+            // SIFIR BİR SONUÇTUR, HATA DEĞİL.
+            //
+            // Eskiden bu durumda analizler kaydedilmiyor ve ekranda "hiçbir
+            // pozisyon için 0'dan büyük skor çıkmadı, uygun ilan açık mı
+            // kontrol edin" yazıyordu. Kullanıcı bunu yapılandırma hatası
+            // sanıp ilan aradı — oysa ölçüm yapılmıştı ve sonucu 0'dı.
+            // Analizler artık saklanıyor; burada yalnızca sonucu bildiriyoruz.
+            if (result.noneScored) {
+                setAnalysisError(
+                    'Analiz tamamlandı: aday açık ilanların hiçbirinde puan alamadı. ' +
+                    'Madde bazlı değerlendirmeler kaydedildi — Pozisyon Eşleşmeleri sekmesinden ' +
+                    'hangi maddelerde eksik kaldığını görebilirsiniz.'
+                );
+                return;
+            }
             showSuccess('comment');
         } catch (err) {
             console.error('STAR Analysis error:', err);

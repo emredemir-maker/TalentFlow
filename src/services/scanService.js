@@ -85,6 +85,9 @@ export async function deepScanCandidate(candidate, openPositions, options = {}) 
     let bestTitle = candidate.matchedPositionTitle;
     let aiCalls = 0;
     let attempted = 0;
+    // Kaç pozisyon GERÇEKTEN sonuç üretti. "Hepsi patladı" ile "hepsi 0 aldı"
+    // farklı şeyler ve farklı mesaj gerektiriyor.
+    let produced = 0;
     const failures = [];
 
     for (const pos of positionsToAnalyze) {
@@ -103,8 +106,22 @@ export async function deepScanCandidate(candidate, openPositions, options = {}) 
                 coverageSchema: COVERAGE_SCHEMA,
             });
             aiCalls += 1;
-            // 0 puanlı sonuç "en iyi" kabul edilmez
-            if (result.score > highestScore && result.score > 0) {
+            produced += 1;
+            // En iyi sonuç 0 puanlı da olabilir.
+            //
+            // Eskiden `result.score > 0` şartı vardı ve tüm pozisyonlarda 0
+            // alan aday için bestResult null kalıyordu — ARDINDAN bütün
+            // analizler çöpe gidiyordu: AI çağrıları yapılmış, para ödenmiş,
+            // madde damgaları üretilmiş ama hiçbiri kaydedilmiyordu.
+            //
+            // Canlıda görüldü: "Analiz tamamlandı ancak hiçbir açık pozisyon
+            // için 0'dan büyük skor çıkmadı." Kullanıcı bunu bir yapılandırma
+            // hatası sanıp ilan aradı; oysa ölçüm YAPILMIŞTI ve sonucu 0'dı.
+            //
+            // "Bu aday bu ilanda 0 alıyor" GEÇERLİ bir ölçümdür. Saklanmazsa
+            // aday sonsuza kadar bayat analizle kalır ve kullanıcı tekrar
+            // tekrar tarayıp aynı parayı yeniden öder.
+            if (result.score > highestScore) {
                 highestScore = result.score;
                 bestResult = result;
                 bestTitle = pos.title;
@@ -119,13 +136,19 @@ export async function deepScanCandidate(candidate, openPositions, options = {}) 
     }
 
     if (!bestResult) {
-        // Hepsi patladıysa bu bir CV/uygunluk sorunu DEĞİL, teknik hatadır.
+        // Buraya artık yalnızca HİÇBİR sonuç üretilmediğinde geliniyor —
+        // 0 puanlı sonuç da bir sonuçtur ve yukarıda bestResult'a yazılır.
         if (attempted > 0 && failures.length === attempted) {
             return { status: 'analysis_failed', failures, aiCalls };
         }
-        // Çağrılar döndü ama hiçbiri 0'dan büyük skor üretmedi.
         return { status: 'no_result', failures, aiCalls };
     }
+
+    // Hiçbir pozisyon 0'ı geçemedi. Analizler yine de KAYDEDİLİR — ölçüm
+    // yapıldı, parası ödendi, madde damgaları elimizde. Ama adayın gösterilen
+    // pozisyonu değiştirilmez: 0 alan bir ilanı "en iyi eşleşme" diye yazmak,
+    // olmayan bir uyumu varmış gibi göstermek olur.
+    const noneScored = highestScore <= 0;
 
     const updates = {
         aiAnalysis: sanitizeForFirestore({
@@ -137,14 +160,18 @@ export async function deepScanCandidate(candidate, openPositions, options = {}) 
         aiScore: bestResult.score,
         positionAnalyses: updatedAnalyses,
         // İşe alım uzmanı ataması bağlayıcı — "en iyi eşleşme" onu ezemez
-        matchedPositionTitle: assignedPos ? assignedPos.title : bestTitle,
+        matchedPositionTitle: assignedPos
+            ? assignedPos.title
+            : (noneScored ? candidate.matchedPositionTitle ?? bestTitle : bestTitle),
         lastScannedAt: new Date().toISOString(),
     };
     // Ortak matchScore yalnızca 'initial' aşamada AI tarafından ezilebilir
     if ((candidate.scoringStage || 'initial') === 'initial') {
         updates.matchScore = bestResult.score;
     }
-    return { status: 'scanned', updates, aiCalls };
+    // `noneScored` çağırana bildiriliyor ki arayüz DOĞRU cümleyi kurabilsin:
+    // bu bir yapılandırma sorunu değil, bir ölçüm sonucu.
+    return { status: 'scanned', updates, aiCalls, noneScored, produced };
 }
 
 /**
