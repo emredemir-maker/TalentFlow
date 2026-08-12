@@ -26,6 +26,7 @@ import { db, admin } from '../config/firebaseAdmin.js';
 import { pdf } from './pdf.js';
 import { generateText } from './gemini.js';
 import { childLogger } from './logger.js';
+import { positionRequirements } from './positionRequirements.js';
 const log = childLogger('bulk-worker');
 
 const require = createRequire(import.meta.url);
@@ -230,24 +231,11 @@ const TOOL_TERMS = new Set([
 const CAPABILITY_SHARE = 0.75;
 const TOOL_SHARE = 0.25;
 
-/**
- * Pozisyonun gereksinimlerini {text, must} biçiminde döndürür.
- * `requirementsMeta` yoksa (eski ilanlar) must: null — işaretlenmemiş
- * demektir ve skorlama nötr davranır. src/utils/positionRequirements.js
- * içindeki requirementsOf'un sunucu ikizidir.
- */
-export function positionRequirements(position) {
-    if (typeof position === 'string' || !position) return [];
-    const meta = position.requirementsMeta;
-    if (Array.isArray(meta) && meta.length > 0) {
-        return meta
-            .filter((r) => r && typeof r.text === 'string' && r.text.trim())
-            .map((r) => ({ text: r.text.trim(), must: Boolean(r.must) }));
-    }
-    return (position.requirements || [])
-        .filter((t) => typeof t === 'string' && t.trim())
-        .map((t) => ({ text: t.trim(), must: null }));
-}
+// Gereksinim okuma ve parmak izi services/positionRequirements.js'e taşındı:
+// mülakat değerlendirme ucu da aynı hesaba ihtiyaç duyuyor ve yalnızca bunun
+// için toplu içe aktarma makinesinin tamamını içe aktarmamalı. Buradan yeniden
+// dışa aktarılıyor — mevcut çağıranlar ve testler değişmedi.
+export { positionRequirements };
 
 /**
  * Ücretsiz anahtar-kelime ön skoru.
