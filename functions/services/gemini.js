@@ -134,7 +134,7 @@ export async function generateText(prompt, options = {}) {
             // Önbellek isabeti de SAYILIR (token'sız). Önbelleğin işe yarayıp
             // yaramadığını gösteren tek sayı bu oran; isabetleri kaydetmezsek
             // ölçüm "hiç çağrı yapılmamış" gibi görünür.
-            recordUsage({ label, modelId, cached: true });
+            void recordUsage({ label, modelId, cached: true }).catch(() => {});
             return cached;
         }
     }
@@ -155,7 +155,7 @@ export async function generateText(prompt, options = {}) {
             const text = result.response.text();
             // Ölçüm beklenmez (await yok): fatura kaydı yüzünden kullanıcı
             // bekletilmez ve hata yutulur.
-            recordUsage({ label, modelId, usage: readUsage(result.response) });
+            void recordUsage({ label, modelId, usage: readUsage(result.response) }).catch(() => {});
             if (key) cacheSet(key, text);
             return text;
         } catch (err) {
@@ -256,7 +256,7 @@ export async function generateGrounded(prompt, options = {}) {
                 ...readGrounding(result.response),
                 grounded: true,
             };
-            recordUsage({ label: 'grounded', modelId, usage: readUsage(result.response) });
+            void recordUsage({ label: 'grounded', modelId, usage: readUsage(result.response) }).catch(() => {});
             if (key) cacheSet(key, value);
             return value;
         } catch (err) {

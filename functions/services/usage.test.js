@@ -138,3 +138,43 @@ describe('summarize', () => {
         expect(summarize({ byLabel: { x: {} } }).rows[0].cost).toBe(0);
     });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ÖLÇÜM ASLA İŞİ DURDURMAZ.
+//
+// CI'da yakalandı: `admin.firestore.FieldValue` erişimi try bloğunun
+// DIŞINDAYDI. admin mock'lanmamış bir ortamda undefined olunca hata try'a
+// girmeden fırlıyor, çağrı `await`'siz olduğu için de yakalanamayan bir
+// reddedilmeye dönüşüyordu.
+//
+// Yerel çalıştırmada görünmedi çünkü orada admin gerçekten başlıyor. Kural
+// yazılıydı, uygulaması eksikti.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('recordUsage — dayanıklılık', () => {
+    it('resolves quietly when the Firestore admin SDK is unavailable', async () => {
+        vi.resetModules();
+        vi.doMock('../config/firebaseAdmin.js', () => ({ db: undefined, admin: undefined }));
+        const { recordUsage } = await import('./usage.js');
+        await expect(recordUsage({ label: 'coverage' })).resolves.toBeUndefined();
+        vi.doUnmock('../config/firebaseAdmin.js');
+    });
+
+    it('resolves quietly when the write itself fails', async () => {
+        vi.resetModules();
+        vi.doMock('../config/firebaseAdmin.js', () => ({
+            db: { doc: () => ({ set: async () => { throw new Error('permission denied'); } }) },
+            admin: { firestore: { FieldValue: { increment: (n) => ({ __inc: n }) } } },
+        }));
+        const { recordUsage } = await import('./usage.js');
+        await expect(recordUsage({ label: 'narrative' })).resolves.toBeUndefined();
+        vi.doUnmock('../config/firebaseAdmin.js');
+    });
+
+    it('never rejects for any input', async () => {
+        vi.resetModules();
+        const { recordUsage } = await import('./usage.js');
+        for (const bad of [undefined, {}, { label: null }, { label: 'x', usage: 'metin' }]) {
+            await expect(recordUsage(bad)).resolves.toBeUndefined();
+        }
+    });
+});

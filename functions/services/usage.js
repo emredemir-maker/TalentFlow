@@ -81,14 +81,23 @@ export function dayKey(date) {
  *
  * @param {{label: string, modelId?: string, usage?: object, cached?: boolean, now?: Date}} input
  */
-export async function recordUsage({ label, modelId = '', usage, cached = false, now = new Date() }) {
+export async function recordUsage({ label, modelId = '', usage, cached = false, now = new Date() } = {}) {
     const key = normalizeLabel(label);
     const { inTokens, outTokens, totalTokens } = cached
         ? { inTokens: 0, outTokens: 0, totalTokens: 0 }
         : (usage || { inTokens: 0, outTokens: 0, totalTokens: 0 });
 
-    const inc = admin.firestore.FieldValue.increment;
     try {
+        // HER ŞEY try İÇİNDE.
+        //
+        // İlk sürümde bu satır dışarıdaydı ve CI'da patladı: admin mock'lanmamış
+        // bir test ortamında `admin.firestore` undefined ve erişim try'a
+        // girmeden fırlıyordu. Yani "ölçüm işi durdurmaz" kuralını kendi
+        // kodumda çiğnemişim — üstelik yerel çalıştırmada admin gerçekten
+        // başladığı için görünmüyordu.
+        const inc = admin?.firestore?.FieldValue?.increment;
+        if (typeof inc !== 'function') return;
+
         await db.doc(`artifacts/talent-flow/public/data/usage/${dayKey(now)}`).set(
             {
                 day: dayKey(now),
