@@ -23,6 +23,7 @@ import CandidateAvatar from '../components/CandidateAvatar';
 import CandidateCvPanel from '../components/CandidateCvPanel';
 import ScoreBreakdownPanel from '../components/ScoreBreakdownPanel';
 import InterviewPlanPanel from '../components/InterviewPlanPanel';
+import InterviewOutcomePanel from '../components/InterviewOutcomePanel';
 import MustHaveBadge from '../components/MustHaveBadge';
 import StarEvidenceCards from '../components/StarEvidenceCards';
 import { starPercent } from '../utils/starDimensions';
@@ -1421,6 +1422,18 @@ export default function CandidateProcessPage() {
                                                 position={displayedPosition}
                                                 analysis={displayedFullAnalysis}
                                                 onSave={handleSaveInterviewPlan}
+                                            />
+                                        )}
+
+                                        {/* Mülakat sonucu — planın ÜSTÜNDE değil altında
+                                            duruyor ama okuma sırası tersine işliyor: mülakat
+                                            yapılmışsa panel görünür ve "odada ne değişti"yi
+                                            söyler; yapılmamışsa hiç çıkmaz. */}
+                                        {!analyzingIds.has(candidate.id) && displayedPosition && (
+                                            <InterviewOutcomePanel
+                                                candidate={candidate}
+                                                position={displayedPosition}
+                                                analysis={displayedFullAnalysis}
                                             />
                                         )}
 

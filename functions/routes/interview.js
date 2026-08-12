@@ -31,6 +31,8 @@ import { db, admin } from '../config/firebaseAdmin.js';
 import { requireAuth } from '../middleware/auth.js';
 import { generateText } from '../services/gemini.js';
 import { sanitizeForPrompt } from '../services/promptGuard.js';
+import { buildGradingPrompt, parseVerdicts, gradableItems } from '../services/interviewGrader.js';
+import { positionRequirements, requirementsFingerprint } from '../services/positionRequirements.js';
 import { childLogger } from '../services/logger.js';
 const log = childLogger('interview');
 
@@ -332,141 +334,246 @@ router.post(
             });
         }
 
-        // ── AI evaluation (Gemini)
-        let aiAnalysis = null;
-        try {
-            const prompt = buildManualInterviewPrompt({
-                positionTitle,
-                candidateName,
-                interviewType,
-                date,
-                time,
-                questions: safeQuestions,
-                transcript,
-                notes,
-            });
-            const raw = (
-                await generateText(prompt, {
-                    generationConfig: {
-                        temperature: 0,
-                        topP: 0,
-                        topK: 1,
-                        maxOutputTokens: 4096,
-                        responseMimeType: 'application/json',
-                    },
-                })
-            )
-                .replace(/```json|```/gi, '')
-                .trim();
-            const match = raw.match(/\{[\s\S]*\}/);
-            if (match) {
-                const parsed = JSON.parse(match[0]);
-                const clamp = (v) => Math.min(100, Math.max(0, Math.round(Number(v) || 0)));
-                const scoredQuestions = (parsed.questions || []).map((s) => ({
-                    question: String(s.question || ''),
-                    score: clamp(s.score),
-                    rationale: String(s.rationale || ''),
-                }));
-                aiAnalysis = {
-                    questions: scoredQuestions,
-                    aggregateScore:
-                        parsed.aggregateScore != null
-                            ? clamp(parsed.aggregateScore)
-                            : scoredQuestions.length > 0
-                              ? Math.round(
-                                    scoredQuestions.reduce((sum, q) => sum + q.score, 0) /
-                                        scoredQuestions.length
-                                )
-                              : null,
-                    summary: String(parsed.summary || ''),
-                    recommendedOutcome: VALID_OUTCOMES.has(parsed.recommendedOutcome)
-                        ? parsed.recommendedOutcome
-                        : 'pending',
-                };
-            }
-        } catch (err) {
-            // AI eval failures don't block the record — recruiter still gets
-            // their manually entered data saved. The UI shows "AI değerlendirme
-            // başarısız" and the record can be re-evaluated later.
-            log.warn({ err: err.message }, '[create-manual-interview] AI evaluation failed');
+        // ── Gereksinim bazlı değerlendirme
+        //
+        // Plandan gelen sorular `requirementIndex` taşıyor. Bu adım o bağı
+        // kullanıp her cevabın İLGİLİ MADDEYİ kapatıp kapatmadığına damga
+        // basar — 0-100'lük genel puandan bağımsız, ölçülebilir bir sonuç.
+        //
+        // AYRI ÇAĞRI, bilerek. Aynı hatayı bir kez yaptık: skoru belirleyen
+        // çıktıyı anlatımla aynı çağrıya koyunca aynı aday iki taramada 80 ve
+        // 65 aldı. Damga küçük ve tek başına üretiliyor.
+        //
+        // İlan SUNUCUDAN okunuyor: madde metinleri ve parmak izi tek kaynaktan
+        // gelmeli. İstemcinin gönderdiğine güvenilseydi bayat bir sekme, eski
+        // madde metinleriyle damga üretirdi.
+        const gradingContext = await loadGradingContext(positionId, safeQuestions);
+
+        const [evalResult, verdictResult] = await Promise.allSettled([
+            runManualEvaluation({
+                positionTitle, candidateName, interviewType, date, time,
+                questions: safeQuestions, transcript, notes,
+            }),
+            runRequirementGrading(gradingContext, positionTitle),
+        ]);
+
+        const aiAnalysis = evalResult.status === 'fulfilled' ? evalResult.value : null;
+        if (evalResult.status === 'rejected') {
+            // Değerlendirme patlasa bile kayıt DÜŞMEZ: recruiter'ın elle
+            // girdiği veri saklanır ve sonra yeniden değerlendirilebilir.
+            log.warn({ err: evalResult.reason?.message }, '[create-manual-interview] AI evaluation failed');
         }
 
-        // ── Persist to /interviews/{sessionId}
-        const sessionId = `mi-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-        try {
-            const sessionRef = db.doc(`interviews/${sessionId}`);
-            const payload = {
-                sessionId,
-                mode: 'manual',
-                candidateId,
-                candidateName,
-                positionId: positionId || null,
-                positionTitle: positionTitle || null,
-                interviewerId: req.user?.uid || null,
-                interviewerName: interviewerName || req.user?.email || null,
-                date,
-                time: time || null,
-                durationMinutes:
-                    typeof durationMinutes === 'number' && durationMinutes > 0
-                        ? Math.min(durationMinutes, 600)
-                        : null,
-                interviewType,
-                questions: safeQuestions,
-                transcript: typeof transcript === 'string' ? transcript.slice(0, 50000) : '',
-                notes: typeof notes === 'string' ? notes.slice(0, 10000) : '',
-                recruiterOutcome: recruiterOutcome || 'pending',
-                aiAnalysis,
-                status: 'completed',
-                createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                createdBy: req.user?.uid || null,
-            };
-            await sessionRef.set(payload);
-
-            // Mirror onto candidate.interviewSessions[] so existing dashboard
-            // & timeline UIs (which read off the candidate doc) pick it up
-            // without changes.
-            try {
-                const candidateRef = db.doc(
-                    `artifacts/talent-flow/public/data/candidates/${candidateId}`
-                );
-                await candidateRef.set(
-                    {
-                        interviewSessions: admin.firestore.FieldValue.arrayUnion({
-                            id: sessionId,
-                            mode: 'manual',
-                            date,
-                            time: time || null,
-                            interviewType,
-                            status: 'completed',
-                            recruiterOutcome: recruiterOutcome || 'pending',
-                            aggregateScore: aiAnalysis?.aggregateScore ?? null,
-                            createdAt: new Date().toISOString(),
-                        }),
-                    },
-                    { merge: true }
-                );
-            } catch (mirrorErr) {
-                // Mirror is best-effort — the canonical record is /interviews/.
-                log.warn(
-                    { err: mirrorErr.message },
-                    '[create-manual-interview] candidate mirror failed'
-                );
-            }
-
-            log.info(
-                {
-                    sessionId,
-                    candidateId,
-                    aiOk: !!aiAnalysis,
-                },
-                '[create-manual-interview] created'
-            );
-            res.json({ sessionId, aiAnalysis });
-        } catch (err) {
-            log.error({ err: err.message }, '[create-manual-interview] Firestore write failed');
-            res.status(500).json({ error: err.message });
+        const requirementVerdicts = verdictResult.status === 'fulfilled' ? verdictResult.value : [];
+        if (verdictResult.status === 'rejected') {
+            log.warn({ err: verdictResult.reason?.message }, '[create-manual-interview] requirement grading failed');
         }
+
+        // ── Persist
+        await persistManualInterview({
+            req, res,
+            record: {
+                candidateId, candidateName, positionId, positionTitle, interviewerName,
+                date, time, durationMinutes, interviewType, transcript, notes,
+                recruiterOutcome,
+            },
+            safeQuestions,
+            aiAnalysis,
+            requirementVerdicts,
+            requirementsFingerprint: gradingContext.fingerprint,
+        });
     }
 );
+
+/** İlanı okuyup değerlendirilecek maddeleri ve parmak izini hazırlar. */
+async function loadGradingContext(positionId, safeQuestions) {
+    const empty = { items: [], fingerprint: null, allowed: new Set() };
+    if (!positionId) return empty;
+    try {
+        const snap = await db.doc(`artifacts/talent-flow/public/data/positions/${positionId}`).get();
+        if (!snap.exists) return empty;
+        const position = snap.data();
+        const items = gradableItems(safeQuestions, positionRequirements(position));
+        return {
+            items,
+            fingerprint: requirementsFingerprint(position),
+            allowed: new Set(items.map((i) => i.requirementIndex)),
+        };
+    } catch (err) {
+        log.warn({ err: err.message }, '[create-manual-interview] position read failed');
+        return empty;
+    }
+}
+
+/** Damga çağrısı — küçük çıktı, skoru belirleyen kısım. */
+async function runRequirementGrading({ items, allowed }, positionTitle) {
+    if (!items || items.length === 0) return [];
+    const raw = (
+        await generateText(buildGradingPrompt({ positionTitle, items }), {
+            generationConfig: {
+                temperature: 0,
+                topP: 0,
+                topK: 1,
+                // Madde başına üç kısa alan; dar tavan modeli kısa tutmaya da
+                // yardım ediyor.
+                maxOutputTokens: 2048,
+                responseMimeType: 'application/json',
+            },
+        })
+    )
+        .replace(/```json|```/gi, '')
+        .trim();
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) return [];
+    return parseVerdicts(JSON.parse(match[0]), allowed);
+}
+
+/** Anlatım çağrısı — 0-100 puanlar, özet, outcome önerisi. */
+async function runManualEvaluation(input) {
+    const raw = (
+        await generateText(buildManualInterviewPrompt(input), {
+            generationConfig: {
+                temperature: 0,
+                topP: 0,
+                topK: 1,
+                maxOutputTokens: 4096,
+                responseMimeType: 'application/json',
+            },
+        })
+    )
+        .replace(/```json|```/gi, '')
+        .trim();
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+
+    const parsed = JSON.parse(match[0]);
+    const clamp = (v) => Math.min(100, Math.max(0, Math.round(Number(v) || 0)));
+    const scoredQuestions = (parsed.questions || []).map((s) => ({
+        question: String(s.question || ''),
+        score: clamp(s.score),
+        rationale: String(s.rationale || ''),
+    }));
+    return {
+        questions: scoredQuestions,
+        aggregateScore:
+            parsed.aggregateScore != null
+                ? clamp(parsed.aggregateScore)
+                : scoredQuestions.length > 0
+                  ? Math.round(
+                        scoredQuestions.reduce((sum, q) => sum + q.score, 0) /
+                            scoredQuestions.length
+                    )
+                  : null,
+        summary: String(parsed.summary || ''),
+        recommendedOutcome: VALID_OUTCOMES.has(parsed.recommendedOutcome)
+            ? parsed.recommendedOutcome
+            : 'pending',
+    };
+}
+
+/** Kaydı /interviews/{sessionId} altına yazar ve aday belgesine yansıtır. */
+async function persistManualInterview({
+    req,
+    res,
+    record,
+    safeQuestions,
+    aiAnalysis,
+    requirementVerdicts,
+    requirementsFingerprint: fingerprint,
+}) {
+    const {
+        candidateId, candidateName, positionId, positionTitle, interviewerName,
+        date, time, durationMinutes, interviewType, transcript, notes, recruiterOutcome,
+    } = record;
+
+    const sessionId = `mi-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    try {
+        await db.doc(`interviews/${sessionId}`).set({
+            sessionId,
+            mode: 'manual',
+            candidateId,
+            candidateName,
+            positionId: positionId || null,
+            positionTitle: positionTitle || null,
+            interviewerId: req.user?.uid || null,
+            interviewerName: interviewerName || req.user?.email || null,
+            date,
+            time: time || null,
+            durationMinutes:
+                typeof durationMinutes === 'number' && durationMinutes > 0
+                    ? Math.min(durationMinutes, 600)
+                    : null,
+            interviewType,
+            questions: safeQuestions,
+            transcript: typeof transcript === 'string' ? transcript.slice(0, 50000) : '',
+            notes: typeof notes === 'string' ? notes.slice(0, 10000) : '',
+            recruiterOutcome: recruiterOutcome || 'pending',
+            aiAnalysis,
+            requirementVerdicts,
+            // Damga olmadan bu yargılar hangi listeye ait bilinmez ve okuyucu
+            // onları yeni madde numaralarına dizer — bugün dört kez düzelttiğimiz
+            // hatanın ta kendisi.
+            requirementsFingerprint: fingerprint || null,
+            status: 'completed',
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            createdBy: req.user?.uid || null,
+        });
+
+        // Aday belgesine yansıt.
+        //
+        // interviewSessions[]: mevcut liste ve zaman çizelgesi ekranları aday
+        // belgesinden okuyor; onlar değişmeden çalışsın diye.
+        //
+        // interviewCoverage[pozisyon]: madde damgaları. Pozisyon BAŞINA, çünkü
+        // aday iki ilana bakılıyorsa açık maddeleri farklı. CV analizinin
+        // ÜZERİNE YAZILMAZ — ikisi ayrı kanıt ve birleşimi okuma anında
+        // hesaplanıyor (src/utils/interviewCoverage.js).
+        try {
+            const candidateRef = db.doc(
+                `artifacts/talent-flow/public/data/candidates/${candidateId}`
+            );
+            const update = {
+                interviewSessions: admin.firestore.FieldValue.arrayUnion({
+                    id: sessionId,
+                    mode: 'manual',
+                    date,
+                    time: time || null,
+                    interviewType,
+                    status: 'completed',
+                    recruiterOutcome: recruiterOutcome || 'pending',
+                    aggregateScore: aiAnalysis?.aggregateScore ?? null,
+                    createdAt: new Date().toISOString(),
+                }),
+            };
+            if (positionTitle && requirementVerdicts.length > 0 && fingerprint) {
+                update.interviewCoverage = {
+                    [positionTitle]: {
+                        sessionId,
+                        date,
+                        verdicts: requirementVerdicts,
+                        requirementsFingerprint: fingerprint,
+                        gradedAt: new Date().toISOString(),
+                    },
+                };
+            }
+            await candidateRef.set(update, { merge: true });
+        } catch (mirrorErr) {
+            // Yansıtma en iyi çaba — asıl kayıt /interviews/ altında.
+            log.warn(
+                { err: mirrorErr.message },
+                '[create-manual-interview] candidate mirror failed'
+            );
+        }
+
+        log.info(
+            { sessionId, candidateId, aiOk: !!aiAnalysis, verdicts: requirementVerdicts.length },
+            '[create-manual-interview] created'
+        );
+        res.json({ sessionId, aiAnalysis, requirementVerdicts });
+    } catch (err) {
+        log.error({ err: err.message }, '[create-manual-interview] Firestore write failed');
+        res.status(500).json({ error: err.message });
+    }
+}
 
 export default router;
