@@ -809,7 +809,7 @@ export default function CandidateProcessPage() {
             // sorusunu ortadan kaldırıyor: sebep aday kartındaki rozette yazıyor.
             const rankOf = new Map(results.map((c) => [
                 c.id,
-                gateRank(mustHaveGate(fullAnalysisForPosition(c, selectedPos.title), selectedPos).status),
+                gateRank(mustHaveGate(fullAnalysisForPosition(c, selectedPos.title), selectedPos, c).status),
             ]));
             results.sort((a, b) => {
                 const ra = rankOf.get(a.id) ?? 2;
@@ -921,7 +921,7 @@ export default function CandidateProcessPage() {
     // analysisForPosition yalnızca {summary, analyzedFor, score} döndürüyor ve
     // requirementCoverage taşımıyor.
     const displayedFullAnalysis = fullAnalysisForPosition(candidate, candidate?.matchedPositionTitle);
-    const displayedGate = mustHaveGate(displayedFullAnalysis, displayedPosition);
+    const displayedGate = mustHaveGate(displayedFullAnalysis, displayedPosition, candidate);
     const displayedGateLabel = gateLabel(displayedGate);
 
     /**

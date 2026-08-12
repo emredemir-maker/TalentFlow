@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, AlertCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, AlertCircle, Mic } from 'lucide-react';
 
 const TONES = {
     red:     { wrap: 'bg-red-50 border-red-100 text-red-700',           icon: AlertTriangle },
@@ -30,6 +30,16 @@ export default function MustHaveBadge({ gate, label }) {
                 {gate.totalMust > 0 && (
                     <span className="text-[9px] opacity-70">/ {gate.totalMust} zorunlu madde</span>
                 )}
+                {/* Rozet dün kırmızıyken bugün yeşilse sebebi görünmeli.
+                    Sessizce değişen bir yargı, açıklanamayan bir yargıdır. */}
+                {label.interview && (
+                    <span
+                        title={`${gate.fromInterview} zorunlu maddenin damgası mülakattan geldi`}
+                        className="ml-auto flex items-center gap-1 text-[9px] font-black uppercase tracking-widest opacity-70"
+                    >
+                        <Mic className="w-2.5 h-2.5" /> mülakat
+                    </span>
+                )}
             </div>
 
             {items?.length > 0 && (
@@ -38,6 +48,11 @@ export default function MustHaveBadge({ gate, label }) {
                         <li key={it.index} className="text-[11px] leading-relaxed">
                             <span className="font-bold">{it.text}</span>
                             {it.note && <span className="opacity-80"> — {it.note}</span>}
+                            {/* Odadan gelen gerekçe adayın kendi cümlesi; CV
+                                notundan ayırt edilebilmeli. */}
+                            {it.fromInterview && (
+                                <Mic className="inline w-2.5 h-2.5 ml-1 opacity-60" />
+                            )}
                         </li>
                     ))}
                 </ul>

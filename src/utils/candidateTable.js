@@ -3,7 +3,7 @@
 // Kept UI-free so filtering, sorting and export-row mapping are unit-testable
 // without rendering. The page component owns filter STATE; this module owns
 // filter BEHAVIOR.
-import { analysisScoreFor, analysisFor } from './positionScore';
+import { analysisScoreFor, analysisFor, analysisScoreDetail } from './positionScore';
 import { mustHaveGate } from './mustHaveGate';
 import { STAGES, getStage } from './pipelineStages';
 
@@ -243,7 +243,11 @@ export function applyTableFilters(rows, filters, opts = {}) {
             result = result.map((c) => ({
                 ...c,
                 positionScore: scoreForPosition(c, opts.position, opts.keywordScoreFn),
-                positionGate: mustHaveGate(analysisFor(c, opts.position?.title), opts.position),
+                positionGate: mustHaveGate(analysisFor(c, opts.position?.title), opts.position, c),
+                // Skor mülakattan etkilendiyse hücre bunu söylemeli. Sessizce
+                // değişen bir sayı, açıklanamayan bir sayıdır: kullanıcı dün
+                // 65 gördüğü adayı bugün 78'de bulur ve nedenini bilemez.
+                positionInterviewed: analysisScoreDetail(c, opts.position).interviewed,
             }));
         } else {
             result = result.filter((c) => (c.bestTitle || c.position) === f.position);

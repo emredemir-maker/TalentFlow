@@ -19,8 +19,7 @@
 // bunların hiçbiri adayın kusuru değil.
 
 import { calculateHybridScore } from '../services/geminiService';
-import { requirementsOf, requirementsFingerprint } from './positionRequirements';
-import { isStaleFor } from './positionScore';
+import { requirementsOf, requirementsFingerprint, isStaleFor } from './positionRequirements';
 
 /** Mülakatın karar verdiği damgalar — bunlar CV yargısını geçersiz kılar. */
 const CONCLUSIVE = new Set(['met', 'partial', 'missing']);

@@ -110,7 +110,7 @@ function viewOf(candidate, position, fingerprint) {
         score: position
             ? (scanned ? analysisScoreFor(candidate, position) : NaN)
             : Number(candidate?.bestScore ?? 0),
-        gate: scanned ? mustHaveGate(analysis, position).status : 'unknown',
+        gate: scanned ? mustHaveGate(analysis, position, candidate).status : 'unknown',
         star: scanned ? starPercent(analysis?.starAnalysis) : null,
         stageKey: resolveStageKey(candidate?.status),
     };
