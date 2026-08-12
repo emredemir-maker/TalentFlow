@@ -113,21 +113,63 @@ describe('buildManualInterviewPrompt', () => {
 
     it('asks for the strict JSON output shape the route handler parses', () => {
         const prompt = buildManualInterviewPrompt(baseInput);
-        // The parser in /api/create-manual-interview reads these keys —
-        // pin the prompt's request shape so a tweak doesn't break the parser.
+        // Ayrıştırıcı bu anahtarları okuyor — biçim değişirse kırılır.
         expect(prompt).toContain('"questions"');
-        expect(prompt).toContain('"score"');
-        expect(prompt).toContain('"rationale"');
-        expect(prompt).toContain('"aggregateScore"');
+        expect(prompt).toContain('"observation"');
         expect(prompt).toContain('"summary"');
-        expect(prompt).toContain('"recommendedOutcome"');
+        expect(prompt).toContain('"strengths"');
+        expect(prompt).toContain('"concerns"');
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BU ÇAĞRIDAN SAYI İSTENMEZ.
+//
+// Canlıda ölçüldü: kullanıcı iyi geçmediğini söylediği görüşmeye 90, daha
+// uygun bulduğu adayın görüşmesine 80 verildi. Sıralama ters döndü.
+//
+// Sebep buradaydı: modelden çıpasız bir 0-100 isteniyordu. Ne 70 ile 90'ın
+// farkı tanımlıydı ne de neyin ölçüldüğü. Böyle bir istekte model akıcılığı
+// yetkinlik sanar. Sayı artık damgalardan kodda hesaplanıyor.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('buildManualInterviewPrompt — puan istenmiyor', () => {
+    const prompt = buildManualInterviewPrompt(baseInput);
+
+    it('tells the model not to score, and says why', () => {
+        expect(prompt).toContain('PUAN VERME');
+        expect(prompt).toMatch(/kötü geçmiş bir görüşme 90, daha iyi bir aday 80/);
     });
 
-    it('mentions all three valid recommendedOutcome values so the model knows the enum', () => {
-        const prompt = buildManualInterviewPrompt(baseInput);
-        expect(prompt).toContain('positive');
-        expect(prompt).toContain('negative');
-        expect(prompt).toContain('pending');
+    it('no longer asks for any numeric field', () => {
+        expect(prompt).not.toContain('"score"');
+        expect(prompt).not.toContain('"aggregateScore"');
+        expect(prompt).not.toContain('0-100 arası puan ver');
+    });
+
+    it('no longer asks the model to pick an outcome', () => {
+        // Öneri de damgalardan türetiliyor; kuralı okunabilir ve sabit
+        expect(prompt).not.toContain('"recommendedOutcome"');
+    });
+
+    it('asks for observations instead of judgements', () => {
+        expect(prompt).toMatch(/her biri GÖZLEM, hüküm değil/);
+        expect(prompt).toMatch(/Adayın iyi\/kötü olduğunu SÖYLEME/);
+    });
+
+    it('bans the proxies that inflated the old score', () => {
+        // Uzun ve akıcı konuşan aday kazanıyordu
+        expect(prompt).toMatch(/Akıcılık, kelime seçimi, konuşma uzunluğu/);
+        expect(prompt).toMatch(/Uzun cevap iyi cevap değildir/);
+        expect(prompt).toMatch(/sempatikliği, özgüveni/);
+    });
+
+    it('keeps the demographic ban', () => {
+        expect(prompt).toMatch(/Cinsiyet, yaş, aksan, memleket/);
+    });
+
+    it('does not let it invent strengths for every interview', () => {
+        // Her görüşmeye iki güçlü yön uydurmak, gerçek olanları görünmez kılar
+        expect(prompt).toMatch(/Dayanacak bir şey yoksa boş liste bırak/);
     });
 });
 

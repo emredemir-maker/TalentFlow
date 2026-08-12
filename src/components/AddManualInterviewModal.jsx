@@ -817,7 +817,11 @@ function Section({ title, required, children }) {
 
 // ─── Result panel — shown after successful submit ─────────────────────────
 function ResultPanel({ result, onClose }) {
-    const ai = result.aiAnalysis;
+    const ai = result?.aiAnalysis;
+    // Sayı ve öneri artık SUNUCUDA damgalardan hesaplanıyor, aiAnalysis
+    // içinden değil: modelin ürettiği puan canlıda ters sıralama üretti.
+    const evidence = result?.evidence;
+    const recommendedOutcome = result?.recommendedOutcome;
     return (
         <div className="p-6">
             <div className="flex items-center gap-3 mb-4">
@@ -832,32 +836,66 @@ function ResultPanel({ result, onClose }) {
                 </div>
             </div>
 
-            {ai ? (
+            {ai || evidence ? (
                 <div className="space-y-4">
-                    {ai.aggregateScore != null && (
-                        <div className="bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-100 rounded-xl p-4">
-                            <div className="text-xs font-bold uppercase text-indigo-600 mb-1">
-                                Genel Skor
+                    {/* KANIT ORANI — payda her zaman yanında.
+                        Eskiden burada modelin ürettiği çıpasız bir "Genel Skor"
+                        vardı ve canlıda ters sıralama üretti: kötü geçmiş bir
+                        görüşme 90, daha uygun aday 80 aldı. Sayı artık madde
+                        damgalarından kodda hesaplanıyor ve tek başına değil,
+                        kaç maddeden çıktığıyla birlikte gösteriliyor. */}
+                    {evidence?.score != null ? (
+                        <div className="bg-white border border-slate-200 rounded-xl p-4">
+                            <div className="text-xs font-bold uppercase text-slate-500 mb-1">
+                                Kanıt oranı
                             </div>
                             <div className="text-3xl font-black text-slate-900">
-                                {ai.aggregateScore}
-                                <span className="text-base text-slate-400 font-bold">/100</span>
+                                %{evidence.score}
                             </div>
-                            {ai.recommendedOutcome && (
-                                <div className="text-xs text-slate-600 mt-1">
-                                    AI önerisi:{' '}
+                            <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                                Odada sorulan <strong>{evidence.asked} maddenin</strong>{' '}
+                                {evidence.met} tanesinde tam, {evidence.partial} tanesinde kısmi
+                                kanıt çıktı; {evidence.missing} tanesinde çıkmadı.
+                                {evidence.inconclusive > 0 && (
+                                    <> {evidence.inconclusive} madde için karar verilemedi — skora girmedi.</>
+                                )}
+                            </p>
+                            {evidence.mustMissing > 0 && (
+                                <p className="text-xs text-red-600 font-bold mt-1.5">
+                                    {evidence.mustMissing} zorunlu madde odada karşılanmadı.
+                                </p>
+                            )}
+                            {recommendedOutcome && (
+                                <div className="text-xs text-slate-600 mt-2 pt-2 border-t border-slate-100">
+                                    Öneri:{' '}
                                     <strong>
-                                        {ai.recommendedOutcome === 'positive'
+                                        {recommendedOutcome === 'positive'
                                             ? '✅ Olumlu'
-                                            : ai.recommendedOutcome === 'negative'
+                                            : recommendedOutcome === 'negative'
                                               ? '❌ Olumsuz'
                                               : '⏳ Beklemede'}
                                     </strong>
+                                    <span className="text-slate-400"> · karar sizin</span>
                                 </div>
                             )}
                         </div>
+                    ) : (
+                        /* Sayı YOK ve bu dürüst bir sonuç: sorular gereksinime
+                           bağlı değilse ölçülecek bir şey de yok. Uydurma bir
+                           puan basmaktansa neyin eksik olduğunu söylüyoruz. */
+                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                            <div className="text-xs font-bold uppercase text-slate-500 mb-1">
+                                Sayısal sonuç üretilmedi
+                            </div>
+                            <p className="text-xs text-slate-600 leading-relaxed">
+                                Bu görüşmedeki sorular ilanın maddelerine bağlı değil, o yüzden
+                                ölçülecek bir şey yok. Madde bazlı sonuç için soruların{' '}
+                                <strong>Mülakat Planı</strong>ndan gelmesi gerekiyor — aşağıdaki
+                                gözlemler ve özet yine kaydedildi.
+                            </p>
+                        </div>
                     )}
-                    {ai.summary && (
+                    {ai?.summary && (
                         <div className="bg-white border border-slate-200 rounded-lg p-4">
                             <div className="text-xs font-bold uppercase text-slate-500 mb-2">
                                 Özet
@@ -865,27 +903,52 @@ function ResultPanel({ result, onClose }) {
                             <p className="text-sm text-slate-700 leading-relaxed">{ai.summary}</p>
                         </div>
                     )}
-                    {Array.isArray(ai.questions) && ai.questions.length > 0 && (
+                    {(ai?.strengths?.length > 0 || ai?.concerns?.length > 0) && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {ai.strengths?.length > 0 && (
+                                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+                                    <div className="text-xs font-bold uppercase text-emerald-700 mb-1.5">
+                                        Öne çıkanlar
+                                    </div>
+                                    <ul className="space-y-1">
+                                        {ai.strengths.map((t, i) => (
+                                            <li key={i} className="text-xs text-emerald-800 leading-relaxed">· {t}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                            {ai.concerns?.length > 0 && (
+                                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                                    <div className="text-xs font-bold uppercase text-amber-700 mb-1.5">
+                                        Dikkat edilecekler
+                                    </div>
+                                    <ul className="space-y-1">
+                                        {ai.concerns.map((t, i) => (
+                                            <li key={i} className="text-xs text-amber-800 leading-relaxed">· {t}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    {/* Soru başına GÖZLEM — puan değil. Cevap başına 0-100
+                        vermek aynı şişme sorununu satır satır tekrarlıyordu. */}
+                    {Array.isArray(ai?.questions) && ai.questions.length > 0 && (
                         <div className="space-y-2">
                             <div className="text-xs font-bold uppercase text-slate-500">
-                                Soru Skorları
+                                Soru bazlı gözlemler
                             </div>
                             {ai.questions.map((q, i) => (
                                 <div
                                     key={i}
                                     className="bg-white border border-slate-200 rounded-lg p-3"
                                 >
-                                    <div className="flex items-start justify-between gap-3 mb-1">
-                                        <div className="text-sm font-semibold text-slate-800 flex-1">
-                                            {q.question}
-                                        </div>
-                                        <div className="text-sm font-black text-indigo-600 whitespace-nowrap">
-                                            {q.score}/100
-                                        </div>
+                                    <div className="text-sm font-semibold text-slate-800 mb-1">
+                                        {q.question}
                                     </div>
-                                    {q.rationale && (
+                                    {q.observation && (
                                         <p className="text-xs text-slate-500 leading-relaxed">
-                                            {q.rationale}
+                                            {q.observation}
                                         </p>
                                     )}
                                 </div>
