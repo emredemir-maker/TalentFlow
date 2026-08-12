@@ -278,3 +278,46 @@ describe('statusLabel ve isUpgrade', () => {
         expect(isUpgrade('partial', 'partial')).toBe(false);
     });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OLMAYAN MÜLAKATI VAR DİYE RAPOR ETME.
+//
+// Kullanıcı ekran görüntüsü gönderdi: hiç görüşülmemiş bir adayda panel
+// "Mülakat kaydı var ama CV taraması eski gereksinim listesine ait" diyordu.
+// Sorduk, "hayır daha görüşmedim" dedi.
+//
+// Sebep sıradaydı: bayatlık kontrolü, mülakat kaydı olup olmadığına
+// bakılmadan ÖNCE yapılıyordu. Sistemin olmayan bir kaydı varmış gibi
+// göstermesi, yanlış bir sayı göstermesinden kötü — kullanıcı verisine olan
+// güveni sarsıyor.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('mülakatı olmayan adayda bayat CV', () => {
+    const staleCv = { ...cvAnalysis(['met', 'met', 'missing', 'met']), requirementsFingerprint: 'rESKI' };
+
+    it('does not claim an interview exists when there is none', () => {
+        const merged = mergeInterviewCoverage(staleCv, { name: 'Onol' }, POSITION);
+        expect(merged.hasInterview).toBe(false);
+        expect(merged.cvStale).toBe(false); // ← panel bu yüzden hiç görünmüyor
+    });
+
+    it('stays silent for a candidate with no interview and a fresh scan', () => {
+        const merged = mergeInterviewCoverage(cvAnalysis(['met', 'met', 'missing', 'met']), {}, POSITION);
+        expect(merged.hasInterview).toBe(false);
+        expect(merged.cvStale).toBe(false);
+    });
+
+    it('still reports cvStale when an interview genuinely exists', () => {
+        // Asıl mesaj hâlâ ulaşılabilir olmalı: mülakat var, taban bayat
+        const merged = mergeInterviewCoverage(staleCv, withInterview([v(3, 'met')]), POSITION);
+        expect(merged.cvStale).toBe(true);
+        expect(merged.hasInterview).toBe(false);
+    });
+
+    it('says nothing when both the scan and the interview stamps are stale', () => {
+        // İkisi de eski ilana aitse birleştirilecek bir şey yok ve
+        // "mülakat kaydı var" demek yine yanıltıcı olurdu
+        const merged = mergeInterviewCoverage(staleCv, withInterview([v(3, 'met')], 'rESKI'), POSITION);
+        expect(merged.cvStale).toBe(false);
+        expect(merged.hasInterview).toBe(false);
+    });
+});
