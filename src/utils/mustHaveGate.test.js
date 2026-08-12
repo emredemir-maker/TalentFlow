@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mustHaveGate, gateRank, gateLabel } from './mustHaveGate.js';
+import { requirementsFingerprint } from './positionRequirements.js';
 
 const POSITION = {
     title: 'Growth Product Manager',
@@ -10,7 +11,10 @@ const POSITION = {
     ],
 };
 
-const withStatuses = (statuses) => ({
+// Değerlendirmeler madde NUMARASINA bağlı; damga hangi listeye ait olduklarını
+// söyler. Damgasız kayıtta kapı hüküm veremez.
+const withStatuses = (statuses, fingerprint = requirementsFingerprint(POSITION)) => ({
+    requirementsFingerprint: fingerprint,
     requirementCoverage: {
         assessments: statuses.map((status, i) => ({ index: i + 1, status, note: `not ${i + 1}` })),
     },
@@ -47,6 +51,7 @@ describe('mustHaveGate', () => {
     it('reads assessments nested under scoreData too', () => {
         // Kayıtlar iki yerleşimle de saklanıyor; ikisini de okuyabilmeli
         const analysis = {
+            requirementsFingerprint: requirementsFingerprint(POSITION),
             scoreData: { requirementCoverage: { assessments: [{ index: 1, status: 'missing' }] } },
         };
         expect(mustHaveGate(analysis, POSITION).status).toBe('missing');
@@ -103,5 +108,44 @@ describe('gateLabel', () => {
 
     it('confirms a clean pass', () => {
         expect(gateLabel({ status: 'ok' }).tone).toBe('emerald');
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BAYAT ANALİZDE KAPI HESAPLANMAZ.
+//
+// Canlıda görüldü: gereksinim listesi taramadan sonra değişti ve şerit eski
+// yargıyı YENİ maddenin adıyla raporladı —
+//   "CX ürünü geliştirmiş olmak — Fiyatlandırma sahipliğine dair kanıt yok"
+// Başlık bir maddeden, gerekçe başka bir maddeden. Skor kırılımı bayatken
+// gizleniyordu ama bu şerit gözden kaçmıştı.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('bayat analizde kapı', () => {
+    it('refuses to judge when the requirement list changed after the scan', () => {
+        const gate = mustHaveGate(withStatuses(['met', 'missing', 'met'], 'rESKI'), POSITION);
+        expect(gate.status).toBe('unknown');
+        expect(gate.missing).toEqual([]);
+        expect(gate.partial).toEqual([]);
+    });
+
+    it('refuses to judge an unstamped analysis', () => {
+        // Hangi listeye ait olduğunu bilmiyoruz; varsaymak aynı kaymayı üretir
+        const gate = mustHaveGate({
+            requirementCoverage: { assessments: [{ index: 1, status: 'missing' }] },
+        }, POSITION);
+        expect(gate.status).toBe('unknown');
+    });
+
+    it('still reports how many must-haves the ad has', () => {
+        // "Hüküm veremiyorum" demek, ilanın kaç zorunlusu olduğunu da
+        // gizlemek anlamına gelmemeli
+        expect(mustHaveGate(withStatuses(['met', 'met', 'met'], 'rESKI'), POSITION).totalMust).toBe(2);
+    });
+
+    it('judges normally once the analysis matches the current list', () => {
+        const gate = mustHaveGate(withStatuses(['met', 'missing', 'met']), POSITION);
+        expect(gate.status).toBe('missing');
+        expect(gate.missing[0].text).toBe('A/B test kurgulama');
+        expect(gate.missing[0].note).toBe('not 2');
     });
 });

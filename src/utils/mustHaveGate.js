@@ -9,7 +9,7 @@
 // (EU AI Act yüksek riskli kategori: sistem öneri sunar, insan karar verir).
 // Arayüz bunu rozet olarak gösterir ve varsayılan sıralamada aşağı alır.
 
-import { requirementsOf } from './positionRequirements';
+import { requirementsOf, requirementsFingerprint } from './positionRequirements';
 
 /** Analiz kaydından madde değerlendirmelerini çıkarır (iki olası yerleşim). */
 function assessmentsOf(analysis) {
@@ -45,6 +45,20 @@ export function mustHaveGate(analysis, position) {
         .map((r, i) => ({ ...r, index: i + 1 }))
         .filter((r) => r.must === true);
     if (must.length === 0) return empty;
+
+    // BAYAT ANALİZDE KAPI HESAPLANMAZ.
+    //
+    // Değerlendirmeler madde NUMARASINA bağlı. Gereksinim listesi değişince o
+    // numara başka bir maddeye denk gelir ve kapı, eski yargıyı yeni maddenin
+    // adıyla raporlar. Canlıda tam olarak bu görüldü:
+    //   "CX ürünü geliştirmiş olmak — Fiyatlandırma sahipliğine dair kanıt yok"
+    // Başlık bir maddeden, gerekçe başka bir maddeden.
+    //
+    // Skor kırılımını bayatken gizlemiştik ama bu şerit gözden kaçmıştı.
+    // Hüküm veremeyeceğimiz yerde "unknown" demek, yanlış hüküm vermekten iyi.
+    if (analysis?.requirementsFingerprint !== requirementsFingerprint(position)) {
+        return { ...empty, totalMust: must.length };
+    }
 
     const assessments = assessmentsOf(analysis);
     if (!assessments) return { ...empty, totalMust: must.length };
