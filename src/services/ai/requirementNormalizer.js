@@ -103,7 +103,7 @@ export async function normalizeRequirements({ mustText = '', niceText = '', titl
     });
 
     const model = await getModel();
-    const result = await model.generateContent(prompt, { maxOutputTokens: 8192 });
+    const result = await model.generateContent(prompt, { maxOutputTokens: 8192, label: 'requirement' });
     const parsed = parseAIJson(result.response.text(), { items: [], notes: [] });
 
     const items = (Array.isArray(parsed?.items) ? parsed.items : [])

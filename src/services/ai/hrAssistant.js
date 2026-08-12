@@ -125,7 +125,7 @@ export async function questionToQuery(question, { positions = [], activePosition
     });
 
     const model = await getModel();
-    const result = await model.generateContent(prompt, { maxOutputTokens: 2048 });
+    const result = await model.generateContent(prompt, { maxOutputTokens: 2048, label: 'assistant' });
     const parsed = parseAIJson(result.response.text(), null);
     if (!parsed || typeof parsed !== 'object') {
         throw new Error('Soru sorguya çevrilemedi. Biraz daha somut yazmayı deneyin.');
@@ -163,7 +163,7 @@ export async function narrateResult(question, result) {
     });
 
     const model = await getModel();
-    const res = await model.generateContent(prompt, { maxOutputTokens: 1024 });
+    const res = await model.generateContent(prompt, { maxOutputTokens: 1024, label: 'assistant' });
     const parsed = parseAIJson(res.response.text(), { comment: '' });
     return String(parsed?.comment || '').trim();
 }

@@ -227,7 +227,7 @@ async function runNarrative(prompt, modelId) {
     // bulamadığı için hiçbir kurtarma denemesi tutmaz — analiz sessizce
     // "sonuç üretmedi"ye düşerdi. Cap'tir, hedef değil: kısa yanıtlar için
     // maliyeti yok.
-    const result = await model.generateContent(prompt, { maxOutputTokens: 16384 });
+    const result = await model.generateContent(prompt, { maxOutputTokens: 16384, label: 'narrative' });
     const raw = result.response.text();
     const parsed = parseAIJson(raw);
     if (!parsed) {

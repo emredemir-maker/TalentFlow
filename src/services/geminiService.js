@@ -93,7 +93,7 @@ Sadece şu JSON formatında dön:
     const model = await getModel(modelId);
     // Long CVs produce long structured JSON (cvData + multi-entry experiences).
     // Default 8k cap was truncating the output mid-string and breaking JSON.parse.
-    const result = await model.generateContent(prompt, { maxOutputTokens: 32768 });
+    const result = await model.generateContent(prompt, { maxOutputTokens: 32768, label: 'cv-parse' });
     const parsed = parseAIJson(result.response.text());
     // Merge regex-extracted contact info so the record is complete
     // without having leaked PII to the AI model.
@@ -136,7 +136,7 @@ Sadece şu JSON formatında dön (başka hiçbir şey yazma):
     const model = await getModel(modelId);
     // Same rationale as parseCandidateFromText: long CVs blow past the
     // 8k default and the structured array gets truncated mid-entry.
-    const result = await model.generateContent(prompt, { maxOutputTokens: 32768 });
+    const result = await model.generateContent(prompt, { maxOutputTokens: 32768, label: 'cv-parse' });
     const raw = result.response.text().replace(/```json|```/gi, '').trim();
     try {
         const arr = JSON.parse(raw);
