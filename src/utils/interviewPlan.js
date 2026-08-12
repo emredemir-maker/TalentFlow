@@ -325,7 +325,15 @@ export function planToText(plan, probes, { candidateName = '', positionTitle = '
         const tier = priorityLabel(p.priority).text;
         lines.push(`${i + 1}. [${p.minutes} dk] [${tier}] ${p.text}${p.must ? ' (ZORUNLU)' : ''}`);
         lines.push(`   Neden: ${p.why}`);
-        lines.push(`   SORU: ${p.question}`);
+        // Soru YAZILMAMIŞ olabilir — kullanıcı "Soruları yaz"a basmamış ya da
+        // AI çağrısı hiç yapılamamış olabilir (canlıda oldu: harcama tavanı).
+        // Böyle bir durumda plan yine de işe yarar; hangi maddeyi neden
+        // soracağını söylüyor. Ama `${undefined}` basmak planı çöpe çevirir.
+        if (p.question) {
+            lines.push(`   SORU: ${p.question}`);
+        } else {
+            lines.push('   SORU: (yazılmadı — bu maddeyi kendi sözlerinizle sorun)');
+        }
         if (p.followUp) lines.push(`   Yüzeysel kalırsa: ${p.followUp}`);
         if (p.listenFor) lines.push(`   İyi cevapta: ${p.listenFor}`);
         lines.push('');

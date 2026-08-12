@@ -201,6 +201,23 @@ export default function InterviewPlanPanel({ candidate, position, analysis, onSa
                         <p className="text-[10px] text-red-600">{error}</p>
                     )}
 
+                    {/* AI HİÇBİR SORUYU YAZAMADI.
+                        generateProbeQuestions hata durumunda sessizce yedek
+                        sorulara düşüyor — plan çalışır kalsın diye doğru bir
+                        karar, ama kullanıcı bunu bilmezse jenerik soruları
+                        "AI'ın adaya özel yazdığı sorular" sanır. Canlıda
+                        harcama tavanı dolunca tam olarak bu oldu. */}
+                    {written && written.length > 0 && written.every((p) => !p.generated) && (
+                        <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                            <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                            <p className="text-[10px] text-amber-800 leading-relaxed">
+                                <strong>Sorular AI ile yazılamadı</strong> — aşağıdakiler hazır yedek
+                                sorular. Plan yine geçerli: hangi maddeyi neden soracağınız doğru.
+                                Yalnızca cümleler adaya özel değil, kendi sözlerinizle sorabilirsiniz.
+                            </p>
+                        </div>
+                    )}
+
                     {/* Açılış */}
                     <Block minutes={plan.minutes.opening} title="Açılış">
                         Tanışma, sürecin akışı, adayın son rolü. Değerlendirme burada başlamaz.
