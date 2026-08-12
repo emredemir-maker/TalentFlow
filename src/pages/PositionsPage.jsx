@@ -1797,6 +1797,11 @@ export default function PositionsPage() {
             {/* Yeniden tarama: hem ilan kaydedildikten sonra hem de ilan
                 detayından açılır; eşiği kullanıcı belirler. */}
             <RescanPositionModal
+                // Diyalog kapanınca unmount OLMUYOR (isOpen ile gizleniyor),
+                // bu yüzden seçim ve arama bir sonraki ilana taşınırdı. Anahtar
+                // değişince bileşen sıfırdan kurulur — senkronizasyon effect'i
+                // yazmaktan daha güvenli.
+                key={rescanTarget?.position?.id || 'none'}
                 position={rescanTarget?.position}
                 candidates={rescanTarget ? candidatesForPosition(rescanTarget.position, rescanTarget.previousTitle) : []}
                 isOpen={Boolean(rescanTarget)}
