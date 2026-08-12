@@ -27,7 +27,7 @@ const router = Router();
 // mülakat adayı anon Firebase oturumuyla gelir) — ama tokensız dış çağrılar
 // (açık Gemini proxy kötüye kullanımı) 401 alır.
 router.post('/api/ai/generate', aiLimiter, verifyFirebaseToken, async (req, res) => {
-    const { prompt, modelId = 'gemini-2.5-flash', mimeType, maxOutputTokens } = req.body || {};
+    const { prompt, modelId = 'gemini-2.5-flash', mimeType, maxOutputTokens, label } = req.body || {};
     if (!prompt || typeof prompt !== 'string') {
         return res.status(400).json({ error: 'prompt is required' });
     }
@@ -52,6 +52,9 @@ router.post('/api/ai/generate', aiLimiter, verifyFirebaseToken, async (req, res)
         // generationConfig). Identical re-runs return instantly.
         const text = await generateText(prompt, {
             modelId,
+            // Hangi özellik? Etiketsiz ölçüm "toplam şu kadar" der ve hiçbir
+            // karar vermeye yaramaz; asıl soru hangi ekranın ne yaktığı.
+            label,
             generationConfig: {
                 temperature: responseMimeType === 'text/plain' ? 0.7 : 0,
                 topP: responseMimeType === 'text/plain' ? 0.95 : 0,

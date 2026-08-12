@@ -112,7 +112,7 @@ export async function scoreCoverage(jobDescription, candidateData, modelId = 'ge
     const model = await getModel(modelId);
     // Çıktı küçük: 10 madde için üç alan + dört sayı. 2048 fazlasıyla yeter
     // ve dar tavan modeli kısa tutmaya da yardım ediyor.
-    const result = await model.generateContent(prompt, { maxOutputTokens: 2048 });
+    const result = await model.generateContent(prompt, { maxOutputTokens: 2048, label: 'coverage' });
     const parsed = parseAIJson(result.response.text(), { assessments: [], star: {} });
 
     const assessments = (Array.isArray(parsed?.assessments) ? parsed.assessments : [])

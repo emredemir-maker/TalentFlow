@@ -34,7 +34,7 @@ router.post('/api/score-screening-answers', aiLimiter, verifyFirebaseToken, asyn
         { POZISYON: positionTitle || 'Genel Pozisyon', SORU_CEVAPLAR: qaPairs }
     );
     try {
-        const rawText = (await generateText(prompt)).replace(/```json|```/gi, '').trim();
+        const rawText = (await generateText(prompt, { label: 'prescreen' })).replace(/```json|```/gi, '').trim();
         const match = rawText.match(/\{[\s\S]*\}/);
         if (!match) return res.status(500).json({ error: 'AI response could not be parsed.' });
         const parsed = JSON.parse(match[0]);
@@ -66,7 +66,7 @@ router.post('/api/suggest-screening-questions', aiLimiter, requireAuth(), async 
         { POZISYON: positionTitle || 'Genel Pozisyon', GEREKSINIMLER: requirements || '' }
     );
     try {
-        const rawText = (await generateText(prompt)).replace(/```json|```/gi, '').trim();
+        const rawText = (await generateText(prompt, { label: 'prescreen' })).replace(/```json|```/gi, '').trim();
         const match = rawText.match(/\{[\s\S]*\}/);
         if (!match) return res.status(500).json({ error: 'AI response could not be parsed.' });
         const parsed = JSON.parse(match[0]);
@@ -90,7 +90,7 @@ router.post('/api/improve-screening-question', aiLimiter, requireAuth(), async (
         }
     );
     try {
-        const rawText = (await generateText(prompt)).replace(/```json|```/gi, '').trim();
+        const rawText = (await generateText(prompt, { label: 'prescreen' })).replace(/```json|```/gi, '').trim();
         const match = rawText.match(/\{[\s\S]*\}/);
         if (!match) return res.status(500).json({ error: 'AI response could not be parsed.' });
         const parsed = JSON.parse(match[0]);

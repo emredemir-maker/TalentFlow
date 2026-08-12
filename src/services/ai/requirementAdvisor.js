@@ -105,7 +105,7 @@ export async function suggestRequirementRewrites(position, flaggedItems) {
     });
 
     const model = await getModel();
-    const result = await model.generateContent(prompt, { maxOutputTokens: 8192 });
+    const result = await model.generateContent(prompt, { maxOutputTokens: 8192, label: 'requirement' });
     const parsed = parseAIJson(result.response.text(), { reviews: [] });
     return Array.isArray(parsed?.reviews) ? parsed.reviews : [];
 }

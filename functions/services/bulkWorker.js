@@ -170,7 +170,7 @@ ${text.substring(0, 15000)}`;
     // generateText() handles retry/backoff and caches identical CV text
     // (same prompt -> same SHA256 key) so re-runs on transient errors
     // don't pay another quota tick.
-    const raw = (await generateText(prompt, { useCache })).replace(/```json|```/gi, '').trim();
+    const raw = (await generateText(prompt, { useCache, label: 'cv-parse' })).replace(/```json|```/gi, '').trim();
     const match = raw.match(/\{[\s\S]*\}/);
     if (!match) return null;
     try { return JSON.parse(match[0]); } catch { return null; }

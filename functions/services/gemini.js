@@ -30,6 +30,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { db } from '../config/firebaseAdmin.js';
 import { buildStructuredPrompt } from './promptGuard.js';
 import { childLogger } from './logger.js';
+import { recordUsage, readUsage } from './usage.js';
 
 const log = childLogger('gemini');
 
@@ -123,13 +124,17 @@ const MAX_RETRIES = 4;
  * @throws if no API key is configured or if all retries are exhausted
  */
 export async function generateText(prompt, options = {}) {
-    const { modelId = 'gemini-2.5-flash', generationConfig, useCache = true } = options;
+    const { modelId = 'gemini-2.5-flash', generationConfig, useCache = true, label = 'other' } = options;
 
     const key = useCache ? cacheKey(prompt, modelId, generationConfig) : null;
     if (key) {
         const cached = cacheGet(key);
         if (cached !== null) {
             log.debug('cache hit');
+            // Önbellek isabeti de SAYILIR (token'sız). Önbelleğin işe yarayıp
+            // yaramadığını gösteren tek sayı bu oran; isabetleri kaydetmezsek
+            // ölçüm "hiç çağrı yapılmamış" gibi görünür.
+            recordUsage({ label, modelId, cached: true });
             return cached;
         }
     }
@@ -148,6 +153,9 @@ export async function generateText(prompt, options = {}) {
         try {
             const result = await model.generateContent(prompt);
             const text = result.response.text();
+            // Ölçüm beklenmez (await yok): fatura kaydı yüzünden kullanıcı
+            // bekletilmez ve hata yutulur.
+            recordUsage({ label, modelId, usage: readUsage(result.response) });
             if (key) cacheSet(key, text);
             return text;
         } catch (err) {
@@ -248,6 +256,7 @@ export async function generateGrounded(prompt, options = {}) {
                 ...readGrounding(result.response),
                 grounded: true,
             };
+            recordUsage({ label: 'grounded', modelId, usage: readUsage(result.response) });
             if (key) cacheSet(key, value);
             return value;
         } catch (err) {
