@@ -22,6 +22,7 @@ import AddCandidateModal from '../components/AddCandidateModal';
 import CandidateAvatar from '../components/CandidateAvatar';
 import CandidateCvPanel from '../components/CandidateCvPanel';
 import ScoreBreakdownPanel from '../components/ScoreBreakdownPanel';
+import InterviewPlanPanel from '../components/InterviewPlanPanel';
 import MustHaveBadge from '../components/MustHaveBadge';
 import StarEvidenceCards from '../components/StarEvidenceCards';
 import { starPercent } from '../utils/starDimensions';
@@ -922,6 +923,27 @@ export default function CandidateProcessPage() {
     const displayedGate = mustHaveGate(displayedFullAnalysis, displayedPosition);
     const displayedGateLabel = gateLabel(displayedGate);
 
+    /**
+     * Mülakat planını adayın üzerine POZİSYON BAŞINA yazar.
+     *
+     * Aday birden fazla ilana bakılıyor olabilir ve her ilanın açık maddeleri
+     * farklı. Tek bir `interviewPlan` alanı, ikinci pozisyonun planı
+     * yazıldığında birincisini sessizce ezerdi.
+     *
+     * Plan `fingerprint` taşır: ilan sonradan değişirse panel bunu görüp planı
+     * bayat ilan eder. Saklanan bir planın "hâlâ geçerli" sanılması, planın
+     * hiç olmamasından kötü — mülakatçıyı yanlış maddeyi sormaya gönderir.
+     */
+    const handleSaveInterviewPlan = async (plan) => {
+        if (!candidate || !displayedPosition?.title) return;
+        await updateCandidate(candidate.id, {
+            interviewPlans: {
+                ...(candidate.interviewPlans || {}),
+                [displayedPosition.title]: plan,
+            },
+        });
+    };
+
     // STAR rozeti. Hesap starDimensions.starPercent'te — TEK yerde.
     //
     // Burada kendi kopyası vardı ve `(toplam / 4) * 10` ile eski 0-10 ölçeğini
@@ -1387,6 +1409,18 @@ export default function CandidateProcessPage() {
                                             <ScoreBreakdownPanel
                                                 analysis={displayedFullAnalysis}
                                                 position={displayedPosition}
+                                            />
+                                        )}
+
+                                        {/* Mülakat planı — skorun bıraktığı soruyu odaya taşır.
+                                            Kırılımın hemen altında duruyor çünkü aynı veriyi
+                                            okuyor: hangi madde açık kaldıysa mülakatın işi o. */}
+                                        {!analyzingIds.has(candidate.id) && displayedPosition && (
+                                            <InterviewPlanPanel
+                                                candidate={candidate}
+                                                position={displayedPosition}
+                                                analysis={displayedFullAnalysis}
+                                                onSave={handleSaveInterviewPlan}
                                             />
                                         )}
 

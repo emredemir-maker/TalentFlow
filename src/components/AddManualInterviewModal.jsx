@@ -6,8 +6,12 @@
 //   1. Aday seç (mevcut candidates listesinden, search'lü)
 //   2. Pozisyon otomatik adaydan gelir (override edilebilir)
 //   3. Görüşme metadata: tip / tarih / saat / süre / görüşmeci
-//   4. Sorular ve Cevaplar — pozisyonun screeningQuestions'ı varsa
-//      otomatik gelir; recruiter ekleyebilir/silebilir; AI öneri butonu
+//   4. Sorular ve Cevaplar — iki kaynaktan biriyle önceden dolar:
+//        a) Adayın MÜLAKAT PLANI (varsa ve güncel gereksinim listesine aitse).
+//           Bu sorular taramada açık kalmış maddelerden çıkarıldı ve her biri
+//           `requirementIndex` taşır — cevap o gereksinime bağlanabilir.
+//        b) Pozisyonun screeningQuestions'ı — jenerik, herkese aynı.
+//      Recruiter ekleyebilir/silebilir; AI öneri butonu
 //      mevcut /api/suggest-screening-questions endpoint'ini kullanır
 //   5. Opsiyonel: transcript dump + recruiter notları
 //   6. Outcome: olumlu / olumsuz / beklemede
@@ -19,6 +23,7 @@
 // "Kapat"a basınca (sonuç ekranını incelemek için).
 import { useEffect, useMemo, useState } from 'react';
 import { getAuth } from 'firebase/auth';
+import { savedPlanFor } from '../utils/interviewPlan';
 import {
     AlertCircle,
     CheckCircle2,
@@ -114,20 +119,54 @@ export default function AddManualInterviewModal({
         }
     }, [candidateId, candidates, positions]);
 
-    // Auto-load position's screeningQuestions when position changes (only if
-    // recruiter hasn't already typed answers — never clobber typed input)
+    // Soru listesini önceden doldur — iki kaynak, biri diğerinden çok üstün.
+    //
+    //   1. MÜLAKAT PLANI (varsa): adayın taramasında açık kalan maddelerden
+    //      çıkarılmış sorular. Her soru hangi gereksinimi kapattığını taşır
+    //      (`requirementIndex`), yani cevap geldiğinde o maddeye bağlanabilir.
+    //   2. Pozisyonun ön eleme soruları: aynı ilana başvuran herkes için aynı.
+    //
+    // Plan yalnızca GÜNCEL gereksinim listesine aitse kullanılır — savedPlanFor
+    // parmak izini kontrol eder. Eski bir planın soruları, artık var olmayan
+    // maddeleri sorar ve cevaplar yanlış maddeye yazılırdı.
+    //
+    // Yazılmış içeriğin üzerine hiçbir koşulda yazılmaz.
     useEffect(() => {
         if (!positionId) return;
         const pos = positions.find((p) => p.id === positionId);
+        const cand = candidates.find((c) => c.id === candidateId);
+        const hasContent = questions.some((q) => q.question.trim() || q.answer.trim());
+        if (hasContent) return;
+
+        const plan = savedPlanFor(cand, pos);
+        if (plan) {
+            setQuestions(
+                plan.probes.map((p) => ({
+                    question: p.question || p.text,
+                    answer: '',
+                    requirementIndex: p.requirementIndex,
+                    listenFor: p.listenFor || '',
+                    must: Boolean(p.must),
+                }))
+            );
+            return;
+        }
+
         const screening = (pos?.screeningQuestions || []).filter(
             (q) => typeof q === 'string' && q.trim()
         );
         if (screening.length === 0) return;
-        // Only seed if current questions are all empty
-        const hasContent = questions.some((q) => q.question.trim() || q.answer.trim());
-        if (hasContent) return;
         setQuestions(screening.map((q) => ({ question: q, answer: '' })));
-    }, [positionId, positions]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [positionId, candidateId, positions, candidates]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Sorular plandan mı geldi? SAKLANMIYOR, türetiliyor.
+    //
+    // Ayrı bir bayrak tutmuştum ve bayatlıyordu: modal kapanıp başka bir adayla
+    // açıldığında, yeni adayın ne planı ne de ön eleme sorusu varsa doldurma
+    // etkisi erken dönüyor ve bayrak önceki adaydan kalıyordu — ekran jenerik
+    // sorulara "plandan geldi" diyordu. Gereksinim bağı zaten soruların
+    // içinde; ikinci bir yerde tutmak onu yanlış olabilecek hâle getiriyor.
+    const planLoaded = questions.some((q) => Number.isFinite(Number(q.requirementIndex)));
 
     // ── Derived: filtered candidate list for the search dropdown
     const filteredCandidates = useMemo(() => {
@@ -234,9 +273,19 @@ export default function AddManualInterviewModal({
                     time,
                     durationMinutes: Number(durationMinutes) || null,
                     interviewType,
-                    questions: questions.filter(
-                        (q) => q.question.trim() || q.answer.trim()
-                    ),
+                    // requirementIndex plandan gelen sorularda dolu: cevabın
+                    // HANGİ gereksinime dair olduğunu kayda geçirir. Bu bağ
+                    // olmadan mülakat skoru CV skoruyla kıyaslanamaz — yalnızca
+                    // havada duran bir 0-100 olur.
+                    questions: questions
+                        .filter((q) => q.question.trim() || q.answer.trim())
+                        .map((q) => ({
+                            question: q.question,
+                            answer: q.answer,
+                            ...(Number.isFinite(Number(q.requirementIndex))
+                                ? { requirementIndex: Number(q.requirementIndex) }
+                                : {}),
+                        })),
                     transcript,
                     notes,
                     recruiterOutcome,
@@ -349,6 +398,7 @@ export default function AddManualInterviewModal({
                             removeQuestion={removeQuestion}
                             handleAiSuggest={handleAiSuggest}
                             aiSuggesting={aiSuggesting}
+                            planLoaded={planLoaded}
                             // free-text
                             transcript={transcript}
                             setTranscript={setTranscript}
@@ -428,6 +478,7 @@ function FormBody(props) {
         removeQuestion,
         handleAiSuggest,
         aiSuggesting,
+        planLoaded,
         transcript,
         setTranscript,
         notes,
@@ -591,6 +642,22 @@ function FormBody(props) {
 
             {/* Sorular ve Cevaplar */}
             <Section title="Sorular ve Cevaplar">
+                {/* Plandan gelen sorular jenerik değil: her biri taramada açık
+                    kalmış bir gereksinime bağlı ve cevap o maddeye yazılacak.
+                    Kullanıcının bu farkı görmesi gerekiyor — aksi hâlde
+                    soruları silip yerine kendi jenerik sorularını yazar ve
+                    bağ sessizce kopar. */}
+                {planLoaded && (
+                    <div className="mb-3 flex items-start gap-2 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2">
+                        <Sparkles className="w-3.5 h-3.5 text-cyan-500 shrink-0 mt-0.5" />
+                        <p className="text-xs text-cyan-800 leading-relaxed">
+                            Sorular bu adayın <strong>mülakat planından</strong> geldi — her biri
+                            taramada açık kalmış bir gereksinime bağlı. Soru metnini
+                            değiştirebilirsiniz, bağ korunur; <strong>silerseniz</strong> o madde
+                            değerlendirmesiz kalır.
+                        </p>
+                    </div>
+                )}
                 <div className="space-y-3">
                     {questions.map((q, idx) => (
                         <div
@@ -601,6 +668,14 @@ function FormBody(props) {
                                 <span className="text-xs font-bold text-slate-500 mt-2 min-w-[24px]">
                                     Q{idx + 1}
                                 </span>
+                                {q.must && (
+                                    <span
+                                        title="Bu soru zorunlu bir gereksinime bağlı"
+                                        className="mt-2 px-1.5 py-0.5 rounded border border-red-200 bg-red-50 text-red-600 text-[9px] font-black shrink-0"
+                                    >
+                                        zorunlu
+                                    </span>
+                                )}
                                 <input
                                     type="text"
                                     placeholder="Soru…"
@@ -620,6 +695,14 @@ function FormBody(props) {
                                     </button>
                                 )}
                             </div>
+                            {/* "İyi cevapta ne olmalı" — plan yazarken üretildi
+                                ve cevabı yazarken en çok işe yaradığı yer
+                                burası: mülakatçı neyi kaçırdığını görür. */}
+                            {q.listenFor && (
+                                <p className="ml-6 mb-1.5 text-[11px] text-emerald-700 leading-relaxed">
+                                    <span className="font-bold">İyi cevapta:</span> {q.listenFor}
+                                </p>
+                            )}
                             <textarea
                                 placeholder="Adayın cevabı…"
                                 value={q.answer}

@@ -196,6 +196,35 @@ const VALID_INTERVIEW_TYPES = new Set(['phone', 'in-person', 'teams', 'zoom', 'm
 const VALID_OUTCOMES = new Set(['positive', 'negative', 'pending']);
 
 /**
+ * Soru-cevap listesini kayda uygun hâle getirir.
+ *
+ * `requirementIndex` mülakat PLANINDAN gelen sorularda dolu ve cevabın HANGİ
+ * gereksinime dair olduğunu kayda geçirir. Bu bağ olmadan mülakat skoru havada
+ * duran bir 0-100 olur; CV skoruyla kıyaslanamaz ve "şu zorunlu madde odada
+ * kapandı mı?" sorusu cevapsız kalır.
+ *
+ * Pozitif tamsayı olmayan değer sessizce DÜŞER. Uydurma ya da bozuk bir numara
+ * cevabı yanlış maddeye bağlar — bugün aynı sınıf hatanın (numara kayması)
+ * dört ayrı görünümünü düzelttik; beşincisini kaydın içine yazmayalım.
+ *
+ * @param {unknown} questions
+ * @returns {Array<{question: string, answer: string, requirementIndex?: number}>}
+ */
+export function sanitizeQuestions(questions) {
+    if (!Array.isArray(questions)) return [];
+    return questions
+        .filter((q) => q && typeof q.question === 'string' && q.question.trim())
+        .map((q) => {
+            const idx = Number(q.requirementIndex);
+            return {
+                question: String(q.question).slice(0, 1000).trim(),
+                answer: String(q.answer || '').slice(0, 5000).trim(),
+                ...(Number.isInteger(idx) && idx > 0 ? { requirementIndex: idx } : {}),
+            };
+        });
+}
+
+/**
  * Build a Gemini prompt that scores Q&A pairs + optional transcript/notes
  * and returns a structured evaluation. Mirrors /api/score-screening-answers
  * shape, plus a recommendedOutcome field the UI uses to suggest a label.
@@ -292,14 +321,7 @@ router.post(
                 error: `recruiterOutcome şunlardan biri olmalı: ${[...VALID_OUTCOMES].join(', ')}`,
             });
         }
-        const safeQuestions = Array.isArray(questions)
-            ? questions
-                  .filter((q) => q && typeof q.question === 'string' && q.question.trim())
-                  .map((q) => ({
-                      question: String(q.question).slice(0, 1000).trim(),
-                      answer: String(q.answer || '').slice(0, 5000).trim(),
-                  }))
-            : [];
+        const safeQuestions = sanitizeQuestions(questions);
         const hasContent =
             safeQuestions.length > 0 ||
             (transcript && transcript.trim()) ||
