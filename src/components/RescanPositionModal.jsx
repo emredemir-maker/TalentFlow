@@ -16,12 +16,13 @@
 // Eşik, adayın O POZİSYON için mevcut skoruna uygulanır (kayıtlı analiz ile
 // ücretsiz anahtar-kelime skorunun büyüğü — scoreForPosition).
 import { useMemo, useState } from 'react';
-import { Target, Loader2, X, AlertCircle } from 'lucide-react';
+import { Target, Loader2, X, AlertCircle, Search } from 'lucide-react';
 
 import { scoreForPosition } from '../utils/candidateTable';
 import { calculateMatchScore } from '../services/matchService';
 import { analysisFor, isStaleFor } from '../utils/positionScore';
 import { usesCurrentRubric } from '../utils/coverageDetail';
+import { resolveTargets, searchableTargets } from '../utils/rescanTargets';
 
 /** Tarama kapsamı. */
 const SCOPES = {
@@ -42,6 +43,10 @@ export default function RescanPositionModal({
 }) {
     const [minScore, setMinScore] = useState('0');
     const [scope, setScope] = useState('stale');
+    // Tek tek seçim. Boşsa kapsam+eşik davranışı birebir eskisi gibi çalışır —
+    // toplu akış bu eklemeden etkilenmemeli.
+    const [picked, setPicked] = useState(() => new Set());
+    const [search, setSearch] = useState('');
 
     // Adayın bu pozisyondaki güncel skoru + analizinin bayat olup olmadığı.
     // calculateMatchScore {score,...} objesi döndürür; ham geçilirse skor
@@ -74,7 +79,22 @@ export default function RescanPositionModal({
     )), [scored, scope]);
 
     const threshold = Number(minScore) || 0;
-    const selected = inScope.filter((s) => s.score >= threshold);
+    const selected = resolveTargets({ scored, inScope, threshold, picked });
+
+    // Tek tek seçim yapıldıysa kapsam ve eşik devre dışı — kullanıcı zaten
+    // kimi istediğini söyledi.
+    const manual = picked.size > 0;
+
+    const searchable = useMemo(
+        () => searchableTargets(scored, search, picked),
+        [scored, search, picked]
+    );
+
+    const toggle = (id) => setPicked((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        return next;
+    });
 
     if (!isOpen || !position) return null;
 
@@ -113,7 +133,7 @@ export default function RescanPositionModal({
                         varsayılan olarak hepsini taratmak yüzlerce gereksiz
                         AI çağrısı demek. Düzeltilmesi gereken küme bayat
                         olanlar ve parmak izi onu kesin biliyor. */}
-                    <div>
+                    <div className={manual ? 'opacity-40 pointer-events-none' : ''}>
                         <label className="block text-[11px] font-bold text-slate-600 mb-1.5">
                             Kimler taransın?
                         </label>
@@ -149,7 +169,87 @@ export default function RescanPositionModal({
                         )}
                     </div>
 
+                    {/* TEK TEK SEÇİM.
+                        Eskiden yoktu ve tek bir adayı bir ilana karşı
+                        taratmanın yolu da yoktu: en dar kapsam 87 aday, en
+                        genişi 440. Tek aday için 87 AI çağrısı yapmak
+                        gerekiyordu. Arama TÜM havuzda çalışır — aranan aday
+                        çoğu zaman seçili kapsamın dışında kalıyor. */}
                     <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                            <label className="text-[11px] font-bold text-slate-600">
+                                Ya da tek tek seçin
+                            </label>
+                            {manual && (
+                                <button
+                                    type="button"
+                                    onClick={() => setPicked(new Set())}
+                                    disabled={running}
+                                    className="text-[10px] font-bold text-cyan-600 hover:text-cyan-700 disabled:opacity-40"
+                                >
+                                    Seçimi temizle ({picked.size})
+                                </button>
+                            )}
+                        </div>
+                        <div className="relative">
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-300" />
+                            <input
+                                type="text"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                disabled={running}
+                                placeholder="Aday ara — isim ya da e-posta"
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-[12px] text-slate-800 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 disabled:opacity-50"
+                            />
+                        </div>
+                        {(search.trim() || manual) && (
+                            <div className="mt-1.5 max-h-44 overflow-y-auto rounded-xl border border-slate-200 divide-y divide-slate-100">
+                                {searchable.length === 0 && (
+                                    <p className="px-3 py-3 text-[11px] text-slate-400">
+                                        Bu aramayla eşleşen aday yok.
+                                    </p>
+                                )}
+                                {searchable.map((s) => (
+                                    <label
+                                        key={s.candidate.id}
+                                        className="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer hover:bg-slate-50"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={picked.has(s.candidate.id)}
+                                            onChange={() => toggle(s.candidate.id)}
+                                            disabled={running}
+                                            className="accent-cyan-500 shrink-0"
+                                        />
+                                        <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-slate-700">
+                                            {s.candidate.name || '—'}
+                                        </span>
+                                        {s.stale && (
+                                            <span className="shrink-0 px-1.5 py-px rounded bg-amber-50 border border-amber-200 text-[9px] font-black text-amber-700">
+                                                bayat
+                                            </span>
+                                        )}
+                                        {!s.scanned && (
+                                            <span className="shrink-0 px-1.5 py-px rounded bg-slate-50 border border-slate-200 text-[9px] font-black text-slate-500">
+                                                taranmamış
+                                            </span>
+                                        )}
+                                        <span className="shrink-0 tabular-nums text-[10px] font-black text-slate-400">
+                                            %{s.score}
+                                        </span>
+                                    </label>
+                                ))}
+                            </div>
+                        )}
+                        {manual && (
+                            <p className="text-[10px] text-cyan-700 mt-1.5 leading-snug">
+                                Seçim yaptığınız için <strong>kapsam ve eşik yok sayılıyor</strong> —
+                                yalnızca işaretlediğiniz {picked.size} aday taranacak.
+                            </p>
+                        )}
+                    </div>
+
+                    <div className={manual ? 'opacity-40 pointer-events-none' : ''}>
                         <label className="block text-[11px] font-bold text-slate-600 mb-1.5">
                             Minimum uyum skoru
                         </label>
