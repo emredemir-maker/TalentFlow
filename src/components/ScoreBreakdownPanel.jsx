@@ -4,6 +4,7 @@ import { explainHybridScore } from '../services/geminiService';
 import { requirementsOf } from '../utils/positionRequirements';
 import { coverageDetailState, usesCurrentRubric } from '../utils/coverageDetail';
 import { isStaleFor, analysisScoreDetail } from '../utils/positionScore';
+import { STAR_MAX, STAR_LABELS, anchorLabel } from '../utils/starDimensions';
 
 /**
  * "Bu skor neden 54?" — skorun tam kırılımı.
@@ -178,10 +179,19 @@ export default function ScoreBreakdownPanel({ analysis, position }) {
                                 </h5>
                             </div>
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                                {/* ETİKET TÜRKÇE, ÖLÇEK PAYLAŞILAN SABİTTEN.
+                                    İkisi de canlıda yanlıştı:
+                                    · `{d.key}` + CSS uppercase, sayfa lang="tr"
+                                      olduğu için 'Situation' → SİTUATİON
+                                    · `/10` sabiti 0-10 döneminden kalmış; tam
+                                      not alan boyut "3/10" görünüyordu */}
                                 {exp.star.dimensions.map((d) => (
                                     <div key={d.key} className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-1.5">
-                                        <p className="text-[9px] font-black text-slate-400 uppercase">{d.key}</p>
-                                        <p className="text-[13px] font-black text-slate-700">{d.score}/10</p>
+                                        <p className="text-[9px] font-black text-slate-400 uppercase">
+                                            {STAR_LABELS[d.key] || d.key}
+                                        </p>
+                                        <p className="text-[13px] font-black text-slate-700">{d.score}/{STAR_MAX}</p>
+                                        <p className="text-[8px] text-slate-400">{anchorLabel(d.score, STAR_MAX)}</p>
                                     </div>
                                 ))}
                             </div>
