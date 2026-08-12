@@ -16,8 +16,33 @@
 
 export const STAR_KEYS = ['Situation', 'Task', 'Action', 'Result'];
 
+/**
+ * STAR ölçeğinin ÜST SINIRI — 0-3.
+ *
+ * Sabit olarak burada duruyor çünkü canlıda bir ekran hâlâ "/10" yazıyordu:
+ * 0-10'dan 0-3'e geçilirken kırılım paneli atlanmış. Tam not alan bir boyut
+ * ekranda "3/10" görünüyordu — felaket gibi okunan, aslında kusursuz bir
+ * sonuç. Ölçeği yazan her ekran buradan okusun.
+ */
+export const STAR_MAX = 3;
+
 /** 0-3 çapalarının insan okunur karşılığı. */
 export const ANCHOR_LABELS = ['Bilgi yok', 'Anılmış', 'Anlatılmış', 'Ölçülmüş'];
+
+/**
+ * Boyut adlarının Türkçesi.
+ *
+ * Ham İngilizce anahtarı ekrana basıp CSS ile büyütmek YANLIŞ: sayfa
+ * `lang="tr"` ve tarayıcı Türkçe büyütme kuralı uyguluyor — 'Situation'
+ * ekranda **SİTUATİON** çıkıyordu (noktalı İ). Bugün aynı tuzağa altıncı kez
+ * düşüldü, bu sefer JS'te değil CSS'te.
+ */
+export const STAR_LABELS = {
+    Situation: 'Durum',
+    Task: 'Görev',
+    Action: 'Eylem',
+    Result: 'Sonuç',
+};
 
 /** Eski "Pozitif (+): … Negatif (-): …" metnini ikiye böler. */
 function splitLegacyReason(text) {
