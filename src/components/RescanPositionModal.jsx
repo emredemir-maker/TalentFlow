@@ -34,6 +34,16 @@ const SCOPES = {
 export default function RescanPositionModal({
     position,
     candidates,
+    // TÜM havuz — yalnızca tek tek seçim için.
+    //
+    // `candidates` ilanın ALANINA uyan adaylardan oluşuyor. Kullanıcı "bence
+    // bu aday bu ilana uyar" dediğinde sisteme bunu söyleyemiyordu: domain
+    // filtresi adayı listeye bile sokmuyordu. Kararın makinede değil insanda
+    // olması gerekiyor.
+    //
+    // Kapsam sayıları ve eşik ESKİ havuzla çalışmaya devam ediyor; yalnızca
+    // arama kutusu tüm havuzu görüyor.
+    allCandidates,
     isOpen,
     running,
     progress,
@@ -51,10 +61,10 @@ export default function RescanPositionModal({
     // Adayın bu pozisyondaki güncel skoru + analizinin bayat olup olmadığı.
     // calculateMatchScore {score,...} objesi döndürür; ham geçilirse skor
     // sessizce 0 olur (tabloda da aynı sarmalayıcı kullanılıyor).
-    const scored = useMemo(() => {
+    const scoreAll = useMemo(() => (list) => {
         if (!position) return [];
         const keywordScoreFn = (c, p) => calculateMatchScore(c, p).score;
-        return (candidates || []).map((c) => {
+        return (list || []).map((c) => {
             const analysis = analysisFor(c, position.title);
             return {
                 candidate: c,
@@ -66,7 +76,23 @@ export default function RescanPositionModal({
                 stale: Boolean(analysis) && (isStaleFor(analysis, position) || !usesCurrentRubric(analysis)),
             };
         });
-    }, [candidates, position]);
+    }, [position]);
+
+    // Kapsam ve eşik: ilanın alanına uyan havuz (eski davranış).
+    const scored = useMemo(() => scoreAll(candidates), [scoreAll, candidates]);
+
+    // Arama ve tek tek seçim: TÜM havuz. Alan dışı bir adayı taratmak
+    // isteyen kullanıcı onu bulabilmeli.
+    const scoredAll = useMemo(
+        () => scoreAll(allCandidates?.length ? allCandidates : candidates),
+        [scoreAll, allCandidates, candidates]
+    );
+
+    /** Bu aday ilanın alanına uymuyor — seçildiyse kullanıcı bilerek eziyor. */
+    const relatedIds = useMemo(
+        () => new Set((candidates || []).map((c) => c.id)),
+        [candidates]
+    );
 
     const counts = useMemo(() => ({
         stale: scored.filter((s) => s.stale).length,
@@ -79,15 +105,21 @@ export default function RescanPositionModal({
     )), [scored, scope]);
 
     const threshold = Number(minScore) || 0;
-    const selected = resolveTargets({ scored, inScope, threshold, picked });
+    const selected = resolveTargets({ scored: scoredAll, inScope, threshold, picked });
 
     // Tek tek seçim yapıldıysa kapsam ve eşik devre dışı — kullanıcı zaten
     // kimi istediğini söyledi.
     const manual = picked.size > 0;
 
+    // Kullanıcının bilerek ezdiği sistem yargısı — sayısı görünsün.
+    const offDomainPicked = useMemo(
+        () => [...picked].filter((id) => !relatedIds.has(id)).length,
+        [picked, relatedIds]
+    );
+
     const searchable = useMemo(
-        () => searchableTargets(scored, search, picked),
-        [scored, search, picked]
+        () => searchableTargets(scoredAll, search, picked),
+        [scoredAll, search, picked]
     );
 
     const toggle = (id) => setPicked((prev) => {
@@ -234,6 +266,17 @@ export default function RescanPositionModal({
                                                 taranmamış
                                             </span>
                                         )}
+                                        {/* Sistem bu adayı ilanın alanına uygun
+                                            görmüyor. Seçilebilir — karar sizin —
+                                            ama bilerek seçtiğinizi görün. */}
+                                        {!relatedIds.has(s.candidate.id) && (
+                                            <span
+                                                title="Sistem bu adayı ilanın alanına uygun görmüyor; yine de taratabilirsiniz"
+                                                className="shrink-0 px-1.5 py-px rounded bg-violet-50 border border-violet-200 text-[9px] font-black text-violet-600"
+                                            >
+                                                alan dışı
+                                            </span>
+                                        )}
                                         <span className="shrink-0 tabular-nums text-[10px] font-black text-slate-400">
                                             %{s.score}
                                         </span>
@@ -245,6 +288,12 @@ export default function RescanPositionModal({
                             <p className="text-[10px] text-cyan-700 mt-1.5 leading-snug">
                                 Seçim yaptığınız için <strong>kapsam ve eşik yok sayılıyor</strong> —
                                 yalnızca işaretlediğiniz {picked.size} aday taranacak.
+                                {offDomainPicked > 0 && (
+                                    <>
+                                        {' '}Bunların <strong>{offDomainPicked} tanesi</strong> sistemin
+                                        alan dışı saydığı aday; sizin kararınızla taranacak.
+                                    </>
+                                )}
                             </p>
                         )}
                     </div>

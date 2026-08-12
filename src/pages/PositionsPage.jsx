@@ -1804,6 +1804,9 @@ export default function PositionsPage() {
                 key={rescanTarget?.position?.id || 'none'}
                 position={rescanTarget?.position}
                 candidates={rescanTarget ? candidatesForPosition(rescanTarget.position, rescanTarget.previousTitle) : []}
+                // Arama kutusu TÜM havuzu görsün: "bence bu aday bu ilana uyar"
+                // diyen kullanıcı, sistemin alan filtresini ezebilmeli.
+                allCandidates={enrichedCandidates}
                 isOpen={Boolean(rescanTarget)}
                 running={Boolean(rescanProgress)}
                 progress={rescanProgress}

@@ -120,3 +120,50 @@ describe('searchableTargets', () => {
         expect(searchableTargets(SCORED, null, undefined)).toHaveLength(4);
     });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ALAN DIŞI ADAYI DA TARATABİLMEK.
+//
+// Kullanıcı sordu: "bir aday benim growth pozisyonum için uygun değildir ama
+// daha uygun olduğu bir pozisyon olabilir, ona uyumunu nasıl ölçerim?"
+//
+// Ölçemiyordu. Domain filtresi adayı havuza sokmuyordu; ne "Yeniden Analiz
+// Et" o ilanı deniyordu ne de yeniden tarama diyaloğunda aday listede
+// çıkıyordu. Yani "bence bu aday bu ilana uyar" cümlesini sisteme
+// söyleyemiyordunuz.
+//
+// Karar makinede değil insanda olmalı. Arama artık TÜM havuzu görüyor;
+// kapsam ve eşik ise eski (alan uyumlu) havuzla çalışmaya devam ediyor.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('alan dışı aday', () => {
+    // Kapsam havuzu: ilanın alanına uyanlar
+    const related = [row('a', 'Mustafa Enc', 39, { stale: true, scanned: true })];
+    // Tüm havuz: alan dışı Onol da içinde
+    const everyone = [...related, row('z', 'Onol Ustun', 8, { stale: false, scanned: false })];
+
+    it('finds an off-domain candidate the scope pool never contained', () => {
+        expect(searchableTargets(related, 'onol', new Set())).toEqual([]);
+        expect(searchableTargets(everyone, 'onol', new Set()).map((s) => s.candidate.id)).toEqual(['z']);
+    });
+
+    it('scans exactly the off-domain candidate when picked', () => {
+        const out = resolveTargets({
+            scored: everyone,
+            inScope: related,
+            threshold: 0,
+            picked: new Set(['z']),
+        });
+        expect(out.map((s) => s.candidate.id)).toEqual(['z']);
+    });
+
+    it('leaves the bulk path on the scope pool — picking is the only override', () => {
+        // Seçim yoksa alan dışı aday HİÇ taranmamalı; toplu akış değişmedi
+        const out = resolveTargets({
+            scored: everyone,
+            inScope: related,
+            threshold: 0,
+            picked: new Set(),
+        });
+        expect(out.map((s) => s.candidate.id)).toEqual(['a']);
+    });
+});
