@@ -110,18 +110,52 @@ export async function scoreCoverage(jobDescription, candidateData, modelId = 'ge
     });
 
     const model = await getModel(modelId);
-    // Çıktı küçük: 10 madde için üç alan + dört sayı. 2048 fazlasıyla yeter
-    // ve dar tavan modeli kısa tutmaya da yardım ediyor.
-    const result = await model.generateContent(prompt, { maxOutputTokens: 2048, label: 'coverage' });
-    const parsed = parseAIJson(result.response.text(), { assessments: [], star: {} });
+    // TAVAN 2048 DEĞİL.
+    //
+    // Çıktının kendisi küçük (10 madde × üç alan + dört sayı) ve ilk sürüm bu
+    // yüzden 2048 kullanıyordu. Ama Gemini 2.5 Flash'ta DÜŞÜNME AÇIK ve
+    // düşünme token'ları bu tavana dahil. Uzun bir gereksinim listesinde
+    // düşünme bütçeyi tüketiyor, cevaba yer kalmıyor ve yanıt yarıda kesiliyor.
+    //
+    // Canlıda görüldü: dün STAR 2/3 ve zengin kanıt üreten bir CV, bugün aynı
+    // ilanda 0/0/0/0 döndü. Aday değişmemişti, yanıt boş geliyordu.
+    const result = await model.generateContent(prompt, { maxOutputTokens: 8192, label: 'coverage' });
+    const raw = result.response.text();
 
-    const assessments = (Array.isArray(parsed?.assessments) ? parsed.assessments : [])
+    // SESSİZ BOŞ DÖNÜŞ YOK.
+    //
+    // Burada `parseAIJson(raw, { assessments: [], star: {} })` vardı: yanıt
+    // okunamayınca boş bir sonuç dönüyordu ve bu, "aday hiçbir maddeyi
+    // karşılamıyor" ile BİREBİR aynı görünüyordu. Skoru 0, STAR'ı 0/3, arayüzde
+    // "CV'de bu boyuta dair bilgi bulunamadı" — kusursuz bir CV için.
+    //
+    // Anlatım çağrısı okunamayan yanıtta zaten hata fırlatıyor. Skoru BELİRLEYEN
+    // çağrının daha sessiz olması tam tersi olmalıydı: bu çağrı patladığında en
+    // gürültülü o olmalı.
+    const parsed = parseAIJson(raw);
+    if (!parsed || !Array.isArray(parsed.assessments)) {
+        throw new Error(
+            `Skor çağrısının yanıtı okunamadı (uzunluk: ${String(raw || '').length}). `
+            + 'Yanıt boş ya da kesilmiş olabilir — analiz kaydedilmedi.'
+        );
+    }
+
+    const assessments = parsed.assessments
         .map((a) => ({
             index: Number(a?.index),
             status: STATUSES.has(String(a?.status).toLowerCase()) ? String(a.status).toLowerCase() : 'missing',
             kind: String(a?.kind || '').toLowerCase().startsWith('ara') ? 'arac' : 'deneyim',
         }))
         .filter((a) => Number.isInteger(a.index) && a.index > 0);
+
+    // Boş bir damga listesi de bir başarısızlıktır: ilanın maddeleri varken
+    // model hiçbirine hüküm vermediyse ortada değerlendirme yok demektir.
+    // Bunu 0 puan diye kaydetmek, adaya ait olmayan bir sonucu ona yazmaktır.
+    if (assessments.length === 0) {
+        throw new Error(
+            'Skor çağrısı hiçbir madde değerlendirmesi döndürmedi — analiz kaydedilmedi.'
+        );
+    }
 
     const star = {};
     for (const key of STAR_KEYS) star[key] = { score: clampStar(parsed?.star?.[key]) };
