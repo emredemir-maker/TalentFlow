@@ -114,7 +114,16 @@ describe('SCORER_PROMPT', async () => {
 
     it('keeps the narrative out of the scoring call', () => {
         expect(flat).toMatch(/Farkı bu çağrıda AÇIKLAMA/);
-        expect(flat).toMatch(/maxOutputTokens: 2048/);
+    });
+
+    it('does not starve the call with a 2048 ceiling', () => {
+        // Canlıda görüldü: dün STAR 2/3 ve zengin kanıt üreten bir CV, bugün
+        // aynı ilanda 0/0/0/0 döndü. Cikti kucuk ama Gemini 2.5 Flash'ta
+        // DÜŞÜNME AÇIK ve düşünme token'ları bu tavana dahil — uzun bir
+        // gereksinim listesinde bütçeyi tüketip cevaba yer bırakmıyor.
+        expect(flat).not.toMatch(/maxOutputTokens: 2048/);
+        expect(flat).toMatch(/maxOutputTokens: 8192/);
+        expect(flat).toMatch(/düşünme token'ları bu tavana dahil/);
     });
 
     it('keeps STAR anchored to evidence, not quality', () => {
@@ -166,5 +175,58 @@ describe('analog alan kuralı — zorunlu kontrol', async () => {
 
     it('keeps the gap explanation out of this call', () => {
         expect(flat).toMatch(/Farkı yazma, o ayrı bir adımın işi/);
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SESSİZ BOŞ DÖNÜŞ YOK.
+//
+// Canlıda görüldü: kusursuz bir CV — dün STAR 2/3 ve "%1300 gelir artışı"
+// gibi kanıtlar üretmişti — bugün aynı ilanda %0 uyum, STAR 0/3 ve dört
+// boyutta "CV'de bu boyuta dair bilgi bulunamadı" döndü.
+//
+// Sebep: yanıt okunamayınca `parseAIJson(raw, { assessments: [], star: {} })`
+// boş bir sonuç dönüyordu ve bu, "aday hiçbir maddeyi karşılamıyor" ile
+// BİREBİR aynı görünüyordu. Teknik bir arıza, adayın kusuru gibi kaydediliyordu.
+//
+// Anlatım çağrısı okunamayan yanıtta zaten hata fırlatıyordu. Skoru BELİRLEYEN
+// çağrının daha sessiz olması tam tersi olmalıydı.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('scoreCoverage — okunamayan yanıt', async () => {
+    const { getModel } = await import('./config.js');
+    const { scoreCoverage } = await import('./coverageScorer.js');
+    const respond = (text) => {
+        getModel.mockResolvedValue({
+            generateContent: async () => ({ response: { text: () => text } }),
+        });
+    };
+
+    it('throws instead of pretending the candidate scored zero', async () => {
+        respond('');
+        await expect(scoreCoverage('ilan', {})).rejects.toThrow(/okunamadı/);
+    });
+
+    it('throws on a truncated response, which is what a starved ceiling produces', async () => {
+        respond('{"assessments": [{"index": 1, "status": "par');
+        await expect(scoreCoverage('ilan', {})).rejects.toThrow(/okunamadı/);
+    });
+
+    it('throws when the model returned no verdicts at all', async () => {
+        // Boş bir damga listesini 0 puan diye kaydetmek, adaya ait olmayan
+        // bir sonucu ona yazmaktır
+        respond('{"assessments": [], "star": {"Situation": 2}}');
+        await expect(scoreCoverage('ilan', {})).rejects.toThrow(/hiçbir madde değerlendirmesi/);
+    });
+
+    it('reports the response length so a truncation is recognisable', async () => {
+        respond('{"broken"');
+        await expect(scoreCoverage('ilan', {})).rejects.toThrow(/uzunluk: 9/);
+    });
+
+    it('still succeeds on a well-formed response', async () => {
+        respond('{"assessments": [{"index": 1, "status": "met", "kind": "deneyim"}], "star": {"Situation": 3}}');
+        const out = await scoreCoverage('ilan', {});
+        expect(out.assessments).toHaveLength(1);
+        expect(out.star.Situation.score).toBe(3);
     });
 });
