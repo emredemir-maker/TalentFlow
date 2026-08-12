@@ -171,10 +171,22 @@ describe('recordUsage — dayanıklılık', () => {
     });
 
     it('never rejects for any input', async () => {
+        // MOCK AÇIKÇA VERİLİYOR.
+        //
+        // Önceki hâli yalnızca `vi.resetModules()` çağırıp içe aktarıyordu.
+        // Ondan önceki testler `doUnmock` yaptığı için modül sıfırlaması
+        // GERÇEK firebaseAdmin.js'i yüklüyor — CI'da kimlik bilgisi yok ve
+        // Admin SDK başlatma askıda kalıp testi 5 saniyede düşürüyordu.
+        // Yerelde geçmişti çünkü burada admin anında başlıyor.
         vi.resetModules();
+        vi.doMock('../config/firebaseAdmin.js', () => ({
+            db: { doc: () => ({ set: async () => {} }) },
+            admin: { firestore: { FieldValue: { increment: (n) => ({ __inc: n }) } } },
+        }));
         const { recordUsage } = await import('./usage.js');
         for (const bad of [undefined, {}, { label: null }, { label: 'x', usage: 'metin' }]) {
             await expect(recordUsage(bad)).resolves.toBeUndefined();
         }
+        vi.doUnmock('../config/firebaseAdmin.js');
     });
 });

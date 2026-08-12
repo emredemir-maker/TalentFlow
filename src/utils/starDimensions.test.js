@@ -219,3 +219,64 @@ describe('starPercent', () => {
         expect(starPercent(dims(99, 99, 99, 99))).toBe(100);
     });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ÖLÇEK VE ETİKET — canlıda ikisi de yanlıştı.
+//
+// Kullanıcı ekran görüntüsü gönderdi: kırılım panelinde dört boyut da
+// "0/10" yazıyordu, oysa ölçek 0-3. Tam not alan bir boyut "3/10" görünürdü —
+// felaket gibi okunan, aslında kusursuz bir sonuç. 0-10'dan 0-3'e geçilirken
+// bu ekran atlanmış.
+//
+// Aynı görüntüde boyut adı **SİTUATİON** yazıyordu: ham 'Situation' anahtarı
+// CSS ile büyütülüyor ve sayfa lang="tr" olduğu için tarayıcı Türkçe büyütme
+// kuralı uyguluyor. Bugün aynı tuzağa altıncı kez düşüldü — bu sefer JS'te
+// değil CSS'te.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('STAR ölçeği ve etiketleri', () => {
+    it('exposes the scale as a shared constant, not a magic number', async () => {
+        const { STAR_MAX } = await import('./starDimensions');
+        expect(STAR_MAX).toBe(3);
+    });
+
+    it('has a Turkish label for every dimension', async () => {
+        const { STAR_LABELS, STAR_KEYS } = await import('./starDimensions');
+        for (const key of STAR_KEYS) {
+            expect(STAR_LABELS[key]).toBeTruthy();
+        }
+    });
+
+    it('labels survive Turkish uppercasing without growing a dotted İ', async () => {
+        // CSS text-transform:uppercase, lang="tr" ile aynı sonucu vermeli.
+        // 'Situation' → 'SİTUATİON' olurdu; 'Durum' → 'DURUM' güvenli.
+        const { STAR_LABELS } = await import('./starDimensions');
+        for (const label of Object.values(STAR_LABELS)) {
+            expect(label.toLocaleUpperCase('tr-TR')).not.toContain('İ');
+        }
+    });
+
+    it('anchors the full scale end to end', async () => {
+        const { anchorLabel, STAR_MAX, ANCHOR_LABELS } = await import('./starDimensions');
+        expect(anchorLabel(0, STAR_MAX)).toBe(ANCHOR_LABELS[0]);
+        expect(anchorLabel(STAR_MAX, STAR_MAX)).toBe(ANCHOR_LABELS[ANCHOR_LABELS.length - 1]);
+    });
+});
+
+describe('kırılım paneli ölçeği', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const { fileURLToPath } = await import('node:url');
+    const src = fs.readFileSync(
+        path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../components/ScoreBreakdownPanel.jsx'),
+        'utf8'
+    );
+
+    it('never hardcodes a STAR denominator again', () => {
+        expect(src).not.toMatch(/\{d\.score\}\/10/);
+        expect(src).toMatch(/\{d\.score\}\/\{STAR_MAX\}/);
+    });
+
+    it('prints the Turkish label, not the raw English key', () => {
+        expect(src).toMatch(/STAR_LABELS\[d\.key\]/);
+    });
+});
