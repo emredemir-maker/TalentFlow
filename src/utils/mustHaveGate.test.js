@@ -149,3 +149,119 @@ describe('bayat analizde kapı', () => {
         expect(gate.missing[0].note).toBe('not 2');
     });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MÜLAKAT KAPIYA GİRER.
+//
+// Aday odada bir zorunlu maddeyi kapattıysa kapı da bunu görmeli. Görmezse
+// skor 78'e çıkarken şerit "1 zorunlu eksik" demeye devam eder ve sıralama
+// adayı listenin dibinde tutar — iki ekran birbirine ters düşer.
+//
+// `candidate` verilmezse davranış BİREBİR eskisi gibi: eski çağıranlar
+// bozulmamalı.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('mülakat kapıya yansır', () => {
+    const withVerdicts = (verdicts, fingerprint = requirementsFingerprint(POSITION)) => ({
+        interviewCoverage: {
+            [POSITION.title]: {
+                sessionId: 'mi-1',
+                verdicts,
+                requirementsFingerprint: fingerprint,
+            },
+        },
+    });
+
+    it('opens the gate when the room closed the only missing must-have', () => {
+        const analysis = withStatuses(['met', 'missing', 'met']);
+        expect(mustHaveGate(analysis, POSITION).status).toBe('missing');
+
+        const gate = mustHaveGate(
+            analysis,
+            POSITION,
+            withVerdicts([{ requirementIndex: 2, verdict: 'met', quote: 'A/B testleri ben kurdum' }])
+        );
+        expect(gate.status).toBe('ok');
+        expect(gate.missing).toEqual([]);
+        expect(gate.fromInterview).toBe(1);
+    });
+
+    it('closes the gate when the room revealed a must-have was not real', () => {
+        // Tek yönlü olsaydı sistem gerçeği değil iyimserliği ölçerdi
+        const gate = mustHaveGate(
+            withStatuses(['met', 'met', 'met']),
+            POSITION,
+            withVerdicts([{ requirementIndex: 1, verdict: 'missing', quote: 'O projede ben yoktum' }])
+        );
+        expect(gate.status).toBe('missing');
+        expect(gate.missing[0].text).toBe('Funnel sahipliği');
+    });
+
+    it('shows the candidate own words as the reason, not the CV note', () => {
+        // Odadan gelen gerekçe CV notundan daha güçlü bir dayanak
+        const gate = mustHaveGate(
+            withStatuses(['met', 'met', 'met']),
+            POSITION,
+            withVerdicts([{ requirementIndex: 2, verdict: 'partial', quote: 'Testleri kurgulamadım, sonuçlarını okudum' }])
+        );
+        expect(gate.partial[0].note).toBe('Testleri kurgulamadım, sonuçlarını okudum');
+        expect(gate.partial[0].fromInterview).toBe(true);
+    });
+
+    it('leaves CV-only items marked as coming from the CV', () => {
+        const gate = mustHaveGate(
+            withStatuses(['missing', 'missing', 'met']),
+            POSITION,
+            withVerdicts([{ requirementIndex: 1, verdict: 'met' }])
+        );
+        expect(gate.missing).toHaveLength(1);
+        expect(gate.missing[0].index).toBe(2);
+        expect(gate.missing[0].note).toBe('not 2');
+        expect(gate.missing[0].fromInterview).toBe(false);
+        expect(gate.fromInterview).toBe(1);
+    });
+
+    it('ignores an inconclusive verdict entirely', () => {
+        // Soru atlandı diye aday cezalandırılmaz — ama ödüllendirilmez de
+        const gate = mustHaveGate(
+            withStatuses(['met', 'missing', 'met']),
+            POSITION,
+            withVerdicts([{ requirementIndex: 2, verdict: 'inconclusive' }])
+        );
+        expect(gate.status).toBe('missing');
+        expect(gate.fromInterview).toBe(0);
+    });
+
+    it('ignores verdicts stamped against an older requirement list', () => {
+        const gate = mustHaveGate(
+            withStatuses(['met', 'missing', 'met']),
+            POSITION,
+            withVerdicts([{ requirementIndex: 2, verdict: 'met' }], 'rESKI')
+        );
+        expect(gate.status).toBe('missing');
+        expect(gate.fromInterview).toBe(0);
+    });
+
+    it('behaves exactly as before when no candidate is passed', () => {
+        // Eski çağıranlar bozulmamalı
+        const analysis = withStatuses(['met', 'missing', 'met']);
+        const withoutCandidate = mustHaveGate(analysis, POSITION);
+        const withNull = mustHaveGate(analysis, POSITION, null);
+        expect(withoutCandidate).toEqual(withNull);
+        expect(withoutCandidate.status).toBe('missing');
+        expect(withoutCandidate.fromInterview).toBe(0);
+    });
+});
+
+describe('gateLabel — mülakat işareti', () => {
+    it('flags a verdict that came from the room', () => {
+        // Aynı adayın rozeti dün kırmızıyken bugün yeşilse, sebebi görünmeli
+        expect(gateLabel({ status: 'ok', fromInterview: 2 }).interview).toBe(true);
+        expect(gateLabel({ status: 'ok', fromInterview: 0 }).interview).toBe(false);
+        expect(gateLabel({ status: 'ok' }).interview).toBe(false);
+    });
+
+    it('keeps the existing text and tone untouched', () => {
+        expect(gateLabel({ status: 'missing', missing: [1, 2], fromInterview: 1 }))
+            .toMatchObject({ text: '2 zorunlu eksik', tone: 'red' });
+    });
+});

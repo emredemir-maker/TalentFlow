@@ -10,6 +10,7 @@
 // Arayüz bunu rozet olarak gösterir ve varsayılan sıralamada aşağı alır.
 
 import { requirementsOf, requirementsFingerprint } from './positionRequirements';
+import { mergeInterviewCoverage } from './interviewCoverage';
 
 /** Analiz kaydından madde değerlendirmelerini çıkarır (iki olası yerleşim). */
 function assessmentsOf(analysis) {
@@ -22,11 +23,23 @@ function assessmentsOf(analysis) {
 /**
  * Adayın bu pozisyonun ZORUNLU maddelerine karşı durumu.
  *
+ * `candidate` verilirse MÜLAKAT damgaları da okunur. Verilmezse yalnızca CV
+ * taraması kullanılır — eski çağıranlar birebir aynı davranmaya devam eder.
+ *
+ * Mülakatın buraya girmesi şart: aday odada bir zorunlu maddeyi kapattıysa
+ * şerit hâlâ "1 zorunlu eksik" diyor ve sıralama onu aşağıda tutuyordu.
+ * Kapının okuduğu bilgi ile skorun okuduğu bilgi ayrışırsa, ekranda 78 yazan
+ * bir aday kırmızı rozetle listenin dibinde kalır.
+ *
+ * @param {object} analysis
+ * @param {object} position
+ * @param {object} [candidate] — mülakat damgaları için; yoksa yalnızca CV
  * @returns {{
  *   status: 'ok'|'partial'|'missing'|'unknown',
  *   missing: Array<{index: number, text: string, note: string}>,
  *   partial: Array<{index: number, text: string, note: string}>,
- *   totalMust: number
+ *   totalMust: number,
+ *   fromInterview: number
  * }}
  *   - ok:      tüm zorunlular karşılanıyor
  *   - partial: hiçbiri eksik değil ama en az biri kısmen
@@ -34,9 +47,10 @@ function assessmentsOf(analysis) {
  *   - unknown: ilan zorunlu işaretlememiş ya da madde bazlı analiz yok.
  *              Bilgi yokluğunu "eksik" saymak, işaretlenmemiş eski ilanlardaki
  *              herkesi haksızca aşağı iterdi.
+ *   - fromInterview: kaç zorunlu maddenin damgası odadan geldi
  */
-export function mustHaveGate(analysis, position) {
-    const empty = { status: 'unknown', missing: [], partial: [], totalMust: 0 };
+export function mustHaveGate(analysis, position, candidate = null) {
+    const empty = { status: 'unknown', missing: [], partial: [], totalMust: 0, fromInterview: 0 };
 
     const requirements = requirementsOf(position);
     if (!Array.isArray(requirements) || requirements.length === 0) return empty;
@@ -60,7 +74,16 @@ export function mustHaveGate(analysis, position) {
         return { ...empty, totalMust: must.length };
     }
 
-    const assessments = assessmentsOf(analysis);
+    // MÜLAKAT VARSA BİRLEŞMİŞ LİSTE OKUNUR.
+    //
+    // Aday odada bir zorunlu maddeyi kapattıysa kapı da bunu görmeli. Yoksa
+    // skor 78'e çıkarken şerit "1 zorunlu eksik" demeye devam eder ve
+    // sıralama adayı aşağıda tutar — iki ekran birbirine ters düşer.
+    //
+    // mergeInterviewCoverage kendi bayatlık denetimini yapıyor; mülakat
+    // damgası tutmazsa CV değerlendirmelerini olduğu gibi geri verir.
+    const merged = candidate ? mergeInterviewCoverage(analysis, candidate, position) : null;
+    const assessments = merged?.assessments || assessmentsOf(analysis);
     if (!assessments) return { ...empty, totalMust: must.length };
 
     const byIndex = new Map();
@@ -69,26 +92,34 @@ export function mustHaveGate(analysis, position) {
         if (!Number.isFinite(idx)) continue;
         byIndex.set(idx, {
             status: String(a?.status || '').toLowerCase(),
-            note: typeof a?.note === 'string' ? a.note : '',
+            // Odadan gelen damgada gerekçe adayın kendi cümlesi; CV notundan
+            // daha güçlü bir dayanak ve şeritte o gösterilmeli.
+            note: a?.source === 'interview'
+                ? (typeof a?.interviewQuote === 'string' ? a.interviewQuote : '')
+                : (typeof a?.note === 'string' ? a.note : ''),
+            fromInterview: a?.source === 'interview',
         });
     }
 
     const missing = [];
     const partial = [];
     let assessed = 0;
+    let fromInterview = 0;
     for (const r of must) {
         const a = byIndex.get(r.index);
         if (!a) continue;
         assessed += 1;
-        if (a.status === 'missing') missing.push({ index: r.index, text: r.text, note: a.note });
-        else if (a.status === 'partial') partial.push({ index: r.index, text: r.text, note: a.note });
+        if (a.fromInterview) fromInterview += 1;
+        const entry = { index: r.index, text: r.text, note: a.note, fromInterview: a.fromInterview };
+        if (a.status === 'missing') missing.push(entry);
+        else if (a.status === 'partial') partial.push(entry);
     }
 
     // Hiçbir zorunlu madde değerlendirilmemişse hüküm veremeyiz
     if (assessed === 0) return { ...empty, totalMust: must.length };
 
     const status = missing.length > 0 ? 'missing' : (partial.length > 0 ? 'partial' : 'ok');
-    return { status, missing, partial, totalMust: must.length };
+    return { status, missing, partial, totalMust: must.length, fromInterview };
 }
 
 /**
@@ -108,8 +139,15 @@ export function gateRank(status) {
     }
 }
 
-/** Rozet metni ve tonu. */
+/**
+ * Rozet metni ve tonu.
+ *
+ * `interview` bayrağı, kapının en az bir maddede odadaki cevabı kullandığını
+ * söyler. Arayüz bunu göstermeli: aynı adayın rozeti dün kırmızıyken bugün
+ * yeşilse, sebebinin görünmemesi skorun sessizce değişmesiyle aynı şey olur.
+ */
 export function gateLabel(gate) {
+    const interview = Number(gate?.fromInterview) > 0;
     switch (gate?.status) {
         case 'missing':
             return {
@@ -117,6 +155,7 @@ export function gateLabel(gate) {
                     ? '1 zorunlu eksik'
                     : `${gate.missing.length} zorunlu eksik`,
                 tone: 'red',
+                interview,
             };
         case 'partial':
             return {
@@ -124,9 +163,10 @@ export function gateLabel(gate) {
                     ? '1 zorunlu kısmen'
                     : `${gate.partial.length} zorunlu kısmen`,
                 tone: 'amber',
+                interview,
             };
         case 'ok':
-            return { text: 'Zorunlular tam', tone: 'emerald' };
+            return { text: 'Zorunlular tam', tone: 'emerald', interview };
         default:
             return null;
     }

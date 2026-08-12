@@ -11,7 +11,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
     Search, Download, Users, ChevronUp, ChevronDown, ChevronLeft, ChevronRight,
     FilterX, Table2, Wrench, CheckSquare, Square, Layers, X, Loader2, AlertCircle, CheckCircle2,
-    Share2, Building2, Brain, Mail,
+    Share2, Building2, Brain, Mail, Mic,
 } from 'lucide-react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -51,7 +51,7 @@ function StageChip({ status }) {
     );
 }
 
-function ScoreCell({ value, gate }) {
+function ScoreCell({ value, gate, interviewed }) {
     if (value === null || value === undefined || value === '') {
         return <span className="text-slate-300">—</span>;
     }
@@ -62,7 +62,18 @@ function ScoreCell({ value, gate }) {
     const label = gate ? gateLabel(gate) : null;
     return (
         <span className="inline-flex flex-col items-center leading-tight">
-            <span style={{ color }} className="font-black">%{value}</span>
+            <span className="inline-flex items-center gap-1">
+                <span style={{ color }} className="font-black">%{value}</span>
+                {/* Skor mülakattan etkilendiyse hücre bunu söylemeli: dün 65
+                    gördüğü adayı bugün 78'de bulan kullanıcı nedenini
+                    bilmeli. Sessizce değişen sayı, açıklanamayan sayıdır. */}
+                {interviewed && (
+                    <Mic
+                        className="w-2.5 h-2.5 text-slate-400"
+                        aria-label="Mülakat sonucu skora dahil"
+                    />
+                )}
+            </span>
             {label && label.tone === 'red' && (
                 <span
                     title={gate.missing.map((m) => m.text).join(' · ')}
@@ -784,7 +795,7 @@ export default function CandidatesTablePage() {
                                         </td>
                                         <td className="px-3 py-2.5 text-center"><ScoreCell value={c.bestScore} /></td>
                                         {selectedPosition && (
-                                            <td className="px-3 py-2.5 text-center"><ScoreCell value={c.positionScore} gate={c.positionGate} /></td>
+                                            <td className="px-3 py-2.5 text-center"><ScoreCell value={c.positionScore} gate={c.positionGate} interviewed={c.positionInterviewed} /></td>
                                         )}
                                         <td className="px-3 py-2.5 text-center"><ScoreCell value={c.interviewScore} /></td>
                                         <td className="px-3 py-2.5 text-center"><ScoreCell value={c.combinedScore} /></td>

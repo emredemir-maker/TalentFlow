@@ -151,7 +151,91 @@ describe('bayat analiz', () => {
     });
 
     it('reports scanned=false when the candidate has no analysis here', () => {
-        expect(analysisScoreDetail(candidate({ score: 1 }), { title: 'Yok' })).toEqual({ score: 0, stale: false, scanned: false });
+        expect(analysisScoreDetail(candidate({ score: 1 }), { title: 'Yok' }))
+            .toEqual({ score: 0, stale: false, scanned: false, interviewed: false, cvScore: 0 });
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MÜLAKAT SKORA GİRER — çünkü listeler bu fonksiyonu okuyor.
+//
+// Ayrı bir "mülakat skoru" alanı eklenseydi tablo eski sayıyı göstermeye
+// devam eder, aday sayfası yenisini gösterirdi. Bu modül tam da o sapmayı
+// önlemek için yazılmıştı.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('mülakat skora yansır', () => {
+    // 1. ve 2. zorunlu karşılanıyor, 3. tercihen eksik
+    const coverage = {
+        assessments: [
+            { index: 1, status: 'met' },
+            { index: 2, status: 'met' },
+            { index: 3, status: 'missing' },
+        ],
+    };
+
+    const withVerdicts = (base, verdicts) => ({
+        ...base,
+        interviewCoverage: {
+            [position.title]: {
+                sessionId: 'mi-1',
+                date: '2026-08-12',
+                verdicts,
+                requirementsFingerprint: requirementsFingerprint(position),
+            },
+        },
+    });
+
+    it('raises the list score when the interview closed a gap', () => {
+        const base = fresh({ score: 50, starAnalysis: star(10), requirementCoverage: coverage });
+        const cvOnly = analysisScoreDetail(base, position);
+        const after = analysisScoreDetail(
+            withVerdicts(base, [{ requirementIndex: 1, verdict: 'missing', quote: 'O işi yapmadım' }]),
+            position
+        );
+        // 1. madde met → missing: skor DÜŞMELİ, ve iki alan da dönmeli
+        expect(after.score).toBeLessThan(cvOnly.score);
+        expect(after.cvScore).toBe(cvOnly.score);
+        expect(after.interviewed).toBe(true);
+    });
+
+    it('keeps cvScore alongside so the UI can explain the difference', () => {
+        // Sessizce değişen bir skor, açıklanamayan bir skordur
+        const base = fresh({ score: 50, starAnalysis: star(10), requirementCoverage: coverage });
+        const after = analysisScoreDetail(
+            withVerdicts(base, [{ requirementIndex: 1, verdict: 'partial' }]),
+            position
+        );
+        expect(after.cvScore).not.toBe(after.score);
+    });
+
+    it('leaves the score untouched when the interview was inconclusive', () => {
+        const base = fresh({ score: 50, starAnalysis: star(10), requirementCoverage: coverage });
+        const after = analysisScoreDetail(
+            withVerdicts(base, [{ requirementIndex: 1, verdict: 'inconclusive' }]),
+            position
+        );
+        expect(after.score).toBe(after.cvScore);
+        expect(after.interviewed).toBe(true);
+    });
+
+    it('ignores interview verdicts stamped against an older requirement list', () => {
+        const base = fresh({ score: 50, starAnalysis: star(10), requirementCoverage: coverage });
+        const stale = {
+            ...base,
+            interviewCoverage: {
+                [position.title]: {
+                    verdicts: [{ requirementIndex: 1, verdict: 'missing' }],
+                    requirementsFingerprint: 'rESKI',
+                },
+            },
+        };
+        expect(analysisScoreDetail(stale, position).score).toBe(analysisScoreDetail(base, position).score);
+        expect(analysisScoreDetail(stale, position).interviewed).toBe(false);
+    });
+
+    it('reports interviewed=false for a candidate who has not been interviewed', () => {
+        const base = fresh({ score: 50, starAnalysis: star(10), requirementCoverage: coverage });
+        expect(analysisScoreDetail(base, position).interviewed).toBe(false);
     });
 });
 

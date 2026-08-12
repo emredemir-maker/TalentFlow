@@ -137,3 +137,29 @@ export function requirementsFingerprint(position) {
     }
     return `r${(h >>> 0).toString(36)}`;
 }
+
+/**
+ * Kayıtlı değerlendirmeler GÜNCEL gereksinim listesine mi ait?
+ *
+ * Değerlendirmeler madde NUMARASINA bağlı: {index: 6, status: 'partial'}.
+ * Liste değişince o numara başka bir maddeye denk gelir ve eski yargı yanlış
+ * maddeye yapışır. Canlıda ölçüldü: aynı aday, aynı formül — bayat
+ * değerlendirmeyle 77, taze taramayla 65.
+ *
+ * Damgası olmayan eski kayıtlar da bayat sayılır: hangi listeye ait
+ * olduklarını bilmiyoruz ve varsaymak aynı hatayı üretir.
+ *
+ * BURADA YAŞIYOR çünkü sorduğu soru bir SÜRÜM sorusu, bir skor sorusu değil.
+ * positionScore.js'te durduğu sürece mülakat birleşimi onu okuyamıyordu:
+ * interviewCoverage → positionScore → interviewCoverage döngüsü çıkıyordu.
+ * Bu modülün hiç içe aktarması yok, o yüzden herkes buradan okuyabilir.
+ */
+export function isStaleFor(analysis, position) {
+    const assessments = analysis?.requirementCoverage?.assessments
+        || analysis?.scoreData?.requirementCoverage?.assessments;
+    // Madde bazlı değerlendirme yoksa eşleştirilecek numara da yok — bayatlık
+    // kavramı burada anlamsız.
+    if (!Array.isArray(assessments)) return false;
+    if (!position?.title) return true;
+    return analysis?.requirementsFingerprint !== requirementsFingerprint(position);
+}

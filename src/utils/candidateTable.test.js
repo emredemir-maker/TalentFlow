@@ -13,6 +13,7 @@ import {
     locationBucket,
     analysisForPosition,
 } from './candidateTable';
+import { requirementsFingerprint } from './positionRequirements';
 
 const mkTs = (iso) => ({ toMillis: () => new Date(iso).getTime() });
 
@@ -462,5 +463,83 @@ describe('analysisForPosition', () => {
         expect(analysisForPosition(null, 'Growth PM')).toBeNull();
         expect(analysisForPosition(candidate, '')).toBeNull();
         expect(analysisForPosition({}, 'Growth PM')).toBeNull();
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MÜLAKAT LİSTEYE YANSIR.
+//
+// Aday odada bir zorunlu maddeyi kapattıysa listede de yukarı çıkmalı. Skor
+// aday sayfasında değişip tabloda değişmeseydi, iki ekran birbirine ters
+// düşerdi — bu modülün en başta çözdüğü sorunun aynısı.
+//
+// Ve değişim GÖRÜNÜR olmalı: dün 65 gördüğü adayı bugün 78'de bulan kullanıcı
+// nedenini bilebilmeli.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('mülakat tabloya yansır', () => {
+    const POS = {
+        title: 'Growth PM',
+        requirementsMeta: [
+            { text: 'Funnel sahipliği', must: true },
+            { text: 'A/B test', must: true },
+        ],
+    };
+
+    const rowFor = (extra) => applyTableFilters(
+        [{
+            id: 'c1',
+            name: 'Aday',
+            status: 'ai_analysis',
+            positionAnalyses: {
+                'Growth PM': {
+                    requirementsFingerprint: requirementsFingerprint(POS),
+                    starAnalysis: {
+                        Situation: { score: 3 }, Task: { score: 3 }, Action: { score: 3 }, Result: { score: 3 },
+                    },
+                    requirementCoverage: {
+                        assessments: [{ index: 1, status: 'met' }, { index: 2, status: 'missing' }],
+                    },
+                },
+            },
+            ...extra,
+        }],
+        { ...DEFAULT_FILTERS, position: 'Growth PM' },
+        { position: POS, positionMode: true }
+    )[0];
+
+    const interviewed = (verdicts) => ({
+        interviewCoverage: {
+            'Growth PM': { verdicts, requirementsFingerprint: requirementsFingerprint(POS) },
+        },
+    });
+
+    it('raises the row score when the room closed a must-have', () => {
+        const before = rowFor({});
+        const after = rowFor(interviewed([{ requirementIndex: 2, verdict: 'met', quote: 'Testleri ben kurdum' }]));
+        expect(after.positionScore).toBeGreaterThan(before.positionScore);
+    });
+
+    it('opens the row gate too, so the badge and the score agree', () => {
+        // Skor yükselip rozet kırmızı kalsaydı iki ekran birbirine ters düşerdi
+        expect(rowFor({}).positionGate.status).toBe('missing');
+        const after = rowFor(interviewed([{ requirementIndex: 2, verdict: 'met' }]));
+        expect(after.positionGate.status).toBe('ok');
+        expect(after.positionGate.fromInterview).toBe(1);
+    });
+
+    it('marks the row so the change is not silent', () => {
+        expect(rowFor({}).positionInterviewed).toBe(false);
+        expect(rowFor(interviewed([{ requirementIndex: 2, verdict: 'met' }])).positionInterviewed).toBe(true);
+    });
+
+    it('ignores verdicts recorded against an older requirement list', () => {
+        const stale = rowFor({
+            interviewCoverage: {
+                'Growth PM': { verdicts: [{ requirementIndex: 2, verdict: 'met' }], requirementsFingerprint: 'rESKI' },
+            },
+        });
+        expect(stale.positionScore).toBe(rowFor({}).positionScore);
+        expect(stale.positionGate.status).toBe('missing');
+        expect(stale.positionInterviewed).toBe(false);
     });
 });
