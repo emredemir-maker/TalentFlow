@@ -5,7 +5,7 @@
 // Gemini); covered by manual smoke for now.
 import { describe, expect, it } from 'vitest';
 
-import { buildManualInterviewPrompt, filterSessionMerge, PROTECTED_SESSION_FIELDS } from './interview.js';
+import { buildManualInterviewPrompt, filterSessionMerge, sanitizeQuestions, PROTECTED_SESSION_FIELDS } from './interview.js';
 
 // Minimum-viable input shape — every other test reuses this with overrides
 const baseInput = {
@@ -172,6 +172,68 @@ describe('filterSessionMerge', () => {
             'interviewScore', 'aiOverallScore', 'aiSummary', 'starScores',
             'questions', 'currentQuestionIndex', 'candidateResponse', 'candidateId']) {
             expect(PROTECTED_SESSION_FIELDS.has(field)).toBe(true);
+        }
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SORU KAYDI — cevabın hangi gereksinime dair olduğu.
+//
+// Mülakat planından gelen sorular `requirementIndex` taşır. Bu bağ olmadan
+// mülakat skoru havada duran bir 0-100 olur: CV skoruyla kıyaslanamaz ve
+// "şu zorunlu madde odada kapandı mı?" sorusu cevapsız kalır.
+//
+// Bozuk numara SESSİZCE DÜŞER. Bugün aynı sınıf hatanın (madde numarası
+// kayması) dört ayrı görünümünü düzelttik; beşincisini kaydın içine yazmayalım.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('sanitizeQuestions', () => {
+    it('keeps the requirement link a planned question carries', () => {
+        const out = sanitizeQuestions([
+            { question: 'CX deneyimi?', answer: 'Employee engagement ürünü', requirementIndex: 3 },
+        ]);
+        expect(out[0]).toEqual({
+            question: 'CX deneyimi?',
+            answer: 'Employee engagement ürünü',
+            requirementIndex: 3,
+        });
+    });
+
+    it('omits the field entirely for a free-typed question', () => {
+        const out = sanitizeQuestions([{ question: 'Serbest soru', answer: 'Cevap' }]);
+        expect(out[0]).not.toHaveProperty('requirementIndex');
+    });
+
+    it('drops a malformed index instead of binding the answer to the wrong item', () => {
+        for (const bad of ['abc', 0, -1, 1.5, null, NaN, Infinity, {}]) {
+            const out = sanitizeQuestions([{ question: 'S', answer: 'C', requirementIndex: bad }]);
+            expect(out[0]).not.toHaveProperty('requirementIndex');
+        }
+    });
+
+    it('accepts a numeric string, since JSON round-trips lose the type', () => {
+        expect(sanitizeQuestions([{ question: 'S', answer: 'C', requirementIndex: '4' }])[0].requirementIndex).toBe(4);
+    });
+
+    it('drops rows with no question text', () => {
+        const out = sanitizeQuestions([
+            { question: '   ', answer: 'yetim cevap' },
+            { answer: 'sorusuz' },
+            null,
+            { question: 'Geçerli', answer: '' },
+        ]);
+        expect(out).toHaveLength(1);
+        expect(out[0].question).toBe('Geçerli');
+    });
+
+    it('truncates oversized text so one answer cannot blow the prompt budget', () => {
+        const out = sanitizeQuestions([{ question: 'q'.repeat(2000), answer: 'a'.repeat(9000) }]);
+        expect(out[0].question).toHaveLength(1000);
+        expect(out[0].answer).toHaveLength(5000);
+    });
+
+    it('returns an empty list for anything that is not an array', () => {
+        for (const bad of [null, undefined, 'metin', {}, 5]) {
+            expect(sanitizeQuestions(bad)).toEqual([]);
         }
     });
 });
