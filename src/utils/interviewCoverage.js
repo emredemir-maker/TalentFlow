@@ -80,12 +80,22 @@ export function mergeInterviewCoverage(analysis, candidate, position) {
     const cvAssessments = assessmentsOf(analysis);
     if (!cvAssessments) return empty;
 
-    // CV analizi bayatsa birleştirilecek geçerli bir taban yok: eski yargıları
-    // yeni numaralara dizip üstüne mülakat eklemek, hatayı katlamak olurdu.
-    if (isStaleFor(analysis, position)) return { ...empty, cvStale: true };
-
+    // ÖNCE MÜLAKAT VAR MI? Sıra önemli ve ilk yazdığımda tersti.
+    //
+    // Bayatlık kontrolü önde olunca, hiç görüşülmemiş bir adayda `cvStale`
+    // true dönüyordu ve panel "Mülakat kaydı var ama CV taraması eski" diyordu.
+    // Kullanıcı ekranı gösterip "hayır, daha görüşmedim" dedi — panel olmayan
+    // bir kaydı VAR diye rapor ediyordu.
+    //
+    // Mülakat yoksa CV'nin bayat olması bu panelin konusu değil; onu skor
+    // kırılımı zaten söylüyor.
     const cov = interviewCoverageFor(candidate, position);
     if (!cov) return empty;
+
+    // Mülakat var ama CV analizi bayat: birleştirilecek geçerli bir taban yok.
+    // Eski yargıları yeni numaralara dizip üstüne mülakat eklemek, hatayı
+    // katlamak olurdu.
+    if (isStaleFor(analysis, position)) return { ...empty, cvStale: true };
 
     const requirements = requirementsOf(position);
     const byIndex = new Map(cvAssessments.map((a) => [Number(a?.index), a]).filter(([i]) => Number.isFinite(i)));
