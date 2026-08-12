@@ -88,7 +88,7 @@ export async function buildRequirementGlossary(position) {
     });
 
     const model = await getModel();
-    const result = await model.generateContent(prompt, { maxOutputTokens: 8192 });
+    const result = await model.generateContent(prompt, { maxOutputTokens: 8192, label: 'requirement' });
     const parsed = parseAIJson(result.response.text(), { entries: [] });
     return Array.isArray(parsed?.entries) ? parsed.entries : [];
 }

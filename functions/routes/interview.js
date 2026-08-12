@@ -449,6 +449,7 @@ async function runRequirementGrading({ items, allowed }, positionTitle) {
     if (!items || items.length === 0) return [];
     const raw = (
         await generateText(buildGradingPrompt({ positionTitle, items }), {
+            label: 'interview-grade',
             generationConfig: {
                 temperature: 0,
                 topP: 0,
@@ -480,6 +481,7 @@ async function runRequirementGrading({ items, allowed }, positionTitle) {
 async function runManualEvaluation(input) {
     const raw = (
         await generateText(buildManualInterviewPrompt(input), {
+            label: 'interview-eval',
             generationConfig: {
                 temperature: 0,
                 topP: 0,
