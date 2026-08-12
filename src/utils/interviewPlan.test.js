@@ -478,3 +478,43 @@ describe('plan şeması', () => {
         expect(buildInterviewPlan(null, POSITION).schema).toBe(PLAN_SCHEMA);
     });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SORULAR YAZILMAMIŞKEN PLAN.
+//
+// Canlıda oldu: Gemini harcama tavanı doldu, hiçbir soru yazılamadı. Plan
+// iskeleti AI'sız üretiliyor ve o hâliyle bile işe yarıyor — hangi maddeyi
+// neden soracağını söylüyor. Ama kopyalanan metin `undefined` basarsa plan
+// çöpe döner ve elde hiçbir şey kalmaz.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('planToText — soru yazılmamışken', () => {
+    const plan = buildInterviewPlan(analysis([at(3, 'missing'), at(1, 'partial')]), POSITION);
+
+    it('never prints "undefined" where a question should be', () => {
+        const text = planToText(plan, plan.probes, { candidateName: 'Öykü' });
+        expect(text).not.toContain('undefined');
+    });
+
+    it('says plainly that the wording is missing', () => {
+        const text = planToText(plan, plan.probes, {});
+        expect(text).toContain('(yazılmadı — bu maddeyi kendi sözlerinizle sorun)');
+    });
+
+    it('still carries everything the interviewer actually needs', () => {
+        // Soru cümlesi olmasa bile plan kullanılabilir olmalı: hangi madde,
+        // neden, kaç dakika, hangi öncelik
+        const text = planToText(plan, plan.probes, {});
+        expect(text).toContain('CX ürünü geliştirmiş olmak');
+        expect(text).toContain('Neden:');
+        expect(text).toContain('[Kritik]');
+        expect(text).toMatch(/\[\d+ dk\]/);
+    });
+
+    it('handles a half-written plan without breaking the rest', () => {
+        const half = plan.probes.map((p, i) => (i === 0 ? { ...p, question: 'Yazılmış soru' } : p));
+        const text = planToText(plan, half, {});
+        expect(text).toContain('SORU: Yazılmış soru');
+        expect(text).toContain('(yazılmadı');
+        expect(text).not.toContain('undefined');
+    });
+});

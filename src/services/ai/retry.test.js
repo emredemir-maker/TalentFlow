@@ -120,3 +120,40 @@ describe('RETRYABLE_STATUS', () => {
         expect(RETRYABLE_STATUS.has(400)).toBe(false);
     });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 429 ÜÇ FARKLI ŞEY OLABİLİR.
+//
+// Canlıda oldu: aylık harcama tavanı doldu ve Gemini 429 döndürdü. Üç kez
+// denemek hiçbir şeyi değiştirmedi, yalnızca kullanıcıyı bekletti. Ayırt
+// eden şey durum kodu değil, gövdedeki metin.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('fetchWithRetry — 429 ayrımı', () => {
+    const resWith = (body) => ({
+        ok: false,
+        status: 429,
+        clone: () => ({ text: async () => body }),
+    });
+
+    it('does not retry a spending-cap 429', async () => {
+        globalThis.fetch.mockResolvedValue(
+            resWith('Your billing account has exceeded its monthly spending cap.')
+        );
+        const res = await run(fetchWithRetry('/api/ai/generate', {}));
+        expect(res.status).toBe(429);
+        expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('still retries a genuine rate-limit 429', async () => {
+        globalThis.fetch.mockResolvedValue(resWith('Rate limit exceeded, please slow down.'));
+        await run(fetchWithRetry('/api/ai/generate', {}, { attempts: 2 }));
+        expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('falls back to retrying when the body cannot be read', async () => {
+        // Bir gelişme uğruna çalışan bir yolu kırmak yok
+        globalThis.fetch.mockResolvedValue({ ok: false, status: 429 }); // clone yok
+        await run(fetchWithRetry('/api/ai/generate', {}, { attempts: 2 }));
+        expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+    });
+});

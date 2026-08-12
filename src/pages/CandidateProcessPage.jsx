@@ -24,6 +24,7 @@ import CandidateCvPanel from '../components/CandidateCvPanel';
 import ScoreBreakdownPanel from '../components/ScoreBreakdownPanel';
 import InterviewPlanPanel from '../components/InterviewPlanPanel';
 import InterviewOutcomePanel from '../components/InterviewOutcomePanel';
+import { aiErrorHint } from '../utils/aiErrorHint';
 import MustHaveBadge from '../components/MustHaveBadge';
 import StarEvidenceCards from '../components/StarEvidenceCards';
 import { starPercent } from '../utils/starDimensions';
@@ -684,11 +685,13 @@ export default function CandidateProcessPage() {
             if (result.status === 'analysis_failed') {
                 // Teknik hata: CV'yi suçlamak yanlış yönlendiriyordu.
                 const first = result.failures?.[0]?.message || 'bilinmeyen hata';
+                // Tavsiye hatanın TÜRÜNDEN çıkar, durum kodundan değil.
+                // Eskiden 429 gören her hataya "1 dakika bekleyin" deniyordu;
+                // harcama tavanı dolduğunda bu tavsiye kullanıcıyı çalışmayacak
+                // bir şeyi tekrar tekrar denemeye yolluyordu.
+                const { hint } = aiErrorHint(first);
                 throw new Error(
-                    `AI analizi başarısız oldu (CV sorunu değil): ${first}` +
-                    (/429|kota|quota|rate/i.test(first)
-                        ? ' — Dakikalık istek sınırına takılmış olabilirsiniz, 1 dakika bekleyip tekrar deneyin.'
-                        : '')
+                    `AI analizi başarısız oldu (CV sorunu değil): ${first}${hint ? ` — ${hint}` : ''}`
                 );
             }
             if (result.status !== 'scanned') {

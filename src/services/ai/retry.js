@@ -13,6 +13,8 @@
 // bildirimde görüyor ama liste "tarandı" görünmeye devam ediyor. Skor eski,
 // etiket yeni.
 
+import { isRetryable } from '../../utils/aiErrorHint.js';
+
 /** Ağ geçidi kaynaklı, tekrar denemeye değer HTTP durumları. */
 export const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
 
@@ -57,6 +59,22 @@ export async function fetchWithRetry(url, init, { attempts = MAX_ATTEMPTS, onRet
         }
 
         if (res.ok || !RETRYABLE_STATUS.has(res.status)) return res;
+
+        // 429 ÜÇ FARKLI ŞEY OLABİLİR ve yalnızca biri geçici.
+        //
+        // Aylık harcama tavanı dolduğunda da 429 geliyor. Onu üç kez denemek
+        // hiçbir şeyi değiştirmez, yalnızca kullanıcıyı ~3 saniye bekletir ve
+        // ardından aynı hatayı verir. Ayırt eden şey durum kodu değil,
+        // gövdedeki metin — o yüzden kopyasını okuyoruz (asıl gövde çağırana
+        // bozulmadan gitmeli).
+        //
+        // Gövde okunamazsa (clone yok, akış tüketilmiş) ESKİ davranışa düşülür
+        // ve yeniden denenir: burada bir gelişme uğruna çalışan bir yolu
+        // kırmak yok.
+        if (res.status === 429 && typeof res.clone === 'function') {
+            const body = await res.clone().text().catch(() => '');
+            if (body && !isRetryable(body)) return res;
+        }
 
         lastError = new Error(`AI isteği başarısız: ${res.status}`);
         onRetry?.({ attempt: attempt + 1, reason: String(res.status) });
