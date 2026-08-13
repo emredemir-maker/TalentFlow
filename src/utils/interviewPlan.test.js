@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
     buildInterviewPlan, planSummary, priorityLabel, planToText, savedPlanFor,
+    planStatus, PLAN_STATUS_TEXT,
     CRITICAL, HIGH, MEDIUM, LOW, VERIFY, PLAN_SCHEMA, OPENING_MINUTES, CLOSING_MINUTES,
 } from './interviewPlan';
 import { requirementsFingerprint } from './positionRequirements';
@@ -597,5 +598,67 @@ describe('doğrulama soruları', () => {
 
     it('gives verification a label and a tone of its own', () => {
         expect(priorityLabel(VERIFY)).toEqual({ text: 'Doğrulama', tone: 'emerald' });
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PLAN NEDEN KULLANILAMIYOR?
+//
+// Canlıda oldu: kullanıcı manuel görüşmeyi kaydetti, AI çağrıları yapıldı,
+// para gitti ve ancak SONUNDA "sorular ilanın maddelerine bağlı değil"
+// yazısını gördü. Hangi sebeple bağlı olmadığı da yazmıyordu.
+//
+// savedPlanFor yalnızca null döndürüp sebebi yutuyordu. Dört durum var ve
+// dördü de farklı bir eylem gerektiriyor.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('planStatus', () => {
+    const probes = [{ requirementIndex: 1, text: 'Funnel sahipliği', question: 'Soru' }];
+    const withPlan = (fingerprint = FP) => ({
+        interviewPlans: { [POSITION.title]: { fingerprint, probes } },
+    });
+
+    it('accepts a plan that matches the current requirement list', () => {
+        const out = planStatus(withPlan(), POSITION);
+        expect(out).toMatchObject({ ok: true, reason: 'ok' });
+        expect(out.plan.probes).toHaveLength(1);
+    });
+
+    it('separates "no position" from "no plan"', () => {
+        // İkisi farklı eylem: biri pozisyon seçmek, diğeri plan üretmek
+        expect(planStatus(withPlan(), null).reason).toBe('no-position');
+        expect(planStatus({}, POSITION).reason).toBe('no-plan');
+    });
+
+    it('names a stale plan as its own case', () => {
+        // İlan değişmiş: planı kullanmak cevabı YANLIŞ maddeye yazardı
+        expect(planStatus(withPlan('rESKI'), POSITION).reason).toBe('stale-plan');
+    });
+
+    it('treats an empty plan as no plan', () => {
+        const empty = { interviewPlans: { [POSITION.title]: { fingerprint: FP, probes: [] } } };
+        expect(planStatus(empty, POSITION).reason).toBe('no-plan');
+    });
+
+    it('has a message and an action for every failing reason', () => {
+        // Sebebi söyleyip ne yapılacağını söylememek yarım bir uyarı
+        for (const reason of ['no-position', 'no-plan', 'stale-plan']) {
+            expect(PLAN_STATUS_TEXT[reason]).toBeTruthy();
+            expect(PLAN_STATUS_TEXT[reason].length).toBeGreaterThan(40);
+        }
+    });
+
+    it('never returns a plan alongside a failure', () => {
+        for (const c of [null, {}, withPlan('rESKI')]) {
+            const out = planStatus(c, POSITION);
+            if (!out.ok) expect(out.plan).toBeNull();
+        }
+    });
+
+    it('keeps savedPlanFor in agreement — one source of truth', () => {
+        // İki ayrı kontrol yazılsaydı biri "kullanılabilir" derken diğeri
+        // "kullanılamaz" diyebilirdi
+        for (const c of [withPlan(), withPlan('rESKI'), {}, null]) {
+            expect(savedPlanFor(c, POSITION)).toBe(planStatus(c, POSITION).plan);
+        }
     });
 });
