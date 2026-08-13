@@ -1513,6 +1513,11 @@ export default function CandidateProcessPage() {
                                             <StarEvidenceCards
                                                 starAnalysis={displayedStar}
                                                 position={displayedPosition}
+                                                narrativeError={
+                                                    displayedFullAnalysis?.narrativeError
+                                                    || candidate?.aiAnalysis?.narrativeError
+                                                    || null
+                                                }
                                             />
                                         )}
                                     </div>

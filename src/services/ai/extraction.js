@@ -196,6 +196,19 @@ export async function extractCandidateEvidence(jobDescription, candidateProfile,
     if (scoreResult.status === 'rejected') throw scoreResult.reason;
     const scored = scoreResult.value;
     const narrative = narrativeResult.status === 'fulfilled' ? narrativeResult.value : null;
+
+    // ANLATIM ÇAĞRISI DÜŞERSE SESSİZ KALMIYORUZ.
+    //
+    // `allSettled` reddi yutuyordu: skor kurtuluyor, tarama "başarılı"
+    // görünüyor ve kayda BOŞ metinler yazılıyordu. Ekranda sonuç, puanları
+    // olan ama tek satır gerekçesi olmayan STAR kartlarıydı — kullanıcı
+    // defalarca yeniden analiz etti ve neden dolmadığını göremedi.
+    //
+    // Kısmi bir başarısızlığı tam bir sonuç gibi göstermek, bugün onlarca
+    // kez düzelttiğimiz hatanın aynısı. Sebep artık kayda giriyor.
+    const narrativeError = narrativeResult.status === 'rejected'
+        ? String(narrativeResult.reason?.message || narrativeResult.reason || 'bilinmeyen hata')
+        : null;
     const { assessments, starAnalysis } = mergeNarrative(scored, narrative?.extractedData);
 
     const data = narrative?.extractedData || {};
@@ -214,6 +227,7 @@ export async function extractCandidateEvidence(jobDescription, candidateProfile,
             starAnalysis,
         },
         evidence: narrative?.evidence || { reasoning: [], summary: '' },
+        narrativeError,
     };
 }
 

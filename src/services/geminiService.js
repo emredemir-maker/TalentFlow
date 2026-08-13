@@ -499,6 +499,8 @@ export async function analyzeCandidateMatch(jobDescription, candidateProfile, mo
         scoreData: evidence.extractedData,
         score: score,
         starAnalysis: evidence.extractedData.starAnalysis ?? null,
+        // Gerekçe metinleri neden boş? Kayda yazılıyor ki ekran söyleyebilsin.
+        narrativeError: evidence.narrativeError ?? null,
         requirementCoverage: evidence.extractedData.requirementCoverage ?? null,
         reasons: evidence.evidence.reasoning || [],
         summary: evidence.evidence.summary ?? null,
