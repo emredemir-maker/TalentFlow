@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
     buildInterviewPlan, planSummary, priorityLabel, planToText, savedPlanFor,
-    CRITICAL, HIGH, MEDIUM, LOW, PLAN_SCHEMA, OPENING_MINUTES, CLOSING_MINUTES,
+    CRITICAL, HIGH, MEDIUM, LOW, VERIFY, PLAN_SCHEMA, OPENING_MINUTES, CLOSING_MINUTES,
 } from './interviewPlan';
 import { requirementsFingerprint } from './positionRequirements';
 
@@ -72,8 +72,11 @@ describe('buildInterviewPlan — kademe ataması', () => {
         expect(withGap.probes[0].priority).toBe(MEDIUM);
         expect(withGap.probes[0].why).toContain('B2B');
 
+        // Fark notu YOKSA madde düşmez, DOĞRULAMAya iner: "karşılıyor" damgası
+        // CV'ye dayanıyor ve zorunlu bir maddede odada teyit etmeye değer.
         const clean = buildInterviewPlan(analysis([at(1, 'met', { gap: '' })]), POSITION);
-        expect(clean.probes).toHaveLength(0);
+        expect(clean.probes).toHaveLength(1);
+        expect(clean.probes[0].priority).toBe(VERIFY);
     });
 
     it('ranks a missing NICE-TO-HAVE below a partial must-have', () => {
@@ -344,8 +347,10 @@ describe('planSummary', () => {
         expect(planSummary(plan)).toContain('2 kritik');
     });
 
-    it('says so plainly when the scan left nothing open', () => {
-        const plan = buildInterviewPlan(analysis([at(1, 'met'), at(2, 'met')]), POSITION);
+    it('says so plainly when there is nothing at all to ask', () => {
+        // Yalnızca TERCİH EDİLEN maddeler karşılanıyorsa sorulacak bir şey
+        // kalmıyor — zorunlular teyide dönerdi, tercih edilenler dönmez.
+        const plan = buildInterviewPlan(analysis([at(4, 'met'), at(5, 'met')]), POSITION);
         expect(plan.probes).toEqual([]);
         expect(planSummary(plan)).toContain('açık kalan madde yok');
     });
@@ -524,5 +529,73 @@ describe('planToText — soru yazılmamışken', () => {
         expect(text).toContain('SORU: Yazılmış soru');
         expect(text).toContain('(yazılmadı');
         expect(text).not.toContain('undefined');
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DOĞRULAMA SORULARI — boş kalan zamanı değerlendirmek.
+//
+// Canlıda ölçüldü: %79 alan bir aday için 30 dakikalık görüşmeye yalnızca ÜÇ
+// soru çıktı (5+5+4 = 14 dk), 8 dakika boşta kaldı. Sebep süre değildi —
+// maddelerin çoğu "karşılanıyor" damgalıydı ve plan "sorulacak bir şey yok"
+// diyordu.
+//
+// "Karşılıyor" damgası CV'ye dayanıyor. Zorunlu bir maddenin tek kanıtı bir
+// belgeyse odada teyit etmek boş geçmekten iyi.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('doğrulama soruları', () => {
+    it('asks to verify a met MUST-HAVE instead of skipping it', () => {
+        const plan = buildInterviewPlan(analysis([at(1, 'met')]), POSITION);
+        expect(plan.probes).toHaveLength(1);
+        expect(plan.probes[0].priority).toBe(VERIFY);
+        expect(plan.probes[0].why).toContain('kanıt yalnızca CV');
+    });
+
+    it('does NOT spend interview time verifying a nice-to-have', () => {
+        // Tercih edilen madde karşılanıyorsa teyit etmeye değmez
+        expect(buildInterviewPlan(analysis([at(4, 'met')]), POSITION).probes).toEqual([]);
+    });
+
+    it('puts verification LAST — open items always come first', () => {
+        const plan = buildInterviewPlan(
+            analysis([at(1, 'met'), at(2, 'met'), at(3, 'missing')]),
+            POSITION
+        );
+        expect(plan.probes[0].priority).toBe(CRITICAL);
+        expect(plan.probes.at(-1).priority).toBe(VERIFY);
+    });
+
+    it('drops verification first when the interview is short', () => {
+        // Kısa görüşmede teyit hiç görünmez; açık madde her zaman öncelikli
+        const a = analysis([at(1, 'met'), at(2, 'met'), at(3, 'missing')]);
+        const short = buildInterviewPlan(a, POSITION, { minutes: totalFor(6) });
+        expect(short.probes.map((p) => p.priority)).toEqual([CRITICAL]);
+        expect(short.dropped.every((p) => p.priority === VERIFY)).toBe(true);
+    });
+
+    it('fills the slack the user noticed', () => {
+        // 30 dakika = 22 dakika soru vakti. Üç açık madde 14 dakika tutuyordu;
+        // kalan 8 dakikaya iki teyit sorusu sığar.
+        const a = analysis([
+            at(1, 'partial'), at(2, 'partial'), at(3, 'missing'), // açık: 5+5+6
+            at(4, 'met'), at(5, 'met'),                            // tercihen — girmez
+        ]);
+        const withMet = analysis([
+            at(1, 'partial'), at(2, 'met'), at(3, 'met'),
+        ]);
+        expect(buildInterviewPlan(a, POSITION, { minutes: 30 }).probes.length).toBeGreaterThan(0);
+        // İki zorunlu madde karşılanıyor → ikisi de teyide dönüşüyor
+        const plan = buildInterviewPlan(withMet, POSITION, { minutes: 30 });
+        expect(plan.probes.filter((p) => p.priority === VERIFY)).toHaveLength(2);
+    });
+
+    it('names verification separately in the summary', () => {
+        // 5 sorunun 2'sinin teyit olduğunu okuyan kişi bilmeli
+        const plan = buildInterviewPlan(analysis([at(1, 'missing'), at(2, 'met')]), POSITION);
+        expect(planSummary(plan)).toContain('1 doğrulama');
+    });
+
+    it('gives verification a label and a tone of its own', () => {
+        expect(priorityLabel(VERIFY)).toEqual({ text: 'Doğrulama', tone: 'emerald' });
     });
 });

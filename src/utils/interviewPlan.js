@@ -30,7 +30,24 @@ export const HIGH = 'yuksek';
 export const MEDIUM = 'orta';
 export const LOW = 'dusuk';
 
-const PRIORITY_ORDER = [CRITICAL, HIGH, MEDIUM, LOW];
+/**
+ * DOĞRULAMA — karşılanan zorunlu maddeyi odada teyit etmek.
+ *
+ * Plan başta yalnızca AÇIK maddeleri soruyordu ve bu, canlıda 30 dakikalık
+ * bir görüşmeye üç soru üretti: kalan 8 dakika boşta kaldı. Aday %79 almıştı,
+ * yani maddelerin çoğu "karşılanıyor" damgalıydı ve sistem "sorulacak bir şey
+ * yok" diyordu.
+ *
+ * Ama karşılanıyor damgası CV'ye dayanıyor. Zorunlu bir maddenin tek kanıtı
+ * bir belgeyse, onu odada teyit etmek boş geçmekten iyidir — hele vakit
+ * varken.
+ *
+ * EN SONDA duruyor: açık maddeler her zaman önce sorulur, doğrulama yalnızca
+ * artan zamana girer. Kısa bir görüşmede hiç görünmez.
+ */
+export const VERIFY = 'dogrulama';
+
+const PRIORITY_ORDER = [CRITICAL, HIGH, MEDIUM, LOW, VERIFY];
 
 /**
  * Kademe başına ayrılan dakika.
@@ -45,6 +62,9 @@ const MINUTES_BY_PRIORITY = {
     [HIGH]: 5,
     [MEDIUM]: 4,
     [LOW]: 3,
+    // Doğrulama kısa: "bunu gerçekten siz mi yaptınız" sorusu bir örnekle
+    // cevaplanır, STAR derinliği gerekmez.
+    [VERIFY]: 3,
 };
 
 /**
@@ -129,7 +149,23 @@ function classify({ must, status, gap }) {
             ? { priority: MEDIUM, why: `Karşılıyor ama taramada fark notu var: ${gap}` }
             : { priority: LOW, why: `Karşılıyor ama taramada fark notu var: ${gap}` };
     }
-    // Karşılıyor ve fark notu yok — mülakatta sorulacak bir şey kalmadı.
+    // ZORUNLU + karşılanıyor + fark notu yok → DOĞRULAMA.
+    //
+    // Eskiden buradan null dönüyordu ve madde plandan tamamen düşüyordu.
+    // Canlıda sonucu şuydu: %79 alan bir aday için 30 dakikalık görüşmeye
+    // yalnızca 3 soru çıktı, 8 dakika boşta kaldı.
+    //
+    // "Karşılıyor" damgası CV'ye dayanıyor. Zorunlu bir maddenin tek kanıtı
+    // bir belgeyse odada teyit etmek boş geçmekten iyi — ama açık maddelerin
+    // ARDINDAN, artan zamanda.
+    if (status === 'met' && isMust) {
+        return {
+            priority: VERIFY,
+            why: 'Zorunlu madde karşılanıyor ama kanıt yalnızca CV\'de. Vakit varsa odada teyit edin.',
+        };
+    }
+    // Tercih edilen madde karşılanıyor ve fark yok — mülakat vakti harcamaya
+    // değmez.
     return null;
 }
 
@@ -375,6 +411,7 @@ export function priorityLabel(priority) {
         case HIGH: return { text: 'Yüksek', tone: 'amber' };
         case MEDIUM: return { text: 'Orta', tone: 'sky' };
         case LOW: return { text: 'Düşük', tone: 'slate' };
+        case VERIFY: return { text: 'Doğrulama', tone: 'emerald' };
         default: return { text: '—', tone: 'slate' };
     }
 }
@@ -393,8 +430,12 @@ export function planSummary(plan) {
     }
 
     const critical = plan.probes.filter((p) => p.priority === CRITICAL).length;
+    const verify = plan.probes.filter((p) => p.priority === VERIFY).length;
     const parts = [`${plan.probes.length} madde`];
     if (critical > 0) parts.push(`${critical} kritik`);
+    // Doğrulama soruları "açık madde" değil; sayıyı okuyan kişi bunu bilmeli
+    // ki 5 sorunun 2'sinin teyit olduğunu anlasın.
+    if (verify > 0) parts.push(`${verify} doğrulama`);
     if (plan.dropped.length > 0) parts.push(`${plan.dropped.length} madde süreye sığmadı`);
     return parts.join(' · ');
 }

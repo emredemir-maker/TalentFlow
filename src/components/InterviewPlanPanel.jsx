@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 
 import {
-    buildInterviewPlan, planToText, priorityLabel, planSummary, CRITICAL,
+    buildInterviewPlan, planToText, priorityLabel, planSummary, CRITICAL, VERIFY,
 } from '../utils/interviewPlan';
 import { generateProbeQuestions } from '../services/ai/interviewPlanner';
 
@@ -27,6 +27,7 @@ const TONE = {
     amber: 'bg-amber-50 text-amber-700 border-amber-200',
     sky: 'bg-sky-50 text-sky-700 border-sky-200',
     slate: 'bg-slate-50 text-slate-600 border-slate-200',
+    emerald: 'bg-emerald-50 text-emerald-700 border-emerald-200',
 };
 
 const STATUS_TEXT = {
@@ -34,6 +35,10 @@ const STATUS_TEXT = {
     partial: 'Kısmen karşılanıyor',
     met: 'Karşılanıyor',
 };
+
+// Doğrulama soruları açık bir boşluğu kapatmıyor; kullanıcı ikisini
+// karıştırmasın diye kartta ayrıca yazıyor.
+const VERIFY_HINT = 'Boşluk değil — CV\'deki iddiayı teyit için';
 
 export default function InterviewPlanPanel({ candidate, position, analysis, onSave }) {
     const [minutes, setMinutes] = useState(45);
@@ -324,6 +329,9 @@ function ProbeCard({ probe, order }) {
                 <span className="text-[10px] text-slate-400">
                     {STATUS_TEXT[probe.status] || probe.status}
                 </span>
+                {probe.priority === VERIFY && (
+                    <span className="text-[10px] text-emerald-600 italic">{VERIFY_HINT}</span>
+                )}
             </div>
 
             <p className="text-[11px] font-bold text-slate-700 leading-snug">{probe.text}</p>
