@@ -851,13 +851,6 @@ export default function CandidateProcessPage() {
     // parseFeedback kaldırıldı: "Pozitif (+)/Negatif (-)" ayrıştırması artık
     // starDimensions.normalizeStarDimension içinde, eski ve yeni biçimi
     // birlikte ele alacak şekilde yapılıyor.
-    const starAnalysis = candidate?.aiAnalysis?.starAnalysis || {
-        Situation: { evidence: '', score: 0 },
-        Task:      { evidence: '', score: 0 },
-        Action:    { evidence: '', score: 0 },
-        Result:    { evidence: '', score: 0 },
-    };
-
     const rawExperiences = candidate?.experiences || candidate?.careerHistory || [];
     const careerHistory = rawExperiences.filter(exp =>
         exp &&
@@ -940,6 +933,17 @@ export default function CandidateProcessPage() {
     // requirementCoverage taşımıyor.
     const displayedFullAnalysis = fullAnalysisForPosition(candidate, candidate?.matchedPositionTitle);
     const displayedGate = mustHaveGate(displayedFullAnalysis, displayedPosition, candidate);
+
+    // STAR GÖSTERİLEN İLANI İZLESİN.
+    //
+    // Kartlar `candidate.aiAnalysis` okuyordu — adayın EN İYİ eşleşmesinin
+    // analizi. Skor kırılımı ise `displayedFullAnalysis` okuyor, yani ekranda
+    // seçili ilanın analizini. İki bileşen aynı ekranda FARKLI pozisyonun
+    // verisini gösterebiliyordu: solda A ilanının skoru, altında B ilanının
+    // STAR kanıtı. Seçili ilanın analizi varsa STAR da ondan gelir.
+    const displayedStar = displayedFullAnalysis?.starAnalysis
+        || candidate?.aiAnalysis?.starAnalysis
+        || null;
     const displayedGateLabel = gateLabel(displayedGate);
 
     /**
@@ -968,7 +972,7 @@ export default function CandidateProcessPage() {
     // Burada kendi kopyası vardı ve `(toplam / 4) * 10` ile eski 0-10 ölçeğini
     // varsayıyordu. Yeni 0-3 ölçeğine geçilince rozet gerçeğin çok altını
     // gösterdi: S3+T2+A2+R3 için %25 yazarken doğru değer %83'tü.
-    const starScore = starPercent(candidate?.aiAnalysis?.starAnalysis);
+    const starScore = starPercent(displayedStar);
 
     // ── TOP 2% BADGE ────────────────────────────────────────────────────────────
     const isTop2Percent = useMemo(() => {
@@ -1391,7 +1395,7 @@ export default function CandidateProcessPage() {
                                                 )}
                                             </div>
                                             {/* Already analyzed: point to SystemScanner for re-analysis */}
-                                            {candidate.aiAnalysis?.starAnalysis && (
+                                            {displayedStar && (
                                                 <div className="flex items-center gap-2">
                                                     {/* Analizi OLAN adayda yeniden çalıştırma yolu yoktu:
                                                         ekranda yalnızca "Sistem Taraması kullanın" yazıyordu,
@@ -1478,7 +1482,7 @@ export default function CandidateProcessPage() {
                                         )}
 
                                         {/* Empty state — no STAR analysis yet */}
-                                        {!analyzingIds.has(candidate.id) && !candidate.aiAnalysis?.starAnalysis && (
+                                        {!analyzingIds.has(candidate.id) && !displayedStar && (
                                             <div className="flex flex-col items-center justify-center py-12 gap-4 text-center">
                                                 <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center">
                                                     <Brain className="w-7 h-7 text-slate-300" />
@@ -1505,9 +1509,9 @@ export default function CandidateProcessPage() {
                                             sey tek kutuplu oldugu icin negatif tarafta yazacak
                                             gercek bir sey cogu zaman yoktu ve model kacamak
                                             uretiyordu. Ayrinti icin StarEvidenceCards. */}
-                                        {!analyzingIds.has(candidate.id) && candidate.aiAnalysis?.starAnalysis && (
+                                        {!analyzingIds.has(candidate.id) && displayedStar && (
                                             <StarEvidenceCards
-                                                starAnalysis={starAnalysis}
+                                                starAnalysis={displayedStar}
                                                 position={displayedPosition}
                                             />
                                         )}
