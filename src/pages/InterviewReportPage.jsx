@@ -2,13 +2,20 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useCandidates } from '../context/CandidatesContext';
+import { usePositions } from '../context/PositionsContext';
 import { evaluateInterviewer } from '../services/ai/interview.js';
+import { buildInterviewReport, hasCompetencyScores, hasStarScores } from '../utils/interviewReport';
+import {
+    InterviewNarrative,
+    InterviewResultCard,
+    RequirementVerdicts,
+} from '../components/InterviewReportSections';
 import { 
     ChevronLeft, Share2, Download, Brain, 
     Target, Star, MessageSquare, Clock, Zap, 
     ShieldCheck, AlertCircle, FileText, DownloadCloud,
     ExternalLink, Search, MoreHorizontal, Printer, Mail,
-    Users, Activity, TrendingUp, Award,
+    Users, TrendingUp, Award,
     Sparkles, Briefcase, ArrowRight, Video,
     ChevronDown, Loader2, RefreshCw
 } from 'lucide-react';
@@ -17,6 +24,7 @@ export default function InterviewReportPage() {
     const { sessionId } = useParams();
     const navigate = useNavigate();
     const { enrichedCandidates, updateCandidate } = useCandidates();
+    const { positions } = usePositions();
     const [activeTab, setActiveTab] = useState('overview'); // overview, transcript
     const [toast, setToast] = useState(null);
 
@@ -84,6 +92,22 @@ export default function InterviewReportPage() {
         () => (typeof session?.transcript === 'string' ? session.transcript : ''),
         [session]
     );
+    // RAPORUN İÇERİĞİ KAYITTAN GELİR.
+    //
+    // Bu sayfa canlı mülakat akışı için yazılmıştı ve yalnızca onun yazdığı
+    // alanları okuyordu (starScores, aiSummary, finalScore). Manuel görüşme
+    // bambaşka alanlar yazıyor: madde damgaları, kanıt oranı, soru gözlemleri.
+    // Değerlendirme aynı belgenin içindeydi ve ekranda hiç görünmüyordu.
+    const position = useMemo(() => {
+        const list = positions || [];
+        return (
+            list.find((p) => String(p.id) === String(session?.positionId)) ||
+            list.find((p) => p.title && p.title === session?.positionTitle) ||
+            null
+        );
+    }, [positions, session]);
+    const report = useMemo(() => buildInterviewReport(session, position), [session, position]);
+
     /** Belirli bir aday cümlesini bulur; dizi yoksa sessizce null döner. */
     const findAdayQuote = (predicate) =>
         transcriptMessages.find((t) => t?.role === 'ADAY' && predicate(String(t?.text || '')))?.text || null;
@@ -265,9 +289,23 @@ export default function InterviewReportPage() {
                                 <div className="flex items-center gap-4 text-[#64748B]">
                                     <span className="text-[12px] font-bold flex items-center gap-1.5"><Briefcase className="w-3.5 h-3.5" /> {candidate.position || candidate.bestTitle}</span>
                                     <div className="h-3 w-px bg-slate-200" />
-                                    <span className="text-[12px] font-bold flex items-center gap-1.5 text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-100 italic" title="Mülakat skoru (%70) + CV skoru (%30) ağırlıklı ortalaması">
-                                        GENEL %{session.finalScore ?? (candidate.bestScore ? Math.round(candidate.bestScore) : '—')}
-                                    </span>
+                                    {/* SKOR ROZETLERİ — kayıtta ne varsa o.
+                                        Eskiden `finalScore` yoksa CV skoru "GENEL"
+                                        etiketiyle basılıyordu: mülakat raporunda,
+                                        mülakattan gelmiş gibi. Manuel görüşmede
+                                        finalScore hiç yazılmıyor; gösterilen sayı
+                                        her seferinde CV'nin sayısıydı. */}
+                                    {session.finalScore != null && (
+                                        <span className="text-[12px] font-bold flex items-center gap-1.5 text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-100 italic" title="Mülakat skoru (%70) + CV skoru (%30) ağırlıklı ortalaması">
+                                            GENEL %{session.finalScore}
+                                        </span>
+                                    )}
+                                    {report.evidence?.score != null && (
+                                        <span className="text-[11px] font-bold flex items-center gap-1.5 text-purple-600 bg-purple-50 px-2 py-0.5 rounded-lg border border-purple-100 italic" title={`Odada sorulan ${report.evidence.asked} maddede çıkan kanıt oranı`}>
+                                            KANIT %{report.evidence.score}
+                                            <span className="text-purple-400 not-italic">({report.evidence.asked} madde)</span>
+                                        </span>
+                                    )}
                                     {session.interviewScore != null && (
                                         <span className="text-[11px] font-bold flex items-center gap-1.5 text-purple-600 bg-purple-50 px-2 py-0.5 rounded-lg border border-purple-100 italic" title="Bu mülakata özel skor">
                                             MÜL. %{session.interviewScore}
@@ -324,32 +362,22 @@ export default function InterviewReportPage() {
                     {activeTab === 'overview' ? (
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-2 duration-400">
                             
-                            {/* LEFT COLUMN: STAR ANALYSIS */}
+                            {/* LEFT COLUMN: DEĞERLENDİRME */}
                             <div className="lg:col-span-2 space-y-6">
-                                {/* AI SUMMARY CARD */}
-                                <div className="bg-white rounded-[24px] border border-blue-100 p-8 relative overflow-hidden group shadow-sm bg-gradient-to-br from-white to-blue-50/20">
-                                    <div className="flex items-center gap-3 mb-6">
-                                        <div className="p-2 bg-blue-600/10 rounded-xl">
-                                            <Brain className="w-5 h-5 text-blue-600" />
-                                        </div>
-                                        <h3 className="text-[12px] font-black text-[#13294E] uppercase tracking-widest italic">AI STAR ÖZETİ</h3>
-                                        <div className="ml-auto flex gap-1.5">
-                                            <Sparkles className="w-4 h-4 text-blue-300 animate-pulse" />
-                                        </div>
-                                    </div>
-                                    <p className="text-[16px] text-[#334155] leading-relaxed font-medium italic">
-                                        "{session.aiSummary || "Adayın mülakat performansı yapay zeka tarafından analiz edildi. STAR metodolojisine göre detaylı değerlendirme aşağıda yer almaktadır."}"
-                                    </p>
-                                    <div className="mt-8 flex flex-wrap gap-2">
-                                        {(session.tags || ['Analiz Bekleniyor']).map(tag => (
-                                            <span key={tag} className="px-4 py-1.5 bg-white border border-blue-100 rounded-xl text-[10px] font-black text-blue-600 shadow-sm uppercase tracking-tight italic">
-                                                {tag}
-                                            </span>
-                                        ))}
-                                    </div>
-                                </div>
+                                {/* SONUÇ — kanıt oranı damgalardan hesaplandı, modelden gelmedi */}
+                                <InterviewResultCard report={report} />
 
-                                {/* STAR DETAILS */}
+                                {/* MADDE MADDE — adayın kendi sözüyle */}
+                                <RequirementVerdicts report={report} />
+
+                                {/* GÖZLEMLER — sayı üretmeyen, yalnızca anlatan kısım */}
+                                <InterviewNarrative report={report} />
+
+                                {/* STAR — YALNIZCA canlı mülakatta üretiliyor.
+                                    Manuel görüşmede dört boş kutu basıp "analiz
+                                    edilmedi" yazmak, ölçülmeyen bir şeyi
+                                    ölçülmüş gibi göstermenin yumuşak hâliydi. */}
+                                {hasStarScores(session) && (
                                 <div className="space-y-4">
                                     <div className="flex items-center gap-2 px-1">
                                         <h3 className="text-[12px] font-black text-slate-400 uppercase tracking-widest italic">STAR ANALİZ DETAYLARI</h3>
@@ -417,6 +445,7 @@ export default function InterviewReportPage() {
                                         ))}
                                     </div>
                                 </div>
+                                )}
                             </div>
 
                             {/* STRENGTHS & DEVELOPMENT AREAS — only shown when AI generated data */}
@@ -457,7 +486,12 @@ export default function InterviewReportPage() {
 
                             {/* RIGHT COLUMN: ANALYTICS & DECISION */}
                             <div className="space-y-6">
-                                {/* COMPETENCY RADAR */}
+                                {/* COMPETENCY RADAR — beş eksenin BEŞİ de yoksa çizilmez.
+                                    Eksik eksen NaN köşe üretiyordu: poligon sessizce
+                                    kayboluyor, altındaki kutular "0.0 / 10" ve
+                                    "undefined/100" yazıyordu. Manuel görüşmede bu
+                                    alanların hiçbiri üretilmiyor. */}
+                                {hasCompetencyScores(session) && (
                                 <section className="bg-white rounded-[24px] border border-[#E2E8F0] p-6 shadow-sm flex flex-col items-center">
                                     <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-8 w-full italic">YETKİNLİK ANALİZİ</h3>
                                     
@@ -508,16 +542,19 @@ export default function InterviewReportPage() {
                                         </div>
                                     </div>
                                 </section>
+                                )}
 
-                                {/* CRITICAL MOMENTS */}
+                                {/* CRITICAL MOMENTS — canlı akışın ürettiği alan.
+                                    Kayıtta yoksa "kritik an tespit edilemedi" demek
+                                    yanlış: tarama YAPILMADI, sonuç boş çıkmadı. */}
+                                {(session.criticalMoments || []).length > 0 && (
                                 <section className="bg-white rounded-[24px] border border-[#E2E8F0] p-6 shadow-sm space-y-6">
                                     <div className="flex items-center justify-between">
                                         <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] italic">KRİTİK ANLAR</h3>
                                         <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded text-[7px] font-black uppercase border border-emerald-100">AI Taraması</span>
                                     </div>
                                     <div className="space-y-6">
-                                        {(session.criticalMoments || []).length > 0 ? (
-                                            session.criticalMoments.map((moment, idx) => (
+                                        {session.criticalMoments.map((moment, idx) => (
                                             <div key={idx} className="relative pl-6 border-l border-slate-100 space-y-2">
                                                 <div className={`absolute -left-[4.5px] top-1 w-2 h-2 rounded-full ${moment.color}`} />
                                                 <div className="flex items-center gap-3">
@@ -526,15 +563,11 @@ export default function InterviewReportPage() {
                                                 </div>
                                                 <p className="text-[11px] text-slate-500 font-medium leading-snug italic">"{moment.text}"</p>
                                             </div>
-                                        ))
-                                    ) : (
-                                        <div className="text-center py-4">
-                                            <p className="text-[10px] font-bold text-slate-300 uppercase italic">Kritik an tespit edilemedi</p>
-                                        </div>
-                                    )}
+                                        ))}
                                     </div>
                                     <button onClick={() => setActiveTab('transcript')} className="w-full py-2.5 text-[9px] font-black text-[#13294E] uppercase hover:bg-slate-50 rounded-xl border border-slate-100 transition-all">Tüm Transkripti Görüntüle →</button>
                                 </section>
+                                )}
 
                                 {/* DECISION CARD */}
                                 <section className="bg-[#0F172A] rounded-[24px] p-8 shadow-xl space-y-6 text-white border border-white/5 relative overflow-hidden">
@@ -679,12 +712,6 @@ export default function InterviewReportPage() {
                                                   <span className="text-[11px] font-black text-[#0F172A]">{item.value}</span>
                                               </div>
                                           ))}
-                                          <div className="pt-2">
-                                              <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
-                                                  <div className="h-full bg-blue-600 w-full" />
-                                              </div>
-                                              <p className="text-[8px] font-black text-slate-300 mt-1.5 uppercase tracking-widest text-center">Transcript %100 işlendi</p>
-                                          </div>
                                       </div>
                                  </div>
 
@@ -697,18 +724,13 @@ export default function InterviewReportPage() {
                                       </div>
                                  </div>
 
-                                 <div className="bg-[#044D34] rounded-[24px] p-6 shadow-xl space-y-4 text-white relative overflow-hidden group">
-                                      <div className="absolute right-0 bottom-0 opacity-10"><Activity className="w-32 h-32" /></div>
-                                      <h3 className="text-[10px] font-black text-white/30 uppercase tracking-widest italic">DUYGU ANALİZİ</h3>
-                                      <div className="flex items-end gap-1.5 h-16 mb-4">
-                                          {[40, 60, 80, 50, 90, 70, 85].map((h, i) => (
-                                              <div key={i} className="flex-1 bg-white/20 rounded-full relative group-hover:bg-white/40 transition-all" style={{ height: `${h}%` }}>
-                                                  {i === 4 && <div className="absolute inset-0 bg-emerald-400 rounded-full animate-pulse" />}
-                                              </div>
-                                          ))}
-                                      </div>
-                                      <p className="text-[11px] font-medium leading-relaxed italic text-white/80">Oturum genelinde pozitif ve çözüm odaklı ton hakim.</p>
-                                 </div>
+                                 {/* BURADA BİR "DUYGU ANALİZİ" KARTI VARDI ve tamamen
+                                     uydurmaydı: yükseklikleri koda gömülü yedi çubuk
+                                     ve her mülakatta aynı cümle — "oturum genelinde
+                                     pozitif ve çözüm odaklı ton hakim". Hiçbir ölçüme
+                                     dayanmıyordu ama ekranda AI çıktısı gibi duruyordu.
+                                     Yapılmamış bir ölçümün sonucunu yazmak, yanlış
+                                     ölçümden daha kötüdür. Kaldırıldı. */}
                              </div>
 
                              {/* MAIN TRANSCRIPT FEED */}
