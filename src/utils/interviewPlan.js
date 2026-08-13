@@ -32,17 +32,30 @@ export const LOW = 'dusuk';
 
 const PRIORITY_ORDER = [CRITICAL, HIGH, MEDIUM, LOW];
 
-/** Kademe başına ayrılan dakika — kritik maddeler STAR'a kadar açılmalı. */
+/**
+ * Kademe başına ayrılan dakika.
+ *
+ * İlk değerler (8/6/4/3) fazla cömertti: kullanıcı 30 dakikalık bir görüşme
+ * için yalnızca ÜÇ soru çıktığını bildirdi ve haklıydı. Bir maddeyi STAR
+ * derinliğinde konuşmak — soru, cevap, bir derinleştirme — 5-6 dakika sürer,
+ * 8 değil.
+ */
 const MINUTES_BY_PRIORITY = {
-    [CRITICAL]: 8,
-    [HIGH]: 6,
+    [CRITICAL]: 6,
+    [HIGH]: 5,
     [MEDIUM]: 4,
     [LOW]: 3,
 };
 
-/** Açılış ve kapanış — soru bütçesinden ÖNCE ayrılır. */
-export const OPENING_MINUTES = 5;
-export const CLOSING_MINUTES = 8; // adayın soruları + sonraki adım
+/**
+ * Açılış ve kapanış — soru bütçesinden ÖNCE ayrılır.
+ *
+ * Eski değerler 5 ve 8'di: 30 dakikalık bir görüşmenin 13 dakikası, yani
+ * %43'ü soru sorulmayan zamana gidiyordu. Tanışma üç dakikada olur; adayın
+ * soruları ve sonraki adım beş dakikada.
+ */
+export const OPENING_MINUTES = 3;
+export const CLOSING_MINUTES = 5; // adayın soruları + sonraki adım
 
 const STAR_KEYS = ['Situation', 'Task', 'Action', 'Result'];
 
