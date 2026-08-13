@@ -163,10 +163,33 @@ export async function scoreCoverage(jobDescription, candidateData, modelId = 'ge
     return { assessments, star };
 }
 
-/** Anlatım çağrısından gelen metinleri damgalarla birleştirir. */
+/**
+ * Anlatım çağrısından gelen metinleri damgalarla birleştirir.
+ *
+ * `narrative` = anlatım çağrısının `extractedData` nesnesi. ŞEKLİ PROMPT'TA
+ * YAZILI (extraction.js, EXTRACTOR_PROMPT):
+ *
+ *   { requirementCoverage: { notes: [{index, note, evidence, gap}] },
+ *     starAnalysis: { Situation: {evidence, missing, conflict}, … } }
+ *
+ * BU İKİ YOL YANLIŞ YAZILMIŞTI ve hiçbir zaman veri bulamıyordu: kod
+ * `narrative.notes` ve `narrative.star` okuyordu — ikisi de bir kademe yukarıda
+ * ve farklı isimde. Sonuç: her taramada her adayın STAR gerekçeleri ve madde
+ * dayanakları BOŞ kaydediliyordu. Skorlar doğruydu (onlar skor çağrısından
+ * geliyor) ama ekranda kanıt hiç görünmüyordu.
+ *
+ * Üstelik anlatım çağrısı AI maliyetinin %82'si. Parası ödenen çıktının
+ * neredeyse tamamı okunmadan atılıyordu.
+ *
+ * Testler bunu yakalayamadı çünkü UYDURMA bir şekil besliyorlardı
+ * (`{notes: […], star: {…}}`) — üretimde hiç oluşmayan bir şekil. Bu yüzden
+ * aşağıda prompt'un kendisine bakan bir sözleşme testi var.
+ */
 export function mergeNarrative({ assessments, star }, narrative) {
     const notesByIndex = new Map(
-        (Array.isArray(narrative?.notes) ? narrative.notes : [])
+        (Array.isArray(narrative?.requirementCoverage?.notes)
+            ? narrative.requirementCoverage.notes
+            : [])
             .filter((n) => Number.isFinite(Number(n?.index)))
             .map((n) => [Number(n.index), n])
     );
@@ -185,7 +208,7 @@ export function mergeNarrative({ assessments, star }, narrative) {
     // Tersi olsaydı anlatımın kararsızlığı skora sızardı.
     const starAnalysis = {};
     for (const key of STAR_KEYS) {
-        const text = narrative?.star?.[key] || {};
+        const text = narrative?.starAnalysis?.[key] || {};
         starAnalysis[key] = {
             score: star[key]?.score ?? 0,
             evidence: String(text.evidence || '').trim(),
