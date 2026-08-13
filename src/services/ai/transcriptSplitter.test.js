@@ -159,10 +159,27 @@ describe('SPLITTER_PROMPT', async () => {
         expect(flat).toMatch(/Puan verme, damga verme, yorum yazma/);
     });
 
-    it('makes leaving a question empty the safe choice', () => {
+    it('allows leaving a question empty, but only after a real search', () => {
         expect(flat).toMatch(/BULAMAZSAN BOŞ BIRAK/);
-        expect(flat).toMatch(/Emin değilsen boş bırak/);
-        expect(flat).toMatch(/UYDURULAN cevap ise adaya ait olmayan/);
+        expect(flat).toMatch(/anlam aramasını YAPTIKTAN sonra/);
+        expect(flat).toMatch(/UYDURMAK: adaya ait olmayan bir şeyi ona mal eder/);
+    });
+
+    it('matches on meaning, not on the question wording', () => {
+        // Canlıda oldu: aday vibecoding sorusuna cevap verdi ama terimi
+        // kullanmadı ("Cursor'la prototip çıkardım" gibi) ve ayırıcı soruyu
+        // boş bıraktı. Terimi birebir aramak, cevabı olan bir soruyu yok
+        // saymaya yol açıyor.
+        expect(flat).toMatch(/ÖNCE ANLAMA BAK, KELİMEYE DEĞİL/);
+        expect(flat).toMatch(/sorudaki terimleri KULLANMADAN cevap vermiş olabilir/);
+        expect(flat).toMatch(/vibecoding.{0,200}Cursor'la prototip/);
+    });
+
+    it('names missing an answer as a real error too, not a safe default', () => {
+        // İlk sürümde "emin değilsen boş bırak" tek yönlü bir kaçış
+        // sağlıyordu; kaçırmanın da bir bedeli olduğu yazılı değildi
+        expect(flat).toMatch(/KAÇIRMAK: adayın anlattığı bir şeyi yok sayar/);
+        expect(flat).toMatch(/kaçmak serbest değil/);
     });
 
     it('tells the model interviews do not follow the question order', () => {

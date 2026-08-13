@@ -21,15 +21,72 @@ export default function InterviewReportPage() {
     const [toast, setToast] = useState(null);
 
     // Find candidate and session - moved up to avoid TDZ for recruiterNotes
-    const { candidate, session } = useMemo(() => {
+    const { candidate, session: mirrored } = useMemo(() => {
         for (const c of enrichedCandidates || []) {
-            const s = Number.isInteger(Number(sessionId)) 
+            const s = Number.isInteger(Number(sessionId))
                 ? c.interviewSessions?.[Number(sessionId)]
                 : c.interviewSessions?.find(s => String(s.id) === String(sessionId));
             if (s) return { candidate: c, session: s };
         }
         return { candidate: null, session: null };
     }, [enrichedCandidates, sessionId]);
+
+    // ASIL KAYIT ADAY BELGESİNDE DEĞİL.
+    //
+    // Aday belgesindeki `interviewSessions[]` yalnızca bir ÖZET taşıyor:
+    // id, tarih, tip, sonuç, skor. Transkript, sorular, cevaplar ve
+    // değerlendirme `/interviews/{sessionId}` altında duruyor.
+    //
+    // Bu sayfa yalnızca özete bakıyordu ve manuel görüşmelerde rapor HEP BOŞ
+    // çıkıyordu — kullanıcı transkript girdiği hâlde. Canlı mülakatlarda
+    // görünmemesinin sebebi o akışın özete daha çok alan yazması.
+    //
+    // Transkriptin tamamını aday belgesine kopyalamak çözüm değil: 50 bin
+    // karakterlik metin her aday okumasında taşınır ve doküman sınırını
+    // zorlar. Rapor açıldığında asıl kaydı okumak doğrusu.
+    const [fullRecord, setFullRecord] = useState(null);
+    useEffect(() => {
+        let alive = true;
+        setFullRecord(null);
+        if (!sessionId) return undefined;
+        (async () => {
+            try {
+                const { doc, getDoc } = await import('firebase/firestore');
+                const { db } = await import('../config/firebase');
+                const snap = await getDoc(doc(db, 'interviews', String(sessionId)));
+                if (alive && snap.exists()) setFullRecord(snap.data());
+            } catch {
+                // Kayıt okunamazsa özetle devam edilir; rapor eksik görünür
+                // ama sayfa çökmez.
+            }
+        })();
+        return () => { alive = false; };
+    }, [sessionId]);
+
+    // Özet ile asıl kayıt birleşiyor. Asıl kayıt üstte: özet eskiyebilir,
+    // kanonik olan /interviews altındaki.
+    const session = useMemo(
+        () => (mirrored || fullRecord ? { ...(mirrored || {}), ...(fullRecord || {}) } : null),
+        [mirrored, fullRecord]
+    );
+
+    // TRANSKRİPTİN İKİ ŞEKLİ VAR ve karıştırmak sayfayı çökertir.
+    //
+    // Canlı mülakat rol etiketli bir MESAJ DİZİSİ tutuyor ([{role, text}]).
+    // Manuel görüşme ise tek bir METİN — kullanıcının yapıştırdığı hâliyle.
+    // Sayfa baştan beri diziyi varsayıyor ve `.find` / `.map` çağırıyor;
+    // metin geldiğinde bunlar TypeError fırlatır.
+    const transcriptMessages = useMemo(
+        () => (Array.isArray(session?.transcript) ? session.transcript : []),
+        [session]
+    );
+    const transcriptText = useMemo(
+        () => (typeof session?.transcript === 'string' ? session.transcript : ''),
+        [session]
+    );
+    /** Belirli bir aday cümlesini bulur; dizi yoksa sessizce null döner. */
+    const findAdayQuote = (predicate) =>
+        transcriptMessages.find((t) => t?.role === 'ADAY' && predicate(String(t?.text || '')))?.text || null;
 
     const [recruiterNotes, setRecruiterNotes] = useState('');
     const [finalDecision, setFinalDecision] = useState('');
@@ -52,7 +109,7 @@ export default function InterviewReportPage() {
         setEvalLoading(true);
         try {
             const result = await evaluateInterviewer({
-                transcript: session.transcript || session.messages || [],
+                transcript: transcriptMessages.length > 0 ? transcriptMessages : (session.messages || []),
                 questions:  (session.questions || []).map(q => q.question || q.text || q),
                 positionTitle: session.positionTitle || candidate?.position || '',
             });
@@ -72,7 +129,7 @@ export default function InterviewReportPage() {
         } finally {
             setEvalLoading(false);
         }
-    }, [session, candidate, sessionId, evalLoading, updateCandidate]);
+    }, [session, candidate, sessionId, evalLoading, updateCandidate, transcriptMessages]);
 
     // Auto-trigger evaluation once per completed session when no saved eval exists yet.
     // Reset the ref whenever sessionId changes so navigating to a different report works correctly.
@@ -305,7 +362,7 @@ export default function InterviewReportPage() {
                                                 score: session.starScores?.S ?? null, 
                                                 color: 'bg-blue-900', 
                                                 desc: 'Adayın mülakat sırasında paylaştığı bağlam ve senaryo derinliği.',
-                                                quote: session.transcript?.find(t => t.role === 'ADAY' && t.text.length > 50)?.text || null
+                                                quote: findAdayQuote((text) => text.length > 50)
                                             },
                                             { 
                                                 key: 'T', 
@@ -321,7 +378,7 @@ export default function InterviewReportPage() {
                                                 score: session.starScores?.A ?? null, 
                                                 color: 'bg-blue-700', 
                                                 desc: 'Adayın teknik ve operasyonel olarak sergilediği pratik çözümler.',
-                                                quote: session.transcript?.find(t => t.role === 'ADAY' && t.text.includes('yaptım'))?.text || null
+                                                quote: findAdayQuote((text) => text.includes('yaptım'))
                                             },
                                             { 
                                                 key: 'R', 
@@ -679,8 +736,15 @@ export default function InterviewReportPage() {
                                       </div>
 
                                       <div className="flex-1 overflow-y-auto space-y-8 pr-4 custom-scrollbar">
-                                         {(session.transcript || []).length > 0 ? (
-                                             session.transcript.map((msg, i) => {
+                                         {transcriptMessages.length === 0 && transcriptText ? (
+                                             /* Manuel görüşme: rol etiketi yok, kullanıcının
+                                                yapıştırdığı metin olduğu gibi gösteriliyor.
+                                                Uydurma bir rol ataması yapmıyoruz. */
+                                             <div className="p-6 rounded-[24px] bg-slate-50 text-[14px] leading-relaxed text-[#0F172A] whitespace-pre-wrap">
+                                                 {transcriptText}
+                                             </div>
+                                         ) : transcriptMessages.length > 0 ? (
+                                             transcriptMessages.map((msg, i) => {
                                                  const isAday = msg.role === 'ADAY';
                                                  const initial = msg.role === 'ADAY' ? 'A' : 'M';
                                                  return (

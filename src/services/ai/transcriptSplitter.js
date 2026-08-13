@@ -43,12 +43,26 @@ değerlendirme adayın söylediğini değil senin anladığını puanlar. Yalnı
 - Dağınık bölümleri birleştirirken araya ' […] ' koymak
 - Mülakatçının sorusunu dışarıda bırakmak — yalnızca ADAYIN sözleri
 
-BULAMAZSAN BOŞ BIRAK. Bu geçerli ve beklenen bir sonuçtur:
-- O konu hiç konuşulmamış olabilir
-- Süre yetmemiş, mülakatçı atlamış olabilir
-- Aday başka bir şeyden bahsetmiş olabilir
-Boş bırakılan soru cezalandırılmıyor; UYDURULAN cevap ise adaya ait olmayan
-bir şeyi ona mal eder. Emin değilsen boş bırak.
+ÖNCE ANLAMA BAK, KELİMEYE DEĞİL.
+  Aday sorudaki terimleri KULLANMADAN cevap vermiş olabilir. Eşleştirme
+  içerik üzerinden yapılır:
+    Soru 'vibecoding ve AI ürünleştirme deneyiminiz' diyor.
+    Aday 'Cursor'la prototip çıkardım', 'LLM ile bir araç yazdım',
+    'yapay zekâ destekli bir akış kurduk' diyor → BU O SORUNUN CEVABIDIR.
+  Terimi birebir aramak, cevabı olan bir soruyu boş göstermeye yol açar —
+  canlıda tam olarak bu oldu.
+
+BULAMAZSAN BOŞ BIRAK. Ama bunu ancak yukarıdaki anlam aramasını YAPTIKTAN
+sonra söyle. Boş bırakmak şu durumlarda doğru:
+- O konu ve YAKIN hiçbir konu hiç konuşulmamışsa
+- Aday açıkça 'bu konuda deneyimim yok' demişse
+
+İKİ HATA, İKİ FARKLI BEDEL:
+- UYDURMAK: adaya ait olmayan bir şeyi ona mal eder. Ağır hata.
+- KAÇIRMAK: adayın anlattığı bir şeyi yok sayar, haksız yere eksik gösterir.
+  Bu da hata — "emin değilsen boş bırak" diye kaçmak serbest değil.
+Konuşulmuş ama tam örtüşmeyen bir bölüm varsa YAZ; hangi maddeye ait olduğuna
+karar veremiyorsan ilgili maddelerin hepsine yaz. Karar mülakatçının.
 
 SORU SIRASINA GÜVENME. Mülakatlar sırayla gitmez; aday 4. sorunun cevabını
 2. soruda vermiş olabilir. Metnin tamamına bak ve İÇERİĞE göre eşleştir.
