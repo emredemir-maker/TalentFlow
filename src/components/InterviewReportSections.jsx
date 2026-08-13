@@ -6,7 +6,10 @@
 // basıyordu. Değerlendirme aynı belgenin içindeydi.
 
 import React from 'react';
-import { AlertCircle, Brain, Check, HelpCircle, Minus, ShieldCheck, Target, X } from 'lucide-react';
+import {
+    AlertCircle, Brain, Check, HelpCircle, Loader2, Minus,
+    RefreshCw, ShieldCheck, Target, X,
+} from 'lucide-react';
 import { NO_SCORE_TEXT, OUTCOME_LABEL, VERDICT_LABEL } from '../utils/interviewReport';
 
 const VERDICT_STYLE = {
@@ -28,7 +31,7 @@ const OUTCOME_STYLE = {
  * "%75" tek başına yanıltıcı: dört maddenin üçü mü, on maddenin yedisi mi?
  * Payda her zaman görünür.
  */
-export function InterviewResultCard({ report }) {
+export function InterviewResultCard({ report, onReevaluate, regrading, regradeNote }) {
     const e = report.evidence;
     const gate = Number(e?.mustMissing) > 0;
 
@@ -42,7 +45,26 @@ export function InterviewResultCard({ report }) {
                         Öneri: {OUTCOME_LABEL[report.outcome] || report.outcome}
                     </span>
                 )}
+                {/* Cevabı sonradan tamamlayınca görüşmeyi baştan girmek
+                    gerekiyordu: değerlendirme yalnızca kayıt anında
+                    yapılıyordu. Bu düğme aynı kaydı yerinde yeniden ölçer. */}
+                {onReevaluate && (
+                    <button
+                        type="button"
+                        onClick={onReevaluate}
+                        disabled={regrading}
+                        className={`${report.outcome ? '' : 'ml-auto '}flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100 transition-all disabled:opacity-50`}
+                    >
+                        {regrading
+                            ? <><Loader2 className="w-3 h-3 animate-spin" /> Değerlendiriliyor…</>
+                            : <><RefreshCw className="w-3 h-3" /> Yeniden değerlendir</>}
+                    </button>
+                )}
             </div>
+
+            {regradeNote && (
+                <p className="text-[11px] text-slate-500 leading-relaxed">{regradeNote}</p>
+            )}
 
             {/* SAYI ÜRETİLEMEDİYSE SEBEBİ YAZILIR — 0 basılmaz. Ölçemediğini 0
                 diye yazmak, olmayan bir ölçümü varmış gibi göstermektir. */}
