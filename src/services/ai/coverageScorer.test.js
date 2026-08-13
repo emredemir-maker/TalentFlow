@@ -28,7 +28,9 @@ describe('mergeNarrative', () => {
         // Anlatım çağrısı damga göndermeye kalkarsa yok sayılmalı; yoksa
         // kararsızlık tekrar skora sızar
         const merged = mergeNarrative(scored, {
-            notes: [{ index: 1, status: 'missing', note: 'Kanıt var', evidence: 'X şirketinde 3 yıl' }],
+            requirementCoverage: {
+                notes: [{ index: 1, status: 'missing', note: 'Kanıt var', evidence: 'X şirketinde 3 yıl' }],
+            },
         });
         expect(merged.assessments[0].status).toBe('met');
         expect(merged.assessments[0].evidence).toBe('X şirketinde 3 yıl');
@@ -36,7 +38,7 @@ describe('mergeNarrative', () => {
 
     it('keeps the STAR score from the scoring call and only adds text', () => {
         const merged = mergeNarrative(scored, {
-            star: { Situation: { score: 0, evidence: 'Rol açıkça yazılmış' } },
+            starAnalysis: { Situation: { score: 0, evidence: 'Rol açıkça yazılmış' } },
         });
         expect(merged.starAnalysis.Situation.score).toBe(3);
         expect(merged.starAnalysis.Situation.evidence).toBe('Rol açıkça yazılmış');
@@ -53,10 +55,12 @@ describe('mergeNarrative', () => {
 
     it('matches notes by index, not by order', () => {
         const merged = mergeNarrative(scored, {
-            notes: [
-                { index: 3, note: 'ucuncu' },
-                { index: 1, note: 'birinci' },
-            ],
+            requirementCoverage: {
+                notes: [
+                    { index: 3, note: 'ucuncu' },
+                    { index: 1, note: 'birinci' },
+                ],
+            },
         });
         expect(merged.assessments.find((a) => a.index === 1).note).toBe('birinci');
         expect(merged.assessments.find((a) => a.index === 3).note).toBe('ucuncu');
@@ -228,5 +232,73 @@ describe('scoreCoverage — okunamayan yanıt', async () => {
         const out = await scoreCoverage('ilan', {});
         expect(out.assessments).toHaveLength(1);
         expect(out.star.Situation.score).toBe(3);
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SÖZLEŞME TESTİ — prompt ne üretiyorsa kod ORADAN okumalı.
+//
+// Bu iki yol yanlış yazılmıştı ve HİÇBİR ZAMAN veri bulamıyordu:
+//   kod okuyordu:   narrative.notes          ve  narrative.star
+//   prompt üretiyor: extractedData.requirementCoverage.notes
+//                    extractedData.starAnalysis
+//
+// Sonuç: her taramada, her adayın STAR gerekçeleri ve madde dayanakları BOŞ
+// kaydediliyordu. Skorlar doğruydu — onlar skor çağrısından geliyor — ama
+// ekranda kanıt hiç görünmüyordu. Kullanıcı "her aday için STAR kayıtları boş
+// kalıyor" diye bildirdi ve haklıydı.
+//
+// Anlatım çağrısı AI maliyetinin %82'si: parası ödenen çıktının neredeyse
+// tamamı okunmadan atılıyordu.
+//
+// Yukarıdaki birim testler bunu yakalayamadı çünkü UYDURMA bir şekil
+// besliyorlardı — üretimde hiç oluşmayan bir şekil. Bir testin kendi kurduğu
+// dünyada geçmesi, kodun gerçek dünyada çalıştığını göstermiyor. Bu yüzden
+// aşağıdaki test prompt'un KENDİSİNE bakıyor.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('anlatim sozlesmesi', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const { fileURLToPath } = await import('node:url');
+    const dir = path.dirname(fileURLToPath(import.meta.url));
+    const promptSrc = fs.readFileSync(path.resolve(dir, 'extraction.js'), 'utf8');
+    const mergeSrc = fs.readFileSync(path.resolve(dir, 'coverageScorer.js'), 'utf8');
+
+    it('reads notes from where the prompt actually puts them', () => {
+        // Prompt: extractedData.requirementCoverage.notes
+        expect(promptSrc).toMatch(/"requirementCoverage":\s*\{[\s\S]{0,120}"notes"/);
+        expect(mergeSrc).toMatch(/narrative\?\.requirementCoverage\?\.notes/);
+    });
+
+    it('reads STAR text from where the prompt actually puts it', () => {
+        expect(promptSrc).toMatch(/"starAnalysis":\s*\{/);
+        expect(mergeSrc).toMatch(/narrative\?\.starAnalysis\?\.\[key\]/);
+    });
+
+    it('no longer reads the two paths that never existed', () => {
+        expect(mergeSrc).not.toMatch(/narrative\?\.notes/);
+        expect(mergeSrc).not.toMatch(/narrative\?\.star\?\./);
+    });
+
+    it('carries the real narrative shape end to end', () => {
+        // extraction.js'in mergeNarrative'e verdiği nesnenin birebir şekli
+        const merged = mergeNarrative(scored, {
+            requirementCoverage: {
+                notes: [{ index: 2, note: 'kısmen', evidence: 'CV dayanağı', gap: 'eksik olan' }],
+            },
+            starAnalysis: {
+                Situation: { evidence: 'Rol yazılmış', missing: '', conflict: '', confidentiality: false },
+                Result: { evidence: '', missing: 'Sayı yok', conflict: '', confidentiality: true },
+            },
+        });
+        const second = merged.assessments.find((a) => a.index === 2);
+        expect(second.note).toBe('kısmen');
+        expect(second.evidence).toBe('CV dayanağı');
+        expect(second.gap).toBe('eksik olan');
+        expect(merged.starAnalysis.Situation.evidence).toBe('Rol yazılmış');
+        expect(merged.starAnalysis.Result.missing).toBe('Sayı yok');
+        expect(merged.starAnalysis.Result.confidentiality).toBe(true);
+        // Puan her zaman SKOR çağrısından
+        expect(merged.starAnalysis.Situation.score).toBe(3);
     });
 });
