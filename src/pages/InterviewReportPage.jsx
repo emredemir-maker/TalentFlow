@@ -5,6 +5,8 @@ import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
 import { evaluateInterviewer } from '../services/ai/interview.js';
 import { buildInterviewReport, hasCompetencyScores, hasStarScores } from '../utils/interviewReport';
+import { splitTranscript } from '../services/ai/transcriptSplitter';
+import { getAuth } from 'firebase/auth';
 import {
     InterviewNarrative,
     InterviewResultCard,
@@ -111,6 +113,53 @@ export default function InterviewReportPage() {
     /** Belirli bir aday cümlesini bulur; dizi yoksa sessizce null döner. */
     const findAdayQuote = (predicate) =>
         transcriptMessages.find((t) => t?.role === 'ADAY' && predicate(String(t?.text || '')))?.text || null;
+
+    // YENİDEN DEĞERLENDİRME.
+    //
+    // Değerlendirme bugüne kadar YALNIZCA kayıt anında yapılıyordu. Cevabı
+    // sonradan tamamlamak hiçbir şeyi değiştirmiyordu: rapor kendi kaydını
+    // okuyor, kayıtta damga yok, ekran "sayısal sonuç üretilmedi" diyor.
+    // Kullanıcının tek çıkışı görüşmeyi baştan girmekti ve canlıda bu döngüye
+    // iki kez girildi.
+    const [regrading, setRegrading] = useState(false);
+    const [regradeNote, setRegradeNote] = useState('');
+
+    const runReevaluate = useCallback(async () => {
+        if (!session || regrading) return;
+        setRegrading(true);
+        setRegradeNote('');
+        try {
+            let questions = Array.isArray(session.questions) ? session.questions : [];
+
+            // CEVAP BOŞSA ÖNCE ONU DOLDUR. Boş cevaba damga basılamaz; aynı
+            // boş kaydı yeniden değerlendirmek parayı iki kez harcayıp aynı
+            // sonucu verirdi.
+            const empty = questions.filter((q) => !String(q?.answer || '').trim()).length;
+            if (empty > 0 && transcriptText.trim()) {
+                const out = await splitTranscript(transcriptText, questions);
+                questions = out.questions;
+                setRegradeNote(`Transkriptten ${out.filled} cevap dolduruldu.`);
+            }
+
+            const idToken = await getAuth().currentUser?.getIdToken();
+            const res = await fetch('/api/reevaluate-interview', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+                },
+                body: JSON.stringify({ sessionId, questions }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Yeniden değerlendirilemedi.');
+            // Ekranı kaydın yeni hâliyle tazele — sayfayı yenilemeye gerek yok.
+            setFullRecord((prev) => ({ ...(prev || {}), ...data, questions }));
+        } catch (err) {
+            setRegradeNote(err.message);
+        } finally {
+            setRegrading(false);
+        }
+    }, [session, sessionId, transcriptText, regrading]);
 
     const [recruiterNotes, setRecruiterNotes] = useState('');
     const [finalDecision, setFinalDecision] = useState('');
@@ -365,7 +414,12 @@ export default function InterviewReportPage() {
                             {/* LEFT COLUMN: DEĞERLENDİRME */}
                             <div className="lg:col-span-2 space-y-6">
                                 {/* SONUÇ — kanıt oranı damgalardan hesaplandı, modelden gelmedi */}
-                                <InterviewResultCard report={report} />
+                                <InterviewResultCard
+                                    report={report}
+                                    onReevaluate={report.mode === 'manual' ? runReevaluate : null}
+                                    regrading={regrading}
+                                    regradeNote={regradeNote}
+                                />
 
                                 {/* MADDE MADDE — adayın kendi sözüyle */}
                                 <RequirementVerdicts report={report} />

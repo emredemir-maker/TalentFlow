@@ -656,4 +656,161 @@ async function persistManualInterview({
     }
 }
 
+/**
+ * KAYITLI BİR GÖRÜŞMEYİ YENİDEN DEĞERLENDİRİR.
+ *
+ * Değerlendirme bugüne kadar YALNIZCA kayıt anında yapılıyordu. Cevabı
+ * sonradan tamamlamak (ya da transkripti sonradan sorulara dağıtmak) hiçbir
+ * şeyi değiştirmiyordu: rapor kendi kaydını okuyor, kayıtta damga yok, ekran
+ * "sayısal sonuç üretilmedi" diyor. Kullanıcının tek çıkışı görüşmeyi baştan
+ * girmekti ve canlıda bu döngüye iki kez girildi.
+ *
+ * Bu uç aynı iki AI çağrısını kayıttaki (ya da gönderilen güncel) soru-cevap
+ * üzerinde tekrar çalıştırır ve kaydı yerinde günceller. YENİ KAYIT ÜRETMEZ —
+ * aynı görüşmenin iki kopyası listede yan yana durmamalı.
+ *
+ * İlan sunucudan yeniden okunuyor: madde metinleri ve parmak izi tek
+ * kaynaktan gelmeli. Bu sayede ilan görüşmeden sonra değiştiyse damgalar
+ * BUGÜNKÜ listeye göre üretilir ve parmak izi ona göre damgalanır.
+ */
+router.post(
+    '/api/reevaluate-interview',
+    aiLimiter,
+    requireAuth(['recruiter', 'admin', 'super_admin']),
+    async (req, res) => {
+        const { sessionId, questions } = req.body || {};
+        if (!sessionId || typeof sessionId !== 'string') {
+            return res.status(400).json({ error: 'sessionId zorunludur.' });
+        }
+
+        let record;
+        try {
+            const snap = await db.doc(`interviews/${sessionId}`).get();
+            if (!snap.exists) return res.status(404).json({ error: 'Görüşme kaydı bulunamadı.' });
+            record = snap.data();
+        } catch (err) {
+            log.error({ err: err.message }, '[reevaluate-interview] read failed');
+            return res.status(500).json({ error: 'Görüşme kaydı okunamadı.' });
+        }
+
+        // Gönderilen sorular varsa onlar geçerli (kullanıcı cevapları
+        // tamamlamış olabilir); yoksa kayıttakiler yeniden değerlendirilir.
+        const safeQuestions = Array.isArray(questions)
+            ? sanitizeQuestions(questions)
+            : sanitizeQuestions(record.questions);
+
+        const transcript = typeof record.transcript === 'string' ? record.transcript : '';
+        const notes = typeof record.notes === 'string' ? record.notes : '';
+        if (safeQuestions.length === 0 && !transcript.trim() && !notes.trim()) {
+            return res.status(400).json({ error: 'Değerlendirilecek içerik yok.' });
+        }
+
+        const gradingContext = await loadGradingContext(record.positionId, safeQuestions);
+
+        const [evalResult, verdictResult] = await Promise.allSettled([
+            runManualEvaluation({
+                positionTitle: record.positionTitle || '',
+                candidateName: record.candidateName || '',
+                interviewType: record.interviewType || 'other',
+                date: record.date || '',
+                time: record.time || '',
+                questions: safeQuestions,
+                transcript,
+                notes,
+            }),
+            runRequirementGrading(gradingContext, record.positionTitle || ''),
+        ]);
+
+        const aiAnalysis = evalResult.status === 'fulfilled' ? evalResult.value : null;
+        const requirementVerdicts = verdictResult.status === 'fulfilled' ? verdictResult.value : [];
+        const evidence = interviewEvidence(requirementVerdicts, gradingContext.requirements);
+        const recommendedOutcome = suggestOutcome(evidence);
+        const noScoreReason = scoreBlockReason(
+            safeQuestions, gradingContext.items, requirementVerdicts
+        );
+
+        try {
+            await db.doc(`interviews/${sessionId}`).set({
+                questions: safeQuestions,
+                aiAnalysis,
+                requirementVerdicts,
+                evidence,
+                recommendedOutcome,
+                noScoreReason: noScoreReason || null,
+                evalSchema: EVAL_SCHEMA,
+                requirementsFingerprint: gradingContext.fingerprint || null,
+                // İZ BIRAKIYORUZ. Bir skorun ne zaman ve kaçıncı kez üretildiği
+                // sorulabilir olmalı; sessizce değişen bir sayı açıklanamaz.
+                reevaluatedAt: new Date().toISOString(),
+                reevaluatedBy: req.user?.uid || null,
+            }, { merge: true });
+
+            await mirrorReevaluation({
+                candidateId: record.candidateId,
+                sessionId,
+                positionTitle: record.positionTitle,
+                date: record.date,
+                evidence,
+                requirementVerdicts,
+                fingerprint: gradingContext.fingerprint,
+            });
+        } catch (err) {
+            log.error({ err: err.message }, '[reevaluate-interview] write failed');
+            return res.status(500).json({ error: err.message });
+        }
+
+        log.info(
+            { sessionId, verdicts: requirementVerdicts.length, score: evidence?.score ?? null },
+            '[reevaluate-interview] done'
+        );
+        res.json({
+            sessionId, aiAnalysis, requirementVerdicts, evidence, recommendedOutcome,
+            noScoreReason: noScoreReason || null,
+        });
+    }
+);
+
+/**
+ * Yeni sonucu aday belgesine yansıtır.
+ *
+ * `interviewSessions` bir DİZİ: arrayUnion ile güncellenemez, mevcut kayıt
+ * bulunup değiştirilmeli. Yoksa listede eski skorla yeni skor yan yana durur —
+ * bütün gün kaçındığımız "iki ekran iki sayı" sapmasının aynısı.
+ */
+async function mirrorReevaluation({
+    candidateId, sessionId, positionTitle, date, evidence, requirementVerdicts, fingerprint,
+}) {
+    if (!candidateId) return;
+    const ref = db.doc(`artifacts/talent-flow/public/data/candidates/${candidateId}`);
+    try {
+        const snap = await ref.get();
+        if (!snap.exists) return;
+        const sessions = Array.isArray(snap.data().interviewSessions)
+            ? snap.data().interviewSessions
+            : [];
+        const update = {
+            interviewSessions: sessions.map((s) => (
+                String(s?.id) === String(sessionId)
+                    ? { ...s, aggregateScore: evidence?.score ?? null, evalSchema: EVAL_SCHEMA }
+                    : s
+            )),
+        };
+        if (positionTitle && requirementVerdicts.length > 0 && fingerprint) {
+            update.interviewCoverage = {
+                ...(snap.data().interviewCoverage || {}),
+                [positionTitle]: {
+                    sessionId,
+                    date: date || null,
+                    verdicts: requirementVerdicts,
+                    requirementsFingerprint: fingerprint,
+                    gradedAt: new Date().toISOString(),
+                },
+            };
+        }
+        await ref.set(update, { merge: true });
+    } catch (err) {
+        log.warn({ err: err.message }, '[reevaluate-interview] candidate mirror failed');
+    }
+}
+
 export default router;
