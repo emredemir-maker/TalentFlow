@@ -251,3 +251,48 @@ describe('hasStarScores / hasCompetencyScores', () => {
         })).toBe(true);
     });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SEBEBİ SUNUCU BİLİR.
+//
+// Kayıt anında elinde soru, cevap ve damga hepsi vardı. Rapordan geriye dönük
+// tahmin "bağ yok" ile "cevap yok"u ayıramaz — canlıda tam olarak bu ikisi
+// karıştı ve kullanıcı zaten yaptığı işi tekrar yapmaya gönderildi.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('kayitli sebep', () => {
+    const noScore = { requirementVerdicts: [], evidence: null };
+
+    it('uses the reason the server recorded', () => {
+        const r = buildInterviewReport({ ...noScore, noScoreReason: 'no-answer' }, POSITION);
+        expect(r.noScoreReason).toBe('no-answer');
+        expect(NO_SCORE_TEXT['no-answer']).toMatch(/cevap kutuları boştu/);
+    });
+
+    it('tells the user the transcript box alone is not enough', () => {
+        // Transkripti yapıştırmak ölçüm için yetmiyor; cevapların kutulara
+        // dağıtılması gerekiyor ve bunu kullanıcının bilmesi lazım
+        expect(NO_SCORE_TEXT['no-answer']).toMatch(/Transkriptten cevapları doldur/);
+        expect(NO_SCORE_TEXT['no-answer']).toMatch(/transkriptin kendisi soru bazında ölçülmüyor/);
+    });
+
+    it('ignores an unknown reason instead of showing an empty box', () => {
+        const r = buildInterviewReport({ ...noScore, noScoreReason: 'kim-bilir' }, POSITION);
+        expect(NO_SCORE_TEXT[r.noScoreReason]).toBeTruthy();
+    });
+
+    it('falls back to guessing for records saved before the field existed', () => {
+        expect(buildInterviewReport(noScore, POSITION).noScoreReason).toBe('no-questions');
+        expect(buildInterviewReport({ ...noScore, questions: [{ question: 'S' }] }, POSITION).noScoreReason)
+            .toBe('no-link');
+    });
+
+    it('lets a stale requirement list override the stored reason', () => {
+        // İlan değiştiyse damgaların hangi listeye ait olduğu belirsiz;
+        // bu, cevap eksikliğinden daha önemli bir uyarı
+        const r = buildInterviewReport(
+            { ...noScore, noScoreReason: 'no-answer', requirementsFingerprint: 'eski' },
+            POSITION
+        );
+        expect(r.noScoreReason).toBe('stale');
+    });
+});

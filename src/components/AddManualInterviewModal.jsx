@@ -24,6 +24,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getAuth } from 'firebase/auth';
 import { savedPlanFor, planStatus, PLAN_STATUS_TEXT } from '../utils/interviewPlan';
+import { NO_SCORE_TEXT } from '../utils/interviewReport';
 import { splitTranscript } from '../services/ai/transcriptSplitter';
 import {
     AlertCircle,
@@ -188,6 +189,22 @@ export default function AddManualInterviewModal({
     );
     // Aday seçilmeden uyarı göstermek anlamsız; henüz form doldurulmuyor.
     const planWarning = candidateId && !planLoaded ? PLAN_STATUS_TEXT[planState.reason] : '';
+
+    // PLAN VAR AMA CEVAPLAR BOŞ — bu da ölçümü engelliyor ve uyarısı yoktu.
+    //
+    // Canlıda oldu: kullanıcı plandan soruları üretti, sorular modalda
+    // göründü, transkripti yapıştırdı ve kaydetti. Sonuç: "sayısal sonuç
+    // üretilmedi — sorular ilanın maddelerine bağlı değil". Oysa bağlıydı;
+    // eksik olan cevaptı. Sunucu cevapsız soruyu değerlendirmeye almıyor
+    // (boş cevaba damga basmak token harcamaktan başka bir şey yapmaz) ve
+    // ekran yanlış sebebi yazıyordu.
+    //
+    // Transkripti kutuya yapıştırmak YETMİYOR: ölçüm soru bazında yapılıyor,
+    // cevapların kutulara dağıtılması gerekiyor.
+    const linkedUnanswered = questions.filter(
+        (q) => Number.isFinite(Number(q.requirementIndex)) && !String(q.answer || '').trim()
+    ).length;
+    const answerWarning = planLoaded && linkedUnanswered > 0;
 
     // ── Derived: filtered candidate list for the search dropdown
     const filteredCandidates = useMemo(() => {
@@ -459,6 +476,8 @@ export default function AddManualInterviewModal({
                             aiSuggesting={aiSuggesting}
                             planLoaded={planLoaded}
                             planWarning={planWarning}
+                            answerWarning={answerWarning}
+                            linkedUnanswered={linkedUnanswered}
                             handleSplitTranscript={handleSplitTranscript}
                             splitting={splitting}
                             splitNote={splitNote}
@@ -543,6 +562,8 @@ function FormBody(props) {
         aiSuggesting,
         planLoaded,
         planWarning,
+        answerWarning,
+        linkedUnanswered,
         handleSplitTranscript,
         splitting,
         splitNote,
@@ -723,6 +744,17 @@ function FormBody(props) {
                             <strong>Madde bazlı sonuç çıkmayacak.</strong> {planWarning}
                             {' '}Yine de kaydedebilirsiniz — gözlemler ve özet üretilir, yalnızca
                             sayısal sonuç ve madde damgaları olmaz.
+                        </p>
+                    </div>
+                )}
+                {answerWarning && (
+                    <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                        <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                        <p className="text-xs text-amber-800 leading-relaxed">
+                            <strong>{linkedUnanswered} sorunun cevabı boş.</strong> Boş cevap ölçüme
+                            girmez — o maddeler değerlendirilmeden kalır. Transkripti aşağıya
+                            yapıştırdıysanız <strong>"Transkriptten cevapları doldur"</strong> düğmesine
+                            basın; transkriptin kendisi soru bazında ölçülmüyor.
                         </p>
                     </div>
                 )}
@@ -981,18 +1013,19 @@ function ResultPanel({ result, onClose }) {
                             )}
                         </div>
                     ) : (
-                        /* Sayı YOK ve bu dürüst bir sonuç: sorular gereksinime
-                           bağlı değilse ölçülecek bir şey de yok. Uydurma bir
-                           puan basmaktansa neyin eksik olduğunu söylüyoruz. */
+                        /* Sayı YOK ve bu dürüst bir sonuç. Ama SEBEBİ tek değil:
+                           burada sabit bir cümle vardı ("sorular maddeye bağlı
+                           değil") ve canlıda yanlış çıktı — sorular plandan
+                           gelmişti, bağ vardı, eksik olan cevaptı. Kullanıcı
+                           zaten yaptığı işi tekrar yapmaya gönderildi. Sebebi
+                           artık sunucu söylüyor. */
                         <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
                             <div className="text-xs font-bold uppercase text-slate-500 mb-1">
                                 Sayısal sonuç üretilmedi
                             </div>
                             <p className="text-xs text-slate-600 leading-relaxed">
-                                Bu görüşmedeki sorular ilanın maddelerine bağlı değil, o yüzden
-                                ölçülecek bir şey yok. Madde bazlı sonuç için soruların{' '}
-                                <strong>Mülakat Planı</strong>ndan gelmesi gerekiyor — aşağıdaki
-                                gözlemler ve özet yine kaydedildi.
+                                {NO_SCORE_TEXT[result?.noScoreReason] || NO_SCORE_TEXT['no-link']}
+                                {' '}Aşağıdaki gözlemler ve özet yine kaydedildi.
                             </p>
                         </div>
                     )}
