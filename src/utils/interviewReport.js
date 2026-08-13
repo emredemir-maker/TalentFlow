@@ -43,8 +43,16 @@ export const OUTCOME_LABEL = {
  * göstermektir. Sebebi söylemek ve boş bırakmak doğrusu.
  */
 export const NO_SCORE_TEXT = {
+    'no-questions': 'Bu kayıtta soru-cevap yok; yalnızca transkript ya da not girilmiş. '
+        + 'Ölçüm soru bazında yapılıyor.',
     'no-link': 'Sorular ilanın maddelerine bağlı değildi — ölçülecek bir şey yok. '
         + 'Aday sayfasındaki Mülakat Planı\'ndan soru üretirseniz sonraki görüşme ölçülür.',
+    // BU SEBEP CANLIDA KAÇIRILDI ve kullanıcıya yanlış iş yaptırdı: sorular
+    // plandan gelmişti, bağ VARDI, eksik olan cevaptı. Ekran yine de "sorular
+    // maddeye bağlı değil" diyordu.
+    'no-answer': 'Sorular maddelere bağlıydı ama cevap kutuları boştu — boş cevaba damga '
+        + 'basılamaz. Transkripti yapıştırdıysanız "Transkriptten cevapları doldur" '
+        + 'düğmesine basmanız gerekiyor; transkriptin kendisi soru bazında ölçülmüyor.',
     'no-verdict': 'Cevaplardan hiçbir maddeye hüküm çıkmadı; hepsi "karar verilemedi" kaldı.',
     stale: 'İlan bu görüşmeden sonra değişti. Damgalar eski madde listesine ait, '
         + 'yeni numaralara dizilirse cevaplar yanlış maddelere yazılır.',
@@ -145,9 +153,17 @@ export function buildInterviewReport(session, position) {
         }))
         .filter((q) => q.question);
 
+    // SEBEBİ SUNUCU BİLİR — o an elinde soru, cevap ve damga hepsi vardı.
+    // Buradan geriye dönük tahmin etmek "bağ yok" ile "cevap yok"u ayıramaz;
+    // canlıda tam olarak bu ikisi karıştı ve kullanıcı zaten yapmış olduğu işi
+    // (plandan soru üretmeyi) tekrar yapmaya gönderildi.
+    //
+    // Eski kayıtlarda alan yok; onlar için tahmin sürüyor.
+    const stored = String(session?.noScoreReason || '');
     let noScoreReason = null;
     if (requirementsStale) noScoreReason = 'stale';
-    else if (verdicts.length === 0) noScoreReason = 'no-link';
+    else if (NO_SCORE_TEXT[stored]) noScoreReason = stored;
+    else if (verdicts.length === 0) noScoreReason = asked.length === 0 ? 'no-questions' : 'no-link';
     else if (evidence && evidence.score === null) noScoreReason = 'no-verdict';
 
     const strengths = (Array.isArray(ai.strengths) ? ai.strengths : []).filter(Boolean);

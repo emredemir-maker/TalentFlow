@@ -145,6 +145,40 @@ export function parseVerdicts(parsed, allowedIndexes) {
  * @param {Array} questions — sanitizeQuestions çıktısı
  * @param {Array<{text: string, must: boolean|null}>} requirements
  */
+/**
+ * Sayı neden üretilemedi? — TEK sebep değil, DÖRT ayrı sebep var.
+ *
+ * Arayüz bugüne kadar hepsine aynı cümleyi yazıyordu: "sorular ilanın
+ * maddelerine bağlı değil". Canlıda bu yanlış çıktı: kullanıcı planından soru
+ * üretmiş, sorular modalda görünüyordu — yani bağ VARDI. Eksik olan cevaptı.
+ * Kullanıcı doğru olanı yapmışken sistem ona yanlış işi yaptırmaya çalıştı.
+ *
+ * Yanlış teşhis, teşhis koymamaktan kötüdür: kullanıcıyı çözülmüş bir sorunu
+ * tekrar çözmeye gönderir.
+ *
+ * @param {Array} questions — sanitizeQuestions çıktısı
+ * @param {Array} items — gradableItems çıktısı (bağlı VE cevaplı)
+ * @param {Array} verdicts — parseVerdicts çıktısı
+ * @returns {'no-questions'|'no-link'|'no-answer'|'no-verdict'|null}
+ */
+export function scoreBlockReason(questions, items, verdicts) {
+    const list = Array.isArray(questions) ? questions : [];
+    if (list.length === 0) return 'no-questions';
+
+    const linked = list.filter(
+        (q) => Number.isInteger(q?.requirementIndex) && q.requirementIndex > 0
+    );
+    if (linked.length === 0) return 'no-link';
+
+    // Bağlı sorular var ama hiçbirinin cevabı girilmemiş. gradableItems
+    // cevapsızları eliyor — boş cevaba damga bastırmak token harcamaktan
+    // başka bir şey yapmaz.
+    if (!Array.isArray(items) || items.length === 0) return 'no-answer';
+
+    if (!Array.isArray(verdicts) || verdicts.length === 0) return 'no-verdict';
+    return null;
+}
+
 export function gradableItems(questions, requirements) {
     if (!Array.isArray(questions) || !Array.isArray(requirements)) return [];
     return questions

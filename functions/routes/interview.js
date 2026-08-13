@@ -31,7 +31,12 @@ import { db, admin } from '../config/firebaseAdmin.js';
 import { requireAuth } from '../middleware/auth.js';
 import { generateText } from '../services/gemini.js';
 import { sanitizeForPrompt } from '../services/promptGuard.js';
-import { buildGradingPrompt, parseVerdicts, gradableItems } from '../services/interviewGrader.js';
+import {
+    buildGradingPrompt,
+    gradableItems,
+    parseVerdicts,
+    scoreBlockReason,
+} from '../services/interviewGrader.js';
 import { positionRequirements, requirementsFingerprint } from '../services/positionRequirements.js';
 import { interviewEvidence, suggestOutcome, EVAL_SCHEMA } from '../services/interviewScore.js';
 import { childLogger } from '../services/logger.js';
@@ -404,11 +409,20 @@ router.post(
         const evidence = interviewEvidence(requirementVerdicts, gradingContext.requirements);
         const recommendedOutcome = suggestOutcome(evidence);
 
+        // SEBEBİ DE KAYDEDİYORUZ. Arayüz bugüne kadar sayı yoksa tek bir cümle
+        // yazıyordu ("sorular maddeye bağlı değil") ve canlıda bu YANLIŞ çıktı:
+        // kullanıcı planından soru üretmişti, bağ vardı, eksik olan cevaptı.
+        // Yanlış teşhis kullanıcıyı çözülmüş bir sorunu tekrar çözmeye gönderir.
+        const noScoreReason = scoreBlockReason(
+            safeQuestions, gradingContext.items, requirementVerdicts
+        );
+
         // ── Persist
         await persistManualInterview({
             req, res,
             evidence,
             recommendedOutcome,
+            noScoreReason,
             record: {
                 candidateId, candidateName, positionId, positionTitle, interviewerName,
                 date, time, durationMinutes, interviewType, transcript, notes,
@@ -519,6 +533,7 @@ async function persistManualInterview({
     requirementVerdicts,
     evidence,
     recommendedOutcome,
+    noScoreReason,
     requirementsFingerprint: fingerprint,
 }) {
     const {
@@ -556,6 +571,9 @@ async function persistManualInterview({
             // basmaktansa boş bırakılıyor.
             evidence,
             recommendedOutcome,
+            // Sayı yoksa NEDEN yok. Tek bir varsayılan cümle yazmak canlıda
+            // yanlış teşhis üretti: bağ vardı, eksik olan cevaptı.
+            noScoreReason: noScoreReason || null,
             // Şema damgası: 1 = modelin ürettiği çıpasız 0-100 (şişik),
             // 2 = damgalardan hesaplanan kanıt oranı. Eski kayıtlar yeni
             // olanlarla aynı listede sıralanmamalı.
@@ -628,7 +646,10 @@ async function persistManualInterview({
             },
             '[create-manual-interview] created'
         );
-        res.json({ sessionId, aiAnalysis, requirementVerdicts, evidence, recommendedOutcome });
+        res.json({
+            sessionId, aiAnalysis, requirementVerdicts, evidence, recommendedOutcome,
+            noScoreReason: noScoreReason || null,
+        });
     } catch (err) {
         log.error({ err: err.message }, '[create-manual-interview] Firestore write failed');
         res.status(500).json({ error: err.message });
