@@ -233,15 +233,39 @@ describe('GRADER_INSTRUCTION', async () => {
         expect(flat).toMatch(/Anlatım.{0,60}AYRI çağrıda kalıyor/);
     });
 
-    it('is actually called with a narrow token ceiling and temperature 0', () => {
-        // Niyet burada yazılı ama tavan ÇAĞIRAN tarafta; ikisi ayrışırsa
-        // yorum doğru kalır, davranış bozulur
+    it('does not starve the call with a 2048 ceiling', () => {
+        // BU TEST 2048'İ SABİTLİYORDU ve hatayı korudu.
+        //
+        // Çıktı gerçekten küçük, ama GİRDİ değil: her madde için gereksinim
+        // metni + soru + 5000 karaktere kadar CEVAP gidiyor. Gemini 2.5
+        // Flash'ta düşünme açık ve düşünme token'ları bu tavana dahil. Uzun
+        // cevaplarda düşünme bütçeyi tüketiyor, yanıta yer kalmıyor, çağrı
+        // BOŞ dönüyor.
+        //
+        // Canlıda görüldü: sorular maddelere bağlı, cevaplar dolu, yine de
+        // tek damga üretilmedi ve ekran "cevaplardan hüküm çıkmadı" dedi.
+        // Skor çağrısında (coverage) birebir aynı hata vardı ve 8192'ye
+        // çıkarılarak çözülmüştü — bu, aynı hatanın üçüncü görünümü.
+        //
+        // "Çıktı küçük" niyeti prompt'ta yazılı olarak kalıyor; tavan ise
+        // düşünmeye yer bırakacak kadar geniş.
         const route = fs.readFileSync(
             path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../routes/interview.js'),
             'utf8'
         ).replace(/\s+/g, ' ');
-        expect(route).toMatch(/runRequirementGrading[\s\S]{0,600}maxOutputTokens: 2048/);
-        expect(route).toMatch(/runRequirementGrading[\s\S]{0,400}temperature: 0/);
+        expect(route).toMatch(/runRequirementGrading[\s\S]{0,1400}maxOutputTokens: 8192/);
+        expect(route).toMatch(/runRequirementGrading[\s\S]{0,1400}temperature: 0/);
+    });
+
+    it('does not swallow an unreadable response as "no verdicts"', () => {
+        // `if (!match) return []` boş dizi donduruyordu ve bu, "hicbir maddeye
+        // hukum verilemedi" ile BIREBIR ayni goruntuyu veriyordu
+        const route = fs.readFileSync(
+            path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../routes/interview.js'),
+            'utf8'
+        );
+        expect(route).toMatch(/Damga çağrısının yanıtı okunamadı/);
+        expect(route).not.toMatch(/if \(!match\) return \[\];/);
     });
 
     it('runs the two calls in parallel so one failure cannot take the other down', () => {

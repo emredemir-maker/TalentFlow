@@ -159,9 +159,10 @@ export function parseVerdicts(parsed, allowedIndexes) {
  * @param {Array} questions — sanitizeQuestions çıktısı
  * @param {Array} items — gradableItems çıktısı (bağlı VE cevaplı)
  * @param {Array} verdicts — parseVerdicts çıktısı
- * @returns {'no-questions'|'no-link'|'no-answer'|'no-verdict'|null}
+ * @param {boolean} [gradingFailed] — damga çağrısı hata verdi mi
+ * @returns {'no-questions'|'no-link'|'no-answer'|'grading-failed'|'no-verdict'|null}
  */
-export function scoreBlockReason(questions, items, verdicts) {
+export function scoreBlockReason(questions, items, verdicts, gradingFailed = false) {
     const list = Array.isArray(questions) ? questions : [];
     if (list.length === 0) return 'no-questions';
 
@@ -175,6 +176,13 @@ export function scoreBlockReason(questions, items, verdicts) {
     // başka bir şey yapmaz.
     if (!Array.isArray(items) || items.length === 0) return 'no-answer';
 
+    // ÇAĞRI DÜŞTÜ İLE HÜKÜM ÇIKMADI AYNI ŞEY DEĞİL.
+    //
+    // İkisi de boş damga listesi üretiyor ve ekran ikisine de "hepsi karar
+    // verilemedi kaldı" yazıyordu. Bu bir ÖLÇÜM İDDİASI: adayın cevaplarına
+    // bakılıp karar verilememiş gibi okunuyor. Oysa çağrı düştüğünde ortada
+    // hiç değerlendirme yok — cevaplar hiç okunmadı bile.
+    if (gradingFailed) return 'grading-failed';
     if (!Array.isArray(verdicts) || verdicts.length === 0) return 'no-verdict';
     return null;
 }
