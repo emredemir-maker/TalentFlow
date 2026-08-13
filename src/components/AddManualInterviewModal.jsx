@@ -23,7 +23,7 @@
 // "Kapat"a basınca (sonuç ekranını incelemek için).
 import { useEffect, useMemo, useState } from 'react';
 import { getAuth } from 'firebase/auth';
-import { savedPlanFor } from '../utils/interviewPlan';
+import { savedPlanFor, planStatus, PLAN_STATUS_TEXT } from '../utils/interviewPlan';
 import { splitTranscript } from '../services/ai/transcriptSplitter';
 import {
     AlertCircle,
@@ -170,6 +170,24 @@ export default function AddManualInterviewModal({
     // sorulara "plandan geldi" diyordu. Gereksinim bağı zaten soruların
     // içinde; ikinci bir yerde tutmak onu yanlış olabilecek hâle getiriyor.
     const planLoaded = questions.some((q) => Number.isFinite(Number(q.requirementIndex)));
+
+    // KAYDETMEDEN ÖNCE UYAR.
+    //
+    // Canlıda oldu: kullanıcı görüşmeyi kaydetti, AI çağrıları yapıldı, para
+    // gitti ve ancak SONUNDA "sorular ilanın maddelerine bağlı değil" yazısını
+    // gördü. Üstelik hangi sebeple bağlı olmadığı da yazmıyordu.
+    //
+    // Dört durum var ve dördü de farklı bir eylem gerektiriyor; hangisi
+    // olduğunu şimdi söylüyoruz.
+    const planState = useMemo(
+        () => planStatus(
+            candidates.find((c) => c.id === candidateId),
+            positions.find((p) => p.id === positionId)
+        ),
+        [candidates, candidateId, positions, positionId]
+    );
+    // Aday seçilmeden uyarı göstermek anlamsız; henüz form doldurulmuyor.
+    const planWarning = candidateId && !planLoaded ? PLAN_STATUS_TEXT[planState.reason] : '';
 
     // ── Derived: filtered candidate list for the search dropdown
     const filteredCandidates = useMemo(() => {
@@ -440,6 +458,7 @@ export default function AddManualInterviewModal({
                             handleAiSuggest={handleAiSuggest}
                             aiSuggesting={aiSuggesting}
                             planLoaded={planLoaded}
+                            planWarning={planWarning}
                             handleSplitTranscript={handleSplitTranscript}
                             splitting={splitting}
                             splitNote={splitNote}
@@ -523,6 +542,7 @@ function FormBody(props) {
         handleAiSuggest,
         aiSuggesting,
         planLoaded,
+        planWarning,
         handleSplitTranscript,
         splitting,
         splitNote,
@@ -694,6 +714,18 @@ function FormBody(props) {
                     Kullanıcının bu farkı görmesi gerekiyor — aksi hâlde
                     soruları silip yerine kendi jenerik sorularını yazar ve
                     bağ sessizce kopar. */}
+                {/* Sorular plandan GELMEDİ. Sebebi ve çözümü burada yazıyor;
+                    kullanıcı kaydetmeden önce düzeltebilsin. */}
+                {planWarning && (
+                    <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                        <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                        <p className="text-xs text-amber-800 leading-relaxed">
+                            <strong>Madde bazlı sonuç çıkmayacak.</strong> {planWarning}
+                            {' '}Yine de kaydedebilirsiniz — gözlemler ve özet üretilir, yalnızca
+                            sayısal sonuç ve madde damgaları olmaz.
+                        </p>
+                    </div>
+                )}
                 {planLoaded && (
                     <div className="mb-3 flex items-start gap-2 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2">
                         <Sparkles className="w-3.5 h-3.5 text-cyan-500 shrink-0 mt-0.5" />
