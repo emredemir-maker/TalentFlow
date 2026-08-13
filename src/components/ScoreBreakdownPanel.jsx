@@ -108,6 +108,24 @@ export default function ScoreBreakdownPanel({ analysis, position }) {
                         )}
                     </div>
 
+                    {/* STAR HİÇ ÖLÇÜLMEMİŞSE bu skor çarpansız.
+                        Sessiz kalırsak "tam güven" ile "ölçülmedi" ekranda
+                        aynı görünür ve ölçülmemiş aday, STAR'ı düşük çıkan
+                        adayın üstüne çıkar. Sayıyı düşürmüyoruz — ölçüm
+                        yapılmamış olması adayın kusuru değil — ama farkın
+                        görünmesi gerekiyor. */}
+                    {!staleRequirements && exp.starMissing && (
+                        <div className="flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                            <RotateCcw className="w-3 h-3 text-slate-400 shrink-0 mt-0.5" />
+                            <p className="text-[10px] text-slate-600 leading-relaxed">
+                                Bu kayıtta <strong>CV kanıt yoğunluğu (STAR) ölçülmemiş</strong>. Skor
+                                kanıt güveniyle çarpılmadı, yani mümkün olan en iyi katsayıyı aldı.
+                                STAR'ı ölçülmüş adaylarla doğrudan kıyaslamayın; adayı{' '}
+                                <strong>yeniden tarayın</strong>.
+                            </p>
+                        </div>
+                    )}
+
                     {!staleRequirements && exp.star && exp.star.penalty > 0.5 && (
                         <p className="text-[10px] text-slate-500 leading-relaxed">
                             CV'de kanıt eksik olduğu için uyum skorundan{' '}

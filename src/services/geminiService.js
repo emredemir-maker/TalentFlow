@@ -367,7 +367,18 @@ export function explainHybridScore(data, requirements) {
     // STAR bir bileşen değil, ÇARPAN. Kırılım da öyle gösterilmeli; iki
     // ayrı ağırlık göstermek ekranı gerçek hesaptan ayırırdı.
     const both = coverageScore !== null && star !== null;
+    // GÜVEN 1 BURADA BİR VARSAYIM, ÖLÇÜM DEĞİL.
+    //
+    // STAR yoksa çarpan uygulanmıyor ve skor tam kredi alıyor — yani "CV'deki
+    // kanıt %100" ile AYNI sonuç. Ölçmediğimiz bir şeye mümkün olan en iyi
+    // değeri vermek, ölçülmüş adayların aleyhine çalışıyor: STAR'ı 60 çıkan
+    // aday 0,88 ile çarpılırken, hiç ölçülmemiş aday 1,00 alıyor.
+    //
+    // Sayıyı burada düşürmüyoruz — bu da ters yönde bir haksızlık olurdu:
+    // ölçüm yapılmamış olması adayın kusuru değil, sistemin eksiği. Ama sessiz
+    // kalmıyoruz: `starMissing` ile işaretleniyor ve arayüz bunu yazıyor.
     const confidence = both ? confidenceFrom(star) : 1;
+    const starMissing = coverageScore !== null && star === null;
 
     let coverage = null;
     if (breakdown) {
@@ -442,6 +453,7 @@ export function explainHybridScore(data, requirements) {
         coverage,
         star: starDetail,
         confidence,
+        starMissing,
     };
 }
 
