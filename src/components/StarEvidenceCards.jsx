@@ -23,14 +23,40 @@ const STEPS = {
  *                      ya da yer kısıtı yüzünden yazmamış olabilir.
  *   Tutarsızlık      — yalnızca gerçek çelişki. Nadir olmalı.
  */
-export default function StarEvidenceCards({ starAnalysis, position }) {
+export default function StarEvidenceCards({ starAnalysis, position, narrativeError }) {
     const dims = normalizeStarAnalysis(starAnalysis);
     if (!dims) return null;
 
     const isLegacy = dims.some((d) => d.legacy);
 
+    // PUAN VAR AMA TEK SATIR GEREKÇE YOK — bunun söylenmesi gerekiyor.
+    //
+    // Kartlar bu durumda yalnızca başlık ve "3/3 Ölçülmüş" rozetini basıyordu;
+    // gövdeleri bomboştu. Kullanıcı defalarca yeniden analiz etti ve neden
+    // dolmadığını hiçbir yerden öğrenemedi — çünkü ekran eksikliği hiç
+    // bildirmiyordu, sadece boş duruyordu.
+    //
+    // İki sebebi var ve ikisi de farklı iş gerektiriyor:
+    //   - Kayıt, metinleri yanlış yerden okuyan sürümle üretilmiş → yeniden tara
+    //   - Anlatım çağrısı o taramada düştü → sebebi `narrativeError` taşıyor
+    const noText = dims.every((d) => !d.evidence && !d.missing && !d.conflict);
+
     return (
         <div className="space-y-2">
+            {noText && (
+                <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                    <p className="text-[11px] text-amber-800 leading-relaxed">
+                        <strong>Bu analizde gerekçe metinleri yok.</strong> Puanlar geçerli — onlar
+                        ayrı bir çağrıdan geliyor — ama &quot;CV&apos;de ne yazıyor&quot; kısmı
+                        kaydedilmemiş.{' '}
+                        {narrativeError
+                            ? <>Sebep: <span className="font-mono">{narrativeError}</span></>
+                            : <>Kayıt, metinleri yanlış yerden okuyan bir sürümle üretilmiş olabilir.</>}
+                        {' '}Doldurmak için <strong>Yeniden Analiz Et</strong> deyin.
+                    </p>
+                </div>
+            )}
             {isLegacy && (
                 <div className="flex items-start gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
                     <Info className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
