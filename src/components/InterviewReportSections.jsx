@@ -78,6 +78,13 @@ export function InterviewResultCard({ report, onReevaluate, regrading, regradeNo
                         <p className="text-[12px] text-amber-800 leading-relaxed">
                             {NO_SCORE_TEXT[report.noScoreReason]}
                         </p>
+                        {/* Teknik sebep gizlenmiyor: aynı hata tekrarlıyorsa
+                            kullanıcı bunu bize aktarabilmeli. */}
+                        {report.gradingError && (
+                            <p className="mt-1 text-[10px] text-amber-700 font-mono break-words">
+                                {report.gradingError}
+                            </p>
+                        )}
                     </div>
                 </div>
             ) : e && (

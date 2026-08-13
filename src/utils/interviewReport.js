@@ -53,7 +53,15 @@ export const NO_SCORE_TEXT = {
     'no-answer': 'Sorular maddelere bağlıydı ama cevap kutuları boştu — boş cevaba damga '
         + 'basılamaz. Transkripti yapıştırdıysanız "Transkriptten cevapları doldur" '
         + 'düğmesine basmanız gerekiyor; transkriptin kendisi soru bazında ölçülmüyor.',
-    'no-verdict': 'Cevaplardan hiçbir maddeye hüküm çıkmadı; hepsi "karar verilemedi" kaldı.',
+    // ÇAĞRI DÜŞTÜ İLE HÜKÜM ÇIKMADI AYNI ŞEY DEĞİL. İkisi de boş damga listesi
+    // üretiyor ve ekran ikisine de "hepsi karar verilemedi kaldı" yazıyordu.
+    // Bu bir ÖLÇÜM İDDİASI: adayın cevaplarına bakılıp karar verilememiş gibi
+    // okunuyor. Oysa çağrı düştüğünde cevaplar hiç okunmadı bile — kullanıcı
+    // adayı ya da kendi girdisini suçlu sanıyor.
+    'grading-failed': 'Değerlendirme çağrısı sonuç döndüremedi — cevaplarınızda bir sorun yok, '
+        + 'sistem tarafındaki çağrı boş döndü. "Yeniden değerlendir" ile tekrar deneyin.',
+    'no-verdict': 'Damgalar üretildi ama hiçbiri bir maddeyi kapatmadı; hepsi "karar verilemedi" '
+        + 'kaldı. Cevaplar sorulan maddelere değinmemiş olabilir.',
     stale: 'İlan bu görüşmeden sonra değişti. Damgalar eski madde listesine ait, '
         + 'yeni numaralara dizilirse cevaplar yanlış maddelere yazılır.',
 };
@@ -160,6 +168,7 @@ export function buildInterviewReport(session, position) {
     //
     // Eski kayıtlarda alan yok; onlar için tahmin sürüyor.
     const stored = String(session?.noScoreReason || '');
+    const gradingError = String(session?.gradingError || '');
     let noScoreReason = null;
     if (requirementsStale) noScoreReason = 'stale';
     else if (NO_SCORE_TEXT[stored]) noScoreReason = stored;
@@ -171,6 +180,8 @@ export function buildInterviewReport(session, position) {
     const summary = String(ai.summary || '').trim();
 
     return {
+        // Damga çağrısının hata metni — ekran sebebi tahmin etmesin.
+        gradingError: gradingError || null,
         mode: session?.mode || 'live',
         evidence,
         outcome: session?.recommendedOutcome || null,

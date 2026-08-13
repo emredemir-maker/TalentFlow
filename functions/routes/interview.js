@@ -392,8 +392,15 @@ router.post(
         }
 
         const requirementVerdicts = verdictResult.status === 'fulfilled' ? verdictResult.value : [];
-        if (verdictResult.status === 'rejected') {
-            log.warn({ err: verdictResult.reason?.message }, '[create-manual-interview] requirement grading failed');
+        // Reddin SEBEBİ kayda giriyor. Log'a yazmak yetmiyordu: ekranda
+        // "cevaplardan hüküm çıkmadı" görünüyor ve bu bir ÖLÇÜM İDDİASI —
+        // kullanıcı adayı ya da kendi girdisini suçlu sanıyor. Oysa çağrı
+        // düştüğünde cevaplar hiç okunmadı bile.
+        const gradingError = verdictResult.status === 'rejected'
+            ? String(verdictResult.reason?.message || verdictResult.reason || 'bilinmeyen hata')
+            : null;
+        if (gradingError) {
+            log.warn({ err: gradingError }, '[create-manual-interview] requirement grading failed');
         }
 
         // ── Sayı KODDA hesaplanır
@@ -414,7 +421,7 @@ router.post(
         // kullanıcı planından soru üretmişti, bağ vardı, eksik olan cevaptı.
         // Yanlış teşhis kullanıcıyı çözülmüş bir sorunu tekrar çözmeye gönderir.
         const noScoreReason = scoreBlockReason(
-            safeQuestions, gradingContext.items, requirementVerdicts
+            safeQuestions, gradingContext.items, requirementVerdicts, Boolean(gradingError)
         );
 
         // ── Persist
@@ -431,6 +438,7 @@ router.post(
             safeQuestions,
             aiAnalysis,
             requirementVerdicts,
+            gradingError,
             requirementsFingerprint: gradingContext.fingerprint,
         });
     }
@@ -468,17 +476,39 @@ async function runRequirementGrading({ items, allowed }, positionTitle) {
                 temperature: 0,
                 topP: 0,
                 topK: 1,
-                // Madde başına üç kısa alan; dar tavan modeli kısa tutmaya da
-                // yardım ediyor.
-                maxOutputTokens: 2048,
+                // TAVAN 2048 DEĞİL — aynı hatayı üçüncü kez yapmayalım.
+                //
+                // Çıktının kendisi küçük (madde başına üç kısa alan) ve ilk
+                // sürüm bu yüzden 2048 kullanıyordu. Ama Gemini 2.5 Flash'ta
+                // DÜŞÜNME AÇIK ve düşünme token'ları bu tavana dahil. Girdi
+                // burada büyük: her madde için gereksinim metni + soru + 5000
+                // karaktere kadar CEVAP gidiyor. Uzun cevaplarda düşünme
+                // bütçeyi tüketiyor, yanıta yer kalmıyor ve çağrı BOŞ dönüyor.
+                //
+                // Canlıda görüldü: sorular maddelere bağlı, cevaplar dolu,
+                // yine de tek damga üretilmedi. Skor çağrısında (coverage)
+                // birebir aynı hata vardı ve 8192'ye çıkarılarak çözülmüştü.
+                maxOutputTokens: 8192,
                 responseMimeType: 'application/json',
             },
         })
     )
         .replace(/```json|```/gi, '')
         .trim();
+
+    // SESSİZ BOŞ DÖNÜŞ YOK.
+    //
+    // Burada `if (!match) return []` vardı: yanıt okunamayınca boş dizi
+    // dönüyordu ve bu, "hiçbir maddeye hüküm verilemedi" ile BİREBİR aynı
+    // görünüyordu. Ekran adayın cevaplarını kararsız bulmuş gibi yazıyordu —
+    // oysa ortada hiç değerlendirme yoktu.
     const match = raw.match(/\{[\s\S]*\}/);
-    if (!match) return [];
+    if (!match) {
+        throw new Error(
+            `Damga çağrısının yanıtı okunamadı (uzunluk: ${raw.length}). `
+            + 'Yanıt boş ya da kesilmiş olabilir.'
+        );
+    }
     return parseVerdicts(JSON.parse(match[0]), allowed);
 }
 
@@ -534,6 +564,7 @@ async function persistManualInterview({
     evidence,
     recommendedOutcome,
     noScoreReason,
+    gradingError,
     requirementsFingerprint: fingerprint,
 }) {
     const {
@@ -574,6 +605,7 @@ async function persistManualInterview({
             // Sayı yoksa NEDEN yok. Tek bir varsayılan cümle yazmak canlıda
             // yanlış teşhis üretti: bağ vardı, eksik olan cevaptı.
             noScoreReason: noScoreReason || null,
+            gradingError: gradingError || null,
             // Şema damgası: 1 = modelin ürettiği çıpasız 0-100 (şişik),
             // 2 = damgalardan hesaplanan kanıt oranı. Eski kayıtlar yeni
             // olanlarla aynı listede sıralanmamalı.
@@ -649,6 +681,7 @@ async function persistManualInterview({
         res.json({
             sessionId, aiAnalysis, requirementVerdicts, evidence, recommendedOutcome,
             noScoreReason: noScoreReason || null,
+            gradingError: gradingError || null,
         });
     } catch (err) {
         log.error({ err: err.message }, '[create-manual-interview] Firestore write failed');
@@ -723,6 +756,11 @@ router.post(
 
         const aiAnalysis = evalResult.status === 'fulfilled' ? evalResult.value : null;
         const requirementVerdicts = verdictResult.status === 'fulfilled' ? verdictResult.value : [];
+        // Damga çağrısının reddi `allSettled` içinde yutuluyordu: skor yok,
+        // sebep yok, kullanıcı adayı suçlu sanıyordu.
+        const gradingError = verdictResult.status === 'rejected'
+            ? String(verdictResult.reason?.message || verdictResult.reason || 'bilinmeyen hata')
+            : null;
         const evidence = interviewEvidence(requirementVerdicts, gradingContext.requirements);
         const recommendedOutcome = suggestOutcome(evidence);
         const noScoreReason = scoreBlockReason(
@@ -737,6 +775,7 @@ router.post(
                 evidence,
                 recommendedOutcome,
                 noScoreReason: noScoreReason || null,
+                gradingError: gradingError || null,
                 evalSchema: EVAL_SCHEMA,
                 requirementsFingerprint: gradingContext.fingerprint || null,
                 // İZ BIRAKIYORUZ. Bir skorun ne zaman ve kaçıncı kez üretildiği
@@ -766,6 +805,7 @@ router.post(
         res.json({
             sessionId, aiAnalysis, requirementVerdicts, evidence, recommendedOutcome,
             noScoreReason: noScoreReason || null,
+            gradingError: gradingError || null,
         });
     }
 );
