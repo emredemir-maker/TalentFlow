@@ -36,6 +36,13 @@ const analysis = (assessments, extra = {}) => ({
 
 const at = (index, status, extra = {}) => ({ index, status, ...extra });
 
+// Süre testleri DAKİKA DEĞERLERİNE değil KURALA bakmalı. Sabitler değişince
+// (kullanıcı "30 dakikaya 3 soru az" dedi ve haklıydı) testler kırılmasın diye
+// bütçe buradan türetiliyor.
+const OVERHEAD = OPENING_MINUTES + CLOSING_MINUTES;
+/** Soru vaktini tam olarak `probeMinutes` yapan toplam süre. */
+const totalFor = (probeMinutes) => OVERHEAD + probeMinutes;
+
 describe('buildInterviewPlan — kademe ataması', () => {
     it('puts an unmet MUST-HAVE at the top as critical', () => {
         // Kapı burada açılır ya da kapanır; mülakattan bunu bilmeden çıkılmaz
@@ -133,11 +140,11 @@ describe('buildInterviewPlan — zaman bütçesi', () => {
     });
 
     it('drops the LOWEST priority items when time runs out — never a critical one', () => {
-        // 20 dakika: 5 açılış + 8 kapanış = 7 dakika soru vakti, tek kritik sığar
+        // Soru vakti tam bir kritik maddeye yetiyor, ikinciye yetmiyor
         const plan = buildInterviewPlan(
             analysis([at(1, 'missing'), at(3, 'missing'), at(5, 'partial')]),
             POSITION,
-            { minutes: 20 }
+            { minutes: totalFor(6) }
         );
         expect(plan.probes).toHaveLength(1);
         expect(plan.probes[0].priority).toBe(CRITICAL);
@@ -150,7 +157,7 @@ describe('buildInterviewPlan — zaman bütçesi', () => {
         const plan = buildInterviewPlan(
             analysis([at(1, 'missing'), at(2, 'missing'), at(3, 'missing')]),
             POSITION,
-            { minutes: 20 }
+            { minutes: totalFor(6) }
         );
         expect(plan.dropped.length).toBeGreaterThan(0);
         expect(planSummary(plan)).toContain('süreye sığmadı');
@@ -163,7 +170,7 @@ describe('buildInterviewPlan — zaman bütçesi', () => {
         const plan = buildInterviewPlan(
             analysis([at(3, 'missing'), at(5, 'partial')]),
             POSITION,
-            { minutes: 20 }
+            { minutes: totalFor(6) }
         );
         expect(plan.probes.map((p) => p.requirementIndex)).toEqual([3]);
         expect(plan.dropped.map((p) => p.requirementIndex)).toEqual([5]);
@@ -172,7 +179,8 @@ describe('buildInterviewPlan — zaman bütçesi', () => {
     it('keeps the top probe even when it alone overruns the budget', () => {
         // Sıfır soruluk bir plan plan değildir. Dar görüşmede en yüksek
         // öncelikli madde korunur ve bütçe aşımı işaretlenir.
-        const plan = buildInterviewPlan(analysis([at(1, 'missing')]), POSITION, { minutes: 15 });
+        // Soru vakti tek bir kritik maddeye bile yetmiyor
+        const plan = buildInterviewPlan(analysis([at(1, 'missing')]), POSITION, { minutes: totalFor(4) });
         expect(plan.probes).toHaveLength(1);
         expect(plan.minutes.overBudget).toBe(true);
         expect(plan.minutes.slack).toBe(0); // negatif boşluk diye bir şey yok
@@ -405,7 +413,7 @@ describe('planToText', () => {
         const tight = buildInterviewPlan(
             analysis([at(1, 'missing'), at(2, 'missing'), at(3, 'missing')]),
             POSITION,
-            { minutes: 20 }
+            { minutes: totalFor(6) }
         );
         const out = planToText(tight, tight.probes, {});
         expect(out).toContain('SÜREYE SIĞMADI');

@@ -24,6 +24,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getAuth } from 'firebase/auth';
 import { savedPlanFor } from '../utils/interviewPlan';
+import { splitTranscript } from '../services/ai/transcriptSplitter';
 import {
     AlertCircle,
     CheckCircle2,
@@ -87,6 +88,8 @@ export default function AddManualInterviewModal({
     const [recruiterOutcome, setRecruiterOutcome] = useState('pending');
 
     const [aiSuggesting, setAiSuggesting] = useState(false);
+    const [splitting, setSplitting] = useState(false);
+    const [splitNote, setSplitNote] = useState('');
     const [submitError, setSubmitError] = useState('');
     const [createdResult, setCreatedResult] = useState(null);
 
@@ -189,6 +192,44 @@ export default function AddManualInterviewModal({
     const addQuestion = () => setQuestions((prev) => [...prev, { question: '', answer: '' }]);
     const removeQuestion = (idx) =>
         setQuestions((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev));
+
+    // ── Transkripti sorulara dağıt
+    //
+    // Model YALNIZCA ayırıyor: hangi bölüm hangi soruya ait. Damga, puan ve
+    // yorum başka çağrıların işi.
+    //
+    // SONUÇ DOĞRUDAN KAYDEDİLMEZ. Kutular doldurulur, kullanıcı okur ve
+    // düzeltir; kaydetme yine onun eylemi. Bir AI çıkarımını insan onayından
+    // geçirmeden değerlendirmeye sokmak, adayın söylemediği bir şeyi ona mal
+    // etme riski taşır.
+    const handleSplitTranscript = async () => {
+        if (!transcript.trim()) {
+            setSubmitError('Önce transkripti yapıştırın.');
+            return;
+        }
+        const asked = questions.filter((q) => q.question.trim());
+        if (asked.length === 0) {
+            setSubmitError('Önce soruların yüklenmesi gerekiyor — adayı ve pozisyonu seçin.');
+            return;
+        }
+        setSubmitError('');
+        setSplitNote('');
+        setSplitting(true);
+        try {
+            const out = await splitTranscript(transcript, questions);
+            setQuestions(out.questions);
+            setSplitNote(
+                out.filled === 0
+                    ? 'Transkriptte bu soruların cevabı bulunamadı — cevapları elle girebilirsiniz.'
+                    : `${out.filled} soru dolduruldu${out.empty > 0 ? `, ${out.empty} soru boş kaldı` : ''}. `
+                      + 'Kaydetmeden önce okuyup düzeltin.'
+            );
+        } catch (err) {
+            setSubmitError(err.message);
+        } finally {
+            setSplitting(false);
+        }
+    };
 
     // ── AI question suggestions (reuses existing backend endpoint)
     const handleAiSuggest = async () => {
@@ -399,6 +440,9 @@ export default function AddManualInterviewModal({
                             handleAiSuggest={handleAiSuggest}
                             aiSuggesting={aiSuggesting}
                             planLoaded={planLoaded}
+                            handleSplitTranscript={handleSplitTranscript}
+                            splitting={splitting}
+                            splitNote={splitNote}
                             // free-text
                             transcript={transcript}
                             setTranscript={setTranscript}
@@ -479,6 +523,9 @@ function FormBody(props) {
         handleAiSuggest,
         aiSuggesting,
         planLoaded,
+        handleSplitTranscript,
+        splitting,
+        splitNote,
         transcript,
         setTranscript,
         notes,
@@ -750,6 +797,28 @@ function FormBody(props) {
                     rows={4}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none resize-y"
                 />
+                {/* Transkripti sorulara dağıt.
+                    Yalnızca BOŞ kutuları doldurur — elle yazdığınız cevaba
+                    dokunmaz. Sonuç doğrudan kaydedilmez; okuyup düzeltmeniz
+                    için kutulara yazılır. */}
+                <div className="flex flex-wrap items-center gap-2 mt-2">
+                    <button
+                        type="button"
+                        onClick={handleSplitTranscript}
+                        disabled={splitting || !transcript.trim()}
+                        className="text-xs font-semibold text-cyan-700 hover:bg-cyan-50 px-3 py-1.5 rounded transition flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                        {splitting
+                            ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Dağıtılıyor…</>
+                            : <><Sparkles className="w-3.5 h-3.5" /> Transkriptten cevapları doldur</>}
+                    </button>
+                    <span className="text-[11px] text-slate-400">
+                        Yalnızca boş kutuları doldurur, yazdıklarınıza dokunmaz.
+                    </span>
+                </div>
+                {splitNote && (
+                    <p className="mt-1.5 text-[11px] text-cyan-700 leading-relaxed">{splitNote}</p>
+                )}
                 <label className="text-xs font-semibold text-slate-600 mb-1 mt-3 block">
                     Görüşmeci notları (izlenimler, gözlemler)
                 </label>
