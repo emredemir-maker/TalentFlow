@@ -336,13 +336,50 @@ export function buildInterviewPlan(analysis, position, { minutes = 45 } = {}) {
  * @returns {object|null}
  */
 export function savedPlanFor(candidate, position) {
-    const title = position?.title;
-    if (!title) return null;
-    const plan = candidate?.interviewPlans?.[title];
-    if (!plan || !Array.isArray(plan.probes) || plan.probes.length === 0) return null;
-    if (plan.fingerprint !== requirementsFingerprint(position)) return null;
-    return plan;
+    // Tek kaynak: kararı planStatus veriyor, bu yalnızca planı çıkarıyor.
+    // İki ayrı kontrol yazılsaydı biri "kullanılabilir" derken diğeri
+    // "kullanılamaz" diyebilirdi.
+    return planStatus(candidate, position).plan;
 }
+
+/**
+ * Kayıtlı plan neden kullanılamıyor?
+ *
+ * `savedPlanFor` yalnızca null döndürüyordu ve sebebi yutuyordu. Canlıda
+ * bedeli şu oldu: kullanıcı manuel görüşmeyi kaydetti, AI çağrıları yapıldı,
+ * para gitti ve ancak SONUNDA "sorular ilanın maddelerine bağlı değil"
+ * yazısını gördü. Hangi sebeple bağlı olmadığı da yazmıyordu.
+ *
+ * Dört ayrı durum, dört ayrı eylem gerektiriyor. Arayüz bunu KAYDETMEDEN
+ * ÖNCE söyleyebilsin diye ayrıştırılıyor.
+ *
+ * @returns {{ok: boolean, reason: string, plan: object|null}}
+ */
+export function planStatus(candidate, position) {
+    const title = position?.title;
+    if (!title) {
+        return { ok: false, reason: 'no-position', plan: null };
+    }
+    const plan = candidate?.interviewPlans?.[title];
+    if (!plan || !Array.isArray(plan.probes) || plan.probes.length === 0) {
+        return { ok: false, reason: 'no-plan', plan: null };
+    }
+    if (plan.fingerprint !== requirementsFingerprint(position)) {
+        // Plan üretildikten sonra ilan değişmiş. Madde numaraları artık başka
+        // maddelere denk geliyor; kullanmak cevabı yanlış maddeye yazardı.
+        return { ok: false, reason: 'stale-plan', plan: null };
+    }
+    return { ok: true, reason: 'ok', plan };
+}
+
+/** Her sebebin kullanıcıya söylediği şey — ve ne yapması gerektiği. */
+export const PLAN_STATUS_TEXT = {
+    'no-position': 'Pozisyon seçilmedi. Madde bazlı sonuç için görüşmenin hangi ilana ait olduğu gerekiyor.',
+    'no-plan': 'Bu aday için bu ilana ait kayıtlı mülakat planı yok. Aday sayfasındaki '
+        + 'Mülakat Planı bölümünden "Soruları yaz" deyin; sorular buraya kendiliğinden gelir.',
+    'stale-plan': 'Kayıtlı plan ilanın ESKİ hâline ait — ilan o günden beri değişti. '
+        + 'Planı yeniden üretin, yoksa cevaplar yanlış maddelere yazılır.',
+};
 
 /**
  * Planı odaya götürülebilir düz metne çevirir.
