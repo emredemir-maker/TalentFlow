@@ -13,10 +13,38 @@
 // lets multer parse THAT, then copies the results (files/file/body) back
 // onto the real request. Without rawBody (local dev) the original multer
 // middleware runs untouched.
+// MULTIPART OLMAYAN İSTEĞE DOKUNULMAZ. Bu satır bir üretim hatasının tam
+// merkeziydi ve yerelde görünmüyordu:
+//
+// Cloud Functions çalışma ortamı HER isteği tamponluyor, yalnızca multipart
+// olanları değil — yani `req.rawBody` bir JSON POST'unda da dolu. Aşağıdaki
+// akış o durumda şunu yapıyordu:
+//
+//   1. express.json() gövdeyi doğru ayrıştırıp req.body'ye yazıyor.
+//   2. rawBody dolu olduğu için multipart dalına giriliyor.
+//   3. multer, multipart olmayan bir akışta hiçbir şey yapmadan next() diyor;
+//      sahte akışın `body` alanı hiç oluşmuyor.
+//   4. `req.body = stream.body || {}` ayrıştırılmış JSON'u {} ile EZİYOR.
+//
+// Sonuç: sunucu gövdeyi hiç görmüyor ve "gövde göndermediniz" diyor —
+// kullanıcı gövdeyi göndermiş olmasına rağmen. Yerelde rawBody olmadığı için
+// dal hiç çalışmıyor, bu yüzden testler ve dev sunucusu temiz görünüyordu.
+//
+// Toplu içe aktarmanın `sources` yolu ilk kurbanı DEĞİL: `records` (JSON) yolu
+// da üretimde aynı sebeple çalışmıyordu, yalnızca kimse denememişti.
 import { Readable } from 'stream';
+
+/** Gövde gerçekten multer'ın işi mi? */
+function isMultipart(req) {
+    return String(req.headers?.['content-type'] || '').toLowerCase().startsWith('multipart/');
+}
 
 export function wrapMulter(multerMiddleware) {
     return (req, res, next) => {
+        // multer multipart olmayan istekte zaten hiçbir şey yapmaz; erken
+        // çıkmak aynı davranışı verir ve req.body'yi kazara ezme ihtimalini
+        // tamamen ortadan kaldırır.
+        if (!isMultipart(req)) return next();
         if (!req.rawBody || !Buffer.isBuffer(req.rawBody)) {
             return multerMiddleware(req, res, next);
         }

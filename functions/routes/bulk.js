@@ -128,7 +128,18 @@ export function createBulkRouter(uploadBaseDir) {
                     status: 'pending',
                 }));
             } else {
-                return res.status(400).json({ error: 'sources, cvs (multipart) veya records (JSON) gereklidir.' });
+                // SUNUCUNUN NE GÖRDÜĞÜNÜ SÖYLE. Bu mesaj bir kez kullanıcıyı
+                // kendi girdisinde hata aramaya gönderdi: gövde gönderilmişti,
+                // wrapMulter onu silmişti, ekran ise "göndermediniz" diyordu.
+                // Bir istekte neyin ulaştığı sunucunun bildiği bir şey;
+                // söylemediğinde kullanıcı olmayan bir hatayı kovalıyor.
+                const seen = [
+                    `content-type: ${req.headers['content-type'] || 'yok'}`,
+                    `gövde alanları: ${Object.keys(req.body || {}).join(', ') || 'yok'}`,
+                ].join(', ');
+                return res.status(400).json({
+                    error: `sources, cvs (multipart) veya records (JSON) gereklidir. Sunucuya ulaşan — ${seen}`,
+                });
             }
             if (items.length === 0 && sources.length === 0) {
                 return res.status(400).json({ error: 'İşlenecek dosya veya kayıt bulunamadı.' });
