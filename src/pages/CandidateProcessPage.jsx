@@ -12,7 +12,8 @@ import { calculateMatchScore, domainLabel, detectCandidateDomain, detectPosition
 import { applyPiiMask, stripPiiForAI } from '../utils/pii';
 import { cleanRoleText, analysisForPosition, fullAnalysisForPosition } from '../utils/candidateTable';
 import { mustHaveGate, gateLabel, gateRank } from '../utils/mustHaveGate';
-import { batchFilesBySize, formatBytes, totalBytes, MAX_REQUEST_BYTES } from '../utils/bulkUpload';
+import { formatBytes, totalBytes, oversizedFiles, MAX_SOURCE_BYTES, MAX_SOURCES } from '../utils/bulkUpload';
+import { uploadBulkSources } from '../services/bulkStorageUpload';
 import { getFeedbackEmail } from '../utils/templateService';
 import { db } from '../config/firebase';
 import { doc, getDoc, getDocs, onSnapshot, setDoc, serverTimestamp, collection, query, where } from 'firebase/firestore';
@@ -106,6 +107,9 @@ export default function CandidateProcessPage() {
     const [bulkPositionId, setBulkPositionId]   = useState('');
     const [bulkImporting, setBulkImporting]     = useState(false);
     const [bulkProgress, setBulkProgress]       = useState({ total: 0, completed: 0, failed: 0, items: [], avgScore: null, status: null });
+    // Storage'a yükleme oranı — iş henüz oluşmadığı için Firestore'da karşılığı
+    // yok. { transferred, total, done } ya da null (yükleme sürmüyor).
+    const [bulkUploadProgress, setBulkUploadProgress] = useState(null);
     // Multiple job ids: uploads are split into <28MB batches (Cloud Functions
     // caps requests at 32MB) and each batch becomes its own backend job.
     const [bulkJobIds, setBulkJobIds]           = useState([]);
@@ -156,8 +160,12 @@ export default function CandidateProcessPage() {
                 const duplicates = jobs.reduce((s, d) => s + (d.duplicateCount || 0), 0);
                 const allDone = jobData.size === bulkJobIds.length &&
                     jobs.every(d => d.status === 'completed' || d.status === 'error');
+                // 'unpacking' ayrı gösterilir: arşiv açılırken toplam sayı
+                // henüz büyümektedir ve "0/0 kuyrukta" yazmak, sistemin o an
+                // yaptığı işi gizlemek olurdu.
                 const status = allDone ? 'completed'
-                    : jobs.some(d => d.status === 'processing') ? 'processing' : 'queued';
+                    : jobs.some(d => d.status === 'processing') ? 'processing'
+                    : jobs.some(d => d.status === 'unpacking') ? 'unpacking' : 'queued';
                 // Weighted average over jobs that reported a score
                 const scored = jobs.filter(d => d.avgScore != null && (d.processedCount || 0) > 0);
                 const scoredCount = scored.reduce((s, d) => s + (d.processedCount || 0), 0);
@@ -269,7 +277,7 @@ export default function CandidateProcessPage() {
                     where('createdBy', '==', user.uid)
                 ));
                 const active = snap.docs
-                    .filter(d => ['queued', 'processing'].includes(d.data().status))
+                    .filter(d => ['queued', 'processing', 'unpacking'].includes(d.data().status))
                     .sort((a, b) => (a.data().createdAt?.toMillis?.() || 0) - (b.data().createdAt?.toMillis?.() || 0))
                     .map(d => d.id);
                 if (active.length > 0) {
@@ -555,38 +563,48 @@ export default function CandidateProcessPage() {
                 try { localStorage.setItem('bulkActiveJobs', JSON.stringify([data.jobId])); } catch { /* storage unavailable */ }
                 setBulkProgress(prev => ({ ...prev, total: data.totalCount || prev.total, status: 'queued' }));
             } else {
-                // File upload path — split into <28MB batches: Cloud Functions
-                // kills requests over 32MB at the infrastructure level (plain
-                // "Internal Error", no logs), so one big multipart POST with
-                // many ZIPs never reaches the backend at all.
+                // DOSYA YOLU — dosya doğrudan Storage'a gider, API'ye yalnızca
+                // yol bildirilir. Eskiden dosya isteğin gövdesindeydi ve sunucu
+                // ZIP'i açıp her PDF'in metnini o istek içinde çıkarıyordu;
+                // Hosting rewrite'ı 60 saniyede kestiği için büyük arşivlerde
+                // istek ölüyor, kullanıcı "başlatılamadı" görüyordu — oysa
+                // sunucu çoğu zaman çalışmaya devam ediyordu.
                 if (!bulkFiles.length) { setBulkImporting(false); return; }
-                const { batches, oversized } = batchFilesBySize(bulkFiles);
+                const oversized = oversizedFiles(bulkFiles);
                 if (oversized.length > 0) {
                     throw new Error(
-                        `Şu dosyalar tek başına ${formatBytes(MAX_REQUEST_BYTES)} sınırını aşıyor: ` +
-                        `${oversized.map(f => f.name).join(', ')}. Lütfen ZIP'i daha küçük parçalara bölüp tekrar deneyin.`
+                        `Şu dosyalar ${formatBytes(MAX_SOURCE_BYTES)} sınırını aşıyor: ` +
+                        `${oversized.map(f => f.name).join(', ')}.`
                     );
                 }
-                const initialItems = bulkFiles.map(f => ({ name: f.name, status: 'pending' }));
-                setBulkProgress({ total: bulkFiles.length, completed: 0, failed: 0, items: initialItems, avgScore: null, status: 'queued' });
-                const jobIds = [];
-                for (const batch of batches) {
-                    const formData = new FormData();
-                    batch.forEach(f => formData.append('cvs', f));
-                    if (selectedPos) {
-                        formData.append('positionId', selectedPos.id);
-                        formData.append('positionTitle', selectedPos.title);
-                    }
-                    const data = await postBulkImport({ method: 'POST', headers: authHeaders, body: formData });
-                    jobIds.push(data.jobId);
+                if (bulkFiles.length > MAX_SOURCES) {
+                    throw new Error(`Tek seferde en fazla ${MAX_SOURCES} dosya seçilebilir (${bulkFiles.length} seçili). Bir ZIP içinde istediğiniz kadar CV olabilir.`);
                 }
-                setBulkJobIds(jobIds);
-                try { localStorage.setItem('bulkActiveJobs', JSON.stringify(jobIds)); } catch { /* storage unavailable */ }
+                // Toplam CV sayısı arşiv açılana kadar bilinmiyor; uydurulmuş
+                // bir hedef yerine yükleme oranı gösterilir, sayıyı worker
+                // açtıkça Firestore dinleyicisi dolduracak.
+                setBulkProgress({ total: 0, completed: 0, failed: 0, items: [], avgScore: null, status: 'uploading' });
+                const sources = await uploadBulkSources(bulkFiles, user?.uid, {
+                    onProgress: (p) => setBulkUploadProgress(p),
+                });
+                setBulkUploadProgress(null);
+                const data = await postBulkImport({
+                    method: 'POST',
+                    headers: { ...authHeaders, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        positionId: selectedPos?.id || '',
+                        positionTitle: selectedPos?.title || '',
+                        sources,
+                    }),
+                });
+                setBulkJobIds([data.jobId]);
+                try { localStorage.setItem('bulkActiveJobs', JSON.stringify([data.jobId])); } catch { /* storage unavailable */ }
                 setBulkProgress(prev => ({ ...prev, status: 'queued' }));
             }
         } catch (err) {
             console.error('Bulk import start error:', err);
             setBulkImporting(false);
+            setBulkUploadProgress(null);
             setBulkProgress(prev => ({ ...prev, status: 'error', errorMessage: err.message }));
         }
     };
@@ -2659,7 +2677,7 @@ export default function CandidateProcessPage() {
                                                 onDrop={e => {
                                                     e.preventDefault();
                                                     const files = Array.from(e.dataTransfer.files).filter(f => /\.(pdf|docx|zip)$/i.test(f.name));
-                                                    setBulkFiles(prev => [...prev, ...files].slice(0, 20));
+                                                    setBulkFiles(prev => [...prev, ...files].slice(0, MAX_SOURCES));
                                                 }}
                                                 onClick={() => document.getElementById('bulk-cv-input')?.click()}
                                                 className="border-2 border-dashed border-violet-200 rounded-xl p-8 text-center cursor-pointer hover:border-violet-400 hover:bg-violet-50/30 transition-all"
@@ -2672,19 +2690,20 @@ export default function CandidateProcessPage() {
                                                     className="hidden"
                                                     onChange={e => {
                                                         const files = Array.from(e.target.files || []);
-                                                        setBulkFiles(prev => [...prev, ...files].slice(0, 20));
+                                                        setBulkFiles(prev => [...prev, ...files].slice(0, MAX_SOURCES));
                                                     }}
                                                 />
                                                 <Upload className="w-8 h-8 text-violet-300 mx-auto mb-2" />
                                                 <p className="text-[13px] font-bold text-slate-500">Sürükleyin veya tıklayın</p>
-                                                <p className="text-[10px] text-slate-400 mt-1">PDF, DOCX veya ZIP (içinde PDF/DOCX) • Maks. 20 dosya</p>
+                                                <p className="text-[10px] text-slate-400 mt-1">PDF, DOCX veya ZIP (içinde PDF/DOCX) • Maks. {MAX_SOURCES} dosya, her biri {formatBytes(MAX_SOURCE_BYTES)}</p>
+                                                <p className="text-[10px] text-slate-400 mt-0.5">Bir ZIP&apos;in içinde kaç CV olduğu sınırlı değil — hepsini tek arşive koyabilirsiniz.</p>
                                             </div>
 
                                             {bulkFiles.length > 0 && (
                                                 <>
                                                     <div className="space-y-1 max-h-32 overflow-y-auto">
                                                         {bulkFiles.map((f, i) => {
-                                                            const tooBig = (f.size || 0) > MAX_REQUEST_BYTES;
+                                                            const tooBig = (f.size || 0) > MAX_SOURCE_BYTES;
                                                             return (
                                                                 <div key={i} className={`flex items-center justify-between px-3 py-1.5 rounded-lg border ${tooBig ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-200'}`}>
                                                                     <span className={`text-[11px] font-medium truncate ${tooBig ? 'text-red-600' : 'text-slate-600'}`}>{f.name}</span>
@@ -2706,15 +2725,10 @@ export default function CandidateProcessPage() {
                                                             Toplam: {formatBytes(totalBytes(bulkFiles))}
                                                         </span>
                                                         {(() => {
-                                                            const { batches, oversized } = batchFilesBySize(bulkFiles);
+                                                            const oversized = oversizedFiles(bulkFiles);
                                                             if (oversized.length > 0) return (
                                                                 <span className="text-[10px] text-red-500 font-bold">
-                                                                    {oversized.length} dosya {formatBytes(MAX_REQUEST_BYTES)} sınırını aşıyor — ZIP'i bölün
-                                                                </span>
-                                                            );
-                                                            if (batches.length > 1) return (
-                                                                <span className="text-[10px] text-violet-500 font-semibold">
-                                                                    {batches.length} parti halinde gönderilecek
+                                                                    {oversized.length} dosya {formatBytes(MAX_SOURCE_BYTES)} sınırını aşıyor
                                                                 </span>
                                                             );
                                                             return null;
@@ -2777,19 +2791,39 @@ export default function CandidateProcessPage() {
                             {/* Progress */}
                             {(bulkImporting || bulkProgress.total > 0) && (
                                 <div className="space-y-3">
-                                    {/* Progress bar */}
-                                    <div>
-                                        <div className="flex items-center justify-between mb-1">
-                                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">İlerleme</span>
-                                            <span className="text-[10px] font-bold text-slate-400">{bulkProgress.completed + bulkProgress.failed} / {bulkProgress.total}</span>
+                                    {/* Progress bar — yükleme sırasında BAYT, sonrasında KAYIT sayar.
+                                        Dosya Storage'a giderken kaç CV olduğu henüz bilinmiyor; kayıt
+                                        çubuğunu "0/0" göstermek, ölçülmemiş bir ilerlemeyi ölçülmüş
+                                        gibi sunmak olurdu. */}
+                                    {bulkUploadProgress ? (
+                                        <div>
+                                            <div className="flex items-center justify-between mb-1">
+                                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Yükleniyor</span>
+                                                <span className="text-[10px] font-bold text-slate-400">
+                                                    {formatBytes(bulkUploadProgress.transferred)} / {formatBytes(bulkUploadProgress.total)}
+                                                </span>
+                                            </div>
+                                            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                                                <div
+                                                    className="h-full rounded-full bg-violet-500 transition-all duration-300"
+                                                    style={{ width: `${bulkUploadProgress.total > 0 ? (bulkUploadProgress.transferred / bulkUploadProgress.total) * 100 : 0}%` }}
+                                                />
+                                            </div>
                                         </div>
-                                        <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                                            <div
-                                                className={`h-full rounded-full transition-all duration-500 ${bulkProgress.failed > 0 && bulkProgress.completed === 0 ? 'bg-red-400' : 'bg-violet-500'}`}
-                                                style={{ width: `${bulkProgress.total > 0 ? ((bulkProgress.completed + bulkProgress.failed) / bulkProgress.total) * 100 : 0}%` }}
-                                            />
+                                    ) : (
+                                        <div>
+                                            <div className="flex items-center justify-between mb-1">
+                                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">İlerleme</span>
+                                                <span className="text-[10px] font-bold text-slate-400">{bulkProgress.completed + bulkProgress.failed} / {bulkProgress.total}</span>
+                                            </div>
+                                            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                                                <div
+                                                    className={`h-full rounded-full transition-all duration-500 ${bulkProgress.failed > 0 && bulkProgress.completed === 0 ? 'bg-red-400' : 'bg-violet-500'}`}
+                                                    style={{ width: `${bulkProgress.total > 0 ? ((bulkProgress.completed + bulkProgress.failed) / bulkProgress.total) * 100 : 0}%` }}
+                                                />
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
 
                                     {/* File list — static display, icons reflect aggregate job counters */}
                                     <div className="space-y-1 max-h-48 overflow-y-auto">
@@ -2826,16 +2860,19 @@ export default function CandidateProcessPage() {
                                         <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-bold ${
                                             bulkProgress.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
                                             bulkProgress.status === 'error' ? 'bg-red-50 text-red-700 border border-red-200' :
-                                            bulkProgress.status === 'processing' ? 'bg-violet-50 text-violet-700 border border-violet-200' :
+                                            ['processing', 'uploading', 'unpacking'].includes(bulkProgress.status) ? 'bg-violet-50 text-violet-700 border border-violet-200' :
                                             'bg-slate-50 text-slate-500 border border-slate-200'
                                         }`}>
-                                            {bulkProgress.status === 'processing' && <Loader2 className="w-3 h-3 animate-spin" />}
+                                            {['processing', 'uploading', 'unpacking'].includes(bulkProgress.status) && <Loader2 className="w-3 h-3 animate-spin" />}
                                             {bulkProgress.status === 'completed' && <CheckCircle2 className="w-3 h-3" />}
                                             {bulkProgress.status === 'error' && <XCircle className="w-3 h-3" />}
                                             {bulkProgress.status === 'queued' && <Clock className="w-3 h-3" />}
                                             <span>
                                                 {bulkProgress.status === 'completed' ? `Tamamlandı — ${bulkProgress.completed - (bulkProgress.duplicates || 0)} başarılı${bulkProgress.duplicates > 0 ? `, ${bulkProgress.duplicates} mükerrer atlandı` : ''}${bulkProgress.failed > 0 ? `, ${bulkProgress.failed} hatalı` : ''}${bulkProgress.avgScore != null ? ` · Ort. Eşleşme: %${bulkProgress.avgScore}` : ''}` :
                                                  bulkProgress.status === 'error' ? (bulkProgress.errorMessage || 'İşlem hatası oluştu') :
+                                                 bulkProgress.status === 'uploading' ? 'Dosyalar yükleniyor — sekmeyi kapatmayın' :
+                                                 // Toplam büyürken gösterilir: sayı henüz kesin değil.
+                                                 bulkProgress.status === 'unpacking' ? `Arşiv açılıyor — ${bulkProgress.total} CV bulundu` :
                                                  bulkProgress.status === 'processing' ? `İşleniyor… ${bulkProgress.completed + bulkProgress.failed}/${bulkProgress.total}` :
                                                  'Sıraya alındı'}
                                             </span>

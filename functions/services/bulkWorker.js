@@ -22,11 +22,12 @@ import fs from 'fs';
 import { readFile } from 'fs/promises';
 import { createRequire } from 'module';
 
-import { db, admin } from '../config/firebaseAdmin.js';
+import { db, admin, getStorageBucket } from '../config/firebaseAdmin.js';
 import { pdf } from './pdf.js';
 import { generateText } from './gemini.js';
 import { childLogger } from './logger.js';
 import { positionRequirements } from './positionRequirements.js';
+import { expandJobSources } from './bulkExpand.js';
 const log = childLogger('bulk-worker');
 
 const require = createRequire(import.meta.url);
@@ -411,7 +412,12 @@ async function claimNextQueuedJob() {
 const STALE_JOB_MS = 10 * 60 * 1000;
 export async function recoverStaleJobs() {
     try {
-        const snap = await db.collection(BULK_JOBS_COLL).where('status', '==', 'processing').get();
+        // 'unpacking' de kurtarılabilir olmalı: açma fazı uzun sürer ve o
+        // sırada ölen bir instance işi orada asılı bırakırdı — yalnızca
+        // 'processing' aranırken böyle bir iş kimsenin taramasına düşmüyordu.
+        const snap = await db.collection(BULK_JOBS_COLL)
+            .where('status', 'in', ['processing', 'unpacking'])
+            .get();
         let recovered = 0;
         for (const doc of snap.docs) {
             const d = doc.data();
@@ -476,20 +482,78 @@ export async function runBulkWorkerLoop() {
     }
 }
 
+/**
+ * AÇMA FAZI — Storage'daki kaynak dosyaları kayıtlara çevirir.
+ *
+ * Bu iş eskiden `POST /api/bulk-import` isteğinin içindeydi ve Hosting'in 60
+ * saniyelik kesme sınırına takılıyordu (gerekçesi services/bulkSources.js).
+ * Burada HTTP saati işlemiyor; işçiye CPU'yu istemcinin keepalive zinciri
+ * sağlıyor.
+ *
+ * Toplam sayı ancak arşivler açıldıkça bilinir; ilerleme büyüyen bir toplamla
+ * bildirilir. Ekran "0/0" ya da uydurulmuş bir hedef göstermez.
+ */
+async function unpackSources(jobRef, itemsRef, sources) {
+    let bucket;
+    try {
+        bucket = getStorageBucket();
+    } catch (err) {
+        throw new Error(`Storage kovası çözümlenemedi — dosyalar okunamıyor: ${err.message}`);
+    }
+    const touch = () => admin.firestore.FieldValue.serverTimestamp();
+    await jobRef.update({ status: 'unpacking', lastUpdatedAt: touch() });
+
+    const result = await expandJobSources({
+        sources,
+        downloadSource: async (storagePath) => (await bucket.file(storagePath).download())[0],
+        extractText: (buffer, ext) => extractCvText(buffer, ext),
+        writeItems: async (items) => {
+            const batch = db.batch();
+            for (const item of items) batch.set(itemsRef.doc(String(item.index)), item);
+            await batch.commit();
+        },
+        // lastUpdatedAt aynı zamanda canlılık işareti: uzun bir açma sırasında
+        // recoverStaleJobs işi bayat sanıp başka bir işçiye kaptırmasın.
+        onProgress: ({ totalCount, unpackedCount }) => jobRef.update({
+            totalCount, unpackedCount, lastUpdatedAt: touch(),
+        }),
+        cleanupSource: async (storagePath) => { await bucket.file(storagePath).delete(); },
+    });
+
+    await jobRef.update({
+        expanded: true,
+        status: 'processing',
+        totalCount: result.totalCount,
+        unpackedCount: result.totalCount,
+        truncated: result.truncated,
+        lastUpdatedAt: touch(),
+    });
+    log.info(`[bulk-import] Unpacked ${result.totalCount} item(s), ${result.failedCount} unreadable`);
+    return result;
+}
+
 // Execute a single job (already claimed, status = processing)
 async function executeJob(jobId) {
     const jobRef = db.doc(`${BULK_JOBS_COLL}/${jobId}`);
     const itemsRef = db.collection(`${BULK_JOBS_COLL}/${jobId}/items`);
     try {
         // status already set to 'processing' by claimNextQueuedJob
+        const jobData = (await jobRef.get()).data() || {};
+        const positionId = jobData.positionId || '';
+        const positionTitle = jobData.positionTitle || '';
+
+        // Kayıtlar henüz yoksa önce aç. SIRALAMA GÜVENLİK GEREĞİ: açma bitmeden
+        // hiçbir kayıt işlenmez, bu yüzden yarıda kalan bir açmayı baştan
+        // yapmak güvenlidir — üzerine yazılan kayıtların hiçbiri işlenmemiştir.
+        if (!jobData.expanded && Array.isArray(jobData.sources) && jobData.sources.length > 0) {
+            await unpackSources(jobRef, itemsRef, jobData.sources);
+        }
+
         const itemsSnap = await itemsRef.orderBy('index').get();
         const total = itemsSnap.size;
         let processedCount = 0;
         let failedCount = 0;
         let duplicateCount = 0;
-        const jobData = (await jobRef.get()).data() || {};
-        const positionId = jobData.positionId || '';
-        const positionTitle = jobData.positionTitle || '';
 
         // Açık pozisyon başlıkları (işe bir kez okunur): yüklemede pozisyon
         // seçilmediyse Gemini ön skoru en uygun açık pozisyona göre verir.

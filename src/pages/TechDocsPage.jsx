@@ -552,12 +552,12 @@ function ApiSection() {
             <Table
                 headers={['Method', 'Endpoint', 'Rate Limit', 'Açıklama']}
                 rows={[
-                    ['POST', '`/api/bulk-import`', 'requireAuth', 'Çoklu CV yükleme (max 20 dosya) — Multer bulkUpload middleware; job ID döner'],
+                    ['POST', '`/api/bulk-import`', 'requireAuth', '`sources[]` (Storage yolları — tercih edilen), `cvs` (multipart, eski) veya `records[]` (JSON); job ID döner'],
                     ['GET', '`/api/bulk-import/:jobId`', 'requireAuth', 'İş kuyruğu durumu sorgulama (Firestore bulkImportJobs belgesi)'],
                 ]}
             />
             <InfoBox type="info">
-                Dosyalar sunucuya yüklenir, sırayla işlenir ve her biri için ayrı Gemini AI çağrısı yapılır. İlerleme durumu Firestore bulkImportJobs koleksiyonu üzerinden onSnapshot ile canlı takip edilir.
+                Dosyalar tarayıcıdan <strong>doğrudan Firebase Storage&apos;a</strong> (`bulk-imports/{`{uid}`}/…`) yüklenir; API&apos;ye yalnızca yol bildirilir. Bu yol Hosting rewrite&apos;ından geçmediği için ne 32MB gövde sınırı ne de 60 saniyelik kesme uygulanır. Arşivi açma ve metin çıkarma işini worker yapar (`services/bulkExpand.js`); her CV için tek bir Gemini çağrısı hem ayrıştırma hem ön skor üretir. İlerleme Firestore bulkImportJobs koleksiyonundan onSnapshot ile canlı takip edilir.
             </InfoBox>
 
             <SectionTitle>Ön Eleme Sorusu İyileştirme</SectionTitle>
