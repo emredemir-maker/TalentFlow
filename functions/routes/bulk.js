@@ -24,6 +24,8 @@ import {
     BULK_JOBS_COLL,
     extractCvText,
 } from '../services/bulkWorker.js';
+import { parseSources } from '../services/bulkSources.js';
+import { chunk } from '../services/bulkExpand.js';
 import { childLogger } from '../services/logger.js';
 const log = childLogger('bulk');
 
@@ -62,7 +64,19 @@ export function createBulkRouter(uploadBaseDir) {
             const positionId = req.body?.positionId || '';
             const positionTitle = req.body?.positionTitle || '';
             let items = [];
-            if (req.files && req.files.length > 0) {
+            let sources = [];
+            if (req.body?.sources) {
+                // STORAGE YOLU — tercih edilen akış. Dosya tarayıcıdan doğrudan
+                // Storage'a gitti; burada yalnızca YOL kaydediliyor ve istek
+                // milisaniyeler içinde dönüyor. Açma/çıkarma işi worker'da
+                // (services/bulkExpand.js) — gerekçesi services/bulkSources.js.
+                const raw = typeof req.body.sources === 'string'
+                    ? JSON.parse(req.body.sources)
+                    : req.body.sources;
+                const parsed = parseSources(raw, req.user.uid);
+                if (parsed.error) return res.status(400).json({ error: parsed.error });
+                sources = parsed.sources;
+            } else if (req.files && req.files.length > 0) {
                 const bulkDir = path.join(uploadBaseDir, 'uploads', 'bulk-tmp');
                 for (const file of req.files) {
                     const name = file.originalname.toLowerCase();
@@ -114,9 +128,11 @@ export function createBulkRouter(uploadBaseDir) {
                     status: 'pending',
                 }));
             } else {
-                return res.status(400).json({ error: 'cvs (multipart) veya records (JSON) gereklidir.' });
+                return res.status(400).json({ error: 'sources, cvs (multipart) veya records (JSON) gereklidir.' });
             }
-            if (items.length === 0) return res.status(400).json({ error: 'İşlenecek dosya veya kayıt bulunamadı.' });
+            if (items.length === 0 && sources.length === 0) {
+                return res.status(400).json({ error: 'İşlenecek dosya veya kayıt bulunamadı.' });
+            }
             // Pre-extract CV text from uploaded files so Firestore items are durable
             // (worker does not depend on temp files surviving a restart)
             for (const item of items) {
@@ -139,13 +155,30 @@ export function createBulkRouter(uploadBaseDir) {
                 }
             }
             const jobRef = db.collection(BULK_JOBS_COLL).doc();
-            await jobRef.set({ status: 'queued', totalCount: items.length, processedCount: 0, failedCount: 0, positionId, positionTitle, createdBy: req.user.uid, createdAt: admin.firestore.FieldValue.serverTimestamp() });
-            const batch = db.batch();
-            for (const item of items) {
-                batch.set(jobRef.collection('items').doc(String(item.index)), item);
+            await jobRef.set({
+                status: 'queued',
+                // Storage yolunda gerçek sayı ancak arşivler açılınca bilinir.
+                // Tahmini bir toplam yazmak, ölçülmemiş bir sayıyı ölçülmüş
+                // gibi göstermek olurdu; worker açtıkça günceller.
+                totalCount: items.length,
+                processedCount: 0,
+                failedCount: 0,
+                positionId,
+                positionTitle,
+                createdBy: req.user.uid,
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                ...(sources.length > 0 ? { sources, expanded: false, sourceCount: sources.length } : {}),
+            });
+            // Firestore batch'i 500 işlemle sınırlı. Tek batch'e sığmayan bir
+            // kayıt listesi commit'te patlar ve iş hiç oluşmamış görünürdü.
+            for (const part of chunk(items)) {
+                const batch = db.batch();
+                for (const item of part) {
+                    batch.set(jobRef.collection('items').doc(String(item.index)), item);
+                }
+                await batch.commit();
             }
-            await batch.commit();
-            res.json({ jobId: jobRef.id, totalCount: items.length });
+            res.json({ jobId: jobRef.id, totalCount: items.length, sourceCount: sources.length });
             // Worker loop will pick this job up automatically via polling
         } catch (err) {
             log.error(`[bulk-import] Error: ${err.message}`);

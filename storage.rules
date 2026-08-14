@@ -19,6 +19,25 @@ service firebase.storage {
                       && request.resource.size < 20 * 1024 * 1024;
     }
 
+    // ── Toplu içe aktarma kaynakları ─────────────────────────────────────────
+    // Tarayıcı ZIP/PDF/DOCX'i buraya yükler, API'ye yalnızca YOL gönderilir.
+    // Bu yol Hosting rewrite'ından geçmediği için ne 32MB gövde sınırı ne de
+    // 60 saniyelik kesme uygulanır (gerekçe: functions/services/bulkSources.js).
+    //
+    // Yolun içinde uid taşınması kasıtlı: yazma iznini burada, okuma/silme
+    // yetkisini sunucuda AYNI tek gerçek belirler (parseSources). Kullanıcı
+    // yalnızca kendi klasörüne yazar; sunucu da yolun kendisine ait olduğunu
+    // doğrulamadan hiçbir dosyayı açmaz.
+    //
+    // Okuma yok: dosyayı yalnızca Admin SDK (kuralları atlar) indirir. İçeride
+    // başkasının CV'si var, tarayıcıya açmanın bir sebebi yok.
+    match /bulk-imports/{userId}/{allPaths=**} {
+      allow read:   if false;
+      allow write:  if request.auth != null
+                       && request.auth.uid == userId
+                       && request.resource.size < 200 * 1024 * 1024;
+    }
+
     // Whitelist of safe raster image MIME types. Excludes image/svg+xml,
     // which can carry inline JS and is therefore an XSS vector when the
     // asset is later rendered as <img> on a same-origin domain.
