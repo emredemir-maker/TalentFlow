@@ -150,7 +150,7 @@ describe('resolvePreScore', () => {
     const OPEN = ['Frontend Dev', 'İK Uzmanı'];
 
     it('uses the Gemini score when valid and clamps to 0-100', () => {
-        expect(resolvePreScore({ matchScore: 82, matchedPosition: 'Frontend Dev' }, '', OPEN)).toEqual({ score: 82, matchedTitle: 'Frontend Dev' });
+        expect(resolvePreScore({ matchScore: 82, matchedPosition: 'Frontend Dev' }, '', OPEN)).toEqual({ score: 82, matchedTitle: 'Frontend Dev', method: 'ai' });
         expect(resolvePreScore({ matchScore: 140, matchedPosition: 'Frontend Dev' }, '', OPEN).score).toBe(100);
         expect(resolvePreScore({ matchScore: 76.6, matchedPosition: 'Frontend Dev' }, '', OPEN).score).toBe(77);
     });
@@ -169,19 +169,47 @@ describe('resolvePreScore', () => {
 
     it('returns a null title when nothing matches any open position', () => {
         const parsed = { matchScore: 60, matchedPosition: 'Uydurma Pozisyon', position: 'muhasebeci', skills: [] };
-        expect(resolvePreScore(parsed, '', OPEN)).toEqual({ score: 0, matchedTitle: null });
+        expect(resolvePreScore(parsed, '', OPEN)).toEqual({ score: 0, matchedTitle: null, method: 'keyword' });
     });
 
     it('keeps the profile-quality score with a null title when there are no open positions', () => {
-        expect(resolvePreScore({ matchScore: 82, matchedPosition: 'Herhangi' }, '', [])).toEqual({ score: 82, matchedTitle: null });
+        expect(resolvePreScore({ matchScore: 82, matchedPosition: 'Herhangi' }, '', [])).toEqual({ score: 82, matchedTitle: null, method: 'ai' });
     });
 
-    it('falls back to the keyword score when the AI score is missing or zero', () => {
+    // BU TEST HATAYI SABİTLİYORDU ve adı da onu söylüyordu: "missing OR ZERO".
+    //
+    // Prompt modele açıkça "aday uygun değilse matchScore'u 0 ver" diyor —
+    // yani 0 modelin CEVABI, cevapsızlığı değil. Eski kod ikisini aynı sayıp
+    // 0'ı atıyor ve sessizce anahtar-kelime cetveline düşüyordu.
+    //
+    // Canlı sonucu: 117 adaylık bir partide skorlar 10-19 ve 40-61 diye iki
+    // öbeğe ayrılmıştı ve 20-39 bandında TEK aday yoktu. Aday dağılımı böyle
+    // görünmez; bu, aynı kolonda iki ayrı cetvelin damgasıydı.
+    it('respects an explicit zero instead of substituting another scale', () => {
         const parsed = { position: 'frontend developer', skills: ['react'], matchScore: 0 };
-        const { score, matchedTitle } = resolvePreScore(parsed, 'Frontend Developer', OPEN);
+        expect(resolvePreScore(parsed, 'Frontend Developer', OPEN)).toEqual({
+            score: 0, matchedTitle: 'Frontend Developer', method: 'ai',
+        });
+    });
+
+    it('falls back to the keyword score only when the AI score is missing or unreadable', () => {
+        const parsed = { position: 'frontend developer', skills: ['react'] };
+        const { score, matchedTitle, method } = resolvePreScore(parsed, 'Frontend Developer', OPEN);
         expect(matchedTitle).toBe('Frontend Developer');
         expect(score).toBeGreaterThan(0); // anahtar-kelime eşleşmesi ('frontend', 'developer')
-        expect(resolvePreScore({ matchScore: 'abc', position: '' }, '', []).score).toBe(0);
+        expect(method).toBe('keyword');
+
+        expect(resolvePreScore({ matchScore: 'abc', position: '' }, '', [])).toEqual({
+            score: 0, matchedTitle: null, method: 'none',
+        });
+    });
+
+    // Hangi cetvelin ölçtüğü KAYDA GİRMELİ. İki cetvel tek kolonda toplanınca
+    // sıralama sessizce anlamını yitiriyor ve hangi adayın hangisiyle
+    // ölçüldüğü sonradan anlaşılamıyordu.
+    it('reports which ruler produced the score', () => {
+        expect(resolvePreScore({ matchScore: 70 }, 'İK Uzmanı', OPEN).method).toBe('ai');
+        expect(resolvePreScore({ position: 'ik uzmanı' }, 'İK Uzmanı', OPEN).method).toBe('keyword');
     });
 });
 
