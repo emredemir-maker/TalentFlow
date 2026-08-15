@@ -327,6 +327,18 @@ export function sortRows(rows, sortKey, sortDir = 'desc') {
 }
 
 /**
+ * Ön skoru hangi cetvelin ürettiği.
+ *
+ * Eski kayıtlarda alan yok — boş kalır ve "bilmiyoruz" demek olur; bir
+ * varsayım yazmak, ölçülmemiş bir şeyi ölçülmüş göstermek olurdu.
+ */
+const PRESCORE_METHOD_LABEL = {
+    ai: 'AI',
+    keyword: 'Anahtar kelime',
+    none: 'Üretilemedi',
+};
+
+/**
  * Adayın STAR boyutlarını "3/3/2/3" biçiminde tek hücreye sığdırır.
  *
  * Yüzde tek başına doygunluğu gizler: dört boyutun hepsi 3/3 ise ölçek
@@ -357,6 +369,10 @@ export function buildExportRows(rows) {
         // yükseltti mi?" sorusu cevapsız kalıyordu — taranmışta ön skor
         // görünmüyordu bile.
         'Ön Skor (İlk)': Number.isFinite(Number(c.initialAiScore)) ? Number(c.initialAiScore) : '',
+        // Ön skoru HANGİ CETVEL üretti. İki cetvel (Gemini / anahtar-kelime)
+        // aynı kolonda toplandığında sıralama sessizce anlamsızlaşıyor;
+        // hangisinin ölçtüğünü görmeden dağılıma bakmak yanıltıcı.
+        'Ön Skor Yöntemi': PRESCORE_METHOD_LABEL[c.prescoreMethod] || '',
         'AI Skoru': c.bestScore ?? '',
         ...(c.positionScore !== undefined ? { 'Seçili Pozisyon Uyumu': c.positionScore } : {}),
         // STAR: yüzde ÖLÇEĞİ, kırılım DOYGUNLUĞU gösterir. Yüzde 100 ile

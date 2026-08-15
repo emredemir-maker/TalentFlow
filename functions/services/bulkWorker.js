@@ -64,20 +64,33 @@ const clampScore = (n) => Math.max(0, Math.min(100, Math.round(n)));
  */
 export function resolvePreScore(parsed, positionTitle, openPositions = []) {
     const aiScore = Number(parsed?.matchScore);
-    const hasAiScore = !isNaN(aiScore) && aiScore > 0;
+    // SIFIR BİR SKORDUR, skor yokluğu değil.
+    //
+    // Eskiden `aiScore > 0` isteniyordu. Prompt modele açıkça "aday uygun
+    // değilse matchScore'u 0 ver" diyor — yani 0 modelin CEVABI. Kod o cevabı
+    // "skor gelmedi" sayıp sessizce anahtar-kelime cetveline düşüyordu.
+    //
+    // Sonuç canlı veride görüldü: 117 adaylık bir partide skorlar 10-19 ve
+    // 40-61 diye iki öbeğe ayrılmıştı, ARADA 20-39 bandında tek aday yoktu.
+    // Bu bir aday dağılımı değil, aynı kolonda iki ayrı cetvelin damgası —
+    // bir grup Gemini ölçeğiyle, bir grup anahtar-kelime ölçeğiyle
+    // puanlanmıştı ve ikisi örtüşmüyordu. Kolona göre sıralamak, farklı
+    // birimlerdeki sayıları yan yana dizmek demekti.
+    const hasAiScore = Number.isFinite(aiScore) && aiScore >= 0;
     // Liste başlık dizisi ya da pozisyon dokümanı dizisi olabilir; doküman
     // verildiğinde anahtar-kelime skoru gereksinimleri de dikkate alır.
     const openPositionTitles = openPositions.map(positionTitleOf).filter(Boolean);
 
     if (positionTitle) {
         const assigned = openPositions.find((p) => positionTitleOf(p) === positionTitle) || positionTitle;
-        const score = hasAiScore ? clampScore(aiScore) : calculateSimpleMatchScore(parsed, assigned);
-        return { score, matchedTitle: positionTitle };
+        return hasAiScore
+            ? { score: clampScore(aiScore), matchedTitle: positionTitle, method: 'ai' }
+            : { score: calculateSimpleMatchScore(parsed, assigned), matchedTitle: positionTitle, method: 'keyword' };
     }
 
     const validated = matchOpenTitle(parsed?.matchedPosition, openPositionTitles);
     if (validated && hasAiScore) {
-        return { score: clampScore(aiScore), matchedTitle: validated };
+        return { score: clampScore(aiScore), matchedTitle: validated, method: 'ai' };
     }
 
     let best = { score: 0, matchedTitle: null };
@@ -85,15 +98,17 @@ export function resolvePreScore(parsed, positionTitle, openPositions = []) {
         const s = calculateSimpleMatchScore(parsed, position);
         if (s > best.score) best = { score: s, matchedTitle: positionTitleOf(position) };
     }
-    if (best.matchedTitle) return best;
+    if (best.matchedTitle) return { ...best, method: 'keyword' };
 
     // Açık pozisyon listesi hiç yokken skor profil kalitesini ölçer (prompt
     // öyle ister); liste varken hiçbirine eşleşmemek gerçek bir "uygun
     // pozisyon yok" durumudur ve skor 0'dır.
     if (openPositionTitles.length === 0) {
-        return { score: hasAiScore ? clampScore(aiScore) : 0, matchedTitle: null };
+        return hasAiScore
+            ? { score: clampScore(aiScore), matchedTitle: null, method: 'ai' }
+            : { score: 0, matchedTitle: null, method: 'none' };
     }
-    return { score: 0, matchedTitle: null };
+    return { score: 0, matchedTitle: null, method: 'keyword' };
 }
 
 // Global single-worker flag — only one job runs at a time across all requests.
@@ -665,7 +680,8 @@ async function executeJob(jobId) {
                         await jobRef.update({ processedCount, failedCount, duplicateCount, lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp() });
                         break;
                     }
-                    const { score: matchScore, matchedTitle } = resolvePreScore(parsed, positionTitle, openPositions);
+                    const { score: matchScore, matchedTitle, method: prescoreMethod } =
+                        resolvePreScore(parsed, positionTitle, openPositions);
                     // Eşleşen başlıktan pozisyon doc id'sini çöz — yüklemede
                     // pozisyon seçilmediyse bile aday gerçek bir pozisyona bağlanır.
                     const matchedPos = openPositions.find((p) => p.title === matchedTitle);
@@ -677,6 +693,13 @@ async function executeJob(jobId) {
                         position: positionTitle || parsed?.position || '',
                         matchedPositionTitle: matchedTitle,
                         initialAiScore: matchScore,
+                        // Skoru HANGİ CETVEL ürettiği kayda girer. İki cetvel
+                        // (Gemini / anahtar-kelime) tek kolonda toplandığında
+                        // sıralama sessizce anlamsızlaşıyordu ve hangi adayın
+                        // hangisiyle ölçüldüğü sonradan anlaşılamıyordu.
+                        // maintenance/prescore ucu bu alanı zaten yazıyordu;
+                        // toplu içe aktarma yazmıyordu.
+                        prescoreMethod,
                         matchReason: noOpenMatch ? 'Uygun açık pozisyon bulunamadı.' : (parsed?.matchReason || ''),
                         positionId: positionId || item.positionId || matchedPos?.id || '',
                         company: parsed?.company || '',

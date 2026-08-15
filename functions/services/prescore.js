@@ -65,7 +65,13 @@ ${cvText.substring(0, 6000)}`;
             if (match) {
                 const parsed = JSON.parse(match[0]);
                 const score = Number(parsed?.matchScore);
-                if (!isNaN(score) && score > 0) {
+                // SIFIR BİR SKORDUR. Prompt modele "uygun değilse 0 ver"
+                // diyor; `> 0` istemek o cevabı "skor gelmedi" sayıp sessizce
+                // anahtar-kelime cetveline düşürüyordu. İki cetvel tek kolonda
+                // toplanınca sıralama anlamını yitiriyor — canlıda 20-39
+                // bandında tek aday olmayan bimodal bir dağılım olarak çıktı
+                // (bkz. bulkWorker.resolvePreScore).
+                if (Number.isFinite(score) && score >= 0) {
                     // AI'nın başlığı yalnızca açık pozisyon listesinde birebir
                     // karşılığı varsa kabul edilir; listede yoksa skor uydurma
                     // bir pozisyona aittir → anahtar-kelime yedeğine düş.

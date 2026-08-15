@@ -283,6 +283,7 @@ describe('buildExportRows', () => {
             'Kaynak Detayı': 'Sponsorlu',
             'Otonom Tarama': 'Yapılmadı',
             'Ön Skor (İlk)': '',
+            'Ön Skor Yöntemi': '',
             'AI Skoru': 85,
             'STAR %': '',
             'STAR Kırılım': '',
@@ -341,6 +342,19 @@ describe('buildExportRows', () => {
         }]);
         expect(row['STAR %']).toBe(92);
         expect(row['STAR Kırılım']).toBe('3/3 · 3/3 · 2/3 · 3/3');
+    });
+
+    // Hangi cetvelin ölçtüğünü görmeden dağılıma bakmak yanıltıcı: iki cetvel
+    // tek kolonda toplanınca sıralama sessizce anlamını yitiriyor.
+    it('names the ruler that produced the intake score', () => {
+        expect(buildExportRows([{ id: 'x', status: 'new', prescoreMethod: 'ai' }])[0]['Ön Skor Yöntemi'])
+            .toBe('AI');
+        expect(buildExportRows([{ id: 'x', status: 'new', prescoreMethod: 'keyword' }])[0]['Ön Skor Yöntemi'])
+            .toBe('Anahtar kelime');
+    });
+
+    it('leaves the method blank on older records instead of guessing one', () => {
+        expect(buildExportRows([{ id: 'x', status: 'new' }])[0]['Ön Skor Yöntemi']).toBe('');
     });
 
     it('leaves STAR columns blank when the analysis never ran', () => {
