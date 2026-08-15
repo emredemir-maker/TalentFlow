@@ -6,6 +6,7 @@
 import { analysisScoreFor, analysisFor, analysisScoreDetail } from './positionScore';
 import { mustHaveGate } from './mustHaveGate';
 import { STAGES, getStage } from './pipelineStages';
+import { normalizeStarAnalysis, starPercent } from './starDimensions';
 
 /** Map any raw/legacy candidate status onto a canonical stage key. */
 export function resolveStageKey(status) {
@@ -325,6 +326,18 @@ export function sortRows(rows, sortKey, sortDir = 'desc') {
     });
 }
 
+/**
+ * Adayın STAR boyutlarını "3/3/2/3" biçiminde tek hücreye sığdırır.
+ *
+ * Yüzde tek başına doygunluğu gizler: dört boyutun hepsi 3/3 ise ölçek
+ * ayrıştırmıyor demektir ve bu ancak ham değerlere bakınca görülür.
+ */
+function starBreakdown(starAnalysis) {
+    const dims = normalizeStarAnalysis(starAnalysis);
+    if (!dims) return '';
+    return dims.map((d) => `${d.score}/${d.max}`).join(' · ');
+}
+
 /** Flat, Turkish-labelled rows for the Excel export — column order matters. */
 export function buildExportRows(rows) {
     return rows.map((c) => ({
@@ -338,8 +351,18 @@ export function buildExportRows(rows) {
         'Kaynak': c.source || '',
         'Kaynak Detayı': c.sourceDetail || '',
         'Otonom Tarama': isDeepScanned(c) ? 'Yapıldı' : 'Yapılmadı',
+        // ÖN SKOR ile AI SKORU AYNI KOLONDA DEĞİL, çünkü aynı şey değiller.
+        // Ön skor aday havuza girerken verildi (tek hafif çağrı); AI skoru
+        // derin taramanın sonucu. İkisi tek kolonda toplanınca "tarama skorları
+        // yükseltti mi?" sorusu cevapsız kalıyordu — taranmışta ön skor
+        // görünmüyordu bile.
+        'Ön Skor (İlk)': Number.isFinite(Number(c.initialAiScore)) ? Number(c.initialAiScore) : '',
         'AI Skoru': c.bestScore ?? '',
         ...(c.positionScore !== undefined ? { 'Seçili Pozisyon Uyumu': c.positionScore } : {}),
+        // STAR: yüzde ÖLÇEĞİ, kırılım DOYGUNLUĞU gösterir. Yüzde 100 ile
+        // "dört boyutun dördü de 3/3" aynı satırda okunabilsin.
+        'STAR %': starPercent(c.aiAnalysis?.starAnalysis) ?? '',
+        'STAR Kırılım': starBreakdown(c.aiAnalysis?.starAnalysis),
         'Mülakat Skoru': c.interviewScore ?? '',
         'Genel Skor': c.combinedScore ?? '',
         'Deneyim (Yıl)': c.experience ?? '',
