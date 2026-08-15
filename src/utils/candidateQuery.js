@@ -45,6 +45,30 @@ export const QUERY_FIELDS = {
     text: { ops: ['includes'], needsScan: false },
 };
 
+/**
+ * Pozisyon olmadan ANLAMI OLMAYAN alanlar.
+ *
+ * Bu alanların hepsi adayın `positionAnalyses[pozisyonBaşlığı]` kaydını okur.
+ * Pozisyon yoksa o kayıt bulunamaz, aday "taranmamış" sayılır ve `skipped`
+ * kefesine düşer — HER aday. Sonuç 0 çıkar ve ekran "bu pozisyon için derin
+ * taraması yok" der.
+ *
+ * O cümle canlıda yanlış çıktı: 659 adayın hepsi elendi, oysa ortada pozisyon
+ * YOKTU. Kullanıcı tarama yapmaya yönlendirildi — tarama yapsa da değişmezdi.
+ * Eksik olan tarama değil, pozisyondu.
+ *
+ * Sebebi yanlış söylemek, söylememekten kötüdür: kullanıcıyı çözülmeyecek bir
+ * işe gönderir.
+ */
+export const POSITION_FIELDS = new Set(['score', 'requirement', 'gate', 'star']);
+
+/** Sorgu bir pozisyon olmadan çalışabilir mi? */
+export function queryNeedsPosition(spec) {
+    const filters = Array.isArray(spec?.filters) ? spec.filters : [];
+    if (filters.some((f) => POSITION_FIELDS.has(f?.field))) return true;
+    return POSITION_FIELDS.has(spec?.sort?.field);
+}
+
 const REQUIREMENT_STATUSES = ['met', 'partial', 'missing'];
 const GATE_STATUSES = ['ok', 'partial', 'missing', 'unknown'];
 const SCAN_STATES = ['scanned', 'unscanned', 'fresh', 'stale'];
@@ -287,6 +311,10 @@ export function runCandidateQuery(spec, { candidates = [], positions = [] } = {}
     return {
         position,
         positionTitle: position?.title || null,
+        // "Pozisyon eksik" ile "tarama eksik" AYRI iki durum ve ayrı iki iş
+        // gerektiriyor. İkisini aynı cümleyle anlatmak, kullanıcıyı yapması
+        // gerekmeyen bir işe (yeniden tarama) gönderiyordu.
+        missingPosition: queryNeedsPosition(spec) && !position,
         pool: pool.length,
         evaluated: pool.length - skipped,
         skipped,
