@@ -88,6 +88,15 @@ Soru: "adaylar hangi şehirlerde"
 Soru: "maaş beklentisi 100 binin altındakiler"
 {"intent":"list","filters":[],"unsupported":"Sistemde maaş beklentisi alanı tutulmuyor; bu soruyu veriyle yanıtlayamam."}
 
+"mulakat_incelemesi" ARACININ ALANLARI (bu araçta "filters" KULLANILMAZ):
+- "position": hangi pozisyonun görüşmeleri sorulduysa o başlık
+- "candidate": tek bir aday sorulduysa adı; pozisyon geneli soruluyorsa boş bırak
+
+Bu araç YALNIZCA görüşme yapılmış adaylar için çalışır. "Kimlerle görüştük",
+"mülakatlar nasıl geçti", "hangi maddeyi sormamışız" gibi sorular buraya gider.
+"Kimi çağıralım", "en iyi adaylar" gibi HAVUZ soruları aday_sorgusu'na gider —
+görüşme yapılmamış adaylar bu araçta hiç görünmez.
+
 ÖNCEKİ TURLAR — TAKİP SORULARI:
 Kullanıcı "onlardan", "bunların içinde", "peki ya", "aynı pozisyonda" gibi
 ifadelerle bir önceki sorguya atıf yapabilir. Böyle bir atıf VARSA önceki
@@ -104,7 +113,7 @@ TIRNAK KURALI: metin değerlerinin içinde düz çift tırnak (") KULLANMA; tek
 tırnak (') kullan. Kaçışsız tırnak tüm yanıtı okunamaz hâle getirir.
 
 ÇIKTI: yalnızca JSON.
-{"tool":"aday_sorgusu"|null,"intent":"list|count|group","position":"...","filters":[...],"sort":{...},"limit":N,"groupBy":"...","unsupported":"..."}
+{"tool":"aday_sorgusu"|"mulakat_incelemesi"|null,"intent":"list|count|group","position":"...","candidate":"...","filters":[...],"sort":{...},"limit":N,"groupBy":"...","unsupported":"..."}
 `;
 
 const NARRATOR_PROMPT = `

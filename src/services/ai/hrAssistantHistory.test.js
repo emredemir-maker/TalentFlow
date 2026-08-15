@@ -67,7 +67,12 @@ describe('questionToQuery — geçmiş', () => {
         await questionToQuery('soru', { positions: [], history: [{ soru: 'önceki', sorgu: null, sonuc: null }] });
         const prompt = lastPrompt();
         expect(prompt).toContain('önceki');
-        expect(prompt).not.toContain('candidate');
+        // Aday VERİSİ sızmamalı. Eskiden burada 'candidate' kelimesi aranıyordu
+        // ama prompt artık mulakat_incelemesi aracının "candidate" PARAMETRESİNİ
+        // tanımlıyor — kelimenin kendisi meşru. Aranması gereken şey aday
+        // kaydından gelen alanlar; sınırın asıl bekçisi assistantContext.
+        expect(prompt).not.toContain('cvText');
+        expect(prompt).not.toContain('positionAnalyses');
     });
 });
 
