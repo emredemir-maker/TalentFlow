@@ -16,13 +16,27 @@
 
 import { getModel } from './config.js';
 import { parseAIJson, buildStructuredPrompt, sanitizeForPrompt } from './utils.js';
+import { toolById, toolMenu } from './assistantTools.js';
+
+/** Tek araçlı dünyada modelin "tool" yazmayı atlaması hata sayılmaz. */
+const DEFAULT_TOOL_ID = 'aday_sorgusu';
 
 const TRANSLATOR_PROMPT = `
-Sen bir işe alım veri asistanısın. Kullanıcının Türkçe sorusunu, aday havuzunda
-çalıştırılacak YAPILANDIRILMIŞ BİR SORGUYA çevir.
+Sen bir işe alım veri asistanısın. Kullanıcının Türkçe sorusunu, çalıştırılacak
+YAPILANDIRILMIŞ BİR İSTEĞE çevir.
 
 ASLA cevap üretme. Aday sayısı, isim, oran YAZMA — onları kod hesaplayacak.
-Senin ürettiğin tek şey sorgunun kendisi.
+Senin ürettiğin tek şey isteğin kendisi.
+
+ARAÇ SEÇİMİ — İLK KARAR BU:
+ARACLAR bölümüne bak ve soruyu hangi aracın cevaplayabileceğine karar ver;
+kimliğini "tool" alanına yaz.
+
+Hiçbiri uymuyorsa "tool" alanına null yaz ve "unsupported" alanına nedenini
+tek cümleyle yaz. Uymayan bir aracı seçmektense null yazmak DOĞRUDUR: yanlış
+araç, sorulmayan soruya cevap üretir ve kullanıcı bunu fark edemez.
+
+AŞAĞIDAKİ ALAN SÖZLÜĞÜ YALNIZCA "aday_sorgusu" ARACI İÇİNDİR.
 
 KULLANABİLECEĞİN ALANLAR — bunların DIŞINA ÇIKMA:
 - score      : pozisyon puanı.  op: gte | lte | eq,  value: sayı (0-100)
@@ -90,7 +104,7 @@ TIRNAK KURALI: metin değerlerinin içinde düz çift tırnak (") KULLANMA; tek
 tırnak (') kullan. Kaçışsız tırnak tüm yanıtı okunamaz hâle getirir.
 
 ÇIKTI: yalnızca JSON.
-{"intent":"list|count|group","position":"...","filters":[...],"sort":{...},"limit":N,"groupBy":"...","unsupported":"..."}
+{"tool":"aday_sorgusu"|null,"intent":"list|count|group","position":"...","filters":[...],"sort":{...},"limit":N,"groupBy":"...","unsupported":"..."}
 `;
 
 const NARRATOR_PROMPT = `
@@ -137,6 +151,7 @@ export async function questionToQuery(question, { positions = [], activePosition
         ACIK_POZISYONLAR: sanitizeForPrompt(titles.join('\n')),
         BAGLAMDAKI_POZISYON: sanitizeForPrompt(activePosition?.title || 'yok'),
         BAGLAMDAKI_GEREKSINIMLER: sanitizeForPrompt(reqs || 'yok'),
+        ARACLAR: toolMenu(),
         ONCEKI_TURLAR: history.length > 0
             ? sanitizeForPrompt(JSON.stringify(history))
             : 'yok',
@@ -148,7 +163,24 @@ export async function questionToQuery(question, { positions = [], activePosition
     if (!parsed || typeof parsed !== 'object') {
         throw new Error('Soru sorguya çevrilemedi. Biraz daha somut yazmayı deneyin.');
     }
-    return parsed;
+
+    // ARACI KOD DOĞRULAR. Model kayıtta olmayan bir kimlik yazarsa (uydurma ya
+    // da yeni bir aracın adını hatırlaması) dispatch sessizce boşa düşerdi.
+    // Tanınmayan kimlik = araç yok.
+    const declared = String(parsed.tool ?? '').trim();
+    const tool = toolById(declared);
+    return {
+        ...parsed,
+        // Üç ayrı durum, üç ayrı sonuç:
+        //   kayıtlı kimlik      → o araç
+        //   YAZILMIŞ ama tanınmıyor → null. Model başka bir yetenek istiyor
+        //     demektir; varsayılana düşmek onu SORULMAYAN soruya cevap
+        //     verdirmek olurdu ve kullanıcı bunu fark edemezdi.
+        //   hiç yazılmamış      → tek araçlı dünyada varsayılan. Araç sayısı
+        //     artınca bu varsayım kaldırılmalı; o noktada eksik alan gerçek
+        //     bir belirsizliktir.
+        tool: tool ? tool.id : ((declared || parsed.unsupported) ? null : DEFAULT_TOOL_ID),
+    };
 }
 
 /**

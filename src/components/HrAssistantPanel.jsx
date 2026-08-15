@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
     MessageSquare, X, Send, Loader2, AlertTriangle, Info, ChevronRight, Sparkles, RotateCcw,
+    ThumbsUp, ThumbsDown,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCandidates } from '../context/CandidatesContext';
@@ -9,6 +10,8 @@ import { runCandidateQuery } from '../utils/candidateQuery';
 import { questionToQuery, narrateResult } from '../services/ai/hrAssistant';
 import { buildContext } from '../utils/assistantContext';
 import { loadChat, saveChat, clearChat } from '../services/assistantChatStore';
+import { toolById, capabilityMessage, TOOLS } from '../services/ai/assistantTools';
+import { saveFeedback } from '../services/assistantFeedback';
 
 /**
  * İK Asistanı — doğal dilde veri sorgulama.
@@ -20,12 +23,10 @@ import { loadChat, saveChat, clearChat } from '../services/assistantChatStore';
  * Bu sürüm yalnızca OKUR. Hiçbir şeyi değiştirmez, tarama başlatmaz.
  */
 
-const ORNEKLER = [
-    'Tüm zorunlulukları karşılayan en iyi 5 aday',
-    'SQL bilen ama hiç taranmamış adaylar',
-    'Analizi eski kalmış adaylar',
-    'Adaylar hangi şehirlerde',
-];
+// Örnekler ARAÇ KAYDINDAN gelir. Elle tutulan bir liste, araç eklendiğinde
+// güncellenmeyi unutulur ve kullanıcıya asistanın yapabildiklerinden azını
+// gösterir.
+const ORNEKLER = TOOLS.flatMap((t) => t.examples).slice(0, 6);
 
 export default function HrAssistantPanel() {
     const [open, setOpen] = useState(false);
@@ -60,6 +61,21 @@ export default function HrAssistantPanel() {
             .then(() => setPersistError(''))
             .catch((err) => setPersistError(`Sohbet kaydedilemedi: ${err.message}`));
     }, [uid]);
+
+    /**
+     * Geri bildirim — Faz 7 (öğrenme) bunu kullanacak, bugün yalnızca toplanır.
+     * Toplanmamış geri bildirim sonradan üretilemez; o yüzden düğme şimdi var.
+     */
+    const sendFeedback = useCallback((index, verdict, note = '') => {
+        setTurns((prev) => prev.map((t, i) => (i === index ? { ...t, feedback: verdict } : t)));
+        if (!uid) return;
+        saveFeedback(uid, {
+            question: turns[index - 1]?.text || '',
+            tool: turns[index]?.spec?.tool || null,
+            verdict,
+            note,
+        }).catch((err) => setPersistError(`Geri bildirim kaydedilemedi: ${err.message}`));
+    }, [turns, uid]);
 
     const newTopic = useCallback(() => {
         setTurns([]);
@@ -103,8 +119,16 @@ export default function HrAssistantPanel() {
                 activePosition: active,
                 history,
             });
-            if (spec.unsupported) {
-                finish({ role: 'assistant', spec, unsupported: spec.unsupported });
+            // ARACI KOD SEÇER, model yalnızca önerir. Tanınmayan kimlik ya da
+            // "bunu veriyle yanıtlayamam" cevabı aynı yere çıkar: yapamadığımızı
+            // söyleyip YAPABİLDİKLERİMİZİ sayarız. "Bunu yapamam" tek başına
+            // kullanıcıyı denemeyi bırakmaya iter.
+            if (spec.unsupported || !toolById(spec.tool)) {
+                finish({
+                    role: 'assistant',
+                    spec,
+                    unsupported: capabilityMessage(spec.unsupported),
+                });
                 return;
             }
             const result = runCandidateQuery(
@@ -205,7 +229,12 @@ export default function HrAssistantPanel() {
                 )}
 
                 {turns.map((t, i) => (
-                    <Turn key={i} turn={t} onCandidateClick={openCandidate} />
+                    <Turn
+                        key={i}
+                        turn={t}
+                        onCandidateClick={openCandidate}
+                        onFeedback={(verdict, note) => sendFeedback(i, verdict, note)}
+                    />
                 ))}
 
                 {busy && (
@@ -238,7 +267,7 @@ export default function HrAssistantPanel() {
     );
 }
 
-function Turn({ turn, onCandidateClick }) {
+function Turn({ turn, onCandidateClick, onFeedback }) {
     if (turn.role === 'user') {
         return (
             <p className="ml-8 px-3 py-1.5 rounded-xl bg-cyan-500 text-white text-[11px] leading-relaxed">
@@ -250,11 +279,18 @@ function Turn({ turn, onCandidateClick }) {
         return <p className="text-[11px] text-red-600">{turn.error}</p>;
     }
     if (turn.unsupported) {
-        // Modelin "bunu veriyle yanıtlayamam" demesi, uydurmasından iyidir.
+        // Modelin "bunu veriyle yanıtlayamam" demesi, uydurmasından iyidir —
+        // ama yalnızca yapamadığını söylemek kullanıcıyı denemeyi bırakmaya
+        // iter. Metin artık yapabildiklerimizi de sayıyor (capabilityMessage).
         return (
-            <div className="flex items-start gap-2 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2">
-                <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
-                <p className="text-[11px] text-amber-800 leading-relaxed">{turn.unsupported}</p>
+            <div className="space-y-1.5">
+                <div className="flex items-start gap-2 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                    <p className="text-[11px] text-amber-800 leading-relaxed whitespace-pre-line">
+                        {turn.unsupported}
+                    </p>
+                </div>
+                <FeedbackBar value={turn.feedback} onSend={onFeedback} />
             </div>
         );
     }
@@ -303,6 +339,63 @@ function Turn({ turn, onCandidateClick }) {
             )}
 
             <AuditBox result={r} />
+            <FeedbackBar value={turn.feedback} onSend={onFeedback} />
+        </div>
+    );
+}
+
+/**
+ * Geri bildirim çubuğu.
+ *
+ * Faz 7 (öğrenme) bu veriye dayanacak ama o katman henüz yok. Toplamayı
+ * ertelemenin bedeli şu: toplanmamış geri bildirim sonradan ÜRETİLEMEZ.
+ * Kullanıcının "bu cevap yanlıştı" dediği an geçerse, o bilgi bir daha geri
+ * gelmez. Düğme bugün var, kullanan taraf sonra gelecek.
+ *
+ * Olumsuzda not istenir: "yanlış" damgası tek başına düzeltilecek bir şey
+ * söylemez.
+ */
+function FeedbackBar({ value, onSend }) {
+    const [noteOpen, setNoteOpen] = useState(false);
+    const [note, setNote] = useState('');
+
+    if (value) {
+        return (
+            <p className="text-[9px] text-slate-400">
+                {value === 'up' ? 'Kaydedildi — teşekkürler.' : 'Not alındı, asistanı geliştirmekte kullanılacak.'}
+            </p>
+        );
+    }
+
+    if (noteOpen) {
+        return (
+            <form
+                onSubmit={(e) => { e.preventDefault(); onSend('down', note); }}
+                className="flex items-center gap-1.5"
+            >
+                <input
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder="Neyi yanlış yaptı? (isteğe bağlı)"
+                    autoFocus
+                    className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-[10px] text-slate-700 outline-none focus:border-cyan-400"
+                />
+                <button type="submit" className="text-[9px] font-black uppercase text-cyan-600 px-1.5">
+                    Gönder
+                </button>
+            </form>
+        );
+    }
+
+    return (
+        <div className="flex items-center gap-1">
+            <span className="text-[9px] text-slate-300 uppercase tracking-wider">Bu cevap işine yaradı mı?</span>
+            <button onClick={() => onSend('up')} title="Yararlı" className="p-1 rounded hover:bg-slate-100 text-slate-300 hover:text-emerald-500">
+                <ThumbsUp className="w-3 h-3" />
+            </button>
+            <button onClick={() => setNoteOpen(true)} title="Yararsız" className="p-1 rounded hover:bg-slate-100 text-slate-300 hover:text-red-500">
+                <ThumbsDown className="w-3 h-3" />
+            </button>
         </div>
     );
 }
