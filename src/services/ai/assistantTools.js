@@ -41,6 +41,19 @@ export const TOOLS = [
             'Adaylar hangi şehirlerde',
         ],
     },
+    {
+        id: 'mulakat_incelemesi',
+        label: 'Mülakat incelemesi',
+        description:
+            'Yapılmış görüşmeleri inceler: damga dağılımı, hangi gereksinim maddesi '
+            + 'kapandı, hangi madde hiç sorulmadı, hangi görüşmede sayısal sonuç çıkmadı. '
+            + 'Adayın cevabından alıntılarla yorumlar. Bir pozisyona ya da tek bir adaya '
+            + 'bağlı sorulabilir. Yalnızca GÖRÜŞME YAPILMIŞ adaylar için çalışır.',
+        examples: [
+            'Bu pozisyonda görüştüğümüz adaylar nasıldı',
+            'Mülakatlarda hangi madde hiç sorulmamış',
+        ],
+    },
 ];
 
 const BY_ID = new Map(TOOLS.map((t) => [t.id, t]));

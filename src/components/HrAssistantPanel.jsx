@@ -11,6 +11,9 @@ import { questionToQuery, narrateResult } from '../services/ai/hrAssistant';
 import { buildContext } from '../utils/assistantContext';
 import { loadChat, saveChat, clearChat } from '../services/assistantChatStore';
 import { toolById, capabilityMessage, TOOLS } from '../services/ai/assistantTools';
+import { buildInterviewReview, reviewSummaryForPrompt } from '../utils/interviewReview';
+import { narrateInterviewReview } from '../services/ai/interviewReviewer';
+import { loadInterviewEntries } from '../services/interviewReviewLoader';
 import { saveFeedback } from '../services/assistantFeedback';
 
 /**
@@ -131,6 +134,28 @@ export default function HrAssistantPanel() {
                 });
                 return;
             }
+            if (spec.tool === 'mulakat_incelemesi') {
+                const title = forcePosition || spec.position || contextPosition || '';
+                const loaded = await loadInterviewEntries({
+                    candidates: enrichedCandidates || [],
+                    position: title,
+                    candidateName: spec.candidate || '',
+                });
+                const pos = (positions || []).find((p) => p?.title === title) || null;
+                const review = buildInterviewReview(loaded.entries, pos);
+                // Anlatım düşse bile çerçeve gösterilir — sayılar zaten hazır ve
+                // asıl bilgi onlar. Hatayı yutmayız, kutuda yazarız.
+                let narration = null;
+                let narrationError = '';
+                try {
+                    narration = await narrateInterviewReview(q, reviewSummaryForPrompt(review));
+                } catch (err) {
+                    narrationError = err?.message || 'Yorum üretilemedi.';
+                }
+                finish({ role: 'assistant', spec, review, loaded, narration, narrationError, question: q });
+                return;
+            }
+
             // Pozisyon çözümü: kullanıcının seçtiği > modelin yazdığı > sayfa
             // bağlamı. Hiçbiri yoksa ve soru pozisyon gerektiriyorsa TEK açık
             // pozisyon varken sormanın anlamı yok — kullan ve hangisini
@@ -307,6 +332,15 @@ function Turn({ turn, onCandidateClick, onFeedback, openPositions = [], onPickPo
         );
     }
 
+    if (turn.review) {
+        return (
+            <div className="space-y-2">
+                <ReviewTurn turn={turn} />
+                <FeedbackBar value={turn.feedback} onSend={onFeedback} />
+            </div>
+        );
+    }
+
     const r = turn.result;
     return (
         <div className="space-y-2">
@@ -355,6 +389,90 @@ function Turn({ turn, onCandidateClick, onFeedback, openPositions = [], onPickPo
             )}
             <AuditBox result={r} />
             <FeedbackBar value={turn.feedback} onSend={onFeedback} />
+        </div>
+    );
+}
+
+/** İnceleme bölümü — boşsa hiç render edilmez. */
+function ReviewBlock({ title, items, tone }) {
+    if (!items || items.length === 0) return null;
+    return (
+        <div>
+            <p className={`text-[9px] font-black uppercase tracking-widest mb-1 ${tone}`}>{title}</p>
+            <ul className="space-y-0.5">
+                {items.map((x, i) => (
+                    <li key={i} className="text-[11px] text-slate-600 leading-relaxed">• {x}</li>
+                ))}
+            </ul>
+        </div>
+    );
+}
+
+/** Mülakat incelemesi — çerçeve kodda hesaplandı, yorum modelden geldi. */
+function ReviewTurn({ turn }) {
+    const { review, loaded, narration, narrationError } = turn;
+
+    if (review.interviewCount === 0) {
+        return (
+            <p className="text-[11px] text-slate-600 leading-relaxed">
+                {loaded.matchedCandidates === 0
+                    ? 'Bu tanıma uyan aday bulamadım.'
+                    : `${loaded.matchedCandidates} aday buldum ama hiçbiriyle kayıtlı görüşme yok. `
+                      + 'Bu araç yalnızca görüşme yapılmış adayları inceler.'}
+            </p>
+        );
+    }
+
+    return (
+        <div className="space-y-2">
+            {narration?.ozet && (
+                <p className="text-[11px] text-slate-700 leading-relaxed">{narration.ozet}</p>
+            )}
+            {narrationError && (
+                <p className="text-[10px] text-amber-700 leading-relaxed">
+                    Yorum üretilemedi ({narrationError}) — aşağıdaki sayılar yine de geçerli,
+                    onları kod hesapladı.
+                </p>
+            )}
+            <ReviewBlock title="Öne çıkanlar" items={narration?.one_cikanlar} tone="text-emerald-600" />
+            <ReviewBlock title="Mülakatta sorulacaklar" items={narration?.mulakatta_sorulacaklar} tone="text-amber-600" />
+            <ReviewBlock title="Uyarılar" items={narration?.uyarilar} tone="text-red-500" />
+
+            <div className="rounded-lg bg-slate-50 border border-slate-100 px-2.5 py-2 space-y-1">
+                <p className="flex items-center gap-1 text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                    <Info className="w-2.5 h-2.5" /> Nasıl hesaplandı
+                </p>
+                <p className="text-[10px] text-slate-500 leading-relaxed">
+                    {review.position ? <><strong>{review.position}</strong> · </> : null}
+                    {review.interviewCount} görüşme okundu, <strong>{review.scored}</strong> tanesinde
+                    sayısal sonuç var. Damgalar: {review.tally.met} karşılıyor, {review.tally.partial} kısmen,
+                    {' '}{review.tally.missing} karşılamıyor, {review.tally.inconclusive} karar verilemedi.
+                </p>
+                {/* Ölçülemeyen görüşmeyi saymamak, olmayan bir ölçümü varmış
+                    gibi göstermenin en sinsi hâli olurdu. */}
+                {review.unscored.length > 0 && (
+                    <p className="text-[10px] text-amber-700 leading-relaxed">
+                        <strong>{review.unscored.length}</strong> görüşmede sayısal sonuç yok; ortalamaya
+                        ve damga sayılarına girmediler.
+                    </p>
+                )}
+                {review.staleCount > 0 && (
+                    <p className="text-[10px] text-amber-700 leading-relaxed">
+                        <strong>{review.staleCount}</strong> görüşmenin damgaları ilanın ESKİ madde
+                        listesine ait — bugünkü maddelerle karşılaştırılamaz.
+                    </p>
+                )}
+                {loaded.truncated > 0 && (
+                    <p className="text-[10px] text-amber-700 leading-relaxed">
+                        {loaded.truncated} görüşme okuma sınırına takıldı ve incelenmedi.
+                    </p>
+                )}
+                {loaded.withoutInterview > 0 && (
+                    <p className="text-[10px] text-slate-500 leading-relaxed">
+                        {loaded.withoutInterview} aday bu tanıma uyuyor ama hiç görüşme yapılmamış.
+                    </p>
+                )}
+            </div>
         </div>
     );
 }
