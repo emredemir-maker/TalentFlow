@@ -1,11 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-    MessageSquare, X, Send, Loader2, AlertTriangle, Info, ChevronRight, Sparkles,
+    MessageSquare, X, Send, Loader2, AlertTriangle, Info, ChevronRight, Sparkles, RotateCcw,
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
 import { runCandidateQuery } from '../utils/candidateQuery';
 import { questionToQuery, narrateResult } from '../services/ai/hrAssistant';
+import { buildContext } from '../utils/assistantContext';
+import { loadChat, saveChat, clearChat } from '../services/assistantChatStore';
 
 /**
  * İK Asistanı — doğal dilde veri sorgulama.
@@ -30,10 +33,39 @@ export default function HrAssistantPanel() {
     const [busy, setBusy] = useState(false);
     const [turns, setTurns] = useState([]);
     const [contextPosition, setContextPosition] = useState(null);
+    // Kalıcılık hatası sohbeti DURDURMAZ ama saklanmaz da: sessizce kaydedilmiş
+    // gibi davranmak, kullanıcının yenilemede her şeyi kaybetmesi demek olurdu.
+    const [persistError, setPersistError] = useState('');
 
+    const { user } = useAuth();
     const { enrichedCandidates, setViewCandidateId } = useCandidates();
     const { positions } = usePositions();
     const endRef = useRef(null);
+    const uid = user?.uid || '';
+
+    // Kayıtlı sohbeti bir kez yükle — panel ilk açıldığında.
+    const loadedRef = useRef(false);
+    useEffect(() => {
+        if (!open || !uid || loadedRef.current) return;
+        loadedRef.current = true;
+        loadChat(uid)
+            .then((saved) => { if (saved.length > 0) setTurns(saved); })
+            .catch((err) => setPersistError(`Kayıtlı sohbet okunamadı: ${err.message}`));
+    }, [open, uid]);
+
+    /** Turları kalıcı hâle yaz; hata olursa sessiz kalma, söyle. */
+    const persist = useCallback((next) => {
+        if (!uid) return;
+        saveChat(uid, next)
+            .then(() => setPersistError(''))
+            .catch((err) => setPersistError(`Sohbet kaydedilemedi: ${err.message}`));
+    }, [uid]);
+
+    const newTopic = useCallback(() => {
+        setTurns([]);
+        setPersistError('');
+        if (uid) clearChat(uid).catch(() => { /* temizlik hatası akışı durdurmaz */ });
+    }, [uid]);
 
     // Sayfa bağlamı: ilan detayı açıkken kullanıcı "bu pozisyonda…" diyebilsin.
     useEffect(() => {
@@ -47,14 +79,32 @@ export default function HrAssistantPanel() {
     const ask = async (text) => {
         const q = String(text || '').trim();
         if (!q || busy) return;
+        // Bağlam SORU ÖNCESİ hâlden kurulur; içinde aday adı ya da CV metni yok
+        // (bkz. utils/assistantContext.js).
+        const base = turns;
+        const history = buildContext(base);
+        const userTurn = { role: 'user', text: q };
         setQuestion('');
         setBusy(true);
-        setTurns((prev) => [...prev, { role: 'user', text: q }]);
+        setTurns([...base, userTurn]);
+
+        // Turu tamamla: ekrana yaz VE kalıcı hâle geçir. İkisi tek yerde olsun ki
+        // bir cevap ekranda görünüp kayda girmemesi mümkün olmasın.
+        const finish = (assistantTurn) => {
+            const next = [...base, userTurn, assistantTurn];
+            setTurns(next);
+            persist(next);
+        };
+
         try {
             const active = positions?.find((p) => p?.title === contextPosition) || null;
-            const spec = await questionToQuery(q, { positions: positions || [], activePosition: active });
+            const spec = await questionToQuery(q, {
+                positions: positions || [],
+                activePosition: active,
+                history,
+            });
             if (spec.unsupported) {
-                setTurns((prev) => [...prev, { role: 'assistant', unsupported: spec.unsupported }]);
+                finish({ role: 'assistant', spec, unsupported: spec.unsupported });
                 return;
             }
             const result = runCandidateQuery(
@@ -64,9 +114,11 @@ export default function HrAssistantPanel() {
             // Yorum başarısız olsa da sonuç gösterilmeli — sayılar zaten hazır.
             let comment = '';
             try { comment = await narrateResult(q, result); } catch { comment = ''; }
-            setTurns((prev) => [...prev, { role: 'assistant', result, comment }]);
+            // spec KAYDEDİLİR: takip sorusu ("peki onlardan İstanbul'da olanlar")
+            // bir sonraki turda bu sorguyu devralacak.
+            finish({ role: 'assistant', spec, result, comment });
         } catch (err) {
-            setTurns((prev) => [...prev, { role: 'assistant', error: err?.message || 'Sorgu çalıştırılamadı.' }]);
+            finish({ role: 'assistant', error: err?.message || 'Sorgu çalıştırılamadı.' });
         } finally {
             setBusy(false);
         }
@@ -102,10 +154,31 @@ export default function HrAssistantPanel() {
                         {contextPosition ? `Bağlam: ${contextPosition}` : `${enrichedCandidates?.length || 0} aday · yalnızca okur`}
                     </p>
                 </div>
-                <button onClick={() => setOpen(false)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 shrink-0">
-                    <X className="w-4 h-4" />
-                </button>
+                <div className="flex items-center gap-1 shrink-0">
+                    {/* Bağlamı bilerek temizlemek: konu değiştirirken asistanın
+                        eski filtreleri devralmasını istemeyen kullanıcı için. */}
+                    {turns.length > 0 && (
+                        <button
+                            onClick={newTopic}
+                            title="Yeni konu — önceki sorular bağlamdan çıkar"
+                            className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+                        >
+                            <RotateCcw className="w-3 h-3" />
+                            <span className="text-[9px] font-black uppercase tracking-wider">Yeni konu</span>
+                        </button>
+                    )}
+                    <button onClick={() => setOpen(false)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
+                        <X className="w-4 h-4" />
+                    </button>
+                </div>
             </header>
+
+            {persistError && (
+                <p className="flex items-start gap-1.5 px-4 py-1.5 bg-amber-50 border-b border-amber-100 text-[10px] text-amber-800 shrink-0">
+                    <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
+                    {persistError} — sohbet ekranda duruyor ama sayfayı yenilerseniz kaybolur.
+                </p>
+            )}
 
             <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
                 {turns.length === 0 && (
@@ -113,6 +186,11 @@ export default function HrAssistantPanel() {
                         <p className="text-[11px] text-slate-500 leading-relaxed">
                             Aday havuzuna Türkçe soru sorun. Sayıları kod hesaplar, uydurma cevap
                             gelmez — her cevabın altında hangi filtrelerin uygulandığı yazar.
+                        </p>
+                        <p className="text-[10px] text-slate-400 leading-relaxed">
+                            Takip sorusu sorabilirsiniz: &quot;peki onlardan İstanbul&apos;da
+                            olanlar&quot; deyince önceki filtreler korunur. Konu değiştirirken
+                            <strong> Yeni konu</strong> deyin.
                         </p>
                         {ORNEKLER.map((o) => (
                             <button
