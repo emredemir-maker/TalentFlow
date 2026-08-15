@@ -282,7 +282,10 @@ describe('buildExportRows', () => {
             'Kaynak': 'LinkedIn',
             'Kaynak Detayı': 'Sponsorlu',
             'Otonom Tarama': 'Yapılmadı',
+            'Ön Skor (İlk)': '',
             'AI Skoru': 85,
+            'STAR %': '',
+            'STAR Kırılım': '',
             'Mülakat Skoru': 90,
             'Genel Skor': 88,
             'Deneyim (Yıl)': 5,
@@ -298,6 +301,52 @@ describe('buildExportRows', () => {
         expect(row['Aşama']).toBe('Ön Eleme');
         expect(row['Mülakat Skoru']).toBe('');
         expect(row['Yetenekler']).toBe('');
+    });
+
+    // "Tarama skorları yükseltti mi?" sorusunun cevabı iki sayıyı YAN YANA
+    // görmeyi gerektiriyor. Tek kolonda toplandıklarında taranmış adayın giriş
+    // skoru hiç görünmüyordu ve soru ancak tahminle cevaplanabiliyordu.
+    it('exports the intake score alongside the deep-scan score', () => {
+        const [row] = buildExportRows([{
+            id: 'x', status: 'new', initialAiScore: 41, bestScore: 78,
+        }]);
+        expect(row['Ön Skor (İlk)']).toBe(41);
+        expect(row['AI Skoru']).toBe(78);
+    });
+
+    it('keeps a zero intake score instead of blanking it', () => {
+        // 0 bir ölçüm: "hiçbir maddeyi karşılamıyor". Boş bırakmak onu
+        // "ölçülmedi" ile karıştırır.
+        const [row] = buildExportRows([{ id: 'x', status: 'new', initialAiScore: 0 }]);
+        expect(row['Ön Skor (İlk)']).toBe(0);
+    });
+
+    it('leaves the intake score blank when there never was one', () => {
+        const [row] = buildExportRows([{ id: 'x', status: 'new' }]);
+        expect(row['Ön Skor (İlk)']).toBe('');
+    });
+
+    // Yüzde doygunluğu gizler: dört boyut da 3/3 ise ölçek ayrıştırmıyordur ve
+    // bu ancak ham değerlerde görünür.
+    it('exports both the STAR percentage and the per-dimension breakdown', () => {
+        const [row] = buildExportRows([{
+            id: 'x',
+            status: 'new',
+            aiAnalysis: {
+                starAnalysis: {
+                    Situation: { score: 3 }, Task: { score: 3 },
+                    Action: { score: 2 }, Result: { score: 3 },
+                },
+            },
+        }]);
+        expect(row['STAR %']).toBe(92);
+        expect(row['STAR Kırılım']).toBe('3/3 · 3/3 · 2/3 · 3/3');
+    });
+
+    it('leaves STAR columns blank when the analysis never ran', () => {
+        const [row] = buildExportRows([{ id: 'x', status: 'new' }]);
+        expect(row['STAR %']).toBe('');
+        expect(row['STAR Kırılım']).toBe('');
     });
 });
 

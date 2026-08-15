@@ -220,7 +220,16 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
             const currentStage = candidate.scoringStage || 'initial';
             if (currentStage === 'initial') {
                 updates.matchScore = bestResult.score;
-                updates.initialAiScore = bestResult.score;
+                // initialAiScore BURADA EZİLİRDİ. Alanın adı "ilk skor" ama
+                // derin tarama üzerine yazınca "ilk" kalmıyordu: aday havuza
+                // girerken kaç almıştı sorusunun cevabı yok oluyordu. Toplu
+                // tarayıcı (SystemScanner) bu alana zaten dokunmuyor; iki yol
+                // aynı adayda farklı sonuç veriyordu — hangisiyle taradığınıza
+                // göre ön skorunuz duruyor ya da duruyordu.
+                //
+                // Ön skor ile derin skoru karşılaştırmak, ölçeğin şişip
+                // şişmediğini anlamanın TEK yolu. Bu alan artık giriş anına ait
+                // ve değişmiyor.
             }
 
             await updateCandidate(candidate.id, updates);
