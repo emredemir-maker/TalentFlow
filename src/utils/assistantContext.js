@@ -33,6 +33,8 @@ export const MAX_STORED_TURNS = 40;
 export function compactSpec(spec) {
     if (!spec || typeof spec !== 'object') return null;
     const out = {};
+    // Hangi araç çalıştı — takip sorusu araç değiştiriyorsa model bunu bilmeli.
+    if (spec.tool) out.tool = spec.tool;
     if (spec.intent) out.intent = spec.intent;
     if (spec.position) out.position = spec.position;
     if (Array.isArray(spec.filters) && spec.filters.length > 0) out.filters = spec.filters;
@@ -96,6 +98,10 @@ export function serializeTurns(turns = [], maxTurns = MAX_STORED_TURNS) {
         if (t?.comment) out.comment = String(t.comment);
         if (t?.unsupported) out.unsupported = String(t.unsupported);
         if (t?.error) out.error = String(t.error);
+        // Verilmiş geri bildirim korunur: sayfa yenilenince düğmeler yeniden
+        // boş görünürse kullanıcı aynı cevaba ikinci kez oy verir ve sayım
+        // bozulur.
+        if (t?.feedback) out.feedback = String(t.feedback);
         const spec = compactSpec(t?.spec);
         if (spec) out.spec = spec;
         if (t?.result) {

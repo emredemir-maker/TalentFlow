@@ -49,7 +49,14 @@ describe('questionToQuery — geçmiş', () => {
     });
 
     it('still works with no context argument at all', async () => {
-        await expect(questionToQuery('kaç aday var')).resolves.toEqual({ intent: 'list', filters: [] });
+        await expect(questionToQuery('kaç aday var')).resolves.toEqual({
+            intent: 'list', filters: [], tool: 'aday_sorgusu',
+        });
+    });
+
+    it('offers the tool menu so the model can pick one', async () => {
+        await questionToQuery('kaç aday var', { positions: [] });
+        expect(lastPrompt()).toContain('aday_sorgusu');
     });
 
     // Bağlamı `assistantContext.buildContext` kuruyor ve aday adı koymuyor.
@@ -61,5 +68,36 @@ describe('questionToQuery — geçmiş', () => {
         const prompt = lastPrompt();
         expect(prompt).toContain('önceki');
         expect(prompt).not.toContain('candidate');
+    });
+});
+
+describe('questionToQuery — araç seçimi', () => {
+    const respondWith = (obj) =>
+        generateContent.mockResolvedValue({ response: { text: () => JSON.stringify(obj) } });
+
+    it('keeps a registered tool id', async () => {
+        respondWith({ tool: 'aday_sorgusu', intent: 'list', filters: [] });
+        expect((await questionToQuery('soru')).tool).toBe('aday_sorgusu');
+    });
+
+    // Model uydurma ya da hatırladığı bir kimlik yazabilir. Kod doğrulamazsa
+    // dispatch sessizce boşa düşer ve kullanıcı cevap beklerken hiçbir şey olmaz.
+    it('rejects a tool id that is not in the registry', async () => {
+        respondWith({ tool: 'maas_arastirmasi', intent: 'list', filters: [] });
+        expect((await questionToQuery('maaş bandı nedir')).tool).toBeNull();
+    });
+
+    it('leaves the tool null when the model says it cannot answer', async () => {
+        respondWith({ tool: null, filters: [], unsupported: 'Maaş alanı sistemde yok.' });
+        const spec = await questionToQuery('maaş beklentisi 100k altı');
+        expect(spec.tool).toBeNull();
+        expect(spec.unsupported).toMatch(/Maaş alanı/);
+    });
+
+    // Tek araçlı dünyada alanı atlamak hata değil; araç sayısı artınca bu
+    // varsayım kaldırılmalı, o noktada eksik alan gerçek bir belirsizliktir.
+    it('falls back to the single tool when the model omits the field', async () => {
+        respondWith({ intent: 'count', filters: [{ field: 'skill', value: 'SQL' }] });
+        expect((await questionToQuery('SQL bilen kaç aday var')).tool).toBe('aday_sorgusu');
     });
 });
