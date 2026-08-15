@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
     runCandidateQuery, resolvePosition, QUERY_FIELDS, DEFAULT_LIMIT, MAX_LIMIT,
+    queryNeedsPosition,
 } from './candidateQuery';
 import { requirementsFingerprint } from './positionRequirements';
 
@@ -292,5 +293,54 @@ describe('alan sözlüğü', () => {
         const needsScan = Object.entries(QUERY_FIELDS)
             .filter(([, v]) => v.needsScan).map(([k]) => k).sort();
         expect(needsScan).toEqual(['gate', 'requirement', 'score', 'star']);
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POZİSYON EKSİKLİĞİ İLE TARAMA EKSİKLİĞİ AYNI ŞEY DEĞİL.
+//
+// Canlıda 659 adaylık havuzda "tüm zorunlulukları geçen en iyi 5 aday" sorusu
+// 0 döndü ve ekran "bu pozisyon için derin taraması yok" dedi — ortada
+// pozisyon YOKKEN. Kullanıcı tarama yapmaya yönlendirildi; tarama yapsa da
+// değişmeyecekti. Sebebi yanlış söylemek, söylememekten kötü.
+describe('missingPosition', () => {
+    const CAND = [{ id: 'a', name: 'Ayşe', status: 'new' }];
+
+    it('flags a gate query that ran without a position', () => {
+        const out = runCandidateQuery({ filters: [{ field: 'gate', value: 'ok' }] }, { candidates: CAND, positions: [] });
+        expect(out.missingPosition).toBe(true);
+        expect(out.positionTitle).toBeNull();
+    });
+
+    it('flags requirement, score and star the same way', () => {
+        for (const field of ['requirement', 'score', 'star']) {
+            const out = runCandidateQuery({ filters: [{ field, value: 'met', index: 1, op: 'gte' }] }, { candidates: CAND, positions: [] });
+            expect(out.missingPosition).toBe(true);
+        }
+    });
+
+    // Konum/beceri/aşama bir ilana bağlı değil; onlarda pozisyon istemek
+    // kullanıcıyı gereksiz bir soruyla durdurmak olurdu.
+    it('does not ask for a position when the query does not need one', () => {
+        const out = runCandidateQuery({ filters: [{ field: 'location', op: 'includes', value: 'İstanbul' }] }, { candidates: CAND, positions: [] });
+        expect(out.missingPosition).toBe(false);
+    });
+
+    it('is false once a position resolves', () => {
+        const positions = [{ id: 'p1', title: 'Growth PM', status: 'open', requirementsMeta: [{ text: 'SQL', must: true }] }];
+        const out = runCandidateQuery({ position: 'Growth PM', filters: [{ field: 'gate', value: 'ok' }] }, { candidates: CAND, positions });
+        expect(out.missingPosition).toBe(false);
+    });
+});
+
+describe('queryNeedsPosition', () => {
+    it('recognises a sort that needs one', () => {
+        expect(queryNeedsPosition({ filters: [], sort: { field: 'star', dir: 'desc' } })).toBe(true);
+        expect(queryNeedsPosition({ filters: [], sort: { field: 'name', dir: 'asc' } })).toBe(false);
+    });
+
+    it('tolerates junk', () => {
+        expect(queryNeedsPosition(null)).toBe(false);
+        expect(queryNeedsPosition({})).toBe(false);
     });
 });

@@ -6,7 +6,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
-import { runCandidateQuery } from '../utils/candidateQuery';
+import { runCandidateQuery, queryNeedsPosition } from '../utils/candidateQuery';
 import { questionToQuery, narrateResult } from '../services/ai/hrAssistant';
 import { buildContext } from '../utils/assistantContext';
 import { loadChat, saveChat, clearChat } from '../services/assistantChatStore';
@@ -92,7 +92,7 @@ export default function HrAssistantPanel() {
 
     useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [turns, busy]);
 
-    const ask = async (text) => {
+    const ask = async (text, { forcePosition = '' } = {}) => {
         const q = String(text || '').trim();
         if (!q || busy) return;
         // Bağlam SORU ÖNCESİ hâlden kurulur; içinde aday adı ya da CV metni yok
@@ -131,8 +131,17 @@ export default function HrAssistantPanel() {
                 });
                 return;
             }
+            // Pozisyon çözümü: kullanıcının seçtiği > modelin yazdığı > sayfa
+            // bağlamı. Hiçbiri yoksa ve soru pozisyon gerektiriyorsa TEK açık
+            // pozisyon varken sormanın anlamı yok — kullan ve hangisini
+            // kullandığını söyle (denetim kutusu başlığı zaten yazıyor).
+            let chosen = forcePosition || spec.position || contextPosition || '';
+            if (!chosen && queryNeedsPosition(spec)) {
+                const open = (positions || []).filter((p) => p?.status === 'open');
+                if (open.length === 1) chosen = open[0].title;
+            }
             const result = runCandidateQuery(
-                { ...spec, position: spec.position || contextPosition },
+                { ...spec, position: chosen },
                 { candidates: enrichedCandidates || [], positions: positions || [] }
             );
             // Yorum başarısız olsa da sonuç gösterilmeli — sayılar zaten hazır.
@@ -140,7 +149,8 @@ export default function HrAssistantPanel() {
             try { comment = await narrateResult(q, result); } catch { comment = ''; }
             // spec KAYDEDİLİR: takip sorusu ("peki onlardan İstanbul'da olanlar")
             // bir sonraki turda bu sorguyu devralacak.
-            finish({ role: 'assistant', spec, result, comment });
+            // Soru turda saklanır: pozisyon seçilince aynı soru yeniden çalışacak.
+            finish({ role: 'assistant', spec, result, comment, question: q });
         } catch (err) {
             finish({ role: 'assistant', error: err?.message || 'Sorgu çalıştırılamadı.' });
         } finally {
@@ -234,6 +244,8 @@ export default function HrAssistantPanel() {
                         turn={t}
                         onCandidateClick={openCandidate}
                         onFeedback={(verdict, note) => sendFeedback(i, verdict, note)}
+                        openPositions={(positions || []).filter((p) => p?.status === 'open')}
+                        onPickPosition={(title) => ask(t.question || turns[i - 1]?.text || '', { forcePosition: title })}
                     />
                 ))}
 
@@ -267,7 +279,7 @@ export default function HrAssistantPanel() {
     );
 }
 
-function Turn({ turn, onCandidateClick, onFeedback }) {
+function Turn({ turn, onCandidateClick, onFeedback, openPositions = [], onPickPosition }) {
     if (turn.role === 'user') {
         return (
             <p className="ml-8 px-3 py-1.5 rounded-xl bg-cyan-500 text-white text-[11px] leading-relaxed">
@@ -338,8 +350,44 @@ function Turn({ turn, onCandidateClick, onFeedback }) {
                 <p className="text-[11px] text-slate-500 italic">Bu sorguyla eşleşen aday yok.</p>
             )}
 
+            {r.missingPosition && (
+                <PositionPicker positions={openPositions} onPick={onPickPosition} />
+            )}
             <AuditBox result={r} />
             <FeedbackBar value={turn.feedback} onSend={onFeedback} />
+        </div>
+    );
+}
+
+/**
+ * Pozisyon seçici — cevap veremediğimizde SORARIZ.
+ *
+ * Soru bir pozisyona bağlıysa ve pozisyon verilmediyse, doğru davranış boş
+ * liste döndürüp sebebi yanlış söylemek değil, eksik olanı istemektir. Bir
+ * asistanın en temel davranışı bu: anlamadığı yerde soru sorar.
+ */
+function PositionPicker({ positions, onPick }) {
+    if (!positions.length) {
+        return (
+            <p className="text-[11px] text-slate-500 italic">
+                Açık pozisyon yok — bu soruyu cevaplayabilmek için önce bir ilan gerekiyor.
+            </p>
+        );
+    }
+    return (
+        <div className="space-y-1.5">
+            <p className="text-[11px] text-slate-600 leading-relaxed">Hangi pozisyon için bakayım?</p>
+            <div className="flex flex-wrap gap-1.5">
+                {positions.map((p) => (
+                    <button
+                        key={p.id || p.title}
+                        onClick={() => onPick?.(p.title)}
+                        className="px-2.5 py-1 rounded-lg border border-cyan-200 bg-cyan-50 text-[11px] font-bold text-cyan-700 hover:bg-cyan-100 transition-colors"
+                    >
+                        {p.title}
+                    </button>
+                ))}
+            </div>
         </div>
     );
 }
@@ -425,10 +473,21 @@ function AuditBox({ result }) {
                     ))}
                 </ul>
             )}
-            {result.skipped > 0 && (
+            {/* Pozisyon eksikken bu cümle YANLIŞ olur: "bu pozisyon için derin
+                taraması yok" der ama ortada pozisyon yoktur. Canlıda 659 adayın
+                tamamı böyle elendi ve kullanıcı tarama yapmaya yönlendirildi —
+                tarama yapsa da değişmeyecekti. Sebep ayrı, mesaj da ayrı. */}
+            {result.skipped > 0 && !result.missingPosition && (
                 <p className="text-[10px] text-amber-700 leading-relaxed">
                     <strong>{result.skipped}</strong> aday sayıma girmedi: bu pozisyon için derin
                     taraması yok, karşılıyor da karşılamıyor da diyemeyiz.
+                </p>
+            )}
+            {result.missingPosition && (
+                <p className="text-[10px] text-amber-700 leading-relaxed">
+                    Bu soru bir pozisyona bağlı — puan, gereksinim maddesi, zorunlu kapısı ve STAR
+                    hep bir ilana göre ölçülür. Pozisyon seçilmediği için hiçbir aday
+                    değerlendirilemedi.
                 </p>
             )}
             {result.ignored.length > 0 && (
