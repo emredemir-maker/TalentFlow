@@ -13,6 +13,7 @@
 
 import { buildInterviewReport, VERDICT_LABEL } from './interviewReport';
 import { requirementsOf } from './positionRequirements';
+import { compareToBand } from './salaryBand';
 
 const VERDICTS = ['met', 'partial', 'missing', 'inconclusive'];
 
@@ -73,8 +74,14 @@ export function buildInterviewReview(entries = [], position = null) {
             if (row) { row[item.verdict] += 1; row.asked += 1; }
         }
 
+        // MAAŞ: adayın o odada söylediği beklenti ile ilanın bandı.
+        // compareToBand birimler uyuşmuyorsa 'unknown' döner ve SEBEBİNİ yazar
+        // — kur çevirmiyoruz (gerekçe: utils/salaryBand.js).
+        const salary = compareToBand(entry?.session?.candidateSalary, position?.salaryBand);
+
         perCandidate.push({
             name,
+            salary,
             outcome: report.outcome || null,
             recruiterOutcome: report.recruiterOutcome || null,
             evidenceScore: report.evidence.score,
@@ -96,6 +103,23 @@ export function buildInterviewReview(entries = [], position = null) {
         });
     }
 
+    // BÜTÇE TABLOSU. 'unknown' ayrı sayılır ve ayrı gösterilir: beklentisi
+    // sorulmamış adayı "bandın içinde" saymak, ölçülmemiş bir şeyi ölçülmüş
+    // göstermek olurdu ve tabloyu olduğundan iyimser yapardı.
+    const salaryTally = { above: 0, within: 0, below: 0, unknown: 0 };
+    const overshoots = [];
+    for (const c of perCandidate) {
+        salaryTally[c.salary?.status || 'unknown'] += 1;
+        if (c.salary?.status === 'above' && Number.isFinite(c.salary.overshoot)) {
+            overshoots.push(c.salary.overshoot);
+        }
+    }
+    // Ortanca, tek bir uç adayın tabloyu bozmasını engeller.
+    const sortedOvershoot = [...overshoots].sort((a, b) => a - b);
+    const medianOvershoot = sortedOvershoot.length
+        ? sortedOvershoot[Math.floor((sortedOvershoot.length - 1) / 2)]
+        : null;
+
     const requirementCoverage = [...perRequirement.values()];
     // HİÇ SORULMAMIŞ MADDE bir bulgu: o madde hakkında bilgimiz yok demek,
     // "aday karşılamıyor" demek DEĞİL. Karıştırmak adayı olmayan bir eksikle
@@ -108,6 +132,9 @@ export function buildInterviewReview(entries = [], position = null) {
         scored,
         perCandidate,
         tally,
+        salaryTally,
+        medianOvershoot,
+        hasBand: Boolean(position?.salaryBand),
         requirementCoverage,
         neverAsked,
         unscored,
@@ -137,6 +164,15 @@ export function reviewSummaryForPrompt(review, sampling = {}) {
             kural: toplam > okunan ? 'en yeni görüşmeler önce' : null,
         },
         pozisyon: review.position,
+        // Bütçe tablosu. 'bilinmiyor' AYRI: beklentisi kayıtlı olmayan adayı
+        // banda uyuyormuş gibi saymak, tabloyu olduğundan iyimser yapar.
+        butce: review.hasBand ? {
+            bandin_ustunde: review.salaryTally.above,
+            bandin_icinde: review.salaryTally.within,
+            bandin_altinda: review.salaryTally.below,
+            beklentisi_bilinmiyor: review.salaryTally.unknown,
+            ortanca_asim_orani: review.medianOvershoot,
+        } : null,
         gorusme_sayisi: review.interviewCount,
         sayisal_sonucu_olan: review.scored,
         damga_dagilimi: review.tally,
