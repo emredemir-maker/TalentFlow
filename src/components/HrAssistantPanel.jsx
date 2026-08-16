@@ -14,6 +14,7 @@ import { toolById, capabilityMessage, TOOLS } from '../services/ai/assistantTool
 import { buildInterviewReview, reviewSummaryForPrompt } from '../utils/interviewReview';
 import { narrateInterviewReview } from '../services/ai/interviewReviewer';
 import { loadInterviewEntries } from '../services/interviewReviewLoader';
+import { reviewFingerprint, loadReview, saveReview } from '../services/interviewReviewCache';
 import { saveFeedback } from '../services/assistantFeedback';
 
 /**
@@ -145,14 +146,25 @@ export default function HrAssistantPanel() {
                 const review = buildInterviewReview(loaded.entries, pos);
                 // Anlatım düşse bile çerçeve gösterilir — sayılar zaten hazır ve
                 // asıl bilgi onlar. Hatayı yutmayız, kutuda yazarız.
+                const summary = reviewSummaryForPrompt(review, loaded);
+                const fingerprint = reviewFingerprint(summary);
                 let narration = null;
                 let narrationError = '';
+                let fromCache = false;
                 try {
-                    narration = await narrateInterviewReview(q, reviewSummaryForPrompt(review));
+                    // DAMGALA VE SAKLA: aynı çerçeve aynı yorumu verir. Girdi
+                    // değişmedikçe model yeniden konuşmaz — asistanın salı ve
+                    // perşembe farklı şey söylemesi böyle biter.
+                    if (uid) narration = await loadReview(uid, fingerprint);
+                    fromCache = Boolean(narration);
+                    if (!narration) {
+                        narration = await narrateInterviewReview(q, summary);
+                        if (uid) await saveReview(uid, fingerprint, narration).catch(() => {});
+                    }
                 } catch (err) {
                     narrationError = err?.message || 'Yorum üretilemedi.';
                 }
-                finish({ role: 'assistant', spec, review, loaded, narration, narrationError, question: q });
+                finish({ role: 'assistant', spec, review, loaded, narration, narrationError, fromCache, question: q });
                 return;
             }
 
@@ -462,9 +474,15 @@ function ReviewTurn({ turn }) {
                         listesine ait — bugünkü maddelerle karşılaştırılamaz.
                     </p>
                 )}
+                {/* ÖRNEKLEM AÇIKÇA YAZILIR. Alt kümenin dağılımını bütünün
+                    dağılımı gibi göstermek, kullanıcının fark edemeyeceği bir
+                    yanıltma olur — seçim kuralı da yazsın ki keyfi olmadığı
+                    görülsün. */}
                 {loaded.truncated > 0 && (
                     <p className="text-[10px] text-amber-700 leading-relaxed">
-                        {loaded.truncated} görüşme okuma sınırına takıldı ve incelenmedi.
+                        Toplam <strong>{loaded.totalSessions}</strong> görüşme var; <strong>en yeni
+                        {' '}{review.interviewCount}</strong> tanesi incelendi. Yukarıdaki dağılım
+                        bütünün değil, bu alt kümenin dağılımıdır.
                     </p>
                 )}
                 {loaded.withoutInterview > 0 && (

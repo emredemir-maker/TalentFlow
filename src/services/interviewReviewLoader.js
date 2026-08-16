@@ -4,18 +4,34 @@
 // sorular ve transcript tam kayıtta (`interviews/{sessionId}`). İnceleme
 // çerçevesi damgalara dayandığı için tam kaydı okumak zorunlu.
 //
-// Okuma SINIRLI: bir soruda onlarca belge çekmek hem yavaş hem gereksiz.
-// Sınıra takılan görüşme sayısı geri döndürülür ve ekranda söylenir —
-// "hepsine baktım" izlenimi vermek, bakmadığını gizlemek olur.
+// ── ÖRNEKLEM ────────────────────────────────────────────────────────────────
+// Okuma SINIRLI. İlk sürümde seçim adayların DİZİ SIRASINA göreydi: 200
+// görüşmeden "ilk 25"i alınıyor ve dağılımı genel tabloymuş gibi sunuluyordu.
+// Keyfi bir alt kümeden çıkan yüzdeyi bütünün yüzdesi diye göstermek, bu
+// projede tekrar tekrar düzelttiğimiz hatanın ta kendisi — bu kez benim
+// bıraktığım hâliyle.
+//
+// İki şey değişti:
+//   1. Seçim DETERMİNİSTİK: en yeni görüşmeler önce. Kural keyfi değil ve
+//      ekranda yazıyor.
+//   2. Kesme olduğunda bu bilgi anlatıcıya da gidiyor; "genel olarak" diye
+//      başlayan bir cümle kurması engelleniyor (services/ai/interviewReviewer.js).
 
 import { doc, getDoc } from 'firebase/firestore';
 
 import { db } from '../config/firebase';
 
 /** Tek soruda okunacak en fazla görüşme kaydı. */
-export const MAX_SESSIONS = 25;
+export const MAX_SESSIONS = 60;
 
 const norm = (s) => String(s || '').trim().toLocaleLowerCase('tr');
+
+/** Görüşmenin zamanı — sıralama için. Tarihsizler en sona. */
+function sessionTime(summary) {
+    const raw = summary?.date || summary?.createdAt || summary?.startedAt;
+    const ms = raw ? Date.parse(typeof raw === 'string' ? raw : String(raw)) : NaN;
+    return Number.isFinite(ms) ? ms : -Infinity;
+}
 
 /**
  * Adayları pozisyon ve/veya isme göre süzer, görüşme kayıtlarını çeker.
@@ -43,11 +59,23 @@ export async function loadInterviewEntries({ candidates = [], position = '', can
         const sessions = Array.isArray(c?.interviewSessions) ? c.interviewSessions : [];
         if (sessions.length === 0) { withoutInterview += 1; continue; }
         for (const s of sessions) {
-            if (s?.id) pending.push({ candidateId: c.id, candidateName: c.name || '', sessionId: String(s.id) });
+            if (s?.id) {
+                pending.push({
+                    candidateId: c.id,
+                    candidateName: c.name || '',
+                    sessionId: String(s.id),
+                    at: sessionTime(s),
+                });
+            }
         }
     }
 
-    const truncated = Math.max(0, pending.length - MAX_SESSIONS);
+    // EN YENİ ÖNCE. Keyfi bir alt küme yerine savunulabilir ve söylenebilir
+    // bir kural: "en yeni N görüşmeye baktım".
+    pending.sort((a, b) => b.at - a.at);
+
+    const totalSessions = pending.length;
+    const truncated = Math.max(0, totalSessions - MAX_SESSIONS);
     const slice = pending.slice(0, MAX_SESSIONS);
 
     const entries = [];
@@ -62,5 +90,14 @@ export async function loadInterviewEntries({ candidates = [], position = '', can
         }
     }
 
-    return { entries, matchedCandidates: matched.length, withoutInterview, truncated };
+    return {
+        entries,
+        matchedCandidates: matched.length,
+        withoutInterview,
+        truncated,
+        totalSessions,
+        // Örneklem kuralı ekranda ve prompt'ta yazsın: kesme varken çıkan
+        // dağılım BÜTÜNÜN değil, bu alt kümenin dağılımıdır.
+        selection: truncated > 0 ? 'en-yeni' : 'tamami',
+    };
 }

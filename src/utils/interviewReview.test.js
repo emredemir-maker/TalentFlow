@@ -119,3 +119,36 @@ describe('reviewSummaryForPrompt', () => {
         expect(summary.pozisyon).toBe('Growth PM');
     });
 });
+
+// ÖRNEKLEM GİZLENEMEZ.
+//
+// İlk sürümde seçim adayların dizi sırasınaydı ve kesme bilgisi anlatıcıya
+// HİÇ gitmiyordu: 200 görüşmenin keyfi 25'inden çıkan dağılım, bütünün
+// dağılımı gibi anlatılabiliyordu. Kullanıcı bunu fark edemezdi.
+describe('reviewSummaryForPrompt — örneklem', () => {
+    it('tells the narrator when it is looking at a subset', () => {
+        const review = buildInterviewReview([entry('Ayşe')], POSITION);
+        const summary = reviewSummaryForPrompt(review, { totalSessions: 200 });
+        expect(summary.orneklem).toEqual({
+            okunan_gorusme: 1,
+            toplam_gorusme: 200,
+            tamami_mi: false,
+            kural: 'en yeni görüşmeler önce',
+        });
+    });
+
+    it('marks a complete read as complete', () => {
+        const review = buildInterviewReview([entry('Ayşe'), entry('Mehmet')], POSITION);
+        const summary = reviewSummaryForPrompt(review, { totalSessions: 2 });
+        expect(summary.orneklem.tamami_mi).toBe(true);
+        expect(summary.orneklem.kural).toBeNull();
+    });
+
+    // Örneklem bilgisi verilmezse okunan sayı toplam sayılır — uydurma bir
+    // "toplam" üretmektense elimizdekini beyan etmek doğru.
+    it('does not invent a total when none was supplied', () => {
+        const summary = reviewSummaryForPrompt(buildInterviewReview([entry('Ayşe')], POSITION));
+        expect(summary.orneklem.toplam_gorusme).toBe(1);
+        expect(summary.orneklem.tamami_mi).toBe(true);
+    });
+});
