@@ -5,7 +5,7 @@ import { analysisScoreFor } from '../utils/positionScore';
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import Header from '../components/Header';
 import { usePositions } from '../context/PositionsContext';
-import { normalizeBand, formatBand, CURRENCIES, CURRENCY_LABEL, PERIODS, PERIOD_LABEL } from '../utils/salaryBand';
+import { normalizeBand, formatBand, CURRENCIES, CURRENCY_LABEL, PERIODS, PERIOD_LABEL, BASES, BASIS_LABEL } from '../utils/salaryBand';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 import { collection, onSnapshot, addDoc, getDocs, query, where, serverTimestamp } from 'firebase/firestore';
@@ -702,7 +702,7 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
 function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser, userDepartments, isExtracting, onExtract, jdText, setJdText }) {
     const [formData, setFormData] = useState({
         title: '', department: isDepartmentUser ? (userDepartments?.[0] || '') : '', minExperience: '', reqItems: [], description: '',
-        salaryMin: '', salaryMax: '', salaryCurrency: 'TRY', salaryPeriod: 'monthly',
+        salaryMin: '', salaryMax: '', salaryCurrency: 'TRY', salaryPeriod: 'monthly', salaryBasis: 'gross',
         screeningEnabled: false, screeningQuestions: [''],
     });
     const [suggestingQuestions, setSuggestingQuestions] = useState(false);
@@ -1000,6 +1000,7 @@ function PositionEditModal({ pos, candidates, departments, isDepartmentUser, use
         salaryMax: pos.salaryBand?.max?.toString() || '',
         salaryCurrency: pos.salaryBand?.currency || 'TRY',
         salaryPeriod: pos.salaryBand?.period || 'monthly',
+        salaryBasis: pos.salaryBand?.basis || 'gross',
         // İşaretlenmemiş eski ilanlarda maddeler zorunlu sayılır — formun
         // önceki davranışı da buydu (hepsi "olmazsa olmaz" kutusuna gelirdi).
         reqItems: requirementsOf(pos).map((r) => ({ text: r.text, must: r.must !== false })),
@@ -1298,7 +1299,7 @@ export default function PositionsPage() {
             // Bütçe bandı: adayın beklentisiyle karşılaştırmanın BİR ucu.
             // normalizeBand null dönerse alan hiç yazılmaz — boş bir band
             // yazmak, tanımlanmamış bütçeyi tanımlanmış gibi gösterirdi.
-            salaryBand: normalizeBand({ min: formData.salaryMin, max: formData.salaryMax, currency: formData.salaryCurrency, period: formData.salaryPeriod }),
+            salaryBand: normalizeBand({ min: formData.salaryMin, max: formData.salaryMax, currency: formData.salaryCurrency, period: formData.salaryPeriod, basis: formData.salaryBasis }),
             requirements: reqs, requirementsMeta: meta, matchedCandidates,
             screeningEnabled: formData.screeningEnabled && cleanedQuestions.length > 0,
             screeningQuestions: cleanedQuestions,
@@ -1330,7 +1331,7 @@ export default function PositionsPage() {
             // Bütçe bandı: adayın beklentisiyle karşılaştırmanın BİR ucu.
             // normalizeBand null dönerse alan hiç yazılmaz — boş bir band
             // yazmak, tanımlanmamış bütçeyi tanımlanmış gibi gösterirdi.
-            salaryBand: normalizeBand({ min: formData.salaryMin, max: formData.salaryMax, currency: formData.salaryCurrency, period: formData.salaryPeriod }),
+            salaryBand: normalizeBand({ min: formData.salaryMin, max: formData.salaryMax, currency: formData.salaryCurrency, period: formData.salaryPeriod, basis: formData.salaryBasis }),
             requirements: reqs,
             requirementsMeta: meta,
             description: formData.description || '',
@@ -1847,13 +1848,14 @@ function SalaryBandFields({ formData, setFormData, inputCls }) {
     const preview = formatBand({
         min: formData.salaryMin, max: formData.salaryMax,
         currency: formData.salaryCurrency, period: formData.salaryPeriod,
+        basis: formData.salaryBasis,
     });
     return (
         <div>
             <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">
                 Bütçe Bandı <span className="text-slate-300">(isteğe bağlı)</span>
             </label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                 <input type="number" min="0" placeholder="Alt" value={formData.salaryMin}
                     onChange={(e) => set({ salaryMin: e.target.value })} className={inputCls} />
                 <input type="number" min="0" placeholder="Üst" value={formData.salaryMax}
@@ -1865,6 +1867,13 @@ function SalaryBandFields({ formData, setFormData, inputCls }) {
                 <select value={formData.salaryPeriod} onChange={(e) => set({ salaryPeriod: e.target.value })}
                     className={inputCls + ' appearance-none cursor-pointer'}>
                     {PERIODS.map((x) => <option key={x} value={x}>{PERIOD_LABEL[x]}</option>)}
+                </select>
+                {/* BRÜT/NET DE BİR BİRİM. Aday net konuşur, bütçe brüt tutulur;
+                    ikisini kıyaslamak farkı %30-40 küçük gösterir ve bu hata
+                    MAKUL göründüğü için fark edilmez. */}
+                <select value={formData.salaryBasis} onChange={(e) => set({ salaryBasis: e.target.value })}
+                    className={inputCls + ' appearance-none cursor-pointer'}>
+                    {BASES.map((x) => <option key={x} value={x}>{BASIS_LABEL[x]}</option>)}
                 </select>
             </div>
             <p className="mt-1 text-[10px] text-slate-400">

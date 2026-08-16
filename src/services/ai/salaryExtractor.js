@@ -38,6 +38,12 @@ SAYIYI NORMALLEŞTİR:
 - Aralık söylendiyse ("90-100 bin") min ve max ayrı yaz; tek rakamsa ikisi de
   aynı olsun.
 
+BRÜT / NET:
+- Aday "net" ya da "brüt" dediyse "basis" alanına net / gross yaz.
+- DEMEDİYSE BOŞ BIRAK ("basis": ""). VARSAYMA. Türkiye'de çoğu aday net
+  konuşur ama "çoğu" bir ölçüm değil: yanlış baz farkı %30-40 kaydırır ve bu
+  hata YANLIŞ OLDUĞU HÂLDE MAKUL göründüğü için kimse fark etmez.
+
 PARA BİRİMİ VE DÖNEM:
 - currency: TRY | USD | EUR. Aday söylemediyse ve bağlamdan KESİN
   anlaşılmıyorsa TRY yaz.
@@ -52,7 +58,7 @@ bir sözdür.
 
 ÇIKTI (yalnızca JSON):
 {"found": true|false, "min": 0, "max": 0, "currency": "TRY", "period": "monthly",
- "quote": "...", "uncertain": ""}
+ "basis": "gross"|"net"|"", "quote": "...", "uncertain": ""}
 `;
 
 /**
@@ -93,6 +99,9 @@ export async function extractSalaryFromTranscript(transcript) {
         max: max ?? min,
         currency: ['TRY', 'USD', 'EUR'].includes(parsed.currency) ? parsed.currency : 'TRY',
         period: ['monthly', 'yearly'].includes(parsed.period) ? parsed.period : 'monthly',
+        // Baz VARSAYILMAZ: aday söylemediyse null kalır ve karşılaştırmaya
+        // girmez. Kullanıcı toplu ekranda tek tıkla işaretler.
+        basis: ['gross', 'net'].includes(parsed.basis) ? parsed.basis : null,
         quote,
         uncertain: String(parsed.uncertain || '').trim(),
     };
