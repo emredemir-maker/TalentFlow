@@ -24,6 +24,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getAuth } from 'firebase/auth';
 import { savedPlanFor, planStatus, PLAN_STATUS_TEXT } from '../utils/interviewPlan';
+import { normalizeBand, formatBand, CURRENCIES, CURRENCY_LABEL, PERIODS, PERIOD_LABEL } from '../utils/salaryBand';
 import { NO_SCORE_TEXT } from '../utils/interviewReport';
 import { splitTranscript } from '../services/ai/transcriptSplitter';
 import {
@@ -87,6 +88,13 @@ export default function AddManualInterviewModal({
     const [transcript, setTranscript] = useState('');
     const [notes, setNotes] = useState('');
     const [recruiterOutcome, setRecruiterOutcome] = useState('pending');
+    // ADAYIN MAAŞ BEKLENTİSİ — odada duyulan rakam. En güvenilir kaynak bu:
+    // sayıyı siz duydunuz, kimse yorumlamadı. Boş bırakılabilir; boş beklentiyi
+    // sıfır sanmak, sorulmamış bir soruyu cevaplanmış göstermek olurdu.
+    const [salaryMin, setSalaryMin] = useState('');
+    const [salaryMax, setSalaryMax] = useState('');
+    const [salaryCurrency, setSalaryCurrency] = useState('TRY');
+    const [salaryPeriod, setSalaryPeriod] = useState('monthly');
 
     const [aiSuggesting, setAiSuggesting] = useState(false);
     const [splitting, setSplitting] = useState(false);
@@ -365,6 +373,10 @@ export default function AddManualInterviewModal({
                     transcript,
                     notes,
                     recruiterOutcome,
+                    candidateSalary: normalizeBand({
+                        min: salaryMin, max: salaryMax,
+                        currency: salaryCurrency, period: salaryPeriod,
+                    }),
                 }),
             });
             const data = await res.json();
@@ -456,6 +468,11 @@ export default function AddManualInterviewModal({
                             positionId={positionId}
                             setPositionId={setPositionId}
                             selectedPosition={selectedPosition}
+                            // maaş beklentisi
+                            salaryMin={salaryMin} setSalaryMin={setSalaryMin}
+                            salaryMax={salaryMax} setSalaryMax={setSalaryMax}
+                            salaryCurrency={salaryCurrency} setSalaryCurrency={setSalaryCurrency}
+                            salaryPeriod={salaryPeriod} setSalaryPeriod={setSalaryPeriod}
                             // metadata
                             interviewType={interviewType}
                             setInterviewType={setInterviewType}
@@ -573,6 +590,8 @@ function FormBody(props) {
         setNotes,
         recruiterOutcome,
         setRecruiterOutcome,
+        salaryMin, setSalaryMin, salaryMax, setSalaryMax,
+        salaryCurrency, setSalaryCurrency, salaryPeriod, setSalaryPeriod,
         submitError,
     } = props;
 
@@ -897,7 +916,34 @@ function FormBody(props) {
 
             {/* Outcome */}
             <Section title="Senin Değerlendirmen">
-                <div className="grid grid-cols-3 gap-2">
+                <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                    Adayın Maaş Beklentisi <span className="text-slate-300">(isteğe bağlı)</span>
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <input type="number" min="0" placeholder="Alt" value={salaryMin}
+                        onChange={(e) => setSalaryMin(e.target.value)}
+                        className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[12px] outline-none focus:border-violet-300" />
+                    <input type="number" min="0" placeholder="Üst" value={salaryMax}
+                        onChange={(e) => setSalaryMax(e.target.value)}
+                        className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[12px] outline-none focus:border-violet-300" />
+                    <select value={salaryCurrency} onChange={(e) => setSalaryCurrency(e.target.value)}
+                        className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[12px] outline-none focus:border-violet-300">
+                        {CURRENCIES.map((c) => <option key={c} value={c}>{c} {CURRENCY_LABEL[c]}</option>)}
+                    </select>
+                    <select value={salaryPeriod} onChange={(e) => setSalaryPeriod(e.target.value)}
+                        className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[12px] outline-none focus:border-violet-300">
+                        {PERIODS.map((x) => <option key={x} value={x}>{PERIOD_LABEL[x]}</option>)}
+                    </select>
+                </div>
+                {/* Boş bırakmak SIFIR demek değil, "sorulmadı" demek. Sıfır sanmak,
+                    sorulmamış bir soruyu cevaplanmış göstermek olurdu. */}
+                <p className="text-[10px] text-slate-400">
+                    {formatBand({ min: salaryMin, max: salaryMax, currency: salaryCurrency, period: salaryPeriod })
+                        || 'Boş bırakırsanız "sorulmadı" olarak kaydedilir — sıfır sayılmaz.'}
+                </p>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
                     {OUTCOME_OPTIONS.map((o) => {
                         const active = recruiterOutcome === o.id;
                         return (
