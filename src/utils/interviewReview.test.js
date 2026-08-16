@@ -152,3 +152,56 @@ describe('reviewSummaryForPrompt — örneklem', () => {
         expect(summary.orneklem.tamami_mi).toBe(true);
     });
 });
+
+// BÜTÇE FARKI — "adaylar iyi ama bütçemin çok üzerindeler" ölçülebilir olsun.
+//
+// En kritik kural: BEKLENTİSİ BİLİNMEYEN aday "bandın içinde" sayılmaz.
+// Saymak, ölçülmemiş bir şeyi ölçülmüş göstermek ve tabloyu olduğundan
+// iyimser yapmak olurdu — üstelik çıktısı bir bütçe kararı.
+describe('bütçe farkı', () => {
+    const BANDED = { ...POSITION, salaryBand: { min: 80000, max: 120000, currency: 'TRY', period: 'monthly' } };
+    const withSalary = (name, salary) => entry(name, { candidateSalary: salary });
+    const TRY_ = (n) => ({ min: n, max: n, currency: 'TRY', period: 'monthly' });
+
+    it('places each candidate against the band', () => {
+        const out = buildInterviewReview([
+            withSalary('Ayşe', TRY_(150000)),
+            withSalary('Mehmet', TRY_(100000)),
+            withSalary('Zeynep', TRY_(50000)),
+        ], BANDED);
+        expect(out.salaryTally).toEqual({ above: 1, within: 1, below: 1, unknown: 0 });
+    });
+
+    it('counts a missing expectation as unknown, never as within', () => {
+        const out = buildInterviewReview([withSalary('Ayşe', null), withSalary('Mehmet', TRY_(100000))], BANDED);
+        expect(out.salaryTally).toEqual({ above: 0, within: 1, below: 0, unknown: 1 });
+    });
+
+    // Kur çevirmiyoruz; çeviremediğimiz aday "bandın içinde" sayılamaz.
+    it('counts a mismatched currency as unknown', () => {
+        const out = buildInterviewReview([withSalary('Ayşe', { min: 5000, max: 5000, currency: 'USD', period: 'monthly' })], BANDED);
+        expect(out.salaryTally.unknown).toBe(1);
+        expect(out.perCandidate[0].salary.reason).toMatch(/kur çevirmiyoruz/i);
+    });
+
+    // Ortanca: tek bir uç aday tabloyu bozmasın.
+    it('reports the median overshoot, not the mean', () => {
+        const out = buildInterviewReview([
+            withSalary('A', TRY_(132000)),   // %10
+            withSalary('B', TRY_(150000)),   // %25
+            withSalary('C', TRY_(600000)),   // %400 — uç
+        ], BANDED);
+        expect(out.medianOvershoot).toBeCloseTo(0.25);
+    });
+
+    it('says nothing about budget when the position has no band', () => {
+        const out = buildInterviewReview([withSalary('Ayşe', TRY_(150000))], POSITION);
+        expect(out.hasBand).toBe(false);
+        expect(reviewSummaryForPrompt(out).butce).toBeNull();
+    });
+
+    it('hands the narrator the budget table when a band exists', () => {
+        const summary = reviewSummaryForPrompt(buildInterviewReview([withSalary('Ayşe', TRY_(150000))], BANDED));
+        expect(summary.butce).toMatchObject({ bandin_ustunde: 1, beklentisi_bilinmiyor: 0 });
+    });
+});
