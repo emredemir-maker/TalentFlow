@@ -201,6 +201,33 @@ router.post('/api/update-candidate-status', sessionLimiter, async (req, res) => 
 // same as automated interviews in lists, reports, and search.
 
 const VALID_INTERVIEW_TYPES = new Set(['phone', 'in-person', 'teams', 'zoom', 'meet', 'other']);
+const SALARY_CURRENCIES = new Set(['TRY', 'USD', 'EUR']);
+const SALARY_PERIODS = new Set(['monthly', 'yearly']);
+
+/**
+ * Adayın maaş beklentisini kayda uygun hâle getirir.
+ *
+ * İstemci `utils/salaryBand.normalizeBand` ile gönderiyor ama sunucu istemciye
+ * güvenmez. Para birimi ve dönem AYRI alanlar çünkü bunlarsız sayı yarım bir
+ * ölçüm; iki yarım ölçümü karşılaştırmak bütçe kararını yanlış verdirir.
+ */
+function sanitizeSalary(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    const num = (v) => {
+        const n = Number(v);
+        return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
+    };
+    const min = num(raw.min);
+    const max = num(raw.max);
+    if (min === null && max === null) return null;
+    return {
+        min,
+        max,
+        currency: SALARY_CURRENCIES.has(raw.currency) ? raw.currency : 'TRY',
+        period: SALARY_PERIODS.has(raw.period) ? raw.period : 'monthly',
+    };
+}
+
 const VALID_OUTCOMES = new Set(['positive', 'negative', 'pending']);
 
 /**
@@ -570,6 +597,7 @@ async function persistManualInterview({
     const {
         candidateId, candidateName, positionId, positionTitle, interviewerName,
         date, time, durationMinutes, interviewType, transcript, notes, recruiterOutcome,
+        candidateSalary,
     } = record;
 
     const sessionId = `mi-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -641,6 +669,10 @@ async function persistManualInterview({
                     interviewType,
                     status: 'completed',
                     recruiterOutcome: recruiterOutcome || 'pending',
+                // Adayın odada söylediği beklenti. YOKSA null: boş beklentiyi
+                // sıfır saymak, sorulmamış bir soruyu cevaplanmış göstermek
+                // olurdu ve bütçe raporunu sessizce aşağı çekerdi.
+                candidateSalary: sanitizeSalary(candidateSalary),
                     // Liste ekranları bu alanı okuyor. Artık modelin sayısı
                     // değil, damgalardan hesaplanan kanıt oranı yazılıyor;
                     // ölçülecek bir şey yoksa null kalıyor.
