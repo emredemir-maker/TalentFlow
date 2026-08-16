@@ -31,7 +31,7 @@ describe('extractSalaryFromTranscript', () => {
     it('returns a proposal with its quote', async () => {
         reply({ found: true, min: 95000, max: 95000, currency: 'TRY', period: 'monthly', quote: 'Aylık 95 bin TL bekliyorum' });
         expect(await extractSalaryFromTranscript(TRANSCRIPT)).toEqual({
-            min: 95000, max: 95000, currency: 'TRY', period: 'monthly',
+            min: 95000, max: 95000, currency: 'TRY', period: 'monthly', basis: null,
             quote: 'Aylık 95 bin TL bekliyorum', uncertain: '',
         });
     });
@@ -100,5 +100,23 @@ describe('EXTRACTOR_PROMPT — sözleşme', () => {
 
     it('rules out the interviewer own band', () => {
         expect(source).toMatch(/Mülakatçının söylediği bant adayın beklentisi DEĞİLDİR/);
+    });
+});
+
+// Baz VARSAYILMAZ. "Çoğu aday net konuşur" bir ölçüm değil.
+describe('brüt / net çıkarımı', () => {
+    it('keeps the basis when the candidate said it', async () => {
+        reply({ found: true, min: 95000, currency: 'TRY', period: 'monthly', basis: 'net', quote: 'net 95 bin' });
+        expect((await extractSalaryFromTranscript(TRANSCRIPT)).basis).toBe('net');
+    });
+
+    it('leaves the basis null when the candidate did not say it', async () => {
+        reply({ found: true, min: 95000, currency: 'TRY', period: 'monthly', basis: '', quote: '95 bin' });
+        expect((await extractSalaryFromTranscript(TRANSCRIPT)).basis).toBeNull();
+    });
+
+    it('forbids assuming a basis in the prompt', () => {
+        expect(source).toMatch(/DEMEDİYSE BOŞ BIRAK/);
+        expect(source).toMatch(/VARSAYMA/);
     });
 });

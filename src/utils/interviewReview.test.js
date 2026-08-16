@@ -159,9 +159,9 @@ describe('reviewSummaryForPrompt — örneklem', () => {
 // Saymak, ölçülmemiş bir şeyi ölçülmüş göstermek ve tabloyu olduğundan
 // iyimser yapmak olurdu — üstelik çıktısı bir bütçe kararı.
 describe('bütçe farkı', () => {
-    const BANDED = { ...POSITION, salaryBand: { min: 80000, max: 120000, currency: 'TRY', period: 'monthly' } };
+    const BANDED = { ...POSITION, salaryBand: { min: 80000, max: 120000, currency: 'TRY', period: 'monthly', basis: 'gross' } };
     const withSalary = (name, salary) => entry(name, { candidateSalary: salary });
-    const TRY_ = (n) => ({ min: n, max: n, currency: 'TRY', period: 'monthly' });
+    const TRY_ = (n) => ({ min: n, max: n, currency: 'TRY', period: 'monthly', basis: 'gross' });
 
     it('places each candidate against the band', () => {
         const out = buildInterviewReview([
@@ -179,7 +179,7 @@ describe('bütçe farkı', () => {
 
     // Kur çevirmiyoruz; çeviremediğimiz aday "bandın içinde" sayılamaz.
     it('counts a mismatched currency as unknown', () => {
-        const out = buildInterviewReview([withSalary('Ayşe', { min: 5000, max: 5000, currency: 'USD', period: 'monthly' })], BANDED);
+        const out = buildInterviewReview([withSalary('Ayşe', { min: 5000, max: 5000, currency: 'USD', period: 'monthly', basis: 'gross' })], BANDED);
         expect(out.salaryTally.unknown).toBe(1);
         expect(out.perCandidate[0].salary.reason).toMatch(/kur çevirmiyoruz/i);
     });
@@ -203,5 +203,18 @@ describe('bütçe farkı', () => {
     it('hands the narrator the budget table when a band exists', () => {
         const summary = reviewSummaryForPrompt(buildInterviewReview([withSalary('Ayşe', TRY_(150000))], BANDED));
         expect(summary.butce).toMatchObject({ bandin_ustunde: 1, beklentisi_bilinmiyor: 0 });
+    });
+});
+
+// Baz belirtilmemişse aday karşılaştırmaya GİRMEZ — "içeride" sayılamaz.
+describe('bütçe farkı — brüt/net', () => {
+    const BANDED = { ...POSITION, salaryBand: { min: 80000, max: 120000, currency: 'TRY', period: 'monthly', basis: 'gross' } };
+    it('counts a basis-less expectation as unknown', () => {
+        const out = buildInterviewReview(
+            [entry('Ayşe', { candidateSalary: { min: 100000, max: 100000, currency: 'TRY', period: 'monthly' } })],
+            BANDED
+        );
+        expect(out.salaryTally).toEqual({ above: 0, within: 0, below: 0, unknown: 1 });
+        expect(out.perCandidate[0].salary.reason).toMatch(/brüt\/net belirtilmemiş/);
     });
 });

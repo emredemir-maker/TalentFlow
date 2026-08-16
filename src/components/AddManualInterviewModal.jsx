@@ -25,7 +25,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { getAuth } from 'firebase/auth';
 import { savedPlanFor, planStatus, PLAN_STATUS_TEXT } from '../utils/interviewPlan';
 import { extractSalaryFromTranscript } from '../services/ai/salaryExtractor';
-import { normalizeBand, formatBand, CURRENCIES, CURRENCY_LABEL, PERIODS, PERIOD_LABEL } from '../utils/salaryBand';
+import { normalizeBand, formatBand, CURRENCIES, CURRENCY_LABEL, PERIODS, PERIOD_LABEL, BASES, BASIS_LABEL } from '../utils/salaryBand';
 import { NO_SCORE_TEXT } from '../utils/interviewReport';
 import { splitTranscript } from '../services/ai/transcriptSplitter';
 import {
@@ -96,6 +96,10 @@ export default function AddManualInterviewModal({
     const [salaryMax, setSalaryMax] = useState('');
     const [salaryCurrency, setSalaryCurrency] = useState('TRY');
     const [salaryPeriod, setSalaryPeriod] = useState('monthly');
+    // BAZIN VARSAYILANI YOK. Aday "net" ya da "brüt" demediyse boş kalır ve
+    // karşılaştırmaya girmez; varsaymak %30-40'lık hatayı makul görünen bir
+    // sayının içine gömmek olurdu.
+    const [salaryBasis, setSalaryBasis] = useState('');
 
     const [aiSuggesting, setAiSuggesting] = useState(false);
     const [splitting, setSplitting] = useState(false);
@@ -356,6 +360,7 @@ export default function AddManualInterviewModal({
         setSalaryMax(String(salaryHint.max ?? salaryHint.min ?? ''));
         setSalaryCurrency(salaryHint.currency);
         setSalaryPeriod(salaryHint.period);
+        setSalaryBasis(salaryHint.basis || '');
         setSalaryHint(null);
         setSalaryHintState('idle');
     };
@@ -407,7 +412,7 @@ export default function AddManualInterviewModal({
                     recruiterOutcome,
                     candidateSalary: normalizeBand({
                         min: salaryMin, max: salaryMax,
-                        currency: salaryCurrency, period: salaryPeriod,
+                        currency: salaryCurrency, period: salaryPeriod, basis: salaryBasis,
                     }),
                 }),
             });
@@ -507,6 +512,7 @@ export default function AddManualInterviewModal({
                             salaryMin={salaryMin} setSalaryMin={setSalaryMin}
                             salaryMax={salaryMax} setSalaryMax={setSalaryMax}
                             salaryCurrency={salaryCurrency} setSalaryCurrency={setSalaryCurrency}
+                            salaryBasis={salaryBasis} setSalaryBasis={setSalaryBasis}
                             salaryPeriod={salaryPeriod} setSalaryPeriod={setSalaryPeriod}
                             // metadata
                             interviewType={interviewType}
@@ -628,6 +634,7 @@ function FormBody(props) {
         salaryHint, salaryHintState, onFindSalary, onAcceptSalary, transcriptFilled,
         salaryMin, setSalaryMin, salaryMax, setSalaryMax,
         salaryCurrency, setSalaryCurrency, salaryPeriod, setSalaryPeriod,
+        salaryBasis, setSalaryBasis,
         submitError,
     } = props;
 
@@ -956,7 +963,7 @@ function FormBody(props) {
                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
                     Adayın Maaş Beklentisi <span className="text-slate-300">(isteğe bağlı)</span>
                 </label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                     <input type="number" min="0" placeholder="Alt" value={salaryMin}
                         onChange={(e) => setSalaryMin(e.target.value)}
                         className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[12px] outline-none focus:border-violet-300" />
@@ -970,6 +977,11 @@ function FormBody(props) {
                     <select value={salaryPeriod} onChange={(e) => setSalaryPeriod(e.target.value)}
                         className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[12px] outline-none focus:border-violet-300">
                         {PERIODS.map((x) => <option key={x} value={x}>{PERIOD_LABEL[x]}</option>)}
+                    </select>
+                    <select value={salaryBasis} onChange={(e) => setSalaryBasis(e.target.value)}
+                        className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[12px] outline-none focus:border-violet-300">
+                        <option value="">brüt/net?</option>
+                        {BASES.map((x) => <option key={x} value={x}>{BASIS_LABEL[x]}</option>)}
                     </select>
                 </div>
                 {transcriptFilled && (

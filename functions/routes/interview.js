@@ -203,6 +203,9 @@ router.post('/api/update-candidate-status', sessionLimiter, async (req, res) => 
 const VALID_INTERVIEW_TYPES = new Set(['phone', 'in-person', 'teams', 'zoom', 'meet', 'other']);
 const SALARY_CURRENCIES = new Set(['TRY', 'USD', 'EUR']);
 const SALARY_PERIODS = new Set(['monthly', 'yearly']);
+// Bazın VARSAYILANI YOK — belirtilmemişse null. Brüt/net karışması %30-40
+// sapma demek ve bu hata makul göründüğü için fark edilmez.
+const SALARY_BASES = new Set(['gross', 'net']);
 
 /**
  * Adayın maaş beklentisini kayda uygun hâle getirir.
@@ -225,6 +228,7 @@ function sanitizeSalary(raw) {
         max,
         currency: SALARY_CURRENCIES.has(raw.currency) ? raw.currency : 'TRY',
         period: SALARY_PERIODS.has(raw.period) ? raw.period : 'monthly',
+        basis: SALARY_BASES.has(raw.basis) ? raw.basis : null,
     };
 }
 
