@@ -1,136 +1,147 @@
-# TalentFlow 🚀 - Yapay Zeka Destekli Stratejik İK Paneli
+# TalentFlow
 
-TalentFlow, modern işe alım süreçlerini otomatize eden, Google Gemini AI tabanlı, yüksek etkileşimli ve stratejik bir aday yönetim sistemidir (ATS). Adayların özgeçmişlerini analiz eder, STAR tekniği ile puanlar, mülakat süreçlerini yönetir ve Google Workspace (Gmail & Takvim) entegrasyonu ile uçtan uca bir deneyim sunar.
+![AI Product](https://img.shields.io/badge/AI%20Product-Talent%20Decision%20Support-7c3aed?style=for-the-badge)
+![Domain](https://img.shields.io/badge/Domain-Recruitment%20%26%20HR-2563eb?style=for-the-badge)
+![Status](https://img.shields.io/badge/Status-Public%20Prototype-111827?style=for-the-badge)
 
----
+> AI-supported recruitment and candidate operations platform for structuring hiring workflows, evaluating candidates, and improving decision quality.
 
-## 🎨 Tasarım Estetiği (Battle Station HUD)
+TalentFlow is a product prototype focused on how recruitment teams can move from scattered candidate data and manual follow-ups to a more structured, measurable, and AI-supported hiring workflow.
 
-Uygulama, "Strategic Command Center" (Stratejik Komuta Merkezi) estetiği ile tasarlanmıştır. 
-- **Stitch UI & Glassmorphism**: Saydam katmanlar, projenin derinliğini yansıtan neon efektler ve projenin her iki modda (Açık/Koyu) kusursuz görünmesini sağlayan **Stitch UI** mimarisi.
-- **HUD (Head-Up Display) & Compact Design**: Veri yoğunluğunu maksimize eden, beyaz boşlukları minimize edilmiş, tek ekranda kritik bilgileri sunan ultra-kompakt grid yapısı.
-- **Dynamic Theme Engine**: CSS değişkenleri tabanlı `navy` renk sistemi ile aydınlık ve karanlık modlar arasında yumuşak, görsel kalıntı bırakmayan geçişler.
-- **Vibrant UX**: Mikro-animasyonlar ve dinamik hover efektleri ile premium bir "Battle Station" deneyimi.
+The goal is not to replace recruiter judgment. The goal is to help teams see the right signals faster, compare candidates more consistently, and keep the hiring process under human control.
 
 ---
 
-## 🛠️ Teknik Altyapı & Mimari
+## Product Snapshot
 
-TalentFlow, modern bir Full-Stack mimarisine sahiptir:
-
-### Frontend
-- **Framework**: React 19 (Vite)
-- **Styling**: Tailwind CSS 4.x + Global CSS Variables (Theme-aware navy color system)
-- **State Management**: React Context API & UserSettingsContext (Theme & Layout preferences)
-- **Routing**: React Router DOM 7
-- **Grafikler**: Recharts (HUD tarzı analitik kartlar)
-- **İkonlar**: Lucide React
-
-### Backend & AI
-- **Runtime**: Node.js (V3 Express Server)
-- **AI Engine**: Google Generative AI (Gemini Flash/Pro Modelleri)
-- **Middleware**: Puppeteer (Web Kazıma), Multer (Dosya Yükleme), Mammoth/PDF-parse (Döküman İşleme)
-- **Security**: Helmet, XSS-Clean, Rate-Limit, HPP
-
-### Bulut Servisleri (Firebase)
-- **Database**: Cloud Firestore (Gerçek zamanlı aday ve pozisyon takibi)
-- **Authentication**: Firebase Auth (Email/Password & Google Login)
-- **Hosting**: Firebase Hosting
-- **Serverless**: Firebase Cloud Functions (Opsiyonel backend dağıtımı)
+| Area | What TalentFlow Does |
+|---|---|
+| Candidate intake | Centralizes candidate profiles, CVs, and application context |
+| AI analysis | Supports structured candidate review and scoring |
+| Interview workflow | Helps manage interview planning, notes, and follow-up actions |
+| Decision support | Makes candidate comparison more consistent and transparent |
+| Communication | Supports candidate messaging and follow-up workflows |
+| Analytics | Gives visibility into hiring pipeline performance |
 
 ---
 
-## ✨ Fonksiyonel Özellikler
+## Why It Matters
 
-### 1. Stratejik Analitik (Analytics HUD)
-- **Genel Bakış**: Performans matrisi, kanal verimliliği ve aday dönüşüm oranları.
-- **Aday Kazanımı**: Hangi kaynaklardan ne kadar verim alındığının (LinkedIn, Kariyer.net vb.) analizi.
-- **Yanıt Oranları**: Mesajlaşma kuyruğu ve aday geri dönüş istatistikleri.
+Recruitment workflows often become fragmented across CV files, spreadsheets, emails, meeting notes, and informal team discussions.
 
-### 2. Akıllı Aday Yönetimi (Candidate Portal)
-- **AI STAR Analizi**: Özgeçmişleri S (Situation), T (Task), A (Action), R (Result) bazında 100 üzerinden puanlama.
-- **Dinamik Mülakat Planlama**: Google Takvim üzerinden Meet linki oluşturarak otomatik mülakat planlama ve seans geçmişinden tek tıkla mülakata (veya doğrudan toplantı linkine) katılma.
-- **Canlı Gözlemci (Live Observer)**: Aday ile yapılan mülakatlarda sadece adayın sesini veya hem aday hem mülakatçının sesini (opsiyonel filtreleme ile) dinleyerek anlık transkript çıkaran ve AI tüyolar veren eşzamanlı sistem.
-- **Mesaj Kuyruğu**: Adaylara gönderilen e-postaların ve hatırlatıcıların merkezi yönetimi.
+That fragmentation creates three product problems:
 
-### 3. Pozisyon & Departman İş Akışı
-- **Talep Yönetimi**: Departman yöneticilerinin yeni pozisyon taleplerini İK ekibine iletmesi ve onay süreci.
-- **AI Eşleştirme**: Pozisyon gereksinimleri ile mevcut aday havuzunun anlık "Match" skorlaması.
+- decision context gets lost,
+- candidate comparison becomes inconsistent,
+- operational follow-up depends too much on manual effort.
 
-### 4. Google Workspace Entegrasyonu
-- **Gmail**: Tek tıklamayla adaylara doğrudan e-posta gönderimi.
-- **Calendar**: Mülakatların takvime işlenmesi ve katılımcı davetleri.
+TalentFlow explores how AI can support recruitment operations by turning unstructured candidate inputs into reviewable signals while keeping the final decision with the hiring team.
 
 ---
 
-## 🚀 Kurulum ve Çalıştırma
+## Product Flow
 
-### Gereksinimler
-- Node.js (v18+)
-- Firebase Projesi
-- Google AI (Gemini) API Key
-
-### Adım Adım Kurulum
-
-1.  **Projeyi Klonlayın:**
-    ```bash
-    git clone [repository-url]
-    cd TalentFlow
-    ```
-
-2.  **Bağımlılıkları Yükleyin:**
-    ```bash
-    npm install
-    # Firestore ve Server taraflı işlemler için root dizinde npm install yeterlidir.
-    ```
-
-3.  **Ortam Değişkenlerini Ayarlayın:**
-    - `.env.example` dosyasını `.env` olarak kopyalayın.
-    - Gerekli Firebase config ve API anahtarlarını doldurun:
-    ```env
-    VITE_FIREBASE_API_KEY=your_key
-    VITE_GEMINI_API_KEY=your_key
-    VITE_APP_URL=http://localhost:5174
-    ```
-
-4.  **Uygulamayı Çalıştırın:**
-    ```bash
-    # Frontend (Vite) ve Backend (Express) eşzamanlı çalışır
-    npm run dev
-    ```
-
-### Portlar
-- **Frontend**: `localhost:5174`
-- **Backend**: `localhost:3000`
-
----
-
-## 📂 Proje Dizin Yapısı
-
-```text
-TalentFlow/
-├── src/                # Frontend Kaynak Kodları
-│   ├── components/     # UI Bileşenleri (Modallar, Kartlar, Navigasyon)
-│   ├── context/        # Global State Management (Auth, Candidate, Positions)
-│   ├── pages/          # Sayfa Görünümleri (Dashboard, Analytics, Process)
-│   ├── services/       # İş Mantığı & API Servisleri (Gemini, Integration, Match)
-│   ├── config/         # Firebase ve Global Ayarlar
-│   └── assets/         # Statik Görseller ve CSS Tokenları
-├── functions/          # Firebase Cloud Functions (Backend Logic)
-├── server.js           # Ana Express Sunucusu (PDF Parsing & Scraper logic)
-├── firestore.rules     # Güvenlik Kuralları
-├── firebase.json       # Dağıtım Yapılandırması
-├── package.json        # Paket ve Script Tanımları
-└── .env                # Gizli Anahtarlar (Commit edilmez!)
+```mermaid
+flowchart LR
+    A[Candidate profile or CV] --> B[Structured intake]
+    B --> C[AI-supported analysis]
+    C --> D[Role fit and evaluation signals]
+    D --> E[Interview workflow]
+    E --> F[Team review]
+    F --> G[Hiring decision support]
 ```
 
 ---
 
-## 🔒 Güvenlik Notları
-- **Frontend Veri İşleme**: Veriler Rule 2 gereği `onSnapshot` ile dinlenir ve istemci tarafında filtrelenir.
-- **Hassas Veriler**: API anahtarları asla kod içine gömülmez, `.env` dosyası üzerinden `import.meta.env` ile çekilir.
+## Core Capabilities
+
+| Capability | Product Value |
+|---|---|
+| Candidate profile management | Keeps candidate context in one place |
+| CV and document analysis | Turns unstructured inputs into comparable signals |
+| AI-supported scoring | Helps teams review candidates with more structure |
+| Interview planning | Connects candidate evaluation with scheduling and follow-up |
+| Live interview support | Captures interview context and supports real-time review |
+| Pipeline analytics | Makes bottlenecks and conversion points easier to see |
+| Workspace integrations | Connects hiring workflows with email and calendar actions |
 
 ---
 
-**TalentFlow** - *Recruiting the future, today.*
-Powered by **Gemini AI**
+## Human-in-the-Loop Design
+
+TalentFlow is designed around the idea that AI should support hiring decisions, not make them alone.
+
+| AI Can Help With | Human Judgment Stays Responsible For |
+|---|---|
+| Summarizing candidate information | Final hiring decisions |
+| Highlighting role-fit signals | Cultural and team fit assessment |
+| Structuring interview notes | Interpretation of sensitive context |
+| Detecting gaps or risks | Fairness, ethics, and accountability |
+| Suggesting next actions | Candidate communication tone and timing |
+
+---
+
+## My Role / Product Perspective
+
+This project reflects my product focus on operational workflows where AI creates value by improving decision quality, not by blindly automating people out of the process.
+
+Key product questions behind TalentFlow:
+
+| Product Question | Design Direction |
+|---|---|
+| How can candidate review become more consistent? | Use structured AI-assisted evaluation signals |
+| How can recruitment teams reduce manual follow-up? | Connect analysis, scheduling, and communication workflows |
+| How can AI remain trustworthy in hiring? | Keep outputs explainable and human-reviewed |
+| How can teams compare candidates without losing context? | Centralize profiles, interviews, and pipeline data |
+| How can hiring operations become measurable? | Surface funnel, response, and process analytics |
+
+---
+
+## Architecture Overview
+
+```mermaid
+flowchart TB
+    UI[React Frontend] --> APP[Candidate and Position Workflows]
+    APP --> AI[Google Gemini AI Services]
+    APP --> DB[(Firebase / Firestore)]
+    APP --> AUTH[Firebase Auth]
+    APP --> API[Node.js / Express Services]
+    API --> DOCS[CV and Document Parsing]
+    APP --> INT[Google Workspace Integrations]
+```
+
+---
+
+## Technology
+
+| Layer | Stack |
+|---|---|
+| Frontend | React, Vite, Tailwind CSS, React Router |
+| UI / UX | Theme-aware interface, compact dashboard patterns, Lucide icons |
+| AI | Google Gemini models |
+| Backend | Node.js, Express, Firebase Cloud Functions |
+| Data | Firebase Firestore |
+| Auth | Firebase Authentication |
+| Documents | PDF and document parsing workflows |
+| Integrations | Gmail and Google Calendar workflows |
+| Analytics | Dashboard and pipeline reporting views |
+
+---
+
+## Current Status
+
+Public product prototype and portfolio project.
+
+TalentFlow is useful as a showcase for AI-supported workflow design, recruitment operations, decision-support UX, and human-in-the-loop product thinking.
+
+---
+
+## Portfolio Context
+
+TalentFlow is part of my broader product focus around:
+
+- AI-supported operational products,
+- decision-support systems,
+- workflow automation with human control,
+- CRM/CX and operations thinking applied to internal business processes,
+- turning unstructured inputs into measurable product signals.
