@@ -5,6 +5,7 @@ import { analysisScoreFor } from '../utils/positionScore';
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import Header from '../components/Header';
 import { usePositions } from '../context/PositionsContext';
+import { normalizeBand, formatBand, CURRENCIES, CURRENCY_LABEL, PERIODS, PERIOD_LABEL } from '../utils/salaryBand';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 import { collection, onSnapshot, addDoc, getDocs, query, where, serverTimestamp } from 'firebase/firestore';
@@ -701,6 +702,7 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
 function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser, userDepartments, isExtracting, onExtract, jdText, setJdText }) {
     const [formData, setFormData] = useState({
         title: '', department: isDepartmentUser ? (userDepartments?.[0] || '') : '', minExperience: '', reqItems: [], description: '',
+        salaryMin: '', salaryMax: '', salaryCurrency: 'TRY', salaryPeriod: 'monthly',
         screeningEnabled: false, screeningQuestions: [''],
     });
     const [suggestingQuestions, setSuggestingQuestions] = useState(false);
@@ -851,6 +853,7 @@ function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser,
                                 />
                             </Field>
                         </div>
+                        <SalaryBandFields formData={formData} setFormData={setFormData} inputCls={INPUT_CLS} />
                         <Field label="Gereksinimler">
                             <RequirementListEditor
                                 items={formData.reqItems}
@@ -993,6 +996,10 @@ function PositionEditModal({ pos, candidates, departments, isDepartmentUser, use
         title: pos.title || '',
         department: pos.department || '',
         minExperience: pos.minExperience?.toString() || '0',
+        salaryMin: pos.salaryBand?.min?.toString() || '',
+        salaryMax: pos.salaryBand?.max?.toString() || '',
+        salaryCurrency: pos.salaryBand?.currency || 'TRY',
+        salaryPeriod: pos.salaryBand?.period || 'monthly',
         // İşaretlenmemiş eski ilanlarda maddeler zorunlu sayılır — formun
         // önceki davranışı da buydu (hepsi "olmazsa olmaz" kutusuna gelirdi).
         reqItems: requirementsOf(pos).map((r) => ({ text: r.text, must: r.must !== false })),
@@ -1129,6 +1136,7 @@ function PositionEditModal({ pos, candidates, departments, isDepartmentUser, use
                             <Field label="Min. Tecrübe (yıl)">
                                 <input type="number" min="0" value={formData.minExperience} onChange={e => setFormData(p => ({ ...p, minExperience: e.target.value }))} className={INPUT_CLS} />
                             </Field>
+                            <SalaryBandFields formData={formData} setFormData={setFormData} inputCls={INPUT_CLS} />
                             <Field label="Gereksinimler">
                                 <RequirementListEditor
                                     items={formData.reqItems}
@@ -1287,6 +1295,10 @@ export default function PositionsPage() {
             title: formData.title, department: formData.department,
             description: formData.description || '',
             minExperience: parseInt(formData.minExperience) || 0,
+            // Bütçe bandı: adayın beklentisiyle karşılaştırmanın BİR ucu.
+            // normalizeBand null dönerse alan hiç yazılmaz — boş bir band
+            // yazmak, tanımlanmamış bütçeyi tanımlanmış gibi gösterirdi.
+            salaryBand: normalizeBand({ min: formData.salaryMin, max: formData.salaryMax, currency: formData.salaryCurrency, period: formData.salaryPeriod }),
             requirements: reqs, requirementsMeta: meta, matchedCandidates,
             screeningEnabled: formData.screeningEnabled && cleanedQuestions.length > 0,
             screeningQuestions: cleanedQuestions,
@@ -1315,6 +1327,10 @@ export default function PositionsPage() {
             title: formData.title,
             department: formData.department,
             minExperience: parseInt(formData.minExperience) || 0,
+            // Bütçe bandı: adayın beklentisiyle karşılaştırmanın BİR ucu.
+            // normalizeBand null dönerse alan hiç yazılmaz — boş bir band
+            // yazmak, tanımlanmamış bütçeyi tanımlanmış gibi gösterirdi.
+            salaryBand: normalizeBand({ min: formData.salaryMin, max: formData.salaryMax, currency: formData.salaryCurrency, period: formData.salaryPeriod }),
             requirements: reqs,
             requirementsMeta: meta,
             description: formData.description || '',
@@ -1814,6 +1830,48 @@ export default function PositionsPage() {
                 onClose={() => { if (!rescanProgress) setRescanTarget(null); }}
                 onStart={runRescan}
             />
+        </div>
+    );
+}
+
+/**
+ * Bütçe bandı alanları.
+ *
+ * Para birimi ve dönem ZORUNLU olarak seçili gelir: "120000" tek başına yarım
+ * bir ölçüm ve iki yarım ölçümü karşılaştırmak bütçe kararını yanlış verdirir.
+ * Boş bırakılırsa band hiç yazılmaz — tanımlanmamış bütçeyi tanımlanmış gibi
+ * göstermektense yokluğunu bilmek yeğ.
+ */
+function SalaryBandFields({ formData, setFormData, inputCls }) {
+    const set = (patch) => setFormData((p) => ({ ...p, ...patch }));
+    const preview = formatBand({
+        min: formData.salaryMin, max: formData.salaryMax,
+        currency: formData.salaryCurrency, period: formData.salaryPeriod,
+    });
+    return (
+        <div>
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">
+                Bütçe Bandı <span className="text-slate-300">(isteğe bağlı)</span>
+            </label>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <input type="number" min="0" placeholder="Alt" value={formData.salaryMin}
+                    onChange={(e) => set({ salaryMin: e.target.value })} className={inputCls} />
+                <input type="number" min="0" placeholder="Üst" value={formData.salaryMax}
+                    onChange={(e) => set({ salaryMax: e.target.value })} className={inputCls} />
+                <select value={formData.salaryCurrency} onChange={(e) => set({ salaryCurrency: e.target.value })}
+                    className={inputCls + ' appearance-none cursor-pointer'}>
+                    {CURRENCIES.map((c) => <option key={c} value={c}>{c} {CURRENCY_LABEL[c]}</option>)}
+                </select>
+                <select value={formData.salaryPeriod} onChange={(e) => set({ salaryPeriod: e.target.value })}
+                    className={inputCls + ' appearance-none cursor-pointer'}>
+                    {PERIODS.map((x) => <option key={x} value={x}>{PERIOD_LABEL[x]}</option>)}
+                </select>
+            </div>
+            <p className="mt-1 text-[10px] text-slate-400">
+                {preview
+                    ? <>Kayıtlı band: <strong className="text-slate-500">{preview}</strong> — adayın beklentisi bununla karşılaştırılacak.</>
+                    : 'Band girilmezse aday beklentileri bir şeyle kıyaslanamaz.'}
+            </p>
         </div>
     );
 }
