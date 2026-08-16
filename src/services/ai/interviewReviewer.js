@@ -28,6 +28,13 @@ DEĞİL, hakkında bilgimiz olmayan maddelerdir. Bunları adayın kusuru gibi
 anlatmak, olmayan bir eksikle cezalandırmaktır. Doğru cümle şudur:
 "şu madde hiç sorulmamış, bir sonraki görüşmede sorulmalı".
 
+ÖRNEKLEMİ GİZLEME:
+"orneklem.tamami_mi" false ise elindeki veri TÜM görüşmelerin değil, bir alt
+kümesinin. Bu durumda "genel olarak", "adayların çoğu", "havuz şöyle" gibi
+BÜTÜNE dair cümle KURMA. Bunun yerine kaç görüşmeye bakıldığını söyleyerek
+konuş: "bakılan N görüşmede…". Alt kümenin oranını bütünün oranı gibi sunmak,
+kullanıcının fark edemeyeceği bir yanıltmadır.
+
 ÖLÇÜLEMEYEN GÖRÜŞMELERİ SÖYLE:
 "olculemeyen_gorusmeler" boş değilse bunu MUTLAKA belirt. "3 görüşmeden
 2'sinde sayısal sonuç yok" demek ile hiç dememek arasında dağlar var.

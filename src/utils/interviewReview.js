@@ -123,8 +123,19 @@ export function buildInterviewReview(entries = [], position = null) {
  * CEVAPTAN çıkardığı kısa alıntılar gider. Alıntı bir veri alanıdır; prompt
  * onu talimat saymamakla yükümlü.
  */
-export function reviewSummaryForPrompt(review) {
+export function reviewSummaryForPrompt(review, sampling = {}) {
+    const okunan = review.interviewCount;
+    const toplam = Number(sampling.totalSessions) || okunan;
     return {
+        // ÖRNEKLEM PROMPT'A GİRER. Girmezse model, keyfi bir alt kümenin
+        // dağılımını bütünün dağılımı gibi anlatır ve kullanıcı bunu fark
+        // edemez — "genel olarak adaylar şöyle" cümlesi tam da böyle kurulur.
+        orneklem: {
+            okunan_gorusme: okunan,
+            toplam_gorusme: toplam,
+            tamami_mi: toplam <= okunan,
+            kural: toplam > okunan ? 'en yeni görüşmeler önce' : null,
+        },
         pozisyon: review.position,
         gorusme_sayisi: review.interviewCount,
         sayisal_sonucu_olan: review.scored,
