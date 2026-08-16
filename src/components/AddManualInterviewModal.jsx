@@ -24,6 +24,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getAuth } from 'firebase/auth';
 import { savedPlanFor, planStatus, PLAN_STATUS_TEXT } from '../utils/interviewPlan';
+import { extractSalaryFromTranscript } from '../services/ai/salaryExtractor';
 import { normalizeBand, formatBand, CURRENCIES, CURRENCY_LABEL, PERIODS, PERIOD_LABEL } from '../utils/salaryBand';
 import { NO_SCORE_TEXT } from '../utils/interviewReport';
 import { splitTranscript } from '../services/ai/transcriptSplitter';
@@ -98,6 +99,12 @@ export default function AddManualInterviewModal({
 
     const [aiSuggesting, setAiSuggesting] = useState(false);
     const [splitting, setSplitting] = useState(false);
+    // Transkriptten çıkarılan maaş ÖNERİSİ. Doğrudan alanlara yazılmaz:
+    // alıntısıyla gösterilir ve ancak kullanıcı kabul ederse alanlara geçer.
+    // Yanlış okunmuş bir para rakamı bu zincirin sonunda bütçe kararına
+    // dönüşüyor; onaysız kabul en pahalı hata olurdu.
+    const [salaryHint, setSalaryHint] = useState(null);
+    const [salaryHintState, setSalaryHintState] = useState('idle'); // idle|busy|none|error
     const [splitNote, setSplitNote] = useState('');
     const [submitError, setSubmitError] = useState('');
     const [createdResult, setCreatedResult] = useState(null);
@@ -328,6 +335,31 @@ export default function AddManualInterviewModal({
             transcript.trim() ||
             notes.trim());
 
+    /** Transkriptten maaş beklentisi ARA — bulursa öner, kaydetme. */
+    const findSalaryInTranscript = async () => {
+        setSalaryHintState('busy');
+        setSalaryHint(null);
+        try {
+            const hint = await extractSalaryFromTranscript(transcript);
+            setSalaryHint(hint);
+            // Bulamamak bir HATA DEĞİL: çoğu görüşmede maaş konuşulmaz.
+            setSalaryHintState(hint ? 'idle' : 'none');
+        } catch {
+            setSalaryHintState('error');
+        }
+    };
+
+    /** Öneriyi alanlara geçir — bu, KULLANICI eylemidir. */
+    const acceptSalaryHint = () => {
+        if (!salaryHint) return;
+        setSalaryMin(String(salaryHint.min ?? ''));
+        setSalaryMax(String(salaryHint.max ?? salaryHint.min ?? ''));
+        setSalaryCurrency(salaryHint.currency);
+        setSalaryPeriod(salaryHint.period);
+        setSalaryHint(null);
+        setSalaryHintState('idle');
+    };
+
     const handleSubmit = async () => {
         if (!isFormValid) {
             setSubmitError(
@@ -469,6 +501,9 @@ export default function AddManualInterviewModal({
                             setPositionId={setPositionId}
                             selectedPosition={selectedPosition}
                             // maaş beklentisi
+                            salaryHint={salaryHint} salaryHintState={salaryHintState}
+                            onFindSalary={findSalaryInTranscript} onAcceptSalary={acceptSalaryHint}
+                            transcriptFilled={Boolean(transcript.trim())}
                             salaryMin={salaryMin} setSalaryMin={setSalaryMin}
                             salaryMax={salaryMax} setSalaryMax={setSalaryMax}
                             salaryCurrency={salaryCurrency} setSalaryCurrency={setSalaryCurrency}
@@ -590,6 +625,7 @@ function FormBody(props) {
         setNotes,
         recruiterOutcome,
         setRecruiterOutcome,
+        salaryHint, salaryHintState, onFindSalary, onAcceptSalary, transcriptFilled,
         salaryMin, setSalaryMin, salaryMax, setSalaryMax,
         salaryCurrency, setSalaryCurrency, salaryPeriod, setSalaryPeriod,
         submitError,
@@ -936,6 +972,50 @@ function FormBody(props) {
                         {PERIODS.map((x) => <option key={x} value={x}>{PERIOD_LABEL[x]}</option>)}
                     </select>
                 </div>
+                {transcriptFilled && (
+                    <button
+                        type="button"
+                        onClick={onFindSalary}
+                        disabled={salaryHintState === 'busy'}
+                        className="text-[10px] font-black uppercase tracking-wider text-violet-600 hover:text-violet-700 disabled:opacity-50"
+                    >
+                        {salaryHintState === 'busy' ? 'Transkript taranıyor…' : 'Transkriptten bul'}
+                    </button>
+                )}
+                {salaryHintState === 'none' && (
+                    <p className="text-[10px] text-slate-500">
+                        Transkriptte maaş beklentisi geçmiyor. Bu bir hata değil — çoğu görüşmede
+                        konuşulmaz.
+                    </p>
+                )}
+                {salaryHintState === 'error' && (
+                    <p className="text-[10px] text-amber-700">Tarama yapılamadı; alanı elle doldurabilirsiniz.</p>
+                )}
+                {/* ÖNERİ ALINTISIYLA GELİR ve onaysız hiçbir yere yazılmaz.
+                    Dayanağı görünmeyen bir sayıyı onaylatmak, onayı
+                    anlamsızlaştırır. */}
+                {salaryHint && (
+                    <div className="rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 space-y-1.5">
+                        <p className="text-[11px] text-violet-900">
+                            Transkriptte bulundu:{' '}
+                            <strong>{formatBand(salaryHint)}</strong>
+                        </p>
+                        <p className="text-[10px] text-violet-700 italic">&ldquo;{salaryHint.quote}&rdquo;</p>
+                        {salaryHint.uncertain && (
+                            <p className="text-[10px] text-amber-700">Emin değil: {salaryHint.uncertain}</p>
+                        )}
+                        <div className="flex gap-2">
+                            <button type="button" onClick={onAcceptSalary}
+                                className="px-2.5 py-1 rounded-lg bg-violet-500 text-white text-[10px] font-black uppercase tracking-wider">
+                                Kabul et
+                            </button>
+                            <button type="button" onClick={onFindSalary}
+                                className="px-2.5 py-1 rounded-lg border border-violet-200 text-violet-700 text-[10px] font-black uppercase tracking-wider">
+                                Yeniden ara
+                            </button>
+                        </div>
+                    </div>
+                )}
                 {/* Boş bırakmak SIFIR demek değil, "sorulmadı" demek. Sıfır sanmak,
                     sorulmamış bir soruyu cevaplanmış göstermek olurdu. */}
                 <p className="text-[10px] text-slate-400">
