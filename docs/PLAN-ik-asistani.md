@@ -198,7 +198,7 @@ adayın beklentisi sistemde vardı.
 | 2/4b Transkriptten çıkarım (motor + bağlantı) | ✅ PR #163, #164 |
 | Brüt/net ayrımı | ✅ PR #166 |
 | 3/4 Fark raporu | ✅ PR #165 |
-| **Toplu geriye dönük tarama** | **sırada** |
+| Toplu geriye dönük tarama | ✅ yazıldı |
 | 4/4 Bant önerisi | veri eşiğe ulaşınca |
 
 ### Değişmeyen kural: birim eksikse karşılaştırma yok
@@ -237,6 +237,31 @@ alanı onlar kaydedilirken yoktu. Tasarım:
 Beklenti: 60 görüşmenin hepsinde rakam çıkmaz. Aday yalnızca "şu an 70
 alıyorum" demişse motor bilerek boş döner — mevcut maaşı beklenti sanmak tüm
 tabloyu kaydırırdı.
+
+#### Yazılırken çıkan dört karar
+
+**Tarama bilerek yavaş.** Sunucudaki `aiLimiter` dakikada 20 istek geçiriyor.
+60 satırı olabildiğince hızlı sürmek, 20'nciden sonra 429 duvarı demek:
+`fetchWithRetry` üç kez dener, üçü de aynı dakikaya düşer, satır "taranamadı"
+ile kapanır — ve kullanıcı bunu *modelin bulamadığı* sanır. Çağrılar arasında
+4 saniye var (15/dk), ekranda kalan süre yazıyor ve durdurma düğmesi var.
+Bekleyen bir çubuk, sessizce yarısı düşmüş bir listeden iyidir.
+
+**Beklentisi kayıtlı görüşme listeye girmiyor.** Girseydi tarama, insanın odada
+duyup yazdığı rakamın üstüne modelin okuduğu rakamı öneriyor olurdu.
+
+**Toplu brüt/net yalnızca BOŞ olanı doldurur.** Bir satırda baz doluysa o damga
+adayın kendi sözünden geldi ("net 95 bin isterim"); havuz geneline dair bir
+kabulün onu ezmesi, ölçülmüş bir şeyi varsayımla değiştirmek olurdu.
+
+**Yazma yalnızca `interviews/{sessionId}`'e.** Fark raporu beklentiyi oradan
+okuyor. Aday belgesindeki `interviewSessions[]` kopyasına dokunulmuyor: o alanı
+bugün hiçbir ekran okumuyor ve diziyi istemciden yeniden yazmak, bu projede bir
+kez yaşanmış "hayalet yazım" yarışını geri getirirdi.
+
+Rakamın kaynağı (`candidateSalaryMeta`: alıntı mı, elle mi, kim, ne zaman)
+kayda geçiyor — altı ay sonra "bu sayıyı kim koydu" sorusunun cevabı olmadan
+bir bütçe raporunun dayanağı da olmaz.
 
 ### 4/4 için eşik
 
