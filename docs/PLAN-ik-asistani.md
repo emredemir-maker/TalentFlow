@@ -185,6 +185,69 @@ Bu bir sorgu değil, ölçülebilir bulgular üzerine kurulu bir teşhis:
 
 ---
 
+## Ek: Maaş zinciri (2026-08-16 kararları)
+
+Kullanıcının gözlemi: *"Adaylar genel olarak iyiler ancak maaş bütçemin çok
+üzerindeler."* Bu cümle hiçbir yere yazılamıyordu — ne ilanın bütçesi ne
+adayın beklentisi sistemde vardı.
+
+| Adım | Durum |
+|---|---|
+| 1/4 İlana bütçe bandı | ✅ PR #161 |
+| 2/4 Aday beklentisi (modal alanı) | ✅ PR #162 |
+| 2/4b Transkriptten çıkarım (motor + bağlantı) | ✅ PR #163, #164 |
+| Brüt/net ayrımı | ✅ PR #166 |
+| 3/4 Fark raporu | ✅ PR #165 |
+| **Toplu geriye dönük tarama** | **sırada** |
+| 4/4 Bant önerisi | veri eşiğe ulaşınca |
+
+### Değişmeyen kural: birim eksikse karşılaştırma yok
+
+Bir maaş rakamı üç birim taşımadan ölçüm değildir: **para birimi, dönem,
+brüt/net**. Üçünden biri eksik ya da iki taraf arasında farklıysa
+`compareToBand` karşılaştırmayı REDDEDER ve sebebini yazar.
+
+**Çevrim yapılmaz.** Ne kur (dalgalanır) ne brüt↔net (vergi dilimine,
+kümülatif matraha ve yıla bağlı, kişiden kişiye değişir). Uydurma bir çevrim,
+uydurma bir karşılaştırma üretir — ve bu zincirin çıktısı bir bütçe kararı.
+
+**Bazın varsayılanı YOK.** Para birimi ve dönemde makul varsayılan var
+(TRY / aylık); bazda yok ve olmamalı. Sebebi hatanın büyüklüğü değil
+GÖRÜNÜRLÜĞÜ: yanlış dönem 12 kat sapar ve göze batar, yanlış baz 1.4 kat
+sapar ve batmaz. Belirtilmemişse null kalır, karşılaştırmaya girmez.
+
+### Beklentisi bilinmeyen aday "bandın içinde" sayılmaz
+
+Ayrı kefede durur ve anlatıcı bunu söylemekle yükümlüdür. Saymak, tabloyu
+olduğundan iyimser yapmak olurdu.
+
+### Sıradaki iş: toplu geriye dönük tarama
+
+Geçmiş görüşmelerin transkriptlerinde rakamlar zaten var ama `candidateSalary`
+alanı onlar kaydedilirken yoktu. Tasarım:
+
+- Tek ekran, satır başına bir görüşme
+- Model bulduysa **alıntısıyla** öneri (kabul / reddet)
+- Bulamadıysa **boş alan** — kullanıcı elle yazar (transkript orada okunabilir)
+- **Brüt/net toplu işaretleme** düğmesi: bir işe alımcının havuzu genelde
+  tutarlıdır ("hepsi net")
+- Onay ritüele dönüşmesin diye alıntılar yan yana durur; 60 modal açtırmak
+  herkesi "kabul, kabul, kabul" demeye iter ve onayı anlamsızlaştırır
+
+Beklenti: 60 görüşmenin hepsinde rakam çıkmaz. Aday yalnızca "şu an 70
+alıyorum" demişse motor bilerek boş döner — mevcut maaşı beklenti sanmak tüm
+tabloyu kaydırırdı.
+
+### 4/4 için eşik
+
+Bant önerisi ("şu deneyim ve şu puan aralığına bakın") ancak bandın İÇİNDE
+kalan aday sayısı **5 veya daha fazlaysa** kurulabilir. Altındaysa model sayıyı
+söyleyip öneri vermediğini belirtir. Az veriden bant üretmek istatistik değil,
+kılık değiştirmiş tahmindir — ve çıktısı bir bütçe kararıdır. Kural prompt'ta
+yazılı (services/ai/interviewReviewer.js).
+
+---
+
 ## Riskler
 
 **Enjeksiyon yüzeyi büyüyor.** Transcript adayın **kendi sözleri** — CV'den bile açık bir
