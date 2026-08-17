@@ -1014,17 +1014,24 @@ export default function CandidateProcessPage() {
         const incompatible = [];
         openPositions.forEach(pos => {
             const pDomain = detectPositionDomain(pos);
-            const isCompat = cDomain === 'general' || pDomain === 'general' || pDomain === 'management' || cDomain === 'management' || cDomain === pDomain;
+            // ATAMA ALAN FİLTRESİNİ EZER. Meslek alanı tespiti bir SEZGİ:
+            // canlıda "Veri/Analitik" sayılan bir aday için altı ilanın altısı
+            // da "ayrı alan" kovasına düştü ve ekran "uygun açık pozisyon yok"
+            // dedi — oysa kullanıcının istediği ilana uyum %76'ydı. Kullanıcı
+            // "bu adayı bu ilana bakıyorum" dediyse, sezgi susar.
+            const isAssigned = Boolean(candidate.positionId) && candidate.positionId === pos.id;
+            const isCompat = isAssigned || cDomain === 'general' || pDomain === 'general' || pDomain === 'management' || cDomain === 'management' || cDomain === pDomain;
             const savedAnalysis = candidate.positionAnalyses?.[pos.title];
             const staticMatch = calculateMatchScore(candidate, pos);
             const matchData = savedAnalysis
                 ? { score: savedAnalysis.score, summary: savedAnalysis.summary, isAi: true, reasons: savedAnalysis.reasons || [] }
                 : { score: staticMatch.score, summary: null, isAi: false, reasons: staticMatch.reasons || [] };
-            const entry = { position: pos, match: matchData, positionDomain: pDomain };
+            const entry = { position: pos, match: matchData, positionDomain: pDomain, isAssigned };
             if (isCompat) compatible.push(entry);
             else incompatible.push(entry);
         });
-        compatible.sort((a, b) => b.match.score - a.match.score);
+        // Atanan ilan en üstte: kullanıcının kararı listenin başında dursun.
+        compatible.sort((a, b) => (b.isAssigned ? 1 : 0) - (a.isAssigned ? 1 : 0) || b.match.score - a.match.score);
         incompatible.sort((a, b) => b.match.score - a.match.score);
         return { candidateDomain: cDomain, compatible, incompatible };
     }, [candidate, positions]);
@@ -1043,6 +1050,50 @@ export default function CandidateProcessPage() {
      */
     const [evaluatingTitle, setEvaluatingTitle] = useState(null);
     const [evaluateErrors, setEvaluateErrors] = useState({});
+    const [assigningId, setAssigningId] = useState(null);
+
+    /**
+     * BU ADAYI BU İLANA ATA — meslek alanı sezgisini kullanıcı ezer.
+     *
+     * `candidate.positionId` üç yerde "işe alım uzmanının atadığı pozisyon"
+     * olarak okunuyor ve BAĞLAYICI sayılıyor (SystemScanner, scanService,
+     * CandidateDrawer). Ama onu YAZAN hiçbir ekran yoktu: tasarlanmış bir
+     * kaçış kapısının kapısı yoktu.
+     *
+     * Sonucu canlıda görüldü: meslek alanı "Veri/Analitik" tespit edilen bir
+     * adayda altı açık ilanın altısı da "ayrı alan" sayıldı. Bu durumda
+     * otonom tarama hiçbir şey yapmıyor — analiz edilecek pozisyon listesi
+     * `[assignedPos || bestMatch || compatiblePositions[0]]` ve üçü de boş.
+     * Kullanıcı adayı ilerletemiyor, üstelik istediği ilana uyum %76.
+     */
+    const assignToPosition = async (position) => {
+        if (!position?.id || assigningId) return;
+        setAssigningId(position.id);
+        try {
+            await updateCandidate(candidate.id, {
+                positionId: position.id,
+                // Başlıktaki "Uygun açık pozisyon yok" sentineli de kalkar:
+                // artık bir bağ VAR ve onu insan kurdu.
+                matchedPositionTitle: position.title,
+            });
+        } finally {
+            setAssigningId(null);
+        }
+    };
+
+    const clearAssignment = async (position) => {
+        if (assigningId) return;
+        setAssigningId(position?.id || 'clear');
+        try {
+            const updates = { positionId: null };
+            // Başlığı yalnızca BİZİM yazdığımız değerse geri alıyoruz; sistemin
+            // kendi bulduğu bir eşleşmeyi atamayı kaldırmak silmemeli.
+            if (candidate.matchedPositionTitle === position?.title) updates.matchedPositionTitle = null;
+            await updateCandidate(candidate.id, updates);
+        } finally {
+            setAssigningId(null);
+        }
+    };
 
     const evaluateForPosition = async (position) => {
         if (!position?.title || evaluatingTitle) return;
@@ -1821,7 +1872,7 @@ export default function CandidateProcessPage() {
                                             ) : (
                                                 <div className="space-y-2.5">
                                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Eşleşen Pozisyonlar ({compatible.length})</p>
-                                                    {compatible.map(({ position: pos, match, positionDomain }) => {
+                                                    {compatible.map(({ position: pos, match, positionDomain, isAssigned }) => {
                                                     const saved = candidate.positionAnalyses?.[pos.title];
                                                     const busy = evaluatingTitle === pos.title;
                                                     const evalError = evaluateErrors[pos.title];
@@ -1869,6 +1920,16 @@ export default function CandidateProcessPage() {
                                                                                 BAYAT
                                                                             </span>
                                                                         )}
+                                                                        {/* Kullanıcının kararı görünür durur: otonom
+                                                                            tarama da bu ilanı bağlayıcı sayıyor. */}
+                                                                        {isAssigned && (
+                                                                            <span
+                                                                                title="Bu adayı bu ilana siz atadınız; otonom tarama da bu ilanı esas alır"
+                                                                                className="shrink-0 inline-flex items-center gap-1 text-[7px] font-black px-1.5 py-0.5 bg-cyan-50 text-cyan-700 border border-cyan-100 rounded-full"
+                                                                            >
+                                                                                <Target className="w-2 h-2" /> ATANDI
+                                                                            </span>
+                                                                        )}
                                                                     </div>
                                                                     <div className="flex items-center gap-2 text-[10px] text-slate-400">
                                                                         <span>{pos.department || '—'}</span>
@@ -1893,18 +1954,40 @@ export default function CandidateProcessPage() {
                                                                     tek AI çağrısı, diğer pozisyonların analizine
                                                                     dokunmaz. Skorun yanında AI rozeti varken bile
                                                                     "hangi tarihte, güncel mi" görünür olmalı. */}
-                                                                <button
-                                                                    onClick={() => evaluateForPosition(pos)}
-                                                                    disabled={Boolean(evaluatingTitle)}
-                                                                    title={match.isAi
-                                                                        ? 'Bu adayı bu ilana göre yeniden değerlendir (1 AI çağrısı)'
-                                                                        : 'Bu adayı bu ilana göre değerlendir (1 AI çağrısı)'}
-                                                                    className="shrink-0 self-start flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200 text-[10px] font-black uppercase tracking-wider text-slate-600 hover:border-cyan-300 hover:text-cyan-700 transition-colors disabled:opacity-40"
-                                                                >
-                                                                    {busy
-                                                                        ? <><Loader2 className="w-3 h-3 animate-spin" /> Değerlendiriliyor</>
-                                                                        : <><Sparkles className="w-3 h-3" /> {match.isAi ? 'Yeniden değerlendir' : 'Bu ilana göre değerlendir'}</>}
-                                                                </button>
+                                                                <div className="shrink-0 self-start flex items-center gap-1.5">
+                                                                    {/* ATAMA: adayın hangi ilan için düşünüldüğünü
+                                                                        SİSTEM değil kullanıcı söyler. Otonom tarama
+                                                                        atanan ilanı her zaman analiz kümesine alıyor
+                                                                        (SystemScanner), bu yüzden meslek alanı
+                                                                        filtresine takılan adaylar da ilerleyebiliyor. */}
+                                                                    <button
+                                                                        onClick={() => (isAssigned ? clearAssignment(pos) : assignToPosition(pos))}
+                                                                        disabled={Boolean(assigningId)}
+                                                                        title={isAssigned
+                                                                            ? 'Atamayı kaldır'
+                                                                            : 'Bu adayı bu ilana ata — otonom tarama da bu ilanı esas alır'}
+                                                                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-wider transition-colors disabled:opacity-40 ${
+                                                                            isAssigned
+                                                                                ? 'border-cyan-200 bg-cyan-50 text-cyan-700 hover:bg-cyan-100'
+                                                                                : 'border-slate-200 text-slate-600 hover:border-cyan-300 hover:text-cyan-700'
+                                                                        }`}
+                                                                    >
+                                                                        <Target className="w-3 h-3" />
+                                                                        {isAssigned ? 'Atamayı kaldır' : 'Bu ilana ata'}
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => evaluateForPosition(pos)}
+                                                                        disabled={Boolean(evaluatingTitle)}
+                                                                        title={match.isAi
+                                                                            ? 'Bu adayı bu ilana göre yeniden değerlendir (1 AI çağrısı)'
+                                                                            : 'Bu adayı bu ilana göre değerlendir (1 AI çağrısı)'}
+                                                                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200 text-[10px] font-black uppercase tracking-wider text-slate-600 hover:border-cyan-300 hover:text-cyan-700 transition-colors disabled:opacity-40"
+                                                                    >
+                                                                        {busy
+                                                                            ? <><Loader2 className="w-3 h-3 animate-spin" /> Değerlendiriliyor</>
+                                                                            : <><Sparkles className="w-3 h-3" /> {match.isAi ? 'Yeniden değerlendir' : 'Değerlendir'}</>}
+                                                                    </button>
+                                                                </div>
                                                             </div>
 
                                                             {(analyzedAt || evalError) && (
@@ -1933,6 +2016,14 @@ export default function CandidateProcessPage() {
                                                     <p className="text-[11px] text-slate-400">
                                                         Bu pozisyonlar aday profiliyle farklı meslek alanında; otomatik eşleştirme önceliği almaz ama her biri ayrıca skorlanır.
                                                     </p>
+                                                    {/* MESLEK ALANI BİR SEZGİ, KİLİT DEĞİL. Tespit yanılabilir
+                                                        ve yanıldığında aday hiçbir yere ilerleyemiyor: otonom
+                                                        tarama uyumlu pozisyon bulamayınca analiz edecek bir şey
+                                                        bulamıyor. "Ata" bu kararı insana geri veriyor. */}
+                                                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
+                                                        Alan tespiti yanılmış olabilir. <strong>Ata</strong> derseniz bu ilan bağlayıcı
+                                                        olur: otonom tarama da onu esas alır ve aday uyumlu listeye taşınır.
+                                                    </p>
                                                     <div className="space-y-1 mt-2">
                                                         {incompatible.map(({ position: pos, match }) => (
                                                             <div key={pos.id} className="flex items-center gap-2 text-[10px]">
@@ -1948,9 +2039,17 @@ export default function CandidateProcessPage() {
                                                                     değil kullanıcının; alan filtresi bir öneri,
                                                                     bir kilit değil. */}
                                                                 <button
+                                                                    onClick={() => assignToPosition(pos)}
+                                                                    disabled={Boolean(assigningId)}
+                                                                    title="Bu adayı bu ilana ata — alan tespitini ez, otonom tarama da bu ilanı esas alsın"
+                                                                    className="shrink-0 ml-auto inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-cyan-600 hover:text-cyan-700 disabled:opacity-40"
+                                                                >
+                                                                    <Target className="w-2.5 h-2.5" /> ata
+                                                                </button>
+                                                                <button
                                                                     onClick={() => evaluateForPosition(pos)}
                                                                     disabled={Boolean(evaluatingTitle)}
-                                                                    className="shrink-0 ml-auto text-[9px] font-black uppercase tracking-wider text-slate-400 hover:text-cyan-600 disabled:opacity-40"
+                                                                    className="shrink-0 text-[9px] font-black uppercase tracking-wider text-slate-400 hover:text-cyan-600 disabled:opacity-40"
                                                                 >
                                                                     {evaluatingTitle === pos.title ? 'değerlendiriliyor…' : 'değerlendir'}
                                                                 </button>
