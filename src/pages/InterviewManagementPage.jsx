@@ -12,6 +12,7 @@ import { getCalendarEvents, connectGoogleWorkspace, sendDirectEmail, createDirec
 import { getInviteEmail, getParticipantEmail, getRescheduleEmail } from '../utils/templateService';
 import { buildICS } from '../utils/emailTemplates';
 import AddManualInterviewModal from '../components/AddManualInterviewModal';
+import SalaryBackfillModal from '../components/SalaryBackfillModal';
 import { 
     Plus, 
     Video, 
@@ -50,7 +51,8 @@ import {
     X,
     UserPlus,
     AtSign,
-    Briefcase
+    Briefcase,
+    Wallet
 } from 'lucide-react';
 
 const PARTICIPANT_INVITES_PATH = 'artifacts/talent-flow/public/data/participantInvites';
@@ -107,6 +109,12 @@ export default function InterviewManagementPage() {
 
     // Manual interview entry modal — see components/AddManualInterviewModal.jsx
     const [manualInterviewOpen, setManualInterviewOpen] = useState(false);
+
+    // Geçmiş görüşmelerde eksik kalan maaş beklentisi taraması.
+    // `candidateSalary` alanı eski kayıtlar yazılırken yoktu; rakam
+    // transkriptte duruyor ama hiçbir rapora girmiyor.
+    // — see components/SalaryBackfillModal.jsx
+    const [salaryBackfillOpen, setSalaryBackfillOpen] = useState(false);
 
     // Single dropdown that consolidates the 4 separate action buttons
     // (Yeni Seans Planla / Hızlı Mülakat Başlat / Yüz Yüze / Manuel Görüşme Ekle).
@@ -2193,6 +2201,32 @@ export default function InterviewManagementPage() {
                                                     <div className="text-[11px] text-slate-500 mt-0.5">Sistem dışında yapılmış görüşmeyi kaydet</div>
                                                 </div>
                                             </button>
+
+                                            {/* Geçmişe dönük maaş taraması.
+                                                Görüşme kaydına DOKUNMAZ, yalnızca eksik
+                                                kalan beklenti alanını doldurur — ve
+                                                yalnızca kullanıcının onayladığı satırlarda.
+                                                Yazma hakkı recruiter'da olduğu için
+                                                departman kullanıcısına gösterilmiyor. */}
+                                            {!isDepartmentUser && (
+                                                <button
+                                                    role="menuitem"
+                                                    onClick={() => {
+                                                        setNewInterviewMenuOpen(false);
+                                                        setSalaryBackfillOpen(true);
+                                                    }}
+                                                    className="w-full flex items-start gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left"
+                                                    title="Geçmiş görüşmelerin transkriptinde geçen maaş beklentisini bul ve onayınla kaydet"
+                                                >
+                                                    <div className="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center shrink-0 mt-0.5">
+                                                        <Wallet className="w-4 h-4 text-violet-600" />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="text-[13px] font-semibold text-slate-800">Maaş Beklentilerini Tara</div>
+                                                        <div className="text-[11px] text-slate-500 mt-0.5">Geçmiş görüşmelerde eksik kalan beklentiyi tamamla</div>
+                                                    </div>
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 )}
@@ -2847,6 +2881,13 @@ export default function InterviewManagementPage() {
                 // Listener on /interviews picks up the new doc automatically
                 // — no manual refresh needed. Just close the modal.
             }}
+        />
+
+        <SalaryBackfillModal
+            open={salaryBackfillOpen}
+            onClose={() => setSalaryBackfillOpen(false)}
+            candidates={enrichedCandidates}
+            uid={userId}
         />
     </div>
     );
