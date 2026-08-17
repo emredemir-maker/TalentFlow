@@ -2,7 +2,7 @@
 // Command Table layout — with redesigned Create / Detail / Edit screens
 
 import { analysisScoreFor } from '../utils/positionScore';
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import Header from '../components/Header';
 import { usePositions } from '../context/PositionsContext';
 import { normalizeBand, formatBand, CURRENCIES, CURRENCY_LABEL, PERIODS, PERIOD_LABEL, BASES, BASIS_LABEL } from '../utils/salaryBand';
@@ -699,11 +699,17 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
 
 // CREATE MODAL — Full Screen
 // ─────────────────────────────────────────────────────────────
-function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser, userDepartments, isExtracting, onExtract, jdText, setJdText }) {
+function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser, userDepartments, isExtracting, onExtract, jdText, setJdText, initialData }) {
     const [formData, setFormData] = useState({
         title: '', department: isDepartmentUser ? (userDepartments?.[0] || '') : '', minExperience: '', reqItems: [], description: '',
         salaryMax: '', salaryCurrency: 'TRY', salaryPeriod: 'monthly', salaryBasis: 'gross',
         screeningEnabled: false, screeningQuestions: [''],
+        // İK asistanının taslağı forma DOLU gelir; buradan sonrası normal
+        // form akışı — düzenleme ve kaydetme kullanıcıda.
+        ...(initialData || {}),
+        // Departman kullanıcısı kendi departmanı dışına ilan açamaz; taslak
+        // başka bir departman önerse bile bu kural bozulmaz.
+        ...(isDepartmentUser ? { department: userDepartments?.[0] || '' } : {}),
     });
     const [suggestingQuestions, setSuggestingQuestions] = useState(false);
     const [improvingIdx, setImprovingIdx] = useState(null);
@@ -1176,7 +1182,7 @@ function Field({ label, children }) {
 // MAIN PAGE
 // ─────────────────────────────────────────────────────────────
 export default function PositionsPage() {
-    const { positions, loading, addPosition, addPositionRequest, approvePosition, rejectPosition, deletePosition, togglePositionStatus, updatePosition } = usePositions();
+    const { positions, loading, addPosition, addPositionRequest, approvePosition, rejectPosition, deletePosition, togglePositionStatus, updatePosition, positionDraft, setPositionDraft } = usePositions();
     const { enrichedCandidates, updateCandidate, setViewCandidateId } = useCandidates();
     const candidates = enrichedCandidates || [];
     const { isDepartmentUser, userDepartments, userProfile, user, role } = useAuth();
@@ -1234,6 +1240,20 @@ export default function PositionsPage() {
         window.addEventListener('openPosition', handleOpenPosition);
         return () => window.removeEventListener('openPosition', handleOpenPosition);
     }, [positions]);
+
+    // İK asistanından gelen ilan taslağı: form DOLU açılır ama kaydedilmez.
+    // Kaydetme kararı kullanıcıda — asistan `positions` koleksiyonuna hiçbir
+    // koşulda kendi başına yazmaz (2026-08-14 kullanıcı kararı).
+    //
+    // Taslak burada TÜKETİLİR: temizlenmezse kullanıcı formu kapatıp "Yeni
+    // Pozisyon"a bastığında eski taslak yeniden karşısına çıkar.
+    const draftSeed = useRef(null);
+    useEffect(() => {
+        if (!positionDraft) return;
+        draftSeed.current = positionDraft;
+        setCreateOpen(true);
+        setPositionDraft(null);
+    }, [positionDraft, setPositionDraft]);
 
     const handleToggleStatus = async (id, currentStatus) => {
         const positionTitle = positions.find(p => p.id === id)?.title || 'Pozisyon';
@@ -1311,6 +1331,7 @@ export default function PositionsPage() {
         }
         setCreateOpen(false);
         setJdText('');
+        draftSeed.current = null;
     };
 
     const handleUpdate = async (formData) => {
@@ -1753,7 +1774,8 @@ export default function PositionsPage() {
             {/* ── MODALS & DRAWERS ── */}
             {createOpen && (
                 <PositionCreateModal
-                    onClose={() => { setCreateOpen(false); setJdText(''); }}
+                    initialData={draftSeed.current}
+                    onClose={() => { setCreateOpen(false); setJdText(''); draftSeed.current = null; }}
                     onSubmit={handleCreate}
                     departments={departments}
                     isDepartmentUser={isDepartmentUser}

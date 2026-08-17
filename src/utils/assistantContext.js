@@ -174,6 +174,12 @@ export function serializeTurns(turns = [], maxTurns = MAX_STORED_TURNS) {
             if (t.narrationError) out.narrationError = String(t.narrationError);
         }
 
+        // Taslak olduğu gibi saklanır: küçük bir nesne ve kullanıcı sayfayı
+        // yenileyince onayladığı maddeleri kaybetmemeli. Düzeltme isteği de
+        // en son taslağın üstüne çalışıyor — saklanmazsa "zorunluları üçe
+        // indir" sıfırdan yeni bir ilan üretir.
+        if (t?.draft) out.draft = t.draft;
+
         if (t?.market) {
             const market = compactMarket(t.market);
             // Google'ın gösterim şartı sığmadıysa cevabı hiç saklamıyoruz;

@@ -110,6 +110,20 @@ Bu araç DIŞARIYA bakar: "piyasada ne veriliyor", "ne kadar maaş vermeliyim",
 ne" sorusu piyasa DEĞİLDİR — o kendi verimizdir ve bugün aday_sorgusu ile de
 ölçülemez; öyle bir soruda "tool": null yaz.
 
+"pozisyon_taslagi" ARACININ ALANLARI (bu araçta "filters" KULLANILMAZ):
+- "brief": kullanıcının isteğinin TAMAMI, kendi cümleleriyle. ÖZETLEME,
+  kısaltma, düzeltme — ilan taslağını üretecek olan çağrı bu metni okuyacak
+  ve senin attığın her ayrıntı taslaktan da düşer.
+
+Bu araç ilan YAZAR: "şöyle bir pozisyon açacağım", "X ilanı hazırla", "bu role
+ilan taslağı çıkar" buraya gider.
+
+ÖNCEKİ TURDA BİR TASLAK VARSA ve kullanıcı onu değiştirmek istiyorsa
+("zorunluları üçe indir", "SQL'i tercihene al", "başlığı değiştir", "uzaktan
+çalışma ekle") YİNE BU ARACA gider; "brief" alanına düzeltme isteğini yaz.
+Düzeltme isteğini yeni bir ilan sanıp sıfırdan üretmek, kullanıcının
+onayladığı maddeleri çöpe atar.
+
 ÖNCEKİ TURLAR — TAKİP SORULARI:
 Kullanıcı "onlardan", "bunların içinde", "peki ya", "aynı pozisyonda" gibi
 ifadelerle bir önceki sorguya atıf yapabilir. Böyle bir atıf VARSA önceki
@@ -126,7 +140,7 @@ TIRNAK KURALI: metin değerlerinin içinde düz çift tırnak (") KULLANMA; tek
 tırnak (') kullan. Kaçışsız tırnak tüm yanıtı okunamaz hâle getirir.
 
 ÇIKTI: yalnızca JSON.
-{"tool":"aday_sorgusu"|"mulakat_incelemesi"|"piyasa_arastirmasi"|null,"intent":"list|count|group","position":"...","candidate":"...","level":"...","location":"...","subject":"...","filters":[...],"sort":{...},"limit":N,"groupBy":"...","unsupported":"..."}
+{"tool":"aday_sorgusu"|"mulakat_incelemesi"|"piyasa_arastirmasi"|"pozisyon_taslagi"|null,"intent":"list|count|group","position":"...","candidate":"...","level":"...","location":"...","subject":"...","brief":"...","filters":[...],"sort":{...},"limit":N,"groupBy":"...","unsupported":"..."}
 `;
 
 const NARRATOR_PROMPT = `
