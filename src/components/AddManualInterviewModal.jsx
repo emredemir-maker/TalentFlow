@@ -964,10 +964,10 @@ function FormBody(props) {
                     Adayın Maaş Beklentisi <span className="text-slate-300">(isteğe bağlı)</span>
                 </label>
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                    <input type="number" min="0" placeholder="Alt" value={salaryMin}
+                    <input type="text" inputMode="numeric" placeholder="Alt" value={salaryMin}
                         onChange={(e) => setSalaryMin(e.target.value)}
                         className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[12px] outline-none focus:border-violet-300" />
-                    <input type="number" min="0" placeholder="Üst" value={salaryMax}
+                    <input type="text" inputMode="numeric" placeholder="Üst" value={salaryMax}
                         onChange={(e) => setSalaryMax(e.target.value)}
                         className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[12px] outline-none focus:border-violet-300" />
                     <select value={salaryCurrency} onChange={(e) => setSalaryCurrency(e.target.value)}
