@@ -147,3 +147,37 @@ describe('brüt / net', () => {
         expect(formatBand({ min: 100000, basis: 'net' })).toBe('100.000+ ₺ (aylık, net)');
     });
 });
+
+// SERBEST METİN GİRİŞİ — ok tuşlu number alanı kalktı, kullanıcı elle yazıyor.
+//
+// Nokta Türkçede BİNLER AYRACI. Eski num() onu ondalık sanıyordu: "120.000"
+// değeri 120 olarak okunuyordu ve bütçe bandı sessizce bin kat küçülüyordu.
+// number girişi nokta yazdırmadığı için hata gizli kalmıştı; alan metne
+// dönünce açığa çıkardı.
+describe('serbest metin girişi', () => {
+    it('reads Turkish thousand separators', () => {
+        expect(normalizeBand({ max: '120.000' }).max).toBe(120000);
+        expect(normalizeBand({ max: '120 000' }).max).toBe(120000);
+        expect(normalizeBand({ max: '₺120.000' }).max).toBe(120000);
+    });
+
+    it('reads a plain number the same way', () => {
+        expect(normalizeBand({ max: '120000' }).max).toBe(120000);
+        expect(normalizeBand({ max: 120000 }).max).toBe(120000);
+    });
+
+    it('still rejects text with no digits', () => {
+        expect(normalizeBand({ max: 'abc' })).toBeNull();
+        expect(normalizeBand({ max: '' })).toBeNull();
+    });
+
+    // Bütçenin anlamlı ucu TAVAN; alt sınır bir kısıt değil.
+    it('works as a ceiling-only band', () => {
+        const band = normalizeBand({ max: '120.000', currency: 'TRY', period: 'monthly', basis: 'gross' });
+        expect(formatBand(band)).toBe('en fazla 120.000 ₺ (aylık, brüt)');
+        expect(compareToBand({ min: 150000, currency: 'TRY', period: 'monthly', basis: 'gross' }, band))
+            .toMatchObject({ status: 'above' });
+        expect(compareToBand({ min: 90000, currency: 'TRY', period: 'monthly', basis: 'gross' }, band))
+            .toEqual({ status: 'within' });
+    });
+});

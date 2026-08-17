@@ -702,7 +702,7 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
 function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser, userDepartments, isExtracting, onExtract, jdText, setJdText }) {
     const [formData, setFormData] = useState({
         title: '', department: isDepartmentUser ? (userDepartments?.[0] || '') : '', minExperience: '', reqItems: [], description: '',
-        salaryMin: '', salaryMax: '', salaryCurrency: 'TRY', salaryPeriod: 'monthly', salaryBasis: 'gross',
+        salaryMax: '', salaryCurrency: 'TRY', salaryPeriod: 'monthly', salaryBasis: 'gross',
         screeningEnabled: false, screeningQuestions: [''],
     });
     const [suggestingQuestions, setSuggestingQuestions] = useState(false);
@@ -996,7 +996,6 @@ function PositionEditModal({ pos, candidates, departments, isDepartmentUser, use
         title: pos.title || '',
         department: pos.department || '',
         minExperience: pos.minExperience?.toString() || '0',
-        salaryMin: pos.salaryBand?.min?.toString() || '',
         salaryMax: pos.salaryBand?.max?.toString() || '',
         salaryCurrency: pos.salaryBand?.currency || 'TRY',
         salaryPeriod: pos.salaryBand?.period || 'monthly',
@@ -1299,7 +1298,7 @@ export default function PositionsPage() {
             // Bütçe bandı: adayın beklentisiyle karşılaştırmanın BİR ucu.
             // normalizeBand null dönerse alan hiç yazılmaz — boş bir band
             // yazmak, tanımlanmamış bütçeyi tanımlanmış gibi gösterirdi.
-            salaryBand: normalizeBand({ min: formData.salaryMin, max: formData.salaryMax, currency: formData.salaryCurrency, period: formData.salaryPeriod, basis: formData.salaryBasis }),
+            salaryBand: normalizeBand({ max: formData.salaryMax, currency: formData.salaryCurrency, period: formData.salaryPeriod, basis: formData.salaryBasis }),
             requirements: reqs, requirementsMeta: meta, matchedCandidates,
             screeningEnabled: formData.screeningEnabled && cleanedQuestions.length > 0,
             screeningQuestions: cleanedQuestions,
@@ -1331,7 +1330,7 @@ export default function PositionsPage() {
             // Bütçe bandı: adayın beklentisiyle karşılaştırmanın BİR ucu.
             // normalizeBand null dönerse alan hiç yazılmaz — boş bir band
             // yazmak, tanımlanmamış bütçeyi tanımlanmış gibi gösterirdi.
-            salaryBand: normalizeBand({ min: formData.salaryMin, max: formData.salaryMax, currency: formData.salaryCurrency, period: formData.salaryPeriod, basis: formData.salaryBasis }),
+            salaryBand: normalizeBand({ max: formData.salaryMax, currency: formData.salaryCurrency, period: formData.salaryPeriod, basis: formData.salaryBasis }),
             requirements: reqs,
             requirementsMeta: meta,
             description: formData.description || '',
@@ -1846,7 +1845,7 @@ export default function PositionsPage() {
 function SalaryBandFields({ formData, setFormData, inputCls }) {
     const set = (patch) => setFormData((p) => ({ ...p, ...patch }));
     const preview = formatBand({
-        min: formData.salaryMin, max: formData.salaryMax,
+        max: formData.salaryMax,
         currency: formData.salaryCurrency, period: formData.salaryPeriod,
         basis: formData.salaryBasis,
     });
@@ -1855,10 +1854,14 @@ function SalaryBandFields({ formData, setFormData, inputCls }) {
             <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">
                 Bütçe Bandı <span className="text-slate-300">(isteğe bağlı)</span>
             </label>
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                <input type="number" min="0" placeholder="Alt" value={formData.salaryMin}
-                    onChange={(e) => set({ salaryMin: e.target.value })} className={inputCls} />
-                <input type="number" min="0" placeholder="Üst" value={formData.salaryMax}
+            {/* TEK TUTAR: bütçenin anlamlı ucu TAVAN. Alt sınır bir bütçe
+                kısıtı değil, olsa olsa bir tercih — ve girilmesi zorunlu
+                olmayan bir alan, girilmediğinde bandı yarım bırakıyordu.
+                Giriş serbest metin: number girişinin ok tuşları maaş gibi
+                büyük tutarlarda işe yaramıyor. */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <input type="text" inputMode="numeric" placeholder="Bütçe üst sınırı"
+                    value={formData.salaryMax}
                     onChange={(e) => set({ salaryMax: e.target.value })} className={inputCls} />
                 <select value={formData.salaryCurrency} onChange={(e) => set({ salaryCurrency: e.target.value })}
                     className={inputCls + ' appearance-none cursor-pointer'}>

@@ -34,9 +34,15 @@ export const CURRENCY_LABEL = { TRY: '₺', USD: '$', EUR: '€' };
 export const PERIOD_LABEL = { monthly: 'aylık', yearly: 'yıllık' };
 export const BASIS_LABEL = { gross: 'brüt', net: 'net' };
 
+// RAKAM DIŞINDAKİ HER ŞEY ATILIR. Alan artık serbest metin (ok tuşlu number
+// girişi kalktı) ve kullanıcı "120.000", "120 000", "₺120.000" yazabiliyor.
+// Nokta Türkçede BİNLER AYRACI: eskiden ondalık sanılıp "120.000" değeri 120
+// olarak okunuyordu — maaşta kuruş zaten anlamsız, tamsayıya indirgiyoruz.
 const num = (v) => {
-    const n = Number(String(v ?? '').replace(/[^\d.-]/g, ''));
-    return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
+    const digits = String(v ?? '').replace(/[^\d]/g, '');
+    if (!digits) return null;
+    const n = Number(digits);
+    return Number.isFinite(n) && n > 0 ? n : null;
 };
 
 /**
