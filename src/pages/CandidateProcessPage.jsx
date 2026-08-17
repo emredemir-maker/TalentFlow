@@ -6,7 +6,9 @@ import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
 import { useAuth } from '../context/AuthContext';
 import { parseExperiencesFromText, parseCandidateFromText } from '../services/geminiService';
-import { deepScanCandidate } from '../services/scanService';
+import { deepScanCandidate, rescanCandidateForPosition } from '../services/scanService';
+import { isStaleFor } from '../utils/positionRequirements';
+import { usesCurrentRubric } from '../utils/coverageDetail';
 import { extractTextFromFile } from '../services/cvParser';
 import { calculateMatchScore, domainLabel, detectCandidateDomain, detectPositionDomain } from '../services/matchService';
 import { applyPiiMask, stripPiiForAI } from '../utils/pii';
@@ -1027,6 +1029,50 @@ export default function CandidateProcessPage() {
         return { candidateDomain: cDomain, compatible, incompatible };
     }, [candidate, positions]);
 
+    /**
+     * BU ADAYI BU İLANA GÖRE DEĞERLENDİR — tek pozisyon, tek AI çağrısı.
+     *
+     * "Pozisyon Eşleşmeleri" sekmesi bugüne kadar yalnızca OKUNUYORDU: skorlar
+     * listeleniyor ama bir ilanı seçip "bunu değerlendir" demenin yolu yok.
+     * Kullanıcı bunu bildirdi — "bir CV'nin spesifik bir pozisyon için
+     * değerlendirmesini yapmak istiyorum, ekranda net değil".
+     *
+     * Tek yol Pozisyonlar ekranındaki "Adayları Yeniden Tara" idi: pozisyondan
+     * başlamayı gerektiriyor ve adı bir bakım işi gibi duruyor. Motor
+     * (rescanCandidateForPosition) zaten hazırdı, aday tarafından çağıran yoktu.
+     */
+    const [evaluatingTitle, setEvaluatingTitle] = useState(null);
+    const [evaluateErrors, setEvaluateErrors] = useState({});
+
+    const evaluateForPosition = async (position) => {
+        if (!position?.title || evaluatingTitle) return;
+        setEvaluatingTitle(position.title);
+        setEvaluateErrors((prev) => ({ ...prev, [position.title]: '' }));
+        try {
+            const result = await rescanCandidateForPosition(candidate, position);
+            if (result.status === 'scanned') {
+                await updateCandidate(candidate.id, result.updates);
+                return;
+            }
+            // BAŞARISIZLIĞIN SEBEBİ AYRIŞIR. "Kanıt yok" ile "AI patladı" aynı
+            // şey değil: birincisinde CV'yi düzeltmek, ikincisinde tekrar
+            // denemek gerekiyor. Tek bir "olmadı" mesajı canlıda kota aşımını
+            // CV eksikliği sandırmıştı.
+            setEvaluateErrors((prev) => ({
+                ...prev,
+                [position.title]: result.status === 'skipped_no_cv'
+                    ? 'Bu adayda CV metni yok — önce CV yeniden ayrıştırılmalı.'
+                    : result.status === 'analysis_failed'
+                        ? (result.failures?.[0]?.message || 'AI çağrısı başarısız oldu.')
+                        : 'Model bu ilan için sonuç üretemedi.',
+            }));
+        } catch (err) {
+            setEvaluateErrors((prev) => ({ ...prev, [position.title]: err?.message || 'Değerlendirme yapılamadı.' }));
+        } finally {
+            setEvaluatingTitle(null);
+        }
+    };
+
     // ── TABS ──────────────────────────────────────────────────────────────────
     const TABS = [
         { id: 'ai_analysis',      label: 'STAR Analizi',        icon: <Brain className="w-3.5 h-3.5" /> },
@@ -1775,7 +1821,17 @@ export default function CandidateProcessPage() {
                                             ) : (
                                                 <div className="space-y-2.5">
                                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Eşleşen Pozisyonlar ({compatible.length})</p>
-                                                    {compatible.map(({ position: pos, match, positionDomain }) => (
+                                                    {compatible.map(({ position: pos, match, positionDomain }) => {
+                                                    const saved = candidate.positionAnalyses?.[pos.title];
+                                                    const busy = evaluatingTitle === pos.title;
+                                                    const evalError = evaluateErrors[pos.title];
+                                                    // BAYAT ANALİZ SESSİZ KALMAZ. İki ayrı sebep, aynı
+                                                    // sonuç: bu skor bugünkü ilanla ölçülmedi.
+                                                    const stale = saved && (isStaleFor(saved, pos) || !usesCurrentRubric(saved));
+                                                    const analyzedAt = saved?.analyzedAt
+                                                        ? new Date(saved.analyzedAt).toLocaleDateString('tr-TR')
+                                                        : null;
+                                                    return (
                                                         <div key={pos.id} className="bg-white border border-slate-100 hover:border-slate-200 rounded-2xl p-4 transition-all">
                                                             <div className="flex items-center gap-3">
                                                                 {/* Score ring */}
@@ -1803,6 +1859,16 @@ export default function CandidateProcessPage() {
                                                                                 <TrendingUp className="w-2 h-2" /> Yüksek
                                                                             </span>
                                                                         )}
+                                                                        {/* Skor bugünkü madde listesiyle ölçülmedi —
+                                                                            söylemezsek kullanıcı güncel sanır. */}
+                                                                        {stale && (
+                                                                            <span
+                                                                                title="Bu analiz ilanın ESKİ madde listesine ait; skor bugünkü ölçüyle uyumsuz"
+                                                                                className="shrink-0 text-[7px] font-black px-1.5 py-0.5 bg-amber-50 text-amber-600 border border-amber-100 rounded-full"
+                                                                            >
+                                                                                BAYAT
+                                                                            </span>
+                                                                        )}
                                                                     </div>
                                                                     <div className="flex items-center gap-2 text-[10px] text-slate-400">
                                                                         <span>{pos.department || '—'}</span>
@@ -1822,9 +1888,39 @@ export default function CandidateProcessPage() {
                                                                         </div>
                                                                     )}
                                                                 </div>
+
+                                                                {/* BU İLANA GÖRE DEĞERLENDİR — yalnızca bu ilan,
+                                                                    tek AI çağrısı, diğer pozisyonların analizine
+                                                                    dokunmaz. Skorun yanında AI rozeti varken bile
+                                                                    "hangi tarihte, güncel mi" görünür olmalı. */}
+                                                                <button
+                                                                    onClick={() => evaluateForPosition(pos)}
+                                                                    disabled={Boolean(evaluatingTitle)}
+                                                                    title={match.isAi
+                                                                        ? 'Bu adayı bu ilana göre yeniden değerlendir (1 AI çağrısı)'
+                                                                        : 'Bu adayı bu ilana göre değerlendir (1 AI çağrısı)'}
+                                                                    className="shrink-0 self-start flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200 text-[10px] font-black uppercase tracking-wider text-slate-600 hover:border-cyan-300 hover:text-cyan-700 transition-colors disabled:opacity-40"
+                                                                >
+                                                                    {busy
+                                                                        ? <><Loader2 className="w-3 h-3 animate-spin" /> Değerlendiriliyor</>
+                                                                        : <><Sparkles className="w-3 h-3" /> {match.isAi ? 'Yeniden değerlendir' : 'Bu ilana göre değerlendir'}</>}
+                                                                </button>
                                                             </div>
+
+                                                            {(analyzedAt || evalError) && (
+                                                                <div className="mt-2 pl-14 space-y-0.5">
+                                                                    {analyzedAt && (
+                                                                        <p className="text-[9px] text-slate-400">
+                                                                            Değerlendirme tarihi: {analyzedAt}
+                                                                            {stale && ' — ilanın o günkü madde listesine göre'}
+                                                                        </p>
+                                                                    )}
+                                                                    {evalError && <p className="text-[10px] text-red-500 leading-relaxed">{evalError}</p>}
+                                                                </div>
+                                                            )}
                                                         </div>
-                                                    ))}
+                                                    );
+                                                    })}
                                                 </div>
                                             )}
 
@@ -1847,7 +1943,18 @@ export default function CandidateProcessPage() {
                                                                         <Sparkles className="w-2 h-2" /> AI
                                                                     </span>
                                                                 )}
-                                                                <span className="text-slate-300 text-[9px] shrink-0 ml-auto">{pos.department || ''}</span>
+                                                                {/* ALAN DIŞI SAYILAN İLAN DA DEĞERLENDİRİLEBİLİR.
+                                                                    "Bence bu aday bu ilana uyar" kararı sistemin
+                                                                    değil kullanıcının; alan filtresi bir öneri,
+                                                                    bir kilit değil. */}
+                                                                <button
+                                                                    onClick={() => evaluateForPosition(pos)}
+                                                                    disabled={Boolean(evaluatingTitle)}
+                                                                    className="shrink-0 ml-auto text-[9px] font-black uppercase tracking-wider text-slate-400 hover:text-cyan-600 disabled:opacity-40"
+                                                                >
+                                                                    {evaluatingTitle === pos.title ? 'değerlendiriliyor…' : 'değerlendir'}
+                                                                </button>
+                                                                <span className="text-slate-300 text-[9px] shrink-0">{pos.department || ''}</span>
                                                             </div>
                                                         ))}
                                                     </div>
