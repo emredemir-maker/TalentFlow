@@ -114,6 +114,36 @@ describe('rescanCandidateForPosition — teknik hata ayrımı', () => {
         expect(out.status).toBe('scanned');
         expect(out.updates.positionAnalyses['Growth Product Manager'].score).toBe(64);
     });
+
+    // ADAY KARTINDAN "BU İLANA GÖRE DEĞERLENDİR" BU YOLU ÇAĞIRIYOR.
+    //
+    // Kaydın hangi madde listesine ve hangi damgalama kuralına ait olduğu
+    // yazılmazsa, ilan sonradan değiştiğinde eski yargı yanlış maddeye yapışır
+    // ve ekran bayatlığı gösteremez. Tarih POZİSYON BAŞINA tutulur: adayın
+    // `lastScannedAt` alanı tek bir tarih taşıyor ve üç ilana karşı üç ayrı
+    // günde değerlendirilmiş bir adayda hangisinin ne zaman yapıldığını
+    // söyleyemiyor.
+    it('stamps the analysis so the screen can tell whether it is stale', async () => {
+        analyzeCandidateMatch.mockResolvedValue({ score: 64, summary: 'ok' });
+
+        const out = await rescanCandidateForPosition(CANDIDATE, POSITION);
+        const saved = out.updates.positionAnalyses['Growth Product Manager'];
+
+        expect(saved.requirementsFingerprint).toBeTruthy();
+        expect(saved.coverageSchema).toBeGreaterThan(0);
+        expect(Date.parse(saved.analyzedAt)).not.toBeNaN();
+    });
+
+    // Diğer ilanların analizine DOKUNULMAZ: aday kartından tek bir ilanı
+    // değerlendirmek, öbür ilanların skorunu silmemeli.
+    it('leaves the other positions’ analyses untouched', async () => {
+        analyzeCandidateMatch.mockResolvedValue({ score: 64, summary: 'ok' });
+
+        const withOther = { ...CANDIDATE, positionAnalyses: { 'Başka İlan': { score: 42 } } };
+        const out = await rescanCandidateForPosition(withOther, POSITION);
+
+        expect(out.updates.positionAnalyses['Başka İlan']).toEqual({ score: 42 });
+    });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

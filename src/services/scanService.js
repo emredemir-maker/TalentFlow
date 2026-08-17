@@ -218,6 +218,11 @@ export async function rescanCandidateForPosition(candidate, position, options = 
         ...result,
         requirementsFingerprint: requirementsFingerprint(position),
         coverageSchema: COVERAGE_SCHEMA,
+        // POZİSYON BAŞINA TARİH. `lastScannedAt` adayın TAMAMI için tek bir
+        // tarih tutuyor; aday üç ilana karşı üç ayrı günde değerlendirildiyse
+        // o alan hangisinin ne zaman yapıldığını söyleyemiyor. Ekran "bu skor
+        // ne zamanki" sorusuna cevap verebilmeli.
+        analyzedAt: new Date().toISOString(),
     });
 
     const updates = {
