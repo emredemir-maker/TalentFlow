@@ -18,6 +18,9 @@ import { reviewFingerprint, loadReview, saveReview } from '../services/interview
 import { saveFeedback } from '../services/assistantFeedback';
 import { researchMarket } from '../services/ai/marketResearch';
 import { formatBand } from '../utils/salaryBand';
+import { draftPosition } from '../services/ai/positionDrafter';
+import { normalizeDraft, draftForPrompt, draftToFormData } from '../utils/positionDraft';
+import PositionDraftCard from './PositionDraftCard';
 
 /**
  * İK Asistanı — doğal dilde veri sorgulama.
@@ -34,6 +37,20 @@ import { formatBand } from '../utils/salaryBand';
 // gösterir.
 const ORNEKLER = TOOLS.flatMap((t) => t.examples).slice(0, 6);
 
+/**
+ * Sohbetteki EN SON taslak.
+ *
+ * Düzeltme isteği ("zorunluları üçe indir") var olanın üstüne çalışır; taslak
+ * bulunamazsa istek yeni bir ilan sanılır ve kullanıcının onayladığı maddeler
+ * çöpe gider.
+ */
+function lastDraft(turns = []) {
+    for (let i = turns.length - 1; i >= 0; i -= 1) {
+        if (turns[i]?.draft) return turns[i].draft;
+    }
+    return null;
+}
+
 export default function HrAssistantPanel() {
     const [open, setOpen] = useState(false);
     const [question, setQuestion] = useState('');
@@ -46,7 +63,7 @@ export default function HrAssistantPanel() {
 
     const { user } = useAuth();
     const { enrichedCandidates, setViewCandidateId } = useCandidates();
-    const { positions } = usePositions();
+    const { positions, setPositionDraft } = usePositions();
     const endRef = useRef(null);
     const uid = user?.uid || '';
 
@@ -195,6 +212,30 @@ export default function HrAssistantPanel() {
                 return;
             }
 
+            if (spec.tool === 'pozisyon_taslagi') {
+                // DÜZELTME İSTEĞİ VAR OLANIN ÜSTÜNE ÇALIŞIR. Son taslağı
+                // vermezsek "zorunluları üçe indir" isteği sıfırdan yeni bir
+                // ilan üretir ve kullanıcının onayladığı maddeler çöpe gider.
+                const previous = lastDraft(base);
+                const raw = await draftPosition(spec.brief || q, {
+                    previousDraft: draftForPrompt(previous),
+                    departments: [...new Set((positions || []).map((p) => p?.department).filter(Boolean))],
+                });
+                const draft = normalizeDraft(raw);
+                if (!draft) {
+                    finish({
+                        role: 'assistant',
+                        spec,
+                        notice: 'Taslak üretemedim — isteği biraz daha somut yazmayı deneyin '
+                            + '(rol adı, seviye, aradığınız iki üç şey).',
+                        question: q,
+                    });
+                    return;
+                }
+                finish({ role: 'assistant', spec, draft, question: q });
+                return;
+            }
+
             // Pozisyon çözümü: kullanıcının seçtiği > modelin yazdığı > sayfa
             // bağlamı. Hiçbiri yoksa ve soru pozisyon gerektiriyorsa TEK açık
             // pozisyon varken sormanın anlamı yok — kullan ve hangisini
@@ -221,6 +262,29 @@ export default function HrAssistantPanel() {
             setBusy(false);
         }
     };
+
+    /** Karttaki band eklemesi turda kalıcı olsun — sayfa yenilenince kaybolmasın. */
+    const updateDraft = useCallback((index, nextDraft) => {
+        setTurns((prev) => {
+            const next = prev.map((t, i) => (i === index ? { ...t, draft: nextDraft } : t));
+            persist(next);
+            return next;
+        });
+    }, [persist]);
+
+    /**
+     * Taslağı ilan formuna taşır — ASISTAN KAYDETMEZ.
+     *
+     * Taslak context üzerinden geçiyor, olay (event) ile değil: kullanıcı
+     * pozisyonlar ekranında değilse o ekran henüz takılı değildir ve olayı
+     * dinleyecek kimse olmaz. Aynı düzen randevu ekranında da var
+     * (CandidatesContext.preselectedInterviewData).
+     */
+    const openDraftInForm = useCallback((draft) => {
+        setPositionDraft?.(draftToFormData(draft));
+        window.dispatchEvent(new CustomEvent('changeView', { detail: 'positions' }));
+        setOpen(false);
+    }, [setPositionDraft]);
 
     const openCandidate = (c) => {
         setViewCandidateId(c.id);
@@ -310,6 +374,9 @@ export default function HrAssistantPanel() {
                         onFeedback={(verdict, note) => sendFeedback(i, verdict, note)}
                         openPositions={(positions || []).filter((p) => p?.status === 'open')}
                         onPickPosition={(title) => ask(t.question || turns[i - 1]?.text || '', { forcePosition: title })}
+                        positions={positions || []}
+                        onUpdateDraft={(next) => updateDraft(i, next)}
+                        onOpenDraftForm={openDraftInForm}
                     />
                 ))}
 
@@ -343,7 +410,10 @@ export default function HrAssistantPanel() {
     );
 }
 
-function Turn({ turn, onCandidateClick, onFeedback, openPositions = [], onPickPosition }) {
+function Turn({
+    turn, onCandidateClick, onFeedback, openPositions = [], onPickPosition,
+    positions = [], onUpdateDraft, onOpenDraftForm,
+}) {
     if (turn.role === 'user') {
         return (
             <p className="ml-8 px-3 py-1.5 rounded-xl bg-cyan-500 text-white text-[11px] leading-relaxed">
@@ -393,6 +463,20 @@ function Turn({ turn, onCandidateClick, onFeedback, openPositions = [], onPickPo
         return (
             <div className="space-y-2">
                 <MarketTurn market={turn.market} />
+                <FeedbackBar value={turn.feedback} onSend={onFeedback} />
+            </div>
+        );
+    }
+
+    if (turn.draft) {
+        return (
+            <div className="space-y-2">
+                <PositionDraftCard
+                    draft={turn.draft}
+                    positions={positions}
+                    onUpdateDraft={onUpdateDraft}
+                    onOpenForm={() => onOpenDraftForm?.(turn.draft)}
+                />
                 <FeedbackBar value={turn.feedback} onSend={onFeedback} />
             </div>
         );
