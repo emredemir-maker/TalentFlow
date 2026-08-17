@@ -83,12 +83,67 @@ export function buildContext(turns = [], limits = {}) {
 }
 
 /**
+ * Mülakat incelemesinin EKRANDA KULLANILAN parçası.
+ *
+ * `perCandidate` alıntılarıyla birlikte büyük ve ekranda hiç gösterilmiyor;
+ * saklanan yalnızca panelin okuduğu sayılar.
+ */
+function compactReview(review) {
+    return {
+        position: review.position ?? null,
+        interviewCount: review.interviewCount ?? 0,
+        scored: review.scored ?? 0,
+        tally: review.tally || { met: 0, partial: 0, missing: 0, inconclusive: 0 },
+        unscored: (Array.isArray(review.unscored) ? review.unscored : [])
+            .map((u) => ({ name: String(u?.name || ''), reason: String(u?.reason || '') })),
+        staleCount: review.staleCount ?? 0,
+    };
+}
+
+/**
+ * Google'ın arama önerisi bloğu için tavan.
+ *
+ * Blok grounding kullanıldığında OLDUĞU GİBİ gösterilmek zorunda — süs değil,
+ * kullanım şartı. Kırpılmış HTML bozuk render eder; tavana sığmıyorsa cevabın
+ * TAMAMI saklanmaz ve tur "ayrıntısı saklanmadı" der. Kaynakları gösterip
+ * şartı düşürmek, iki kötüden kötü olanı.
+ */
+export const MAX_SUGGESTION_HTML = 8000;
+
+/** Piyasa araştırmasının saklanabilir hâli; şart sığmıyorsa null. */
+function compactMarket(market) {
+    const html = String(market.searchSuggestionHtml || '');
+    if (html.length > MAX_SUGGESTION_HTML) return null;
+    return {
+        band: market.band || null,
+        withheld: Boolean(market.withheld),
+        grounded: Boolean(market.grounded),
+        date: String(market.date || ''),
+        scope: String(market.scope || ''),
+        benefits: (Array.isArray(market.benefits) ? market.benefits : []).map(String).slice(0, 8),
+        caution: String(market.caution || ''),
+        sources: (Array.isArray(market.sources) ? market.sources : [])
+            .slice(0, 6)
+            .map((s) => ({ title: String(s?.title || ''), uri: String(s?.uri || '') })),
+        searchSuggestionHtml: html,
+        query: market.query || null,
+    };
+}
+
+/**
  * Turları Firestore'a yazılabilir hâle getirir.
  *
  * Canlı `result.rows` her adayın TAM belgesini taşıyor (cvText dahil). Onu
  * olduğu gibi yazmak hem 1MB belge sınırını zorlar hem de aday verisini
  * gereksiz yere ikinci bir yere kopyalar. Ekranın gerçekten kullandığı alanlar
  * kalır: id, ad, konum, puan.
+ *
+ * ── ARAÇ ÇIKTISI SAKLANMAZSA TUR ÇÖKER ──────────────────────────────────────
+ * Burası uzun süre yalnızca aday sorgusunu tanıdı. Mülakat incelemesi turu
+ * kaydedilirken `review` düşüyor, sayfa yenilenince panel o turu aday sorgusu
+ * sanıp `result.groups` okumaya çalışıyor ve TÜM sohbet çöküyordu. Yeni bir
+ * araç eklenirken çıktısının buraya da eklenmesi gerekiyor; eklenmezse tur
+ * sessizce boşalır.
  */
 export function serializeTurns(turns = [], maxTurns = MAX_STORED_TURNS) {
     const list = (Array.isArray(turns) ? turns : []).slice(-maxTurns);
@@ -104,6 +159,28 @@ export function serializeTurns(turns = [], maxTurns = MAX_STORED_TURNS) {
         if (t?.feedback) out.feedback = String(t.feedback);
         const spec = compactSpec(t?.spec);
         if (spec) out.spec = spec;
+        // Soru turda saklanır: pozisyon seçici aynı soruyu yeniden çalıştırıyor.
+        if (t?.question) out.question = String(t.question).slice(0, 300);
+
+        if (t?.review) {
+            out.review = compactReview(t.review);
+            out.loaded = {
+                matchedCandidates: t.loaded?.matchedCandidates ?? 0,
+                withoutInterview: t.loaded?.withoutInterview ?? 0,
+                truncated: t.loaded?.truncated ?? 0,
+                totalSessions: t.loaded?.totalSessions ?? 0,
+            };
+            if (t.narration) out.narration = t.narration;
+            if (t.narrationError) out.narrationError = String(t.narrationError);
+        }
+
+        if (t?.market) {
+            const market = compactMarket(t.market);
+            // Google'ın gösterim şartı sığmadıysa cevabı hiç saklamıyoruz;
+            // tur bunu söyleyecek. Sessizce yarısını göstermek olmaz.
+            if (market) out.market = market;
+            else out.detailOmitted = true;
+        }
         if (t?.result) {
             const r = t.result;
             out.result = {

@@ -14,6 +14,7 @@ import {
     compactSpec,
     serializeTurns,
     MAX_CONTEXT_TURNS,
+    MAX_SUGGESTION_HTML,
 } from './assistantContext';
 
 const spec = (over = {}) => ({
@@ -177,5 +178,64 @@ describe('serializeTurns', () => {
         expect(serializeTurns([{ role: 'assistant', unsupported: 'yok' }])).toEqual([
             { role: 'assistant', unsupported: 'yok' },
         ]);
+    });
+
+    // ARAÇ ÇIKTISI SAKLANMAZSA TUR ÇÖKER. Mülakat incelemesi turu kaydedilirken
+    // `review` düşüyordu; sayfa yenilenince panel o turu aday sorgusu sanıp
+    // `result.groups` okuyor ve TÜM sohbet çöküyordu.
+    it('stores the interview review a turn needs to render itself', () => {
+        const [stored] = serializeTurns([{
+            role: 'assistant',
+            spec: { tool: 'mulakat_incelemesi' },
+            question: 'bu pozisyonda kimlerle görüştük',
+            review: {
+                position: 'Growth PM', interviewCount: 4, scored: 3,
+                tally: { met: 5, partial: 2, missing: 1, inconclusive: 0 },
+                unscored: [{ name: 'Ayşe', reason: 'bağ yok' }], staleCount: 1,
+                // Ekranda hiç görünmeyen ağır alan — saklanmamalı.
+                perCandidate: [{ name: 'Ayşe', quotes: [{ quote: 'uzun alıntı' }] }],
+            },
+            loaded: { matchedCandidates: 6, withoutInterview: 2, truncated: 0, totalSessions: 4 },
+            narration: { ozet: 'kısa özet' },
+        }]);
+
+        expect(stored.review).toMatchObject({ interviewCount: 4, scored: 3, staleCount: 1 });
+        expect(stored.review.perCandidate).toBeUndefined();
+        expect(stored.loaded).toMatchObject({ matchedCandidates: 6, totalSessions: 4 });
+        expect(stored.narration).toEqual({ ozet: 'kısa özet' });
+        expect(stored.question).toBe('bu pozisyonda kimlerle görüştük');
+    });
+
+    it('stores a market answer with its sources', () => {
+        const [stored] = serializeTurns([{
+            role: 'assistant',
+            spec: { tool: 'piyasa_arastirmasi' },
+            market: {
+                band: { min: 90000, max: 130000, currency: 'TRY', period: 'monthly', basis: 'gross' },
+                withheld: false, grounded: true, date: '2026', scope: 'İstanbul',
+                benefits: ['yemek kartı'], caution: '',
+                sources: [{ title: 'Rapor', uri: 'https://example.com' }],
+                searchSuggestionHtml: '<div>öneri</div>',
+                query: { title: 'Growth PM', level: 'senior', location: 'İstanbul' },
+            },
+        }]);
+        expect(stored.market.band.min).toBe(90000);
+        expect(stored.market.sources).toEqual([{ title: 'Rapor', uri: 'https://example.com' }]);
+        expect(stored.market.searchSuggestionHtml).toBe('<div>öneri</div>');
+    });
+
+    // Google'ın arama önerisi bloğu OLDUĞU GİBİ gösterilmek zorunda. Sığmıyorsa
+    // kaynakları gösterip şartı düşürmek yerine cevabın tamamını saklamıyoruz.
+    it('drops the whole market answer when the required search block will not fit', () => {
+        const [stored] = serializeTurns([{
+            role: 'assistant',
+            market: {
+                band: { min: 1, max: 2, currency: 'TRY', period: 'monthly', basis: null },
+                sources: [{ title: 'Rapor', uri: 'https://example.com' }],
+                searchSuggestionHtml: 'x'.repeat(MAX_SUGGESTION_HTML + 1),
+            },
+        }]);
+        expect(stored.market).toBeUndefined();
+        expect(stored.detailOmitted).toBe(true);
     });
 });

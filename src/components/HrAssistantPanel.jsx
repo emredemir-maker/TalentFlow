@@ -16,6 +16,8 @@ import { narrateInterviewReview } from '../services/ai/interviewReviewer';
 import { loadInterviewEntries } from '../services/interviewReviewLoader';
 import { reviewFingerprint, loadReview, saveReview } from '../services/interviewReviewCache';
 import { saveFeedback } from '../services/assistantFeedback';
+import { researchMarket } from '../services/ai/marketResearch';
+import { formatBand } from '../utils/salaryBand';
 
 /**
  * İK Asistanı — doğal dilde veri sorgulama.
@@ -165,6 +167,31 @@ export default function HrAssistantPanel() {
                     narrationError = err?.message || 'Yorum üretilemedi.';
                 }
                 finish({ role: 'assistant', spec, review, loaded, narration, narrationError, fromCache, question: q });
+                return;
+            }
+
+            if (spec.tool === 'piyasa_arastirmasi') {
+                // Rol adı olmadan piyasaya bakmak anlamsız: band bir ROLE aittir.
+                // Bağlamdaki pozisyonu kullanırız ama o da yoksa UYDURMAYIZ —
+                // sorarız. Asistanın en temel davranışı bu.
+                const title = forcePosition || spec.position || contextPosition || '';
+                if (!title) {
+                    finish({
+                        role: 'assistant',
+                        spec,
+                        notice: 'Hangi rol için piyasaya bakayım? Rol adını yazın — seviye ve şehir de '
+                            + 'eklerseniz bant daha isabetli olur (ör. "İstanbul’da senior Growth PM").',
+                        question: q,
+                    });
+                    return;
+                }
+                const market = await researchMarket({
+                    title,
+                    level: spec.level || '',
+                    location: spec.location || '',
+                    subject: spec.subject === 'yan_haklar' ? 'yan_haklar' : 'maas',
+                });
+                finish({ role: 'assistant', spec, market, question: q });
                 return;
             }
 
@@ -344,6 +371,15 @@ function Turn({ turn, onCandidateClick, onFeedback, openPositions = [], onPickPo
         );
     }
 
+    if (turn.notice) {
+        return (
+            <div className="space-y-1.5">
+                <p className="text-[11px] text-slate-700 leading-relaxed">{turn.notice}</p>
+                <FeedbackBar value={turn.feedback} onSend={onFeedback} />
+            </div>
+        );
+    }
+
     if (turn.review) {
         return (
             <div className="space-y-2">
@@ -353,7 +389,27 @@ function Turn({ turn, onCandidateClick, onFeedback, openPositions = [], onPickPo
         );
     }
 
+    if (turn.market) {
+        return (
+            <div className="space-y-2">
+                <MarketTurn market={turn.market} />
+                <FeedbackBar value={turn.feedback} onSend={onFeedback} />
+            </div>
+        );
+    }
+
     const r = turn.result;
+    // KAYITTAN GELEN TUR EKSİK OLABİLİR. Aday sorgusu dışındaki araçların
+    // çıktısı bir süre hiç saklanmıyordu ve sayfa yenilenince bu tur aday
+    // sorgusu sanılıp `result.groups` okunuyor, TÜM panel çöküyordu. Eksik
+    // turu söylemek, sohbeti düşürmekten iyidir.
+    if (!r) {
+        return (
+            <p className="text-[11px] text-slate-400 italic">
+                Bu cevabın ayrıntısı saklanmadı — soruyu tekrar sorabilirsiniz.
+            </p>
+        );
+    }
     return (
         <div className="space-y-2">
             {turn.comment && (
@@ -491,6 +547,108 @@ function ReviewTurn({ turn }) {
                     </p>
                 )}
             </div>
+        </div>
+    );
+}
+
+/**
+ * Piyasa araştırması — bant, yan haklar ve KAYNAKLAR.
+ *
+ * Kabul kuralı burada görünür hâle geliyor: kaynak listesi boşken ekranda maaş
+ * rakamı YOKTUR. Rakam gizlendiyse bunu söyleriz — "bulunamadı" ile
+ * "bulundu ama gösteremiyoruz" iki farklı şeydir ve ikincisi kullanıcının
+ * bilmesi gereken bir karardır.
+ */
+function MarketTurn({ market }) {
+    const { band, withheld, grounded, date, scope, benefits = [], caution, sources = [], query } = market;
+
+    return (
+        <div className="space-y-2">
+            {band ? (
+                <div className="rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-cyan-600">Piyasa bandı</p>
+                    <p className="text-[13px] font-black text-slate-800 tabular-nums">{formatBand(band)}</p>
+                    {/* Baz yoksa bu bant kendi bütçenizle KARŞILAŞTIRILAMAZ —
+                        brüt/net farkı %30-40 ve makul göründüğü için fark
+                        edilmez (gerekçe: utils/salaryBand.js). */}
+                    {!band.basis && (
+                        <p className="text-[10px] text-amber-700 mt-0.5">
+                            Kaynaklar brüt mü net mi söylemiyor — kendi bandınızla doğrudan
+                            karşılaştırmayın.
+                        </p>
+                    )}
+                    {date && <p className="text-[10px] text-slate-500 mt-0.5">Verinin dönemi: {date}</p>}
+                </div>
+            ) : withheld ? (
+                <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                    <p className="text-[11px] text-amber-800 leading-relaxed">
+                        Bir bant üretildi ama <strong>hiçbir kaynağa dayanmıyor</strong>, o yüzden
+                        rakamı göstermiyorum. Kaynaksız bir maaş rakamı teklif dayanağı olamaz.
+                    </p>
+                </div>
+            ) : (
+                <p className="text-[11px] text-slate-600 leading-relaxed">
+                    Bu rol için kaynaklı bir ücret bandı bulunamadı.
+                </p>
+            )}
+
+            {/* Arama aracı çalışmadıysa cevap modelin kendi hatırladığıdır.
+                Sessizce kaynaklıymış gibi sunmak en kötüsü olurdu. */}
+            {!grounded && (
+                <p className="text-[10px] text-amber-700 leading-relaxed">
+                    Arama yapılamadı — aşağıdaki bilgi modelin hatırladığıdır, doğrulanmamıştır.
+                </p>
+            )}
+
+            {benefits.length > 0 && (
+                <div>
+                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Yaygın yan haklar</p>
+                    <ul className="space-y-0.5">
+                        {benefits.map((b, i) => (
+                            <li key={i} className="text-[11px] text-slate-600 leading-relaxed">• {b}</li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+
+            {caution && <p className="text-[10px] text-slate-500 italic leading-relaxed">{caution}</p>}
+
+            <div className="rounded-lg bg-slate-50 border border-slate-100 px-2.5 py-2 space-y-1">
+                <p className="flex items-center gap-1 text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                    <Info className="w-2.5 h-2.5" /> Ne arandı
+                </p>
+                <p className="text-[10px] text-slate-500 leading-relaxed">
+                    <strong>{query?.title || '—'}</strong>
+                    {query?.level ? ` · ${query.level}` : ' · seviye belirtilmedi'}
+                    {query?.location ? ` · ${query.location}` : ' · konum belirtilmedi'}
+                </p>
+                {scope && <p className="text-[10px] text-slate-500 leading-relaxed">{scope}</p>}
+            </div>
+
+            {/* KAYNAKLAR — iddianın izi. Bunlar yoksa yukarıda rakam da yok. */}
+            {sources.length > 0 && (
+                <div className="space-y-0.5">
+                    <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Kaynaklar</p>
+                    {sources.slice(0, 6).map((s) => (
+                        <a
+                            key={s.uri}
+                            href={s.uri}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block text-[10px] text-cyan-700 hover:underline truncate"
+                        >
+                            {s.title || s.uri}
+                        </a>
+                    ))}
+                </div>
+            )}
+
+            {/* Google'ın gösterim şartı: arama önerisi bloğu grounding
+                kullanıldığında OLDUĞU GİBİ gösterilmek zorunda. */}
+            {market.searchSuggestionHtml && (
+                <div className="pt-1 overflow-x-auto" dangerouslySetInnerHTML={{ __html: market.searchSuggestionHtml }} />
+            )}
         </div>
     );
 }

@@ -54,6 +54,18 @@ export const TOOLS = [
             'Mülakatlarda hangi madde hiç sorulmamış',
         ],
     },
+    {
+        id: 'piyasa_arastirmasi',
+        label: 'Piyasa araştırması',
+        description:
+            'Bir rol için piyasadaki ücret bandını ve yaygın yan hakları WEBDE ARAYARAK '
+            + 'bulur ve kaynaklarını gösterir. Kendi aday havuzuna DEĞİL, dışarıdaki '
+            + 'piyasaya bakar. Rol başlığı, seviye ve konumla çalışır.',
+        examples: [
+            'İstanbul’da senior Growth PM maaşı ne kadar',
+            'Bu pozisyon için hangi yan haklar veriliyor',
+        ],
+    },
 ];
 
 const BY_ID = new Map(TOOLS.map((t) => [t.id, t]));
