@@ -63,6 +63,15 @@ Kullanıcının söylemediği YIL SAYISI, ARAÇ ADI, SEKTÖR ya da DİPLOMA şar
 yazmaktan kaçın — bunlar en çok haksız eleme yapan maddelerdir. Gerçekten
 gerekiyorsa "gaps" listesine soru olarak yaz: 'Kaç yıl deneyim istiyorsunuz?'
 
+KULLANICI ÖNCELİĞİ SÖYLEDİYSE ONA UY:
+"Şunları tercihen ekle", "bunları zorunlu yap", "X'i tercihene al" gibi bir
+istek geldiyse öncelik BELLİDİR; kendi kararını verme, "must" alanını
+kullanıcının dediği gibi ayarla. Bu maddelerin "source" değeri "kullanici"dir
+— kullanıcı onları açıkça saydı.
+Virgülle sıralanmış birden çok şey eklenmesi istendiyse HER BİRİ AYRI MADDE
+olur; hepsini tek maddede toplamak, tek damga alacak bir maddeye altı ayrı
+konu sıkıştırmaktır.
+
 DÜZELTME İSTEĞİ GELDİYSE:
 MEVCUT_TASLAK doluysa kullanıcı yeni bir ilan istemiyor, VAR OLANI düzeltmek
 istiyor. YALNIZCA istenen değişikliği yap; geri kalan maddeleri, başlığı ve
@@ -110,10 +119,41 @@ export async function draftPosition(brief, { previousDraft = null, departments =
     });
 
     const model = await getModel();
-    const result = await model.generateContent(prompt, { maxOutputTokens: 4096, label: 'position-draft' });
-    const parsed = parseAIJson(result.response.text(), null);
-    if (!parsed || typeof parsed !== 'object') {
-        throw new Error('Taslak üretilemedi. İsteği biraz daha somut yazmayı deneyin.');
+
+    // ── NEDEN İKİ DENEME VE NEDEN BU KADAR BÜTÇE ────────────────────────────
+    // Canlıda çıktı: gayet somut bir düzeltme isteği ("tercihen maddelere ekle:
+    // ...") "Taslak üretilemedi" ile döndü. Sebep isteğin belirsizliği değildi
+    // — modelin JSON'u YARIDA KESİLMİŞTİ.
+    //
+    // Düzeltme isteğinde model taslağın TAMAMINI yeniden yazmak zorunda:
+    // korunan maddeler, işaretler, kaynaklar, varsayımlar. Buna Gemini 2.5'in
+    // düşünme token'ları ekleniyor ve ikisi de aynı çıktı bütçesinden yeniyor.
+    // 4096 yetmedi.
+    //
+    // İkinci deneme daha büyük bütçeyle: kesilme ihtimali kalan tek makul
+    // açıklamaysa bir kez daha denemek, kullanıcıya yanlış sebebi söylemekten
+    // ucuz. Sunucu önbelleği (prompt + generationConfig) tavan değiştiği için
+    // ikinci denemeyi gerçekten çalıştırıyor.
+    const attempts = [8192, 16384];
+    let lastText = '';
+    for (const maxOutputTokens of attempts) {
+        const result = await model.generateContent(prompt, { maxOutputTokens, label: 'position-draft' });
+        lastText = result.response.text();
+        const parsed = parseAIJson(lastText, null);
+        if (parsed && typeof parsed === 'object') return parsed;
     }
-    return parsed;
+
+    // SEBEBİ DOĞRU SÖYLE. Eski mesaj isteği suçluyordu ve canlıda tam da
+    // isteğin kusursuz olduğu bir durumda çıktı; kullanıcı cümlesini yeniden
+    // yazarak zaman kaybetti. Kapanmamış bir JSON kesilmenin en görünür izi.
+    // Kesilmenin izi: JSON BAŞLAMIŞ ama kapanmamış. Hiç JSON olmayan bir
+    // cevabı "kesildi" saymak, sebebi yine yanlış söylemek olurdu.
+    const trimmed = lastText.replace(/```json|```/gi, '').trim();
+    const looksTruncated = trimmed.startsWith('{') && !trimmed.endsWith('}');
+    throw new Error(
+        looksTruncated
+            ? 'Taslak üretilemedi: modelin cevabı yarıda kesildi. Önceki taslak duruyor — '
+              + 'düzeltmeyi daha küçük parçalara bölerek deneyin (örn. maddeleri ikiye ayırın).'
+            : 'Taslak üretilemedi: modelin cevabı okunamadı. Önceki taslak duruyor, tekrar deneyin.'
+    );
 }

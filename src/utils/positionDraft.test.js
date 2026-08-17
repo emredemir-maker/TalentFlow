@@ -67,6 +67,16 @@ describe('lintDraft', () => {
         expect(lintDraft(d).map((f) => f.code)).toContain('priority-in-text');
     });
 
+    // Gerçek bir ilandan: "...en az 2-3 yıl deneyim; B2B SaaS deneyimi güçlü
+    // artı" — tercih ifadesi ZORUNLU bir maddenin içinde duruyordu.
+    it('catches "güçlü artı" hiding inside a mandatory item', () => {
+        const d = normalizeDraft({
+            title: 'X',
+            items: [item('Müşteriyle birebir çalışılan bir rolde 2-3 yıl deneyim; B2B SaaS deneyimi güçlü artı', { must: true })],
+        });
+        expect(lintDraft(d).map((f) => f.code)).toContain('priority-in-text');
+    });
+
     it('flags an item long enough to be asking several things', () => {
         const d = normalizeDraft({ title: 'X', items: [item('a'.repeat(200))] });
         expect(lintDraft(d).map((f) => f.code)).toContain('too-long');

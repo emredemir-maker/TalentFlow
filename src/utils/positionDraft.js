@@ -41,8 +41,12 @@ export const MANY_MUST = 5;
  * Öncelik ifadeleri MADDE METNİNDE durmamalı; `must` işaretine taşınmalı.
  * Metinde kalırsa değerlendirme yapan model işarete değil metne inanır.
  */
+// Liste gerçek bir ilandan büyüdü: "B2B SaaS deneyimi güçlü artı" ifadesi
+// zorunlu bir maddenin İÇİNDE duruyordu ve 'artı olur' kalıbına uymadığı için
+// yakalanmıyordu.
 const PRIORITY_WORDS = [
-    'tercihen', 'tercih sebebi', 'zorunlu', 'şart', 'artı olur', 'olmazsa olmaz',
+    'tercihen', 'tercih sebebi', 'tercih edilir', 'zorunlu', 'şart',
+    'artı olur', 'güçlü artı', 'artı sağlar', 'olmazsa olmaz',
     'nice to have', 'must have',
 ];
 

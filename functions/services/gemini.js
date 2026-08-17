@@ -153,6 +153,17 @@ export async function generateText(prompt, options = {}) {
         try {
             const result = await model.generateContent(prompt);
             const text = result.response.text();
+            // KESİLME SESSİZ BİR ARIZA. Cevap MAX_TOKENS ile bittiğinde metin
+            // yarıda kalıyor; JSON bekleyen çağıran taraf onu "model saçmaladı"
+            // sanıyor ve kullanıcıya YANLIŞ sebebi söylüyor ("isteğinizi daha
+            // somut yazın" — oysa istek gayet somuttu). Gemini 2.5'te düşünme
+            // token'ları da bu bütçeden yendiği için tavan beklenenden çabuk
+            // doluyor. Etiketiyle birlikte loglanıyor: hangi özelliğin tavanı
+            // yetmiyor, tahminle değil kayıtla bilinsin.
+            const finishReason = result.response?.candidates?.[0]?.finishReason;
+            if (finishReason && finishReason !== 'STOP') {
+                log.warn({ label, modelId, finishReason, chars: text.length }, 'model output did not finish cleanly');
+            }
             // Ölçüm beklenmez (await yok): fatura kaydı yüzünden kullanıcı
             // bekletilmez ve hata yutulur.
             void recordUsage({ label, modelId, usage: readUsage(result.response) }).catch(() => {});
