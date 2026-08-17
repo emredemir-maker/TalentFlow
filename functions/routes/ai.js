@@ -90,8 +90,19 @@ router.post('/api/ai/ask', aiLimiter, verifyFirebaseToken, async (req, res) => {
     }
 
     // Bu uç kısa açıklamalar için; uzun metin istenirse maliyet ve gecikme
-    // hızla artar. 2048 bilinçli bir tavan.
-    const tokenCap = Math.min(Math.max(parseInt(maxOutputTokens, 10) || 1024, 256), 2048);
+    // hızla artar. Ama TAVAN 2048 CANLIDA YETMEDİ ve arıza sessizdi:
+    //
+    // Gemini 2.5'te DÜŞÜNME TOKEN'LARI da çıktı bütçesinden yeniyor. Piyasa
+    // araştırması gibi arama yapan bir çağrıda düşünme payı tek başına tavanı
+    // doldurabiliyor; cevap yarıda kesiliyor. Kesilen cevapta yalnızca metin
+    // eksik kalmıyor — GROUNDING METADATA DA BOŞ geliyor, yani kaynak listesi
+    // boşalıyor. Kaynaksız cevabı gizleyen kural devreye giriyor ve kullanıcı
+    // "kaynaklı bant bulunamadı" görüyor. Görünen belirti ile sebep arasında
+    // hiçbir bağ yok.
+    //
+    // Tavan bir HEDEF değil sınır: kısa cevaplar yine kısa üretiliyor,
+    // yalnızca kesilme ihtimali kalkıyor.
+    const tokenCap = Math.min(Math.max(parseInt(maxOutputTokens, 10) || 2048, 256), 8192);
 
     try {
         const result = await generateGrounded(prompt, { modelId, maxOutputTokens: tokenCap });

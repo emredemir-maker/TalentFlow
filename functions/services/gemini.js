@@ -234,8 +234,15 @@ function readGrounding(response) {
     // we want it in the logs — this is the branch that produced a confusing
     // screen and we cannot reproduce it without a real key.
     if (searchQueries.length > 0 && sources.length === 0) {
+        // finishReason BURADA KRİTİK: 'MAX_TOKENS' ise sebep modelin kaynak
+        // göstermemesi değil, cevabın KESİLMESİ. Kesilen cevapta grounding
+        // metadata da boş geliyor ve arıza "kaynak bulunamadı" gibi görünüyor.
         log.warn(
-            { queries: searchQueries.length, metaKeys: Object.keys(meta).join(',') },
+            {
+                queries: searchQueries.length,
+                metaKeys: Object.keys(meta).join(','),
+                finishReason: response?.candidates?.[0]?.finishReason || 'bilinmiyor',
+            },
             'grounding: search ran but no citable chunks came back'
         );
     }
