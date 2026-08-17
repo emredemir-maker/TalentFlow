@@ -41,7 +41,12 @@ BAZI UYDURMA. Kaynak açıkça "brüt" ya da "net" demiyorsa BAZ satırına
 "bilinmiyor" yaz. Türkiye'de aday genelde net konuşur ama "genelde" bir ölçüm
 değildir ve yanlış baz farkı %30-40 kaydırır.
 
-Cevabını tam olarak şu satırlarla ver, başka hiçbir şey yazma:
+ÖNCE 2-3 CÜMLE DÜZ METİN YAZ: hangi kaynak ne söylüyor, sayılar nereden
+geliyor. Bu bölüm süs değil — Google Arama ile grounding, alıntıları düz
+metne bağlıyor. Yalnızca etiketli satır yazarsan cevap hiçbir sayfaya
+bağlanmaz ve kaynaksız kaldığı için EKRANDA GÖSTERİLMEZ.
+
+Sonra bir boş satır bırak ve şu etiketli satırları yaz:
 
 BANT_ALT: yalnızca rakam (ayraçsız) ya da yok
 BANT_UST: yalnızca rakam (ayraçsız) ya da yok
@@ -165,6 +170,7 @@ export async function researchMarket({ title = '', level = '', location = '', su
     );
     const parsed = parseMarketAnswer(answer.text);
     const sources = Array.isArray(answer.sources) ? answer.sources : [];
+    const searchQueries = Array.isArray(answer.searchQueries) ? answer.searchQueries : [];
 
     // KAYNAKSIZ RAKAM GÖSTERİLMEZ — kural burada, prompt'ta değil. Modele
     // "kaynaksız yazma" demek bir dilek; bu bir kısıt.
@@ -174,6 +180,14 @@ export async function researchMarket({ title = '', level = '', location = '', su
     return {
         band,
         withheld: sources.length === 0 && parsedBand !== null,
+        // NEDEN gizlendi — canlıda ikisi karıştı. Arama hiç yapılamamış olmakla,
+        // arama yapılıp hiçbir sayfanın kaynak gösterilmemesi farklı şeyler ve
+        // kullanıcı ekranda Google'ın arama bloğunu görürken "hiçbir kaynağa
+        // dayanmıyor" cümlesini okuyunca haklı olarak çelişki görüyor.
+        withheldReason: sources.length > 0
+            ? ''
+            : (searchQueries.length > 0 ? 'searched-uncited' : 'not-searched'),
+        searchQueries,
         grounded: Boolean(answer.grounded),
         date: parsed.date,
         scope: parsed.scope,

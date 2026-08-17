@@ -197,22 +197,53 @@ const SEARCH_TOOLS = [
     [{ googleSearchRetrieval: {} }],
 ];
 
-/** Grounding metadata → the few fields the UI actually needs. */
+/**
+ * Grounding metadata → the few fields the UI actually needs.
+ *
+ * ── WHY THIS READS MORE THAN ONE SHAPE ──────────────────────────────────────
+ * Seen in production: the answer came back with a rendered Search Suggestions
+ * block (so a search DID run) but `groundingChunks` was empty. The salary tool
+ * withholds numbers when the source list is empty, so the user got a screen
+ * saying "no sources" right above Google's own search chip — two statements
+ * that contradict each other.
+ *
+ * Chunks can arrive as `web` (public search) or `retrievedContext` (retrieval
+ * tools), and either may be absent while the search still happened. So we read
+ * both shapes AND return `searchQueries`: it is the honest answer to "did it
+ * search?", which is a different question from "can this claim be traced?".
+ */
 function readGrounding(response) {
     const meta = response?.candidates?.[0]?.groundingMetadata;
-    if (!meta) return { sources: [], searchSuggestionHtml: '' };
+    if (!meta) return { sources: [], searchSuggestionHtml: '', searchQueries: [] };
 
     const seen = new Set();
     const sources = [];
     for (const chunk of meta.groundingChunks || []) {
-        const web = chunk?.web;
-        if (!web?.uri || seen.has(web.uri)) continue;
-        seen.add(web.uri);
-        sources.push({ title: String(web.title || web.uri), uri: String(web.uri) });
+        const ref = chunk?.web || chunk?.retrievedContext;
+        if (!ref?.uri || seen.has(ref.uri)) continue;
+        seen.add(ref.uri);
+        sources.push({ title: String(ref.title || ref.uri), uri: String(ref.uri) });
     }
+
+    const searchQueries = (Array.isArray(meta.webSearchQueries) ? meta.webSearchQueries : [])
+        .map((q) => String(q || '').trim())
+        .filter(Boolean)
+        .slice(0, 6);
+
+    // Searched but cited nothing: the caller may want to say so precisely, and
+    // we want it in the logs — this is the branch that produced a confusing
+    // screen and we cannot reproduce it without a real key.
+    if (searchQueries.length > 0 && sources.length === 0) {
+        log.warn(
+            { queries: searchQueries.length, metaKeys: Object.keys(meta).join(',') },
+            'grounding: search ran but no citable chunks came back'
+        );
+    }
+
     return {
         sources: sources.slice(0, 8),
         searchSuggestionHtml: String(meta.searchEntryPoint?.renderedContent || ''),
+        searchQueries,
     };
 }
 
@@ -275,7 +306,7 @@ export async function generateGrounded(prompt, options = {}) {
         modelId,
         generationConfig: { temperature: 0.2, maxOutputTokens },
     });
-    const value = { text, sources: [], searchSuggestionHtml: '', grounded: false };
+    const value = { text, sources: [], searchSuggestionHtml: '', searchQueries: [], grounded: false };
     if (key) cacheSet(key, value);
     return value;
 }

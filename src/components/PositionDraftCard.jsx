@@ -202,9 +202,11 @@ export default function PositionDraftCard({ draft, positions = [], onUpdateDraft
                             </div>
                         ) : (
                             <p className="text-[10px] text-amber-700 leading-relaxed">
-                                {market.withheld
-                                    ? 'Bir bant üretildi ama hiçbir kaynağa dayanmıyor — rakamı göstermiyorum.'
-                                    : 'Bu rol için kaynaklı bir bant bulunamadı.'}
+                                {!market.withheld
+                                    ? 'Bu rol için kaynaklı bir bant bulunamadı.'
+                                    : market.withheldReason === 'searched-uncited'
+                                        ? 'Arama yapıldı ama model hiçbir sayfayı kaynak göstermedi — rakamı göstermiyorum.'
+                                        : 'Bir bant üretildi ama hiçbir kaynağa dayanmıyor — rakamı göstermiyorum.'}
                             </p>
                         )}
                         {market.sources?.length > 0 && (

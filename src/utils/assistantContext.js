@@ -117,6 +117,10 @@ function compactMarket(market) {
     return {
         band: market.band || null,
         withheld: Boolean(market.withheld),
+        // Gizleme SEBEBİ de saklanır: yenilendiğinde ekran yine doğru cümleyi
+        // kurmalı ("arama yapıldı ama kaynak gösterilmedi" ≠ "arama yapılamadı").
+        withheldReason: String(market.withheldReason || ''),
+        searchQueries: (Array.isArray(market.searchQueries) ? market.searchQueries : []).map(String).slice(0, 6),
         grounded: Boolean(market.grounded),
         date: String(market.date || ''),
         scope: String(market.scope || ''),
