@@ -1,7 +1,9 @@
 # Plan: İK Asistanı — tek araçlı sorgudan yaşayan asistana
 
 Tarih: 2026-08-14
-Durum: Planlandı — uygulama başlamadı
+Durum: Faz 0, 1, 2, 4 ve 5 yazıldı. Faz 3 (pozisyon teşhisi), Faz 6 (yetkinliğe
+göre aday önerisi) ve Faz 7 (kurum hafızası) sırada. Faz 5'te yalnızca 5/4
+(benzer ilanlarla karşılaştırma) kapsam dışı bırakıldı.
 
 ## Amaç
 
@@ -160,9 +162,38 @@ Bu bir sorgu değil, ölçülebilir bulgular üzerine kurulu bir teşhis:
 - 5/2 Maddeler **ölçülebilir** yazılır — mevcut damga motoru bunları değerlendirebilmeli
 - 5/3 Taslak düzenlenebilir biçimde sunulur; kaydetme **kullanıcı eylemi**
 - 5/4 Benzer açık ilanlarla karşılaştırma: çakışan maddeler, eksik kalanlar
+      *(kapsam dışı bırakıldı — 2026-08-17 kullanıcı kararı)*
 - 5/5 İsteğe bağlı: Faz 4 çıktısıyla maaş bandı önerisi (kaynaklarıyla)
 
 **Kabul:** Asistan hiçbir koşulda `positions` koleksiyonuna kendi başına yazmıyor.
+
+#### Yazılırken çıkan üç karar
+
+**Her madde kaynağını taşıyor.** Bir taslak, tanımı gereği kullanıcının
+söylemediği şeyler önerir — yoksa taslak değil dikte olurdu. Tehlike şu:
+"3-5 yıl deneyim" gibi bir madde makul görünür, kullanıcı onu kendi yazdığı
+sanır ve o madde GERÇEK ADAYLARI eler. Bu yüzden her madde `source` taşıyor
+(`kullanici` / `oneri`) ve ekranda "öneri" rozetiyle ayrılıyor. Kaynağı
+belirsiz madde ÖNERİ sayılıyor: kullanıcı fazladan bir maddeyi gözden geçirir,
+eksik gözden geçirmez.
+
+**Denetim modelde değil kodda.** Prompt'a "öncelik kelimesini metne yazma"
+demek bir dilek. `lintDraft` onu ölçüyor: metinde kalmış bir "tercihen",
+damgalama yapan modele işaretle ÇELİŞEN sinyal verir ve model metne inanır.
+Aynı yerde uzun madde (birden çok şey soruyor), tekrar eden madde, hiç zorunlu
+olmaması ve fazla zorunlu olması da ölçülüyor. Hiçbiri kaydetmeyi ENGELLEMİYOR
+— engellemek, kullanıcının kendi ilanı hakkındaki kararını sisteme devretmek
+olurdu.
+
+**Bazı bilinmeyen band forma taşınmıyor.** İlan formundaki brüt/net seçicisinin
+boş seçeneği yok ve varsayılanı brüt. Bazı bilinmeyen bir bandı oraya yazmak,
+bilinmeyen bir şeyi BRÜT diye iddia etmek olur. Rakamı taşımamak, yanlış
+etiketle taşımaktan iyi — ekran bunu söylüyor.
+
+Maaş bandı iki kaynaktan gelebiliyor ve ikisi de kullanıcı eylemiyle taslağa
+giriyor: **kendi ilanlarınız** (`utils/internalBand.js` — ücretsiz, aynı
+birimden en az 3 ilan yoksa sayı vermez, çevrim yapmaz) ve **piyasa**
+(Faz 4, kaynaklarıyla).
 
 ### Faz 6 — Yetkinliğe göre aday önerisi
 

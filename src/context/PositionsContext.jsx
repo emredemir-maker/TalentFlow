@@ -29,6 +29,9 @@ export function PositionsProvider({ children }) {
     const [positions, setPositions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    // İK asistanından gelen ilan taslağı — PositionsPage onu form verisi
+    // olarak alır ve tüketince temizler.
+    const [positionDraft, setPositionDraft] = useState(null);
 
     // Initial listener for real-time updates
     useEffect(() => {
@@ -162,6 +165,17 @@ export function PositionsProvider({ children }) {
         positions,
         loading,
         error,
+        // İK asistanının ürettiği ilan taslağı, forma taşınmayı bekliyor.
+        //
+        // Olay (event) ile geçirilemez: kullanıcı pozisyonlar ekranında
+        // değilken o ekran takılı değildir ve olayı dinleyecek kimse olmaz.
+        // Aynı düzen randevu akışında da var (CandidatesContext).
+        //
+        // TASLAK BİR KAYIT DEĞİLDİR: form açılır, kullanıcı düzenler ve
+        // kaydetmeye kendisi karar verir. Asistan `positions` koleksiyonuna
+        // hiçbir koşulda yazmaz.
+        positionDraft,
+        setPositionDraft,
         addPosition,
         addPositionRequest,
         approvePosition,

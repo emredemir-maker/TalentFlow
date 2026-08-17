@@ -66,6 +66,19 @@ export const TOOLS = [
             'Bu pozisyon için hangi yan haklar veriliyor',
         ],
     },
+    {
+        id: 'pozisyon_taslagi',
+        label: 'İlan taslağı',
+        description:
+            'Doğal dilden iş ilanı taslağı üretir: başlık, özet, zorunlu ve tercihen '
+            + 'maddeler. Var olan bir taslağı düzeltme isteğiyle günceller '
+            + '("zorunluları üçe indir", "SQL ekle"). HİÇBİR ŞEY KAYDETMEZ — taslak '
+            + 'ekranda durur, ilanı kaydetme kararı kullanıcınındır.',
+        examples: [
+            'Senior Growth PM ilanı hazırla — İstanbul, hibrit',
+            'Bu role bir ilan taslağı çıkar',
+        ],
+    },
 ];
 
 const BY_ID = new Map(TOOLS.map((t) => [t.id, t]));
