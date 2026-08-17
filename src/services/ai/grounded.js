@@ -44,6 +44,11 @@ export async function askGrounded(prompt, { maxOutputTokens = 1024 } = {}) {
         text: String(data?.text || '').trim(),
         sources: Array.isArray(data?.sources) ? data.sources : [],
         searchSuggestionHtml: String(data?.searchSuggestionHtml || ''),
+        // "Arama yapıldı mı" ile "iddia izlenebilir mi" AYRI sorular. Canlıda
+        // ikisi çeliştiği görüldü: Google'ın arama bloğu geldi ama kaynak
+        // listesi boştu, ekran da "hiçbir kaynağa dayanmıyor" dedi. Arayüzün
+        // doğru cümleyi kurabilmesi için ikisi de gerekiyor.
+        searchQueries: Array.isArray(data?.searchQueries) ? data.searchQueries : [],
         grounded: Boolean(data?.grounded),
     };
 }

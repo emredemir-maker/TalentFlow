@@ -39,7 +39,7 @@ vi.mock('../config/firebaseAdmin.js', () => ({
 }));
 
 // Now safe to import the module.
-const { generateText, parseProfile, getDefaultCvParsingModel } = await import('./gemini.js');
+const { generateText, generateGrounded, parseProfile, getDefaultCvParsingModel } = await import('./gemini.js');
 
 beforeEach(() => {
     mockGenerateContent.mockReset();
@@ -144,6 +144,70 @@ describe('generateText', () => {
         await assertion;
         // MAX_RETRIES = 4, so 5 total attempts (initial + 4 retries)
         expect(mockGenerateContent).toHaveBeenCalledTimes(5);
+    });
+});
+
+// GROUNDING METADATA — "aradı mı" ile "izi sürülebilir mi" ayrı sorular.
+//
+// Canlıda görüldü: cevapla birlikte Google'ın arama önerisi bloğu geldi (yani
+// arama ÇALIŞTI) ama groundingChunks boştu. Maaş aracı kaynak listesi boşken
+// rakamı gizliyor, dolayısıyla kullanıcı Google'ın arama çipinin hemen üstünde
+// "hiçbir kaynağa dayanmıyor" cümlesini okudu — birbiriyle çelişen iki ifade.
+describe('generateGrounded — kaynak okuma', () => {
+    const grounded = (meta) => ({
+        response: { text: () => 'cevap', candidates: [{ groundingMetadata: meta }] },
+    });
+
+    it('reads web chunks as sources', async () => {
+        mockGenerateContent.mockResolvedValue(grounded({
+            groundingChunks: [{ web: { uri: 'https://a.example', title: 'A' } }],
+            searchEntryPoint: { renderedContent: '<div>chip</div>' },
+            webSearchQueries: ['growth pm maaş'],
+        }));
+        const out = await generateGrounded('p1', { useCache: false });
+        expect(out.sources).toEqual([{ title: 'A', uri: 'https://a.example' }]);
+        expect(out.searchSuggestionHtml).toBe('<div>chip</div>');
+        expect(out.searchQueries).toEqual(['growth pm maaş']);
+    });
+
+    // Alma araçlarında parça `web` yerine `retrievedContext` altında geliyor;
+    // yalnızca birini okumak kaynakları sessizce yutuyordu.
+    it('also reads retrievedContext chunks', async () => {
+        mockGenerateContent.mockResolvedValue(grounded({
+            groundingChunks: [{ retrievedContext: { uri: 'https://b.example', title: 'B' } }],
+        }));
+        expect((await generateGrounded('p2', { useCache: false })).sources)
+            .toEqual([{ title: 'B', uri: 'https://b.example' }]);
+    });
+
+    // Ekranın doğru cümleyi kurabilmesi için gereken ayrım.
+    it('reports the search queries even when nothing was cited', async () => {
+        mockGenerateContent.mockResolvedValue(grounded({
+            groundingChunks: [],
+            searchEntryPoint: { renderedContent: '<div>chip</div>' },
+            webSearchQueries: ['senior growth pm salary turkey'],
+        }));
+        const out = await generateGrounded('p3', { useCache: false });
+        expect(out.sources).toEqual([]);
+        expect(out.searchQueries).toEqual(['senior growth pm salary turkey']);
+        expect(out.grounded).toBe(true);
+    });
+
+    it('drops duplicate and uri-less chunks', async () => {
+        mockGenerateContent.mockResolvedValue(grounded({
+            groundingChunks: [
+                { web: { uri: 'https://a.example', title: 'A' } },
+                { web: { uri: 'https://a.example', title: 'A tekrar' } },
+                { web: { title: 'adressiz' } },
+            ],
+        }));
+        expect((await generateGrounded('p4', { useCache: false })).sources).toHaveLength(1);
+    });
+
+    it('returns empty grounding when the response carries no metadata', async () => {
+        mockGenerateContent.mockResolvedValue({ response: { text: () => 'cevap', candidates: [{}] } });
+        const out = await generateGrounded('p5', { useCache: false });
+        expect(out).toMatchObject({ sources: [], searchQueries: [], searchSuggestionHtml: '' });
     });
 });
 

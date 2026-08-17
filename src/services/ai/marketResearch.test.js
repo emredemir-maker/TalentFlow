@@ -25,7 +25,8 @@ const ANSWER = [
 const SOURCE = { title: 'Maaş raporu 2026', uri: 'https://example.com/rapor' };
 
 const reply = (over = {}) => ({
-    text: ANSWER, sources: [SOURCE], searchSuggestionHtml: '<div>öneri</div>', grounded: true, ...over,
+    text: ANSWER, sources: [SOURCE], searchSuggestionHtml: '<div>öneri</div>',
+    searchQueries: ['growth pm maaş'], grounded: true, ...over,
 });
 
 beforeEach(() => { askGrounded.mockReset(); });
@@ -95,6 +96,24 @@ describe('researchMarket', () => {
         // "bulunamadı" ile "bulundu ama gösteremiyoruz" ayrı şeyler; ekran
         // ikincisini söylemek zorunda.
         expect(out.withheld).toBe(true);
+    });
+
+    // CANLIDA GÖRÜLDÜ: Google'ın arama bloğu ekranda dururken "hiçbir kaynağa
+    // dayanmıyor" yazıyordu — kullanıcı haklı olarak çelişki gördü. Arama
+    // yapılmış olmakla iddianın izlenebilir olması ayrı şeyler.
+    it('separates "searched but cited nothing" from "never searched"', async () => {
+        askGrounded.mockResolvedValue(reply({ sources: [], searchQueries: ['growth pm salary'] }));
+        const searched = await researchMarket({ title: 'Growth PM' });
+        expect(searched.withheldReason).toBe('searched-uncited');
+        expect(searched.searchQueries).toEqual(['growth pm salary']);
+
+        askGrounded.mockResolvedValue(reply({ sources: [], searchQueries: [] }));
+        expect((await researchMarket({ title: 'Growth PM' })).withheldReason).toBe('not-searched');
+    });
+
+    it('leaves the reason empty when sources did arrive', async () => {
+        askGrounded.mockResolvedValue(reply());
+        expect((await researchMarket({ title: 'Growth PM' })).withheldReason).toBe('');
     });
 
     it('does not claim withholding when the model found nothing either', async () => {

@@ -667,8 +667,22 @@ function MarketTurn({ market }) {
                 <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
                     <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
                     <p className="text-[11px] text-amber-800 leading-relaxed">
-                        Bir bant üretildi ama <strong>hiçbir kaynağa dayanmıyor</strong>, o yüzden
-                        rakamı göstermiyorum. Kaynaksız bir maaş rakamı teklif dayanağı olamaz.
+                        {/* İKİ AYRI DURUM, İKİ AYRI CÜMLE. Arama hiç yapılamamış olmakla,
+                            arama yapılıp hiçbir sayfanın kaynak gösterilmemesi farklı
+                            şeyler; ikisine aynı cümleyi yazmak ekranda Google'ın arama
+                            bloğunu gören kullanıcıya çelişki gibi görünüyordu. */}
+                        {market.withheldReason === 'searched-uncited' ? (
+                            <>
+                                <strong>Arama yapıldı ama model hiçbir sayfayı kaynak göstermedi</strong>,
+                                o yüzden ürettiği rakamı göstermiyorum. İzi sürülemeyen bir maaş rakamı
+                                teklif dayanağı olamaz.
+                            </>
+                        ) : (
+                            <>
+                                Bir bant üretildi ama <strong>hiçbir kaynağa dayanmıyor</strong>, o yüzden
+                                rakamı göstermiyorum. Kaynaksız bir maaş rakamı teklif dayanağı olamaz.
+                            </>
+                        )}
                     </p>
                 </div>
             ) : (
@@ -708,6 +722,14 @@ function MarketTurn({ market }) {
                     {query?.location ? ` · ${query.location}` : ' · konum belirtilmedi'}
                 </p>
                 {scope && <p className="text-[10px] text-slate-500 leading-relaxed">{scope}</p>}
+                {/* Modelin GERÇEKTEN arattığı sorgular. Kaynak gelmediğinde bile
+                    kullanıcı aramanın çalıştığını görür ve aynı sorguyu kendisi
+                    çalıştırabilir. */}
+                {market.searchQueries?.length > 0 && (
+                    <p className="text-[10px] text-slate-400 leading-relaxed">
+                        Arananlar: {market.searchQueries.join(' · ')}
+                    </p>
+                )}
             </div>
 
             {/* KAYNAKLAR — iddianın izi. Bunlar yoksa yukarıda rakam da yok. */}
