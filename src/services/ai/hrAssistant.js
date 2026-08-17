@@ -97,6 +97,19 @@ Bu araç YALNIZCA görüşme yapılmış adaylar için çalışır. "Kimlerle g�
 "Kimi çağıralım", "en iyi adaylar" gibi HAVUZ soruları aday_sorgusu'na gider —
 görüşme yapılmamış adaylar bu araçta hiç görünmez.
 
+"piyasa_arastirmasi" ARACININ ALANLARI (bu araçta "filters" KULLANILMAZ):
+- "position": rol başlığı. Kullanıcı söylemediyse bağlamdaki pozisyonu kullan.
+- "level"   : junior | mid | senior | lead | director — kullanıcı söylediyse.
+              SÖYLEMEDİYSE BOŞ BIRAK, varsayma: seviye uydurmak bandı sessizce
+              kaydırır.
+- "location": şehir ya da ülke — kullanıcı söylediyse.
+- "subject" : maas | yan_haklar. İkisi birden soruluyorsa maas yaz.
+
+Bu araç DIŞARIYA bakar: "piyasada ne veriliyor", "ne kadar maaş vermeliyim",
+"hangi yan haklar standart" soruları buraya gider. "Adaylarımızın beklentisi
+ne" sorusu piyasa DEĞİLDİR — o kendi verimizdir ve bugün aday_sorgusu ile de
+ölçülemez; öyle bir soruda "tool": null yaz.
+
 ÖNCEKİ TURLAR — TAKİP SORULARI:
 Kullanıcı "onlardan", "bunların içinde", "peki ya", "aynı pozisyonda" gibi
 ifadelerle bir önceki sorguya atıf yapabilir. Böyle bir atıf VARSA önceki
@@ -113,7 +126,7 @@ TIRNAK KURALI: metin değerlerinin içinde düz çift tırnak (") KULLANMA; tek
 tırnak (') kullan. Kaçışsız tırnak tüm yanıtı okunamaz hâle getirir.
 
 ÇIKTI: yalnızca JSON.
-{"tool":"aday_sorgusu"|"mulakat_incelemesi"|null,"intent":"list|count|group","position":"...","candidate":"...","filters":[...],"sort":{...},"limit":N,"groupBy":"...","unsupported":"..."}
+{"tool":"aday_sorgusu"|"mulakat_incelemesi"|"piyasa_arastirmasi"|null,"intent":"list|count|group","position":"...","candidate":"...","level":"...","location":"...","subject":"...","filters":[...],"sort":{...},"limit":N,"groupBy":"...","unsupported":"..."}
 `;
 
 const NARRATOR_PROMPT = `
