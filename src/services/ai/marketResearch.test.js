@@ -73,6 +73,30 @@ describe('parseMarketAnswer', () => {
         expect(out.max).toBeNull();
     });
 
+    // Prompt önce düz metin istiyor; düz metin isteyen bir cevapta model
+    // satırları markdown'la biçimliyor. Süsü ayıklamayan eşleştirme bu
+    // satırları görmez ve bant sessizce boş kalır.
+    it('reads labels through markdown decoration', () => {
+        const decorated = [
+            'Kaynaklara göre bu rolde bant şöyle:',
+            '',
+            '**BANT_ALT:** 90.000',
+            '- **BANT_UST**: 130000',
+            '* PARA_BIRIMI: TRY',
+            'DONEM: aylik',
+            '**BAZ:** brut',
+        ].join('\n');
+        expect(parseMarketAnswer(decorated)).toMatchObject({
+            min: 90000, max: 130000, currency: 'TRY', period: 'monthly', basis: 'gross',
+        });
+    });
+
+    // Cevap kesilirse etiketler hiç gelmez — uydurma bir sayı üretmek yerine
+    // boş dönmeli.
+    it('returns nothing when the answer was cut off before the labels', () => {
+        expect(parseMarketAnswer('Kaynaklara göre bu rolde ücretler')).toMatchObject({ min: null, max: null });
+    });
+
     it('survives an unparseable answer', () => {
         expect(parseMarketAnswer('serbest metin')).toMatchObject({ min: null, max: null, benefits: [] });
         expect(parseMarketAnswer('')).toMatchObject({ min: null, max: null });

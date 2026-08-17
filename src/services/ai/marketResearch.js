@@ -108,12 +108,20 @@ export function parseMarketAnswer(raw) {
     // Eşleştirme KATLANMIŞ metinle: modelin "İ" harfi bazen tek kod noktası,
     // bazen 'i' + birleşik nokta geliyor. Bu tuzağı bu projede beşinci kez
     // görüyoruz (bkz. utils/turkishText.js).
+    // Etiketin çevresindeki SÜSÜ at. Prompt artık önce düz metin istiyor ve
+    // düz metin isteyen bir cevapta model satırları markdown'la biçimliyor:
+    // '**BANT_ALT:** 90.000', '- BANT_ALT: 90.000'. Süsü ayıklamayan bir
+    // eşleştirme bu satırları görmez ve bant sessizce boş kalır.
+    const labelOf = (raw) => foldTr(raw).replace(/[*_`#>\-–—•\s]/g, '');
+
     const grab = (label) => {
-        const folded = foldTr(label);
+        const wanted = labelOf(label);
         for (const line of text.split(/\r?\n/)) {
             const at = line.indexOf(':');
             if (at === -1) continue;
-            if (foldTr(line.slice(0, at)).trim() === folded) return line.slice(at + 1).trim();
+            if (labelOf(line.slice(0, at)) === wanted) {
+                return line.slice(at + 1).replace(/\*+/g, '').trim();
+            }
         }
         return '';
     };
@@ -164,9 +172,14 @@ export function parseMarketAnswer(raw) {
  *   gizlendi. Bu bir hata değil, kuralın çalışması.
  */
 export async function researchMarket({ title = '', level = '', location = '', subject = 'maas' } = {}) {
+    // 1024 CANLIDA YETMEDİ. Gemini 2.5'te düşünme token'ları da çıktı
+    // bütçesinden yeniyor; arama yapan bir çağrıda düşünme payı tek başına
+    // tavanı doldurup cevabı kesiyor. Kesilen cevapta etiketli satırlar
+    // eksik kalıyor (bant ayrıştırılamıyor) VE grounding metadata boşalıyor
+    // (kaynak listesi boş). İki belirti, tek sebep.
     const answer = await askGrounded(
         buildMarketQuery({ title, level, location, subject }),
-        { maxOutputTokens: 1024 }
+        { maxOutputTokens: 4096 }
     );
     const parsed = parseMarketAnswer(answer.text);
     const sources = Array.isArray(answer.sources) ? answer.sources : [];
