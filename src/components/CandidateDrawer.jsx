@@ -12,7 +12,9 @@ import {
 import MatchScoreRing from './MatchScoreRing';
 import AIAnalysisPanel from './AIAnalysisPanel';
 import { analyzeCandidateMatch } from '../services/geminiService';
-import { buildJobDescription, requirementsOf } from '../utils/positionRequirements';
+import { rescanCandidateForPosition } from '../services/scanService';
+import { buildJobDescription, requirementsOf, requirementsFingerprint, isStaleFor } from '../utils/positionRequirements';
+import { COVERAGE_SCHEMA, usesCurrentRubric } from '../utils/coverageDetail';
 import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
 import { calculateMatchScore, filterPositionsByDomain, detectJobDomain, domainLabel } from '../services/matchService';
@@ -60,6 +62,13 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
     const [aiError, setAiError] = useState(null);
     const [jobDescription, setJobDescription] = useState('');
     const [sources, setSources] = useState([]);
+
+    // TEK POZİSYONA GÖRE DEĞERLENDİRME durumu — hangi ilan taranıyor, hangi
+    // ilanda hata çıktı. Aday geneli için tutulan `aiLoading`/`aiError` bunu
+    // ifade edemiyor: kullanıcı bir ilanı taratırken diğer satırların da
+    // "taranıyor" görünmesi, olmayan bir işi varmış gibi gösterirdi.
+    const [scanningTitle, setScanningTitle] = useState(null);
+    const [scanErrors, setScanErrors] = useState({});
 
     // Fetch sources
     useEffect(() => {
@@ -152,6 +161,45 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
     };
 
 
+    /**
+     * BU ADAYI BU İLANA GÖRE DEĞERLENDİR — tek pozisyon, tek AI çağrısı.
+     *
+     * Eskiden bu satırdaki düğme `handleRunAnalysis`'i çağırıyordu: yazısı
+     * "bu pozisyon için analiz yapılmamış" diyor ama davranışı TÜM açık
+     * pozisyonları tarıyor ve ekrana en yüksek skorlu pozisyonun sonucunu
+     * basıyordu. Kullanıcının tıkladığı ilan ile gördüğü sonuç farklı
+     * olabiliyordu; üstelik on açık ilanda tek tıkla on AI çağrısı demekti.
+     *
+     * `rescanCandidateForPosition` zaten tam bu işi yapıyordu ve yalnızca
+     * Pozisyonlar ekranından çağrılıyordu — aday tarafından çağıran yoktu.
+     */
+    const evaluateForPosition = useCallback(async (position) => {
+        if (!position?.title || scanningTitle) return;
+        setScanningTitle(position.title);
+        setScanErrors((prev) => ({ ...prev, [position.title]: '' }));
+        try {
+            const result = await rescanCandidateForPosition(candidate, position);
+            if (result.status === 'scanned') {
+                await updateCandidate(candidate.id, result.updates);
+                return;
+            }
+            // BAŞARISIZLIĞIN SEBEBİ AYRIŞTIRILIR. "Kanıt yok" ile "AI patladı"
+            // aynı şey değil: birincisinde CV'yi düzeltmek, ikincisinde tekrar
+            // denemek gerekiyor. Tek bir "olmadı" mesajı canlıda kota aşımını
+            // CV eksikliği sandırmıştı.
+            const message = result.status === 'skipped_no_cv'
+                ? 'Bu adayda CV metni yok — değerlendirme için önce CV yeniden ayrıştırılmalı.'
+                : result.status === 'analysis_failed'
+                    ? (result.failures?.[0]?.message || 'AI çağrısı başarısız oldu.')
+                    : 'Model bu ilan için sonuç üretemedi.';
+            setScanErrors((prev) => ({ ...prev, [position.title]: message }));
+        } catch (err) {
+            setScanErrors((prev) => ({ ...prev, [position.title]: err?.message || 'Değerlendirme yapılamadı.' }));
+        } finally {
+            setScanningTitle(null);
+        }
+    }, [candidate, updateCandidate, scanningTitle]);
+
     const handleRunAnalysis = useCallback(async () => {
         setAiLoading(true);
         setAiError(null);
@@ -186,7 +234,19 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                     const result = await analyzeCandidateMatch(descToUse, candidate, 'gemini-2.5-flash', {
                         requirements: requirementsOf(pos),
                     });
-                    updatedAnalyses[pos.title] = result;
+                    // DAMGA OLMADAN ANALİZ HANGİ LİSTEYE AİT BİLİNMEZ. Bu yol
+                    // damgayı hiç yazmıyordu: madde değerlendirmeleri madde
+                    // NUMARASINA bağlı olduğu için, ilan sonradan değişince
+                    // eski yargı yanlış maddeye yapışıyor ve kimse fark
+                    // etmiyordu. Pozisyonlar ekranındaki tarama zaten damgayı
+                    // yazıyor (services/scanService.js); iki yol aynı kaydı
+                    // üretmeli.
+                    updatedAnalyses[pos.title] = {
+                        ...result,
+                        requirementsFingerprint: requirementsFingerprint(pos),
+                        coverageSchema: COVERAGE_SCHEMA,
+                        analyzedAt: new Date().toISOString(),
+                    };
 
                     if (result.score > highestScore) {
                         highestScore = result.score;
@@ -603,6 +663,14 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                     const isExpanded = expandedPositionId === pos.id;
                                     const posAnalysis = candidate.positionAnalyses?.[pos.title];
                                     const hasAI = !!posAnalysis;
+                                    const busy = scanningTitle === pos.title;
+                                    const scanError = scanErrors[pos.title];
+                                    // BAYAT ANALİZ SESSİZ KALMAZ. İki ayrı sebep,
+                                    // aynı sonuç: bu skor bugünkü ilanla ölçülmedi.
+                                    const stale = hasAI && (isStaleFor(posAnalysis, pos) || !usesCurrentRubric(posAnalysis));
+                                    const analyzedAt = posAnalysis?.analyzedAt
+                                        ? new Date(posAnalysis.analyzedAt).toLocaleDateString('tr-TR')
+                                        : null;
 
                                     return (
                                         <div key={pos.id} className={`rounded-[2.5rem] border transition-all duration-300 overflow-hidden ${isExpanded ? 'bg-bg-primary border-cyan-500/30 shadow-xl' : 'bg-bg-primary/50 border-border-subtle hover:bg-bg-primary'}`}>
@@ -616,6 +684,19 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                                         <span className="text-[9px] font-bold uppercase tracking-widest bg-violet-500/10 text-violet-400 border border-violet-500/20 px-2 py-0.5 rounded flex items-center gap-1 shadow-sm">
                                                             <Sparkles className="w-2.5 h-2.5" /> AI Analizli
                                                         </span>
+                                                    )}
+                                                    {/* Skor bugünkü madde listesiyle ölçülmedi —
+                                                        söylemezsek kullanıcı güncel sanır. */}
+                                                    {stale && (
+                                                        <span
+                                                            title="Bu analiz ilanın ESKİ madde listesine ait; skor bugünkü ölçüyle uyumsuz"
+                                                            className="text-[9px] font-bold uppercase tracking-widest bg-amber-500/10 text-amber-500 border border-amber-500/20 px-2 py-0.5 rounded shadow-sm"
+                                                        >
+                                                            bayat
+                                                        </span>
+                                                    )}
+                                                    {analyzedAt && !stale && (
+                                                        <span className="text-[9px] text-text-muted">{analyzedAt}</span>
                                                     )}
                                                 </div>
                                                 <div className="flex items-center gap-4">
@@ -631,32 +712,65 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                             {isExpanded && (
                                                 <div className="px-6 pb-6 border-t border-border-subtle pt-6 bg-bg-secondary/20 animate-in slide-in-from-top-2 duration-200">
                                                     {posAnalysis ? (
-                                                        <AIAnalysisPanel
-                                                            result={posAnalysis}
-                                                            loading={aiLoading}
-                                                            error={null}
-                                                            onRetry={null} // Global retry is used instead
-                                                            title={pos.title}
-                                                            targetScore={match.score}
-                                                        />
+                                                        <div className="space-y-4">
+                                                            <AIAnalysisPanel
+                                                                result={posAnalysis}
+                                                                loading={busy}
+                                                                error={null}
+                                                                onRetry={null} // Global retry is used instead
+                                                                title={pos.title}
+                                                                targetScore={match.score}
+                                                            />
+                                                            {stale && (
+                                                                <p className="text-[11px] text-amber-600 dark:text-amber-400 leading-relaxed">
+                                                                    Bu değerlendirme ilanın <strong>eski madde listesine</strong> ait —
+                                                                    madde yargıları bugünkü numaralara denk gelmiyor olabilir.
+                                                                </p>
+                                                            )}
+                                                            {scanError && (
+                                                                <p className="text-[11px] text-red-500 leading-relaxed">{scanError}</p>
+                                                            )}
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); evaluateForPosition(pos); }}
+                                                                disabled={busy}
+                                                                className="text-[10px] font-black uppercase tracking-widest text-cyan-600 dark:text-cyan-400 hover:text-cyan-500 disabled:opacity-40 flex items-center gap-1.5"
+                                                            >
+                                                                {busy
+                                                                    ? <><Loader2 className="w-3 h-3 animate-spin" /> Değerlendiriliyor…</>
+                                                                    : <><RefreshCw className="w-3 h-3" /> Bu ilana göre yeniden değerlendir</>}
+                                                            </button>
+                                                        </div>
                                                     ) : (
                                                         <div className="text-center py-8">
-                                                            {aiLoading ? (
+                                                            {busy ? (
                                                                 <div className="flex flex-col items-center gap-3">
                                                                     <Loader2 className="w-8 h-8 text-cyan-500 animate-spin" />
-                                                                    <p className="text-xs font-black uppercase tracking-widest text-cyan-600 dark:text-cyan-400">AI Deep Scanning...</p>
+                                                                    <p className="text-xs font-black uppercase tracking-widest text-cyan-600 dark:text-cyan-400">
+                                                                        {pos.title} için değerlendiriliyor…
+                                                                    </p>
                                                                 </div>
                                                             ) : (
                                                                 <>
                                                                     <div className="w-20 h-20 rounded-[1.5rem] bg-bg-primary border border-border-subtle flex items-center justify-center mx-auto mb-4 italic shadow-inner">
                                                                         <Brain className="w-10 h-10 text-text-muted opacity-30" />
                                                                     </div>
-                                                                    <p className="text-[13px] text-text-muted mb-6 max-w-[280px] mx-auto font-black italic opacity-60 uppercase tracking-tight leading-relaxed">Bu pozisyon için henüz detaylı yapay zeka analizi yapılmamış.</p>
+                                                                    <p className="text-[13px] text-text-muted mb-2 max-w-[300px] mx-auto font-black italic opacity-60 uppercase tracking-tight leading-relaxed">Bu pozisyon için henüz detaylı yapay zeka analizi yapılmamış.</p>
+                                                                    {/* Düğme artık YAZDIĞI İŞİ yapıyor: yalnızca bu
+                                                                        ilan, tek AI çağrısı. Eskiden tüm açık
+                                                                        pozisyonları tarayıp en yüksek skorlunun
+                                                                        sonucunu basıyordu. */}
+                                                                    <p className="text-[10px] text-text-muted mb-5 max-w-[300px] mx-auto leading-relaxed opacity-70">
+                                                                        Yalnızca bu ilan için çalışır — diğer pozisyonların analizine dokunmaz.
+                                                                    </p>
+                                                                    {scanError && (
+                                                                        <p className="text-[11px] text-red-500 mb-4 max-w-[320px] mx-auto leading-relaxed">{scanError}</p>
+                                                                    )}
                                                                     <button
-                                                                        onClick={(e) => { e.stopPropagation(); handleRunAnalysis(); }}
-                                                                        className="text-[11px] font-black uppercase tracking-widest text-text-primary px-6 py-3 bg-cyan-500 rounded-xl shadow-lg shadow-cyan-500/20 hover:scale-105 active:scale-95 transition-all"
+                                                                        onClick={(e) => { e.stopPropagation(); evaluateForPosition(pos); }}
+                                                                        disabled={Boolean(scanningTitle)}
+                                                                        className="text-[11px] font-black uppercase tracking-widest text-text-primary px-6 py-3 bg-cyan-500 rounded-xl shadow-lg shadow-cyan-500/20 hover:scale-105 active:scale-95 transition-all disabled:opacity-40 disabled:hover:scale-100"
                                                                     >
-                                                                        BAŞLAT
+                                                                        BU İLANA GÖRE DEĞERLENDİR
                                                                     </button>
                                                                 </>
                                                             )}

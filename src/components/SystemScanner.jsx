@@ -8,7 +8,8 @@ import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
 import { findBestPositionMatch, filterPositionsByDomain, calculateMatchScore } from '../services/matchService';
 import { analyzeCandidateMatch } from '../services/geminiService';
-import { buildJobDescription, requirementsOf } from '../utils/positionRequirements';
+import { buildJobDescription, requirementsOf, requirementsFingerprint } from '../utils/positionRequirements';
+import { COVERAGE_SCHEMA } from '../utils/coverageDetail';
 import { useNotifications } from '../context/NotificationContext';
 
 /**
@@ -314,7 +315,19 @@ export default function SystemScanner() {
                                 });
                                 // Sanitize undefined → null at the write boundary; the AI
                                 // sometimes omits fields and Firestore rejects undefined.
-                                updatedAnalyses[pos.title] = sanitizeForFirestore(result);
+                                //
+                                // DAMGA da burada yazılır. Madde yargıları madde
+                                // NUMARASINA bağlı: ilan sonradan değişirse eski
+                                // yargı yanlış maddeye yapışır ve skor sessizce
+                                // yanlış olur. scanService bu damgayı yazıyordu,
+                                // otonom tarama yazmıyordu — yani kullanıcının
+                                // FİİLEN kullandığı yol damgasız analiz üretiyordu.
+                                updatedAnalyses[pos.title] = sanitizeForFirestore({
+                                    ...result,
+                                    requirementsFingerprint: requirementsFingerprint(pos),
+                                    coverageSchema: COVERAGE_SCHEMA,
+                                    analyzedAt: new Date().toISOString(),
+                                });
                                 setAiCount(prev => prev + 1);
 
                                 // 0 puanlı sonuç "en iyi" kabul edilmez — tek
