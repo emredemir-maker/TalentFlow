@@ -5,7 +5,10 @@ import { useState, useEffect, useRef } from 'react';
 import { db, storage } from '../config/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { Building2, Upload, CheckCircle, Loader2, Palette, Globe, Type, Image, X, Eye } from 'lucide-react';
+import { Building2, Upload, CheckCircle, Loader2, Palette, Globe, Type, Image, X, Eye, Target } from 'lucide-react';
+
+import { SECTOR_OPTIONS, MODEL_OPTIONS, TYPE_OPTIONS } from '../utils/sectorTaxonomy';
+import { ORG_PROFILE_FIELD } from '../services/orgProfile';
 
 const BRANDING_PATH = 'artifacts/talent-flow/public/data/settings/branding';
 
@@ -20,7 +23,10 @@ export default function BrandingSettingsPage() {
         logoUrl: '',
         primaryColor: '#13294E',
         tagline: '',
-        website: ''
+        website: '',
+        // Sektör uyumu ölçümünün HEDEFİ (utils/sectorFit.js). Boş eksen
+        // uydurulmaz: tanımsız kalırsa ölçüm "hedef yok" der, sıfır uyum demez.
+        [ORG_PROFILE_FIELD]: { sector: null, model: null, type: null },
     });
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -284,6 +290,56 @@ export default function BrandingSettingsPage() {
                                 <span className="text-xs text-[#64748B] font-mono">{branding.primaryColor}</span>
                             </div>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── SEKTÖR PROFİLİ ───────────────────────────────────────────────
+                Adayların sektör deneyimi BUNA göre ölçülüyor. Üç eksen ayrı
+                duruyor çünkü tek başına "sektör" yanıltıyor: bir B2C pazaryeri
+                ile bir B2B SaaS aynı dikeyde sayılabilir ama işe alımda ayırt
+                eden çoğu zaman kime ve nasıl satıldığı. */}
+            {!previewMode && (
+                <div className="border border-[#E2E8F0] rounded-2xl p-5 space-y-4">
+                    <div className="flex items-start gap-3">
+                        <Target className="w-5 h-5 text-[#13294E] mt-0.5 shrink-0" />
+                        <div>
+                            <h3 className="text-sm font-bold text-[#0F172A]">Sektör Profili</h3>
+                            <p className="text-xs text-[#64748B] mt-0.5">
+                                Adayların sektör deneyimi bu profile göre ölçülür. Boş bıraktığınız eksen
+                                ölçüme girmez — tahmin edilmez.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-3">
+                        {[
+                            { key: 'sector', label: 'Faaliyet alanı', options: SECTOR_OPTIONS, hint: 'Hangi dikey alanda çalışıyorsunuz' },
+                            { key: 'model', label: 'İş modeli', options: MODEL_OPTIONS, hint: 'Kime satıyorsunuz' },
+                            { key: 'type', label: 'Gelir modeli', options: TYPE_OPTIONS, hint: 'Nasıl para kazanıyorsunuz' },
+                        ].map(({ key, label, options, hint }) => (
+                            <div key={key}>
+                                <label htmlFor={`sector-${key}`} className="block text-xs font-semibold text-[#334155] mb-1.5">
+                                    {label}
+                                </label>
+                                <select
+                                    id={`sector-${key}`}
+                                    value={branding[ORG_PROFILE_FIELD]?.[key] || ''}
+                                    onChange={e => setBranding(p => ({
+                                        ...p,
+                                        [ORG_PROFILE_FIELD]: {
+                                            ...(p[ORG_PROFILE_FIELD] || {}),
+                                            [key]: e.target.value || null,
+                                        },
+                                    }))}
+                                    className="w-full px-3 py-2 text-sm rounded-lg border border-[#E2E8F0] bg-white text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#13294E]/20"
+                                >
+                                    <option value="">Belirtilmemiş</option>
+                                    {options.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+                                </select>
+                                <p className="text-[10px] text-[#94A3B8] mt-1">{hint}</p>
+                            </div>
+                        ))}
                     </div>
                 </div>
             )}
