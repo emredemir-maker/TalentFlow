@@ -150,9 +150,12 @@ describe('bayat analiz', () => {
         expect(analysisScoreDetail(c, position).stale).toBe(false);
     });
 
+    // toMatchObject, toEqual değil: dönen nesneye doğrulama alanları eklendi
+    // (verificationEffect, preVerificationScore) ve bu testin iddiası onlar
+    // değil — "bu pozisyonda analiz yoksa taranmamış say".
     it('reports scanned=false when the candidate has no analysis here', () => {
         expect(analysisScoreDetail(candidate({ score: 1 }), { title: 'Yok' }))
-            .toEqual({ score: 0, stale: false, scanned: false, interviewed: false, cvScore: 0 });
+            .toMatchObject({ score: 0, stale: false, scanned: false, interviewed: false, cvScore: 0 });
     });
 });
 
@@ -276,5 +279,76 @@ describe('analysisFor', () => {
         expect(analysisFor(candidate({ score: 1 }), 'Yok')).toBeNull();
         expect(analysisFor(null, 'Growth PM')).toBeNull();
         expect(analysisFor(candidate({ score: 1 }), null)).toBeNull();
+    });
+});
+
+// ── Doğrulamanın skora etkisi ───────────────────────────────────────────────
+// Doğrulama, analizin SÜRÜMÜNE değil CV'nin kendisine bakıyor. Bu yüzden
+// bayat ya da yeniden hesaplanamayan kayıtlarda da geçerli olmak zorunda —
+// erken dönüşlerden birinde unutulsaydı aynı aday iki ekranda iki farklı skor
+// gösterirdi.
+describe('doğrulama etkisi', () => {
+    const clean = { counts: { celiski: 0 }, companies: { total: 0 }, lookupComplete: true, sector: null };
+    const contradicted = { at: 'x', counts: { celiski: 1 }, companies: { total: 0 }, lookupComplete: true, sector: null };
+
+    const withVerification = (analysis, verification) => ({
+        ...fresh(analysis),
+        verification,
+    });
+
+    const base = { score: 70, requirementCoverage: { coverageScore: 70 }, starAnalysis: star(8) };
+
+    it('leaves the score alone when verification never ran', () => {
+        const d = analysisScoreDetail(fresh(base), position);
+        expect(d.verificationEffect.applied).toBe(false);
+        expect(d.score).toBe(d.preVerificationScore);
+    });
+
+    it('leaves the score alone for a clean verification', () => {
+        const d = analysisScoreDetail(withVerification(base, { at: 'x', ...clean }), position);
+        expect(d.score).toBe(d.preVerificationScore);
+    });
+
+    it('lowers the score when a contradiction was measured', () => {
+        const d = analysisScoreDetail(withVerification(base, contradicted), position);
+        expect(d.score).toBeLessThan(d.preVerificationScore);
+        expect(d.verificationEffect.verification.reasons[0].code).toBe('celiski');
+    });
+
+    // Bayat analizde de uygulanmalı: çelişki analizin sürümünde değil,
+    // CV'nin kendisinde. Damgası tutmayan kayıt bayattır (bkz. yukarısı).
+    it('applies to a stale analysis too', () => {
+        const staleCandidate = {
+            ...candidate({
+                requirementsFingerprint: 'rESKI',
+                score: 60,
+                starAnalysis: star(8),
+                requirementCoverage: { assessments: [{ index: 1, status: 'met' }, { index: 2, status: 'met' }, { index: 3, status: 'met' }] },
+            }),
+            verification: contradicted,
+        };
+        const d = analysisScoreDetail(staleCandidate, position);
+        expect(d.stale).toBe(true);
+        expect(d.preVerificationScore).toBe(60);
+        expect(d.score).toBeLessThan(60);
+    });
+
+    // Ham verisi olmayan eski kayıtta saklanan skor gösteriliyor; doğrulama
+    // ona da uygulanmalı.
+    it('applies to a record that cannot be recomputed', () => {
+        const legacy = { ...candidate({ score: 64 }), verification: contradicted };
+        const d = analysisScoreDetail(legacy, position);
+        expect(d.scanned).toBe(true);
+        expect(d.preVerificationScore).toBe(64);
+        expect(d.score).toBeLessThan(64);
+    });
+
+    it('reports sector and verification deductions separately', () => {
+        const d = analysisScoreDetail(
+            withVerification(base, { at: 'x', counts: { celiski: 1 }, companies: { total: 0 }, lookupComplete: true, sector: { verdict: 'yok' } }),
+            position
+        );
+        expect(d.verificationEffect.verification.multiplier).toBeLessThan(1);
+        expect(d.verificationEffect.sector.multiplier).toBeLessThan(1);
     });
 });

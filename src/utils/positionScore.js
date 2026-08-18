@@ -17,6 +17,7 @@
 import { calculateHybridScore } from '../services/geminiService';
 import { isStaleFor } from './positionRequirements';
 import { interviewAdjustedScore } from './interviewCoverage';
+import { applyVerificationToScore, verificationEffect } from './verificationScore';
 
 // isStaleFor artık positionRequirements.js'te yaşıyor: sorduğu soru bir SÜRÜM
 // sorusu ve mülakat birleşiminin de ona ihtiyacı var. Burada kalsaydı
@@ -67,22 +68,45 @@ function canRecompute(analysis) {
  */
 export function analysisScoreDetail(candidate, position) {
     const analysis = analysisFor(candidate, position?.title);
-    if (!analysis) return { score: 0, stale: false, scanned: false, interviewed: false, cvScore: 0 };
+    if (!analysis) {
+        return { score: 0, stale: false, scanned: false, interviewed: false, cvScore: 0, preVerificationScore: 0, verificationEffect: verificationEffect(null) };
+    }
+
+    // DOĞRULAMA ETKİSİ HER DALDA UYGULANIR. Bayat ya da yeniden
+    // hesaplanamayan bir analizde de aday hakkındaki çelişki geçerlidir:
+    // doğrulama analizin sürümüne değil CV'nin kendisine bakıyor. Erken
+    // dönüşlerden birinde unutulsaydı, aynı aday iki ekranda iki farklı skor
+    // gösterirdi — bu modülün en başta çözmek için yazıldığı sapmanın kendisi.
+    const withVerification = (base) => {
+        const applied = applyVerificationToScore(base.score, candidate?.verification);
+        return {
+            ...base,
+            score: applied.score,
+            preVerificationScore: applied.baseScore,
+            verificationEffect: {
+                multiplier: applied.multiplier,
+                verification: applied.verification,
+                sector: applied.sector,
+                applied: applied.applied,
+            },
+        };
+    };
+
     if (!canRecompute(analysis)) {
         const stored = Number(analysis.score) || 0;
-        return { score: stored, stale: false, scanned: true, interviewed: false, cvScore: stored };
+        return withVerification({ score: stored, stale: false, scanned: true, interviewed: false, cvScore: stored });
     }
 
     if (isStaleFor(analysis, position)) {
         const stored = Number(analysis.score) || 0;
-        return { score: stored, stale: true, scanned: true, interviewed: false, cvScore: stored };
+        return withVerification({ score: stored, stale: true, scanned: true, interviewed: false, cvScore: stored });
     }
 
     // Hesap TEK yerde: interviewAdjustedScore. Burada bir kopyası olsaydı iki
     // uygulama zamanla ayrışır ve liste ile mülakat paneli farklı sayı
     // gösterirdi — bu modülün en başta çözmek için yazıldığı sorun.
     const { score, cvScore, hasInterview } = interviewAdjustedScore(analysis, candidate, position);
-    return { score, stale: false, scanned: true, interviewed: hasInterview, cvScore };
+    return withVerification({ score, stale: false, scanned: true, interviewed: hasInterview, cvScore });
 }
 
 /**
