@@ -191,6 +191,22 @@ service cloud.firestore {
       allow write: if isRecruiter();
     }
 
+    // ── Şirket istihbaratı önbelleği ─────────────────────────────────────────
+    // Aday CV'lerinde geçen şirketlerin çözümlenmiş kaydı (services/
+    // companyIntelStore.js). Havuzdaki şirketler çok tekrar ettiği için
+    // önbellek ADAYIN değil ŞİRKETİN altında duruyor ve tüm ekibe hizmet eder.
+    //
+    // KİŞİSEL VERİ TAŞIR: kurucu/ortak adları. Bu adlar ticaret sicilinden,
+    // yani zaten yayımlanmış kayıttan geliyor — ama yine de kişisel veri.
+    // Bu yüzden okuma da yazma da RECRUITER ile sınırlı; department_user
+    // göremez. list kapalı: koleksiyonun tamamını dökmek, havuzdaki tüm
+    // şirketlerin kurucu adlarını tek istekte vermek olurdu.
+    match /artifacts/talent-flow/public/data/companyIntel/{companyId} {
+      allow get:   if isRecruiter();
+      allow list:  if false;
+      allow write: if isRecruiter();
+    }
+
     // ── Settings ─────────────────────────────────────────────────────────────
     // api_keys ve integrations dokümanları SIR taşır (Gemini anahtarı, OAuth
     // clientSecret) — client hiçbir rolde okuyamaz/yazamaz; sunucu Admin SDK
