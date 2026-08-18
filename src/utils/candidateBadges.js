@@ -67,22 +67,55 @@ export function buildCandidateBadges(candidate, {
 } = {}) {
     if (!candidate) return [];
     const out = [];
+    const v = candidate.verification;
 
     // ── Katman 1: canlı, bedava ─────────────────────────────────────────────
     // Yıl eşiği verilmediyse ilandan türetilir; çağıranın her satırda aynı
     // hesabı tekrarlaması gerekmesin.
     const years = requiredYears ?? requiredYearsOf(position);
     const consistency = buildConsistencyReport(candidate, { today, requiredYears: years });
-    const flagIds = new Set(consistency.flags.map((f) => f.id));
 
-    if (consistency.counts.celiski > 0) {
+    // ── ÇELİŞKİ SAYISI İKİ KAYNAĞIN BÜYÜĞÜ ──────────────────────────────────
+    //
+    // Canlı hesap yalnızca KATMAN 1'i görüyor: CV'nin kendi içindeki
+    // tutarsızlıklar. Şirket katmanının bulduğu çelişkiler (ör. şirket
+    // kuruluşundan önceki bir başlangıç tarihi) ağ çağrısı gerektirdiği için
+    // burada yeniden hesaplanamaz; yalnızca kayıtlı özette duruyorlar.
+    //
+    // Bu ayrımı gözden kaçırmak CANLIDA GÖRÜLDÜ: skor şirket çelişkisi
+    // yüzünden düşüyordu ama listede hiçbir rozet çıkmıyordu — yani sistem
+    // adayı bir sebeple aşağı çekiyor ve o sebebi göstermiyordu. Bir skoru
+    // sessizce düşüren kural, açıklanamayan bir skordur.
+    //
+    // TOPLAMA DEĞİL, BÜYÜĞÜNÜ AL: kayıtlı sayaç tarama anındaki Katman 1
+    // çelişkilerini ZATEN içeriyor; toplasaydık aynı çelişki iki kez sayılırdı.
+    // Büyüğünü almak ayrıca CV taramadan sonra değiştiyse yeni Katman 1
+    // çelişkilerinin de görünmesini sağlıyor.
+    //
+    // Sayı, skoru düşüren sayıyla AYNI kaynaktan geliyor (verification.counts)
+    // — rozetin gösterdiği ile skorun cezalandırdığı ayrışamaz.
+    const storedContradictions = Number(v?.counts?.celiski) || 0;
+    const liveContradictions = consistency.counts.celiski;
+    const contradictions = Math.max(liveContradictions, storedContradictions);
+
+    if (contradictions > 0) {
         out.push(badge(
             'celiski',
-            consistency.counts.celiski === 1 ? 'Çelişki' : `${consistency.counts.celiski} çelişki`,
+            contradictions === 1 ? 'Çelişki' : `${contradictions} çelişki`,
             TONE.RED,
-            'CV içinde ölçülmüş tutarsızlık var — Doğrulama sekmesine bakın'
+            storedContradictions > liveContradictions
+                ? 'Ölçülmüş tutarsızlık var — en az biri şirket doğrulamasından geliyor. Doğrulama sekmesine bakın'
+                : 'CV içinde ölçülmüş tutarsızlık var — Doğrulama sekmesine bakın'
         ));
     }
+
+    // Bayrak kimlikleri de iki kaynaktan birleşiyor: listede ilan seçili
+    // değilse yıl eşiği hesaplanmaz ve canlı taraf 'ilan-yil-esigi'
+    // üretemez, ama tarama sırasında ilan bağlamı vardıysa kayıtta durur.
+    const flagIds = new Set([
+        ...consistency.flags.map((f) => f.id),
+        ...(Array.isArray(v?.flagIds) ? v.flagIds : []),
+    ]);
 
     if (flagIds.has('beyan-fazla') || flagIds.has('ilan-yil-esigi')) {
         out.push(badge(
@@ -109,8 +142,7 @@ export function buildCandidateBadges(candidate, {
         }
     }
 
-    // ── Kayıtlı doğrulama özeti ─────────────────────────────────────────────
-    const v = candidate.verification;
+    // ── Kayıtlı doğrulama özeti: sektör ve şirket teyidi ────────────────────
     if (v) {
         const sector = v.sector;
         if (sector?.verdict === VERDICT.NONE) {
