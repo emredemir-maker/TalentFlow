@@ -6,7 +6,7 @@
 // taraması eksik kalan aday "teyitsiz" damgası yemez.
 import { describe, expect, it } from 'vitest';
 
-import { buildCandidateBadges, isVerified, TONE } from './candidateBadges';
+import { buildCandidateBadges, isVerified, TONE, sectorBucket, verificationBucket, verificationCounts } from './candidateBadges';
 import { VERDICT } from './sectorFit';
 
 const TODAY = { year: 2026, month: 8 };
@@ -299,5 +299,74 @@ describe('isVerified', () => {
         expect(isVerified({ verification: {} })).toBe(false);
         expect(isVerified({})).toBe(false);
         expect(isVerified(null)).toBe(false);
+    });
+});
+
+// ── Filtre sınıflandırması ──────────────────────────────────────────────────
+// Filtre ile rozet AYNI sayaçtan okur. Ayrı hesaplansalardı "çelişkili
+// adaylar" filtresi bir küme getirirken listede o adayların bir kısmında
+// çelişki rozeti olmazdı.
+describe('sectorBucket', () => {
+    const withVerdict = (verdict) => candidate({ verification: { at: 'x', sector: { verdict } } });
+
+    it('treats strong and partial fit as the same bucket', () => {
+        expect(sectorBucket(withVerdict(VERDICT.STRONG))).toBe('match');
+        expect(sectorBucket(withVerdict(VERDICT.PARTIAL))).toBe('match');
+    });
+
+    it('keeps neighbour and outside apart', () => {
+        expect(sectorBucket(withVerdict(VERDICT.NEAR))).toBe('near');
+        expect(sectorBucket(withVerdict(VERDICT.NONE))).toBe('outside');
+    });
+
+    // ASIL KORUMA: taranmamış 600 aday "sektör dışı" filtresine düşerse
+    // filtre hiçbir işe yaramaz.
+    it('puts unmeasurable candidates in their own bucket, not "outside"', () => {
+        expect(sectorBucket(withVerdict(VERDICT.UNMEASURED))).toBe('unmeasured');
+        expect(sectorBucket(withVerdict(VERDICT.NO_TARGET))).toBe('unmeasured');
+        expect(sectorBucket(candidate())).toBe('unmeasured');
+        expect(sectorBucket(null)).toBe('unmeasured');
+    });
+});
+
+describe('verificationBucket', () => {
+    const bucket = (c) => verificationBucket(c, { today: TODAY });
+
+    it('ranks contradiction above attention', () => {
+        expect(bucket(candidate({ verification: { at: 'x', counts: { celiski: 1, dikkat: 4 } } }))).toBe('contradiction');
+        expect(bucket(candidate({ verification: { at: 'x', counts: { celiski: 0, dikkat: 4 } } }))).toBe('attention');
+    });
+
+    it('calls a scanned candidate with no findings clean', () => {
+        expect(bucket(candidate({ experience: 6, verification: { at: 'x', counts: { celiski: 0, dikkat: 0 } } }))).toBe('clean');
+    });
+
+    // Taranmamış adayı "temiz" saymak, bakmadığımız şeyi onaylamak olurdu.
+    it('never calls an unscanned candidate clean', () => {
+        expect(bucket(candidate({ experience: 6 }))).toBe('unverified');
+        expect(bucket(candidate({ experience: 6, verification: { counts: { celiski: 0 } } }))).toBe('unverified');
+    });
+
+    // Katman 1 tarama gerektirmiyor: taranmamış adayda da çelişki görünmeli.
+    it('finds a live contradiction even with no stored verification', () => {
+        expect(bucket(candidate({
+            experience: 8,
+            experiences: [exp('Tek Şirket', 'Dev', 'Eyl 2024 - Ağu 2026')],
+        }))).toBe('contradiction');
+    });
+});
+
+describe('verificationCounts — rozet ve filtrenin ortak kaynağı', () => {
+    it('agrees with what the badges display', () => {
+        const c = candidate({ verification: { at: 'x', counts: { celiski: 2, dikkat: 5 } } });
+        const counts = verificationCounts(c, { today: TODAY });
+        const list = badges(c);
+        expect(list.find((b) => b.id === 'celiski').label).toBe(`${counts.contradictions} çelişki`);
+        expect(list.find((b) => b.id === 'dikkat').label).toBe(`${counts.attention} dikkat`);
+    });
+
+    it('survives a malformed candidate', () => {
+        expect(verificationCounts(null).contradictions).toBe(0);
+        expect(verificationCounts({}).verified).toBe(false);
     });
 });

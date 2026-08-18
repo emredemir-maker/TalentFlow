@@ -14,7 +14,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
     ShieldCheck, ShieldAlert, AlertTriangle, Info, CheckCircle2, Search,
-    Building2, ExternalLink, Loader2, HelpCircle, Target, RefreshCw, Settings2,
+    Building2, ExternalLink, Loader2, HelpCircle, Target, RefreshCw, Settings2, TrendingDown,
 } from 'lucide-react';
 
 import { verifyCandidate, buildVerificationSummary, buildStoredReport } from '../services/cvVerification';
@@ -24,6 +24,8 @@ import { describeSectorFit, VERDICT } from '../utils/sectorFit';
 import { modelLabel, typeLabel } from '../utils/sectorTaxonomy';
 import { CLAIM_VERDICT } from '../utils/companyClaims';
 import { formatMonths } from '../utils/cvDates';
+import { verificationEffect } from '../utils/verificationScore';
+import { analysisScoreDetail } from '../utils/positionScore';
 
 /** Ağırlık → görsel dil. Renk keyfi değil: yalnızca çelişki kırmızı. */
 const SEVERITY_STYLE = {
@@ -241,6 +243,80 @@ function SectorFitBlock({ fit, onOpenSettings }) {
     );
 }
 
+/**
+ * BU BULGULAR SKORA NE YAPTI?
+ *
+ * Panel bayrakları gösteriyordu ama kaça mal olduklarını göstermiyordu:
+ * kullanıcı 4 dikkat maddesi ve bir sektör hükmü görüyor, skorun neden
+ * düştüğünü ise başka bir sekmedeki katlanır panelden öğreniyordu.
+ *
+ * Etki RAPORUN KENDİSİNDEN hesaplanıyor, adayın kayıtlı özetinden değil:
+ * ekranda duran bulgularla gösterilen sayı aynı şeyi anlatmalı. İkisi
+ * yalnızca kaydetme başarısız olduğunda ayrışır ve o durumda zaten uyarı
+ * gösteriliyor.
+ */
+function ScoreImpactBlock({ report, candidate, position }) {
+    const summary = buildVerificationSummary(report);
+    const effect = verificationEffect(summary);
+    const reasons = [...effect.verification.reasons, ...effect.sector.reasons];
+
+    // Somut sayı ancak bu adayın bu ilanda taranmış bir analizi varsa
+    // gösterilebilir. Yoksa yalnızca oran gösterilir — uydurma bir taban
+    // skor üzerinden "şu kadar puan kaybetti" demek yanlış olurdu.
+    const detail = position ? analysisScoreDetail(candidate, position) : null;
+    const hasConcrete = Boolean(detail?.scanned && detail.preVerificationScore > 0);
+    const lostPoints = hasConcrete ? detail.preVerificationScore - detail.score : 0;
+
+    if (!effect.applied) {
+        return (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-start gap-3">
+                <CheckCircle2 className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
+                <p className="text-[12px] text-slate-700">
+                    <strong>Bu bulgular skoru düşürmedi.</strong> Dikkat maddeleri mülakatta sorulacak
+                    soru üretir ama tek başlarına puan kesmez; kaynak bulunamaması da ceza değildir.
+                </p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-5">
+            <SectionHeader
+                icon={TrendingDown}
+                title="Skora Etkisi"
+                right={
+                    hasConcrete ? (
+                        <span className="text-[12px] font-black text-rose-700">
+                            {detail.preVerificationScore} → {detail.score}
+                            <span className="text-[10px] font-bold text-rose-500 ml-1.5">−{lostPoints} puan</span>
+                        </span>
+                    ) : (
+                        <span className="text-[12px] font-black text-rose-700">
+                            ×{effect.multiplier.toFixed(2)}
+                        </span>
+                    )
+                }
+            />
+
+            <ul className="space-y-1.5">
+                {reasons.map((r) => (
+                    <li key={r.code} className="flex items-start justify-between gap-3 text-[12px] text-slate-700 bg-white border border-rose-100 rounded-xl px-3 py-2">
+                        <span className="leading-relaxed">{r.label}</span>
+                        <span className="font-black text-rose-600 shrink-0">×{r.factor}</span>
+                    </li>
+                ))}
+            </ul>
+
+            <p className="text-[10px] text-slate-500 mt-2.5 leading-relaxed">
+                {hasConcrete
+                    ? `"${position.title}" ilanındaki skora uygulandı. Diğer ilanlarda da aynı oran geçerli.`
+                    : 'Bu oran, adayın taranmış olduğu her ilandaki skoruna uygulanır.'}
+                {' '}Kesinti yalnızca ÖLÇÜLMÜŞ bulgulardan doğar — kaynak bulunamaması tek başına puan düşürmez.
+            </p>
+        </div>
+    );
+}
+
 export default function VerificationPanel({ candidate, position = null }) {
     const [report, setReport] = useState(null);
     const [running, setRunning] = useState(false);
@@ -399,6 +475,8 @@ export default function VerificationPanel({ candidate, position = null }) {
                             </div>
                         ))}
                     </div>
+
+                    <ScoreImpactBlock report={report} candidate={candidate} position={position} />
 
                     {/* ── Mülakat soruları: raporun ASIL çıktısı, o yüzden en üstte ── */}
                     {report.questions.length > 0 && (

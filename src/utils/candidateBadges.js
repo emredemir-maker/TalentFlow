@@ -49,6 +49,72 @@ const UNVERIFIED_RATIO = 0.5;
 const badge = (id, label, tone, title) => ({ id, label, tone, title });
 
 /**
+ * Adayın doğrulama sayaçları — ROZET VE FİLTRE AYNI YERDEN OKUR.
+ *
+ * Ayrı ayrı hesaplansalardı zamanla ayrışırlardı: "çelişkili adaylar"
+ * filtresi bir kümeyi getirirken listede o adayların bir kısmında çelişki
+ * rozeti olmazdı. Bu projede tekrar tekrar düzeltilen sapmanın aynısı.
+ *
+ * Sayılar İKİ KAYNAĞIN BÜYÜĞÜ:
+ *   canlı   — Katman 1, CV'den anında hesaplanır (tarama gerektirmez)
+ *   kayıtlı — şirket katmanı dahil tarama anındaki toplam
+ * Toplamıyoruz: kayıtlı sayaç tarama anındaki Katman 1'i zaten içeriyor.
+ *
+ * @returns {{contradictions: number, attention: number, flagIds: Set<string>, verified: boolean}}
+ */
+export function verificationCounts(candidate, { position = null, today = currentYearMonth(), requiredYears = null } = {}) {
+    if (!candidate) return { contradictions: 0, attention: 0, flagIds: new Set(), verified: false };
+
+    const v = candidate.verification;
+    const years = requiredYears ?? requiredYearsOf(position);
+    const consistency = buildConsistencyReport(candidate, { today, requiredYears: years });
+
+    return {
+        contradictions: Math.max(consistency.counts.celiski, Number(v?.counts?.celiski) || 0),
+        attention: Math.max(consistency.counts.dikkat, Number(v?.counts?.dikkat) || 0),
+        flagIds: new Set([
+            ...consistency.flags.map((f) => f.id),
+            ...(Array.isArray(v?.flagIds) ? v.flagIds : []),
+        ]),
+        verified: Boolean(v?.at),
+        // Canlı sayı ayrıca taşınıyor: rozet ipucu çelişkinin şirket
+        // katmanından gelip gelmediğini söyleyebilsin.
+        liveContradictions: consistency.counts.celiski,
+    };
+}
+
+/**
+ * Sektör uyumu kovası — filtrenin sınıflandırması.
+ *
+ * ÖLÇÜLEMEYEN AYRI BİR KOVA. "Sektör dışı" ile "ölçemedik" aynı kefeye
+ * konsaydı, taranmamış 600 aday "sektör dışı" filtresine düşerdi ve filtre
+ * hiçbir işe yaramazdı.
+ *
+ * @returns {'match'|'near'|'outside'|'unmeasured'}
+ */
+export function sectorBucket(candidate) {
+    const verdict = candidate?.verification?.sector?.verdict;
+    if (verdict === VERDICT.STRONG || verdict === VERDICT.PARTIAL) return 'match';
+    if (verdict === VERDICT.NEAR) return 'near';
+    if (verdict === VERDICT.NONE) return 'outside';
+    return 'unmeasured';
+}
+
+/**
+ * Doğrulama durumu kovası — filtrenin sınıflandırması.
+ *
+ * @returns {'contradiction'|'attention'|'clean'|'unverified'}
+ *   'clean' YALNIZCA taraması yapılmış ve bulgusu çıkmamış adaylar için.
+ *   Taranmamış adayı "temiz" saymak, bakmadığımız şeyi onaylamak olurdu.
+ */
+export function verificationBucket(candidate, options = {}) {
+    const counts = verificationCounts(candidate, options);
+    if (counts.contradictions > 0) return 'contradiction';
+    if (counts.attention > 0) return 'attention';
+    return counts.verified ? 'clean' : 'unverified';
+}
+
+/**
  * Adayın rozetleri.
  *
  * @param {object} candidate
@@ -69,13 +135,10 @@ export function buildCandidateBadges(candidate, {
     const out = [];
     const v = candidate.verification;
 
-    // ── Katman 1: canlı, bedava ─────────────────────────────────────────────
-    // Yıl eşiği verilmediyse ilandan türetilir; çağıranın her satırda aynı
-    // hesabı tekrarlaması gerekmesin.
-    const years = requiredYears ?? requiredYearsOf(position);
-    const consistency = buildConsistencyReport(candidate, { today, requiredYears: years });
+    // Sayaçlar filtrelerle ORTAK kaynaktan; ayrışamazlar.
+    const counts = verificationCounts(candidate, { position, today, requiredYears });
 
-    // ── ÇELİŞKİ SAYISI İKİ KAYNAĞIN BÜYÜĞÜ ──────────────────────────────────
+    // ── ÇELİŞKİ ────────────────────────────────────────────────────────────
     //
     // Canlı hesap yalnızca KATMAN 1'i görüyor: CV'nin kendi içindeki
     // tutarsızlıklar. Şirket katmanının bulduğu çelişkiler (ör. şirket
@@ -84,26 +147,15 @@ export function buildCandidateBadges(candidate, {
     //
     // Bu ayrımı gözden kaçırmak CANLIDA GÖRÜLDÜ: skor şirket çelişkisi
     // yüzünden düşüyordu ama listede hiçbir rozet çıkmıyordu — yani sistem
-    // adayı bir sebeple aşağı çekiyor ve o sebebi göstermiyordu. Bir skoru
-    // sessizce düşüren kural, açıklanamayan bir skordur.
-    //
-    // TOPLAMA DEĞİL, BÜYÜĞÜNÜ AL: kayıtlı sayaç tarama anındaki Katman 1
-    // çelişkilerini ZATEN içeriyor; toplasaydık aynı çelişki iki kez sayılırdı.
-    // Büyüğünü almak ayrıca CV taramadan sonra değiştiyse yeni Katman 1
-    // çelişkilerinin de görünmesini sağlıyor.
-    //
-    // Sayı, skoru düşüren sayıyla AYNI kaynaktan geliyor (verification.counts)
-    // — rozetin gösterdiği ile skorun cezalandırdığı ayrışamaz.
-    const storedContradictions = Number(v?.counts?.celiski) || 0;
-    const liveContradictions = consistency.counts.celiski;
-    const contradictions = Math.max(liveContradictions, storedContradictions);
+    // adayı bir sebeple aşağı çekiyor ve o sebebi göstermiyordu.
+    const contradictions = counts.contradictions;
 
     if (contradictions > 0) {
         out.push(badge(
             'celiski',
             contradictions === 1 ? 'Çelişki' : `${contradictions} çelişki`,
             TONE.RED,
-            storedContradictions > liveContradictions
+            contradictions > counts.liveContradictions
                 ? 'Ölçülmüş tutarsızlık var — en az biri şirket doğrulamasından geliyor. Doğrulama sekmesine bakın'
                 : 'CV içinde ölçülmüş tutarsızlık var — Doğrulama sekmesine bakın'
         ));
@@ -112,10 +164,7 @@ export function buildCandidateBadges(candidate, {
     // Bayrak kimlikleri de iki kaynaktan birleşiyor: listede ilan seçili
     // değilse yıl eşiği hesaplanmaz ve canlı taraf 'ilan-yil-esigi'
     // üretemez, ama tarama sırasında ilan bağlamı vardıysa kayıtta durur.
-    const flagIds = new Set([
-        ...consistency.flags.map((f) => f.id),
-        ...(Array.isArray(v?.flagIds) ? v.flagIds : []),
-    ]);
+    const flagIds = counts.flagIds;
 
     if (flagIds.has('beyan-fazla') || flagIds.has('ilan-yil-esigi')) {
         out.push(badge(
@@ -156,7 +205,7 @@ export function buildCandidateBadges(candidate, {
     // Genel bir sayaç, çünkü dört ayrı rozet basmak satırı doldurur ve
     // hiçbiri tek başına eleme sebebi değil. Sayı, panelde gösterilenle aynı
     // kaynaktan geliyor — ekranlar ayrışamaz.
-    const attention = Math.max(consistency.counts.dikkat, Number(v?.counts?.dikkat) || 0);
+    const attention = counts.attention;
     if (attention > 0) {
         out.push(badge(
             'dikkat',
