@@ -148,6 +148,69 @@ describe('şirket katmanından gelen çelişki', () => {
     });
 });
 
+// ── CANLIDA GÖRÜLEN İKİNCİ EKSİK ────────────────────────────────────────────
+// Hasan Asgar'ın raporunda 4 DİKKAT maddesi vardı (çakışan dönem, hızlı unvan
+// yükselişi, iki kez unvan/ölçek uyumsuzluğu) ama listede tek rozet bile
+// çıkmıyordu: yalnızca çelişki rozetleniyordu.
+//
+// Gerçek hayatta çelişki nadir, dikkat maddesi sık — yani aracın en çok iş
+// yaptığı seviye tamamen görünmezdi.
+describe('dikkat seviyesindeki bulgular', () => {
+    it('shows an attention counter the list previously hid entirely', () => {
+        const list = badges(candidate({
+            experience: 6,
+            experiences: [exp('Pawn Interactive', 'CEO / Co-Founder', 'Oca 2021 - Halen')],
+            verification: { at: 'x', counts: { celiski: 0, dikkat: 4, bilgi: 0 }, sector: { verdict: VERDICT.NONE } },
+        }));
+        const b = list.find((x) => x.id === 'dikkat');
+        expect(b.label).toBe('4 dikkat');
+        expect(b.tone).toBe(TONE.AMBER);
+        // Rozet eleme sebebi olmadığını söylemeli.
+        expect(b.title).toContain('Eleme sebebi değil');
+    });
+
+    // Ekranlar ayrışamaz: paneldeki DİKKAT sayacı ile rozet aynı sayı.
+    it('reports the same number the verification panel shows', () => {
+        const list = badges(candidate({ verification: { at: 'x', counts: { dikkat: 7 } } }));
+        expect(list.find((x) => x.id === 'dikkat').label).toBe('7 dikkat');
+    });
+
+    it('says nothing when there is no attention finding', () => {
+        expect(idsOf(badges(candidate({ experience: 6, verification: { at: 'x', counts: { celiski: 0, dikkat: 0 } } }))))
+            .not.toContain('dikkat');
+    });
+
+    // Canlı Katman 1 de dikkat üretir (çakışan dönem, unvan sıçraması);
+    // tarama yapılmamış adayda da görünmeli.
+    it('counts live attention findings with no stored verification', () => {
+        const list = badges(candidate({
+            experiences: [
+                exp('A Ltd', 'Dev', 'Oca 2020 - Ara 2023'),
+                exp('B Danışmanlık', 'Danışman', 'Oca 2021 - Ara 2022'),
+            ],
+        }));
+        expect(idsOf(list)).toContain('dikkat');
+    });
+
+    // Kendi şirketi bir kusur değil ama bağlam; unvanın ne anlama geldiğini
+    // değiştiriyor ve listede görünmesi gerekiyor.
+    it('gives the founder match its own badge', () => {
+        const list = badges(candidate({
+            verification: { at: 'x', counts: { dikkat: 2 }, flagIds: ['aday-kurucu', 'unvan-olcek'] },
+        }));
+        const b = list.find((x) => x.id === 'kendi-sirketi');
+        expect(b.label).toBe('Kendi şirketi');
+        expect(b.title).toContain('kusur değil');
+    });
+
+    it('puts the founder badge ahead of the generic counter', () => {
+        const list = badges(candidate({
+            verification: { at: 'x', counts: { dikkat: 3 }, flagIds: ['aday-kurucu'] },
+        }));
+        expect(idsOf(list).indexOf('kendi-sirketi')).toBeLessThan(idsOf(list).indexOf('dikkat'));
+    });
+});
+
 describe('sektör rozetleri — yalnızca kayıtlı özetten', () => {
     const withSector = (sector) => candidate({ verification: { at: 'x', sector } });
 

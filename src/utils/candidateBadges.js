@@ -128,6 +128,44 @@ export function buildCandidateBadges(candidate, {
         ));
     }
 
+    // ── ADAYIN KENDİ ŞİRKETİ ────────────────────────────────────────────────
+    // Kendi şirketinde çalışmak meşru ve yaygın; bu bir kusur rozeti değil.
+    // Ama "Growth Manager" unvanının ne anlama geldiği kendi şirketinde ile
+    // 200 kişilik bir şirkette aynı şey değil, ve bunu listede görmek
+    // işe alımcının sıralamayı doğru okuması için gerekli.
+    if (flagIds.has('aday-kurucu')) {
+        out.push(badge(
+            'kendi-sirketi',
+            'Kendi şirketi',
+            TONE.AMBER,
+            'Aday, çalıştığı şirketlerden birinin kurucuları arasında görünüyor — kusur değil, bağlam'
+        ));
+    }
+
+    // ── DİKKAT SAYACI ───────────────────────────────────────────────────────
+    //
+    // CANLIDA GÖRÜLEN EKSİK: Hasan Asgar'ın raporunda 4 dikkat maddesi vardı
+    // (çakışan dönem, hızlı unvan yükselişi, iki kez unvan/ölçek uyumsuzluğu)
+    // ama listede tek bir rozet bile çıkmıyordu. Yalnızca çelişki rozetleniyor,
+    // dikkat seviyesindeki hiçbir bulgu görünmüyordu.
+    //
+    // Bu, aracın en çok iş yaptığı seviyeyi görünmez kılıyordu: gerçek
+    // hayatta çelişki nadir, dikkat maddesi sık. Ve bunların tamamı mülakatta
+    // sorulacak soru üretiyor.
+    //
+    // Genel bir sayaç, çünkü dört ayrı rozet basmak satırı doldurur ve
+    // hiçbiri tek başına eleme sebebi değil. Sayı, panelde gösterilenle aynı
+    // kaynaktan geliyor — ekranlar ayrışamaz.
+    const attention = Math.max(consistency.counts.dikkat, Number(v?.counts?.dikkat) || 0);
+    if (attention > 0) {
+        out.push(badge(
+            'dikkat',
+            `${attention} dikkat`,
+            TONE.AMBER,
+            `Doğrulama sekmesinde ${attention} dikkat maddesi var — çakışan dönem, unvan/ölçek uyumsuzluğu gibi. Eleme sebebi değil, sorulacak soru.`
+        ));
+    }
+
     // ── Meslek alanı: mevcut kavram, ilan seçiliyse ─────────────────────────
     if (position) {
         const candidateDomain = detectCandidateDomain(candidate);

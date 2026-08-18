@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./companyIntelStore', () => ({ resolveCompanies: vi.fn() }));
 
-const { verifyCandidate, requiredYearsOf, buildVerificationSummary } = await import('./cvVerification');
+const { verifyCandidate, requiredYearsOf, buildVerificationSummary, buildStoredReport } = await import('./cvVerification');
 
 const TODAY = { year: 2026, month: 8 };
 const TARGET = { sector: 'musteri deneyimi', model: 'b2b', type: 'saas' };
@@ -262,5 +262,66 @@ describe('buildVerificationSummary', () => {
         expect(() => buildVerificationSummary(null)).not.toThrow();
         expect(buildVerificationSummary(null).counts).toEqual({ celiski: 0, dikkat: 0, bilgi: 0 });
         expect(buildVerificationSummary(null).sector).toBeNull();
+    });
+});
+
+// ── Ekranda yeniden gösterilebilecek rapor ──────────────────────────────────
+// Başta yalnızca özet saklanıyordu; rapor "yeniden üretmesi bedava" diye
+// atılıyordu. Pratikte bedava değildi: kullanıcı sekmeye her girdiğinde boş
+// ekran görüp taramayı yeniden başlatmak zorunda kalıyordu.
+describe('buildStoredReport', () => {
+    const rich = () => run(
+        { name: 'Hasan Asgar', experiences: [exp('Asgar Digital', 'CEO / Co-Founder', 'Oca 2021 - Ağu 2026')] },
+        {
+            resolveAll: stubLookup({
+                'Asgar Digital': {
+                    name: 'Asgar Digital',
+                    sizeBand: '1-10',
+                    sector: 'musteri deneyimi',
+                    searchSuggestionHtml: '<div>öneri</div>',
+                    sources: Array.from({ length: 20 }, (_, i) => ({ title: `k${i}`, uri: `https://x/${i}` })),
+                },
+            }),
+        }
+    );
+
+    it('keeps everything the panel needs to render without re-running', async () => {
+        const stored = buildStoredReport(await rich());
+        expect(stored.counts).toBeTruthy();
+        expect(stored.flags.length).toBeGreaterThan(0);
+        expect(stored.flags[0]).toHaveProperty('title');
+        expect(stored.flags[0]).toHaveProperty('detail');
+        expect(stored.questions.length).toBeGreaterThan(0);
+        expect(stored.companies[0]).toMatchObject({ company: 'Asgar Digital' });
+        expect(stored.sectorFit).toBeTruthy();
+        expect(stored.verifiedAt).toBeTruthy();
+    });
+
+    it('caps the source list instead of storing everything', async () => {
+        const stored = buildStoredReport(await rich());
+        expect(stored.companies[0].evidence.sources.length).toBeLessThanOrEqual(6);
+    });
+
+    // Google'ın gösterim şartı önbellekten gösterirken de geçerli.
+    it('keeps the search-suggestion block', async () => {
+        const stored = buildStoredReport(await rich());
+        expect(stored.companies[0].evidence.searchSuggestionHtml).toContain('öneri');
+    });
+
+    // Firestore undefined kabul etmiyor; tek bir undefined tüm yazımı düşürür.
+    it('never emits undefined', async () => {
+        const stored = buildStoredReport(await rich());
+        const walk = (o) => {
+            if (!o || typeof o !== 'object') return;
+            for (const v of Object.values(o)) {
+                expect(v).not.toBeUndefined();
+                if (Array.isArray(v)) v.forEach(walk); else walk(v);
+            }
+        };
+        walk(stored);
+    });
+
+    it('returns null for a missing report rather than an empty shell', () => {
+        expect(buildStoredReport(null)).toBeNull();
     });
 });
