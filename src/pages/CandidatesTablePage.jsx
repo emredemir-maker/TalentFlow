@@ -599,6 +599,24 @@ export default function CandidatesTablePage() {
                         <option value="scanned">Taranmış</option>
                         <option value="unscanned">Taranmamış</option>
                     </select>
+                    {/* Sektör uyumu. "Ölçülemedi" AYRI bir seçenek: taraması
+                        yapılmamış adayı "sektör dışı" saymak, bakmadığımız
+                        şeyi olumsuz sonuç gibi göstermek olurdu. */}
+                    <select value={filters.sector} onChange={(e) => setFilter('sector', e.target.value)} className={SELECT_CLS} title="Kurumun hedef sektörüne göre aday deneyimi">
+                        <option value="all">Sektör: Tümü</option>
+                        <option value="match">Aynı sektör</option>
+                        <option value="near_or_match">Aynı ya da komşu sektör</option>
+                        <option value="near">Yalnızca komşu sektör</option>
+                        <option value="outside">Sektör dışı</option>
+                        <option value="unmeasured">Sektör ölçülemedi</option>
+                    </select>
+                    <select value={filters.verification} onChange={(e) => setFilter('verification', e.target.value)} className={SELECT_CLS} title="CV doğrulama bulguları">
+                        <option value="all">Doğrulama: Tümü</option>
+                        <option value="contradiction">Çelişkili</option>
+                        <option value="attention">Dikkat gerektiren</option>
+                        <option value="clean">Temiz (taranmış)</option>
+                        <option value="unverified">Doğrulanmamış</option>
+                    </select>
                     <select value={filters.location} onChange={(e) => setFilter('location', e.target.value)} className={SELECT_CLS} title="CV'den okunan konum bilgisi">
                         <option value="all">Konum: Tümü</option>
                         <option value="istanbul">İstanbul içi</option>

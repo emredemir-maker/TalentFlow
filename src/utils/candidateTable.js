@@ -4,6 +4,7 @@
 // without rendering. The page component owns filter STATE; this module owns
 // filter BEHAVIOR.
 import { analysisScoreFor, analysisFor, analysisScoreDetail } from './positionScore';
+import { sectorBucket, verificationBucket } from './candidateBadges';
 import { mustHaveGate } from './mustHaveGate';
 import { STAGES, getStage } from './pipelineStages';
 import { normalizeStarAnalysis, starPercent } from './starDimensions';
@@ -61,6 +62,10 @@ export const DEFAULT_FILTERS = {
     department: 'all',
     source: 'all',
     scan: 'all', // 'all' | 'scanned' | 'unscanned'
+    // Doğrulama filtreleri. Sınıflandırma utils/candidateBadges.js'te —
+    // rozet ile filtre aynı sayaçtan okur, ayrışamazlar.
+    sector: 'all', // 'all' | 'match' | 'near_or_match' | 'outside' | 'unmeasured'
+    verification: 'all', // 'all' | 'contradiction' | 'attention' | 'clean' | 'unverified'
     location: 'all', // 'all' | 'istanbul' | 'outside' | 'unknown'
     minScore: '',
     dateFrom: '',
@@ -265,6 +270,20 @@ export function applyTableFilters(rows, filters, opts = {}) {
     }
     if (f.location !== 'all') {
         result = result.filter((c) => locationBucket(c) === f.location);
+    }
+    if (f.sector !== 'all') {
+        // 'near_or_match' TEK BİR KOVA DEĞİL, iki kovanın birleşimi:
+        // "aynı ya da komşu sektör" işe alımda sık kurulan bir soru ve
+        // kullanıcıyı iki filtreyi elle birleştirmeye zorlamak anlamsız.
+        result = result.filter((c) => {
+            const bucket = sectorBucket(c);
+            return f.sector === 'near_or_match'
+                ? (bucket === 'match' || bucket === 'near')
+                : bucket === f.sector;
+        });
+    }
+    if (f.verification !== 'all') {
+        result = result.filter((c) => verificationBucket(c, { position: opts.position }) === f.verification);
     }
     if (f.minScore !== '' && !isNaN(Number(f.minScore))) {
         const min = Number(f.minScore);

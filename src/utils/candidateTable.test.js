@@ -606,3 +606,56 @@ describe('mülakat tabloya yansır', () => {
         expect(stale.positionInterviewed).toBe(false);
     });
 });
+
+// ── Doğrulama filtreleri ────────────────────────────────────────────────────
+// Filtrenin sınıflandırması utils/candidateBadges.js'te; burada filtrenin o
+// sınıflandırmayı DOĞRU uyguladığı sabitleniyor.
+describe('sektör ve doğrulama filtreleri', () => {
+    const withSector = (id, verdict) => ({ id, name: id, experiences: [], verification: { at: 'x', sector: { verdict } } });
+    const rows = [
+        withSector('guclu', 'guclu'),
+        withSector('kismi', 'kismi'),
+        withSector('komsu', 'yakin'),
+        withSector('disi', 'yok'),
+        withSector('olculemedi', 'olculemedi'),
+        { id: 'taranmamis', name: 'taranmamis', experiences: [] },
+    ];
+    const idsFor = (filters) => applyTableFilters(rows, filters).map((c) => c.id);
+
+    it('matches the same and partial fit under "aynı sektör"', () => {
+        expect(idsFor({ sector: 'match' }).sort()).toEqual(['guclu', 'kismi']);
+    });
+
+    it('unions same and neighbour so the user does not combine two filters by hand', () => {
+        expect(idsFor({ sector: 'near_or_match' }).sort()).toEqual(['guclu', 'kismi', 'komsu']);
+    });
+
+    it('isolates neighbour-only', () => {
+        expect(idsFor({ sector: 'near' })).toEqual(['komsu']);
+    });
+
+    // ASIL KORUMA: taranmamış adaylar "sektör dışı" filtresine düşmemeli.
+    it('keeps unmeasured candidates out of "sektör dışı"', () => {
+        expect(idsFor({ sector: 'outside' })).toEqual(['disi']);
+        expect(idsFor({ sector: 'unmeasured' }).sort()).toEqual(['olculemedi', 'taranmamis']);
+    });
+
+    it('leaves the list untouched when the filter is off', () => {
+        expect(idsFor({ sector: 'all' })).toHaveLength(rows.length);
+        expect(idsFor({ verification: 'all' })).toHaveLength(rows.length);
+    });
+
+    it('separates contradiction, attention, clean and unverified', () => {
+        const vrows = [
+            { id: 'celiskili', experiences: [], verification: { at: 'x', counts: { celiski: 1, dikkat: 0 } } },
+            { id: 'dikkatli', experiences: [], verification: { at: 'x', counts: { celiski: 0, dikkat: 3 } } },
+            { id: 'temiz', experiences: [], verification: { at: 'x', counts: { celiski: 0, dikkat: 0 } } },
+            { id: 'taranmamis', experiences: [] },
+        ];
+        const pick = (v) => applyTableFilters(vrows, { verification: v }).map((c) => c.id);
+        expect(pick('contradiction')).toEqual(['celiskili']);
+        expect(pick('attention')).toEqual(['dikkatli']);
+        expect(pick('clean')).toEqual(['temiz']);
+        expect(pick('unverified')).toEqual(['taranmamis']);
+    });
+});
