@@ -7,6 +7,8 @@
 // owns filter state and rendering. The xlsx library is imported lazily on
 // the first export click so it never enters the initial bundle.
 import { gateLabel } from '../utils/mustHaveGate';
+import { buildCandidateBadges } from '../utils/candidateBadges';
+import CandidateBadges from '../components/CandidateBadges';
 import { useEffect, useMemo, useState } from 'react';
 import {
     Search, Download, Users, ChevronUp, ChevronDown, ChevronLeft, ChevronRight,
@@ -355,6 +357,19 @@ export default function CandidatesTablePage() {
     const sortedRows = useMemo(
         () => sortRows(filteredRows, sortKey, sortDir),
         [filteredRows, sortKey, sortDir]
+    );
+
+    // Rozetler yalnızca GÖRÜNEN satırlar için hesaplanır. Katman 1 saf
+    // aritmetik ve bedava ama 500 adaylık bir havuzda her render'da yeniden
+    // koşmasının anlamı yok; memo satır listesine ve seçili ilana bağlı.
+    // Satır başına en fazla 3 rozet: dördüncüsü tabloyu taşırıyor ve zaten
+    // en önemlileri başta (utils/candidateBadges.js sıralamayı garanti eder).
+    const badgesById = useMemo(
+        () => new Map(sortedRows.map((c) => [
+            c.id,
+            buildCandidateBadges(c, { position: selectedPosition, max: 3 }),
+        ])),
+        [sortedRows, selectedPosition]
     );
 
     const pageCount = Math.max(1, Math.ceil(sortedRows.length / PAGE_SIZE));
@@ -751,6 +766,7 @@ export default function CandidatesTablePage() {
                                         <td className="px-3 py-2.5">
                                             <p className="font-bold text-slate-800 whitespace-nowrap">{c.name || 'İsimsiz'}</p>
                                             <p className="text-[10px] text-slate-400 whitespace-nowrap">{c.email || '—'}</p>
+                                            <CandidateBadges badges={badgesById.get(c.id)} className="mt-1" />
                                         </td>
                                         {/* Serbest metin kolonları genişlik sınırlı: AI'nın ürettiği
                                             uzun rol adları tabloyu yatayda taşırıyordu — kesilen

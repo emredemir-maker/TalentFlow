@@ -4,6 +4,7 @@ import { explainHybridScore } from '../services/geminiService';
 import { requirementsOf } from '../utils/positionRequirements';
 import { coverageDetailState, usesCurrentRubric } from '../utils/coverageDetail';
 import { isStaleFor, analysisScoreDetail } from '../utils/positionScore';
+import { ShieldAlert } from 'lucide-react';
 import { STAR_MAX, STAR_LABELS, anchorLabel } from '../utils/starDimensions';
 
 /**
@@ -14,7 +15,7 @@ import { STAR_MAX, STAR_LABELS, anchorLabel } from '../utils/starDimensions';
  * gerçek skordan sapar ve şeffaflık iddiası yalana dönerdi. Testler
  * madde puanlarının toplamının skora eşit kaldığını sabitliyor.
  */
-export default function ScoreBreakdownPanel({ analysis, position }) {
+export default function ScoreBreakdownPanel({ analysis, position, candidate = null }) {
     const [open, setOpen] = useState(false);
 
     if (!analysis) return null;
@@ -29,9 +30,22 @@ export default function ScoreBreakdownPanel({ analysis, position }) {
     // Bayat kayıtta explainHybridScore hâlâ madde numaralarını eşleştirir;
     // listede gösterilen sayı ise saklanan skor. İkisi ayrışmasın diye
     // başlıktaki sayı da listedekiyle aynı kaynaktan gelir.
-    const headlineScore = staleRequirements
-        ? analysisScoreDetail({ positionAnalyses: { [position?.title]: analysis } }, position).score
-        : exp.score;
+    // Skor TEK kaynaktan: analysisScoreDetail. Panel kendi hesabını yapsaydı
+    // listeyle ayrışırdı — bu modülün en başta çözmek için yazıldığı sorun.
+    // Doğrulama kesintisi de buradan geliyor, o yüzden gerçek aday belgesi
+    // geçilmek zorunda; yoksa panel kesintisiz sayıyı gösterir ve liste ile
+    // panel yine ayrışır.
+    const scoreSource = candidate || { positionAnalyses: { [position?.title]: analysis } };
+    const scoreDetail = analysisScoreDetail(scoreSource, position);
+    const effect = scoreDetail.verificationEffect;
+    const deductions = [...(effect?.verification?.reasons || []), ...(effect?.sector?.reasons || [])];
+    // Kırılımdaki madde puanlarının toplamı DOĞRULAMA ÖNCESİ skora eşit
+    // kalmalı; kesinti ayrı bir satır olarak gösteriliyor. Aksi hâlde
+    // "maddelerin toplamı skoru vermiyor" diye açıklanamayan bir fark çıkardı.
+    const preVerification = staleRequirements ? scoreDetail.preVerificationScore : exp.score;
+    const headlineScore = effect?.applied
+        ? Math.round(preVerification * effect.multiplier)
+        : preVerification;
 
     const pct = (n) => Math.round(n * 100);
 
@@ -53,6 +67,36 @@ export default function ScoreBreakdownPanel({ analysis, position }) {
 
             {open && (
                 <div className="px-4 pb-4 space-y-4 border-t border-slate-100 pt-3">
+                    {/* DOĞRULAMA KESİNTİSİ.
+                        Skoru sessizce düşüren bir kural, açıklanamayan bir
+                        skordur. Her kesintinin sebebi ve çarpanı burada
+                        yazılı; kullanıcı hangi bulgunun kaç puan götürdüğünü
+                        görebilmeli, yoksa sayıya güvenemez. */}
+                    {effect?.applied && (
+                        <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5">
+                            <div className="flex items-center gap-2 mb-1.5">
+                                <ShieldAlert className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                                <span className="text-[10px] font-black text-rose-700 uppercase tracking-widest">
+                                    Doğrulama kesintisi
+                                </span>
+                                <span className="text-[10px] font-black text-rose-700 ml-auto">
+                                    {preVerification} → {headlineScore}
+                                </span>
+                            </div>
+                            <ul className="space-y-1">
+                                {deductions.map((d) => (
+                                    <li key={d.code} className="flex items-start justify-between gap-2 text-[10px] text-slate-700">
+                                        <span className="leading-relaxed">{d.label}</span>
+                                        <span className="font-black text-rose-600 shrink-0">×{d.factor}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                            <p className="text-[9px] text-slate-500 mt-1.5 leading-relaxed">
+                                Kaynak bulunamayan şirketler tek başına kesinti yaratmaz; ayrıntı için
+                                Doğrulama sekmesine bakın.
+                            </p>
+                        </div>
+                    )}
                     {/* GEREKSİNİM LİSTESİ DEĞİŞMİŞ.
                         Kayıtlı değerlendirmeler madde NUMARASINA bağlı; liste
                         değişince o numara başka bir maddeye denk gelir.
