@@ -30,6 +30,7 @@ import InterviewOutcomePanel from '../components/InterviewOutcomePanel';
 import { aiErrorHint } from '../utils/aiErrorHint';
 import MustHaveBadge from '../components/MustHaveBadge';
 import StarEvidenceCards from '../components/StarEvidenceCards';
+import VerificationPanel from '../components/VerificationPanel';
 import { starPercent } from '../utils/starDimensions';
 import {
     Plus, Search, Zap, Brain, X,
@@ -1130,6 +1131,7 @@ export default function CandidateProcessPage() {
         { id: 'cv_file',          label: 'CV',                  icon: <FileQuestion className="w-3.5 h-3.5" /> },
         { id: 'cv_match',         label: 'CV & Uyum',           icon: <FileText className="w-3.5 h-3.5" /> },
         { id: 'pos_matches',      label: 'Pozisyon Eşleşmeleri', icon: <Layers className="w-3.5 h-3.5" /> },
+        { id: 'verification',     label: 'Doğrulama',           icon: <ShieldCheck className="w-3.5 h-3.5" /> },
         { id: 'sessions',         label: 'Mülakatlar',          icon: <Video className="w-3.5 h-3.5" /> },
         { id: 'history',          label: 'Süreç Geçmişi',       icon: <BarChart2 className="w-3.5 h-3.5" /> },
         { id: 'messages',         label: 'Mesajlar',            icon: <MessageSquare className="w-3.5 h-3.5" /> },
@@ -1640,6 +1642,11 @@ export default function CandidateProcessPage() {
 
                                 {/* ── CV (orijinal dosya / form) ── */}
                                 {activeTab === 'cv_file' && <CandidateCvPanel candidate={candidate} />}
+
+                                {/* ── DOĞRULAMA (CV istihbaratı + sektör uyumu) ── */}
+                                {activeTab === 'verification' && (
+                                    <VerificationPanel candidate={candidate} position={displayedPosition} />
+                                )}
 
                                 {/* ── CV & UYUM ── */}
                                 {activeTab === 'cv_match' && (
