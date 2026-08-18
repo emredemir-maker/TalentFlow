@@ -362,12 +362,12 @@ export default function CandidatesTablePage() {
     // Rozetler yalnızca GÖRÜNEN satırlar için hesaplanır. Katman 1 saf
     // aritmetik ve bedava ama 500 adaylık bir havuzda her render'da yeniden
     // koşmasının anlamı yok; memo satır listesine ve seçili ilana bağlı.
-    // Satır başına en fazla 3 rozet: dördüncüsü tabloyu taşırıyor ve zaten
+    // Satır başına en fazla 4 rozet: beşincisi tabloyu taşırıyor ve zaten
     // en önemlileri başta (utils/candidateBadges.js sıralamayı garanti eder).
     const badgesById = useMemo(
         () => new Map(sortedRows.map((c) => [
             c.id,
-            buildCandidateBadges(c, { position: selectedPosition, max: 3 }),
+            buildCandidateBadges(c, { position: selectedPosition, max: 4 }),
         ])),
         [sortedRows, selectedPosition]
     );

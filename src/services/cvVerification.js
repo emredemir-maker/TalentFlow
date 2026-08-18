@@ -82,6 +82,90 @@ export function buildVerificationSummary(report) {
     };
 }
 
+/** Kaynak listesi tavanı — arayüz zaten ilk 6'yı gösteriyor. */
+const MAX_STORED_SOURCES = 6;
+
+/** Google'ın arama önerileri bloğu için üst sınır; devasa HTML saklamayalım. */
+const MAX_SUGGESTION_HTML = 4000;
+
+/**
+ * Raporu EKRANDA yeniden gösterilebilecek hâlde saklamaya hazırlar.
+ *
+ * ── NEDEN SAKLIYORUZ (ÖNCEKİ KARARIN DÜZELTİLMESİ) ──────────────────────────
+ * Başta yalnızca özet saklanıyordu; rapor "yeniden üretmesi bedava" diye
+ * atılıyordu. Pratikte bedava değildi: kullanıcı sekmeye her girdiğinde boş
+ * ekran görüp tarama düğmesine basmak ve beklemek zorunda kalıyordu. Şirket
+ * verisi önbellekten gelse bile bu bir tık ve bir bekleme — ve daha kötüsü,
+ * "bu adayı daha önce taramış mıydım?" sorusunun cevabı ekranda yoktu.
+ *
+ * Boyut endişesi yersizdi: kırpılmış rapor ~10KB, Firestore doküman sınırı
+ * 1MB ve aynı belgede zaten 15.000 karakterlik cvText duruyor.
+ *
+ * Kırpılan tek şey kaynak listesi ve arama önerisi HTML'i.
+ *
+ * @param {object} report verifyCandidate() çıktısı
+ * @returns {object|null} candidate.verificationReport alanına yazılacak rapor
+ */
+export function buildStoredReport(report) {
+    if (!report) return null;
+
+    const trimEvidence = (ev) => {
+        if (!ev) return null;
+        return {
+            name: ev.name || '',
+            exists: ev.exists || 'bilinmiyor',
+            website: ev.website || '',
+            foundedYear: ev.foundedYear ?? null,
+            sizeBand: ev.sizeBand ?? null,
+            sector: ev.sector ?? null,
+            sectorRaw: ev.sectorRaw || '',
+            model: ev.model ?? null,
+            type: ev.type ?? null,
+            headquarters: ev.headquarters || '',
+            founders: Array.isArray(ev.founders) ? ev.founders : [],
+            registry: ev.registry ?? null,
+            caution: ev.caution || '',
+            withheld: Boolean(ev.withheld),
+            withheldReason: ev.withheldReason || '',
+            sources: (Array.isArray(ev.sources) ? ev.sources : [])
+                .slice(0, MAX_STORED_SOURCES)
+                .map((s) => ({ title: s?.title || '', uri: s?.uri || '' })),
+            // Google'ın gösterim şartı: grounded sonuç gösterilirken arama
+            // önerileri de gösterilmeli. Önbellekten gösterirken de geçerli,
+            // o yüzden atmıyoruz — yalnızca boyutunu sınırlıyoruz.
+            searchSuggestionHtml: String(ev.searchSuggestionHtml || '').slice(0, MAX_SUGGESTION_HTML),
+        };
+    };
+
+    return {
+        verifiedAt: report.verifiedAt || new Date().toISOString(),
+        counts: report.counts || { celiski: 0, dikkat: 0, bilgi: 0 },
+        flags: (report.flags || []).map((f) => ({
+            id: f.id, severity: f.severity, title: f.title, detail: f.detail, question: f.question || '',
+        })),
+        questions: report.questions || [],
+        sectorFit: report.sectorFit || null,
+        companies: (report.companies || []).map((c) => ({
+            company: c.company || '',
+            verdict: c.verdict,
+            claim: {
+                company: c.claim?.company || '',
+                role: c.claim?.role || '',
+                duration: c.claim?.duration || '',
+                startYear: c.claim?.startYear ?? null,
+            },
+            evidence: trimEvidence(c.evidence),
+        })),
+        lookup: {
+            fromCache: report.lookup?.fromCache || 0,
+            looked: report.lookup?.looked || 0,
+            skipped: report.lookup?.skipped || [],
+            failed: (report.lookup?.failed || []).map((f) => ({ name: f?.name || '', error: f?.error || '' })),
+            total: report.lookup?.total || 0,
+        },
+    };
+}
+
 // requiredYearsOf artık utils/cvConsistency.js'te yaşıyor: liste rozetleri de
 // aynı eşiğe ihtiyaç duyuyor ve o tarafın bu tek satır için tüm doğrulama
 // zincirini — dolayısıyla Firestore'u — import etmesi saçma olurdu. Mevcut

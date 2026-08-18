@@ -17,7 +17,7 @@ import {
     Building2, ExternalLink, Loader2, HelpCircle, Target, RefreshCw, Settings2,
 } from 'lucide-react';
 
-import { verifyCandidate, buildVerificationSummary } from '../services/cvVerification';
+import { verifyCandidate, buildVerificationSummary, buildStoredReport } from '../services/cvVerification';
 import { readOrgProfile } from '../services/orgProfile';
 import { useCandidates } from '../context/CandidatesContext';
 import { describeSectorFit, VERDICT } from '../utils/sectorFit';
@@ -260,9 +260,25 @@ export default function VerificationPanel({ candidate, position = null }) {
         return () => { alive = false; };
     }, []);
 
-    // Aday değişince eski rapor EKRANDA KALMAMALI — başka birinin bayrakları
-    // bu adaya aitmiş gibi okunur.
-    useEffect(() => { setReport(null); setError(''); }, [candidate?.id]);
+    // KAYITLI RAPORU GÖSTER. Önceden her sekme açılışında boş ekran ve
+    // "Doğrulamayı başlat" düğmesi çıkıyordu; kullanıcı daha önce taradığı
+    // adayı yeniden taramak zorunda kalıyordu ve "bu adayı taramış mıydım?"
+    // sorusunun cevabı hiçbir yerde yoktu.
+    //
+    // Aday değişince state SIFIRLANIR ve yeni adayın kaydı yüklenir —
+    // başka birinin bayrakları bu adaya aitmiş gibi okunmamalı.
+    //
+    // Bağımlılık YALNIZCA aday kimliği. Rapor nesnesini de bağımlılığa
+    // koymak cazip ama zararlı: Firestore dinleyicisi her doküman
+    // güncellemesinde yeni bir nesne üretir, dolayısıyla efekt alakasız bir
+    // değişiklikte de koşar. Kaydetme başarısız olduğu senaryoda bu, az önce
+    // üretilmiş raporu ekrandan siler — kullanıcı taramayı yaptı ve sonucu
+    // kaybeder. Taze rapor zaten run() içinde state'e yazılıyor.
+    useEffect(() => {
+        setReport(candidate?.verificationReport || null);
+        setError('');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [candidate?.id]);
 
     const run = useCallback(async (force = false) => {
         setRunning(true);
@@ -287,7 +303,12 @@ export default function VerificationPanel({ candidate, position = null }) {
             // güncellenmemiş olur ve bunu söylüyoruz.
             if (candidate?.id) {
                 try {
-                    await updateCandidate(candidate.id, { verification: buildVerificationSummary(result) });
+                    await updateCandidate(candidate.id, {
+                        verification: buildVerificationSummary(result),
+                        // Raporun kendisi de saklanıyor ki sekmeye her
+                        // girişte yeniden taramak gerekmesin.
+                        verificationReport: buildStoredReport(result),
+                    });
                 } catch (err) {
                     setError('Rapor üretildi ama adaya kaydedilemedi — listedeki rozetler ve skor güncellenmeyecek: '
                         + (err?.message || 'bilinmeyen hata'));
@@ -313,9 +334,15 @@ export default function VerificationPanel({ candidate, position = null }) {
                         <SectionHeader icon={ShieldCheck} title="CV Doğrulama" />
                         <p className="text-[12px] text-slate-600 leading-relaxed max-w-2xl">
                             CV&apos;deki tarihleri kendi içinde tutarlılık için denetler, şirketleri kamuya açık
-                            kaynaklardan doğrular ve sektör uyumunu ölçer.{' '}
-                            <strong className="text-slate-700">Skoru değiştirmez</strong> — mülakatta sorulacak sorular üretir.
+                            kaynaklardan doğrular ve sektör uyumunu ölçer. Mülakatta sorulacak sorular üretir ve{' '}
+                            <strong className="text-slate-700">ölçülmüş bulgular skoru düşürebilir</strong> —
+                            kaynak bulunamaması tek başına ceza değildir.
                         </p>
+                        {report?.verifiedAt && (
+                            <p className="text-[11px] text-slate-400 mt-1.5">
+                                Son tarama: {new Date(report.verifiedAt).toLocaleString('tr-TR')}
+                            </p>
+                        )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                         {report && (
