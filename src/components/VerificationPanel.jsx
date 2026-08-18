@@ -17,8 +17,9 @@ import {
     Building2, ExternalLink, Loader2, HelpCircle, Target, RefreshCw, Settings2,
 } from 'lucide-react';
 
-import { verifyCandidate } from '../services/cvVerification';
+import { verifyCandidate, buildVerificationSummary } from '../services/cvVerification';
 import { readOrgProfile } from '../services/orgProfile';
+import { useCandidates } from '../context/CandidatesContext';
 import { describeSectorFit, VERDICT } from '../utils/sectorFit';
 import { modelLabel, typeLabel } from '../utils/sectorTaxonomy';
 import { CLAIM_VERDICT } from '../utils/companyClaims';
@@ -247,6 +248,7 @@ export default function VerificationPanel({ candidate, position = null }) {
     const [progress, setProgress] = useState({ done: 0, total: 0 });
     const [target, setTarget] = useState(null);
     const [targetLoaded, setTargetLoaded] = useState(false);
+    const { updateCandidate } = useCandidates();
 
     useEffect(() => {
         let alive = true;
@@ -274,12 +276,29 @@ export default function VerificationPanel({ candidate, position = null }) {
                 onProgress: (done, total) => setProgress({ done, total }),
             });
             setReport(result);
+
+            // ÖZET ADAY BELGESİNE YAZILIR. Rapor saklanmıyor (yeniden üretmek
+            // bedava, şirket verisi zaten önbellekte) ama listedeki rozetler
+            // ve skor kesintisi senkron okunmak zorunda — o yüzden özet
+            // kalıcı olmalı.
+            //
+            // Yazma başarısız olursa rapor EKRANDA KALIR: kullanıcı taramayı
+            // yaptı, sonucu görmeyi hak ediyor. Yalnızca liste/skor tarafı
+            // güncellenmemiş olur ve bunu söylüyoruz.
+            if (candidate?.id) {
+                try {
+                    await updateCandidate(candidate.id, { verification: buildVerificationSummary(result) });
+                } catch (err) {
+                    setError('Rapor üretildi ama adaya kaydedilemedi — listedeki rozetler ve skor güncellenmeyecek: '
+                        + (err?.message || 'bilinmeyen hata'));
+                }
+            }
         } catch (err) {
             setError(err?.message || 'Doğrulama tamamlanamadı.');
         } finally {
             setRunning(false);
         }
-    }, [candidate, position, target]);
+    }, [candidate, position, target, updateCandidate]);
 
     const openSettings = () => window.dispatchEvent(new CustomEvent('changeView', { detail: 'settings' }));
 

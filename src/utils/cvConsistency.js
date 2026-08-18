@@ -125,6 +125,26 @@ export function extractRequiredYears(text) {
     return best;
 }
 
+/**
+ * İlanın istediği asgari yılı, ilanın TÜM metinlerinden çıkarır.
+ *
+ * Burada duruyor çünkü extractRequiredYears de burada ve iki ayrı çağıranı
+ * var: doğrulama raporu (services/cvVerification.js) ve liste rozetleri
+ * (utils/candidateBadges.js). Rozet tarafının bu tek satır için tüm doğrulama
+ * zincirini — dolayısıyla Firestore'u — import etmesi saçma olurdu.
+ */
+export function requiredYearsOf(position) {
+    if (!position) return null;
+    const parts = [
+        position.title,
+        position.description,
+        ...(Array.isArray(position.requirements)
+            ? position.requirements.map((r) => (typeof r === 'string' ? r : r?.text || ''))
+            : []),
+    ];
+    return extractRequiredYears(parts.filter(Boolean).join('\n'));
+}
+
 /** Adayın beyan ettiği deneyim yılı — string de gelebilir, ay cinsine çevrilir. */
 function claimedMonthsOf(candidate) {
     const raw = candidate?.experience;

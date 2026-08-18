@@ -20,7 +20,7 @@
 import {
     buildConsistencyReport,
     measureExperiences,
-    extractRequiredYears,
+    requiredYearsOf,
     SEVERITY,
 } from '../utils/cvConsistency';
 import { verifyCompanyClaim, summarizeCompanyVerification } from '../utils/companyClaims';
@@ -32,22 +32,61 @@ import { resolveCompanies } from './companyIntelStore';
 const SEVERITY_RANK = { celiski: 0, dikkat: 1, bilgi: 2 };
 
 /**
- * İlanın istediği asgari yılı, ilan metinlerinden çıkarır.
+ * Raporu aday belgesine yazılacak KÜÇÜK bir özete indirger.
  *
- * Gereksinim maddeleri, açıklama ve başlık birlikte taranır — yıl eşiği
- * bazen maddede, bazen serbest açıklamada yazıyor.
+ * Raporun tamamı saklanmıyor: bayrak metinleri, kaynak listeleri ve şirket
+ * kanıtları kilobaytlarca yer tutar ve hepsi yeniden üretilebilir (şirket
+ * verisi zaten companyIntel önbelleğinde). Aday belgesinde yalnızca LİSTENİN
+ * ve SKORUN ihtiyaç duyduğu sayılar duruyor.
+ *
+ * Firestore `undefined` kabul etmiyor — her alan açıkça null'a düşürülüyor.
+ *
+ * @param {object} report verifyCandidate() çıktısı
+ * @returns {object} candidate.verification alanına yazılacak özet
  */
-export function requiredYearsOf(position) {
-    if (!position) return null;
-    const parts = [
-        position.title,
-        position.description,
-        ...(Array.isArray(position.requirements)
-            ? position.requirements.map((r) => (typeof r === 'string' ? r : r?.text || ''))
-            : []),
-    ];
-    return extractRequiredYears(parts.filter(Boolean).join('\n'));
+export function buildVerificationSummary(report) {
+    const c = report?.companySummary?.counts || {};
+    const fit = report?.sectorFit || null;
+    const skipped = report?.lookup?.skipped?.length || 0;
+    const failed = report?.lookup?.failed?.length || 0;
+
+    return {
+        at: report?.verifiedAt || new Date().toISOString(),
+        counts: {
+            celiski: report?.counts?.celiski || 0,
+            dikkat: report?.counts?.dikkat || 0,
+            bilgi: report?.counts?.bilgi || 0,
+        },
+        flagIds: (report?.flags || []).map((f) => f.id),
+        companies: {
+            total: report?.companySummary?.total || 0,
+            dogrulandi: c.dogrulandi || 0,
+            dogrulanamadi: c.dogrulanamadi || 0,
+            celiski: c.celiski || 0,
+        },
+        // TARAMA EKSİK KALDIYSA SKOR CEZASI UYGULANMAZ. Atlanan şirket bizim
+        // tavanımızın sonucu; adayın skorundan düşmek kendi kısıtımızın
+        // faturasını ona kesmek olurdu (bkz. utils/verificationScore.js).
+        lookupComplete: skipped === 0 && failed === 0,
+        sector: fit
+            ? {
+                verdict: fit.verdict,
+                exactMonths: fit.exactMonths || 0,
+                nearMonths: fit.nearMonths || 0,
+                recentExactMonths: fit.recentExactMonths || 0,
+                share: fit.share === null || fit.share === undefined ? null : fit.share,
+                stale: Boolean(fit.stale),
+                target: fit.target?.sector || null,
+            }
+            : null,
+    };
 }
+
+// requiredYearsOf artık utils/cvConsistency.js'te yaşıyor: liste rozetleri de
+// aynı eşiğe ihtiyaç duyuyor ve o tarafın bu tek satır için tüm doğrulama
+// zincirini — dolayısıyla Firestore'u — import etmesi saçma olurdu. Mevcut
+// çağıranlar ve testler için buradan yeniden dışa aktarılıyor.
+export { requiredYearsOf };
 
 /**
  * Arama sorgusunu daraltan bağlam.

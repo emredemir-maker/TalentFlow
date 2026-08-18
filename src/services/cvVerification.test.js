@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./companyIntelStore', () => ({ resolveCompanies: vi.fn() }));
 
-const { verifyCandidate, requiredYearsOf } = await import('./cvVerification');
+const { verifyCandidate, requiredYearsOf, buildVerificationSummary } = await import('./cvVerification');
 
 const TODAY = { year: 2026, month: 8 };
 const TARGET = { sector: 'musteri deneyimi', model: 'b2b', type: 'saas' };
@@ -205,5 +205,62 @@ describe('verifyCandidate — robustness', () => {
             experiences: [exp('X', 'Dev', 'Oca 2025 - Ara 2029')],
         });
         expect(r.flags[0].severity).toBe('celiski');
+    });
+});
+
+// ── Aday belgesine yazılan özet ─────────────────────────────────────────────
+// Bu özet listedeki rozetleri ve skor kesintisini besliyor. Yanlış bir alan
+// buradan çıkarsa etkisi tek ekranda değil, tüm sıralamada görünür.
+describe('buildVerificationSummary', () => {
+    const report = async (over = {}) => {
+        const r = await run(
+            { name: 'A B', experiences: [exp('X', 'Dev', 'Oca 2020 - Ağu 2026')] },
+            over
+        );
+        return r;
+    };
+
+    it('keeps only what the list and the score need', async () => {
+        const s = buildVerificationSummary(await report());
+        expect(Object.keys(s).sort()).toEqual(['at', 'companies', 'counts', 'flagIds', 'lookupComplete', 'sector']);
+    });
+
+    // Firestore undefined kabul etmiyor; tek bir undefined tüm yazımı düşürür.
+    it('never emits undefined', async () => {
+        const s = buildVerificationSummary(await report());
+        const walk = (o) => Object.values(o || {}).forEach((v) => {
+            expect(v).not.toBeUndefined();
+            if (v && typeof v === 'object' && !Array.isArray(v)) walk(v);
+        });
+        walk(s);
+    });
+
+    // ASIL KORUMA: bizim atladığımız şirket adayın skorundan düşmemeli.
+    it('marks the lookup incomplete when we skipped or failed companies', async () => {
+        expect(buildVerificationSummary(await report()).lookupComplete).toBe(true);
+
+        const skipped = await report({ resolveAll: stubLookup({}, { skipped: ['Y'] }) });
+        expect(buildVerificationSummary(skipped).lookupComplete).toBe(false);
+
+        const failed = await report({ resolveAll: stubLookup({}, { failed: [{ name: 'Y', error: 'e' }] }) });
+        expect(buildVerificationSummary(failed).lookupComplete).toBe(false);
+    });
+
+    it('carries the sector verdict the badges read', async () => {
+        const r = await run(
+            { name: 'A B', experiences: [exp('Desk360', 'PM', 'Oca 2023 - Ağu 2026')] },
+            {
+                resolveAll: stubLookup({
+                    Desk360: { name: 'Desk360', sources: [{ title: 's', uri: 'https://x' }], sector: 'musteri deneyimi', model: 'b2b', type: 'saas' },
+                }),
+            }
+        );
+        expect(buildVerificationSummary(r).sector).toMatchObject({ verdict: 'guclu', target: 'musteri deneyimi', stale: false });
+    });
+
+    it('survives a malformed or empty report', () => {
+        expect(() => buildVerificationSummary(null)).not.toThrow();
+        expect(buildVerificationSummary(null).counts).toEqual({ celiski: 0, dikkat: 0, bilgi: 0 });
+        expect(buildVerificationSummary(null).sector).toBeNull();
     });
 });

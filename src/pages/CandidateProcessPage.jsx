@@ -1547,6 +1547,7 @@ export default function CandidateProcessPage() {
                                         {/* Skorun tam kırılımı — "neden bu puan?" */}
                                         {!analyzingIds.has(candidate.id) && displayedFullAnalysis && (
                                             <ScoreBreakdownPanel
+                                                candidate={candidate}
                                                 analysis={displayedFullAnalysis}
                                                 position={displayedPosition}
                                             />
