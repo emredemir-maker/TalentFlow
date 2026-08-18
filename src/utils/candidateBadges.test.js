@@ -88,6 +88,66 @@ describe('alan ile sektör ayrı rozetler', () => {
     });
 });
 
+// ── CANLIDA GÖRÜLEN HATA ────────────────────────────────────────────────────
+// Hasan Asgar'ın çelişkisi ŞİRKET katmanından geliyordu (şirket kuruluşundan
+// önceki başlangıç tarihi). Skor bu yüzden düşüyordu ama listede yalnızca
+// "Sektör dışı" görünüyordu — sistem adayı bir sebeple aşağı çekiyor ve o
+// sebebi göstermiyordu.
+//
+// Canlı hesap yalnızca Katman 1'i görüyor; şirket çelişkileri ağ çağrısı
+// gerektirdiği için sadece kayıtlı özette duruyor.
+describe('şirket katmanından gelen çelişki', () => {
+    it('shows a contradiction badge that only the stored summary knows about', () => {
+        const list = badges(candidate({
+            // CV'nin kendi içinde tutarlı — canlı hesap hiçbir çelişki bulmaz
+            experience: 6,
+            experiences: [exp('Asgar Digital', 'Growth Manager', 'Oca 2020 - Ağu 2026')],
+            verification: { at: 'x', counts: { celiski: 1, dikkat: 2, bilgi: 0 }, sector: { verdict: VERDICT.NONE } },
+        }));
+        const b = list.find((x) => x.id === 'celiski');
+        expect(b).toBeTruthy();
+        expect(b.title).toContain('şirket doğrulamasından');
+    });
+
+    // Rozetin gösterdiği sayı ile skorun cezalandırdığı sayı ayrışamaz.
+    it('reports the same count the score multiplier penalises', () => {
+        const list = badges(candidate({
+            verification: { at: 'x', counts: { celiski: 3 } },
+        }));
+        expect(list.find((x) => x.id === 'celiski').label).toBe('3 çelişki');
+    });
+
+    // TOPLAMA DEĞİL: kayıtlı sayaç tarama anındaki Katman 1 çelişkilerini
+    // zaten içeriyor; toplasaydık aynı çelişki iki kez sayılırdı.
+    it('does not double-count a contradiction present in both sources', () => {
+        const list = badges(candidate({
+            experience: 8,
+            experiences: [exp('Tek Şirket', 'Dev', 'Eyl 2024 - Ağu 2026')],
+            verification: { at: 'x', counts: { celiski: 1 } },
+        }));
+        expect(list.find((x) => x.id === 'celiski').label).toBe('Çelişki');
+    });
+
+    // CV tarama sonrası değiştiyse yeni Katman 1 çelişkileri de görünmeli.
+    it('prefers the live count when the CV has gained contradictions since the scan', () => {
+        const list = badges(candidate({
+            experience: 20,
+            experiences: [exp('Tek Şirket', 'Dev', 'Eyl 2024 - Ağu 2026'), exp('X', 'Dev', 'Oca 2020 - Ara 2029')],
+            verification: { at: 'x', counts: { celiski: 1 } },
+        }));
+        expect(list.find((x) => x.id === 'celiski').label).toBe('2 çelişki');
+    });
+
+    // Listede ilan seçili değilken yıl eşiği hesaplanamaz; tarama sırasında
+    // ilan bağlamı vardıysa kayıttan gelmeli.
+    it('reads flag ids from the stored summary too', () => {
+        const list = badges(candidate({
+            verification: { at: 'x', counts: { celiski: 0 }, flagIds: ['ilan-yil-esigi'] },
+        }));
+        expect(idsOf(list)).toContain('tecrube-eksik');
+    });
+});
+
 describe('sektör rozetleri — yalnızca kayıtlı özetten', () => {
     const withSector = (sector) => candidate({ verification: { at: 'x', sector } });
 
