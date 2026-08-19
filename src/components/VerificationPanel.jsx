@@ -14,7 +14,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
     ShieldCheck, ShieldAlert, AlertTriangle, Info, CheckCircle2, Search,
-    Building2, ExternalLink, Loader2, HelpCircle, Target, RefreshCw, Settings2, TrendingDown,
+    Building2, ExternalLink, Loader2, HelpCircle, Target, RefreshCw, Settings2, TrendingDown, TrendingUp,
 } from 'lucide-react';
 
 import { verifyCandidate, buildVerificationSummary, buildStoredReport } from '../services/cvVerification';
@@ -265,33 +265,43 @@ function ScoreImpactBlock({ report, candidate, position }) {
     // skor üzerinden "şu kadar puan kaybetti" demek yanlış olurdu.
     const detail = position ? analysisScoreDetail(candidate, position) : null;
     const hasConcrete = Boolean(detail?.scanned && detail.preVerificationScore > 0);
-    const lostPoints = hasConcrete ? detail.preVerificationScore - detail.score : 0;
 
     if (!effect.applied) {
         return (
             <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-start gap-3">
                 <CheckCircle2 className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
                 <p className="text-[12px] text-slate-700">
-                    <strong>Bu bulgular skoru düşürmedi.</strong> Dikkat maddeleri mülakatta sorulacak
+                    <strong>Bu bulgular skoru değiştirmedi.</strong> Dikkat maddeleri mülakatta sorulacak
                     soru üretir ama tek başlarına puan kesmez; kaynak bulunamaması da ceza değildir.
                 </p>
             </div>
         );
     }
 
+    // Etki İKİ YÖNLÜ olabilir: sektör uyumu skoru yükseltebiliyor. Yükselen
+    // bir skoru kırmızı bir "kesinti" kutusunda göstermek doğrudan yanlış
+    // bilgi olurdu.
+    const isBonus = effect.multiplier > 1;
+    const tone = isBonus
+        ? { box: 'bg-emerald-50 border-emerald-200', text: 'text-emerald-700', chip: 'border-emerald-100', icon: TrendingUp }
+        : { box: 'bg-rose-50 border-rose-200', text: 'text-rose-700', chip: 'border-rose-100', icon: TrendingDown };
+    const delta = hasConcrete ? detail.score - detail.preVerificationScore : 0;
+
     return (
-        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-5">
+        <div className={`rounded-2xl border p-5 ${tone.box}`}>
             <SectionHeader
-                icon={TrendingDown}
+                icon={tone.icon}
                 title="Skora Etkisi"
                 right={
                     hasConcrete ? (
-                        <span className="text-[12px] font-black text-rose-700">
+                        <span className={`text-[12px] font-black ${tone.text}`}>
                             {detail.preVerificationScore} → {detail.score}
-                            <span className="text-[10px] font-bold text-rose-500 ml-1.5">−{lostPoints} puan</span>
+                            <span className="text-[10px] font-bold ml-1.5 opacity-80">
+                                {delta > 0 ? '+' : ''}{delta} puan
+                            </span>
                         </span>
                     ) : (
-                        <span className="text-[12px] font-black text-rose-700">
+                        <span className={`text-[12px] font-black ${tone.text}`}>
                             ×{effect.multiplier.toFixed(2)}
                         </span>
                     )
@@ -300,9 +310,11 @@ function ScoreImpactBlock({ report, candidate, position }) {
 
             <ul className="space-y-1.5">
                 {reasons.map((r) => (
-                    <li key={r.code} className="flex items-start justify-between gap-3 text-[12px] text-slate-700 bg-white border border-rose-100 rounded-xl px-3 py-2">
+                    <li key={r.code} className={`flex items-start justify-between gap-3 text-[12px] text-slate-700 bg-white border rounded-xl px-3 py-2 ${tone.chip}`}>
                         <span className="leading-relaxed">{r.label}</span>
-                        <span className="font-black text-rose-600 shrink-0">×{r.factor}</span>
+                        <span className={`font-black shrink-0 ${r.factor > 1 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            ×{r.factor}
+                        </span>
                     </li>
                 ))}
             </ul>
@@ -311,7 +323,7 @@ function ScoreImpactBlock({ report, candidate, position }) {
                 {hasConcrete
                     ? `"${position.title}" ilanındaki skora uygulandı. Diğer ilanlarda da aynı oran geçerli.`
                     : 'Bu oran, adayın taranmış olduğu her ilandaki skoruna uygulanır.'}
-                {' '}Kesinti yalnızca ÖLÇÜLMÜŞ bulgulardan doğar — kaynak bulunamaması tek başına puan düşürmez.
+                {' '}Etki yalnızca ÖLÇÜLMÜŞ bulgulardan doğar — kaynak bulunamaması tek başına puan düşürmez.
             </p>
         </div>
     );

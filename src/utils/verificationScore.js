@@ -39,12 +39,25 @@ export const UNVERIFIED_MIN_COMPANIES = 3;
 export const UNVERIFIED_RATIO = 0.6;
 export const UNVERIFIED_PENALTY = 0.05;
 
-/** Sektör uyumu çarpanları. Ölçülemeyen ve hedefsiz durumlar NÖTR. */
+/**
+ * Sektör uyumu çarpanları.
+ *
+ * ── NÖTR NOKTA "KISMİ", "GÜÇLÜ" DEĞİL ─────────────────────────────────────
+ * İlk sürümde güçlü uyum 1.00 idi: yani derin sektör deneyimi HİÇBİR ŞEY
+ * kazandırmıyor, yalnızca cezadan kurtarıyordu. Bu asimetrikti — sektör
+ * deneyimi gerçek bir avantaj ve işe alımcının sıralamada bunu görmesi gerek.
+ *
+ * Nötr nokta KISMİ uyuma taşındı: "bu alanda bir miktar deneyimi var" temel
+ * durum, güçlü uyum bunun üstüne ödül alıyor.
+ *
+ * Ölçülemeyen ve hedefsiz durumlar HÂLÂ NÖTR (1.00) — ne ceza ne ödül.
+ * Ölçemediğimiz şeyi iki yönde de kullanmamalıyız.
+ */
 export const SECTOR_FACTOR = {
-    [VERDICT.STRONG]: 1.00,
-    [VERDICT.PARTIAL]: 0.97,
-    [VERDICT.NEAR]: 0.94,
-    [VERDICT.NONE]: 0.90,
+    [VERDICT.STRONG]: 1.04,
+    [VERDICT.PARTIAL]: 1.00,
+    [VERDICT.NEAR]: 0.96,
+    [VERDICT.NONE]: 0.92,
     [VERDICT.UNMEASURED]: 1.00,
     [VERDICT.NO_TARGET]: 1.00,
 };
@@ -124,14 +137,17 @@ export function sectorMultiplier(verification) {
     const reasons = [];
     let multiplier = base;
 
-    if (base < 1) {
+    // Gerekçe hem CEZA hem ÖDÜL için yazılır. Yalnızca cezayı açıklamak,
+    // skoru yükselten bir kuralı görünmez bırakırdı — sessizce yükselen bir
+    // skor da sessizce düşen kadar açıklanamazdır.
+    if (base !== 1) {
         reasons.push({
             code: `sektor-${sector.verdict}`,
-            label: sector.verdict === VERDICT.NONE
-                ? 'Hedef sektörde ve komşu sektörlerde deneyim bulunamadı'
-                : sector.verdict === VERDICT.NEAR
-                    ? 'Yalnızca komşu sektörlerde deneyim'
-                    : 'Hedef sektörde kısmi deneyim',
+            label: sector.verdict === VERDICT.STRONG
+                ? 'Hedef sektörde güçlü ve güncel deneyim'
+                : sector.verdict === VERDICT.NONE
+                    ? 'Hedef sektörde ve komşu sektörlerde deneyim bulunamadı'
+                    : 'Yalnızca komşu sektörlerde deneyim',
             factor: round2(base),
         });
     }
@@ -171,7 +187,10 @@ export function verificationEffect(verification) {
         multiplier,
         verification: v,
         sector: s,
-        applied: multiplier < 1,
+        // İKİ YÖNLÜ. Önceden `multiplier < 1` idi; sektör ödülü eklendikten
+        // sonra bu, skoru YÜKSELTEN bir etkiyi "etki yok" diye raporlardı ve
+        // arayüz sebebi hiç göstermezdi.
+        applied: multiplier !== 1,
     };
 }
 
@@ -185,8 +204,11 @@ export function verificationEffect(verification) {
 export function applyVerificationToScore(score, verification) {
     const base = Number(score) || 0;
     const effect = verificationEffect(verification);
+    // TAVAN 100. Sektör ödülü çarpanı 1'in üstüne çıkarabiliyor; kelepçesiz
+    // bırakırsak skor 100'ü aşar ve tüm arayüz yüzde varsayan bir sayfada
+    // saçmalar. 96 üstündeki adaylarda ödül kırpılır — zaten tavandalar.
     return {
-        score: Math.round(base * effect.multiplier),
+        score: Math.min(100, Math.max(0, Math.round(base * effect.multiplier))),
         baseScore: Math.round(base),
         ...effect,
     };
