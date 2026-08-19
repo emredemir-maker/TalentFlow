@@ -189,3 +189,53 @@ describe('dominantSource', () => {
         expect(dominantSource(null)).toBeNull();
     });
 });
+
+// ── CANLIDA GÖRÜLEN HATA ────────────────────────────────────────────────────
+// Madde değerlendirmeleri İKİ FARKLI YOLDA durabiliyor: kökte ya da
+// `scoreData` altında (analyzeCandidateMatch sonucu oraya yazıyor).
+//
+// Modül kendi çözücüsünü tutuyordu ve yalnızca kök yolu okuyordu. Sonuç:
+// kayıtları `scoreData` altında olan adaylarda blok "hiç karşılanan madde
+// yok" sanıp SESSİZCE görünmez oluyordu — hata değil, boşluk. Gerçek bir
+// adayda dayanak metinleri şirket adlarıyla dopdolu olduğu hâlde tablo hiç
+// çıkmadı.
+//
+// Çözücü artık coverageDetail.js ile paylaşılıyor; iki kopya olsaydı aynı
+// hata er geç tekrarlanırdı.
+describe('değerlendirmelerin durduğu yol', () => {
+    const items = [
+        assessment(1, 'met', 'Vega Interactive funnel sahipliği'),
+        assessment(2, 'met', 'M. Doruk roadmap'),
+    ];
+
+    const runWith = (analysis) => buildScoreProvenance({
+        analysis,
+        requirements: REQUIREMENTS,
+        candidate: { experiences: EXPERIENCES },
+    });
+
+    it('reads assessments stored at the root', () => {
+        expect(runWith({ requirementCoverage: { assessments: items } }).total).toBe(2);
+    });
+
+    // ASIL HATA: bu yol okunmuyordu ve blok sessizce boş dönüyordu.
+    it('reads assessments nested under scoreData', () => {
+        const p = runWith({ scoreData: { requirementCoverage: { assessments: items } } });
+        expect(p.total).toBe(2);
+        expect(p.attributed).toBe(2);
+        expect(p.groups.map((g) => g.company)).toEqual(['Vega Interactive', 'M. Doruk']);
+    });
+
+    it('prefers the root path when both are present', () => {
+        const p = runWith({
+            requirementCoverage: { assessments: [assessment(1, 'met', 'Vega Interactive funnel')] },
+            scoreData: { requirementCoverage: { assessments: items } },
+        });
+        expect(p.total).toBe(1);
+    });
+
+    it('still returns empty when neither path has anything', () => {
+        expect(runWith({}).total).toBe(0);
+        expect(runWith({ scoreData: {} }).total).toBe(0);
+    });
+});

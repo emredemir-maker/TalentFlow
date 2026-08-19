@@ -39,7 +39,18 @@ export function usesCurrentRubric(analysis) {
 }
 
 /** Madde bazlı değerlendirmeler — iki farklı yerde saklanabiliyor. */
-function assessmentsOf(analysis) {
+/**
+ * Madde değerlendirmeleri İKİ FARKLI YOLDA durabiliyor.
+ *
+ * analyzeCandidateMatch sonucu `scoreData` altına yazıyor; başka yollardan
+ * gelen analizlerde ise kökte duruyor. İki yolu bilen tek bir çözücü olmalı:
+ * canlıda görüldü ki yalnızca kök yolu okuyan bir modül, kayıtları `scoreData`
+ * altında olan adaylarda "hiç değerlendirme yok" sanıp sessizce boş dönüyor.
+ *
+ * Dışa açık, çünkü skor dayanağı (utils/scoreProvenance.js) aynı kayıtları
+ * okuyor ve kendi kopyasını tutsaydı aynen bu hata tekrarlanırdı.
+ */
+export function assessmentsOf(analysis) {
     const direct = analysis?.requirementCoverage?.assessments;
     if (Array.isArray(direct)) return direct;
     const nested = analysis?.scoreData?.requirementCoverage?.assessments;

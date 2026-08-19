@@ -28,6 +28,7 @@
 // "skorun tamamı şu şirketten" sonucu çıkarmak en kötü hata olurdu.
 
 import { foldTr } from './turkishText.js';
+import { assessmentsOf } from './coverageDetail.js';
 
 /** Şirket adının eşleştirmede kullanılacak hâli. */
 const NOISE = new Set([
@@ -120,9 +121,12 @@ function companyFactsOf(companyName, storedReport) {
  *   groups katkı sırasına göre: en çok madde getiren iş başta.
  */
 export function buildScoreProvenance({ analysis, requirements = [], candidate } = {}) {
-    const assessments = Array.isArray(analysis?.requirementCoverage?.assessments)
-        ? analysis.requirementCoverage.assessments
-        : [];
+    // ÇÖZÜCÜ PAYLAŞILIYOR. Değerlendirmeler iki yolda durabiliyor
+    // (kökte ya da `scoreData` altında) ve burada kendi kopyamı tutmuştum:
+    // yalnızca kök yolu okuyordu, dolayısıyla kayıtları `scoreData` altında
+    // olan adaylarda blok "hiç karşılanan madde yok" sanıp SESSİZCE
+    // görünmez oluyordu — canlıda tam olarak böyle yaşandı.
+    const assessments = assessmentsOf(analysis) || [];
     const experiences = Array.isArray(candidate?.experiences) ? candidate.experiences : [];
 
     const empty = { total: 0, attributed: 0, unattributed: 0, hasEvidence: false, groups: [] };
