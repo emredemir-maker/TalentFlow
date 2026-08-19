@@ -114,7 +114,7 @@ export function verifyCompanyClaim({ claim, evidence, candidateName } = {}) {
         return { company, verdict: CLAIM_VERDICT.UNVERIFIED, flags };
     }
 
-    // ── Kurucu eşleşmesi — Hasan Asgar vakası ───────────────────────────────
+    // ── Kurucu eşleşmesi — adayın kendi şirketi ──────────────────────────────
     // Bu bir SUÇLAMA DEĞİL. Kendi şirketinde çalışmak meşru ve yaygın; ama
     // "Growth Manager" unvanının ne anlama geldiği, kendi şirketinde ile
     // 200 kişilik bir şirkette aynı şey değil. İşe alımcının bilmesi gereken

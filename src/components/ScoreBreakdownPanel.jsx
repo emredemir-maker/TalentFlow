@@ -4,7 +4,8 @@ import { explainHybridScore } from '../services/geminiService';
 import { requirementsOf } from '../utils/positionRequirements';
 import { coverageDetailState, usesCurrentRubric } from '../utils/coverageDetail';
 import { isStaleFor, analysisScoreDetail } from '../utils/positionScore';
-import { ShieldAlert, TrendingUp } from 'lucide-react';
+import { ShieldAlert, TrendingUp, Layers } from 'lucide-react';
+import { buildScoreProvenance, dominantSource } from '../utils/scoreProvenance';
 import { STAR_MAX, STAR_LABELS, anchorLabel } from '../utils/starDimensions';
 
 /**
@@ -15,6 +16,123 @@ import { STAR_MAX, STAR_LABELS, anchorLabel } from '../utils/starDimensions';
  * gerçek skordan sapar ve şeffaflık iddiası yalana dönerdi. Testler
  * madde puanlarının toplamının skora eşit kaldığını sabitliyor.
  */
+/** Şirket hakkında doğrulama katmanının bildikleri — ÖLÇÜM, yorum değil. */
+const VERDICT_TEXT = {
+    dogrulandi: 'doğrulandı',
+    dogrulanamadi: 'doğrulanamadı',
+    celiski: 'çelişki',
+};
+
+/**
+ * BU SKOR NEYE DAYANIYOR?
+ *
+ * "%95, 200 kişilik bir şirkette doğrulanmış üç yıldan geliyor" ile "%95'in
+ * beşte dördü, adayın kendi kurduğu 1-10 kişilik doğrulanamayan bir
+ * şirketteki dönemden geliyor" bambaşka iki bilgi. İkisi de aynı sayıyı
+ * üretiyor ve karar verici aradaki farkı göremiyordu.
+ *
+ * ── YARGI YOK, ATIF VAR ─────────────────────────────────────────────────────
+ * Blok "bu iş uydurma" ya da "küçük şirket şüpheli" demiyor — kurucu geçmişi
+ * meşru bir kariyer yolu. Görsel ağırlık bu bloktan değil, doğrulama
+ * katmanında ZATEN ölçülmüş olgulardan geliyor.
+ */
+function ProvenanceBlock({ analysis, position, candidate }) {
+    const prov = buildScoreProvenance({
+        analysis,
+        requirements: requirementsOf(position),
+        candidate,
+    });
+    if (prov.total === 0) return null;
+
+    // Analiz dayanak alanı taşımıyorsa atıf hiç denenemez. Bunu "atfedilemedi"
+    // diye göstermek yanıltıcı olur: sorulmamış bir soruyu cevapsız saymak.
+    if (!prov.hasEvidence) {
+        return (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+                <div className="flex items-center gap-2 mb-1">
+                    <Layers className="w-3.5 h-3.5 text-slate-400" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                        Bu skorun dayanağı
+                    </span>
+                </div>
+                <p className="text-[10px] text-slate-500 leading-relaxed">
+                    Bu analiz madde bazında dayanak taşımıyor (eski sürümle yapılmış).
+                    Skorun hangi işlerden geldiğini görmek için adayı <strong>yeniden taratın</strong>.
+                </p>
+            </div>
+        );
+    }
+
+    const top = dominantSource(prov);
+    return (
+        <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+            <div className="flex items-center gap-2 mb-2">
+                <Layers className="w-3.5 h-3.5 text-cyan-500" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">
+                    Bu skorun dayanağı
+                </span>
+                {top && prov.attributed > 1 && (
+                    <span className="text-[10px] font-bold text-slate-500 ml-auto">
+                        {prov.attributed} maddenin {top.count}&apos;i tek işten
+                    </span>
+                )}
+            </div>
+
+            <div className="space-y-2">
+                {prov.groups.map((g) => (
+                    <div key={`${g.company}-${g.duration}`} className="border border-slate-100 rounded-lg px-2.5 py-2 bg-slate-50">
+                        <div className="flex items-baseline justify-between gap-2 flex-wrap">
+                            <span className="text-[11px] font-black text-slate-800">{g.company}</span>
+                            <span className="text-[10px] text-slate-500">
+                                {[g.role, g.duration].filter(Boolean).join(' · ')}
+                            </span>
+                        </div>
+
+                        {/* Olgular doğrulama katmanından geliyor; burada yeniden
+                            yorumlanmıyor, yalnızca skorun yanına taşınıyor. */}
+                        {g.facts && (
+                            <div className="flex flex-wrap gap-1.5 mt-1">
+                                {g.facts.sizeBand && (
+                                    <span className="text-[9px] font-bold px-1.5 py-px rounded border bg-white text-slate-600 border-slate-200">
+                                        {g.facts.sizeBand} kişi
+                                    </span>
+                                )}
+                                {g.facts.verdict && (
+                                    <span className={`text-[9px] font-bold px-1.5 py-px rounded border ${
+                                        g.facts.verdict === 'celiski'
+                                            ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                            : g.facts.verdict === 'dogrulandi'
+                                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                : 'bg-slate-100 text-slate-600 border-slate-200'
+                                    }`}>
+                                        {VERDICT_TEXT[g.facts.verdict] || g.facts.verdict}
+                                    </span>
+                                )}
+                                {g.facts.isFounder && (
+                                    <span className="text-[9px] font-bold px-1.5 py-px rounded border bg-amber-50 text-amber-700 border-amber-200">
+                                        aday kurucu
+                                    </span>
+                                )}
+                            </div>
+                        )}
+
+                        <p className="text-[10px] text-slate-600 mt-1.5 leading-relaxed">
+                            <strong>{g.count} madde:</strong>{' '}
+                            {g.items.map((i) => i.text || `#${i.index}`).join(', ')}
+                        </p>
+                    </div>
+                ))}
+            </div>
+
+            {prov.unattributed > 0 && (
+                <p className="text-[10px] text-slate-400 mt-2">
+                    Atfedilemedi: {prov.unattributed} madde — dayanak metni bir işe bağlanamadı.
+                </p>
+            )}
+        </div>
+    );
+}
+
 export default function ScoreBreakdownPanel({ analysis, position, candidate = null }) {
     const [open, setOpen] = useState(false);
 
@@ -110,6 +228,8 @@ export default function ScoreBreakdownPanel({ analysis, position, candidate = nu
                             </div>
                         );
                     })()}
+
+                    <ProvenanceBlock analysis={analysis} position={position} candidate={candidate} />
 
                     {/* GEREKSİNİM LİSTESİ DEĞİŞMİŞ.
                         Kayıtlı değerlendirmeler madde NUMARASINA bağlı; liste

@@ -193,7 +193,7 @@ export function buildCandidateBadges(candidate, {
 
     // ── DİKKAT SAYACI ───────────────────────────────────────────────────────
     //
-    // CANLIDA GÖRÜLEN EKSİK: Hasan Asgar'ın raporunda 4 dikkat maddesi vardı
+    // CANLIDA GÖRÜLEN EKSİK: bir adayın raporunda 4 dikkat maddesi vardı
     // (çakışan dönem, hızlı unvan yükselişi, iki kez unvan/ölçek uyumsuzluğu)
     // ama listede tek bir rozet bile çıkmıyordu. Yalnızca çelişki rozetleniyor,
     // dikkat seviyesindeki hiçbir bulgu görünmüyordu.

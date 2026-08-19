@@ -121,7 +121,7 @@ describe('measureExperiences', () => {
     });
 });
 
-describe('buildConsistencyReport — the Erkut case', () => {
+describe('buildConsistencyReport — the inflated-claim case', () => {
     // Beyanı 6 yıl, kayıtları 2 yıl. Skor 90 verilmişti; sistemin bunu
     // söylememesi asıl sorundu.
     it('contradicts a claim that the listed roles do not support', () => {

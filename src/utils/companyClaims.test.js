@@ -20,7 +20,7 @@ import {
 import { SEVERITY } from './cvConsistency';
 
 const claim = (over = {}) => ({
-    company: 'Asgar Digital',
+    company: 'Aydın Dijital',
     role: 'Growth Manager',
     startYear: 2022,
     duration: 'Oca 2022 - Ağu 2026',
@@ -28,8 +28,8 @@ const claim = (over = {}) => ({
 });
 
 const evidence = (over = {}) => ({
-    name: 'Asgar Digital',
-    website: 'asgardigital.com',
+    name: 'Aydın Dijital',
+    website: 'aydindijital.com',
     sources: [{ title: 'Kaynak', uri: 'https://example.com' }],
     ...over,
 });
@@ -38,8 +38,8 @@ const idsOf = (r) => r.flags.map((f) => f.id);
 
 describe('namesMatch', () => {
     it('matches the same person written the same way', () => {
-        expect(namesMatch('Hasan Asgar', 'Hasan Asgar')).toBe(true);
-        expect(namesMatch('HASAN ASGAR', 'hasan asgar')).toBe(true);
+        expect(namesMatch('Kerem Aydın', 'Kerem Aydın')).toBe(true);
+        expect(namesMatch('KEREM AYDIN', 'kerem aydın')).toBe(true);
     });
 
     it('ignores middle names and reversed order', () => {
@@ -48,7 +48,7 @@ describe('namesMatch', () => {
     });
 
     it('survives Turkish characters', () => {
-        expect(namesMatch('Şükrü Öztürk', 'Sukru Ozturk')).toBe(true);
+        expect(namesMatch('Şule Güngör', 'Sule Gungor')).toBe(true);
         expect(namesMatch('İbrahim Çelik', 'Ibrahim Celik')).toBe(true);
     });
 
@@ -56,46 +56,46 @@ describe('namesMatch', () => {
     // soyadın üstüne kuramayız.
     it('does not match on surname alone', () => {
         expect(namesMatch('Ahmet Yılmaz', 'Mehmet Yılmaz')).toBe(false);
-        expect(namesMatch('Hasan Asgar', 'Ali Asgar')).toBe(false);
+        expect(namesMatch('Kerem Aydın', 'Ali Aydın')).toBe(false);
     });
 
     it('refuses to match a single-word name', () => {
-        expect(namesMatch('Hasan', 'Hasan Asgar')).toBe(false);
-        expect(namesMatch('', 'Hasan Asgar')).toBe(false);
+        expect(namesMatch('Hasan', 'Kerem Aydın')).toBe(false);
+        expect(namesMatch('', 'Kerem Aydın')).toBe(false);
     });
 });
 
 describe('matchFounder', () => {
     it('finds the candidate among the founders', () => {
-        expect(matchFounder('Hasan Asgar', ['Ayşe Kaya', 'Hasan Asgar'])).toBe('Hasan Asgar');
+        expect(matchFounder('Kerem Aydın', ['Ayşe Kaya', 'Kerem Aydın'])).toBe('Kerem Aydın');
     });
 
     it('returns null when nobody matches', () => {
-        expect(matchFounder('Hasan Asgar', ['Ayşe Kaya'])).toBeNull();
-        expect(matchFounder('Hasan Asgar', null)).toBeNull();
-        expect(matchFounder('', ['Hasan Asgar'])).toBeNull();
+        expect(matchFounder('Kerem Aydın', ['Ayşe Kaya'])).toBeNull();
+        expect(matchFounder('Kerem Aydın', null)).toBeNull();
+        expect(matchFounder('', ['Kerem Aydın'])).toBeNull();
     });
 });
 
 describe('verifyCompanyClaim — no evidence is not an accusation', () => {
     it('reports unverified, never contradicted, when nothing was found', () => {
-        const r = verifyCompanyClaim({ claim: claim(), evidence: null, candidateName: 'Hasan Asgar' });
+        const r = verifyCompanyClaim({ claim: claim(), evidence: null, candidateName: 'Kerem Aydın' });
         expect(r.verdict).toBe(CLAIM_VERDICT.UNVERIFIED);
         expect(r.flags.every((f) => f.severity === SEVERITY.INFO)).toBe(true);
     });
 
     it('says out loud that absence of evidence is not evidence of absence', () => {
-        const r = verifyCompanyClaim({ claim: claim(), evidence: {}, candidateName: 'Hasan Asgar' });
+        const r = verifyCompanyClaim({ claim: claim(), evidence: {}, candidateName: 'Kerem Aydın' });
         expect(r.flags[0].detail).toContain('var olmadığı anlamına GELMEZ');
     });
 });
 
-describe('verifyCompanyClaim — the Hasan Asgar case', () => {
+describe('verifyCompanyClaim — the founder-match case', () => {
     it('surfaces that the candidate founded the company, as context not a verdict', () => {
         const r = verifyCompanyClaim({
             claim: claim(),
-            evidence: evidence({ registry: { source: 'Ticaret Sicil Gazetesi', foundedYear: 2021, founders: ['Hasan Asgar'] } }),
-            candidateName: 'Hasan Asgar',
+            evidence: evidence({ registry: { source: 'Ticaret Sicil Gazetesi', foundedYear: 2021, founders: ['Kerem Aydın'] } }),
+            candidateName: 'Kerem Aydın',
         });
         const f = r.flags.find((x) => x.id === 'aday-kurucu');
         expect(f.severity).toBe(SEVERITY.ATTENTION);
@@ -108,8 +108,8 @@ describe('verifyCompanyClaim — the Hasan Asgar case', () => {
     it('marks a web-only founder match as weaker evidence', () => {
         const r = verifyCompanyClaim({
             claim: claim(),
-            evidence: evidence({ founders: ['Hasan Asgar'] }),
-            candidateName: 'Hasan Asgar',
+            evidence: evidence({ founders: ['Kerem Aydın'] }),
+            candidateName: 'Kerem Aydın',
         });
         expect(r.flags.find((x) => x.id === 'aday-kurucu').detail).toContain('sicil kaydıyla teyit edilmedi');
     });
@@ -118,7 +118,7 @@ describe('verifyCompanyClaim — the Hasan Asgar case', () => {
         const r = verifyCompanyClaim({
             claim: claim(),
             evidence: evidence({ registry: { foundedYear: 2015, founders: ['Ayşe Kaya'] } }),
-            candidateName: 'Hasan Asgar',
+            candidateName: 'Kerem Aydın',
         });
         expect(idsOf(r)).not.toContain('aday-kurucu');
     });
@@ -127,7 +127,7 @@ describe('verifyCompanyClaim — the Hasan Asgar case', () => {
         const r = verifyCompanyClaim({
             claim: claim({ role: 'Growth Manager' }),
             evidence: evidence({ sizeBand: '1-10' }),
-            candidateName: 'Hasan Asgar',
+            candidateName: 'Kerem Aydın',
         });
         expect(r.flags.find((x) => x.id === 'unvan-olcek').severity).toBe(SEVERITY.ATTENTION);
     });
@@ -194,7 +194,7 @@ describe('verifyCompanyClaim — evidence strength is ranked', () => {
         const r = verifyCompanyClaim({
             claim: claim({ startYear: 2022, role: 'Growth Specialist' }),
             evidence: evidence({ registry: { foundedYear: 2015, founders: ['Ayşe Kaya'] }, sizeBand: '51-200' }),
-            candidateName: 'Hasan Asgar',
+            candidateName: 'Kerem Aydın',
         });
         expect(r.verdict).toBe(CLAIM_VERDICT.VERIFIED);
         expect(r.flags).toEqual([]);

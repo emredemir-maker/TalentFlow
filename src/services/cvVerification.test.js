@@ -50,11 +50,11 @@ describe('requiredYearsOf', () => {
     });
 });
 
-describe('verifyCandidate — the two cases that started this', () => {
-    // Erkut: beyanı 6 yıl, kayıtları 2 yıl.
+describe('verifyCandidate — the two patterns that started this', () => {
+    // Beyanı 6 yıl, kayıtları 2 yıl.
     it('carries the consistency contradiction into the combined report', async () => {
         const r = await run({
-            name: 'Erkut Öztürk',
+            name: 'Selim Yalın',
             experience: 6,
             experiences: [exp('Tek Şirket', 'Growth Specialist', 'Eyl 2024 - Ağu 2026')],
         });
@@ -63,17 +63,17 @@ describe('verifyCandidate — the two cases that started this', () => {
         expect(r.questions.length).toBeGreaterThan(0);
     });
 
-    // Hasan Asgar: kendi şirketi.
+    // Adayın kendi şirketi.
     it('surfaces the founder match from the company layer', async () => {
         const r = await run(
-            { name: 'Hasan Asgar', experiences: [exp('Asgar Digital', 'Growth Manager', 'Oca 2022 - Ağu 2026')] },
+            { name: 'Kerem Aydın', experiences: [exp('Aydın Dijital', 'Growth Manager', 'Oca 2022 - Ağu 2026')] },
             {
                 resolveAll: stubLookup({
-                    'Asgar Digital': {
-                        name: 'Asgar Digital',
+                    'Aydın Dijital': {
+                        name: 'Aydın Dijital',
                         sources: [{ title: 's', uri: 'https://x' }],
                         sizeBand: '1-10',
-                        registry: { foundedYear: 2021, founders: ['Hasan Asgar'] },
+                        registry: { foundedYear: 2021, founders: ['Kerem Aydın'] },
                     },
                 }),
             }
@@ -271,11 +271,11 @@ describe('buildVerificationSummary', () => {
 // ekran görüp taramayı yeniden başlatmak zorunda kalıyordu.
 describe('buildStoredReport', () => {
     const rich = () => run(
-        { name: 'Hasan Asgar', experiences: [exp('Asgar Digital', 'CEO / Co-Founder', 'Oca 2021 - Ağu 2026')] },
+        { name: 'Kerem Aydın', experiences: [exp('Aydın Dijital', 'CEO / Co-Founder', 'Oca 2021 - Ağu 2026')] },
         {
             resolveAll: stubLookup({
-                'Asgar Digital': {
-                    name: 'Asgar Digital',
+                'Aydın Dijital': {
+                    name: 'Aydın Dijital',
                     sizeBand: '1-10',
                     sector: 'musteri deneyimi',
                     searchSuggestionHtml: '<div>öneri</div>',
@@ -292,7 +292,7 @@ describe('buildStoredReport', () => {
         expect(stored.flags[0]).toHaveProperty('title');
         expect(stored.flags[0]).toHaveProperty('detail');
         expect(stored.questions.length).toBeGreaterThan(0);
-        expect(stored.companies[0]).toMatchObject({ company: 'Asgar Digital' });
+        expect(stored.companies[0]).toMatchObject({ company: 'Aydın Dijital' });
         expect(stored.sectorFit).toBeTruthy();
         expect(stored.verifiedAt).toBeTruthy();
     });
