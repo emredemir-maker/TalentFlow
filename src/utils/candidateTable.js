@@ -340,6 +340,71 @@ const SORT_ACCESSORS = {
  * Azalan sıralamada çelişkililer başa gelir; işe alımcının bu kolonu
  * tıklarken beklediği şey bu.
  */
+/**
+ * AÇIK FİLTRELERİN İNSAN OKUNUR LİSTESİ.
+ *
+ * Filtre çubuğunda artık on bir kontrol var ve satır kaydırıyor. Kullanıcı
+ * "liste neden bu kadar kısa" sorusunun cevabını görmek için her açılır
+ * listeyi tek tek kontrol etmek zorunda kalıyordu — ve sektör filtresi
+ * eklendiği hâlde kullanıcının gözetiminden kaçtığı canlıda yaşandı.
+ *
+ * Bu fonksiyon açık olan filtreleri çip olarak gösterilebilecek biçimde
+ * döndürür. Arayüzde değil burada durmasının sebebi: hangi filtrenin
+ * "açık" sayıldığı DEFAULT_FILTERS ile karşılaştırmaya bağlı ve bu kural
+ * hasActiveFilters ile aynı kalmak zorunda — ikisi ayrışırsa "Temizle"
+ * düğmesi görünürken hiç çip olmayan bir durum çıkar.
+ *
+ * @returns {Array<{key: string, label: string, value: string}>}
+ */
+export function describeActiveFilters(filters) {
+    const f = { ...DEFAULT_FILTERS, ...filters };
+    const out = [];
+    const push = (key, label, value) => { if (value) out.push({ key, label, value }); };
+
+    if (f.search.trim()) push('search', 'Arama', `"${f.search.trim()}"`);
+    if (f.stage !== 'all') push('stage', 'Aşama', getStage(f.stage).label);
+    if (f.position !== 'all') push('position', 'Pozisyon', f.position);
+    if (f.department !== 'all') push('department', 'Departman', f.department);
+    if (f.source !== 'all') push('source', 'Kaynak', f.source);
+    if (f.scan !== 'all') push('scan', 'Tarama', f.scan === 'scanned' ? 'Taranmış' : 'Taranmamış');
+    if (f.sector !== 'all') push('sector', 'Sektör', SECTOR_FILTER_LABEL[f.sector] || f.sector);
+    if (f.verification !== 'all') push('verification', 'Doğrulama', VERIFICATION_FILTER_LABEL[f.verification] || f.verification);
+    if (f.location !== 'all') push('location', 'Konum', LOCATION_FILTER_LABEL[f.location] || f.location);
+    if (f.minScore !== '') push('minScore', 'Min skor', `%${f.minScore}`);
+    // Tarih aralığı TEK ÇİP: iki ayrı çip kullanıcıya iki ayrı filtre
+    // varmış gibi görünür, oysa okuduğu şey tek bir aralık.
+    if (f.dateFrom || f.dateTo) {
+        push('dateRange', 'Başvuru', `${f.dateFrom || '…'} – ${f.dateTo || '…'}`);
+    }
+    return out;
+}
+
+/** Çip kapatılınca hangi alanlar varsayılana döner. */
+export const FILTER_RESET_FIELDS = {
+    dateRange: ['dateFrom', 'dateTo'],
+};
+
+const SECTOR_FILTER_LABEL = {
+    match: 'Aynı sektör',
+    near_or_match: 'Aynı ya da komşu',
+    near: 'Yalnızca komşu',
+    outside: 'Sektör dışı',
+    unmeasured: 'Ölçülemedi',
+};
+
+const VERIFICATION_FILTER_LABEL = {
+    contradiction: 'Çelişkili',
+    attention: 'Dikkat gerektiren',
+    clean: 'Temiz',
+    unverified: 'Doğrulanmamış',
+};
+
+const LOCATION_FILTER_LABEL = {
+    istanbul: 'İstanbul içi',
+    outside: 'İstanbul dışı',
+    unknown: 'Bilinmiyor',
+};
+
 /** Dışa aktarımda okunabilir etiketler. */
 const VERIFICATION_EXPORT_LABEL = {
     contradiction: 'Çelişkili',

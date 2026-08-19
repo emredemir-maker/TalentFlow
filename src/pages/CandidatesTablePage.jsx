@@ -28,7 +28,7 @@ import { STAGES, getStage } from '../utils/pipelineStages';
 import {
     DEFAULT_FILTERS, applyTableFilters, withCoherentScores, sortRows, buildExportRows,
     resolveStageKey, getAppliedDate, isDeepScanned, cleanRoleText, isIstanbulLocation,
-    VERIFICATION_RANK,
+    VERIFICATION_RANK, describeActiveFilters, FILTER_RESET_FIELDS,
 } from '../utils/candidateTable';
 
 const PAGE_SIZE = 50;
@@ -320,10 +320,24 @@ export default function CandidatesTablePage() {
         }
     };
     const clearFilters = () => { setFilters(DEFAULT_FILTERS); setPage(0); setSelectedIds(new Set()); };
+
+    // Tek bir çipi kapatmak. Tarih aralığı gibi İKİ ALANI olan filtrelerde
+    // ikisini birden sıfırlar; yalnızca birini temizlemek çipin gösterdiği
+    // şeyle çelişen bir ara durum bırakırdı.
+    const clearFilter = (key) => {
+        const fields = FILTER_RESET_FIELDS[key] || [key];
+        setFilters((prev) => {
+            const next = { ...prev };
+            for (const f of fields) next[f] = DEFAULT_FILTERS[f];
+            return next;
+        });
+        setPage(0);
+    };
     const hasActiveFilters = useMemo(
         () => Object.keys(DEFAULT_FILTERS).some((k) => filters[k] !== DEFAULT_FILTERS[k]),
         [filters]
     );
+    const activeFilterChips = useMemo(() => describeActiveFilters(filters), [filters]);
 
     const handleSort = (key) => {
         if (key === sortKey) {
@@ -643,6 +657,32 @@ export default function CandidatesTablePage() {
                         </button>
                     )}
                 </div>
+
+                {/* AÇIK FİLTRE ÇİPLERİ.
+                    Çubukta on bir kontrol var ve satır kaydırıyor; kullanıcı
+                    "liste neden bu kadar kısa" sorusunun cevabını görmek için her
+                    açılır listeyi tek tek kontrol etmek zorunda kalıyordu. Canlıda
+                    yaşandı: yeni eklenen sektör filtresi kullanıcının gözünden
+                    kaçtı. Çipler açık olanı görünür yapar ve tek tıkla kapattırır. */}
+                {activeFilterChips.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1.5 mt-2 px-1">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mr-0.5">
+                            Aktif filtreler
+                        </span>
+                        {activeFilterChips.map((chip) => (
+                            <button
+                                key={chip.key}
+                                onClick={() => clearFilter(chip.key)}
+                                title={`${chip.label} filtresini kaldır`}
+                                className="group inline-flex items-center gap-1.5 text-[11px] bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 rounded-lg pl-2 pr-1.5 py-1 transition-colors"
+                            >
+                                <span className="font-bold opacity-60">{chip.label}:</span>
+                                <span className="font-black">{chip.value}</span>
+                                <X className="w-3 h-3 opacity-50 group-hover:opacity-100" />
+                            </button>
+                        ))}
+                    </div>
+                )}
             </div>
 
             {/* ── Toplu işlem çubuğu / sonuç bildirimi ─────────────────────── */}
