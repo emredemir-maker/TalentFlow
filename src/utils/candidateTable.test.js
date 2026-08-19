@@ -13,6 +13,8 @@ import {
     locationBucket,
     analysisForPosition,
     VERIFICATION_RANK,
+    describeActiveFilters,
+    FILTER_RESET_FIELDS,
 } from './candidateTable';
 import { requirementsFingerprint } from './positionRequirements';
 
@@ -700,5 +702,65 @@ describe('doğrulama kolonu — sıralama ve dışa aktarım', () => {
         const [out] = buildExportRows([{ name: 'Aday', experiences: [] }]);
         expect(out['Doğrulama']).toBe('Doğrulanmadı');
         expect(out['Sektör Uyumu']).toBe('Ölçülemedi');
+    });
+});
+
+// ── Aktif filtre çipleri ────────────────────────────────────────────────────
+// Filtre çubuğunda on bir kontrol var ve satır kaydırıyor. Kullanıcı "liste
+// neden bu kadar kısa" sorusunun cevabını görmek için her açılır listeyi tek
+// tek kontrol etmek zorunda kalıyordu — canlıda yaşandı: yeni eklenen sektör
+// filtresi kullanıcının gözünden kaçtı.
+describe('describeActiveFilters', () => {
+    it('says nothing when no filter is on', () => {
+        expect(describeActiveFilters(DEFAULT_FILTERS)).toEqual([]);
+        expect(describeActiveFilters({})).toEqual([]);
+    });
+
+    it('describes each filter in human words, not raw values', () => {
+        const chips = describeActiveFilters({ sector: 'near_or_match', verification: 'contradiction' });
+        expect(chips).toEqual([
+            { key: 'sector', label: 'Sektör', value: 'Aynı ya da komşu' },
+            { key: 'verification', label: 'Doğrulama', value: 'Çelişkili' },
+        ]);
+    });
+
+    it('quotes a free-text search so it reads as a value', () => {
+        expect(describeActiveFilters({ search: '  ayşe ' })).toEqual([
+            { key: 'search', label: 'Arama', value: '"ayşe"' },
+        ]);
+    });
+
+    // İki ayrı çip kullanıcıya iki ayrı filtre varmış gibi görünür, oysa
+    // okuduğu şey tek bir aralık.
+    it('shows a date range as one chip, not two', () => {
+        const chips = describeActiveFilters({ dateFrom: '2026-01-01', dateTo: '2026-06-30' });
+        expect(chips).toHaveLength(1);
+        expect(chips[0]).toMatchObject({ key: 'dateRange', label: 'Başvuru' });
+        expect(chips[0].value).toContain('2026-01-01');
+        expect(chips[0].value).toContain('2026-06-30');
+    });
+
+    it('still shows a half-open date range', () => {
+        expect(describeActiveFilters({ dateFrom: '2026-01-01' })).toHaveLength(1);
+        expect(describeActiveFilters({ dateTo: '2026-06-30' })).toHaveLength(1);
+    });
+
+    it('clears both date fields when the range chip is closed', () => {
+        expect(FILTER_RESET_FIELDS.dateRange).toEqual(['dateFrom', 'dateTo']);
+    });
+
+    // "Temizle" düğmesi görünürken hiç çip olmayan bir durum çıkmamalı:
+    // ikisi aynı kuralı kullanmak zorunda.
+    it('agrees with the has-active-filters rule for every single filter', () => {
+        for (const key of Object.keys(DEFAULT_FILTERS)) {
+            const probe = {
+                search: 'x', stage: 'interview', position: 'PM', department: 'Yazılım',
+                source: 'LinkedIn', scan: 'scanned', sector: 'outside',
+                verification: 'clean', location: 'istanbul', minScore: '50',
+                dateFrom: '2026-01-01', dateTo: '2026-06-30',
+            }[key];
+            const chips = describeActiveFilters({ [key]: probe });
+            expect(chips.length, `${key} çip üretmeli`).toBeGreaterThan(0);
+        }
     });
 });
