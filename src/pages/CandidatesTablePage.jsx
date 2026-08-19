@@ -7,7 +7,7 @@
 // owns filter state and rendering. The xlsx library is imported lazily on
 // the first export click so it never enters the initial bundle.
 import { gateLabel } from '../utils/mustHaveGate';
-import { buildCandidateBadges } from '../utils/candidateBadges';
+import { buildCandidateBadges, verificationBucket } from '../utils/candidateBadges';
 import CandidateBadges from '../components/CandidateBadges';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -28,6 +28,7 @@ import { STAGES, getStage } from '../utils/pipelineStages';
 import {
     DEFAULT_FILTERS, applyTableFilters, withCoherentScores, sortRows, buildExportRows,
     resolveStageKey, getAppliedDate, isDeepScanned, cleanRoleText, isIstanbulLocation,
+    VERIFICATION_RANK,
 } from '../utils/candidateTable';
 
 const PAGE_SIZE = 50;
@@ -354,22 +355,20 @@ export default function CandidatesTablePage() {
         }),
         [coherentRows, filters, selectedPosition]
     );
-    const sortedRows = useMemo(
-        () => sortRows(filteredRows, sortKey, sortDir),
-        [filteredRows, sortKey, sortDir]
+    // Rozet ve doğrulama rütbesi SIRALAMADAN ÖNCE, satır başına bir kez.
+    // Sıralayıcı her karşılaştırmada erişimci çağırdığı için rütbeyi orada
+    // hesaplamak 662 satırda binlerce CV ayrıştırması demekti.
+    const decoratedRows = useMemo(
+        () => filteredRows.map((c) => ({
+            ...c,
+            badges: buildCandidateBadges(c, { position: selectedPosition, max: 4 }),
+            verificationRank: VERIFICATION_RANK[verificationBucket(c, { position: selectedPosition })],
+        })),
+        [filteredRows, selectedPosition]
     );
-
-    // Rozetler yalnızca GÖRÜNEN satırlar için hesaplanır. Katman 1 saf
-    // aritmetik ve bedava ama 500 adaylık bir havuzda her render'da yeniden
-    // koşmasının anlamı yok; memo satır listesine ve seçili ilana bağlı.
-    // Satır başına en fazla 4 rozet: beşincisi tabloyu taşırıyor ve zaten
-    // en önemlileri başta (utils/candidateBadges.js sıralamayı garanti eder).
-    const badgesById = useMemo(
-        () => new Map(sortedRows.map((c) => [
-            c.id,
-            buildCandidateBadges(c, { position: selectedPosition, max: 4 }),
-        ])),
-        [sortedRows, selectedPosition]
+    const sortedRows = useMemo(
+        () => sortRows(decoratedRows, sortKey, sortDir),
+        [decoratedRows, sortKey, sortDir]
     );
 
     const pageCount = Math.max(1, Math.ceil(sortedRows.length / PAGE_SIZE));
@@ -738,6 +737,7 @@ export default function CandidatesTablePage() {
                                     <SortableHeader label="Aşama" sortKey="stage" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                                     <SortableHeader label="Kaynak" sortKey="source" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                                     <SortableHeader label="Tarama" sortKey="scanStatus" activeKey={sortKey} dir={sortDir} onSort={handleSort} align="center" />
+                                    <SortableHeader label="Doğrulama" sortKey="verification" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                                     <SortableHeader label="AI" sortKey="bestScore" activeKey={sortKey} dir={sortDir} onSort={handleSort} align="center" />
                                     {selectedPosition && (
                                         <SortableHeader label="Poz. Uyum" sortKey="positionScore" activeKey={sortKey} dir={sortDir} onSort={handleSort} align="center" />
@@ -751,14 +751,14 @@ export default function CandidatesTablePage() {
                             <tbody>
                                 {loading && (
                                     <tr>
-                                        <td colSpan={selectedPosition ? 15 : 14} className="px-4 py-12 text-center text-slate-400 text-[12px]">
+                                        <td colSpan={selectedPosition ? 16 : 15} className="px-4 py-12 text-center text-slate-400 text-[12px]">
                                             Adaylar yükleniyor…
                                         </td>
                                     </tr>
                                 )}
                                 {!loading && pageRows.length === 0 && (
                                     <tr>
-                                        <td colSpan={selectedPosition ? 15 : 14} className="px-4 py-12 text-center">
+                                        <td colSpan={selectedPosition ? 16 : 15} className="px-4 py-12 text-center">
                                             <p className="text-slate-400 text-[12px] font-semibold">
                                                 {hasActiveFilters ? 'Filtrelere uyan aday bulunamadı.' : 'Henüz aday yok.'}
                                             </p>
@@ -784,7 +784,6 @@ export default function CandidatesTablePage() {
                                         <td className="px-3 py-2.5">
                                             <p className="font-bold text-slate-800 whitespace-nowrap">{c.name || 'İsimsiz'}</p>
                                             <p className="text-[10px] text-slate-400 whitespace-nowrap">{c.email || '—'}</p>
-                                            <CandidateBadges badges={badgesById.get(c.id)} className="mt-1" />
                                         </td>
                                         {/* Serbest metin kolonları genişlik sınırlı: AI'nın ürettiği
                                             uzun rol adları tabloyu yatayda taşırıyordu — kesilen
@@ -825,6 +824,22 @@ export default function CandidatesTablePage() {
                                                 >
                                                     Taranmadı
                                                 </span>
+                                            )}
+                                        </td>
+                                        {/* Doğrulama kolonu. Boş bir kolon "bozuk" görünür; bu
+                                            yüzden bulgu yoksa da bir şey söylüyoruz — ama
+                                            "temiz" YALNIZCA taraması yapılmış adaylar için.
+                                            Taranmamış adayı temiz saymak, bakmadığımız şeyi
+                                            onaylamak olurdu. */}
+                                        <td className="px-3 py-2.5">
+                                            {c.badges?.length > 0 ? (
+                                                <CandidateBadges badges={c.badges} />
+                                            ) : c.verification?.at ? (
+                                                <span className="text-[9px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded-md border bg-emerald-50 text-emerald-700 border-emerald-200 whitespace-nowrap" title="Doğrulama çalıştırıldı, bulgu çıkmadı">
+                                                    Temiz
+                                                </span>
+                                            ) : (
+                                                <span className="text-slate-300" title="Bu aday için doğrulama henüz çalıştırılmadı">—</span>
                                             )}
                                         </td>
                                         <td className="px-3 py-2.5 text-center"><ScoreCell value={c.bestScore} /></td>

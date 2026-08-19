@@ -12,6 +12,7 @@ import {
     isIstanbulLocation,
     locationBucket,
     analysisForPosition,
+    VERIFICATION_RANK,
 } from './candidateTable';
 import { requirementsFingerprint } from './positionRequirements';
 
@@ -282,6 +283,8 @@ describe('buildExportRows', () => {
             'Kaynak': 'LinkedIn',
             'Kaynak Detayı': 'Sponsorlu',
             'Otonom Tarama': 'Yapılmadı',
+            'Doğrulama': 'Doğrulanmadı',
+            'Sektör Uyumu': 'Ölçülemedi',
             'Ön Skor (İlk)': '',
             'Ön Skor Yöntemi': '',
             'AI Skoru': 85,
@@ -657,5 +660,45 @@ describe('sektör ve doğrulama filtreleri', () => {
         expect(pick('attention')).toEqual(['dikkatli']);
         expect(pick('clean')).toEqual(['temiz']);
         expect(pick('unverified')).toEqual(['taranmamis']);
+    });
+});
+
+describe('doğrulama kolonu — sıralama ve dışa aktarım', () => {
+    const row = (id, rank) => ({ id, experiences: [], verificationRank: rank });
+
+    // Azalan sıralamada çelişkililer başa gelmeli — kolonu tıklayan
+    // işe alımcının beklediği şey bu.
+    it('sorts the most urgent verification state first', () => {
+        const rows = [
+            row('temiz', VERIFICATION_RANK.clean),
+            row('celiskili', VERIFICATION_RANK.contradiction),
+            row('taranmamis', VERIFICATION_RANK.unverified),
+            row('dikkatli', VERIFICATION_RANK.attention),
+        ];
+        expect(sortRows(rows, 'verification', 'desc').map((c) => c.id))
+            .toEqual(['celiskili', 'dikkatli', 'temiz', 'taranmamis']);
+    });
+
+    it('ranks contradiction above attention above clean above unverified', () => {
+        expect(VERIFICATION_RANK.contradiction).toBeGreaterThan(VERIFICATION_RANK.attention);
+        expect(VERIFICATION_RANK.attention).toBeGreaterThan(VERIFICATION_RANK.clean);
+        expect(VERIFICATION_RANK.clean).toBeGreaterThan(VERIFICATION_RANK.unverified);
+    });
+
+    // Tabloda görünen bir kolonun dışa aktarımda olmaması, kullanıcının
+    // hemen çarpacağı bir tutarsızlık.
+    it('carries both columns into the Excel export', () => {
+        const [out] = buildExportRows([{
+            name: 'Aday', experiences: [],
+            verification: { at: 'x', counts: { celiski: 1, dikkat: 0 }, sector: { verdict: 'yok' } },
+        }]);
+        expect(out['Doğrulama']).toBe('Çelişkili');
+        expect(out['Sektör Uyumu']).toBe('Sektör dışı');
+    });
+
+    it('never labels an unscanned candidate as clean in the export', () => {
+        const [out] = buildExportRows([{ name: 'Aday', experiences: [] }]);
+        expect(out['Doğrulama']).toBe('Doğrulanmadı');
+        expect(out['Sektör Uyumu']).toBe('Ölçülemedi');
     });
 });

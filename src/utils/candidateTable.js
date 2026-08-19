@@ -327,6 +327,39 @@ const SORT_ACCESSORS = {
     combinedScore: (c) => (c.combinedScore ?? null),
     experience: (c) => (c.experience ?? null),
     appliedDate: (c) => getAppliedDate(c) || null,
+    // Doğrulama kolonu ÖNCEDEN HESAPLANMIŞ bir rütbe üzerinden sıralanır.
+    // Sıralayıcı her karşılaştırmada erişimci çağırıyor; burada bucket'ı
+    // yeniden hesaplasaydık 662 satırlık bir listede binlerce kez CV tarihi
+    // ayrıştırılırdı. Rütbe, satır süslenirken bir kez yazılıyor.
+    verification: (c) => (c.verificationRank ?? null),
+};
+
+/**
+ * Doğrulama durumunun sıralama rütbesi — büyük olan daha acil.
+ *
+ * Azalan sıralamada çelişkililer başa gelir; işe alımcının bu kolonu
+ * tıklarken beklediği şey bu.
+ */
+/** Dışa aktarımda okunabilir etiketler. */
+const VERIFICATION_EXPORT_LABEL = {
+    contradiction: 'Çelişkili',
+    attention: 'Dikkat gerektiren',
+    clean: 'Temiz',
+    unverified: 'Doğrulanmadı',
+};
+
+const SECTOR_EXPORT_LABEL = {
+    match: 'Aynı sektör',
+    near: 'Komşu sektör',
+    outside: 'Sektör dışı',
+    unmeasured: 'Ölçülemedi',
+};
+
+export const VERIFICATION_RANK = {
+    contradiction: 3,
+    attention: 2,
+    clean: 1,
+    unverified: 0,
 };
 
 /** Return a NEW sorted array; never mutates the input. */
@@ -382,6 +415,12 @@ export function buildExportRows(rows) {
         'Kaynak': c.source || '',
         'Kaynak Detayı': c.sourceDetail || '',
         'Otonom Tarama': isDeepScanned(c) ? 'Yapıldı' : 'Yapılmadı',
+        // Tabloda bir "Doğrulama" kolonu var; dışa aktarımda olmaması
+        // kullanıcının hemen çarpacağı bir tutarsızlık olurdu.
+        // "Temiz" YALNIZCA taraması yapılmış adaylar için; taranmamışı
+        // temiz saymak bakmadığımız şeyi onaylamak olurdu.
+        'Doğrulama': VERIFICATION_EXPORT_LABEL[verificationBucket(c)] || '',
+        'Sektör Uyumu': SECTOR_EXPORT_LABEL[sectorBucket(c)] || '',
         // ÖN SKOR ile AI SKORU AYNI KOLONDA DEĞİL, çünkü aynı şey değiller.
         // Ön skor aday havuza girerken verildi (tek hafif çağrı); AI skoru
         // derin taramanın sonucu. İkisi tek kolonda toplanınca "tarama skorları
