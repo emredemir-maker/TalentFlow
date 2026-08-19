@@ -98,8 +98,26 @@ describe('verificationMultiplier — doğrulanamama oranı', () => {
 describe('sectorMultiplier', () => {
     const withSector = (verdict, extra = {}) => summary({ sector: { verdict, ...extra } });
 
-    it('gives full credit to a strong sector fit', () => {
-        expect(sectorMultiplier(withSector(VERDICT.STRONG)).multiplier).toBe(1);
+    // NÖTR NOKTA "KISMİ". İlk sürümde güçlü uyum 1.00 idi, yani derin sektör
+    // deneyimi hiçbir şey kazandırmıyordu — yalnızca cezadan kurtarıyordu.
+    it('rewards a strong sector fit instead of merely not punishing it', () => {
+        expect(sectorMultiplier(withSector(VERDICT.STRONG)).multiplier).toBeGreaterThan(1);
+        expect(sectorMultiplier(withSector(VERDICT.PARTIAL)).multiplier).toBe(1);
+    });
+
+    // Skoru yükselten bir kural da açıklanmalı: sessizce yükselen skor,
+    // sessizce düşen kadar açıklanamazdır.
+    it('explains the bonus, not just the penalty', () => {
+        const r = sectorMultiplier(withSector(VERDICT.STRONG));
+        expect(r.reasons).toHaveLength(1);
+        expect(r.reasons[0].label).toContain('güçlü');
+        expect(r.reasons[0].factor).toBeGreaterThan(1);
+    });
+
+    // Ödül ölçülü olmalı: sektör deneyimi bir avantaj, gereksinimlerin
+    // yerine geçen bir şey değil.
+    it('keeps the bonus modest', () => {
+        expect(sectorMultiplier(withSector(VERDICT.STRONG)).multiplier).toBeLessThanOrEqual(1.1);
     });
 
     it('orders the verdicts sensibly', () => {
@@ -142,9 +160,17 @@ describe('verificationEffect — iki eksen ayrı kalır', () => {
         expect(e.applied).toBe(true);
     });
 
-    it('reports applied=false when nothing was deducted', () => {
+    it('reports applied=false only when the score is genuinely untouched', () => {
         expect(verificationEffect(summary()).applied).toBe(false);
         expect(verificationEffect(null).applied).toBe(false);
+    });
+
+    // Önceden `multiplier < 1` idi ve skoru YÜKSELTEN etkiyi "etki yok" diye
+    // raporluyordu; arayüz de sebebi hiç göstermezdi.
+    it('reports applied=true for a bonus, not only for a penalty', () => {
+        const e = verificationEffect(summary({ sector: { verdict: VERDICT.STRONG } }));
+        expect(e.multiplier).toBeGreaterThan(1);
+        expect(e.applied).toBe(true);
     });
 
     it('gives every deduction a human-readable reason', () => {
@@ -182,5 +208,27 @@ describe('applyVerificationToScore', () => {
     it('survives a missing or malformed score', () => {
         expect(applyVerificationToScore(null, null).score).toBe(0);
         expect(applyVerificationToScore('abc', null).score).toBe(0);
+    });
+});
+
+// ── Sektör ödülünün tavanı ──────────────────────────────────────────────────
+// Çarpan 1'in üstüne çıkabildiği için skor 100'ü aşabilirdi; yüzde varsayan
+// tüm arayüz saçmalardı.
+describe('tavan', () => {
+    const strong = { counts: { celiski: 0 }, companies: { total: 0 }, lookupComplete: true, sector: { verdict: VERDICT.STRONG } };
+
+    it('never lets the sector bonus push a score past 100', () => {
+        expect(applyVerificationToScore(98, strong).score).toBe(100);
+        expect(applyVerificationToScore(100, strong).score).toBe(100);
+    });
+
+    it('does let the bonus lift a mid-range score', () => {
+        const r = applyVerificationToScore(80, strong);
+        expect(r.score).toBeGreaterThan(80);
+        expect(r.baseScore).toBe(80);
+    });
+
+    it('never goes below zero', () => {
+        expect(applyVerificationToScore(0, { counts: { celiski: 5 } }).score).toBe(0);
     });
 });

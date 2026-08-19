@@ -4,7 +4,7 @@ import { explainHybridScore } from '../services/geminiService';
 import { requirementsOf } from '../utils/positionRequirements';
 import { coverageDetailState, usesCurrentRubric } from '../utils/coverageDetail';
 import { isStaleFor, analysisScoreDetail } from '../utils/positionScore';
-import { ShieldAlert } from 'lucide-react';
+import { ShieldAlert, TrendingUp } from 'lucide-react';
 import { STAR_MAX, STAR_LABELS, anchorLabel } from '../utils/starDimensions';
 
 /**
@@ -72,31 +72,45 @@ export default function ScoreBreakdownPanel({ analysis, position, candidate = nu
                         skordur. Her kesintinin sebebi ve çarpanı burada
                         yazılı; kullanıcı hangi bulgunun kaç puan götürdüğünü
                         görebilmeli, yoksa sayıya güvenemez. */}
-                    {effect?.applied && (
-                        <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5">
-                            <div className="flex items-center gap-2 mb-1.5">
-                                <ShieldAlert className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                                <span className="text-[10px] font-black text-rose-700 uppercase tracking-widest">
-                                    Doğrulama kesintisi
-                                </span>
-                                <span className="text-[10px] font-black text-rose-700 ml-auto">
-                                    {preVerification} → {headlineScore}
-                                </span>
+                    {/* DOĞRULAMA ETKİSİ.
+                        Skoru sessizce değiştiren bir kural, açıklanamayan bir
+                        skordur. Her etkinin sebebi ve çarpanı burada yazılı.
+                        İKİ YÖNLÜ: sektör uyumu skoru yükseltebiliyor ve
+                        yükselen bir skoru "kesinti" diye göstermek yanlış olurdu. */}
+                    {effect?.applied && (() => {
+                        const bonus = effect.multiplier > 1;
+                        const box = bonus ? 'border-emerald-200 bg-emerald-50' : 'border-rose-200 bg-rose-50';
+                        const txt = bonus ? 'text-emerald-700' : 'text-rose-700';
+                        const Icon = bonus ? TrendingUp : ShieldAlert;
+                        return (
+                            <div className={`rounded-lg border px-3 py-2.5 ${box}`}>
+                                <div className="flex items-center gap-2 mb-1.5">
+                                    <Icon className={`w-3.5 h-3.5 shrink-0 ${txt}`} />
+                                    <span className={`text-[10px] font-black uppercase tracking-widest ${txt}`}>
+                                        {bonus ? 'Doğrulama katkısı' : 'Doğrulama kesintisi'}
+                                    </span>
+                                    <span className={`text-[10px] font-black ml-auto ${txt}`}>
+                                        {preVerification} → {headlineScore}
+                                    </span>
+                                </div>
+                                <ul className="space-y-1">
+                                    {deductions.map((d) => (
+                                        <li key={d.code} className="flex items-start justify-between gap-2 text-[10px] text-slate-700">
+                                            <span className="leading-relaxed">{d.label}</span>
+                                            <span className={`font-black shrink-0 ${d.factor > 1 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                                ×{d.factor}
+                                            </span>
+                                        </li>
+                                    ))}
+                                </ul>
+                                <p className="text-[9px] text-slate-500 mt-1.5 leading-relaxed">
+                                    Kaynak bulunamayan şirketler tek başına etki yaratmaz; ayrıntı için
+                                    Doğrulama sekmesine bakın.
+                                </p>
                             </div>
-                            <ul className="space-y-1">
-                                {deductions.map((d) => (
-                                    <li key={d.code} className="flex items-start justify-between gap-2 text-[10px] text-slate-700">
-                                        <span className="leading-relaxed">{d.label}</span>
-                                        <span className="font-black text-rose-600 shrink-0">×{d.factor}</span>
-                                    </li>
-                                ))}
-                            </ul>
-                            <p className="text-[9px] text-slate-500 mt-1.5 leading-relaxed">
-                                Kaynak bulunamayan şirketler tek başına kesinti yaratmaz; ayrıntı için
-                                Doğrulama sekmesine bakın.
-                            </p>
-                        </div>
-                    )}
+                        );
+                    })()}
+
                     {/* GEREKSİNİM LİSTESİ DEĞİŞMİŞ.
                         Kayıtlı değerlendirmeler madde NUMARASINA bağlı; liste
                         değişince o numara başka bir maddeye denk gelir.
