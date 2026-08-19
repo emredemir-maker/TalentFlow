@@ -89,7 +89,7 @@ describe('alan ile sektör ayrı rozetler', () => {
 });
 
 // ── CANLIDA GÖRÜLEN HATA ────────────────────────────────────────────────────
-// Hasan Asgar'ın çelişkisi ŞİRKET katmanından geliyordu (şirket kuruluşundan
+// Bir adayın çelişkisi ŞİRKET katmanından geliyordu (şirket kuruluşundan
 // önceki başlangıç tarihi). Skor bu yüzden düşüyordu ama listede yalnızca
 // "Sektör dışı" görünüyordu — sistem adayı bir sebeple aşağı çekiyor ve o
 // sebebi göstermiyordu.
@@ -101,7 +101,7 @@ describe('şirket katmanından gelen çelişki', () => {
         const list = badges(candidate({
             // CV'nin kendi içinde tutarlı — canlı hesap hiçbir çelişki bulmaz
             experience: 6,
-            experiences: [exp('Asgar Digital', 'Growth Manager', 'Oca 2020 - Ağu 2026')],
+            experiences: [exp('Aydın Dijital', 'Growth Manager', 'Oca 2020 - Ağu 2026')],
             verification: { at: 'x', counts: { celiski: 1, dikkat: 2, bilgi: 0 }, sector: { verdict: VERDICT.NONE } },
         }));
         const b = list.find((x) => x.id === 'celiski');
@@ -149,7 +149,7 @@ describe('şirket katmanından gelen çelişki', () => {
 });
 
 // ── CANLIDA GÖRÜLEN İKİNCİ EKSİK ────────────────────────────────────────────
-// Hasan Asgar'ın raporunda 4 DİKKAT maddesi vardı (çakışan dönem, hızlı unvan
+// Bir adayın raporunda 4 DİKKAT maddesi vardı (çakışan dönem, hızlı unvan
 // yükselişi, iki kez unvan/ölçek uyumsuzluğu) ama listede tek rozet bile
 // çıkmıyordu: yalnızca çelişki rozetleniyordu.
 //
@@ -159,7 +159,7 @@ describe('dikkat seviyesindeki bulgular', () => {
     it('shows an attention counter the list previously hid entirely', () => {
         const list = badges(candidate({
             experience: 6,
-            experiences: [exp('Pawn Interactive', 'CEO / Co-Founder', 'Oca 2021 - Halen')],
+            experiences: [exp('Vega Interactive', 'CEO / Co-Founder', 'Oca 2021 - Halen')],
             verification: { at: 'x', counts: { celiski: 0, dikkat: 4, bilgi: 0 }, sector: { verdict: VERDICT.NONE } },
         }));
         const b = list.find((x) => x.id === 'dikkat');

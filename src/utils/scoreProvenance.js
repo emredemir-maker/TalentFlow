@@ -49,7 +49,7 @@ const norm = (s) => foldTr(String(s || '')).toLowerCase().replace(/[^a-z0-9]+/g,
 /**
  * Şirket adından ayırt edici parçaları çıkarır.
  *
- * "Pawn Interactive Ltd. Şti." → ['pawn', 'interactive']
+ * "Vega Interactive Ltd. Şti." → ['vega', 'interactive']
  * Şirket türü ekleri atılır: her şirkette geçtikleri için ayırt etmezler.
  */
 export function companyTokens(name) {
@@ -78,8 +78,8 @@ export function attributeEvidence(evidence, experiences) {
     (experiences || []).forEach((e, index) => {
         const tokens = companyTokens(e?.company);
         if (tokens.length === 0) return;
-        // TÜM ayırt edici parçalar geçmeli: "Pawn" tek başına yeterli değil,
-        // "Pawn Interactive" aranıyorsa ikisi de bulunmalı.
+        // TÜM ayırt edici parçalar geçmeli: "Vega" tek başına yeterli değil,
+        // "Vega Interactive" aranıyorsa ikisi de bulunmalı.
         const hit = tokens.every((t) => text.includes(` ${t} `) || text.includes(` ${t}`));
         if (!hit) return;
         const score = tokens.join('').length;
