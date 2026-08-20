@@ -510,12 +510,28 @@ export default function CandidatesTablePage() {
         [sortedRows, selectedPosition]
     );
 
+    // SEÇİM VARSA SEÇİME SAYGI DUYULUR.
+    //
+    // Hizalama görünen listeye göre çalışıyordu. "Bu ilana atananlar"
+    // kapsamında bu doğru sonuç veriyor (birkaç aday), ama "tüm havuz"
+    // kapsamında tek tıkla onlarca gereksiz AI çağrısı demek — kullanıcının
+    // ilgilendiği üç aday varken 50 adayı taramak.
+    //
+    // Tabloda zaten seçim kutuları var ve toplu tarama onları kullanıyor;
+    // hizalamanın kullanmaması tutarsızlıktı. Seçim yoksa eski davranış
+    // sürüyor: görünen listedeki hizalanmamışlar.
+    const alignTargets = useMemo(() => {
+        if (selectedIds.size === 0) return unalignedRows;
+        return unalignedRows.filter((c) => selectedIds.has(c.id));
+    }, [unalignedRows, selectedIds]);
+
     const handleAlignToPosition = async () => {
-        if (!selectedPosition || scanProgress || bulkApplying || unalignedRows.length === 0) return;
-        const targets = unalignedRows.slice(0, MAX_ALIGN);
-        const skipped = unalignedRows.length - targets.length;
+        if (!selectedPosition || scanProgress || bulkApplying || alignTargets.length === 0) return;
+        const targets = alignTargets.slice(0, MAX_ALIGN);
+        const skipped = alignTargets.length - targets.length;
+        const scopeText = selectedIds.size > 0 ? 'Seçili' : 'Listedeki';
         const ok = window.confirm(
-            `${targets.length} aday "${selectedPosition.title}" ilanına göre değerlendirilecek.
+            `${scopeText} ${targets.length} aday "${selectedPosition.title}" ilanına göre değerlendirilecek.
 
 `
             + 'Her aday bir AI çağrısı demek; işlem birkaç dakika sürebilir.'
@@ -803,13 +819,23 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
                             <strong>{unalignedRows.length} aday</strong> bu ilana göre derin analiz edilmemiş; skorları
                             anahtar kelime ya da başka bir pozisyonun analizinden geliyor ve
                             diğerleriyle doğrudan karşılaştırılamaz.
+                            {selectedIds.size > 0 && (
+                                <> Seçiminizde bunlardan <strong>{alignTargets.length}</strong> tanesi var.</>
+                            )}
+                            {selectedIds.size === 0 && unalignedRows.length > MAX_ALIGN && (
+                                <> Tek turda en fazla <strong>{MAX_ALIGN}</strong> tanesi taranır —
+                                aday seçerek daraltabilirsiniz.</>
+                            )}
                         </span>
                         <button
                             onClick={handleAlignToPosition}
-                            disabled={bulkApplying}
+                            disabled={bulkApplying || alignTargets.length === 0}
                             className="ml-auto flex items-center gap-1.5 text-[11px] font-bold text-white bg-amber-600 hover:bg-amber-700 px-3 py-1.5 rounded-lg disabled:opacity-50 transition-colors"
                         >
-                            <Brain className="w-3.5 h-3.5" /> Aynı cetvele getir
+                            <Brain className="w-3.5 h-3.5" />
+                            {selectedIds.size > 0
+                                ? `Seçili ${alignTargets.length} adayı hizala`
+                                : 'Aynı cetvele getir'}
                         </button>
                     </div>
                 </div>
