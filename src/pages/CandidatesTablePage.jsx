@@ -690,6 +690,21 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
                         <option value="all">Tüm Pozisyonlar</option>
                         {openPositions.map((p) => <option key={p.id} value={p.title}>{p.title}</option>)}
                     </select>
+                    {/* KAPSAM yalnızca bir ilan seçiliyken görünür — tek başına
+                        anlamı yok. "Pozisyon" adında bir filtrenin filtrelemesi
+                        beklenir; havuzu sıralamak AYRI bir iş ve açıkça
+                        seçilmeli. */}
+                    {filters.position !== 'all' && (
+                        <select
+                            value={filters.positionScope}
+                            onChange={(e) => setFilter('positionScope', e.target.value)}
+                            className={SELECT_CLS}
+                            title="Bu ilana atanmış adaylar mı, yoksa tüm havuz bu ilana göre sıralansın mı"
+                        >
+                            <option value="assigned">Bu ilana atananlar</option>
+                            <option value="pool">Tüm havuzu bu ilana göre sırala</option>
+                        </select>
+                    )}
                     <select value={filters.department} onChange={(e) => setFilter('department', e.target.value)} className={SELECT_CLS}>
                         <option value="all">Tüm Departmanlar</option>
                         {departments.filter((d) => d !== 'all').map((d) => <option key={d} value={d}>{d}</option>)}
