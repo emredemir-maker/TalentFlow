@@ -29,6 +29,7 @@
 
 import { foldTr } from './turkishText.js';
 import { assessmentsOf } from './coverageDetail.js';
+import { normalizeExperiences } from './candidateCv.js';
 
 /** Şirket adının eşleştirmede kullanılacak hâli. */
 const NOISE = new Set([
@@ -127,7 +128,8 @@ export function buildScoreProvenance({ analysis, requirements = [], candidate } 
     // olan adaylarda blok "hiç karşılanan madde yok" sanıp SESSİZCE
     // görünmez oluyordu — canlıda tam olarak böyle yaşandı.
     const assessments = assessmentsOf(analysis) || [];
-    const experiences = Array.isArray(candidate?.experiences) ? candidate.experiences : [];
+    // Geçmiş TEK kaynaktan (bkz. utils/cvConsistency.js — aynı gerekçe).
+    const experiences = normalizeExperiences(candidate);
 
     const empty = { total: 0, attributed: 0, unattributed: 0, hasEvidence: false, groups: [] };
     if (assessments.length === 0 || experiences.length === 0) return empty;

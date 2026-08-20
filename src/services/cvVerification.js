@@ -26,6 +26,7 @@ import {
 import { verifyCompanyClaim, summarizeCompanyVerification } from '../utils/companyClaims';
 import { buildSectorEntries, measureSectorFit } from '../utils/sectorFit';
 import { currentYearMonth } from '../utils/cvDates';
+import { normalizeExperiences } from '../utils/candidateCv';
 import { uniqueCompanies } from './ai/companyIntel';
 import { resolveCompanies } from './companyIntelStore';
 
@@ -206,7 +207,9 @@ export async function verifyCandidate(candidate, {
     resolveAll = resolveCompanies,
     onProgress = null,
 } = {}) {
-    const experiences = Array.isArray(candidate?.experiences) ? candidate.experiences : [];
+    // Geçmiş TEK kaynaktan: ham alanı okumak bazı görevleri hiç
+    // görmemeye yol açıyordu (bkz. utils/cvConsistency.js).
+    const experiences = normalizeExperiences(candidate);
 
     // ── Katman 1 ────────────────────────────────────────────────────────────
     const requiredYears = requiredYearsOf(position);
