@@ -6,6 +6,7 @@ import {
     applyTableFilters,
     scoreForPosition,
     scoreForPositionDetail,
+    isAssignedToPosition,
     SCORE_METHOD,
     withCoherentScores,
     sortRows,
@@ -250,12 +251,13 @@ describe('applyTableFilters — pozisyon uygunluk modu', () => {
     const OPTS = { position: POSITION, keywordScoreFn: () => 0 };
 
     it('applies the min-score threshold to the SELECTED position score, not the best-fit score', () => {
-        const rows = applyTableFilters(ROWS, { position: 'Frontend Developer', minScore: '80' }, OPTS);
+        const rows = applyTableFilters(ROWS, { position: 'Frontend Developer', minScore: '80', positionScope: 'pool' }, OPTS);
         // Eski davranış combinedScore'a bakıp ['1'] döndürürdü; doğrusu ['3'].
         expect(rows.map((c) => c.id)).toEqual(['3']);
     });
-    it('does not exclude candidates by label in position mode — everyone gets a score', () => {
-        const rows = applyTableFilters(ROWS, { position: 'Frontend Developer' }, OPTS);
+    // Sıralama modu (positionScope: 'pool'): aday ELENMEZ, herkes puanlanır.
+    it('scores everyone without excluding by label in ranking scope', () => {
+        const rows = applyTableFilters(ROWS, { position: 'Frontend Developer', positionScope: 'pool' }, OPTS);
         expect(rows).toHaveLength(3);
         expect(rows.map((c) => c.positionScore)).toEqual([40, 0, 85]);
     });
@@ -264,7 +266,7 @@ describe('applyTableFilters — pozisyon uygunluk modu', () => {
         expect(rows.map((c) => c.id)).toEqual(['1']);
     });
     it('sorts by positionScore with the standard sorter', () => {
-        const rows = applyTableFilters(ROWS, { position: 'Frontend Developer' }, OPTS);
+        const rows = applyTableFilters(ROWS, { position: 'Frontend Developer', positionScope: 'pool' }, OPTS);
         expect(sortRows(rows, 'positionScore', 'desc').map((c) => c.id)).toEqual(['3', '1', '2']);
     });
 });
@@ -599,7 +601,7 @@ describe('mülakat tabloya yansır', () => {
             },
             ...extra,
         }],
-        { ...DEFAULT_FILTERS, position: 'Growth PM' },
+        { ...DEFAULT_FILTERS, position: 'Growth PM', positionScope: 'pool' },
         { position: POS, positionMode: true }
     )[0];
 
@@ -779,8 +781,12 @@ describe('describeActiveFilters', () => {
 
     // "Temizle" düğmesi görünürken hiç çip olmayan bir durum çıkmamalı:
     // ikisi aynı kuralı kullanmak zorunda.
+    // positionScope TEK BAŞINA çip üretmez ve üretmemeli: pozisyon seçili
+    // değilken kapsamın anlamı yok, çip göstermek "neden liste kısa"
+    // sorusunu yanlış yere yönlendirirdi.
     it('agrees with the has-active-filters rule for every single filter', () => {
         for (const key of Object.keys(DEFAULT_FILTERS)) {
+            if (key === 'positionScope') continue;
             const probe = {
                 search: 'x', stage: 'interview', position: 'PM', department: 'Yazılım',
                 source: 'LinkedIn', scan: 'scanned', sector: 'outside',
@@ -840,7 +846,60 @@ describe('bir pozisyonun skoru her koşulda aynı cetvelden gelir', () => {
 
     it('carries the method through the position filter', () => {
         const rows = [{ id: 'a', experiences: [], ...manualAssign }];
-        const [out] = applyTableFilters(rows, { position: 'Customer Success' }, { position, keywordScoreFn: keyword });
+        const [out] = applyTableFilters(rows, { position: 'Customer Success', positionScope: 'pool' }, { position, keywordScoreFn: keyword });
         expect(out.positionScoreMethod).toBe(SCORE_METHOD.AI);
+    });
+});
+
+// ── CANLIDA BİLDİRİLEN BEKLENTİ ─────────────────────────────────────────────
+// Kullanıcı Customer Success'e filtreleyince o ilana ATANMIŞ 2 adayı görmeyi
+// bekliyordu; 662 aday gördü. Pozisyon filtresi aday elemiyor, herkesi o
+// ilana göre puanlıyordu.
+//
+// İki soru da meşru — "bu ilana atanmış kimler" (pipeline) ve "havuzda bu
+// role kim uyar" (sourcing) — ama arayüzde ayrımı yoktu.
+describe('pozisyon filtresinin kapsamı', () => {
+    const position = { id: 'p7', title: 'Customer Success' };
+    const rows = [
+        { id: 'atanmis-auto', experiences: [], matchedPositionTitle: 'Customer Success' },
+        { id: 'atanmis-elle', experiences: [], positionId: 'p7' },
+        { id: 'eski-kayit', experiences: [], position: 'Customer Success' },
+        { id: 'alakasiz', experiences: [], matchedPositionTitle: 'Growth Manager' },
+    ];
+    const ids = (filters) => applyTableFilters(rows, filters, { position, keywordScoreFn: () => 40 }).map((c) => c.id);
+
+    it('shows only the candidates assigned to the posting by default', () => {
+        expect(ids({ position: 'Customer Success' }).sort())
+            .toEqual(['atanmis-auto', 'atanmis-elle', 'eski-kayit']);
+    });
+
+    // "Atadım ama göremiyorum" en sinir bozucu arıza türü: atama tek bir
+    // alanda durmuyor.
+    it('recognises every way a candidate can be assigned', () => {
+        expect(isAssignedToPosition({ matchedPositionTitle: 'Customer Success' }, position)).toBe(true);
+        expect(isAssignedToPosition({ positionId: 'p7' }, position)).toBe(true);
+        expect(isAssignedToPosition({ position: 'Customer Success' }, position)).toBe(true);
+        expect(isAssignedToPosition({ bestTitle: 'Customer Success' }, position)).toBe(true);
+        expect(isAssignedToPosition({ matchedPositionTitle: 'Growth Manager' }, position)).toBe(false);
+        expect(isAssignedToPosition(null, position)).toBe(false);
+    });
+
+    it('ranks the whole pool when asked explicitly', () => {
+        expect(ids({ position: 'Customer Success', positionScope: 'pool' })).toHaveLength(4);
+    });
+
+    // Sıra önemli: önce puanla, sonra ele. Tersi olsaydı elenmiş adaylar için
+    // skor hiç hesaplanmazdı ve "tüm havuz" modu boş sayılar gösterirdi.
+    it('still scores every row it returns, in both scopes', () => {
+        const assigned = applyTableFilters(rows, { position: 'Customer Success' }, { position, keywordScoreFn: () => 40 });
+        const pool = applyTableFilters(rows, { position: 'Customer Success', positionScope: 'pool' }, { position, keywordScoreFn: () => 40 });
+        expect(assigned.every((c) => c.positionScore === 40)).toBe(true);
+        expect(pool.every((c) => c.positionScore === 40)).toBe(true);
+    });
+
+    it('shows a chip only for the non-default scope', () => {
+        expect(describeActiveFilters({ position: 'Customer Success' }).map((x) => x.key)).toEqual(['position']);
+        expect(describeActiveFilters({ position: 'Customer Success', positionScope: 'pool' }).map((x) => x.key))
+            .toEqual(['position', 'positionScope']);
     });
 });

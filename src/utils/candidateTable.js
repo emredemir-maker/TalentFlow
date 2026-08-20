@@ -64,6 +64,13 @@ export const DEFAULT_FILTERS = {
     scan: 'all', // 'all' | 'scanned' | 'unscanned'
     // Doğrulama filtreleri. Sınıflandırma utils/candidateBadges.js'te —
     // rozet ile filtre aynı sayaçtan okur, ayrışamazlar.
+    // Pozisyon filtresinin KAPSAMI. İki ayrı soru var ve ikisi de meşru:
+    //   assigned — "bu ilana atanmış adaylar kimler" (pipeline)
+    //   pool     — "havuzda bu role kim uyar" (sourcing)
+    // Ayrım arayüzde yoksa kullanıcı 2 aday beklerken 662 görüyor; canlıda
+    // tam olarak böyle bildirildi. Varsayılan 'assigned', çünkü "Pozisyon"
+    // adında bir FİLTRE'nin filtrelemesi beklenir.
+    positionScope: 'assigned', // 'assigned' | 'pool'
     sector: 'all', // 'all' | 'match' | 'near_or_match' | 'outside' | 'unmeasured'
     verification: 'all', // 'all' | 'contradiction' | 'attention' | 'clean' | 'unverified'
     location: 'all', // 'all' | 'istanbul' | 'outside' | 'unknown'
@@ -117,6 +124,23 @@ export function locationBucket(candidate) {
 function numericScore(value) {
     const n = typeof value === 'object' && value !== null ? Number(value.score) : Number(value);
     return Number.isFinite(n) ? n : 0;
+}
+
+/**
+ * Aday bu ilana ATANMIŞ mı?
+ *
+ * Atama tek bir alanda durmuyor: otomatik eşleşme `matchedPositionTitle`
+ * yazıyor, elle atama `positionId`, eski kayıtlar `position`. Hepsine
+ * bakmazsak kullanıcının kendi atadığı aday listede çıkmaz — ve "atadım ama
+ * göremiyorum" en sinir bozucu arıza türüdür.
+ */
+export function isAssignedToPosition(candidate, position) {
+    const title = position?.title;
+    if (!candidate || !title) return false;
+    return candidate.matchedPositionTitle === title
+        || candidate.position === title
+        || candidate.bestTitle === title
+        || Boolean(position.id && candidate.positionId === position.id);
 }
 
 export function scoreForPosition(candidate, position, keywordScoreFn) {
@@ -319,6 +343,13 @@ export function applyTableFilters(rows, filters, opts = {}) {
                 // 65 gördüğü adayı bugün 78'de bulur ve nedenini bilemez.
                 positionInterviewed: analysisScoreDetail(c, opts.position).interviewed,
             }));
+            // KAPSAM. Puanlama herkes için yapılır (yukarıda), ama liste
+            // yalnızca istenen kümeyi gösterir. Sıra önemli: önce puanla,
+            // sonra ele — tersi olsaydı "tüm havuz" modunda skor hesabı
+            // elenmiş adaylar için hiç yapılmazdı.
+            if (f.positionScope !== 'pool') {
+                result = result.filter((c) => isAssignedToPosition(c, opts.position));
+            }
         } else {
             result = result.filter((c) => (c.bestTitle || c.position) === f.position);
         }
@@ -428,6 +459,9 @@ export function describeActiveFilters(filters) {
     if (f.search.trim()) push('search', 'Arama', `"${f.search.trim()}"`);
     if (f.stage !== 'all') push('stage', 'Aşama', getStage(f.stage).label);
     if (f.position !== 'all') push('position', 'Pozisyon', f.position);
+    // Kapsam yalnızca pozisyon seçiliyken anlamlı; tek başına çip olarak
+    // göstermek "neden liste kısa" sorusunu yanlış yere yönlendirirdi.
+    if (f.position !== 'all' && f.positionScope === 'pool') push('positionScope', 'Kapsam', 'Tüm havuz');
     if (f.department !== 'all') push('department', 'Departman', f.department);
     if (f.source !== 'all') push('source', 'Kaynak', f.source);
     if (f.scan !== 'all') push('scan', 'Tarama', f.scan === 'scanned' ? 'Taranmış' : 'Taranmamış');
