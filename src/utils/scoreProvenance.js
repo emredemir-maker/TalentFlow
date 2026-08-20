@@ -61,33 +61,39 @@ export function companyTokens(name) {
 }
 
 /**
- * Bir dayanak metni hangi göreve ait?
+ * Bir dayanak metni hangi görevleri anıyor?
  *
- * @param {string} evidence maddenin CV'deki somut dayanağı
- * @param {Array} experiences aday deneyimleri
- * @returns {number|null} eşleşen deneyimin dizini; bulunamazsa null
+ * ── İLK SÜRÜMDEKİ HATA: TEK ŞİRKET SEÇMEK ──────────────────────────────────
+ * Önce "en uzun eşleşme kazanır" kuralı vardı: bir dayanak birden fazla
+ * şirket ansa bile yalnızca biri seçiliyordu. Canlıda görüldü ki dayanak
+ * metinleri tam da böyle yazılıyor:
  *
- * EN UZUN EŞLEŞME KAZANIR: "Delta" ve "Delta Yazılım" ikisi de geçiyorsa
- * daha spesifik olan doğrudur. Aksi hâlde alfabetik sıra gibi anlamsız bir
- * şey atfı belirlerdi.
+ *   "8 yıllık ürün yönetimi deneyimi var (A, B, C, D). C'de platformu
+ *    büyütmüş; A'da monetization yönetmiş."
+ *
+ * Böyle bir maddeyi tek şirkete yazmak o şirketin payını ŞİŞİRİYOR ve
+ * diğerlerini tablodan tamamen siliyor — yani "bu skorun ne kadarı şu işe
+ * dayanıyor" sorusunu tam da yanlış yönde cevaplıyor.
+ *
+ * Artık anılan TÜM görevler dönüyor. Bir madde birden fazla işi
+ * gösteriyorsa her ikisinde de listeleniyor ve PAYLAŞIMLI işaretleniyor.
+ *
+ * @returns {number[]} anılan deneyimlerin dizinleri; en spesifik ad önce
  */
-export function attributeEvidence(evidence, experiences) {
+export function citedCompanies(evidence, experiences) {
     const text = ` ${norm(evidence)} `;
-    if (text.trim().length === 0) return null;
+    if (text.trim().length === 0) return [];
 
-    let best = null;
-    let bestScore = 0;
+    const hits = [];
     (experiences || []).forEach((e, index) => {
         const tokens = companyTokens(e?.company);
         if (tokens.length === 0) return;
         // TÜM ayırt edici parçalar geçmeli: "Vega" tek başına yeterli değil,
         // "Vega Interactive" aranıyorsa ikisi de bulunmalı.
         const hit = tokens.every((t) => text.includes(` ${t} `) || text.includes(` ${t}`));
-        if (!hit) return;
-        const score = tokens.join('').length;
-        if (score > bestScore) { bestScore = score; best = index; }
+        if (hit) hits.push({ index, score: tokens.join('').length });
     });
-    return best;
+    return hits.sort((a, b) => b.score - a.score).map((h) => h.index);
 }
 
 /** Şirket hakkında doğrulama katmanının bildiği olgular — yorum değil, ölçüm. */
@@ -155,15 +161,20 @@ export function buildScoreProvenance({ analysis, requirements = [], candidate } 
     for (const a of scoring) {
         const evidence = String(a?.evidence || '').trim();
         if (evidence) withEvidence += 1;
-        const at = evidence ? attributeEvidence(evidence, experiences) : null;
-        if (at === null) { unattributed += 1; continue; }
-        if (!byIndex.has(at)) byIndex.set(at, []);
-        byIndex.get(at).push({
-            index: Number(a.index),
-            text: textOf(a.index),
-            status: String(a.status).toLowerCase(),
-            evidence,
-        });
+        const cited = evidence ? citedCompanies(evidence, experiences) : [];
+        if (cited.length === 0) { unattributed += 1; continue; }
+        // PAYLAŞIMLI MADDE her anılan işte listelenir. Tek işe yazmak o işin
+        // payını şişirir ve diğerlerini tablodan siler.
+        for (const at of cited) {
+            if (!byIndex.has(at)) byIndex.set(at, []);
+            byIndex.get(at).push({
+                index: Number(a.index),
+                text: textOf(a.index),
+                status: String(a.status).toLowerCase(),
+                evidence,
+                shared: cited.length > 1,
+            });
+        }
     }
 
     const groups = [...byIndex.entries()]
@@ -174,6 +185,10 @@ export function buildScoreProvenance({ analysis, requirements = [], candidate } 
                 role: e.role || '',
                 duration: e.duration || '',
                 count: items.length,
+                // Kaç madde başka bir işi de gösteriyor — arayüz bunu söylemek
+                // zorunda, yoksa grupların toplamı atfedilenden fazla çıkıyor ve
+                // okuyan haksız olarak "sayılar tutmuyor" diye düşünüyor.
+                sharedCount: items.filter((i) => i.shared).length,
                 items,
                 facts: companyFactsOf(e.company, candidate?.verificationReport),
             };
