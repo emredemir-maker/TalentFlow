@@ -16,6 +16,17 @@ import { STAR_MAX, STAR_LABELS, anchorLabel } from '../utils/starDimensions';
  * gerçek skordan sapar ve şeffaflık iddiası yalana dönerdi. Testler
  * madde puanlarının toplamının skora eşit kaldığını sabitliyor.
  */
+/** Uzun gereksinim metnini tek satırlık bir ipucuna indirger. */
+const MAX_ITEM_CHARS = 52;
+const shorten = (text) => {
+    const t = String(text || '').trim();
+    if (t.length <= MAX_ITEM_CHARS) return t;
+    // Kelimenin ortasından kesmek okumayı zorlaştırıyor; son boşluğa geri sar.
+    const cut = t.slice(0, MAX_ITEM_CHARS);
+    const at = cut.lastIndexOf(' ');
+    return `${(at > 20 ? cut.slice(0, at) : cut).replace(/[.,;:]$/, '')}…`;
+};
+
 /** Şirket hakkında doğrulama katmanının bildikleri — ÖLÇÜM, yorum değil. */
 const VERDICT_TEXT = {
     dogrulandi: 'doğrulandı',
@@ -72,8 +83,15 @@ function ProvenanceBlock({ analysis, position, candidate }) {
                     Bu skorun dayanağı
                 </span>
                 {top && prov.attributed > 1 && (
+                    // "6'i" DEĞİL. Türkçede sayıya gelen ek sayıya göre
+                    // değişiyor (1'i, 2'si, 3'ü, 6'sı, 9'u) ve tek bir kalıp
+                    // hepsinde doğru olmuyor. "tanesi" her sayıda çalışır.
+                    //
+                    // "Atfedilebilen" da önemli: payda TÜM maddeler değil, işe
+                    // bağlanabilenler. Başlık bunu söylemezse okuyan 8'i toplam
+                    // sanıyor — oysa aşağıda ayrıca atfedilemeyenler yazıyor.
                     <span className="text-[10px] font-bold text-slate-500 ml-auto">
-                        {prov.attributed} maddenin {top.count}&apos;i tek işten
+                        Atfedilebilen {prov.attributed} maddenin {top.count} tanesi tek işten
                     </span>
                 )}
             </div>
@@ -116,9 +134,18 @@ function ProvenanceBlock({ analysis, position, candidate }) {
                             </div>
                         )}
 
+                        {/* Gereksinim metinleri çok uzun olabiliyor (canlıda tek
+                            madde altı satır sürdü) ve hücre paragrafa dönüşüyor.
+                            Tam metin başlıkta duruyor; buradaki iş hangi maddeler
+                            olduğunu SEZDİRMEK, hepsini okutmak değil. */}
                         <p className="text-[10px] text-slate-600 mt-1.5 leading-relaxed">
                             <strong>{g.count} madde:</strong>{' '}
-                            {g.items.map((i) => i.text || `#${i.index}`).join(', ')}
+                            {g.items.map((i, n) => (
+                                <span key={i.index} title={i.text || `#${i.index}`}>
+                                    {n > 0 && ', '}
+                                    {shorten(i.text || `#${i.index}`)}
+                                </span>
+                            ))}
                         </p>
                     </div>
                 ))}
