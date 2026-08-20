@@ -9,7 +9,7 @@
 // dağılıma bakıp "skorun tamamı şu şirketten" sonucu çıkarmak en kötü hata.
 import { describe, expect, it } from 'vitest';
 
-import { companyTokens, attributeEvidence, buildScoreProvenance, dominantSource } from './scoreProvenance';
+import { companyTokens, citedCompanies, buildScoreProvenance, dominantSource } from './scoreProvenance';
 
 const exp = (company, role, duration) => ({ company, role, duration, desc: '' });
 
@@ -46,33 +46,33 @@ describe('companyTokens', () => {
     });
 });
 
-describe('attributeEvidence', () => {
+describe('citedCompanies', () => {
     it('finds the company named in the evidence', () => {
-        expect(attributeEvidence('Vega Interactive bünyesinde funnel sahipliği yaptı', EXPERIENCES)).toBe(0);
-        expect(attributeEvidence('M. Doruk döneminde roadmap kurdu', EXPERIENCES)).toBe(1);
+        expect(citedCompanies('Vega Interactive bünyesinde funnel sahipliği yaptı', EXPERIENCES)).toContain(0);
+        expect(citedCompanies('M. Doruk döneminde roadmap kurdu', EXPERIENCES)).toContain(1);
     });
 
     it('survives Turkish suffixes glued to the company name', () => {
-        expect(attributeEvidence("Nova Games'te ürün yönetimi", EXPERIENCES)).toBe(2);
-        expect(attributeEvidence('Vega Interactive’de A/B testleri', EXPERIENCES)).toBe(0);
+        expect(citedCompanies("Nova Games'te ürün yönetimi", EXPERIENCES)).toContain(2);
+        expect(citedCompanies('Vega Interactive’de A/B testleri', EXPERIENCES)).toContain(0);
     });
 
-    // EN UZUN EŞLEŞME KAZANIR: aksi hâlde atfı anlamsız bir sıra belirlerdi.
-    it('prefers the more specific company when two could match', () => {
+    // Sıra spesifiklikten: en dar ad önce gelir.
+    it('lists the more specific company first', () => {
         const list = [exp('Delta', 'Dev', '2020'), exp('Delta Yazılım', 'Dev', '2021')];
-        expect(attributeEvidence('Delta Yazılım ekibinde çalıştı', list)).toBe(1);
+        expect(citedCompanies('Delta Yazılım ekibinde çalıştı', list)[0]).toBe(1);
     });
 
     // ASIL KORUMA: bağlanamayan dayanak yanlış bir şirkete iliştirilmemeli.
     it('returns null rather than guessing', () => {
-        expect(attributeEvidence('Beş yıllık ürün yönetimi deneyimi', EXPERIENCES)).toBeNull();
-        expect(attributeEvidence('', EXPERIENCES)).toBeNull();
-        expect(attributeEvidence('Vega Interactive', [])).toBeNull();
+        expect(citedCompanies('Beş yıllık ürün yönetimi deneyimi', EXPERIENCES)).toEqual([]);
+        expect(citedCompanies('', EXPERIENCES)).toEqual([]);
+        expect(citedCompanies('Vega Interactive', [])).toEqual([]);
     });
 
     it('does not match on a fragment of the name', () => {
         // "Vega" tek başına yetmez; "Interactive" de geçmeli.
-        expect(attributeEvidence('Vega adlı projede çalıştı', EXPERIENCES)).toBeNull();
+        expect(citedCompanies('Vega adlı projede çalıştı', EXPERIENCES)).toEqual([]);
     });
 });
 
@@ -277,5 +277,54 @@ describe('kariyer geçmişinin durduğu yol', () => {
         expect(p.attributed).toBe(1);
         expect(p.groups[0].role).toBe('Lead PM');
         expect(p.groups[0].duration).toBe('2018 - 2021');
+    });
+});
+
+// ── CANLIDA GÖRÜLEN HATA: TEK ŞİRKET SEÇMEK ─────────────────────────────────
+// İlk sürümde "en uzun eşleşme kazanır" kuralı vardı ve bir dayanak birden
+// fazla şirket ansa bile yalnızca biri seçiliyordu. Oysa dayanak metinleri
+// tam da böyle yazılıyor:
+//
+//   "8 yıllık ürün yönetimi deneyimi var (A, B, C, D). C'de platformu
+//    büyütmüş; A'da monetization yönetmiş."
+//
+// Böyle bir maddeyi tek şirkete yazmak o şirketin payını ŞİŞİRİYOR ve
+// diğerlerini tablodan tamamen siliyor — "bu skorun ne kadarı şu işe
+// dayanıyor" sorusunu tam da yanlış yönde cevaplıyor.
+describe('bir dayanak birden fazla işi anıyorsa', () => {
+    const MULTI = 'Adayın 8 yıllık deneyimi var (Vega Interactive, M. Doruk, Nova Games). '
+        + "Nova Games'te platformu büyütmüş; Vega Interactive'de monetization yönetmiş.";
+
+    it('returns every company the evidence names, not just the longest', () => {
+        const cited = citedCompanies(MULTI, EXPERIENCES);
+        expect(cited).toHaveLength(3);
+        expect(cited).toEqual(expect.arrayContaining([0, 1, 2]));
+    });
+
+    // ASIL HATA: Nova Games tablodan tamamen siliniyordu.
+    it('gives every cited job its own row instead of erasing it', () => {
+        const p = build([assessment(1, 'met', MULTI)]);
+        expect(p.groups.map((g) => g.company).sort())
+            .toEqual(['M. Doruk', 'Nova Games', 'Vega Interactive']);
+    });
+
+    it('marks the item as shared in every group', () => {
+        const p = build([assessment(1, 'met', MULTI)]);
+        expect(p.groups.every((g) => g.sharedCount === 1)).toBe(true);
+        expect(p.groups.every((g) => g.items[0].shared === true)).toBe(true);
+    });
+
+    // Madde BİR KEZ atfedilmiş sayılır; üç grupta görünmesi onu üç madde yapmaz.
+    it('counts the item once toward the attributed total', () => {
+        const p = build([assessment(1, 'met', MULTI)]);
+        expect(p.total).toBe(1);
+        expect(p.attributed).toBe(1);
+        expect(p.unattributed).toBe(0);
+    });
+
+    it('does not mark an item shared when only one job is named', () => {
+        const p = build([assessment(1, 'met', 'Vega Interactive funnel sahipliği')]);
+        expect(p.groups[0].sharedCount).toBe(0);
+        expect(p.groups[0].items[0].shared).toBe(false);
     });
 });

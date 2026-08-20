@@ -91,7 +91,7 @@ function ProvenanceBlock({ analysis, position, candidate }) {
                     // bağlanabilenler. Başlık bunu söylemezse okuyan 8'i toplam
                     // sanıyor — oysa aşağıda ayrıca atfedilemeyenler yazıyor.
                     <span className="text-[10px] font-bold text-slate-500 ml-auto">
-                        Atfedilebilen {prov.attributed} maddenin {top.count} tanesi tek işten
+                        Atfedilebilen {prov.attributed} maddenin {top.count} tanesi bu işi gösteriyor
                     </span>
                 )}
             </div>
@@ -138,6 +138,18 @@ function ProvenanceBlock({ analysis, position, candidate }) {
                             madde altı satır sürdü) ve hücre paragrafa dönüşüyor.
                             Tam metin başlıkta duruyor; buradaki iş hangi maddeler
                             olduğunu SEZDİRMEK, hepsini okutmak değil. */}
+                        {/* PAYLAŞIMLI MADDE söylenmek zorunda: bir dayanak
+                            birden fazla işi anabiliyor ve o madde her ikisinde
+                            de sayılıyor. Söylenmezse grupların toplamı
+                            atfedilenden fazla çıkıyor ve okuyan haklı olarak
+                            "sayılar tutmuyor" diye düşünüyor. */}
+                        {g.sharedCount > 0 && (
+                            <p className="text-[9px] text-slate-400 mt-1">
+                                {g.sharedCount === g.count
+                                    ? 'Bu maddelerin hepsi başka bir işi de gösteriyor.'
+                                    : `Bu maddelerin ${g.sharedCount} tanesi başka bir işi de gösteriyor.`}
+                            </p>
+                        )}
                         <p className="text-[10px] text-slate-600 mt-1.5 leading-relaxed">
                             <strong>{g.count} madde:</strong>{' '}
                             {g.items.map((i, n) => (
