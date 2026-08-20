@@ -3,7 +3,7 @@
 // Kept UI-free so filtering, sorting and export-row mapping are unit-testable
 // without rendering. The page component owns filter STATE; this module owns
 // filter BEHAVIOR.
-import { analysisScoreFor, analysisFor, analysisScoreDetail } from './positionScore';
+import { analysisFor, analysisScoreDetail } from './positionScore';
 import { sectorBucket, verificationBucket } from './candidateBadges';
 import { mustHaveGate } from './mustHaveGate';
 import { STAGES, getStage } from './pipelineStages';
@@ -120,12 +120,71 @@ function numericScore(value) {
 }
 
 export function scoreForPosition(candidate, position, keywordScoreFn) {
-    if (!position?.title) return 0;
-    // Saklanan sayı değil, YENİDEN HESAPLANAN analiz skoru: ağırlık
-    // değişince liste ile skor kırılımı ayrışmasın.
-    const saved = analysisScoreFor(candidate, position);
+    return scoreForPositionDetail(candidate, position, keywordScoreFn).score;
+}
+
+/**
+ * SKORU HANGİ CETVEL ÜRETTİ.
+ *
+ * analiz  — o pozisyon için derin analiz: gereksinim kapsaması × STAR güveni
+ * ai      — o pozisyon için üretilmiş aiAnalysis skoru (tek sayı, kırılımsız)
+ * anahtar — metin eşleşmesi; en zayıfı
+ * yok     — hiçbiri
+ */
+export const SCORE_METHOD = { ANALYSIS: 'analiz', AI: 'ai', KEYWORD: 'anahtar', NONE: 'yok' };
+
+export const SCORE_METHOD_LABEL = {
+    [SCORE_METHOD.ANALYSIS]: 'Derin analiz',
+    [SCORE_METHOD.AI]: 'AI skoru (kırılımsız)',
+    [SCORE_METHOD.KEYWORD]: 'Anahtar kelime',
+    [SCORE_METHOD.NONE]: 'Ölçülmedi',
+};
+
+/**
+ * Bir adayın bir pozisyondaki skoru — TEK CETVELDEN.
+ *
+ * ── NEDEN ARTIK Math.max DEĞİL ──────────────────────────────────────────────
+ * Burada `Math.max(analiz, anahtar kelime)` vardı ve bir üstünde
+ * withCoherentScores buna bir üçüncüsünü daha ekliyordu. Yani aynı pozisyon
+ * için skor üç farklı cetvelden gelebiliyor ve EN CÖMERT olan kazanıyordu.
+ *
+ * Canlıda görüldü: aynı ilana doğrudan eşleşen aday derin analizle (gereksinim
+ * × STAR) ölçülürken, elle atanan aday derin analizi olmadığı için anahtar
+ * kelimeye düşüyordu. İki sayı aynı kolonda yan yana duruyor ama aynı şeyi
+ * ölçmüyorlar — sıralama sessizce anlamını kaybediyor.
+ *
+ * Bu tuzağı bu proje BİR KEZ fark etmiş: ön skor için ayrı bir "Ön Skor
+ * Yöntemi" kolonu var ve yorumu aynen şunu diyor — "İki cetvel aynı kolonda
+ * toplandığında sıralama sessizce anlamsızlaşıyor". Aynı hata pozisyon
+ * skorunda düzeltilmemişti, üstelik Math.max ile daha kötü hâldeydi.
+ *
+ * Artık ÖNCELİK var, maksimum yok: en güçlü cetvel ne diyorsa o. Daha zayıf
+ * bir cetvel yalnızca güçlüsü hiç çalışmamışsa devreye giriyor ve hangisi
+ * olduğu `method` ile dışarı taşınıyor — arayüz bunu SÖYLEMEK zorunda,
+ * yoksa kullanıcı karşılaştırılamaz iki sayıyı karşılaştırır.
+ *
+ * @returns {{score: number, method: string}}
+ */
+export function scoreForPositionDetail(candidate, position, keywordScoreFn) {
+    if (!position?.title) return { score: 0, method: SCORE_METHOD.NONE };
+
+    // 1. Derin analiz. Saklanan sayı değil, YENİDEN HESAPLANAN skor: ağırlık
+    //    değişince liste ile kırılım paneli ayrışmasın.
+    const detail = analysisScoreDetail(candidate, position);
+    if (detail.scanned) return { score: Math.round(detail.score), method: SCORE_METHOD.ANALYSIS };
+
+    // 2. O pozisyon için üretilmiş aiAnalysis. Kırılımı yok ama en azından
+    //    ilanın kendisine bakılarak verilmiş bir sayı.
+    if (candidate?.aiAnalysis?.analyzedForPosition === position.title) {
+        const n = numericScore(candidate.aiAnalysis.score);
+        if (n > 0) return { score: Math.round(n), method: SCORE_METHOD.AI };
+    }
+
+    // 3. Anahtar kelime — en zayıf cetvel, yalnızca son çare.
     const keyword = keywordScoreFn ? numericScore(keywordScoreFn(candidate, position)) : 0;
-    return Math.max(Number.isFinite(saved) ? saved : 0, keyword);
+    if (keyword > 0) return { score: Math.round(keyword), method: SCORE_METHOD.KEYWORD };
+
+    return { score: 0, method: SCORE_METHOD.NONE };
 }
 
 /**
@@ -199,14 +258,15 @@ export function withCoherentScores(rows, openPositions, keywordScoreFn) {
     return rows.map((c) => {
         const pos = c.matchedPositionTitle ? byTitle.get(c.matchedPositionTitle) : null;
         if (!pos) return c;
-        const fromAnalysis = c.aiAnalysis?.analyzedForPosition === pos.title
-            ? Number(c.aiAnalysis?.score || 0)
-            : 0;
-        const score = Math.round(Math.max(scoreForPosition(c, pos, keywordScoreFn), fromAnalysis));
+        // Math.max KALKTI: aiAnalysis artık ayrı bir yarışmacı değil,
+        // scoreForPositionDetail içindeki öncelik sırasının ikinci basamağı.
+        // Üç cetveli yarıştırıp en cömerdini seçmek, sıralamayı anlamsız
+        // kılıyordu (gerekçe: scoreForPositionDetail).
+        const { score, method } = scoreForPositionDetail(c, pos, keywordScoreFn);
         const combined = c.interviewScore != null
             ? Math.round((score + Number(c.interviewScore)) / 2)
             : score;
-        return { ...c, bestScore: score, combinedScore: combined };
+        return { ...c, bestScore: score, combinedScore: combined, scoreMethod: method };
     });
 }
 
@@ -246,9 +306,13 @@ export function applyTableFilters(rows, filters, opts = {}) {
             // hesaplıyordu ama yalnızca aday sayfasında gösteriliyordu:
             // listede %80 gören kullanıcı, adayın bir zorunlu maddeyi hiç
             // karşılamadığını göremiyordu.
+            // Tek hesap, iki alan: detayı iki kez çağırmak aynı işi tekrarlardı.
+            const positionScoreOf = (c) => scoreForPositionDetail(c, opts.position, opts.keywordScoreFn);
             result = result.map((c) => ({
                 ...c,
-                positionScore: scoreForPosition(c, opts.position, opts.keywordScoreFn),
+                positionScore: positionScoreOf(c).score,
+                // Hangi cetvel ölçtü — arayüz bunu göstermek zorunda.
+                positionScoreMethod: positionScoreOf(c).method,
                 positionGate: mustHaveGate(analysisFor(c, opts.position?.title), opts.position, c),
                 // Skor mülakattan etkilendiyse hücre bunu söylemeli. Sessizce
                 // değişen bir sayı, açıklanamayan bir sayıdır: kullanıcı dün

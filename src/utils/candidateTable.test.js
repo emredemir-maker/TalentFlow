@@ -5,6 +5,8 @@ import {
     getAppliedDate,
     applyTableFilters,
     scoreForPosition,
+    scoreForPositionDetail,
+    SCORE_METHOD,
     withCoherentScores,
     sortRows,
     buildExportRows,
@@ -152,10 +154,33 @@ describe('cleanRoleText', () => {
 describe('scoreForPosition', () => {
     const POSITION = { id: 'p1', title: 'Frontend Developer' };
 
-    it('takes the max of the saved AI analysis and the keyword score', () => {
+    // ARTIK Math.max DEĞİL. Üç cetveli yarıştırıp en cömerdini seçmek,
+    // aynı kolondaki iki sayının aynı şeyi ölçmemesine yol açıyordu:
+    // doğrudan eşleşen aday derin analizle, elle atanan aday anahtar
+    // kelimeyle ölçülüyor ve ikisi yan yana sıralanıyordu.
+    it('prefers the deep analysis even when the keyword score is higher', () => {
         const c = { positionAnalyses: { 'Frontend Developer': { score: 62 } } };
         expect(scoreForPosition(c, POSITION, () => 40)).toBe(62);
-        expect(scoreForPosition(c, POSITION, () => 80)).toBe(80);
+        expect(scoreForPosition(c, POSITION, () => 80)).toBe(62);
+    });
+
+    it('reports which ruler produced the number', () => {
+        const analysed = { positionAnalyses: { 'Frontend Developer': { score: 62 } } };
+        expect(scoreForPositionDetail(analysed, POSITION, () => 80).method).toBe(SCORE_METHOD.ANALYSIS);
+
+        const aiOnly = { aiAnalysis: { analyzedForPosition: 'Frontend Developer', score: 70 } };
+        expect(scoreForPositionDetail(aiOnly, POSITION, () => 80)).toEqual({ score: 70, method: SCORE_METHOD.AI });
+
+        const keywordOnly = {};
+        expect(scoreForPositionDetail(keywordOnly, POSITION, () => 80)).toEqual({ score: 80, method: SCORE_METHOD.KEYWORD });
+
+        expect(scoreForPositionDetail({}, POSITION).method).toBe(SCORE_METHOD.NONE);
+    });
+
+    // aiAnalysis BAŞKA bir pozisyon için üretildiyse bu ilanı ölçmüyor.
+    it('ignores an aiAnalysis produced for a different position', () => {
+        const other = { aiAnalysis: { analyzedForPosition: 'Backend Developer', score: 90 } };
+        expect(scoreForPositionDetail(other, POSITION, () => 40)).toEqual({ score: 40, method: SCORE_METHOD.KEYWORD });
     });
     it('works without a keyword function (saved analysis only)', () => {
         const c = { positionAnalyses: { 'Frontend Developer': { score: 55 } } };
@@ -466,9 +491,12 @@ describe('scoreForPosition — skor fonksiyonunun dönüş şekli', () => {
         expect(scoreForPosition(analysed, position, () => ({ score: 62 }))).toBe(80);
     });
 
-    it('uses the keyword score when it beats a stale saved analysis', () => {
+    // Kayıtlı analiz DÜŞÜK olsa bile anahtar kelimeye geçilmez: düşük skor
+    // bir ölçüm sonucudur, ölçülememe değil. Cömert cetvele kaçmak, adayı
+    // ilana göre değil metin benzerliğine göre yukarı çekerdi.
+    it('does not fall back to keywords just because the analysis scored low', () => {
         const analysed = { positionAnalyses: { 'Growth PM': { score: 30 } } };
-        expect(scoreForPosition(analysed, position, () => ({ score: 62 }))).toBe(62);
+        expect(scoreForPosition(analysed, position, () => ({ score: 62 }))).toBe(30);
     });
 
     it('treats unusable values as 0 rather than NaN', () => {
@@ -762,5 +790,57 @@ describe('describeActiveFilters', () => {
             const chips = describeActiveFilters({ [key]: probe });
             expect(chips.length, `${key} çip üretmeli`).toBeGreaterThan(0);
         }
+    });
+});
+
+
+// ── CANLIDA BİLDİRİLEN TUTARSIZLIK ──────────────────────────────────────────
+// Aynı ilan için iki aday FARKLI cetvellerle ölçülüyordu: doğrudan eşleşen
+// adayın derin analizi varken, elle atanan aday anahtar kelimeye düşüyordu.
+// İki sayı aynı kolonda yan yana duruyor ama aynı şeyi ölçmüyorlardı.
+//
+// Eski kod üç cetveli Math.max ile yarıştırıyordu — en cömerdi kazanıyordu ve
+// hangisinin kazandığı adaydan adaya değişiyordu.
+describe('bir pozisyonun skoru her koşulda aynı cetvelden gelir', () => {
+    const position = { id: 'p9', title: 'Customer Success' };
+    const keyword = () => 88;
+
+    const directMatch = { positionAnalyses: { 'Customer Success': { score: 56 } } };
+    const manualAssign = { aiAnalysis: { analyzedForPosition: 'Customer Success', score: 79 } };
+
+    it('does not let a generous ruler outrank a real analysis', () => {
+        expect(scoreForPositionDetail(directMatch, position, keyword))
+            .toEqual({ score: 56, method: SCORE_METHOD.ANALYSIS });
+    });
+
+    it('reports the weaker ruler instead of hiding it', () => {
+        expect(scoreForPositionDetail(manualAssign, position, keyword))
+            .toEqual({ score: 79, method: SCORE_METHOD.AI });
+        expect(scoreForPositionDetail({}, position, keyword))
+            .toEqual({ score: 88, method: SCORE_METHOD.KEYWORD });
+    });
+
+    // ASIL MESELE: iki aday karşılaştırılırken hangisinin nasıl ölçüldüğü
+    // görünmeli. Aynı method değilse sayılar kıyaslanabilir değil.
+    it('makes the mismatch detectable by the caller', () => {
+        const a = scoreForPositionDetail(directMatch, position, keyword);
+        const b = scoreForPositionDetail(manualAssign, position, keyword);
+        expect(b.score).toBeGreaterThan(a.score);
+        expect(a.method).not.toBe(b.method);
+    });
+
+    it('carries the method through withCoherentScores', () => {
+        const rows = [
+            { id: 'a', matchedPositionTitle: 'Customer Success', ...directMatch },
+            { id: 'b', matchedPositionTitle: 'Customer Success', ...manualAssign },
+        ];
+        const out = withCoherentScores(rows, [position], keyword);
+        expect(out.map((c) => c.scoreMethod)).toEqual([SCORE_METHOD.ANALYSIS, SCORE_METHOD.AI]);
+    });
+
+    it('carries the method through the position filter', () => {
+        const rows = [{ id: 'a', experiences: [], ...manualAssign }];
+        const [out] = applyTableFilters(rows, { position: 'Customer Success' }, { position, keywordScoreFn: keyword });
+        expect(out.positionScoreMethod).toBe(SCORE_METHOD.AI);
     });
 });
