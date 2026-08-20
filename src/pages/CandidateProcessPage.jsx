@@ -1,5 +1,6 @@
 // src/pages/CandidateProcessPage.jsx
 import { analysisScoreFor } from '../utils/positionScore';
+import { scoreForPositionDetail } from '../utils/candidateTable';
 import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCandidates } from '../context/CandidatesContext';
@@ -929,14 +930,15 @@ export default function CandidateProcessPage() {
         () => new Map((positions || []).filter(p => p.status === 'open' && p.title).map(p => [p.title, p])),
         [positions]
     );
+    // Math.max KALKTI. Üç cetveli yarıştırıp en cömerdini seçmek, aynı ilan
+    // için iki adayın FARKLI ölçülmesine yol açıyordu: doğrudan eşleşen aday
+    // derin analizle, elle atanan aday anahtar kelimeyle. Artık tek cetvel,
+    // öncelik sırasıyla (gerekçe: utils/candidateTable.scoreForPositionDetail).
     const coherentScoreOf = (c) => {
         if (!c) return 0;
         const pos = c.matchedPositionTitle ? openByTitle.get(c.matchedPositionTitle) : null;
         if (!pos) return Math.round(c.bestScore || 0);
-        const saved = analysisScoreFor(c, pos);
-        const fromAnalysis = c.aiAnalysis?.analyzedForPosition === pos.title ? Number(c.aiAnalysis?.score || 0) : 0;
-        const keyword = Number(calculateMatchScore(c, pos)?.score || 0);
-        return Math.round(Math.max(saved, fromAnalysis, keyword));
+        return scoreForPositionDetail(c, pos, (cand, p) => calculateMatchScore(cand, p)?.score).score;
     };
     const score = coherentScoreOf(candidate);
 

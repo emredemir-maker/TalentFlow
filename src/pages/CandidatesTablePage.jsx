@@ -23,15 +23,25 @@ import { useAuth } from '../context/AuthContext';
 import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
 import { calculateMatchScore } from '../services/matchService';
-import { deepScanCandidate } from '../services/scanService';
+import { deepScanCandidate, rescanCandidateForPosition } from '../services/scanService';
 import { STAGES, getStage } from '../utils/pipelineStages';
 import {
     DEFAULT_FILTERS, applyTableFilters, withCoherentScores, sortRows, buildExportRows,
     resolveStageKey, getAppliedDate, isDeepScanned, cleanRoleText, isIstanbulLocation,
     VERIFICATION_RANK, describeActiveFilters, FILTER_RESET_FIELDS,
+    SCORE_METHOD, SCORE_METHOD_LABEL,
 } from '../utils/candidateTable';
 
 const PAGE_SIZE = 50;
+
+/**
+ * Tek seferde en fazla kaç aday aynı cetvele getirilir.
+ *
+ * Her aday BİR AI çağrısı demek. Tavansız bırakmak 662 adaylık bir havuzda
+ * tek tıkla yüzlerce çağrı gönderirdi. Tavana takılan sayı kullanıcıya
+ * SÖYLENİR — sessizce kesmek, işin bittiği izlenimi verirdi.
+ */
+const MAX_ALIGN = 50;
 
 // Görünüm değişince (aday detayına gidip dönünce) bileşen unmount olur ve
 // yerel state sıfırlanırdı — filtre/sıralama/sayfa sessionStorage'da yaşar
@@ -54,7 +64,33 @@ function StageChip({ status }) {
     );
 }
 
-function ScoreCell({ value, gate, interviewed }) {
+/**
+ * Skoru HANGİ CETVELİN ürettiği.
+ *
+ * Derin analiz normaldir, işaretlenmez. Diğerleri işaretlenir çünkü aynı
+ * kolonda duran iki sayı aynı şeyi ölçmüyor olabilir: doğrudan eşleşen aday
+ * derin analizle, elle atanan aday anahtar kelimeyle ölçülüyor. İşaret
+ * olmadan kullanıcı bunları karşılaştırılabilir sanıyor — canlıda tam olarak
+ * böyle bir "tutarsızlık" olarak bildirildi.
+ */
+function MethodMark({ method }) {
+    if (!method || method === SCORE_METHOD.ANALYSIS || method === SCORE_METHOD.NONE) return null;
+    const keyword = method === SCORE_METHOD.KEYWORD;
+    return (
+        <span
+            title={`${SCORE_METHOD_LABEL[method]} ile ölçüldü — bu ilana göre derin analiz yapılmamış, diğer adaylarla doğrudan karşılaştırılamaz`}
+            className={`mt-0.5 px-1 py-px rounded text-[8px] font-black uppercase tracking-wide whitespace-nowrap border ${
+                keyword
+                    ? 'bg-amber-50 border-amber-200 text-amber-700'
+                    : 'bg-slate-100 border-slate-200 text-slate-500'
+            }`}
+        >
+            {keyword ? 'anahtar kelime' : 'ai'}
+        </span>
+    );
+}
+
+function ScoreCell({ value, gate, interviewed, method }) {
     if (value === null || value === undefined || value === '') {
         return <span className="text-slate-300">—</span>;
     }
@@ -85,6 +121,7 @@ function ScoreCell({ value, gate, interviewed }) {
                     {label.text}
                 </span>
             )}
+            <MethodMark method={method} />
             {label && label.tone === 'amber' && (
                 <span
                     title={gate.partial.map((m) => m.text).join(' · ')}
@@ -460,6 +497,60 @@ export default function CandidatesTablePage() {
     // ilan gereksinimleri veya skorlama değiştiğinde havuzu yeniden
     // değerlendirmeyi imkânsız kılıyordu. Artık seçim taranmış aday
     // içeriyorsa onay metni bunu açıkça söyler ve hepsi yeniden taranır.
+    // ── AYNI CETVELE GETİRME ────────────────────────────────────────────────
+    //
+    // Aynı ilan için iki aday farklı cetvellerle ölçülebiliyor: doğrudan
+    // eşleşen adayın derin analizi varken, elle atanan aday anahtar kelimeye
+    // düşüyor. İşaretleme bunu GÖRÜNÜR yapıyor ama çözmüyor — çözümü, eksik
+    // olanları o ilana göre gerçekten ölçmek.
+    const unalignedRows = useMemo(
+        () => (selectedPosition
+            ? sortedRows.filter((c) => c.positionScoreMethod && c.positionScoreMethod !== SCORE_METHOD.ANALYSIS)
+            : []),
+        [sortedRows, selectedPosition]
+    );
+
+    const handleAlignToPosition = async () => {
+        if (!selectedPosition || scanProgress || bulkApplying || unalignedRows.length === 0) return;
+        const targets = unalignedRows.slice(0, MAX_ALIGN);
+        const skipped = unalignedRows.length - targets.length;
+        const ok = window.confirm(
+            `${targets.length} aday "${selectedPosition.title}" ilanına göre değerlendirilecek.
+
+`
+            + 'Her aday bir AI çağrısı demek; işlem birkaç dakika sürebilir.'
+            + (skipped > 0 ? `
+
+Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabilirsiniz.` : '')
+        );
+        if (!ok) return;
+
+        setScanProgress({ done: 0, total: targets.length });
+        let scanned = 0;
+        let failed = 0;
+        for (let i = 0; i < targets.length; i += 1) {
+            const c = targets[i];
+            try {
+                const r = await rescanCandidateForPosition(c, selectedPosition);
+                if (r?.status === 'scanned' && r.updates) {
+                    await updateCandidate(c.id, r.updates);
+                    scanned += 1;
+                } else {
+                    failed += 1;
+                }
+            } catch {
+                failed += 1;
+            }
+            setScanProgress({ done: i + 1, total: targets.length });
+        }
+        setScanProgress(null);
+        setBulkResult({
+            message: `${scanned} aday "${selectedPosition.title}" ilanına göre ölçüldü`
+                + (skipped > 0 ? ` — tavan nedeniyle ${skipped} aday taranmadı` : ''),
+            failed,
+        });
+    };
+
     const handleBulkScan = async () => {
         if (bulkApplying || scanProgress || selectedIds.size === 0) return;
         if (openPositions.length === 0) { setBulkResult({ message: 'Otonom tarama için açık pozisyon gerekli', failed: 1 }); return; }
@@ -685,6 +776,30 @@ export default function CandidatesTablePage() {
                 )}
             </div>
 
+            {/* AYNI CETVEL UYARISI.
+                Kullanıcı iki sayıyı karşılaştırırken ikisinin aynı şeyi
+                ölçtüğünü varsayıyor. Ölçmüyorlarsa bunu SÖYLEMEK ve
+                düzeltmeyi tek tık uzağa koymak gerekiyor. */}
+            {selectedPosition && unalignedRows.length > 0 && !scanProgress && (
+                <div className="px-6 pt-3">
+                    <div className="flex items-center gap-3 flex-wrap text-[11px] bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5">
+                        <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                        <span className="text-amber-900">
+                            <strong>{unalignedRows.length} aday</strong> bu ilana göre derin analiz edilmemiş; skorları
+                            anahtar kelime ya da başka bir pozisyonun analizinden geliyor ve
+                            diğerleriyle doğrudan karşılaştırılamaz.
+                        </span>
+                        <button
+                            onClick={handleAlignToPosition}
+                            disabled={bulkApplying}
+                            className="ml-auto flex items-center gap-1.5 text-[11px] font-bold text-white bg-amber-600 hover:bg-amber-700 px-3 py-1.5 rounded-lg disabled:opacity-50 transition-colors"
+                        >
+                            <Brain className="w-3.5 h-3.5" /> Aynı cetvele getir
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* ── Toplu işlem çubuğu / sonuç bildirimi ─────────────────────── */}
             {(selectedIds.size > 0 || bulkResult) && (
                 <div className="px-6 pt-3">
@@ -882,9 +997,9 @@ export default function CandidatesTablePage() {
                                                 <span className="text-slate-300" title="Bu aday için doğrulama henüz çalıştırılmadı">—</span>
                                             )}
                                         </td>
-                                        <td className="px-3 py-2.5 text-center"><ScoreCell value={c.bestScore} /></td>
+                                        <td className="px-3 py-2.5 text-center"><ScoreCell value={c.bestScore} method={c.scoreMethod} /></td>
                                         {selectedPosition && (
-                                            <td className="px-3 py-2.5 text-center"><ScoreCell value={c.positionScore} gate={c.positionGate} interviewed={c.positionInterviewed} /></td>
+                                            <td className="px-3 py-2.5 text-center"><ScoreCell value={c.positionScore} gate={c.positionGate} interviewed={c.positionInterviewed} method={c.positionScoreMethod} /></td>
                                         )}
                                         <td className="px-3 py-2.5 text-center"><ScoreCell value={c.interviewScore} /></td>
                                         <td className="px-3 py-2.5 text-center"><ScoreCell value={c.combinedScore} /></td>
