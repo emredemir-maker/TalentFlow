@@ -27,6 +27,7 @@
 // Sahteciliği aramak için kurulan bir aracın, aramadığı bir şeyi cezalandıran
 // bir ayrımcılık aracına dönüşmesinin en kısa yolu bu olurdu.
 
+import { normalizeExperiences } from './candidateCv.js';
 import {
     parseDuration,
     toWindow,
@@ -375,7 +376,19 @@ export function checkAgainstRequirement(measured, requiredYears) {
  *   çıktısı budur: bir puan değil, sorulacak somut sorular.
  */
 export function buildConsistencyReport(candidate, { today = currentYearMonth(), requiredYears = null } = {}) {
-    const measured = measureExperiences(candidate?.experiences, today);
+    // KARİYER GEÇMİŞİ TEK KAYNAKTAN.
+    //
+    // Ham `candidate.experiences` okumak CANLIDA VERİ KAYBETTİ: kayıtların bir
+    // kısmında geçmiş `careerHistory` altında duruyor ve alan adları değişiyor
+    // (title/position, period/dates). CV sekmesi normalizeExperiences kullandığı
+    // için doğru listeyi gösteriyordu; doğrulama zinciri ham alanı okuduğu için
+    // aynı adayın bir kısım görevlerini HİÇ GÖRMÜYORDU.
+    //
+    // Sessiz eksilme en tehlikeli türünden: görev listede yoksa kapsama (coverage)
+    // da bunu yakalayamaz — kapsama okunamayan TARİHİ ölçüyor, eksik KAYDI değil.
+    // Eksik geçmiş üzerinden "beyan ettiğinden az deneyimi var" çelişkisi üretmek
+    // tam da önlemeye çalıştığımız yanlış suçlama olurdu.
+    const measured = measureExperiences(normalizeExperiences(candidate), today);
 
     const flags = [
         checkCoverage(measured),

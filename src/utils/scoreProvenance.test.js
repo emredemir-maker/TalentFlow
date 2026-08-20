@@ -239,3 +239,43 @@ describe('değerlendirmelerin durduğu yol', () => {
         expect(runWith({ scoreData: {} }).total).toBe(0);
     });
 });
+
+// ── CANLIDA GÖRÜLEN VERİ KAYBI ──────────────────────────────────────────────
+// Ham `candidate.experiences` okumak bazı görevleri HİÇ görmüyordu: kayıtların
+// bir kısmında geçmiş `careerHistory` altında duruyor ve alan adları değişiyor
+// (title/position, period/dates). CV sekmesi doğru listeyi gösterirken
+// doğrulama zinciri aynı adayın görevlerinin bir kısmını atlıyordu.
+//
+// Sessiz eksilme en tehlikeli türünden: görev listede yoksa kapsama (coverage)
+// da yakalayamaz — kapsama okunamayan TARİHİ ölçüyor, eksik KAYDI değil.
+describe('kariyer geçmişinin durduğu yol', () => {
+    const items = [assessment(1, 'met', 'Fashion TV platformu büyüttü')];
+
+    const runWith = (candidate) => buildScoreProvenance({
+        analysis: analysisWith(items),
+        requirements: REQUIREMENTS,
+        candidate,
+    });
+
+    it('reads history from experiences', () => {
+        const p = runWith({ experiences: [exp('Fashion TV', 'Lead PM', '2018 - 2021')] });
+        expect(p.attributed).toBe(1);
+        expect(p.groups[0].company).toBe('Fashion TV');
+    });
+
+    // ASIL HATA: bu yol okunmuyordu ve görev sessizce kayboluyordu.
+    it('falls back to careerHistory when experiences is empty', () => {
+        const p = runWith({ experiences: [], careerHistory: [exp('Fashion TV', 'Lead PM', '2018 - 2021')] });
+        expect(p.attributed).toBe(1);
+        expect(p.groups[0].company).toBe('Fashion TV');
+    });
+
+    it('accepts the alternate field names the CV tab already accepted', () => {
+        const p = runWith({
+            careerHistory: [{ company: 'Fashion TV', title: 'Lead PM', period: '2018 - 2021' }],
+        });
+        expect(p.attributed).toBe(1);
+        expect(p.groups[0].role).toBe('Lead PM');
+        expect(p.groups[0].duration).toBe('2018 - 2021');
+    });
+});
