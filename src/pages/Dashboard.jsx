@@ -353,6 +353,20 @@ export default function Dashboard() {
         return map;
     }, [candidates]);
 
+    /**
+     * Toplu yükleme: Aday Süreci sayfasına geç, ardından oradaki modalı aç.
+     *
+     * Yalnızca sayfaya yönlendirmek yetmiyordu — düğmede "Toplu Yükleme"
+     * yazarken kullanıcıyı yükleme ekranının önüne bırakıp modalı açmamak,
+     * düğmenin üzerinde yazan işi yapmaması demekti. Gecikme, hedef sayfa
+     * mount olup dinleyicisini kurana kadar bekliyor; aynı kalıp aşağıdaki
+     * openPosition zincirinde de kullanılıyor.
+     */
+    const openBulkUpload = () => {
+        window.dispatchEvent(new CustomEvent('changeView', { detail: 'candidate-process' }));
+        setTimeout(() => window.dispatchEvent(new CustomEvent('openBulkUpload')), 80);
+    };
+
     /** Satırın aksiyon bağlantısı — mevcut navigasyon zincirlerini aynen kullanır. */
     const rowActionFor = (c) => {
         const sessions = Array.isArray(c.interviewSessions) ? c.interviewSessions : [];
@@ -412,7 +426,7 @@ export default function Dashboard() {
                             </div>
                         ))}
                     <button
-                        onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'candidate-process' }))}
+                        onClick={openBulkUpload}
                         style={{ background: VIOLET }}
                         className="flex items-center gap-1.5 text-[12px] font-semibold text-white px-3 py-1.5 rounded-md hover:opacity-90"
                     >
@@ -515,7 +529,7 @@ export default function Dashboard() {
                         </span>
                         <div className="ml-auto flex items-center gap-2">
                             <button
-                                onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'candidate-process' }))}
+                                onClick={openBulkUpload}
                                 style={{ color: '#6D28D9', background: '#F5F3FF', borderColor: '#DDD6FE' }}
                                 className="flex items-center gap-1.5 whitespace-nowrap text-[12px] font-semibold border rounded-md px-[11px] py-[5px]"
                             >
