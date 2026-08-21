@@ -38,11 +38,17 @@ test.describe('Authenticated shell', () => {
         // same text.
         await expect(page.getByRole('heading', { name: 'Kontrol Paneli', level: 2 })).toBeVisible();
 
-        // The Strategic Overview h1 inside Dashboard's body confirms the
-        // page chunk loaded (it's lazy()), and that data-less render
-        // doesn't crash. Skeleton loaders may still be visible — that's
-        // fine; we're checking the shell mounted.
-        await expect(page.getByRole('heading', { name: 'Stratejik Genel Bakış' })).toBeVisible();
+        // "Aday havuzu" is the pool-table heading inside Dashboard's body;
+        // it confirms the page chunk loaded (it's lazy()) and that a
+        // data-less render doesn't crash. Skeleton loaders may still be
+        // visible — that's fine; we're checking the shell mounted.
+        //
+        // NOTE: do NOT pin the page name here. The top-bar Header already
+        // renders <h2>Kontrol Paneli</h2>; a second heading with that text
+        // inside the page would show the title twice on screen (and trip
+        // Playwright strict mode). This assertion is what caught exactly
+        // that during the Infoset redesign.
+        await expect(page.getByRole('heading', { name: 'Aday havuzu' })).toBeVisible();
 
         // No JS errors during the authenticated boot path.
         expect(errors, errors.join('\n')).toHaveLength(0);
@@ -77,9 +83,9 @@ test.describe('Authenticated shell', () => {
         // swap the page chunk in without a hard reload.
         await page.goto('/');
 
-        // Wait for the dashboard shell first so we don't race the lazy
+        // Wait for the dashboard body first so we don't race the lazy
         // Dashboard chunk against the click.
-        await expect(page.getByRole('heading', { name: 'Stratejik Genel Bakış' })).toBeVisible({
+        await expect(page.getByRole('heading', { name: 'Aday havuzu' })).toBeVisible({
             timeout: 15_000,
         });
 

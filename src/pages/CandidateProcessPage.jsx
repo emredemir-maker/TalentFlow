@@ -1,7 +1,7 @@
 // src/pages/CandidateProcessPage.jsx
 import { analysisScoreFor } from '../utils/positionScore';
 import { scoreForPositionDetail } from '../utils/candidateTable';
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
@@ -120,6 +120,33 @@ export default function CandidateProcessPage() {
     const [bulkToast, setBulkToast]             = useState(null);
     const [bulkTab, setBulkTab]                 = useState('files');
     const [bulkJsonText, setBulkJsonText]       = useState('');
+
+    /**
+     * Toplu yükleme modalını açar.
+     *
+     * Kontrol Paneli'ndeki "Toplu Yükleme" düğmesi de buraya bağlanıyor:
+     * o düğme yalnızca bu sayfaya yönlendirip modalı açmıyordu, yani
+     * üzerinde yazan işi yapmıyordu. `openBulkUpload` olayı oradan gelir.
+     */
+    const openBulkImport = useCallback(() => {
+        // Yalnizca bosta iken sifirla — aktif bir is takip edilirken
+        // sifirlamak, bulkImporting acikken takip verisini silip modali
+        // 0/0'da kilitliyordu.
+        if (!bulkImporting) {
+            setBulkFiles([]);
+            setBulkJobIds([]);
+            setBulkProgress({ total: 0, completed: 0, failed: 0, items: [] });
+            // Onceki partinin pozisyon secimi sessizce yeni partiye tasinmasin
+            setBulkPositionId('');
+        }
+        setBulkImportModal(true);
+    }, [bulkImporting]);
+
+    useEffect(() => {
+        const handler = () => openBulkImport();
+        window.addEventListener('openBulkUpload', handler);
+        return () => window.removeEventListener('openBulkUpload', handler);
+    }, [openBulkImport]);
 
     // Unified "Adaya Mesaj Gönder" modal (Geri Bildirim + Bilgi İste)
     const [feedbackModal, setFeedbackModal]         = useState(false);
@@ -1160,20 +1187,7 @@ export default function CandidateProcessPage() {
                 <div className="flex items-center gap-2">
                     <SystemScanner />
                     <button
-                        onClick={() => {
-                            // Yalnızca boşta iken sıfırla — aktif bir iş takip
-                            // edilirken sıfırlamak, bulkImporting açıkken takip
-                            // verisini silip modalı 0/0'da kilitliyordu.
-                            if (!bulkImporting) {
-                                setBulkFiles([]);
-                                setBulkJobIds([]);
-                                setBulkProgress({ total: 0, completed: 0, failed: 0, items: [] });
-                                // Önceki partinin pozisyon seçimi sessizce yeni
-                                // partiye taşınmasın
-                                setBulkPositionId('');
-                            }
-                            setBulkImportModal(true);
-                        }}
+                        onClick={openBulkImport}
                         className="bg-violet-500 hover:bg-violet-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-colors shadow-sm shadow-violet-200 flex items-center gap-1.5"
                     >
                         <Upload className="w-3.5 h-3.5" /> Toplu Yükleme
