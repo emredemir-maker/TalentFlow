@@ -9,6 +9,17 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5000,
     allowedHosts: true,
+    // Google ile giris signInWithPopup kullaniyor. Chrome'un varsayilan
+    // COOP davranisi altinda acan sayfa popup referansini kaybediyor;
+    // Firebase popup'i `window.closed` ile izleyemiyor, kapatamiyor ve
+    // signInWithPopup sozu hic sonuclanmiyor. Kimlik dogrulama arka planda
+    // BASARILI oluyor, yalnizca popup "sign in"de donuyor.
+    // `same-origin-allow-popups`, sayfanin kendi actigi popup'larla
+    // konusmasina izin verir — Firebase'in bu akis icin onerdigi deger.
+    // Yalnizca gelistirme sunucusu icin; uretim derlemesini etkilemez.
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:3001',
