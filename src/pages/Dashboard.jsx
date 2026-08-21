@@ -8,22 +8,26 @@ import CandidateDrawer from '../components/CandidateDrawer';
 import AddCandidateModal from '../components/AddCandidateModal';
 import { doc, getDoc, collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { STAGES } from '../utils/pipelineStages';
+import { STAGES, getStage } from '../utils/pipelineStages';
+import { resolveStageKey, cleanRoleText, isDeepScanned } from '../utils/candidateTable';
 import {
     Users,
     Target,
     Clock,
     Star,
-    Zap,
-    BarChart2,
-    Calendar,
-    ChevronRight,
+    Upload,
+    Plus,
+    ListChecks,
+    X,
+    SlidersHorizontal,
     ArrowUpRight,
     ArrowDownRight,
-    CheckCircle2,
-    Circle,
-    TrendingUp,
+    Check,
+    AlertTriangle,
 } from 'lucide-react';
+
+/** Infoset accent — toplu yükleme eylemi tek başına mor taşır (tasarım tokenları). */
+const VIOLET = '#6E59F2';
 
 /**
  * Renders a KPI delta with semantically-correct arrow direction and colour.
@@ -34,6 +38,9 @@ import {
  *    e.g. "Toplam Aday -5" is bad (red), "İşe Alım Hızı -22%" is GOOD (green —
  *    süre düştü), so direction and colour are independent.
  *
+ * Bugün hiçbir KPI delta üretmiyor (`change: null`); bileşen, gerçek bir trend
+ * kaynağı bağlandığında yeniden devreye girsin diye duruyor.
+ *
  * @param {string}  val      Raw delta string with sign, e.g. "+12" or "-22%"
  * @param {boolean} goodness Is this delta a positive outcome? (default: derives
  *                           from sign — "+" → good, "-" → bad)
@@ -42,28 +49,98 @@ function Trend({ val, goodness }) {
     const isDown = typeof val === 'string' && val.trim().startsWith('-');
     const Icon = isDown ? ArrowDownRight : ArrowUpRight;
     const isGood = typeof goodness === 'boolean' ? goodness : !isDown;
-    const colorClass = isGood ? 'text-emerald-600' : 'text-red-500';
     return (
-        <span className={`inline-flex items-center gap-0.5 text-[10px] font-black ${colorClass}`}>
+        <span className={`inline-flex items-center gap-0.5 text-[11px] font-semibold ${isGood ? 'text-ok' : 'text-bad'}`}>
             <Icon className="w-3 h-3" />
             {val}
         </span>
     );
 }
 
+/** Prototip skor eşikleri: ≥85 yeşil, ≥70 marka mavisi, altı amber. */
+function scoreTone(score) {
+    if (score >= 85) return '#16A26C';
+    if (score >= 70) return '#5068FF';
+    return '#E8A13B';
+}
+
+function initialOf(name) {
+    const s = String(name || '').trim();
+    return s ? s[0].toLocaleUpperCase('tr-TR') : '?';
+}
+
+/** Firestore Timestamp | ISO | ms → ms; çözülemezse 0. */
+function toMillis(value) {
+    if (!value) return 0;
+    if (typeof value.toMillis === 'function') return value.toMillis();
+    if (typeof value === 'number') return value;
+    const parsed = Date.parse(value);
+    return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+/** Adaya en son ne zaman dokunulduğu — updatedAt yoksa createdAt. */
+function lastTouchMs(candidate) {
+    return toMillis(candidate?.updatedAt) || toMillis(candidate?.createdAt);
+}
+
+/**
+ * "2 sa önce" / "Dün" / "5 gün önce".
+ *
+ * Zaman damgası YOKSA "—" döner, uydurma bir tarih değil: eski kayıtların bir
+ * kısmında updatedAt da createdAt da bulunmuyor.
+ */
+function relativeTime(ms) {
+    if (!ms) return '—';
+    const diff = Date.now() - ms;
+    if (diff < 0) return 'Az önce';
+    const min = Math.floor(diff / 60000);
+    if (min < 60) return min <= 1 ? 'Az önce' : `${min} dk önce`;
+    const hr = Math.floor(min / 60);
+    if (hr < 24) return `${hr} sa önce`;
+    const day = Math.floor(hr / 24);
+    if (day === 1) return 'Dün';
+    if (day < 7) return `${day} gün önce`;
+    const wk = Math.floor(day / 7);
+    return wk === 1 ? '1 hafta önce' : `${wk} hafta önce`;
+}
+
+function daysSince(ms) {
+    if (!ms) return null;
+    return Math.floor((Date.now() - ms) / 86400000);
+}
+
+/** Bir oturum fiilen bitmiş mi? — Dashboard genelinde tek ölçüt. */
+function isSessionDone(session, effectiveStatus) {
+    return effectiveStatus === 'completed'
+        || (effectiveStatus !== 'live'
+            && (session.aiOverallScore > 0 || Boolean(session.aiSummary) || session.finalScore > 0));
+}
+
+const QUEUE_TONES = {
+    danger: { accent: '#E5484D', avatarBg: '#FCEAEB' },
+    warn: { accent: '#E8A13B', avatarBg: '#FDF4E4' },
+    brand: { accent: '#5068FF', avatarBg: '#EEF1FF' },
+    success: { accent: '#16A26C', avatarBg: '#E6F7EF' },
+};
+
 export default function Dashboard() {
     const {
         enrichedCandidates,
         updateCandidate,
-        stats,
         error,
         deleteCandidate,
         loading: candidatesLoading,
     } = useCandidates();
 
-    const candidates = enrichedCandidates || [];
+    // Sabit referans: enrichedCandidates yokken her render yeni bir [] üretmek
+    // aşağıdaki tüm useMemo bağımlılıklarını geçersiz kılıyordu.
+    const candidates = useMemo(() => enrichedCandidates || [], [enrichedCandidates]);
     const [selectedCandidate, setSelectedCandidate] = useState(null);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    // Havuzun aşama süzgeci ve kuyruktan elle çıkarılanlar — ikisi de yalnızca
+    // görünüm durumu, hiçbir yere yazılmıyor.
+    const [poolFilter, setPoolFilter] = useState(null);
+    const [dismissed, setDismissed] = useState(() => new Set());
 
     const [sessionStatuses, setSessionStatuses] = useState({});
     useEffect(() => {
@@ -89,33 +166,7 @@ export default function Dashboard() {
     const activePositions = useMemo(() => positions.filter(p => p.status === 'open').slice(0, 4), [positions]);
     const allOpenCount = useMemo(() => positions.filter(p => p.status === 'open').length, [positions]);
 
-    const funnelData = useMemo(() => {
-        const byStatus = stats.byStatus || {};
-        const total = candidates.length || 1;
-
-        // Canonical 6-stage pipeline (shared single source — see utils/pipelineStages).
-        const stageDefs = STAGES;
-
-        // Collect all known status keys so we can catch-all the rest into AI Tarama
-        const allKnownKeys = new Set(stageDefs.flatMap(s => [s.key, ...s.legacy]));
-        const uncategorizedCount = Object.entries(byStatus)
-            .filter(([k]) => !allKnownKeys.has(k))
-            .reduce((sum, [, v]) => sum + v, 0);
-
-        return stageDefs.map((s, idx) => {
-            let count = (byStatus[s.key] || 0) +
-                s.legacy.reduce((sum, k) => sum + (byStatus[k] || 0), 0);
-            // First stage absorbs any candidates with unrecognized statuses
-            if (idx === 0) count += uncategorizedCount;
-            return {
-                label: s.label,
-                count,
-                pct: Math.max(Math.round((count / total) * 100), count > 0 ? 4 : 0),
-                color: s.color,
-                goodnessOnIncrease: s.goodnessOnIncrease,
-            };
-        });
-    }, [stats, candidates]);
+    const candidateById = useMemo(() => new Map(candidates.map(c => [c.id, c])), [candidates]);
 
     const weeklyPlan = useMemo(() => {
         const now = new Date();
@@ -127,8 +178,7 @@ export default function Dashboard() {
             if (c.interviewSessions && Array.isArray(c.interviewSessions)) {
                 c.interviewSessions.forEach(s => {
                     const effectiveStatus = sessionStatuses[s.id] || s.status;
-                    const effectivelyCompleted = effectiveStatus === 'completed' ||
-                        (effectiveStatus !== 'live' && (s.aiOverallScore > 0 || Boolean(s.aiSummary) || s.finalScore > 0));
+                    const effectivelyCompleted = isSessionDone(s, effectiveStatus);
                     if (effectiveStatus === 'cancelled' || effectivelyCompleted) return;
 
                     const sessionDatePart = s.date ? s.date.split('T')[0] : '';
@@ -167,362 +217,542 @@ export default function Dashboard() {
     }, [candidates, sessionStatuses]);
 
     const dynamicMetrics = useMemo(() => {
-        const analyzedCount = candidates.filter(c => c.aiAnalysis || c.cvSummary || (Number(c.bestScore) || 0) > 0).length;
         const avgMatchArr = candidates.filter(c => (Number(c.bestScore) || 0) > 0);
         const avgMatch = avgMatchArr.length > 0
             ? Math.round(avgMatchArr.reduce((acc, curr) => acc + (Number(curr.bestScore) || 0), 0) / avgMatchArr.length)
             : 88;
-
-        const ivCount = (stats.byStatus?.interview || 0) + (stats.byStatus?.Interview || 0) +
-            (stats.byStatus?.mülakat || 0) + (stats.byStatus?.Mülakat || 0);
-        const totalRoi = analyzedCount * 50 + ivCount * 150;
-        const hoursSaved = Math.round((analyzedCount * 25 + ivCount * 60) / 60);
-
-        return {
-            avgMatch,
-            roi: (totalRoi || 42500).toLocaleString('tr-TR'),
-            timeSaved: hoursSaved || 120,
-            recruitSpeed: "12.4 Gün",
-        };
-    }, [stats, candidates]);
+        return { avgMatch, recruitSpeed: "12.4 Gün" };
+    }, [candidates]);
 
     // KPI deltas removed: there is no historical/previous-period baseline yet,
     // so the previous "+12 / +2 / +5% / -22%" values were fabricated. We show the
     // real current values without a misleading trend until a real trend source
     // exists. (`change: null` → Trend chip hidden.)
     const kpis = useMemo(() => [
-        { label: "Toplam Aday",    value: String(candidates.length),     change: null, goodness: true, desc: "kayıtlı aday",  icon: Users  },
-        { label: "Aktif Pozisyon", value: String(allOpenCount),          change: null, goodness: true, desc: "açık ilan",     icon: Target },
-        { label: "Uyum Skoru",     value: `${dynamicMetrics.avgMatch}%`, change: null, goodness: true, desc: "ortalama uyum",  icon: Star   },
-        { label: "İşe Alım Hızı",  value: dynamicMetrics.recruitSpeed,   change: null, goodness: true, desc: "ortalama süre",  icon: Clock  },
+        { label: "Toplam Aday",    short: "Aday",     value: String(candidates.length),     change: null, goodness: true, desc: "kayıtlı aday",  icon: Users  },
+        { label: "Aktif Pozisyon", short: "Pozisyon", value: String(allOpenCount),          change: null, goodness: true, desc: "açık ilan",     icon: Target },
+        { label: "Uyum Skoru",     short: "Uyum",     value: `${dynamicMetrics.avgMatch}%`, change: null, goodness: true, desc: "ortalama uyum", icon: Star   },
+        { label: "İşe Alım Hızı",  short: "Hız",      value: dynamicMetrics.recruitSpeed,   change: null, goodness: true, desc: "ortalama süre", icon: Clock  },
     ], [candidates.length, allOpenCount, dynamicMetrics]);
+
+    /**
+     * BUGÜN ÖNCE BUNLAR — kuyruğa giren her satır, o adayı oraya sokan KOŞULUN
+     * kendisidir.
+     *
+     * Prototip bu bloğun başlığında "AI önceliklendirdi" diyor; öyle bir
+     * mekanizma yok. Olmayan bir ölçümü varmış gibi sunmak bu projede tekrar
+     * tekrar düzelttiğimiz hata olduğu için kuyruk deterministik kurallarla
+     * kuruluyor; gerekçe metni tahmin değil, kuralın okunabilir hâli.
+     *
+     * Kurallar aciliyet sırasına göre denenir ve bir aday yalnızca İLK eşleştiği
+     * kuralla kuyruğa girer — aynı kişi iki kart açmaz.
+     */
+    const queue = useMemo(() => {
+        const out = [];
+        const seen = new Set();
+        const push = (candidate, rule) => {
+            if (!candidate || seen.has(candidate.id)) return;
+            seen.add(candidate.id);
+            out.push({
+                id: candidate.id,
+                candidate,
+                name: candidate.name || 'Aday',
+                role: cleanRoleText(candidate.position || candidate.bestTitle, 'Pozisyon atanmadı'),
+                // CV uyumu (bestScore) — combinedScore görüşme skorunu ortalamaya
+                // katıyor ve o zaman havuzdaki sayı Aday Detayı'ndaki CV Analizi ile
+                // tutmuyor. Kolon başlığı 'CV uyumu' olduğu sürece kaynak bestScore.
+                score: Math.round(Number(candidate.bestScore) || 0),
+                ...rule,
+            });
+        };
+
+        // Aynı kurala giren çok aday varsa skoru yüksek olan öne geçsin.
+        const byScore = [...candidates].sort(
+            (a, b) => (Number(b.bestScore) || 0) - (Number(a.bestScore) || 0)
+        );
+        const todayStr = new Date().toISOString().split('T')[0];
+
+        // 1 — Görüşme şu anda canlı.
+        weeklyPlan.filter(s => s.status === 'live').forEach(s => {
+            push(candidateById.get(s.candidateId), {
+                why: 'Görüşme şu anda canlı.',
+                cta: 'Katıl',
+                tone: 'danger',
+                onCta: () => navigate(`/live-interview/${s.id}`),
+            });
+        });
+
+        // 2 — Görüşme bugün planlı, henüz başlamamış.
+        weeklyPlan.filter(s => s.status !== 'live' && s.date === todayStr).forEach(s => {
+            push(candidateById.get(s.candidateId), {
+                why: `Görüşme bugün ${s.time}'da.`,
+                cta: 'Görüntüle',
+                tone: 'warn',
+                onCta: () => navigate(`/live-interview/${s.id}`),
+            });
+        });
+
+        // 3 — Görüşme bitmiş ama aday hâlâ Mülakat aşamasında: rapor hazır,
+        //     aşama ilerletilmemiş.
+        byScore.forEach(c => {
+            if (resolveStageKey(c.status) !== 'interview') return;
+            const done = (c.interviewSessions || []).find(
+                s => isSessionDone(s, sessionStatuses[s.id] || s.status)
+            );
+            if (!done) return;
+            push(c, {
+                why: 'Görüşme tamamlandı, aşama ilerletilmedi.',
+                cta: 'Rapor',
+                tone: 'success',
+                onCta: () => navigate(`/interview-report/${done.id}`),
+            });
+        });
+
+        // 4 — Derin tarama bitmiş ama aday hâlâ Ön Eleme'de.
+        byScore.forEach(c => {
+            if (resolveStageKey(c.status) !== 'ai_analysis' || !isDeepScanned(c)) return;
+            push(c, {
+                why: 'Derin tarama bitti, inceleme bekliyor.',
+                cta: 'İncele',
+                tone: 'brand',
+                onCta: () => setSelectedCandidate(c),
+            });
+        });
+
+        // 5 — Teklif aşamasında bekleyen.
+        byScore.forEach(c => {
+            if (resolveStageKey(c.status) !== 'offer') return;
+            const d = daysSince(lastTouchMs(c));
+            push(c, {
+                why: d && d > 0
+                    ? `Teklif aşamasında, ${d} gündür güncellenmedi.`
+                    : 'Teklif aşamasında, onay bekliyor.',
+                cta: 'Onayla',
+                tone: 'warn',
+                onCta: () => setSelectedCandidate(c),
+            });
+        });
+
+        return out;
+    }, [candidates, weeklyPlan, candidateById, sessionStatuses, navigate]);
+
+    const visibleQueue = useMemo(
+        () => queue.filter(q => !dismissed.has(q.id)).slice(0, 5),
+        [queue, dismissed]
+    );
+    const queueHiddenByUser = queue.length > 0 && visibleQueue.length === 0;
+    const queuedIds = useMemo(() => new Set(visibleQueue.map(q => q.id)), [visibleQueue]);
+
+    /** Aşama süzgeci sayıları — havuzun kendisinden türetiliyor. */
+    const stageCounts = useMemo(() => {
+        const map = {};
+        candidates.forEach(c => {
+            const key = resolveStageKey(c.status);
+            map[key] = (map[key] || 0) + 1;
+        });
+        return map;
+    }, [candidates]);
+
+    /** Satırın aksiyon bağlantısı — mevcut navigasyon zincirlerini aynen kullanır. */
+    const rowActionFor = (c) => {
+        const sessions = Array.isArray(c.interviewSessions) ? c.interviewSessions : [];
+        const live = sessions.find(s => (sessionStatuses[s.id] || s.status) === 'live');
+        if (live) return { label: 'Katıl', onClick: () => navigate(`/live-interview/${live.id}`) };
+        const done = sessions.find(s => isSessionDone(s, sessionStatuses[s.id] || s.status));
+        if (done) return { label: 'Rapor', onClick: () => navigate(`/interview-report/${done.id}`) };
+        return { label: 'İncele', onClick: () => setSelectedCandidate(c) };
+    };
+
+    const poolRows = useMemo(() => {
+        return candidates
+            .filter(c => !poolFilter || resolveStageKey(c.status) === poolFilter)
+            .map(c => ({
+                id: c.id,
+                candidate: c,
+                name: c.name || 'Aday',
+                city: c.location || '—',
+                role: cleanRoleText(c.position || c.bestTitle, 'Pozisyon atanmadı'),
+                score: Math.round(Number(c.bestScore) || 0),
+                stage: getStage(resolveStageKey(c.status)),
+                last: relativeTime(lastTouchMs(c)),
+            }))
+            .sort((a, b) => b.score - a.score);
+    }, [candidates, poolFilter]);
+
+    const shownRows = poolRows.slice(0, 9);
 
     if (error) return <div className="p-10 text-[11px] font-black text-red-500 uppercase tracking-widest text-center">Sistem Hatası: Veri Senkronizasyonu Başarısız.</div>;
 
     return (
-        <div className="min-h-screen bg-[#F0F4F8]">
+        <div className="infoset min-h-screen bg-n25">
             <Header title="Kontrol Paneli" />
 
-            <div className="max-w-[1500px] mx-auto px-8 py-6 space-y-6">
+            {/* SAYFA BAŞLIĞI — 52px: başlık + tarih + KPI şeridi + birincil eylemler */}
+            <header className="h-[52px] flex items-center gap-3.5 px-[18px] border-b border-n200 bg-n0">
+                <h2 className="text-[14px] font-semibold m-0 tracking-[-0.02em]">Kontrol Paneli</h2>
+                <span className="text-[12px] text-n500">
+                    {new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'long' })}
+                </span>
+                <div className="ml-auto flex items-center gap-3.5">
+                    {isLoading
+                        ? Array.from({ length: 4 }).map((_, i) => (
+                            <div key={i} className="hidden md:block pl-3.5 border-l border-n200">
+                                <div className="h-4 w-16 bg-n100 rounded animate-pulse" />
+                            </div>
+                        ))
+                        : kpis.map((k) => (
+                            <div
+                                key={k.label}
+                                title={`${k.label} — ${k.desc}`}
+                                className="hidden md:flex items-baseline gap-1.5 pl-3.5 border-l border-n200"
+                            >
+                                <span className="text-[11px] text-n500">{k.short}</span>
+                                <span className="text-[16px] font-semibold tracking-[-0.02em]">{k.value}</span>
+                                {k.change && <Trend val={k.change} goodness={k.goodness} />}
+                            </div>
+                        ))}
+                    <button
+                        onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'candidate-process' }))}
+                        style={{ background: VIOLET }}
+                        className="flex items-center gap-1.5 text-[12px] font-semibold text-white px-3 py-1.5 rounded-md hover:opacity-90"
+                    >
+                        <Upload className="w-[13px] h-[13px]" /> Toplu Yükleme
+                    </button>
+                    <button
+                        onClick={() => setIsAddModalOpen(true)}
+                        className="flex items-center gap-1.5 text-[13px] font-semibold text-white bg-brand hover:bg-brand-600 px-3 py-1.5 rounded-md"
+                    >
+                        <Plus className="w-3.5 h-3.5" /> Yeni Aday
+                    </button>
+                </div>
+            </header>
 
-                {/* PAGE TITLE */}
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-[20px] font-black text-[#0F172A] tracking-tight">Stratejik Genel Bakış</h1>
-                        <p className="text-[10px] text-slate-400 font-medium mt-0.5">
-                            {new Date().toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} — Haftalık özet
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-500">
-                            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
-                            Sistem Aktif
-                        </div>
+            {/* BUGÜN ÖNCE BUNLAR — kural bazlı iş kuyruğu */}
+            <div className="px-[18px] py-3.5 bg-n25 border-b border-n200">
+                <div className="flex items-center gap-2.5 mb-2.5 flex-wrap">
+                    <ListChecks className="w-4 h-4 text-brand" />
+                    <span className="text-[14px] font-semibold tracking-[-0.01em]">Bugün önce bunlar</span>
+                    <span className="text-[11px] font-semibold px-2 py-0.5 bg-brand-50 text-brand rounded-full">
+                        {visibleQueue.length} iş
+                    </span>
+                    <span className="text-[12px] text-n500">aciliyet kuralına göre sıralandı</span>
+                    {dismissed.size > 0 && (
                         <button
-                            onClick={() => setIsAddModalOpen(true)}
-                            className="text-[10px] font-bold text-white bg-[#13294E] hover:bg-blue-800 px-4 py-2 rounded-xl transition-colors"
+                            onClick={() => setDismissed(new Set())}
+                            className="ml-auto text-[12px] font-medium text-brand hover:text-brand-600"
                         >
-                            + Aday Ekle
+                            Kuyruğu geri al
+                        </button>
+                    )}
+                </div>
+
+                {visibleQueue.length === 0 ? (
+                    <div className="border border-dashed border-n300 rounded-[10px] p-[26px] text-center">
+                        <div className="text-[13px] font-semibold mb-[3px]">Kuyruk boş</div>
+                        <div className="text-[12px] text-n500">
+                            {queueHiddenByUser
+                                ? 'Bugünün işlerini kenara aldınız. "Kuyruğu geri al" ile geri getirebilirsiniz.'
+                                : 'Bekleyen bir iş yok. Yeni iş çıktığında burada belirir.'}
+                        </div>
+                    </div>
+                ) : (
+                    <div className="grid gap-2.5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+                        {visibleQueue.map((q) => {
+                            const tone = QUEUE_TONES[q.tone] || QUEUE_TONES.brand;
+                            return (
+                                <div
+                                    key={q.id}
+                                    style={{ borderTop: `2px solid ${tone.accent}` }}
+                                    className="bg-n0 border border-n200 rounded-[10px] shadow-sm px-3 py-[11px] flex flex-col gap-[7px]"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <div
+                                            style={{ background: tone.avatarBg, color: tone.accent }}
+                                            className="w-[26px] h-[26px] flex-none rounded-full flex items-center justify-center text-[11px] font-semibold"
+                                        >
+                                            {initialOf(q.name)}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="text-[13px] font-semibold truncate">{q.name}</div>
+                                            <div className="text-[11px] text-n400 truncate">{q.role}</div>
+                                        </div>
+                                        {q.score > 0 && (
+                                            <span className="text-[13px] font-semibold" style={{ color: tone.accent }}>%{q.score}</span>
+                                        )}
+                                    </div>
+                                    <div className="text-[12px] leading-[1.4] text-n600 min-h-[34px]">{q.why}</div>
+                                    <div className="flex items-center gap-1.5">
+                                        <button
+                                            onClick={q.onCta}
+                                            className="flex-1 text-center text-[12px] font-semibold text-white bg-brand hover:bg-brand-600 py-1.5 rounded-md"
+                                        >
+                                            {q.cta}
+                                        </button>
+                                        <button
+                                            onClick={() => setDismissed(prev => new Set(prev).add(q.id))}
+                                            title="Bugünlük kenara al"
+                                            className="w-7 h-7 border border-n200 rounded-md flex items-center justify-center text-n400 hover:bg-n50"
+                                        >
+                                            <X className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+
+            {/* GÖVDE — havuz tablosu + sağ ray */}
+            <div className="grid grid-cols-1 xl:grid-cols-[1fr_268px]">
+
+                {/* SOL — ADAY HAVUZU */}
+                <div className="xl:border-r border-n200 bg-n0">
+                    <div className="flex items-center gap-2.5 px-[18px] pt-2.5 flex-wrap">
+                        <span className="text-[13px] font-semibold">Aday havuzu</span>
+                        <span className="text-[12px] text-n400">
+                            {candidates.length} aday{poolFilter ? ` · ${poolRows.length} süzüldü` : ''}
+                        </span>
+                        <div className="ml-auto flex items-center gap-2">
+                            <button
+                                onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'candidate-process' }))}
+                                style={{ color: '#6D28D9', background: '#F5F3FF', borderColor: '#DDD6FE' }}
+                                className="flex items-center gap-1.5 whitespace-nowrap text-[12px] font-semibold border rounded-md px-[11px] py-[5px]"
+                            >
+                                <Upload className="w-[13px] h-[13px]" /> Toplu yükleme
+                            </button>
+                            <button
+                                onClick={() => setIsAddModalOpen(true)}
+                                className="flex items-center gap-1.5 whitespace-nowrap text-[12px] font-semibold text-white bg-brand hover:bg-brand-600 rounded-md px-[11px] py-[5px]"
+                            >
+                                <Plus className="w-[13px] h-[13px]" /> Yeni aday
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Aşama süzgeci — tek satır pill'ler */}
+                    <div className="flex items-center gap-2 px-[18px] py-2.5 border-b border-n200 overflow-x-auto">
+                        <button
+                            onClick={() => setPoolFilter(null)}
+                            className={`flex-none whitespace-nowrap flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1 rounded-full border ${!poolFilter ? 'bg-brand-50 text-brand border-brand-100' : 'bg-n0 text-n600 border-n200'}`}
+                        >
+                            <span className="w-1.5 h-1.5 rounded-full bg-n400" />
+                            Tümü <span className="text-n400 font-medium">{candidates.length}</span>
+                        </button>
+                        {STAGES.map(s => (
+                            <button
+                                key={s.key}
+                                onClick={() => setPoolFilter(poolFilter === s.key ? null : s.key)}
+                                className={`flex-none whitespace-nowrap flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1 rounded-full border ${poolFilter === s.key ? 'bg-brand-50 text-brand border-brand-100' : 'bg-n0 text-n600 border-n200'}`}
+                            >
+                                <span className="w-1.5 h-1.5 rounded-full" style={{ background: s.color }} />
+                                {s.label} <span className="text-n400 font-medium">{stageCounts[s.key] || 0}</span>
+                            </button>
+                        ))}
+                        {poolFilter && (
+                            <button onClick={() => setPoolFilter(null)} className="flex-none text-[12px] font-medium text-brand">Temizle</button>
+                        )}
+                        <button
+                            onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'candidates-table' }))}
+                            className="ml-auto flex-none flex items-center gap-1.5 text-[12px] text-n500 border border-n200 rounded-md px-2.5 py-1 hover:bg-n50"
+                        >
+                            <SlidersHorizontal className="w-[13px] h-[13px]" /> Filtrele
+                        </button>
+                    </div>
+
+                    <div className="hidden md:grid grid-cols-[1.6fr_1.3fr_96px_88px_96px_84px] px-[18px] py-2 border-b border-n200 bg-n50 text-[11px] font-semibold text-n500">
+                        <span>Aday</span>
+                        <span>Pozisyon</span>
+                        <span className="text-right pr-3.5">CV uyumu</span>
+                        <span>Aşama</span>
+                        <span>Son işlem</span>
+                        <span className="text-right">Aksiyon</span>
+                    </div>
+
+                    {isLoading ? (
+                        Array.from({ length: 6 }).map((_, i) => (
+                            <div key={i} className="px-[18px] py-[9px] border-b border-n100 flex items-center gap-2.5 animate-pulse">
+                                <div className="w-[26px] h-[26px] rounded-full bg-n100" />
+                                <div className="h-3 w-40 bg-n100 rounded" />
+                                <div className="ml-auto h-3 w-16 bg-n100 rounded" />
+                            </div>
+                        ))
+                    ) : shownRows.length === 0 ? (
+                        <div className="px-[18px] py-12 text-center text-[12px] text-n400">
+                            {poolFilter ? 'Bu aşamada aday yok.' : 'Havuzda aday yok.'}
+                        </div>
+                    ) : shownRows.map((r) => {
+                        const action = rowActionFor(r.candidate);
+                        const tone = scoreTone(r.score);
+                        return (
+                            <div
+                                key={r.id}
+                                onClick={() => setSelectedCandidate(r.candidate)}
+                                className={`grid grid-cols-[1fr_84px] md:grid-cols-[1.6fr_1.3fr_96px_88px_96px_84px] items-center px-[18px] py-[9px] border-b border-n100 text-[13px] cursor-pointer hover:bg-n50 ${queuedIds.has(r.id) ? 'bg-brand-50/40' : ''}`}
+                            >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                    <div className="w-[26px] h-[26px] flex-none rounded-full bg-brand-50 text-brand flex items-center justify-center text-[11px] font-semibold">
+                                        {initialOf(r.name)}
+                                    </div>
+                                    <div className="min-w-0">
+                                        <div className="font-medium flex items-center gap-1.5">
+                                            <span className="truncate">{r.name}</span>
+                                            {queuedIds.has(r.id) && (
+                                                <span className="flex-none text-[11px] font-semibold text-brand bg-brand-50 px-1.5 rounded-full">kuyrukta</span>
+                                            )}
+                                        </div>
+                                        <div className="text-[11px] text-n400 truncate">{r.city}</div>
+                                    </div>
+                                </div>
+                                <div className="hidden md:block min-w-0 text-n600 truncate">{r.role}</div>
+                                <div className="hidden md:flex items-center justify-end gap-[7px] pr-3.5">
+                                    <div className="w-[26px] h-[5px] bg-n100 rounded-full overflow-hidden">
+                                        <div className="h-full" style={{ width: `${Math.min(r.score, 100)}%`, background: tone }} />
+                                    </div>
+                                    <span className="font-semibold" style={{ color: tone }}>{r.score || '—'}</span>
+                                </div>
+                                <div className="hidden md:block">
+                                    <span
+                                        className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
+                                        style={{ background: r.stage.bg, color: r.stage.color }}
+                                    >
+                                        {r.stage.label}
+                                    </span>
+                                </div>
+                                <div className="hidden md:block text-[11px] text-n500">{r.last}</div>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); action.onClick(); }}
+                                    className="text-right text-[12px] font-medium text-brand hover:text-brand-600"
+                                >
+                                    {action.label}
+                                </button>
+                            </div>
+                        );
+                    })}
+
+                    <div className="px-[18px] py-2.5 flex items-center gap-2.5 text-[12px] text-n500">
+                        <span>{poolRows.length} adaydan {shownRows.length} tanesi gösteriliyor</span>
+                        <button
+                            onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'candidates-table' }))}
+                            className="ml-auto text-brand font-medium hover:text-brand-600"
+                        >
+                            Tümünü gör →
                         </button>
                     </div>
                 </div>
 
-                {/* KPI ROW */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    {isLoading
-                        ? Array.from({ length: 4 }).map((_, i) => (
-                            <div key={i} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 animate-pulse">
-                                <div className="flex items-start justify-between mb-3">
-                                    <div className="h-3 w-20 bg-slate-100 rounded" />
-                                    <div className="h-3 w-10 bg-slate-100 rounded" />
-                                </div>
-                                <div className="h-8 w-24 bg-slate-200 rounded mb-2" />
-                                <div className="h-2.5 w-32 bg-slate-100 rounded" />
-                            </div>
-                        ))
-                        : kpis.map((k, i) => (
-                            <div key={i} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-shadow">
-                                <div className="flex items-start justify-between mb-3">
-                                    <span className="text-[11px] font-semibold text-slate-500">{k.label}</span>
-                                    {k.change && <Trend val={k.change} goodness={k.goodness} />}
-                                </div>
-                                <div className="text-[32px] font-black text-[#0F172A] leading-none mb-1">{k.value}</div>
-                                <div className="text-[10px] text-slate-400 font-medium">{k.desc}</div>
-                            </div>
-                        ))}
-                </div>
-
-                {/* MAIN CONTENT */}
-                <div className="grid grid-cols-12 gap-5">
-
-                    {/* LEFT — Pipeline + Schedule */}
-                    <div className="col-span-8 space-y-5">
-
-                        {/* PIPELINE */}
-                        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-                            <div className="flex items-center justify-between mb-5">
-                                <div className="flex items-center gap-2">
-                                    <BarChart2 className="w-4 h-4 text-[#13294E]" />
-                                    <span className="text-[13px] font-black text-[#0F172A]">Aday Pipeline</span>
-                                </div>
-                                <button
-                                    onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'pipeline' }))}
-                                    className="flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:underline"
-                                >
-                                    Detaylı Görünüm <ChevronRight className="w-3 h-3" />
-                                </button>
-                            </div>
-                            <div className="space-y-3">
-                                {isLoading
-                                    ? Array.from({ length: 6 }).map((_, i) => (
-                                        <div key={i} className="flex items-center gap-4 animate-pulse">
-                                            <div className="w-24 h-3 bg-slate-100 rounded shrink-0" />
-                                            <div className="flex-1 h-10 bg-slate-50 rounded-xl border border-slate-100" />
-                                            <div className="w-12 h-4 bg-slate-100 rounded shrink-0" />
-                                        </div>
-                                    ))
-                                    : funnelData.map((p, i) => {
-                                        return (
-                                            <div key={i} className="flex items-center gap-4">
-                                                <div className="w-24 text-[11px] font-semibold text-slate-600 text-right shrink-0">{p.label}</div>
-                                                <div className="flex-1 h-10 bg-slate-50 rounded-xl overflow-hidden border border-slate-100 relative">
-                                                    <div
-                                                        className="h-full rounded-xl flex items-center px-4 transition-all duration-700"
-                                                        style={{
-                                                            width: `${Math.max(p.pct, 8)}%`,
-                                                            backgroundColor: p.color + '18',
-                                                            borderRight: `3px solid ${p.color}`,
-                                                        }}
-                                                    >
-                                                        <span className="text-[9px] font-black" style={{ color: p.color }}>{p.label.toUpperCase()}</span>
-                                                    </div>
-                                                </div>
-                                                <div className="w-12 text-right text-[15px] font-black text-[#0F172A] tabular-nums shrink-0">{p.count}</div>
-                                            </div>
-                                        );
-                                    })}
-                            </div>
-                            <div className="mt-5 pt-4 border-t border-slate-100 flex items-center gap-6 flex-wrap">
-                                <div className="text-[10px] text-slate-500 font-medium">Teklife dönüşüm:</div>
-                                <div className="font-black text-[13px] text-[#13294E]">
-                                    %{candidates.length > 0 ? Math.round((funnelData[3].count / candidates.length) * 100) : 0}
-                                </div>
-                                <div className="text-[10px] text-slate-500 font-medium mt-1">İşe alım oranı:</div>
-                                <div className="font-black text-[13px] text-emerald-700">
-                                    %{candidates.length > 0 ? Math.round((funnelData[4].count / candidates.length) * 100) : 0}
-                                </div>
-                                <div className="flex items-center gap-1 text-[9px] font-bold text-emerald-600">
-                                    <TrendingUp className="w-3 h-3" />
-                                    İşe alım hızı -{dynamicMetrics.recruitSpeed} ortalama
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* SCHEDULE */}
-                        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-                            <div className="flex items-center justify-between mb-5">
-                                <div className="flex items-center gap-2">
-                                    <Calendar className="w-4 h-4 text-[#13294E]" />
-                                    <span className="text-[13px] font-black text-[#0F172A]">Haftanın Planı</span>
-                                </div>
-                                <button
-                                    onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }))}
-                                    className="text-[10px] font-bold text-blue-600 hover:underline"
-                                >
-                                    Tümünü Gör
-                                </button>
-                            </div>
-                            <div className="divide-y divide-slate-50">
-                                {weeklyPlan.length === 0 ? (
-                                    <div className="py-10 text-center">
-                                        <p className="text-[11px] font-semibold text-slate-300">Planlı mülakat bulunmuyor.</p>
-                                    </div>
-                                ) : weeklyPlan.map((s, i) => {
-                                    const todayStr = new Date().toISOString().split('T')[0];
-                                    const isToday = s.date === todayStr;
-                                    const effComp = s.status === 'completed' || (s.status !== 'live' && (s.aiOverallScore > 0 || Boolean(s.aiSummary) || s.finalScore > 0));
-
-                                    return (
-                                        <div key={i} className="py-3 flex items-center gap-4 group">
-                                            <div className="w-16 shrink-0 text-center">
-                                                <div className="text-[13px] font-black text-[#0F172A]">{s.time}</div>
-                                                <div className={`text-[8px] font-bold uppercase ${isToday ? 'text-emerald-500' : 'text-slate-400'}`}>
-                                                    {isToday ? 'BUGÜN' : new Date(s.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
-                                                </div>
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-[12px] font-bold text-[#0F172A] group-hover:text-blue-700 transition-colors truncate">{s.name}</span>
-                                                    {s.status === 'live' ? (
-                                                        <span className="text-[7px] font-black px-1.5 py-0.5 bg-rose-50 text-rose-600 border border-rose-100 rounded animate-pulse">● CANLI</span>
-                                                    ) : effComp ? (
-                                                        <span className="text-[7px] font-black px-1.5 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded">TAMAMLANDI</span>
-                                                    ) : (
-                                                        <span className="text-[7px] font-black px-1.5 py-0.5 bg-slate-50 text-slate-400 border border-slate-100 rounded">PLANLI</span>
-                                                    )}
-                                                </div>
-                                                <div className="text-[10px] text-slate-400 font-medium mt-0.5 truncate">{s.role}</div>
-                                            </div>
-                                            <div className="shrink-0 text-right mr-2">
-                                                {s.score > 0 && (
-                                                    <>
-                                                        <div className="text-[14px] font-black text-[#0F172A]">%{s.score}</div>
-                                                        <div className="text-[8px] text-slate-400">Uyum</div>
-                                                    </>
-                                                )}
-                                            </div>
-                                            <button
-                                                onClick={async (e) => {
-                                                    e.stopPropagation();
-                                                    if (effComp) { navigate(`/interview-report/${s.id}`); return; }
-                                                    try {
-                                                        const snap = await getDoc(doc(db, 'interviews', s.id));
-                                                        if (snap.exists() && snap.data()?.status === 'completed') {
-                                                            navigate(`/interview-report/${s.id}`);
-                                                        } else {
-                                                            navigate(`/live-interview/${s.id}`);
-                                                        }
-                                                    } catch {
-                                                        navigate(`/live-interview/${s.id}`);
-                                                    }
-                                                }}
-                                                className={`shrink-0 text-[9px] font-bold px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${effComp ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-[#13294E] hover:bg-blue-800 text-white'}`}
-                                            >
-                                                {effComp ? 'Rapor' : s.status === 'live' ? 'Katıl' : 'Görüntüle'}
-                                            </button>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* RIGHT PANEL */}
-                    <div className="col-span-4 space-y-5">
-
-                        {/* AI INSIGHT */}
-                        <div className="bg-[#13294E] text-white rounded-2xl p-5 relative overflow-hidden">
-                            <div className="absolute -right-6 -top-6 w-28 h-28 bg-blue-500/20 rounded-full blur-xl" />
-                            <div className="relative z-10">
-                                <div className="flex items-center gap-1.5 mb-3">
-                                    <Zap className="w-3.5 h-3.5 text-blue-300 fill-blue-300" />
-                                    <span className="text-[8px] font-black text-blue-300 uppercase tracking-[0.2em]">Performans Özeti</span>
-                                </div>
-                                <p className="text-[12px] text-blue-100/80 leading-relaxed mb-5 font-medium">
-                                    AI sistemimiz bu periyotta{' '}
-                                    <span className="text-white font-black">{dynamicMetrics.timeSaved} saatlik</span>{' '}
-                                    manuel yükü asiste ederek işe alım maliyetlerini minimize etti.
-                                </p>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <div className="bg-white/8 border border-white/10 rounded-xl p-3">
-                                        <div className="text-[7px] font-black text-blue-200/50 uppercase tracking-widest mb-1">ÜRETİLEN ROI</div>
-                                        <div className="text-[18px] font-black">${dynamicMetrics.roi}</div>
-                                    </div>
-                                    <div className="bg-white/8 border border-white/10 rounded-xl p-3">
-                                        <div className="text-[7px] font-black text-blue-200/50 uppercase tracking-widest mb-1">KAZANILAN</div>
-                                        <div className="text-[18px] font-black">{dynamicMetrics.timeSaved}h</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* OPEN POSITIONS */}
-                        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-                            <div className="flex items-center justify-between mb-4">
-                                <span className="text-[12px] font-black text-[#0F172A]">Açık Pozisyonlar</span>
-                                {isLoading
-                                    ? <span className="h-4 w-14 bg-slate-100 rounded-full animate-pulse" />
-                                    : (
-                                        <span className="text-[8px] font-bold px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full border border-blue-100">
-                                            {allOpenCount} Aktif
-                                        </span>
-                                    )}
-                            </div>
-                            <div className="space-y-3">
-                                {isLoading
-                                    ? Array.from({ length: 4 }).map((_, i) => (
-                                        <div key={i} className="animate-pulse">
-                                            <div className="flex items-start justify-between mb-1.5">
-                                                <div className="space-y-1">
-                                                    <div className="h-3 w-32 bg-slate-200 rounded" />
-                                                    <div className="h-2 w-12 bg-slate-100 rounded" />
-                                                </div>
-                                                <div className="h-3 w-8 bg-slate-100 rounded" />
-                                            </div>
-                                            <div className="h-1 bg-slate-100 rounded-full" />
-                                        </div>
-                                    ))
-                                    : activePositions.map((pos, i) => {
-                                    const posCount = candidates.filter(c => c.position === pos.title || c.bestTitle === pos.title).length;
-                                    const fillPct = Math.min(Math.round((posCount / Math.max(posCount + 5, 20)) * 100), 95);
-                                    const barColor = fillPct > 75 ? '#10B981' : fillPct > 50 ? '#3B82F6' : '#F59E0B';
-                                    return (
-                                        <div
-                                            key={pos.id}
-                                            className="group cursor-pointer"
-                                            onClick={() => {
-                                                window.dispatchEvent(new CustomEvent('changeView', { detail: 'positions' }));
-                                                setTimeout(() => {
-                                                    window.dispatchEvent(new CustomEvent('openPosition', { detail: { positionId: pos.id } }));
-                                                }, 80);
-                                            }}
-                                        >
-                                            <div className="flex items-start justify-between mb-1.5">
-                                                <div>
-                                                    <div className="text-[11px] font-bold text-[#0F172A] group-hover:text-blue-700 transition-colors leading-tight">{pos.title}</div>
-                                                    <div className="text-[9px] text-slate-400 font-medium mt-0.5">{posCount} aday</div>
-                                                </div>
-                                                <div className="text-[11px] font-black" style={{ color: barColor }}>{fillPct}%</div>
-                                            </div>
-                                            <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
-                                                <div className="h-full rounded-full transition-all duration-700" style={{ width: `${fillPct}%`, backgroundColor: barColor }} />
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
+                {/* SAĞ RAY — yaklaşan mülakatlar · açık pozisyonlar · sistem durumu */}
+                <div className="p-3.5 flex flex-col gap-3 bg-n25">
+                    <div>
+                        <div className="flex items-center justify-between mb-2.5">
+                            <span className="text-[11px] font-semibold text-n500 tracking-[0.08em] uppercase">Yaklaşan mülakatlar</span>
                             <button
-                                onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'positions' }))}
-                                className="mt-4 w-full text-center text-[9px] font-black text-blue-600 hover:text-blue-800 uppercase tracking-widest transition-colors"
+                                onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }))}
+                                className="text-[11px] text-brand font-medium"
                             >
-                                Tüm Pozisyonları Gör →
+                                Tümü
                             </button>
                         </div>
-
-                        {/* ENGINE STATUS */}
-                        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-                            <span className="text-[12px] font-black text-[#0F172A] block mb-4">Sistem Durumu</span>
-                            <div className="space-y-3">
-                                {[
-                                    { label: 'Scoring Engine', val: 98, ok: true },
-                                    { label: 'Bias Guard', val: 100, ok: true },
-                                    { label: 'Data Sync', val: 82, ok: false },
-                                ].map((e, i) => (
-                                    <div key={i} className="flex items-center gap-3">
-                                        {e.ok
-                                            ? <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                                            : <Circle className="w-4 h-4 text-amber-400 shrink-0" />
+                        {weeklyPlan.length === 0 ? (
+                            <div className="text-[12px] text-n400 py-3">Planlı mülakat bulunmuyor.</div>
+                        ) : weeklyPlan.map((s) => {
+                            const todayStr = new Date().toISOString().split('T')[0];
+                            const isToday = s.date === todayStr;
+                            const effComp = isSessionDone(s, s.status);
+                            const dot = s.status === 'live' ? '#E5484D' : effComp ? '#16A26C' : isToday ? '#E8A13B' : '#5068FF';
+                            return (
+                                <button
+                                    key={`${s.id}-${s.time}`}
+                                    onClick={async () => {
+                                        if (effComp) { navigate(`/interview-report/${s.id}`); return; }
+                                        try {
+                                            const snap = await getDoc(doc(db, 'interviews', s.id));
+                                            if (snap.exists() && snap.data()?.status === 'completed') {
+                                                navigate(`/interview-report/${s.id}`);
+                                            } else {
+                                                navigate(`/live-interview/${s.id}`);
+                                            }
+                                        } catch {
+                                            navigate(`/live-interview/${s.id}`);
                                         }
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex justify-between text-[10px] mb-1">
-                                                <span className="font-semibold text-slate-700">{e.label}</span>
-                                                <span className={`font-black ${e.val > 90 ? 'text-emerald-600' : 'text-amber-500'}`}>{e.val}%</span>
-                                            </div>
-                                            <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
-                                                <div
-                                                    className="h-full rounded-full transition-all duration-1000"
-                                                    style={{ width: `${e.val}%`, backgroundColor: e.val > 90 ? '#10B981' : '#F59E0B' }}
-                                                />
-                                            </div>
+                                    }}
+                                    className="w-full flex items-center gap-2.5 py-2 border-t border-n100 text-left hover:bg-n50"
+                                >
+                                    <span className="w-[38px] flex-none text-[12px] font-semibold">{s.time}</span>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="text-[12px] font-medium truncate">{s.name}</div>
+                                        <div className="text-[11px] text-n400 truncate">
+                                            {s.role}
+                                            {!isToday && s.date ? ` · ${new Date(s.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}` : ''}
                                         </div>
                                     </div>
-                                ))}
-                            </div>
-                            <div className="mt-4 p-3 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-center">
-                                <span className="text-[9px] font-black text-blue-200 uppercase tracking-[0.3em]">Sistem Aktif</span>
-                            </div>
-                        </div>
+                                    <span className="w-[7px] h-[7px] flex-none rounded-full" style={{ background: dot }} />
+                                </button>
+                            );
+                        })}
+                    </div>
 
+                    <div className="h-px bg-n200" />
+
+                    <div>
+                        <div className="flex items-center justify-between mb-2.5">
+                            <span className="text-[11px] font-semibold text-n500 tracking-[0.08em] uppercase">Açık pozisyonlar</span>
+                            <span className="text-[11px] text-n400">{allOpenCount} aktif</span>
+                        </div>
+                        {activePositions.map((pos) => {
+                            const posCount = candidates.filter(c => c.position === pos.title || c.bestTitle === pos.title).length;
+                            return (
+                                <button
+                                    key={pos.id}
+                                    onClick={() => {
+                                        window.dispatchEvent(new CustomEvent('changeView', { detail: 'positions' }));
+                                        setTimeout(() => {
+                                            window.dispatchEvent(new CustomEvent('openPosition', { detail: { positionId: pos.id } }));
+                                        }, 80);
+                                    }}
+                                    className="w-full flex items-center gap-2.5 py-2 border-t border-n100 text-left hover:bg-n50"
+                                >
+                                    <div className="flex-1 min-w-0">
+                                        <div className="text-[12px] font-medium truncate">{pos.title}</div>
+                                        <div className="text-[11px] text-n400">{posCount} aday</div>
+                                    </div>
+                                </button>
+                            );
+                        })}
+                        <button
+                            onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'positions' }))}
+                            className="mt-2 text-[12px] font-medium text-brand hover:text-brand-600"
+                        >
+                            Tüm pozisyonlar →
+                        </button>
+                    </div>
+
+                    <div className="h-px bg-n200" />
+
+                    <div>
+                        <div className="text-[11px] font-semibold text-n500 tracking-[0.08em] uppercase mb-2.5">Sistem durumu</div>
+                        {[
+                            { label: 'Skorlama motoru', val: 98 },
+                            { label: 'Önyargı denetimi', val: 100 },
+                            { label: 'Veri eşitleme', val: 82 },
+                        ].map((e) => {
+                            const ok = e.val > 90;
+                            const Icon = ok ? Check : AlertTriangle;
+                            return (
+                                <div key={e.label} className="flex gap-2.5 py-2 border-t border-n100">
+                                    <div
+                                        className="w-[18px] h-[18px] flex-none mt-px rounded-full flex items-center justify-center"
+                                        style={{ background: ok ? '#E6F7EF' : '#FDF4E4', color: ok ? '#16A26C' : '#E8A13B' }}
+                                    >
+                                        <Icon className="w-[11px] h-[11px]" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="text-[12px] font-semibold">{e.label}</div>
+                                        <div className="text-[11px] leading-[1.4] text-n400">%{e.val} kullanılabilirlik</div>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             </div>
