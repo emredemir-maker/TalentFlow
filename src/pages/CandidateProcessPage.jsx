@@ -148,6 +148,15 @@ export default function CandidateProcessPage() {
         return () => window.removeEventListener('openBulkUpload', handler);
     }, [openBulkImport]);
 
+    // Pipeline basligindaki "Aday ekle" duğmesi de bu sayfaya yonlendirip
+    // modali actiriyor — yonlendirip birakmak, duğmenin uzerinde yazan isi
+    // yapmamasi olurdu.
+    useEffect(() => {
+        const handler = () => setIsAddModalOpen(true);
+        window.addEventListener('openAddCandidate', handler);
+        return () => window.removeEventListener('openAddCandidate', handler);
+    }, []);
+
     // Unified "Adaya Mesaj Gönder" modal (Geri Bildirim + Bilgi İste)
     const [feedbackModal, setFeedbackModal]         = useState(false);
     const [msgTab, setMsgTab]                       = useState('feedback'); // 'feedback' | 'info'
