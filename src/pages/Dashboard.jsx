@@ -401,10 +401,12 @@ export default function Dashboard() {
         <div className="infoset min-h-screen bg-n25">
             <Header title="Kontrol Paneli" />
 
-            {/* SAYFA BAŞLIĞI — 52px: başlık + tarih + KPI şeridi + birincil eylemler */}
+            {/* SAYFA BAŞLIĞI — 52px: tarih + KPI şeridi + birincil eylemler.
+                Ekran adı burada TEKRARLANMIYOR: Header zaten <h2>Kontrol
+                Paneli</h2> basıyor ve ikisi birlikte başlığı ekranda iki kez
+                gösteriyordu. */}
             <header className="h-[52px] flex items-center gap-3.5 px-[18px] border-b border-n200 bg-n0">
-                <h2 className="text-[14px] font-semibold m-0 tracking-[-0.02em]">Kontrol Paneli</h2>
-                <span className="text-[12px] text-n500">
+                <span className="text-[13px] font-medium text-n700">
                     {new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'long' })}
                 </span>
                 <div className="ml-auto flex items-center gap-3.5">
@@ -445,7 +447,7 @@ export default function Dashboard() {
             <div className="px-[18px] py-3.5 bg-n25 border-b border-n200">
                 <div className="flex items-center gap-2.5 mb-2.5 flex-wrap">
                     <ListChecks className="w-4 h-4 text-brand" />
-                    <span className="text-[14px] font-semibold tracking-[-0.01em]">Bugün önce bunlar</span>
+                    <h2 className="m-0 text-[14px] font-semibold tracking-[-0.01em]">Bugün önce bunlar</h2>
                     <span className="text-[11px] font-semibold px-2 py-0.5 bg-brand-50 text-brand rounded-full">
                         {visibleQueue.length} iş
                     </span>
@@ -523,7 +525,7 @@ export default function Dashboard() {
                 {/* SOL — ADAY HAVUZU */}
                 <div className="xl:border-r border-n200 bg-n0">
                     <div className="flex items-center gap-2.5 px-[18px] pt-2.5 flex-wrap">
-                        <span className="text-[13px] font-semibold">Aday havuzu</span>
+                        <h2 className="m-0 text-[13px] font-semibold">Aday havuzu</h2>
                         <span className="text-[12px] text-n400">
                             {candidates.length} aday{poolFilter ? ` · ${poolRows.length} süzüldü` : ''}
                         </span>

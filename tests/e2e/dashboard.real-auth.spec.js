@@ -46,9 +46,11 @@ test.describe('Real-auth login + dashboard', () => {
         await page.getByRole('button', { name: 'Sisteme Giriş Yap' }).click();
 
         // After successful auth, AuthContext sets user + profile and
-        // App.jsx flips to AuthenticatedApp. The Dashboard's body
-        // heading is the canonical "we mounted post-auth" signal.
-        await expect(page.getByRole('heading', { name: 'Stratejik Genel Bakış' })).toBeVisible({
+        // App.jsx flips to AuthenticatedApp. The Dashboard's body heading
+        // ("Aday havuzu", the pool table) is the canonical "we mounted
+        // post-auth" signal — the top-bar title alone isn't, because it
+        // renders before the lazy page chunk resolves.
+        await expect(page.getByRole('heading', { name: 'Aday havuzu' })).toBeVisible({
             timeout: 20_000,
         });
 
@@ -67,14 +69,14 @@ test.describe('Real-auth login + dashboard', () => {
         await page.locator('input[type="email"]').first().fill(TEST_USER.email);
         await page.locator('input[type="password"]').first().fill(TEST_USER.password);
         await page.getByRole('button', { name: 'Sisteme Giriş Yap' }).click();
-        await expect(page.getByRole('heading', { name: 'Stratejik Genel Bakış' })).toBeVisible({
+        await expect(page.getByRole('heading', { name: 'Aday havuzu' })).toBeVisible({
             timeout: 20_000,
         });
 
         await page.reload();
 
-        // Same dashboard heading should appear again, no bounce to login.
-        await expect(page.getByRole('heading', { name: 'Stratejik Genel Bakış' })).toBeVisible({
+        // Same dashboard body heading should appear again, no bounce to login.
+        await expect(page.getByRole('heading', { name: 'Aday havuzu' })).toBeVisible({
             timeout: 20_000,
         });
         // And the LoginPage heading should NOT be visible
