@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800;900&family=Poppins:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
 /* Dark variant is driven by an explicit [data-theme="dark"] ancestor, NOT the
@@ -36,6 +36,49 @@
   --color-bg-primary: #F8FAFC;
   --color-bg-secondary: #F1F5F9;
   --color-border-subtle: #E2E8F0;
+
+  /* ════════ INFOSET DESIGN SYSTEM ════════
+     Kaynak: design_handoff_talentflow/_ds/…/colors_and_type.css
+
+     HEPSİ YENİ AD. Mevcut tokenların hiçbiri ezilmedi — ezseydik henüz
+     dönüştürülmemiş ekranlar da bir anda değişir ve "ekran ekran doğrula"
+     kuralı işlemez hâle gelirdi. */
+  --color-brand: #5068FF;
+  --color-brand-600: #3E55E6;
+  --color-brand-700: #2E42C2;
+  --color-brand-50: #EEF1FF;
+  --color-brand-100: #DCE2FF;
+  --color-brand-200: #BAC5FF;
+
+  --color-ink: #0E1330;
+  --color-n0: #FFFFFF;
+  --color-n25: #FBFBFD;
+  --color-n50: #F6F7FB;
+  --color-n100: #EEF0F6;
+  --color-n200: #E2E5EE;
+  --color-n300: #CBD0DC;
+  --color-n400: #9AA1B4;
+  --color-n500: #6B7384;
+  --color-n600: #4A5163;
+  --color-n700: #323849;
+  --color-n800: #1D2233;
+  --color-n900: #0E1122;
+
+  --color-ok: #16A26C;
+  --color-ok-bg: #E6F7EF;
+  --color-warn: #E8A13B;
+  --color-warn-bg: #FDF4E4;
+  --color-bad: #E5484D;
+  --color-bad-bg: #FCEAEB;
+  --color-info2: #3E8AEA;
+  --color-info2-bg: #E8F1FD;
+
+  /* Kart yarıçapı ayrı adla: --radius-lg'yi ezmek tüm uygulamadaki
+     rounded-lg kullanımını değiştirirdi. */
+  --radius-card: 14px;
+
+  --font-infoset: 'Poppins', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-dense: 'Inter', 'Poppins', -apple-system, sans-serif;
 }
 
 /* ==================== THE COGNITIVE ARCHITECT - DESIGN SYSTEM ==================== */
@@ -152,4 +195,34 @@ h1, h2, h3, h4 {
 
 .animate-shimmer {
   animation: shimmer 2s infinite;
-}
+}
+
+/* ════════ INFOSET KAPSAMI ════════
+   Yeni tasarım dili GLOBAL DEĞİL, kapsamlı uygulanıyor: yalnızca `.infoset`
+   taşıyan ağaç Poppins ve Infoset zeminini alır.
+   Sebep: ekranlar tek tek dönüştürülüp tek tek doğrulanıyor. body'ye
+   uygulasaydık henüz dokunulmamış ekranlar da değişir, "bu ekran bozuldu mu"
+   sorusu cevaplanamaz hâle gelirdi. Tüm ekranlar bittiğinde kapsam body'ye
+   taşınabilir. */
+.infoset {
+  font-family: var(--font-infoset);
+  background: var(--color-n25);
+  color: var(--color-n900);
+  letter-spacing: 0;
+}
+.infoset h1, .infoset h2, .infoset h3, .infoset h4 {
+  font-family: var(--font-infoset);
+  color: var(--color-n900);
+  letter-spacing: -0.01em;
+}
+/* Yoğun tablolarda Inter — okunurluk için tasarım kararı. */
+.infoset-dense { font-family: var(--font-dense); }
+
+/* Geçişler: 120-200ms, bounce yok. */
+.infoset [data-clickable],
+.infoset button,
+.infoset a {
+  transition: background-color 120ms cubic-bezier(.2,.7,.2,1),
+              border-color 120ms cubic-bezier(.2,.7,.2,1),
+              color 120ms cubic-bezier(.2,.7,.2,1);
+}
