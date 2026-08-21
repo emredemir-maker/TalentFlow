@@ -1,10 +1,9 @@
 // src/pages/Dashboard.jsx
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
 import Header from '../components/Header';
-import CandidateDrawer from '../components/CandidateDrawer';
 import AddCandidateModal from '../components/AddCandidateModal';
 import { doc, getDoc, collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -132,13 +131,11 @@ const QUEUE_TONES = {
 export default function Dashboard() {
     const {
         enrichedCandidates,
-        updateCandidate,
+        setViewCandidateId,
         error,
-        deleteCandidate,
         loading: candidatesLoading,
     } = useCandidates();
 
-    const [selectedCandidate, setSelectedCandidate] = useState(null);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     // Havuzun aşama süzgeci ve kuyruktan elle çıkarılanlar — ikisi de yalnızca
     // görünüm durumu, hiçbir yere yazılmıyor.
@@ -161,6 +158,20 @@ export default function Dashboard() {
 
     const { positions, loading: positionsLoading } = usePositions();
     const navigate = useNavigate();
+
+    /**
+     * Adayı GERÇEK detay sayfasında açar.
+     *
+     * Burası önce CandidateDrawer'ı açıyordu. O çekmece redesign öncesinde bu
+     * ekranda hiç açılmıyordu (state vardı, hiçbir yer set etmiyordu) — havuz
+     * tablosunu yazarken farkında olmadan kullanımdan kalkmış bir bileşeni
+     * yeniden devreye sokmuşum. Kullanılan ekran Aday Süreci sayfası;
+     * PipelinePage de aynı zinciri kullanıyor.
+     */
+    const openCandidate = useCallback((id) => {
+        setViewCandidateId(id);
+        window.dispatchEvent(new CustomEvent('changeView', { detail: 'candidate-process' }));
+    }, [setViewCandidateId]);
 
     // Combined loading state — true while either context is doing its initial fetch.
     // Drives the skeleton placeholders below so KPIs don't flash 0 → real value.
@@ -338,7 +349,7 @@ export default function Dashboard() {
                 why: 'Derin tarama bitti, inceleme bekliyor.',
                 cta: 'İncele',
                 tone: 'brand',
-                onCta: () => setSelectedCandidate(c),
+                onCta: () => openCandidate(c.id),
             });
         });
 
@@ -352,12 +363,12 @@ export default function Dashboard() {
                     : 'Teklif aşamasında, onay bekliyor.',
                 cta: 'Onayla',
                 tone: 'warn',
-                onCta: () => setSelectedCandidate(c),
+                onCta: () => openCandidate(c.id),
             });
         });
 
         return out;
-    }, [candidates, weeklyPlan, candidateById, sessionStatuses, navigate]);
+    }, [candidates, weeklyPlan, candidateById, sessionStatuses, navigate, openCandidate]);
 
     const visibleQueue = useMemo(
         () => queue.filter(q => !dismissed.has(q.id)).slice(0, 5),
@@ -397,7 +408,7 @@ export default function Dashboard() {
         if (live) return { label: 'Katıl', onClick: () => navigate(`/live-interview/${live.id}`) };
         const done = sessions.find(s => isSessionDone(s, sessionStatuses[s.id] || s.status));
         if (done) return { label: 'Rapor', onClick: () => navigate(`/interview-report/${done.id}`) };
-        return { label: 'İncele', onClick: () => setSelectedCandidate(c) };
+        return { label: 'İncele', onClick: () => openCandidate(c.id) };
     };
 
     const poolRows = useMemo(() => {
@@ -626,7 +637,7 @@ export default function Dashboard() {
                         return (
                             <div
                                 key={r.id}
-                                onClick={() => setSelectedCandidate(r.candidate)}
+                                onClick={() => openCandidate(r.id)}
                                 className={`grid grid-cols-[1fr_84px] md:grid-cols-[1.6fr_1.3fr_96px_88px_96px_84px] items-center px-[18px] py-[9px] border-b border-n100 text-[13px] cursor-pointer hover:bg-n50 ${queuedIds.has(r.id) ? 'bg-brand-50/40' : ''}`}
                             >
                                 <div className="flex items-center gap-2.5 min-w-0">
@@ -796,15 +807,6 @@ export default function Dashboard() {
                 </div>
             </div>
 
-            {selectedCandidate && (
-                <CandidateDrawer
-                    candidate={selectedCandidate}
-                    onClose={() => setSelectedCandidate(null)}
-                    onUpdate={updateCandidate}
-                    onDelete={deleteCandidate}
-                    positions={positions}
-                />
-            )}
             <AddCandidateModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
         </div>
     );

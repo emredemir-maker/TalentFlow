@@ -1,7 +1,6 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
-import CandidateDrawer from '../components/CandidateDrawer';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import {
@@ -174,9 +173,6 @@ export default function PipelinePage() {
     // Seçili aday sağ rayı besliyor. Kart tıklaması artık sayfadan ayrılmıyor;
     // eski davranış (aday detayına git) rayda "Aday detayını aç" olarak duruyor.
     const [selectedId, setSelectedId] = useState(null);
-    // Süreçten çıkarma tek bir yerden yürüyor: çekmecedeki red akışı sebebi de
-    // kaydediyor. Buraya sebepsiz ikinci bir red yolu koymak veriyi eksiltirdi.
-    const [drawerCandidate, setDrawerCandidate] = useState(null);
 
     // Live session statuses from root `interviews` collection
     const [sessionStatuses, setSessionStatuses] = useState({});
@@ -379,8 +375,13 @@ export default function PipelinePage() {
                                     >
                                         Aday detayını aç
                                     </button>
+                                    {/* Red akışı ve red SEBEBİ Aday Süreci
+                                        sayfasında yaşıyor; buraya sebepsiz
+                                        ikinci bir red yolu koymak veriyi
+                                        eksiltirdi. Prototipin ayrı "Red
+                                        Modalı"sı modal çalışmasıyla gelecek. */}
                                     <button
-                                        onClick={() => setDrawerCandidate(selected)}
+                                        onClick={() => openCandidateDetail(selected.id)}
                                         className="text-center text-[12px] font-semibold text-bad py-1.5 hover:underline"
                                     >
                                         Süreçten çıkar
@@ -493,12 +494,6 @@ export default function PipelinePage() {
                 </div>
             )}
 
-            {drawerCandidate && (
-                <CandidateDrawer
-                    candidate={drawerCandidate}
-                    onClose={() => setDrawerCandidate(null)}
-                />
-            )}
         </div>
     );
 }
