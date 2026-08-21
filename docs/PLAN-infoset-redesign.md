@@ -46,14 +46,19 @@ Hepsi `Incomplete mockup request/design_handoff_talentflow/` altında:
 | 1 | Kontrol Paneli | `Dashboard.jsx` | ✅ merged (#194) |
 | 2 | Pipeline | `PipelinePage.jsx` | ✅ merged (#197) |
 | 3 | AI Match | `AIMatchPage.jsx` | ⛔ **atlandı** (aşağıda) |
-| 4 | Mülakat Listesi + Planlama | `InterviewManagementPage.jsx` | ⬜ **sıradaki** |
-| 5 | Canlı Mülakat | `LiveInterviewPage.jsx`, `AgentThoughtPanel.jsx` | ⬜ |
+| 4 | Mülakat Listesi + Planlama | `InterviewManagementPage.jsx` | 🟡 **PR #199 açık** |
+| 5 | Canlı Mülakat | `LiveInterviewPage.jsx`, `AgentThoughtPanel.jsx` | ⬜ **sıradaki** |
 | 6 | Rapor | `InterviewReportPage.jsx`, `InterviewReportSections.jsx`, `StarScoreCard.jsx` | ⬜ |
 | 7 | İK Asistanı | `HrAssistantPanel.jsx` | ⬜ |
 | 8 | Aday Detayı | `CandidateProcessPage.jsx`, `CandidateCvPanel.jsx` | ⬜ |
 
-Ek olarak merged: #196 (yerel giriş COOP düzeltmesi).
-**Açık PR: #198** — havuz skor tutarlılığı + aday tıklaması doğru sayfaya.
+Ek olarak merged: #196 (yerel giriş COOP düzeltmesi), #198 (havuz skor
+tutarlılığı + aday tıklaması doğru sayfaya).
+**Açık PR: #199** — Ekran 4.
+
+> ⚠️ Bu belge #198 merge edildikten SONRA o dala işlendiği için `main`'e
+> hiç girmemişti; buraya cherry-pick ile taşındı. Belge güncellemeleri
+> ekran PR'ından ayrı ve kendi PR'ında gitmeli.
 
 Merge sonrası silinebilecek dallar: `redesign/01-kontrol-paneli`,
 `redesign/02-pipeline`, `redesign/02-pipeline-main`.
@@ -121,12 +126,12 @@ olmaz, veri kesin.
 | Karar | Durum |
 |---|---|
 | Funnel chart kaldırıldı | ✅ Ekran 1 |
-| Mülakat takvimi düz listeye | ✅ Ekran 1 · ⬜ Ekran 4 |
+| Mülakat takvimi düz listeye | ✅ Ekran 1 · ✅ Ekran 4 |
 | Toplu Yükleme / Yeni Aday Kontrol Paneli'ne + havuz başlığına | ✅ Ekran 1 |
-| Mülakat oluşturma menüsü (Adımlı/Hızlı/Manuel/Maaş) | ✅ **zaten vardı** (`InterviewManagementPage.jsx:2106`) |
-| Menüde "Maaş Aralığı Tanımla" | ⬜ **eksik** — Ekran 4 |
-| Manuel mülakatlarda "transkript yok" uyarısı | ⬜ Ekran 4 |
-| Maaş modalı kendi pozisyon state'ini kullanır | ⬜ Ekran 4 |
+| Mülakat oluşturma menüsü (Adımlı/Hızlı/Manuel/Maaş) | ✅ **zaten vardı** |
+| Menüde "Maaş Aralığı Tanımla" | ✅ Ekran 4 (#199) |
+| Manuel mülakatlarda "transkript yok" uyarısı | ✅ Ekran 4 (#199) |
+| Maaş modalı kendi pozisyon state'ini kullanır | ✅ Ekran 4 (#199) |
 | Aday Detayı 7 sekme + zorunlu kapısı + skor kırılımı + alt aksiyon çubuğu | ⬜ Ekran 8 |
 | Toolbar tek satır 28px pill | ⬜ Ekran 8 |
 | STAR ölçeği her yerde 0–3 | ⬜ Ekran 5/6 |
@@ -168,28 +173,53 @@ cetvelle hesaplanmış, yanlış şemaya yazılmış sonuçlarla ezer.
 `agenticWorkflow.js` de aynı `DEAD_FILES` listesinde ve o da
 `analyzeCandidateMatch` çağırıyor.
 
-## Ekran 4 planı (sıradaki)
+## Ekran 4 — ne yapıldı (#199)
 
-`src/pages/InterviewManagementPage.jsx` — **2894 satır, 63 hook.** Tek
-oturumda yeniden yazılmaz; tek PR içinde üç parça hâlinde ilerlenmeli.
+`InterviewManagementPage.jsx` + yeni `src/components/SalaryBandModal.jsx`.
 
-| Parça | Kapsam |
+| Parça | Sonuç |
 |---|---|
-| **A. Liste** | Takvim görünümü → prototipin 7 kolonlu tablosu: Aday, Pozisyon, Tür, Tarih & saat, Değerlendirici, Durum, Aksiyon (prototip 864–940). Üstte sekme pill'leri, altta sayfalama satırı |
-| **B. Sağ ray (280px)** | "Bugün" düz listesi (saat, ad, rol, rozet) + ayraç + "Değerlendirici yükü" (ad + sayı) |
-| **C. Maaş Aralığı Tanımla** | "Yeni Mülakat" menüsüne 6. madde. **Kendi pozisyon seçicisi** olacak (README: "CV yükleme akışıyla çakışmaz"). Bant tanımı bugün `PositionsPage.jsx`'te, pozisyonun özelliği olarak duruyor; mantık `src/utils/salaryBand.js` (`normalizeBand`, `formatBand`, `BASES`, `PERIODS`) |
+| **A. Liste** | Ay takvimi ve seçili gün kartları kalktı, yerine 7 kolonlu tablo. Sekmeler Tümü/Yaklaşan/Tamamlanan/İptal. Arama gerçekten süzüyor (eskiden `value`/`onChange` yoktu), sayfalama 12 satır. Ertele/İptal/Sil/Yeniden Planla satır menüsü korundu — bu üç işlem başka hiçbir ekranda yok |
+| **B. Sağ ray (280px)** | "Bugün" düz listesi + "Değerlendirici yükü" (= tamamlanmamış mülakat sayısı; uydurma kapasite yüzdesi yok) |
+| **C. Maaş bandı** | Menüde 6. madde, kendi pozisyon seçicili modal, **yalnız üst sınır**, recruiter'a özel |
 
-Mevcut menü `InterviewManagementPage.jsx:2106` civarında ve beş maddesi var:
-Seans Planla, Hızlı Mülakat Başlat, Yüz Yüze Mülakat, Manuel Görüşme Ekle,
-Maaş Beklentilerini Tara. Menünün kendisi hazır — C parçası ona bir madde
-ekliyor.
+Ek karar: iptal edilen mülakatlar eskiden hem takvimden hem aktif/geçmiş
+kovalarından atılıyordu, yani hiçbir yerde görünmüyorlardı — "İptal"
+sekmesi onları geri getirdi.
 
-Ayrıca "Manuel eklenen mülakatlarda transkript yok uyarısı" kararı da bu
-ekranda; `AddManualInterviewModal.jsx`'e bakılmalı.
+**Yalnız üst sınır neden:** `PositionsPage` aynı alanı `{ max, currency,
+period, basis }` yazıyor. Buraya alt sınır koysaydık pozisyon ekranından
+yapılan ilk düzenlemede sessizce silinirdi.
 
-> ⚠️ `AddManualInterviewModal.jsx` `FormBody(props)` üzerinden render ediyor.
-> Bu dosyada daha önce iki kez props destructure'ına payload satırı eklendi.
-> Düzenlerken dikkat.
+**Satırdaki ★ skor** Pipeline ile aynı kaynak: `finalScore ||
+aiOverallScore`. Manuel görüşmenin `aggregateScore`'u başka bir cetvel
+(damgalardan hesaplanan kanıt oranı) — o yüzden manuel satırlarda ★ yok.
+
+Silinen ölü kod: `selectedCalDate`, `calYear`, `calMonth`,
+`allCalSessions`, `dayCalSessions`, `navigateCal`, `calDaysInMonth`,
+`calFirstDow`, `getCalStatusConfig`, `openWizardWithDate`, `viewTab`.
+Sihirbazın 3. adımının **kendi** takvimi var — tarih seçimi kaybolmadı.
+
+**Canlıda doğrulanmadı:** mock-auth'ta veri boş geliyor. Dolu tablo
+(durum rozetleri, ★ skor, satır menüsü, departman dışı davetler)
+kullanıcının hesabında bir kez gözle görülmeli.
+
+**Kullanıcıya sorulacak:** prototip bekleyen mülakatta CTA'yı "Devam Et"
+diyor; seans henüz başlamadığı ve Kontrol Paneli (#194) "Görüntüle"
+kullandığı için "Görüntüle" seçildi.
+
+## Ekran 5 planı (sıradaki)
+
+`src/pages/LiveInterviewPage.jsx` + `src/components/AgentThoughtPanel.jsx`.
+
+**Render bloğu prototip HTML'inde YOK** — spec `pdata.js` satır 364–410:
+`transcript` (konuşma balonları, mülakatçı/aday renkleri), `wave` (30
+çubuk ses dalgası), `liveAgentSteps` (Veri Ayıklama → Semantik Eşleşme →
+Risk Analizi → Otonom Karar), `qSets` (Derinleştir/Doğrula/Kapanış),
+`suggested` (3 soru önerisi), `starDims` (0–3, `ANCHOR_LABELS`).
+
+Dikkat: **STAR ölçeği 0–3**, etiketler `src/utils/starDimensions.js`'ten
+— uydurma etiket yok. Ekran 6 (Rapor) aynı ölçeği paylaşıyor.
 
 ## Dersler — bunlar tekrar edilmemeli
 
