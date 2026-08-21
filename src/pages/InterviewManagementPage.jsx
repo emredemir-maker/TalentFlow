@@ -13,6 +13,7 @@ import { getInviteEmail, getParticipantEmail, getRescheduleEmail } from '../util
 import { buildICS } from '../utils/emailTemplates';
 import AddManualInterviewModal from '../components/AddManualInterviewModal';
 import SalaryBackfillModal from '../components/SalaryBackfillModal';
+import SalaryBandModal from '../components/SalaryBandModal';
 import { 
     Plus, 
     Video, 
@@ -57,6 +58,46 @@ import {
 
 const PARTICIPANT_INVITES_PATH = 'artifacts/talent-flow/public/data/participantInvites';
 
+/** Tabloda gösterilen görüşme türü etiketleri. */
+const IV_TYPE_LABEL = {
+    technical: 'Teknik',
+    hr: 'İK',
+    product: 'Ürün',
+    culture: 'Kültür',
+    behavioral: 'Davranışsal',
+    phone: 'Telefon',
+    face_to_face: 'Yüz yüze',
+};
+
+/**
+ * Durum rozetinin metni ve renkleri — renkler prototipin `ivStatus`
+ * tablosundan birebir.
+ *
+ * `isDone`, kaydın durumu 'completed' yazmasa bile skoru/özeti olduğunda
+ * tamamlanmış sayılmasını sağlıyor; bu türetme dosyanın üstündeki aktif/geçmiş
+ * ayrımıyla aynı kural.
+ */
+function ivStatusChip(status, isDone) {
+    if (status === 'live') return { label: 'Canlı', bg: '#ECFDF5', fg: '#059669' };
+    if (status === 'cancelled') return { label: 'İptal', bg: '#FEF2F2', fg: '#DC2626' };
+    if (status === 'postponed') return { label: 'Ertelendi', bg: 'var(--color-warn-bg)', fg: 'var(--color-warn)' };
+    if (isDone || status === 'completed') return { label: 'Tamamlandı', bg: '#F5F3FF', fg: '#7C3AED' };
+    return { label: 'Bekliyor', bg: '#EFF6FF', fg: '#2563EB' };
+}
+
+function ivInitials(name = '') {
+    const parts = String(name).trim().split(/\s+/);
+    return ((parts[0]?.[0] || '') + (parts[1]?.[0] || '')).toLocaleUpperCase('tr') || '?';
+}
+
+/** '17.08.2026' — tarih yoksa tire, uydurma bir gün değil. */
+function ivDateLabel(raw) {
+    const part = (raw || '').split('T')[0];
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(part)) return '—';
+    const [y, m, d] = part.split('-');
+    return `${d}.${m}.${y}`;
+}
+
 export default function InterviewManagementPage() {
     const navigate = useNavigate();
     const { user: currentUser, userProfile, userId, isDepartmentUser, role } = useAuth();
@@ -69,12 +110,6 @@ export default function InterviewManagementPage() {
     const [isPlanningMode, setIsPlanningMode] = useState(false);
     const [wizardStep, setWizardStep] = useState(1); // 1 = aday seç, 2 = zaman belirle, 3 = onayla
 
-    // Calendar-first layout state
-    const todayStr = new Date().toISOString().split('T')[0];
-    const todayDate = new Date();
-    const [selectedCalDate, setSelectedCalDate] = useState(todayStr);
-    const [calYear, setCalYear] = useState(todayDate.getFullYear());
-    const [calMonth, setCalMonth] = useState(todayDate.getMonth()); // 0-indexed
     const [selectedCandidate, setSelectedCandidate] = useState(null);
     const [interviewType, setInterviewType] = useState('technical'); // technical, hr, product
     const [isAnalyzingSlots, setIsAnalyzingSlots] = useState(false);
@@ -115,6 +150,10 @@ export default function InterviewManagementPage() {
     // transkriptte duruyor ama hiçbir rapora girmiyor.
     // — see components/SalaryBackfillModal.jsx
     const [salaryBackfillOpen, setSalaryBackfillOpen] = useState(false);
+
+    // Pozisyonun butce tavani. Beklenti taramasindan farkli bir is: bu ilanin
+    // butcesini yazar, digeri adayin soyledigini bulur.
+    const [salaryBandOpen, setSalaryBandOpen] = useState(false);
 
     // Single dropdown that consolidates the 4 separate action buttons
     // (Yeni Seans Planla / Hızlı Mülakat Başlat / Yüz Yüze / Manuel Görüşme Ekle).
@@ -431,10 +470,14 @@ export default function InterviewManagementPage() {
         }
     }, [preselectedInterviewData, enrichedCandidates]);
 
-    const { activeInterviews, pastInterviews, stats } = useMemo(() => {
+    const { activeInterviews, pastInterviews, cancelledInterviews, stats } = useMemo(() => {
         const active = [];
         const past = [];
-        
+        // İPTALLER ARTIK TOPLANIYOR. Eskiden bu döngüde atılıyorlardı ve
+        // ekranda hiçbir yerde görünmüyorlardı; listedeki "İptal" sekmesi
+        // onları geri getiriyor. Aktif/geçmiş kovaları değişmedi.
+        const cancelled = [];
+
         const now = new Date();
         const todayStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
 
@@ -463,6 +506,11 @@ export default function InterviewManagementPage() {
                         ...session,
                         id: session.id || `${c.id}-${Date.now()}-${Math.random()}`,
                         candidate: c,
+                        // Satır menüsündeki ertele/iptal/sil çağrıları adayın
+                        // kimliğini istiyor; takvim listesindeki `_candidateId`
+                        // ile aynı ad, iki kaynağın aynı satır bileşenini
+                        // besleyebilmesi için.
+                        _candidateId: c.id,
                         candidateName: c.name,
                         role: c.position || c.bestTitle || 'Pozisyon',
                         matchScore: c.bestScore || 0,
@@ -471,7 +519,7 @@ export default function InterviewManagementPage() {
                     };
 
                     // Cancelled sessions are completely hidden — not in active, not in history.
-                    if (isCancelled) return;
+                    if (isCancelled) { cancelled.push(sessionData); return; }
 
                     // Filtering logic: Live or Pending/Future goes to Active. Completed/Past goes to History.
                     if (isLive || (isFutureOrToday && !isCompleted)) {
@@ -503,6 +551,7 @@ export default function InterviewManagementPage() {
         return {
             activeInterviews: sortedActive,
             pastInterviews: sortedPast,
+            cancelledInterviews: cancelled.sort((a, b) => (b.date || '').localeCompare(a.date || '')),
             stats: {
                 live: active.filter(i => i._effectiveStatus === 'live').length,
                 today: active.filter(i => (i.date?.split('T')[0] === todayStr)).length,
@@ -512,7 +561,94 @@ export default function InterviewManagementPage() {
         };
     }, [enrichedCandidates, sessionStatuses]);
 
-    const [viewTab, setViewTab] = useState('active'); // active, past
+    // ── Liste görünümü (Ekran 4) ──────────────────────────────────────────────
+    // Sekmeler prototipteki dört kova: Tümü / Yaklaşan / Tamamlanan / İptal.
+    const [ivTab, setIvTab] = useState('all');
+    const [ivSearch, setIvSearch] = useState('');
+    const [ivPage, setIvPage] = useState(0);
+    const IV_PAGE_SIZE = 12;
+
+    /**
+     * Tabloyu besleyen tek liste.
+     *
+     * Kaynak, aday belgesindeki `interviewSessions[]` — havuz ve Aday
+     * Detayı'nın okuduğu liste. Buna departman dışı katılımcı davetleri
+     * (`participantInvites`) ekleniyor: kullanıcı başka bir departmanın
+     * adayına katılımcı olarak çağrıldığında mülakat kendi aday listesinde
+     * görünmüyor, yalnızca davet kaydında duruyor.
+     */
+    const ivRowsAll = useMemo(() => {
+        const myUid = currentUser?.uid;
+        const base = ivTab === 'upcoming' ? activeInterviews
+            : ivTab === 'done' ? pastInterviews
+            : ivTab === 'cancelled' ? cancelledInterviews
+            : [...activeInterviews, ...pastInterviews];
+
+        // Departman dışı davetler yalnızca "Tümü" ve "Yaklaşan"da anlamlı:
+        // davet kaydı tamamlanma/iptal bilgisini taşımıyor.
+        const seen = new Set(base.map(s => s.id || s.sessionId));
+        const extras = (ivTab === 'all' || ivTab === 'upcoming')
+            ? myParticipantSessions.filter(s => !seen.has(s.sessionId))
+            : [];
+
+        let rows = [...base, ...extras];
+
+        if (showMyInterviews || isDepartmentUser) {
+            rows = rows.filter(s =>
+                s._fromInvite ||
+                s.interviewerId === myUid ||
+                (Array.isArray(s.participants) && s.participants.some(p => p.userId === myUid))
+            );
+        }
+
+        const q = ivSearch.trim().toLocaleLowerCase('tr');
+        if (q) {
+            rows = rows.filter(s =>
+                (s.candidateName || '').toLocaleLowerCase('tr').includes(q) ||
+                (s.role || s.positionTitle || s.position || '').toLocaleLowerCase('tr').includes(q)
+            );
+        }
+        return rows;
+    }, [ivTab, ivSearch, showMyInterviews, isDepartmentUser, currentUser?.uid,
+        activeInterviews, pastInterviews, cancelledInterviews, myParticipantSessions]);
+
+    // Sekme/arama değişince sayfa başa döner — yoksa boş bir sayfada kalınır.
+    useEffect(() => { setIvPage(0); }, [ivTab, ivSearch, showMyInterviews]);
+
+    const ivPageCount = Math.max(1, Math.ceil(ivRowsAll.length / IV_PAGE_SIZE));
+    const ivRows = ivRowsAll.slice(ivPage * IV_PAGE_SIZE, ivPage * IV_PAGE_SIZE + IV_PAGE_SIZE);
+
+    /**
+     * Sağ raydaki "Bugün" listesi — aktif mülakatların bugüne düşenleri.
+     *
+     * Tarih YEREL saatle hesaplanıyor. Dosyanın üstündeki `todayStr`
+     * `toISOString()` kullanıyor, yani UTC: Türkiye'de gece yarısı ile 03:00
+     * arasında "bugün" dünü gösterirdi. Oradaki kullanımlara dokunmuyorum,
+     * yeni liste doğru olanı kullanıyor.
+     */
+    const todaySessions = useMemo(() => {
+        const d = new Date();
+        const local = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        return activeInterviews
+            .filter(s => (s.date || '').split('T')[0] === local)
+            .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+    }, [activeInterviews]);
+
+    /**
+     * Değerlendirici yükü — SAYILAN ŞEY AÇIK: henüz tamamlanmamış mülakatlar.
+     * Uydurma bir "kapasite" yüzdesi yok; sayı neyi sayıyorsa o.
+     */
+    const reviewerLoad = useMemo(() => {
+        const counts = new Map();
+        activeInterviews.forEach(s => {
+            const name = s.interviewerName || s.interviewer || 'Atanmadı';
+            counts.set(name, (counts.get(name) || 0) + 1);
+        });
+        return [...counts.entries()]
+            .map(([name, count]) => ({ name, count }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 6);
+    }, [activeInterviews]);
 
     const handleAutoPlan = async () => {
         if (!selectedCandidate) return;
@@ -1307,57 +1443,6 @@ export default function InterviewManagementPage() {
         }
     };
 
-    // ── Calendar computed vars ────────────────────────────────────────────────
-    const allCalSessions = useMemo(() => {
-        const all = [];
-        enrichedCandidates.forEach(c => {
-            (c.interviewSessions || []).forEach(s => {
-                const effectiveStatus = sessionStatuses[s.id] || s.status;
-                if (effectiveStatus === 'cancelled') return; // hide cancelled from calendar
-                all.push({ ...s, candidateName: c.name, position: c.position, matchScore: c.matchScore, _candidateId: c.id });
-            });
-        });
-        return all;
-    }, [enrichedCandidates, sessionStatuses]);
-
-    const calDaysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
-    const calFirstDow = (() => {
-        // JS getDay(): 0=Sun, 1=Mon ... 6=Sat → map to Mon-start 0-indexed
-        const d = new Date(calYear, calMonth, 1).getDay();
-        return d === 0 ? 6 : d - 1;
-    })();
-
-    const dayCalSessions = useMemo(() => {
-        if (!selectedCalDate) return [];
-        return allCalSessions.filter(s => (s.date || '').split('T')[0] === selectedCalDate)
-            .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
-    }, [allCalSessions, selectedCalDate]);
-
-    const navigateCal = (dir) => {
-        let y = calYear, m = calMonth + dir;
-        if (m < 0) { m = 11; y--; }
-        if (m > 11) { m = 0; y++; }
-        setCalYear(y); setCalMonth(m);
-    };
-
-    const openWizardWithDate = () => {
-        setWizardStep(1);
-        setSelectedCandidate(null);
-        setManualDate(selectedCalDate || '');
-        setManualTime('09:00');
-        setIsPlanningMode(true);
-    };
-
-    const getCalStatusConfig = (status) => {
-        switch (status) {
-            case 'live':     return { bg: 'bg-emerald-50', text: 'text-emerald-600', icon: <Play className="w-3 h-3" />, label: 'CANLI' };
-            case 'scheduled': return { bg: 'bg-blue-50', text: 'text-blue-600', icon: <Clock className="w-3 h-3" />, label: 'PLANLANDI' };
-            case 'completed': return { bg: 'bg-slate-100', text: 'text-slate-600', icon: <CheckCircle2 className="w-3 h-3" />, label: 'TAMAMLANDI' };
-            case 'postponed': return { bg: 'bg-amber-50', text: 'text-amber-600', icon: <AlertCircle className="w-3 h-3" />, label: 'ERTELENDİ' };
-            case 'cancelled': return { bg: 'bg-red-50', text: 'text-red-600', icon: <AlertTriangle className="w-3 h-3" />, label: 'İPTAL' };
-            default:         return { bg: 'bg-slate-100', text: 'text-slate-600', icon: null, label: status || '—' };
-        }
-    };
 
 
     return (
@@ -2084,22 +2169,33 @@ export default function InterviewManagementPage() {
                 </div>
             )}
 
-            {/* ═══ CALENDAR-FIRST DASHBOARD ════════════════════════════════════ */}
+            {/* ═══ MÜLAKAT LİSTESİ (Infoset) ═══════════════════════════════════
+                Takvim görünümü düz listeye çevrildi (onaylanmış karar). Ay
+                takvimi tek seferde tek günü gösteriyordu; tablo bütün
+                mülakatları sekmelerle gösteriyor. Tarih seçimi kaybolmadı:
+                planlama sihirbazının 3. adımında kendi takvimi var. */}
             {!isPlanningMode && (
-                <div className="flex-1 flex flex-col overflow-hidden">
-                    {/* Top bar */}
-                    <div className="px-8 py-5 flex items-center justify-between border-b border-[#E2E8F0]/60 bg-white/70 backdrop-blur-sm flex-shrink-0">
+                <div className="infoset flex-1 flex flex-col overflow-hidden bg-n25">
+                    {/* ── Başlık ─────────────────────────────────────────────── */}
+                    <div className="h-14 flex-shrink-0 bg-n0 border-b border-n200 px-[18px] flex items-center gap-3.5">
                         <div>
-                            <h1 className="text-xl font-semibold text-[#0F172A] tracking-tight">Mülakat Yönetimi</h1>
-                            <p className="text-xs text-[#64748B] mt-0.5 font-medium">Aktif operasyonları ve geçmiş seansları yönetin</p>
+                            <h1 className="text-[15px] font-semibold tracking-[-0.02em] text-n900 m-0">Mülakat Yönetimi</h1>
+                            <span className="text-[11px] text-n400">
+                                {stats.total} mülakat · {stats.today} bugün
+                                {stats.live > 0 ? ` · ${stats.live} canlı` : ''}
+                            </span>
                         </div>
-                        <div className="flex items-center gap-3">
-                            <div className="relative">
-                                <Search className="w-4 h-4 text-[#94A3B8] absolute left-3 top-1/2 -translate-y-1/2" />
+                        <div className="ml-auto flex items-center gap-2">
+                            {/* Arama kutusu eskiden dekoratifti (value/onChange yoktu).
+                                Artık tabloyu gerçekten süzüyor. */}
+                            <div className="relative hidden md:block">
+                                <Search className="w-3.5 h-3.5 text-n400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                                 <input
                                     type="text"
-                                    placeholder="Aday veya pozisyon ara..."
-                                    className="pl-9 pr-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#13294E] focus:border-transparent w-64 shadow-sm transition-all"
+                                    value={ivSearch}
+                                    onChange={(e) => setIvSearch(e.target.value)}
+                                    placeholder="Aday veya pozisyon ara…"
+                                    className="pl-8 pr-3 py-1.5 text-[12px] border border-n200 rounded-md bg-n50 focus:outline-none focus:border-brand w-44"
                                 />
                             </div>
                             {/* Single primary action with grouped sub-actions.
@@ -2109,18 +2205,18 @@ export default function InterviewManagementPage() {
                             <div className="relative" onClick={(e) => e.stopPropagation()}>
                                 <button
                                     onClick={() => setNewInterviewMenuOpen(o => !o)}
-                                    className="flex items-center gap-2 bg-[#13294E] text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-800 transition-all shadow-md shadow-blue-900/10"
+                                    className="flex items-center gap-1.5 text-[13px] font-semibold text-white bg-brand hover:bg-brand-600 rounded-md px-[13px] py-[7px]"
                                     aria-haspopup="menu"
                                     aria-expanded={newInterviewMenuOpen}
                                 >
-                                    <Plus className="w-4 h-4" /> Yeni Mülakat
-                                    <ChevronDown className={`w-4 h-4 transition-transform ${newInterviewMenuOpen ? 'rotate-180' : ''}`} />
+                                    <Plus className="w-3.5 h-3.5" /> Yeni Mülakat
+                                    <ChevronDown className={`w-[13px] h-[13px] transition-transform ${newInterviewMenuOpen ? 'rotate-180' : ''}`} />
                                 </button>
 
                                 {newInterviewMenuOpen && (
                                     <div
                                         role="menu"
-                                        className="absolute right-0 top-full mt-2 w-[300px] bg-white rounded-xl shadow-2xl border border-slate-100 z-50 overflow-hidden py-1.5"
+                                        className="absolute right-0 top-full mt-1.5 w-[308px] bg-n0 rounded-[10px] shadow-lg border border-n200 z-50 p-1.5"
                                     >
                                         <button
                                             role="menuitem"
@@ -2132,14 +2228,14 @@ export default function InterviewManagementPage() {
                                                 setManualTime('09:00');
                                                 setIsPlanningMode(true);
                                             }}
-                                            className="w-full flex items-start gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left"
+                                            className="w-full flex items-start gap-2.5 px-2.5 py-[9px] rounded-md hover:bg-n50 text-left"
                                         >
-                                            <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0 mt-0.5">
-                                                <Calendar className="w-4 h-4 text-[#13294E]" />
+                                            <div className="w-7 h-7 rounded-md bg-brand-50 text-brand flex items-center justify-center shrink-0">
+                                                <Calendar className="w-3.5 h-3.5" />
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <div className="text-[13px] font-semibold text-slate-800">Seans Planla</div>
-                                                <div className="text-[11px] text-slate-500 mt-0.5">Adımlı sihirbaz ile yeni mülakat oluştur</div>
+                                                <div className="text-[13px] font-semibold text-n900">Seans Planla</div>
+                                                <div className="text-[11px] leading-[1.45] text-n400">Adımlı sihirbaz ile yeni mülakat oluştur</div>
                                             </div>
                                         </button>
 
@@ -2152,14 +2248,14 @@ export default function InterviewManagementPage() {
                                                 setQuickType('technical');
                                                 setQuickModal(true);
                                             }}
-                                            className="w-full flex items-start gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left"
+                                            className="w-full flex items-start gap-2.5 px-2.5 py-[9px] rounded-md hover:bg-n50 text-left"
                                         >
-                                            <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0 mt-0.5">
-                                                <Play className="w-4 h-4 text-emerald-600 fill-current" />
+                                            <div className="w-7 h-7 rounded-md bg-ok-bg text-ok flex items-center justify-center shrink-0">
+                                                <Play className="w-3.5 h-3.5 fill-current" />
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <div className="text-[13px] font-semibold text-slate-800">Hızlı Mülakat Başlat</div>
-                                                <div className="text-[11px] text-slate-500 mt-0.5">Anında canlı oturum aç</div>
+                                                <div className="text-[13px] font-semibold text-n900">Hızlı Mülakat Başlat</div>
+                                                <div className="text-[11px] leading-[1.45] text-n400">Anında canlı oturum aç</div>
                                             </div>
                                         </button>
 
@@ -2172,33 +2268,35 @@ export default function InterviewManagementPage() {
                                                 setQuickType('technical');
                                                 setQuickModal(true);
                                             }}
-                                            className="w-full flex items-start gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left"
+                                            className="w-full flex items-start gap-2.5 px-2.5 py-[9px] rounded-md hover:bg-n50 text-left"
                                         >
-                                            <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0 mt-0.5">
-                                                <User className="w-4 h-4 text-indigo-600" />
+                                            <div className="w-7 h-7 rounded-md bg-brand-50 text-brand flex items-center justify-center shrink-0">
+                                                <User className="w-3.5 h-3.5" />
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <div className="text-[13px] font-semibold text-slate-800">Yüz Yüze Mülakat</div>
-                                                <div className="text-[11px] text-slate-500 mt-0.5">Ofiste yapılacak görüşme</div>
+                                                <div className="text-[13px] font-semibold text-n900">Yüz Yüze Mülakat</div>
+                                                <div className="text-[11px] leading-[1.45] text-n400">Ofiste yapılacak görüşme</div>
                                             </div>
                                         </button>
 
-                                        <div className="border-t border-slate-100 mt-1 pt-1">
+                                        <div className="border-t border-n100 mt-1 pt-1">
                                             <button
                                                 role="menuitem"
                                                 onClick={() => {
                                                     setNewInterviewMenuOpen(false);
                                                     setManualInterviewOpen(true);
                                                 }}
-                                                className="w-full flex items-start gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left"
+                                                className="w-full flex items-start gap-2.5 px-2.5 py-[9px] rounded-md hover:bg-n50 text-left"
                                                 title="Sistem dışında yapılmış görüşmeyi manuel olarak ekle (telefon, yüzyüze, vb.)"
                                             >
-                                                <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0 mt-0.5">
-                                                    <Plus className="w-4 h-4 text-slate-600" />
+                                                <div className="w-7 h-7 rounded-md bg-n100 text-n600 flex items-center justify-center shrink-0">
+                                                    <Plus className="w-3.5 h-3.5" />
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <div className="text-[13px] font-semibold text-slate-800">Manuel Görüşme Ekle</div>
-                                                    <div className="text-[11px] text-slate-500 mt-0.5">Sistem dışında yapılmış görüşmeyi kaydet</div>
+                                                    <div className="text-[13px] font-semibold text-n900">Manuel Görüşme Ekle</div>
+                                                    <div className="text-[11px] leading-[1.45] text-n400">
+                                                        Sistem dışında yapılmış görüşmeyi kaydet — canlı transkript oluşmaz
+                                                    </div>
                                                 </div>
                                             </button>
 
@@ -2215,15 +2313,40 @@ export default function InterviewManagementPage() {
                                                         setNewInterviewMenuOpen(false);
                                                         setSalaryBackfillOpen(true);
                                                     }}
-                                                    className="w-full flex items-start gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left"
+                                                    className="w-full flex items-start gap-2.5 px-2.5 py-[9px] rounded-md hover:bg-n50 text-left"
                                                     title="Geçmiş görüşmelerin transkriptinde geçen maaş beklentisini bul ve onayınla kaydet"
                                                 >
-                                                    <div className="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center shrink-0 mt-0.5">
-                                                        <Wallet className="w-4 h-4 text-violet-600" />
+                                                    <div className="w-7 h-7 rounded-md bg-warn-bg text-warn flex items-center justify-center shrink-0">
+                                                        <Wallet className="w-3.5 h-3.5" />
                                                     </div>
                                                     <div className="flex-1 min-w-0">
-                                                        <div className="text-[13px] font-semibold text-slate-800">Maaş Beklentilerini Tara</div>
-                                                        <div className="text-[11px] text-slate-500 mt-0.5">Geçmiş görüşmelerde eksik kalan beklentiyi tamamla</div>
+                                                        <div className="text-[13px] font-semibold text-n900">Maaş Beklentilerini Tara</div>
+                                                        <div className="text-[11px] leading-[1.45] text-n400">Geçmiş görüşmelerde eksik kalan beklentiyi tamamla</div>
+                                                    </div>
+                                                </button>
+                                            )}
+
+                                            {/* Bandı TANIMLAMAK, beklentiyi taramaktan
+                                                farklı bir iş: biri ilanın bütçesini
+                                                yazar, diğeri adayın söylediğini bulur.
+                                                Pozisyon yazma hakkı yalnızca
+                                                recruiter'da (firestore.rules). */}
+                                            {!isDepartmentUser && (
+                                                <button
+                                                    role="menuitem"
+                                                    onClick={() => {
+                                                        setNewInterviewMenuOpen(false);
+                                                        setSalaryBandOpen(true);
+                                                    }}
+                                                    className="w-full flex items-start gap-2.5 px-2.5 py-[9px] rounded-md hover:bg-n50 text-left"
+                                                    title="Bir pozisyonun bütçe tavanını tanımla — aday beklentisi bununla kıyaslanır"
+                                                >
+                                                    <div className="w-7 h-7 rounded-md bg-brand-50 text-brand flex items-center justify-center shrink-0">
+                                                        <Wallet className="w-3.5 h-3.5" />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="text-[13px] font-semibold text-n900">Maaş Aralığı Tanımla</div>
+                                                        <div className="text-[11px] leading-[1.45] text-n400">Pozisyonun bütçe tavanını gir</div>
                                                     </div>
                                                 </button>
                                             )}
@@ -2234,330 +2357,358 @@ export default function InterviewManagementPage() {
                         </div>
                     </div>
 
-                    {/* Two-column layout */}
-                    <div className="flex-1 flex overflow-hidden">
+                    {/* ── Tablo + sağ ray ────────────────────────────────────── */}
+                    <div className="flex-1 grid grid-cols-1 xl:grid-cols-[1fr_280px] overflow-hidden">
 
-                        {/* LEFT: Stats + Calendar ─────────────────────────────── */}
-                        <div className="w-[55%] border-r border-[#E2E8F0]/60 flex flex-col bg-white">
+                        {/* SOL: sekmeler + 7 kolonlu tablo ───────────────────── */}
+                        <div className="flex flex-col overflow-hidden xl:border-r border-n200 bg-n0">
 
-                            {/* Stats row */}
-                            <div className="px-8 py-6 grid grid-cols-4 gap-4 border-b border-[#E2E8F0]/40 flex-shrink-0">
-                                {[
-                                    { label: 'CANLI YAYIN', value: stats.live, color: 'text-rose-600' },
-                                    { label: 'BUGÜN', value: stats.today, color: 'text-[#0F172A]' },
-                                    { label: 'BEKLEYEN', value: stats.pending, color: 'text-amber-500' },
-                                    { label: 'TOPLAM', value: stats.total, color: 'text-[#64748B]' },
-                                ].map((stat, i) => (
-                                    <div key={i} className="flex flex-col gap-1">
-                                        <span className="text-[10px] font-black text-[#94A3B8] uppercase tracking-widest">{stat.label}</span>
-                                        <span className={`text-2xl font-semibold tracking-tight ${stat.color}`}>{stat.value}</span>
-                                    </div>
-                                ))}
-                            </div>
-
-                            {/* Calendar */}
-                            <div className="flex-1 overflow-y-auto p-8">
-                                <div className="flex items-center justify-between mb-6">
-                                    <h2 className="text-lg font-semibold tracking-tight text-[#0F172A]">
-                                        {new Date(calYear, calMonth).toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })}
-                                    </h2>
-                                    <div className="flex items-center gap-1">
-                                        <button onClick={() => navigateCal(-1)} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-100 text-[#64748B] transition-colors">
-                                            <ChevronLeft className="w-4 h-4" />
-                                        </button>
-                                        <button onClick={() => navigateCal(1)} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-100 text-[#64748B] transition-colors">
-                                            <ChevronRight className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-7 gap-y-4 gap-x-1 text-center">
-                                    {['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'].map(d => (
-                                        <div key={d} className="text-[10px] font-black text-[#94A3B8] uppercase tracking-wider pb-2">{d}</div>
-                                    ))}
-                                    {Array.from({ length: calFirstDow }).map((_, i) => <div key={`e${i}`} />)}
-                                    {Array.from({ length: calDaysInMonth }).map((_, i) => {
-                                        const day = i + 1;
-                                        const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                                        const isSelected = selectedCalDate === dateStr;
-                                        const isToday = dateStr === todayStr;
-                                        const isPastDay = dateStr < todayStr;
-                                        const hasEvents = allCalSessions.some(s => (s.date || '').split('T')[0] === dateStr);
+                            {/* Sekme pill'leri */}
+                            <div className="flex items-center gap-2.5 px-[18px] py-[11px] border-b border-n200 flex-shrink-0">
+                                <div className="flex items-center gap-0.5 bg-n50 border border-n200 rounded-md p-0.5">
+                                    {[
+                                        { key: 'all', label: 'Tümü', count: activeInterviews.length + pastInterviews.length },
+                                        { key: 'upcoming', label: 'Yaklaşan', count: activeInterviews.length },
+                                        { key: 'done', label: 'Tamamlanan', count: pastInterviews.length },
+                                        { key: 'cancelled', label: 'İptal', count: cancelledInterviews.length },
+                                    ].map(t => {
+                                        const on = ivTab === t.key;
                                         return (
-                                            <div key={day} className="flex justify-center">
-                                                <button
-                                                    onClick={() => setSelectedCalDate(dateStr)}
-                                                    className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium transition-all relative ${
-                                                        isSelected
-                                                            ? 'bg-[#13294E] text-white shadow-md'
-                                                            : isToday
-                                                                ? 'text-[#13294E] font-semibold bg-blue-50/50 hover:bg-blue-100/50'
-                                                                : isPastDay
-                                                                    ? 'text-[#CBD5E1] hover:bg-slate-50'
-                                                                    : 'text-[#334155] hover:bg-slate-100'
-                                                    }`}
-                                                >
-                                                    {day}
-                                                    {hasEvents && !isSelected && (
-                                                        <span className="absolute bottom-1 w-1 h-1 rounded-full bg-[#13294E]" />
-                                                    )}
-                                                    {isToday && !isSelected && (
-                                                        <span className="absolute bottom-0 w-4 h-[2px] rounded-full bg-[#13294E]" />
-                                                    )}
-                                                </button>
-                                            </div>
+                                            <button
+                                                key={t.key}
+                                                onClick={() => setIvTab(t.key)}
+                                                className={`flex items-center gap-1.5 text-[12px] font-semibold px-[11px] py-[5px] rounded ${
+                                                    on ? 'bg-n0 text-n900 shadow-sm' : 'text-n500 hover:text-n700'
+                                                }`}
+                                            >
+                                                {t.label}
+                                                <span className={`text-[11px] font-semibold px-1.5 rounded-full ${
+                                                    on ? 'bg-brand-50 text-brand' : 'bg-n100 text-n400'
+                                                }`}>
+                                                    {t.count}
+                                                </span>
+                                            </button>
                                         );
                                     })}
                                 </div>
-                            </div>
-                        </div>
 
-                        {/* RIGHT: Day Sessions + Quick Plan ───────────────────── */}
-                        <div className="w-[45%] flex flex-col bg-[#FAFAF8]">
-                            <div className="px-8 py-6 flex-1 overflow-y-auto custom-scrollbar">
-                                <div className="mb-4">
-                                    <p className="text-[10px] font-black text-[#94A3B8] uppercase tracking-widest mb-1">Seçili Gün</p>
-                                    <div className="text-xl font-semibold text-[#0F172A] flex items-center gap-3">
-                                        {selectedCalDate
-                                            ? new Date(selectedCalDate + 'T12:00:00').toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })
-                                            : 'Yaklaşan Mülakatlar'}
-                                        {selectedCalDate === todayStr && (
-                                            <span className="text-[10px] font-black bg-blue-100 text-[#13294E] px-2 py-0.5 rounded-full uppercase tracking-wider">Bugün</span>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Tab filter: Tüm / Benim Mülakatlarım */}
-                                <div className="flex gap-1 mb-5 bg-[#F1F5F9] rounded-xl p-1">
-                                    {!isDepartmentUser && (
-                                        <button
-                                            onClick={() => setShowMyInterviews(false)}
-                                            className={`flex-1 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
-                                                !showMyInterviews ? 'bg-white text-[#0F172A] shadow-sm' : 'text-[#94A3B8]'
-                                            }`}
-                                        >
-                                            Tüm Mülakatlar
-                                        </button>
-                                    )}
+                                {/* Kapsam süzgeci — mevcut özellik, korundu.
+                                    Departman kullanıcısı zaten yalnızca kendi
+                                    mülakatlarını görebiliyor, seçenek gösterilmiyor. */}
+                                {!isDepartmentUser && (
                                     <button
-                                        onClick={() => setShowMyInterviews(true)}
-                                        className={`flex-1 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
-                                            showMyInterviews || isDepartmentUser ? 'bg-white text-[#13294E] shadow-sm' : 'text-[#94A3B8]'
+                                        onClick={() => setShowMyInterviews(v => !v)}
+                                        className={`ml-auto flex items-center gap-1.5 text-[12px] font-medium border rounded-md px-[11px] py-[5px] ${
+                                            showMyInterviews
+                                                ? 'bg-brand-50 text-brand border-brand-100'
+                                                : 'bg-n50 text-n600 border-n200 hover:bg-n100'
                                         }`}
                                     >
-                                        Benim Mülakatlarım
+                                        <User className="w-[13px] h-[13px]" /> Benim mülakatlarım
                                     </button>
-                                </div>
+                                )}
+                            </div>
 
-                                {(() => {
-                                    const myUid = currentUser?.uid;
-                                    // Cross-department participant invites for the selected date
-                                    const crossDeptSessions = myParticipantSessions.filter(s =>
-                                        (s.date || '').split('T')[0] === selectedCalDate
-                                    );
-                                    const filteredSessions = (showMyInterviews || isDepartmentUser)
-                                        ? (() => {
-                                            // Sessions from own-department candidates where user is interviewer or participant
-                                            const ownDeptFiltered = dayCalSessions.filter(s =>
-                                                s.interviewerId === myUid ||
-                                                (Array.isArray(s.participants) && s.participants.some(p => p.userId === myUid))
-                                            );
-                                            // Merge cross-department invites, avoid duplicates by sessionId
-                                            const seenIds = new Set(ownDeptFiltered.map(s => s.id || s.sessionId));
-                                            const extras = crossDeptSessions.filter(s => !seenIds.has(s.sessionId));
-                                            return [...ownDeptFiltered, ...extras];
-                                        })()
-                                        : dayCalSessions;
-                                    return filteredSessions.length > 0 ? (
-                                    <div className="space-y-4">
-                                        {filteredSessions.map(s => {
-                                            const statusInfo = getCalStatusConfig(s.status);
-                                            const initials = (s.candidateName || '?').split(' ').map(p => p[0]).join('').substring(0, 2).toUpperCase();
-                                            const participants = Array.isArray(s.participants) ? s.participants : [];
-                                            const sessionKey = s.id || s.sessionId;
-                                            const resolvedCandidateId = s._candidateId || s.candidateId;
-                                            const isMenuOpen = openMenuId === sessionKey;
-                                            const canModify = !['live', 'completed'].includes(s.status);
-                                            return (
-                                                <div key={sessionKey} className="flex group">
-                                                    <div className="w-16 pt-3 flex-shrink-0">
-                                                        <span className="text-sm font-semibold text-[#64748B] group-hover:text-[#13294E] transition-colors">{s.time || '—'}</span>
-                                                    </div>
-                                                    <div className={`flex-1 bg-white rounded-xl border p-4 shadow-sm hover:shadow-md transition-all relative ${
-                                                        s.status === 'live' ? 'border-l-4 border-l-emerald-500 border-[#E2E8F0]' :
-                                                        s.status === 'cancelled' ? 'border-[#FEE2E2] opacity-70' :
-                                                        s.status === 'postponed' ? 'border-amber-200' :
-                                                        'border-[#E2E8F0] hover:border-[#CBD5E1]'
-                                                    }`}>
-                                                        <div className="flex justify-between items-start mb-3">
-                                                            <div className="flex items-center gap-3">
-                                                                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold ${s.status === 'live' ? 'bg-emerald-100 text-emerald-700' : s.status === 'cancelled' ? 'bg-red-50 text-red-400' : 'bg-[#F1F5F9] text-[#475569]'}`}>
-                                                                    {initials}
-                                                                </div>
-                                                                <div>
-                                                                    <div className="flex items-center gap-2">
-                                                                        <h4 className="text-sm font-semibold text-[#0F172A]">{s.candidateName}</h4>
-                                                                        {s.mode === 'manual' && (
-                                                                            <span
-                                                                                title="Bu görüşme manuel olarak girildi (sistem dışında yapılmış)"
-                                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-slate-100 text-slate-600 border border-slate-200"
-                                                                            >
-                                                                                📞 Manuel
-                                                                            </span>
-                                                                        )}
-                                                                    </div>
-                                                                    <p className="text-xs text-[#64748B]">{s.positionTitle || s.position || s.title || '—'}</p>
-                                                                </div>
-                                                            </div>
-                                                            <div className="flex items-center gap-2">
-                                                                {s.candidateResponse?.status && (
-                                                                    <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold tracking-wide ${s.candidateResponse.status === 'confirm' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-50 text-red-500'}`}>
-                                                                        {s.candidateResponse.status === 'confirm' ? '✓ Katılacak' : '✗ Katılamaz'}
-                                                                    </span>
-                                                                )}
-                                                                <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wide ${statusInfo.bg} ${statusInfo.text}`}>
-                                                                    {statusInfo.icon} {statusInfo.label}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex items-center justify-between mt-4 pt-4 border-t border-[#F1F5F9]">
-                                                            <div className="flex items-center gap-4 text-xs text-[#64748B]">
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <User className="w-3.5 h-3.5" />
-                                                                    <span>{s.interviewerName || s.interviewer || '—'}</span>
-                                                                </div>
-                                                                {participants.length > 0 && (
-                                                                    <div className="flex items-center gap-1">
-                                                                        {participants.slice(0, 3).map((p, idx) => (
-                                                                            <div key={idx} title={p.name || p.displayName || p.email} className="w-5 h-5 rounded-full bg-[#13294E]/10 text-[#13294E] flex items-center justify-center text-[8px] font-black border border-white">
-                                                                                {(p.name || p.displayName || p.email || '?').charAt(0).toUpperCase()}
-                                                                            </div>
-                                                                        ))}
-                                                                        {participants.length > 3 && (
-                                                                            <span className="text-[9px] text-[#94A3B8] font-bold">+{participants.length - 3}</span>
-                                                                        )}
-                                                                    </div>
-                                                                )}
-                                                                {s.matchScore && (
-                                                                    <div className="px-1.5 py-0.5 bg-slate-100 rounded text-[10px] font-semibold text-slate-600">%{s.matchScore} UYUM</div>
-                                                                )}
-                                                            </div>
-                                                            {s.status === 'live' ? (
-                                                                <button
-                                                                    onClick={() => {
-                                                                        if (s.mode === 'face_to_face') {
-                                                                            navigate(`/face-interview/${s.id}`);
-                                                                        } else {
-                                                                            navigate(`/live-interview/${s.id}`);
-                                                                        }
-                                                                    }}
-                                                                    className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg transition-colors"
-                                                                >
-                                                                    <Video className="w-3.5 h-3.5" /> Katıl
-                                                                </button>
-                                                            ) : (
-                                                                <div className="relative">
-                                                                    <button
-                                                                        onClick={(e) => { e.stopPropagation(); setOpenMenuId(isMenuOpen ? null : sessionKey); }}
-                                                                        className={`w-7 h-7 flex items-center justify-center rounded-md transition-colors ${isMenuOpen ? 'bg-slate-100 text-[#0F172A]' : 'text-[#94A3B8] hover:bg-slate-100 hover:text-[#0F172A]'}`}
-                                                                    >
-                                                                        <MoreVertical className="w-4 h-4" />
-                                                                    </button>
-                                                                    {isMenuOpen && (
-                                                                        <div
-                                                                            className="absolute right-0 bottom-8 w-44 bg-white rounded-xl shadow-lg border border-[#E2E8F0] py-1 z-50"
-                                                                            onClick={(e) => e.stopPropagation()}
-                                                                        >
-                                                                            {canModify && (
-                                                                                <button
-                                                                                    onClick={() => {
-                                                                                        setOpenMenuId(null);
-                                                                                        setPostponeModal({ candidateId: resolvedCandidateId, sessionId: sessionKey, date: s.date || '', time: s.time || '09:00' });
-                                                                                    }}
-                                                                                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-50 transition-colors"
-                                                                                >
-                                                                                    <AlertCircle className="w-3.5 h-3.5" /> Ertele
-                                                                                </button>
-                                                                            )}
-                                                                            {canModify && s.status !== 'cancelled' && (
-                                                                                <button
-                                                                                    onClick={async () => {
-                                                                                        setOpenMenuId(null);
-                                                                                        if (window.confirm('Bu mülakatı iptal etmek istediğinize emin misiniz?')) {
-                                                                                            await handleUpdateSessionStatus(resolvedCandidateId, sessionKey, 'cancelled');
-                                                                                        }
-                                                                                    }}
-                                                                                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors"
-                                                                                >
-                                                                                    <AlertTriangle className="w-3.5 h-3.5" /> İptal Et
-                                                                                </button>
-                                                                            )}
-                                                                            {s.status === 'cancelled' && (
-                                                                                <button
-                                                                                    onClick={async () => {
-                                                                                        setOpenMenuId(null);
-                                                                                        await handleUpdateSessionStatus(resolvedCandidateId, sessionKey, 'scheduled');
-                                                                                    }}
-                                                                                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-blue-600 hover:bg-blue-50 transition-colors"
-                                                                                >
-                                                                                    <RefreshCw className="w-3.5 h-3.5" /> Yeniden Planla
-                                                                                </button>
-                                                                            )}
-                                                                            <div className="my-1 border-t border-[#F1F5F9]" />
-                                                                            <button
-                                                                                onClick={async () => {
-                                                                                    setOpenMenuId(null);
-                                                                                    handleDeleteSession(resolvedCandidateId, sessionKey);
-                                                                                }}
-                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-50 transition-colors"
-                                                                            >
-                                                                                <Trash2 className="w-3.5 h-3.5" /> Sil
-                                                                            </button>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            )}
-                                                        </div>
+                            {/* Kolon başlıkları */}
+                            <div className="hidden lg:grid grid-cols-[1.5fr_1.25fr_92px_116px_1fr_104px_128px] items-center px-[18px] py-2 border-b border-n200 bg-n50 text-[11px] font-semibold text-n500 flex-shrink-0">
+                                <span>Aday</span>
+                                <span>Pozisyon</span>
+                                <span>Tür</span>
+                                <span>Tarih &amp; saat</span>
+                                <span>Değerlendirici</span>
+                                <span>Durum</span>
+                                <span className="text-right">Aksiyon</span>
+                            </div>
+
+                            {/* Satırlar */}
+                            <div className="flex-1 overflow-y-auto custom-scrollbar">
+                                {ivRows.length === 0 ? (
+                                    <div className="px-[18px] py-14 flex flex-col items-center text-center">
+                                        <div className="w-11 h-11 rounded-full bg-n50 flex items-center justify-center mb-2.5">
+                                            <Calendar className="w-5 h-5 text-n400" />
+                                        </div>
+                                        <div className="text-[13px] font-semibold mb-1">
+                                            {ivSearch ? 'Aramaya uyan mülakat yok' : 'Bu sekmede mülakat yok'}
+                                        </div>
+                                        <p className="text-[12px] text-n500 max-w-[260px] m-0">
+                                            {ivSearch
+                                                ? 'Aday adını veya pozisyonu farklı yazmayı deneyin.'
+                                                : 'Yeni Mülakat menüsünden bir seans planlayarak başlayabilirsiniz.'}
+                                        </p>
+                                    </div>
+                                ) : ivRows.map(s => {
+                                    const sessionKey = s.id || s.sessionId;
+                                    const resolvedCandidateId = s._candidateId || s.candidateId;
+                                    const status = s._effectiveStatus || sessionStatuses[sessionKey] || s.status;
+                                    const isLive = status === 'live';
+                                    const isDone = s._effectiveCompleted || status === 'completed';
+                                    const isCancelled = status === 'cancelled';
+                                    const chip = ivStatusChip(status, isDone);
+                                    const isMenuOpen = openMenuId === sessionKey;
+                                    const canModify = !isLive && !isDone;
+                                    const isManual = s.mode === 'manual';
+                                    // Görüşme skoru — Pipeline ekranıyla AYNI kaynak.
+                                    // Manuel görüşmenin `aggregateScore`'u başka bir
+                                    // cetvel (kanıt oranı); ikisini aynı yıldıza
+                                    // basmak iki ölçüyü karıştırmak olurdu.
+                                    const ivScore = Math.round(Number(s.finalScore || s.aiOverallScore) || 0);
+                                    const participants = Array.isArray(s.participants) ? s.participants : [];
+                                    const openSession = () => {
+                                        if (isDone) { navigate(`/interview-report/${sessionKey}`); return; }
+                                        if (s.mode === 'face_to_face') { navigate(`/face-interview/${sessionKey}`); return; }
+                                        navigate(`/live-interview/${sessionKey}`);
+                                    };
+                                    return (
+                                        <div
+                                            key={sessionKey}
+                                            className="grid grid-cols-1 lg:grid-cols-[1.5fr_1.25fr_92px_116px_1fr_104px_128px] items-center gap-y-1 px-[18px] py-2.5 border-b border-n100 text-[13px] hover:bg-n25"
+                                            style={isLive ? { background: 'rgba(22,162,108,.05)' } : undefined}
+                                        >
+                                            {/* Aday */}
+                                            <div className="flex items-center gap-2.5 min-w-0">
+                                                <div className="w-7 h-7 flex-none rounded-full bg-brand-50 text-brand flex items-center justify-center text-[11px] font-semibold">
+                                                    {ivInitials(s.candidateName)}
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="font-medium truncate">{s.candidateName || 'Aday'}</div>
+                                                    <div className="text-[11px] text-n400">
+                                                        {participants.length > 0 ? `+${participants.length} katılımcı` : 'katılımcı yok'}
                                                     </div>
                                                 </div>
-                                            );
-                                        })}
-                                    </div>
-                                ) : (
-                                    <div className="bg-white rounded-xl border border-dashed border-[#E2E8F0] p-10 flex flex-col items-center justify-center text-center">
-                                        <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mb-4">
-                                            <Calendar className="w-5 h-5 text-[#94A3B8]" />
+                                            </div>
+
+                                            {/* Pozisyon */}
+                                            <div className="min-w-0 text-n600 truncate">
+                                                {s.role || s.positionTitle || s.position || '—'}
+                                            </div>
+
+                                            {/* Tür — manuel görüşmede transkript uyarısı burada */}
+                                            <div className="text-[12px] text-n500">
+                                                <div>{IV_TYPE_LABEL[s.interviewType] || IV_TYPE_LABEL[s.type] || 'Görüşme'}</div>
+                                                {isManual ? (
+                                                    <span
+                                                        title="Manuel girildi — canlı transkript yok. Raporda 'manuel girildi' olarak işaretlenir."
+                                                        className="inline-flex items-center gap-1 text-[11px] text-warn mt-0.5"
+                                                    >
+                                                        <AlertCircle className="w-[11px] h-[11px]" /> Transkript yok
+                                                    </span>
+                                                ) : (
+                                                    <span className="flex items-center gap-1 text-[11px] text-n400 mt-0.5">
+                                                        <Video className="w-[11px] h-[11px]" />
+                                                        {s.mode === 'face_to_face' ? 'Yüz yüze' : 'Görüntülü'}
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            {/* Tarih & saat */}
+                                            <div className="text-[12px] text-n600">
+                                                <div>{ivDateLabel(s.date)}</div>
+                                                <div className="text-[11px] text-n400">{s.time || '—'}</div>
+                                            </div>
+
+                                            {/* Değerlendirici */}
+                                            <div className="text-[12px] text-n600 truncate">
+                                                {s.interviewerName || s.interviewer || '—'}
+                                            </div>
+
+                                            {/* Durum */}
+                                            <div className="flex items-center gap-1.5">
+                                                {isLive && (
+                                                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: chip.fg }} />
+                                                )}
+                                                <span
+                                                    className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
+                                                    style={{ background: chip.bg, color: chip.fg }}
+                                                >
+                                                    {chip.label}
+                                                </span>
+                                            </div>
+
+                                            {/* Aksiyon */}
+                                            <div className="flex items-center justify-end gap-2">
+                                                {isDone && ivScore > 0 && (
+                                                    <span className="text-[12px] font-semibold text-warn">★ {ivScore}</span>
+                                                )}
+                                                {isCancelled ? (
+                                                    <button
+                                                        onClick={() => handleUpdateSessionStatus(resolvedCandidateId, sessionKey, 'scheduled')}
+                                                        className="text-[12px] font-semibold px-2.5 py-[5px] rounded-md bg-n0 text-n600 border border-n200 hover:bg-n50"
+                                                    >
+                                                        Yeniden Planla
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        onClick={openSession}
+                                                        className={`text-[12px] font-semibold px-2.5 py-[5px] rounded-md border ${
+                                                            isLive
+                                                                ? 'bg-ok text-white border-transparent hover:opacity-90'
+                                                                : isDone
+                                                                    ? 'bg-n0 text-n600 border-n200 hover:bg-n50'
+                                                                    : 'bg-brand text-white border-transparent hover:bg-brand-600'
+                                                        }`}
+                                                    >
+                                                        {isLive ? 'Katıl' : isDone ? 'Rapor' : 'Görüntüle'}
+                                                    </button>
+                                                )}
+
+                                                {/* Ertele / iptal / sil — mevcut satır menüsü.
+                                                    Prototipte tek bir CTA var ama bu üç işlem
+                                                    başka hiçbir ekrandan yapılamıyor. */}
+                                                {!s._fromInvite && (
+                                                    <div className="relative">
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); setOpenMenuId(isMenuOpen ? null : sessionKey); }}
+                                                            className={`w-6 h-6 flex items-center justify-center rounded ${
+                                                                isMenuOpen ? 'bg-n100 text-n900' : 'text-n400 hover:bg-n50 hover:text-n900'
+                                                            }`}
+                                                            aria-label="Diğer işlemler"
+                                                        >
+                                                            <MoreVertical className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        {isMenuOpen && (
+                                                            <div
+                                                                className="absolute right-0 top-7 w-44 bg-n0 rounded-[10px] shadow-lg border border-n200 py-1 z-40"
+                                                                onClick={(e) => e.stopPropagation()}
+                                                            >
+                                                                {canModify && !isCancelled && (
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setOpenMenuId(null);
+                                                                            setPostponeModal({ candidateId: resolvedCandidateId, sessionId: sessionKey, date: s.date || '', time: s.time || '09:00' });
+                                                                        }}
+                                                                        className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-semibold text-warn hover:bg-warn-bg text-left"
+                                                                    >
+                                                                        <AlertCircle className="w-3.5 h-3.5" /> Ertele
+                                                                    </button>
+                                                                )}
+                                                                {canModify && !isCancelled && (
+                                                                    <button
+                                                                        onClick={async () => {
+                                                                            setOpenMenuId(null);
+                                                                            if (window.confirm('Bu mülakatı iptal etmek istediğinize emin misiniz?')) {
+                                                                                await handleUpdateSessionStatus(resolvedCandidateId, sessionKey, 'cancelled');
+                                                                            }
+                                                                        }}
+                                                                        className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-semibold text-bad hover:bg-bad-bg text-left"
+                                                                    >
+                                                                        <AlertTriangle className="w-3.5 h-3.5" /> İptal Et
+                                                                    </button>
+                                                                )}
+                                                                {isCancelled && (
+                                                                    <button
+                                                                        onClick={async () => {
+                                                                            setOpenMenuId(null);
+                                                                            await handleUpdateSessionStatus(resolvedCandidateId, sessionKey, 'scheduled');
+                                                                        }}
+                                                                        className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-semibold text-brand hover:bg-brand-50 text-left"
+                                                                    >
+                                                                        <RefreshCw className="w-3.5 h-3.5" /> Yeniden Planla
+                                                                    </button>
+                                                                )}
+                                                                <div className="my-1 border-t border-n100" />
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setOpenMenuId(null);
+                                                                        handleDeleteSession(resolvedCandidateId, sessionKey);
+                                                                    }}
+                                                                    className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-semibold text-n500 hover:bg-n50 text-left"
+                                                                >
+                                                                    <Trash2 className="w-3.5 h-3.5" /> Sil
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
-                                        <h4 className="text-sm font-semibold text-[#0F172A] mb-1">Bu gün için planlanmış mülakat yok</h4>
-                                        <p className="text-xs text-[#64748B] max-w-[200px] mb-6">Yeni bir mülakat planlayarak süreci başlatabilirsiniz.</p>
-                                        <button
-                                            onClick={openWizardWithDate}
-                                            className="text-sm font-semibold text-[#13294E] hover:underline flex items-center gap-1.5"
-                                        >
-                                            <Plus className="w-4 h-4" /> Yeni Planla
-                                        </button>
-                                    </div>
-                                );
-                                })()}
+                                    );
+                                })}
                             </div>
 
-                            {/* Hızlı Planlama */}
-                            <div className="bg-white border-t border-[#E2E8F0] p-5 mx-4 mb-4 rounded-2xl shadow-sm flex-shrink-0">
-                                <h4 className="text-xs font-black text-[#0F172A] uppercase tracking-wider mb-3 flex items-center gap-2">
-                                    <Plus className="w-3.5 h-3.5 text-[#13294E]" /> Hızlı Planlama
-                                </h4>
-                                <button
-                                    onClick={openWizardWithDate}
-                                    className="w-full bg-[#13294E] text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-800 transition-colors flex items-center justify-center gap-2"
-                                >
-                                    <Plus className="w-4 h-4" />
-                                    {selectedCalDate
-                                        ? new Date(selectedCalDate + 'T12:00:00').toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' }) + ' için Planla'
-                                        : 'Yeni Seans Planla'}
-                                </button>
-                                <p className="text-xs text-[#94A3B8] text-center mt-2">Tam sihirbaz 4 adımda planlamanıza yardımcı olur</p>
+                            {/* Sayfalama — gerçek sayfalar, dekoratif değil. */}
+                            <div className="px-[18px] py-2.5 border-t border-n200 flex items-center text-[12px] text-n500 flex-shrink-0">
+                                <span>
+                                    {ivRowsAll.length === 0
+                                        ? 'Kayıt yok'
+                                        : `${ivPage * IV_PAGE_SIZE + 1}–${Math.min(ivRowsAll.length, (ivPage + 1) * IV_PAGE_SIZE)} / ${ivRowsAll.length} mülakat`}
+                                </span>
+                                <div className="ml-auto flex items-center gap-3">
+                                    <button
+                                        onClick={() => setIvPage(p => Math.max(0, p - 1))}
+                                        disabled={ivPage === 0}
+                                        className="text-brand font-medium disabled:text-n300 disabled:cursor-not-allowed"
+                                    >
+                                        ← Önceki
+                                    </button>
+                                    <button
+                                        onClick={() => setIvPage(p => Math.min(ivPageCount - 1, p + 1))}
+                                        disabled={ivPage >= ivPageCount - 1}
+                                        className="text-brand font-medium disabled:text-n300 disabled:cursor-not-allowed"
+                                    >
+                                        Sonraki →
+                                    </button>
+                                </div>
                             </div>
                         </div>
+
+                        {/* SAĞ RAY: bugün + değerlendirici yükü ───────────────── */}
+                        <aside className="p-3.5 flex flex-col gap-3 bg-n25 overflow-y-auto custom-scrollbar">
+                            <div>
+                                <div className="flex items-center justify-between mb-2.5">
+                                    <span className="text-[11px] font-semibold text-n500 tracking-[0.08em] uppercase">Bugün</span>
+                                    <span className="text-[11px] text-n400">
+                                        {new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })}
+                                    </span>
+                                </div>
+                                {todaySessions.length === 0 ? (
+                                    <div className="text-[12px] text-n400 py-3">Bugüne planlı mülakat yok.</div>
+                                ) : todaySessions.map(s => {
+                                    const status = s._effectiveStatus || s.status;
+                                    const chip = ivStatusChip(status, s._effectiveCompleted);
+                                    return (
+                                        <button
+                                            key={`today-${s.id}`}
+                                            onClick={() => {
+                                                if (s._effectiveCompleted) { navigate(`/interview-report/${s.id}`); return; }
+                                                navigate(s.mode === 'face_to_face' ? `/face-interview/${s.id}` : `/live-interview/${s.id}`);
+                                            }}
+                                            className="w-full flex items-center gap-2.5 py-2 border-t border-n100 text-left hover:bg-n50"
+                                        >
+                                            <span className="w-10 flex-none text-[12px] font-semibold">{s.time || '—'}</span>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-[12px] font-medium truncate">{s.candidateName}</div>
+                                                <div className="text-[11px] text-n400 truncate">{s.role || '—'}</div>
+                                            </div>
+                                            <span
+                                                className="flex-none text-[11px] font-semibold px-[7px] py-0.5 rounded-full"
+                                                style={{ background: chip.bg, color: chip.fg }}
+                                            >
+                                                {chip.label}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            <div className="h-px bg-n200" />
+
+                            <div>
+                                <div className="text-[11px] font-semibold text-n500 tracking-[0.08em] uppercase mb-2.5">
+                                    Değerlendirici yükü
+                                </div>
+                                {reviewerLoad.length === 0 ? (
+                                    <div className="text-[12px] text-n400 py-1">Planlı mülakat yok.</div>
+                                ) : reviewerLoad.map(r => (
+                                    <div key={r.name} className="flex items-center gap-2 py-[5px]">
+                                        <span className="flex-1 text-[12px] text-n600 truncate">{r.name}</span>
+                                        <span className="text-[12px] font-semibold">{r.count}</span>
+                                    </div>
+                                ))}
+                                <p className="text-[11px] text-n400 mt-2 m-0">
+                                    Tamamlanmamış mülakat sayısı.
+                                </p>
+                            </div>
+                        </aside>
                     </div>
                 </div>
             )}
@@ -2888,6 +3039,11 @@ export default function InterviewManagementPage() {
             onClose={() => setSalaryBackfillOpen(false)}
             candidates={enrichedCandidates}
             uid={userId}
+        />
+
+        <SalaryBandModal
+            open={salaryBandOpen}
+            onClose={() => setSalaryBandOpen(false)}
         />
     </div>
     );
