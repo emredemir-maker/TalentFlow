@@ -9,7 +9,13 @@ import AddCandidateModal from '../components/AddCandidateModal';
 import { doc, getDoc, collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { STAGES, getStage } from '../utils/pipelineStages';
-import { resolveStageKey, cleanRoleText, isDeepScanned } from '../utils/candidateTable';
+import {
+    resolveStageKey,
+    cleanRoleText,
+    isDeepScanned,
+    withCoherentScores,
+} from '../utils/candidateTable';
+import { calculateMatchScore } from '../services/matchService';
 import {
     Users,
     Target,
@@ -132,9 +138,6 @@ export default function Dashboard() {
         loading: candidatesLoading,
     } = useCandidates();
 
-    // Sabit referans: enrichedCandidates yokken her render yeni bir [] üretmek
-    // aşağıdaki tüm useMemo bağımlılıklarını geçersiz kılıyordu.
-    const candidates = useMemo(() => enrichedCandidates || [], [enrichedCandidates]);
     const [selectedCandidate, setSelectedCandidate] = useState(null);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     // Havuzun aşama süzgeci ve kuyruktan elle çıkarılanlar — ikisi de yalnızca
@@ -163,8 +166,28 @@ export default function Dashboard() {
     // Drives the skeleton placeholders below so KPIs don't flash 0 → real value.
     const isLoading = candidatesLoading || positionsLoading;
 
-    const activePositions = useMemo(() => positions.filter(p => p.status === 'open').slice(0, 4), [positions]);
-    const allOpenCount = useMemo(() => positions.filter(p => p.status === 'open').length, [positions]);
+    const openPositions = useMemo(() => positions.filter(p => p.status === 'open'), [positions]);
+    const activePositions = useMemo(() => openPositions.slice(0, 4), [openPositions]);
+    const allOpenCount = openPositions.length;
+
+    /**
+     * SKOR TUTARLILIĞI — havuzdaki "CV uyumu", Aday Detayı'ndaki CV Analizi ile
+     * AYNI sayı olmak zorunda.
+     *
+     * `enrichedCandidates[].bestScore` ham hâliyle adayın TÜM pozisyon
+     * analizlerinin maksimumu. Aday Detayı ise adayın atandığı pozisyonun
+     * skorunu gösteriyor. En yüksek skoru başka bir pozisyonda olan adaylarda
+     * iki ekran farklı sayı veriyordu.
+     *
+     * `withCoherentScores`, Adaylar tablosunun da kullandığı düzeltme:
+     * bestScore'u `scoreForPositionDetail` ile adayın kendi pozisyonuna göre
+     * yeniden hesaplıyor. Çağrı kalıbı CandidatesTablePage ile birebir aynı —
+     * ikinci bir cetvel üretmemek için.
+     */
+    const candidates = useMemo(
+        () => withCoherentScores(enrichedCandidates || [], openPositions, (c, p) => calculateMatchScore(c, p).score),
+        [enrichedCandidates, openPositions]
+    );
 
     const candidateById = useMemo(() => new Map(candidates.map(c => [c.id, c])), [candidates]);
 

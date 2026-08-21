@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useCandidates } from '../context/CandidatesContext';
+import { usePositions } from '../context/PositionsContext';
 import CandidateDrawer from '../components/CandidateDrawer';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -8,6 +9,8 @@ import {
     List, ArrowUpRight, ChevronRight, MousePointerClick, Upload, X,
 } from 'lucide-react';
 import { STAGES as STAGE_DEFS } from '../utils/pipelineStages';
+import { withCoherentScores } from '../utils/candidateTable';
+import { calculateMatchScore } from '../services/matchService';
 
 function resolveStage(status) {
     if (!status) return 'ai_analysis';
@@ -147,12 +150,24 @@ const TYPE_MAP = { technical: 'Teknik', hr: 'İK', product: 'Ürün', cultural: 
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function PipelinePage() {
-    // enrichedCandidates: ham `candidates` ile AYNI liste, üstüne bestScore /
-    // bestTitle eklenmiş hâli. Kartlardaki skorun Kontrol Paneli havuzundaki
-    // "CV uyumu" ile aynı sayı olması için kaynak burası olmak zorunda; ham
-    // listede bestScore alanı yok.
     const { enrichedCandidates, updateCandidate, setViewCandidateId } = useCandidates();
-    const candidates = useMemo(() => enrichedCandidates || [], [enrichedCandidates]);
+    const { positions } = usePositions();
+    const openPositions = useMemo(() => positions.filter(p => p.status === 'open'), [positions]);
+
+    /**
+     * Kart skorları Kontrol Paneli havuzu ve Aday Detayı ile AYNI cetvelden
+     * gelmek zorunda.
+     *
+     * Ham `candidates` listesinde bestScore alanı hiç yok; enrichedCandidates
+     * onu ekliyor ama TÜM pozisyon analizlerinin maksimumu olarak. Aday Detayı
+     * ise adayın atandığı pozisyonun skorunu gösteriyor. `withCoherentScores`
+     * bu farkı kapatıyor — Adaylar tablosu ve Kontrol Paneli ile birebir aynı
+     * çağrı.
+     */
+    const candidates = useMemo(
+        () => withCoherentScores(enrichedCandidates || [], openPositions, (c, p) => calculateMatchScore(c, p).score),
+        [enrichedCandidates, openPositions]
+    );
     const [tab, setTab] = useState('kanban'); // 'kanban' | 'interviews'
     const [search, setSearch] = useState('');
     const [ivFilter, setIvFilter] = useState('all');
