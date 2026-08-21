@@ -1,0 +1,285 @@
+# Infoset Redesign — Devir Teslim
+
+TalentFlow'un 9 çekirdek ekranının Infoset Design System diliyle yeniden
+üretilmesi. Bu belge yeni bir oturumun sıfırdan bağlam kurmadan devam
+edebilmesi için yazıldı.
+
+## Kaynak dosyalar
+
+Hepsi `Incomplete mockup request/design_handoff_talentflow/` altında:
+
+| Dosya | Ne işe yarar |
+|---|---|
+| `README.md` | Görev tanımı, ekran→dosya tablosu, onaylanmış kararlar |
+| `TalentFlow Prototip.dc.html` | 2005 satır, tıklanabilir hifi prototip |
+| `pdata.js` | 638 satır, prototip verisi — **canlı mülakat ekranının spec'i burada** |
+| `_ds/…/colors_and_type.css` | Token kaynağı |
+
+## Kullanıcının kuralları (değişmez)
+
+1. HTML kopyalanmaz; ekranlar mevcut React bileşenlerinde yeniden üretilir.
+   Renk/spacing/tipografi prototipin inline stillerinden birebir alınır.
+2. **Hiçbir uygulama özelliği bozulmaz.** `src/utils/`, `src/services/`,
+   `src/config/` DEĞİŞTİRİLMEZ. State, route, onClick ve veri akışları korunur.
+   Sadece JSX yapısı ve stiller değişir.
+3. Ekran ekran ilerlenir; her ekrandan sonra uygulama açılıp doğrulanır ve
+   **ayrı commit** atılır.
+4. Doğrulama: Aday Detayı'nda CV Analizi ile havuz listesindeki sayı **eşleşmeli**.
+   STAR ölçeği 0–3, etiketler `starDimensions.js`'ten.
+5. README'deki onaylanmış kararların tamamı uygulanır.
+6. Emin olunmayan davranışta mevcut kod korunur ve **sonunda sorulur** —
+   tahminle değiştirilmez.
+7. Bitince ekran başına tek satırlık değişiklik özeti çıkarılır.
+
+### Kullanıcının çalışma tercihleri
+
+- **PR akışı:** ekran ekran ayrı PR, **doğrudan `main` tabanlı**. Kullanıcı
+  dakikalar içinde merge ediyor; açık PR'a sonradan iş eklenmez.
+- Açıklamalar sade ve yönlendirici olmalı.
+- Anahtar/parola paylaşılmaz; güvenlik ayarlarını kullanıcı kendi yapar.
+
+## Durum
+
+| # | Ekran | Dosya | Durum |
+|---|---|---|---|
+| — | Token temeli | `src/index.css` | ✅ merged (#194) |
+| 1 | Kontrol Paneli | `Dashboard.jsx` | ✅ merged (#194) |
+| 2 | Pipeline | `PipelinePage.jsx` | ✅ merged (#197) |
+| 3 | AI Match | `AIMatchPage.jsx` | ⛔ **atlandı** (aşağıda) |
+| 4 | Mülakat Listesi + Planlama | `InterviewManagementPage.jsx` | ⬜ **sıradaki** |
+| 5 | Canlı Mülakat | `LiveInterviewPage.jsx`, `AgentThoughtPanel.jsx` | ⬜ |
+| 6 | Rapor | `InterviewReportPage.jsx`, `InterviewReportSections.jsx`, `StarScoreCard.jsx` | ⬜ |
+| 7 | İK Asistanı | `HrAssistantPanel.jsx` | ⬜ |
+| 8 | Aday Detayı | `CandidateProcessPage.jsx`, `CandidateCvPanel.jsx` | ⬜ |
+
+Ek olarak merged: #196 (yerel giriş COOP düzeltmesi).
+**Açık PR: #198** — havuz skor tutarlılığı + aday tıklaması doğru sayfaya.
+
+Merge sonrası silinebilecek dallar: `redesign/01-kontrol-paneli`,
+`redesign/02-pipeline`, `redesign/02-pipeline-main`.
+
+## İşe yarayan döngü
+
+Her ekran için sırayla:
+
+```
+1. Prototip bloğunu oku (satır haritası aşağıda)
+2. Mevcut dosyayı TAMAMEN oku — hangi state/handler korunacak, çıkar
+3. SKOR gösteren her yer için: withCoherentScores çağrılıyor mu? (bkz. Ders 1)
+4. Yaz
+5. npx eslint <dosya>
+6. npm run build
+7. npx vitest run
+8. npm run build:e2e-auth && npx vite preview --port 4173
+   → tarayıcıda render + konsol hatası kontrolü
+9. npm run build   ← dist'i üretim derlemesine geri al (ÖNEMLİ)
+10. git checkout -- dist/   ← derleme çıktısı PR'a girmesin
+11. commit → main tabanlı dal → PR
+```
+
+**8. adım neden:** yerel giriş Google popup'ı gerektiriyor ve Claude
+şifre giremiyor. `VITE_E2E_MOCK_AUTH` modu auth'u tamamen atlıyor, böylece
+ekranın çöküp çökmediği doğrulanabiliyor. Veri boş gelir — layout ve konsol
+hatası için yeterli, skor doğrulaması için değil.
+
+**9–10. adım neden:** mock-auth derlemesi `dist/`'i eziyor. Bırakılırsa
+auth'u baypas eden bir derleme repoda kalır. `dist` hem `.gitignore`'da hem
+izleniyor (eski bir kalıntı), o yüzden elle geri alınmalı.
+
+### Token kontrolü (tarayıcıda)
+
+```js
+getComputedStyle(document.querySelector('.infoset')).fontFamily  // Poppins
+// header 52px, canvas #FBFBFD, kenarlık #E2E5EE, marka #5068FF, radius 6px
+```
+
+## Prototip satır haritası
+
+`TalentFlow Prototip.dc.html` içinde:
+
+| Ekran | Satırlar |
+|---|---|
+| Kontrol Paneli (`isDash`) | 57–175 |
+| Aday Detayı (`isCand`) | 178–689 |
+| Pipeline (`isPipe`) | 692–760 |
+| AI Match (`isMatch`) | 763–861 |
+| Mülakat Listesi (`isIv`) | 864–940 |
+| Planlama (`isSch`) | 943–1015 |
+| Rapor (`isRep`) | 1018–1119 |
+| Modaller (elle mülakat, maaş bandı, aday yükleme, red, HR asistanı, toast) | 1123–1313 |
+
+**Canlı Mülakat ekranının render bloğu HTML'de YOK.** Ama tam veri modeli
+`pdata.js` satır 364–410'da duruyor ve export ediliyor: `transcript`
+(konuşma balonları, mülakatçı/aday renkleri), `wave` (30 çubuk ses dalgası),
+`liveAgentSteps` (Veri Ayıklama → Semantik Eşleşme → Risk Analizi → Otonom
+Karar), `qSets` (Derinleştir/Doğrula/Kapanış), `suggested` (3 soru önerisi),
+`starDims` (0–3, `ANCHOR_LABELS`). Ekran 5 bu spec'ten kurulacak — uydurma
+olmaz, veri kesin.
+
+## Onaylanmış tasarım kararları
+
+| Karar | Durum |
+|---|---|
+| Funnel chart kaldırıldı | ✅ Ekran 1 |
+| Mülakat takvimi düz listeye | ✅ Ekran 1 · ⬜ Ekran 4 |
+| Toplu Yükleme / Yeni Aday Kontrol Paneli'ne + havuz başlığına | ✅ Ekran 1 |
+| Mülakat oluşturma menüsü (Adımlı/Hızlı/Manuel/Maaş) | ✅ **zaten vardı** (`InterviewManagementPage.jsx:2106`) |
+| Menüde "Maaş Aralığı Tanımla" | ⬜ **eksik** — Ekran 4 |
+| Manuel mülakatlarda "transkript yok" uyarısı | ⬜ Ekran 4 |
+| Maaş modalı kendi pozisyon state'ini kullanır | ⬜ Ekran 4 |
+| Aday Detayı 7 sekme + zorunlu kapısı + skor kırılımı + alt aksiyon çubuğu | ⬜ Ekran 8 |
+| Toolbar tek satır 28px pill | ⬜ Ekran 8 |
+| STAR ölçeği her yerde 0–3 | ⬜ Ekran 5/6 |
+
+## Bu oturumda alınan kararlar
+
+| Soru | Karar |
+|---|---|
+| Kuyruk gerekçeleri nereden gelecek? | **Gerçek kurallardan** — uydurma "AI önceliklendirdi" yok |
+| ROI kartı / Açık Pozisyonlar | ROI kaldırıldı, Açık Pozisyonlar sağ rayda korundu |
+| Pipeline'daki Mülakatlar sekmesi | **Korundu** (prototipte yok ama çalışan görünüm) |
+| "Süreçten çıkar" | Mevcut red akışını açar — sebepsiz ikinci yol açılmaz |
+| AI Match ekranı | **Atlandı** (aşağıda) |
+| "Maaş Aralığı Tanımla" | Redesign işine dahil, Ekran 4 PR'ında |
+| PR biçimi | Ekran ekran, doğrudan `main` tabanlı |
+
+## Ekran 3 (AI Match) neden atlandı
+
+`AIMatchPage.jsx` (426 satır) `App.jsx`'te **hiçbir route'a bağlı değil**;
+`analysisCallSites.test.js` onu `DEAD_FILES` listesinde tutuyor. Menüye
+bağlamak tasarım işi değil, **veri bozan bir düğme** eklemek olurdu:
+
+1. `analyzeCandidateMatch(jd, candidate, model)` — **4. argümanı geçmiyor.**
+   Canlı çağrı noktalarının hepsi `{ requirements }` geçiyor
+   (`scanService.js:98,202`, `CandidateDrawer:234`, `SystemScanner:313`,
+   `AddCandidateModal:207`, `ApplyPage:295`). Argüman gelmeyince
+   `calculateHybridScore` "eski davranış" dalına düşüyor — zorunlu/tercihen
+   ağırlıklı kapsama devre dışı.
+2. Sonucu **eski şemayla** yazıyor: düz `matchScore` + `aiAnalysis`.
+   Canlı akış `positionAnalyses[positionTitle]` yazıyor.
+3. `PREDEFINED_POSITIONS` kullanan **tek dosya** — uygulama pozisyonları
+   Firestore'dan alıyor.
+4. Bunu `filteredCandidates` üzerinde **döngüyle** yapıyor.
+
+Yani "Eşleştir" düğmesine basan biri, süzülmüş tüm adayların analizini eski
+cetvelle hesaplanmış, yanlış şemaya yazılmış sonuçlarla ezer.
+
+İstenirse ayrı bir iş olarak mevcut mimari üzerine yeniden yazılabilir.
+`agenticWorkflow.js` de aynı `DEAD_FILES` listesinde ve o da
+`analyzeCandidateMatch` çağırıyor.
+
+## Ekran 4 planı (sıradaki)
+
+`src/pages/InterviewManagementPage.jsx` — **2894 satır, 63 hook.** Tek
+oturumda yeniden yazılmaz; tek PR içinde üç parça hâlinde ilerlenmeli.
+
+| Parça | Kapsam |
+|---|---|
+| **A. Liste** | Takvim görünümü → prototipin 7 kolonlu tablosu: Aday, Pozisyon, Tür, Tarih & saat, Değerlendirici, Durum, Aksiyon (prototip 864–940). Üstte sekme pill'leri, altta sayfalama satırı |
+| **B. Sağ ray (280px)** | "Bugün" düz listesi (saat, ad, rol, rozet) + ayraç + "Değerlendirici yükü" (ad + sayı) |
+| **C. Maaş Aralığı Tanımla** | "Yeni Mülakat" menüsüne 6. madde. **Kendi pozisyon seçicisi** olacak (README: "CV yükleme akışıyla çakışmaz"). Bant tanımı bugün `PositionsPage.jsx`'te, pozisyonun özelliği olarak duruyor; mantık `src/utils/salaryBand.js` (`normalizeBand`, `formatBand`, `BASES`, `PERIODS`) |
+
+Mevcut menü `InterviewManagementPage.jsx:2106` civarında ve beş maddesi var:
+Seans Planla, Hızlı Mülakat Başlat, Yüz Yüze Mülakat, Manuel Görüşme Ekle,
+Maaş Beklentilerini Tara. Menünün kendisi hazır — C parçası ona bir madde
+ekliyor.
+
+Ayrıca "Manuel eklenen mülakatlarda transkript yok uyarısı" kararı da bu
+ekranda; `AddManualInterviewModal.jsx`'e bakılmalı.
+
+> ⚠️ `AddManualInterviewModal.jsx` `FormBody(props)` üzerinden render ediyor.
+> Bu dosyada daha önce iki kez props destructure'ına payload satırı eklendi.
+> Düzenlerken dikkat.
+
+## Dersler — bunlar tekrar edilmemeli
+
+### 1. Skor kaynağı üç kez kaydı
+
+Bu kodbazda "hangi skor" sorusunun **tek doğru cevabı** var:
+
+```js
+withCoherentScores(enrichedCandidates, openPositions, (c, p) => calculateMatchScore(c, p).score)
+```
+
+Kalıp `CandidatesTablePage.jsx:399`'da. Skor gösteren her yeni ekranda
+**önce bu çağrılmalı.** Kayma geçmişi:
+
+| Yanlış kaynak | Neden yanlış |
+|---|---|
+| `combinedScore` | Görüşme skorunu CV skoruyla ortalıyor `(bestAiScore + interviewScore) / 2` |
+| ham `candidates` | `bestScore` alanı hiç yok — enrichment ekliyor |
+| ham `bestScore` | Adayın **tüm** pozisyon analizlerinin maksimumu; Aday Detayı **atandığı** pozisyonu gösteriyor |
+
+`withCoherentScores` içindeki not zaten uyarıyor: *"Math.max KALKTI… Üç
+cetveli yarıştırıp en cömerdini seçmek, sıralamayı anlamsız kılıyordu."*
+
+### 2. Var olan state, kullanılıyor demek değil
+
+Kontrol Paneli'nde `selectedCandidate` state'i vardı ama **hiçbir yer set
+etmiyordu** — `CandidateDrawer` ölü koddu. "Mevcut state'i koruyorum" diye
+havuz satırını ona bağlayınca kullanımdan kalkmış bir ekran geri geldi.
+
+Kullanıcı o çekmeceyi kullanmıyor. Aday detayı için doğru zincir:
+
+```js
+setViewCandidateId(id);
+window.dispatchEvent(new CustomEvent('changeView', { detail: 'candidate-process' }));
+```
+
+Bir bileşene bağlanmadan önce: **bugün gerçekten açılıyor mu?**
+
+### 3. Yaptığını iddia eden ama yapmayan düğme koyma
+
+"Toplu Yükleme" düğmesi sayfaya yönlendirip modalı açmıyordu. Çözüm kalıbı:
+hedef sayfada olay dinleyicisi + kaynakta `changeView` sonrası `setTimeout(…, 80)`
+ile olay. Bugün iki tane var: `openBulkUpload`, `openAddCandidate`
+(ikisi de `CandidateProcessPage.jsx`).
+
+Aynı sebeple **eklenmeyenler:** dekoratif satır seçim kutusu (toplu seçim
+davranışı yok), prototipin "AI Match" düğmesi (hedef ekran ölü).
+
+### 4. Uydurma ölçüm sunma
+
+Prototip kuyruk başlığında "AI önceliklendirdi" diyor — öyle bir mekanizma
+yok. Kuyruk beş deterministik kuralla kuruldu ve karttaki gerekçe, adayı
+oraya sokan koşulun okunabilir hâli. KPI trend chip'leri de (`+12`, `+5`)
+geri getirilmedi: gerçek bir trend kaynağı yok, `change: null` duruyor.
+
+### 5. PR tabanı
+
+Bir PR'ın tabanı başka bir PR'ın dalıysa, taban merge edilse bile GitHub
+hedefi otomatik `main`'e **çevirmiyor** — bunu yalnızca taban dal
+silindiğinde yapıyor. #195 bu yüzden `main`'i ıskaladı ve #197 ile yeniden
+gönderildi. **Ekran PR'ları doğrudan `main` tabanlı açılmalı.**
+
+### 6. Dev sunucusu açıkken dal değiştirme
+
+Vite HMR dal atlamalarında eski modülleri tutabiliyor ve ekran "ne yeni ne
+eski" bir karışıma dönüyor. Dal değiştirdikten sonra:
+
+```
+rm -rf node_modules/.vite && npm run dev
+```
+
+ve tarayıcıda sert yenileme (Ctrl+Shift+R).
+
+## Redesign dışı, hâlâ açık
+
+- **Gemini API anahtarı + OAuth `clientSecret` rotasyonu** — sızıntı sonrası
+  hâlâ yapılmadı. Sıra: yeni anahtar → Ayarlar ekranından kaydet → GitHub
+  Secret `VITE_GEMINI_API_KEY` → sonra eskisini sil.
+- **`.env.bak`** proje kökünde ve `.gitignore`'da değil.
+- **`dist/`** hem `.gitignore`'da hem git'te izleniyor — tutarsız.
+- **"1 analizi eskimiş" hatası** — kalıcı; hipotez (analizi olup CV gövdesi
+  olmayan aday tarayıcı tarafından atlanıyor) **doğrulanmadı**.
+- **`interviewCoverage[position]`** yalnızca TEK kayıt tutuyor.
+- **Mülakat raporunda maaş beklentisi düğmesi yok** — mevcut mülakatlara
+  beklenti girilemiyor. Toplu geriye dönük tarama tasarımı
+  `docs/PLAN-ik-asistani.md`'de.
+
+## Asla yapılmayacaklar
+
+- `firebase deploy` elle çalıştırılmaz — `functions/.env.production`'ı şablon
+  değerlerle ezer. Yalnızca CI deploy'u secret'ları doğru yazıyor.
+- Faturalandırma tavanı yükseltilmez, yeni fatura hesabı açılmaz.
+- API anahtarları sohbete yazılmaz.
