@@ -50,12 +50,14 @@ Hepsi `Incomplete mockup request/design_handoff_talentflow/` altında:
 | 5 | Canlı Mülakat | `LiveInterviewPage.jsx` | 🟡 **PR #201 açık** |
 | 6 | Rapor | `InterviewReportPage.jsx`, `InterviewReportSections.jsx` | 🟡 **PR #203 açık** |
 | 7 | İK Asistanı | `HrAssistantPanel.jsx`, `PositionDraftCard.jsx` | ✅ merged (#205) |
-| 8 | Aday Detayı | `CandidateProcessPage.jsx` + 6 panel | 🟡 **PR #207 açık — SON EKRAN** |
+| 8 | Aday Detayı | `CandidateProcessPage.jsx` + 6 panel | ✅ merged (#207) |
+| + | Aday Havuzu | `CandidatesTablePage.jsx` | 🟡 **PR #209** |
+| + | Pozisyonlar | `PositionsPage.jsx` | 🟡 **PR #210** |
 
 Ek olarak merged: #196 (yerel giriş COOP düzeltmesi), #198 (havuz skor
 tutarlılığı + aday tıklaması doğru sayfaya).
 Ekran 4 merged (#199), belge #200 ile `main`'e taşındı.
-**Açık PR: #207** (Ekran 8). Diğer sekiz ekranın hepsi merge edildi.
+Prototipin dokuz ekranı merge edildi. **Açık PR: #209** (Aday Havuzu), **#210** (Pozisyonlar).
 
 > ⚠️ Bu belge #198 merge edildikten SONRA o dala işlendiği için `main`'e
 > hiç girmemişti; buraya cherry-pick ile taşındı. Belge güncellemeleri
@@ -386,19 +388,56 @@ ve build/eslint hiçbir şey söylemez.
 (`bg-amber-500` → `bg-amber-50`), sonra dosyaları kalıntı için tara.
 Ekran 8'de yedi yerde oluştu ve elle düzeltildi.
 
-## Redesign bitti — bundan sonrası
+## Prototip bitti — kapsam genişletiliyor
 
-Dokuz ekranın **sekizi** Infoset diline geçti; Ekran 3 (AI Match)
-kalıcı olarak atlandı (gerekçe yukarıda).
+Prototipin dokuz ekranının **sekizi** Infoset diline geçti (Ekran 3
+kalıcı olarak atlandı). Sonrasında prototip dışı ekranlara devam edildi.
 
-**Kapsam artık `body`'ye taşınabilir.** `src/index.css`'teki `.infoset`
-bloğunun başındaki not bunu söylüyordu: kapsam ekran ekran doğrulama
-bitene kadar dardı. Bitti. Taşımadan önce dokunulmamış ekranlar
-(Ayarlar, Pozisyonlar, Analitik, Rehber, ApplyPage…) tek tek açılıp
-bakılmalı — hepsi eski dilde ve `body`'ye taşımak onları da değiştirir.
+### `.infoset` kapsamını body'ye taşımak HENÜZ ERKEN
 
-Ayrıca hâlâ açık: aday görünümü (Ekran 5) koyu hâliyle duruyor ve
-prototipte karşılığı yok.
+Bu belge önceden "artık `body`'ye taşınabilir" diyordu. Sayılar taşımanın
+erken olduğunu gösteriyor:
+
+- Uygulamada **28 sayfa** var, Infoset diline geçen **9 tanesi**
+  (7 prototip ekranı + Aday Havuzu + Pozisyonlar).
+- Kapsamı `body`'ye almak kalan **19 sayfayı yarı-dönüşmüş** hâle
+  sokar: Poppins ve `#FBFBFD` zemin gelir, ama slate/cyan renkleri,
+  `font-black` ve VERSAL yazımlar olduğu gibi kalır.
+
+Taşımak dokunulmamış ekranları düzeltmez, **tutarsız hâle getirir.**
+Önce onların çevrilmesi gerekiyor.
+
+### Kalan erişilebilir İK ekranları
+
+| Ekran | Satır | Not |
+|---|---|---|
+| Mesajlar | 712 | |
+| Analitik | 651 | |
+| Ayarlar | 672 | Kaynaklar / Departmanlar / Rehber sekmelerini de kapsıyor |
+| Yüz yüze mülakat | — | `FaceToFacePage` |
+| Aday tarafı | — | `ApplyPage`, `CandidateRespondPage`, `CandidateExitPage`, `LoginPage` |
+| Yalnızca super_admin | — | `TechDocsPage`, `IntegrationsPage` |
+
+## Toplu className dönüşümü — çalışan yöntem
+
+Ekran 7'den beri kullanılan yöntem: sınıf adlarını eşleme tablosuyla
+toplu değiştir, sonra kalıntı tara. Metinlere ve mantığa hiç dokunmadığı
+için diff denetlenebilir kalıyor. İki kural şart:
+
+1. **Uzun ad kısa addan ÖNCE.** `bg-amber-50` önce uygulanırsa
+   `bg-amber-500`'ün de önekini yer ve geriye `bg-warn-bg0` gibi
+   **geçersiz** bir sınıf kalır. Tailwind onu sessizce yok sayar; build
+   ve eslint hiçbir şey söylemez. Ekran 8'de yedi yerde oluştu.
+2. **Sonra süpürge geçişi.** Eşleme tablosu yalnızca
+   `bg-`/`text-`/`border-` biliyor; `ring-`, `from-`, `to-`, `shadow-`,
+   `accent-`, `placeholder-` gibi önekler geriye kalıyor. Önekten
+   bağımsız bir regex geçişi bunları da kapatıyor (gölgeler
+   nötrleşiyor, gradyanlar tek renge düşüyor — prototipte ikisi de yok).
+
+**Dönüşüm sonrası okunurluk kontrolü:** renk kovaları daraldığı için
+`text-warn` + `hover:bg-warn` gibi metnin zeminle aynı renge düştüğü
+kombinasyonlar oluşabiliyor. Pozisyonlar ekranında bir düğmede tam
+olarak bu oldu. `text-X.*hover:bg-X` deseniyle taransın.
 
 ## Dersler — bunlar tekrar edilmemeli
 
