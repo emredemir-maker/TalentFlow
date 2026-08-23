@@ -49,13 +49,13 @@ Hepsi `Incomplete mockup request/design_handoff_talentflow/` altında:
 | 4 | Mülakat Listesi + Planlama | `InterviewManagementPage.jsx` | ✅ merged (#199) |
 | 5 | Canlı Mülakat | `LiveInterviewPage.jsx` | 🟡 **PR #201 açık** |
 | 6 | Rapor | `InterviewReportPage.jsx`, `InterviewReportSections.jsx` | 🟡 **PR #203 açık** |
-| 7 | İK Asistanı | `HrAssistantPanel.jsx`, `PositionDraftCard.jsx` | 🟡 **PR #205 açık** |
-| 8 | Aday Detayı | `CandidateProcessPage.jsx`, `CandidateCvPanel.jsx` | ⬜ **sıradaki — son ekran** |
+| 7 | İK Asistanı | `HrAssistantPanel.jsx`, `PositionDraftCard.jsx` | ✅ merged (#205) |
+| 8 | Aday Detayı | `CandidateProcessPage.jsx` + 6 panel | 🟡 **PR #207 açık — SON EKRAN** |
 
 Ek olarak merged: #196 (yerel giriş COOP düzeltmesi), #198 (havuz skor
 tutarlılığı + aday tıklaması doğru sayfaya).
 Ekran 4 merged (#199), belge #200 ile `main`'e taşındı.
-**Açık PR: #205** (Ekran 7). Ekran 5 ve 6 merge edildi.
+**Açık PR: #207** (Ekran 8). Diğer sekiz ekranın hepsi merge edildi.
 
 > ⚠️ Bu belge #198 merge edildikten SONRA o dala işlendiği için `main`'e
 > hiç girmemişti; buraya cherry-pick ile taşındı. Belge güncellemeleri
@@ -133,9 +133,9 @@ olmaz, veri kesin.
 | Menüde "Maaş Aralığı Tanımla" | ✅ Ekran 4 (#199) |
 | Manuel mülakatlarda "transkript yok" uyarısı | ✅ Ekran 4 (#199) |
 | Maaş modalı kendi pozisyon state'ini kullanır | ✅ Ekran 4 (#199) |
-| Aday Detayı 7 sekme + zorunlu kapısı + skor kırılımı + alt aksiyon çubuğu | ⬜ Ekran 8 |
-| Toolbar tek satır 28px pill | ⬜ Ekran 8 |
-| STAR ölçeği her yerde 0–3 | ⚠️ Ekran 5'te veri yok · ⚠️ Ekran 6'da alan zaten 0–100 · ⬜ **asıl yeri Ekran 8** |
+| Aday Detayı sekmeler + zorunlu kapısı + skor kırılımı + alt aksiyon çubuğu | ✅ Ekran 8 (#207) · sekme sayısı 8 kaldı, aşağıda |
+| Toolbar tek satır 28px pill | ✅ Ekran 8 (#207) |
+| STAR ölçeği her yerde 0–3 | ⚠️ Ekran 5'te veri yok · ⚠️ Ekran 6'da alan zaten 0–100 · ✅ Ekran 8'de **zaten uygulanmıştı** |
 
 ## Bu oturumda alınan kararlar
 
@@ -342,29 +342,63 @@ bir düğmeye koyunca düğme marka mavisi yerine `#FBFBFD` çıktı.
 **Kural:** `.infoset` sarmalayıcıda durur, zemin çocuk öğede. Zorunlu
 kalırsan `style={{ background: … }}` sınıf kuralını yener.
 
-## Ekran 8 planı (son ekran)
+## Ekran 8 — ne yapıldı (#207)
 
-`src/pages/CandidateProcessPage.jsx` + `src/components/CandidateCvPanel.jsx`.
-Prototip satırları **178–689** — en uzun blok.
+`CandidateProcessPage.jsx` + içinde render edilen **altı panel**
+(`CandidateCvPanel`, `ScoreBreakdownPanel`, `StarEvidenceCards`,
+`MustHaveBadge`, `InterviewPlanPanel`, `InterviewOutcomePanel`,
+`VerificationPanel`). Tek dosya bırakılsa ekranın yarısı eski dilde
+kalırdı.
 
-Onaylanmış kararlar (README):
-- **7 sekme:** STAR Analizi, CV, CV & Uyum, Pozisyon Eşleşmeleri,
-  Mülakatlar, Süreç Geçmişi, Mesajlar
-- Zorunlu gereksinim kapısı, skor kırılımı, alt aksiyon çubuğu
-  (sağda: Yorum, Mesaj Gönder, Sil, Aşama İlerlet)
-- Toolbar tek satır, 28px pill'ler
-- CV Uyum kolonu sağ padding ile genişletildi
+Araç çubuğu tek satır + 28px hap düğmeler; aday başlığı 44px avatar ve
+tek satır rozetler; sekme şeridi 12px / 2px alt çizgi, VERSAL kalktı;
+alt aksiyon çubuğu 28px'e indi; detay paneli kart olmaktan çıkıp tam
+genişliğe yayıldı.
 
-**STAR 0–3 kararının ASIL YERİ BURASI.** Bu ekran `candidate.starAnalysis`
-okuyor — `utils/starDimensions.js` (`STAR_MAX = 3`, `ANCHOR_LABELS`,
-`normalizeStarAnalysis`, `starPercent`, `anchorLabel`) tam olarak bu alan
-için yazıldı. Ekranda `/10` yazan bir yer kalırsa tam not alan boyut
-"3/10" görünür.
+**"%X Uyum" → "Endeks %X".** Ölçtüğü şey CV analizi ile mülakat
+kanıtının birleşimi; "uyum" tek kaynak varmış gibi okunuyordu.
 
-Ayrıca bu sayfada `openBulkUpload` ve `openAddCandidate` olay
-dinleyicileri var (Kontrol Paneli ve Pipeline oradan tetikliyor) —
-korunmalı. `ScoreBreakdownPanel.jsx` de skor kırılımını çiziyor ve
-`starLabels.test.js` metnini denetliyor.
+### Doğrulama sekmesi KORUNDU
+
+README 7 sekme sayıyor ve listede "Doğrulama" yok — ama o liste
+`VerificationPanel` (576 satır) yazılmadan önce hazırlanmış. CV
+istihbaratı, sektör uyumu, şirket doğrulama ve mülakat öncesi sorular
+orada. Tasarım listesi öyle diyor diye kaldırmak çalışan bir özelliğe
+erişimi silmek olurdu. **Sekme sayısı 8; kullanıcıya soruldu.**
+
+### STAR 0–3 zaten uygulanmıştı
+
+Kararın asıl yeri burasıydı ve kod hâlihazırda doğruydu:
+`ScoreBreakdownPanel` → `STAR_MAX` + `anchorLabel`, `StarEvidenceCards` →
+`normalizeStarAnalysis`, sayfa → `starPercent`. Tarayıcıda 3/3 · 2/3 ve
+ÖLÇÜLMÜŞ / ANLATILMIŞ çapalarıyla görüldü. **Değiştirilecek bir şey
+yoktu.**
+
+### ⚠️ Toplu sınıf eşlemesinde önek çarpışması
+
+Ekran 7 ve 8'de kullanılan toplu `className` dönüşümü hızlı ve
+denetlenebilir ama **bir tuzağı var**: `bg-amber-50` kuralı
+`bg-amber-500`'ün de önekini yer ve `bg-warn-bg0` gibi **geçersiz** bir
+sınıf üretir. Tailwind bunları sessizce yok sayar — düğme zeminsiz kalır
+ve build/eslint hiçbir şey söylemez.
+
+**Kural:** eşleme listesinde uzun adı kısa addan ÖNCE koy
+(`bg-amber-500` → `bg-amber-50`), sonra dosyaları kalıntı için tara.
+Ekran 8'de yedi yerde oluştu ve elle düzeltildi.
+
+## Redesign bitti — bundan sonrası
+
+Dokuz ekranın **sekizi** Infoset diline geçti; Ekran 3 (AI Match)
+kalıcı olarak atlandı (gerekçe yukarıda).
+
+**Kapsam artık `body`'ye taşınabilir.** `src/index.css`'teki `.infoset`
+bloğunun başındaki not bunu söylüyordu: kapsam ekran ekran doğrulama
+bitene kadar dardı. Bitti. Taşımadan önce dokunulmamış ekranlar
+(Ayarlar, Pozisyonlar, Analitik, Rehber, ApplyPage…) tek tek açılıp
+bakılmalı — hepsi eski dilde ve `body`'ye taşımak onları da değiştirir.
+
+Ayrıca hâlâ açık: aday görünümü (Ekran 5) koyu hâliyle duruyor ve
+prototipte karşılığı yok.
 
 ## Dersler — bunlar tekrar edilmemeli
 
