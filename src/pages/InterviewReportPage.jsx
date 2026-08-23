@@ -12,15 +12,49 @@ import {
     InterviewResultCard,
     RequirementVerdicts,
 } from '../components/InterviewReportSections';
-import { 
-    ChevronLeft, Share2, Download, Brain, 
-    Target, Star, MessageSquare, Clock, Zap, 
-    ShieldCheck, AlertCircle, FileText, DownloadCloud,
-    ExternalLink, Search, MoreHorizontal, Printer, Mail,
-    Users, TrendingUp, Award,
-    Sparkles, Briefcase, ArrowRight, Video,
-    ChevronDown, Loader2, RefreshCw
+// Kullanılmayan ikon adları çıkarıldı. Bunları eslint yakalamıyor:
+// no-unused-vars kuralı büyük harfle başlayan adları muaf tutuyor
+// (varsIgnorePattern /^[A-Z_]/), ikonların hepsi büyük harfle başlıyor.
+import {
+    ChevronLeft, ChevronDown, Share2, Download, Search,
+    Brain, Star, MessageSquare, Award, Sparkles,
+    Loader2, RefreshCw,
 } from 'lucide-react';
+
+/**
+ * STAR satırları — canlı mülakatın yazdığı `session.starScores`.
+ *
+ * ÖLÇEK 0-100. Alanı `generateInterviewFinalReport` üretiyor ve şeması açıkça
+ * 0-100 diyor. `utils/starDimensions.js`'teki 0-3'lük çapa ölçeği BAŞKA bir
+ * ölçüme ait (CV analizinin `starAnalysis` alanı); ikisini aynı cetvelle
+ * göstermek 83'ü "83/3" yapardı.
+ *
+ * Türkçe etiket ham anahtardan türetilmiyor: sayfa lang="tr" ve tarayıcı
+ * 'Situation' kelimesini SİTUATİON diye büyütüyor (noktalı İ).
+ */
+const STAR_ROWS = [
+    { key: 'S', label: 'Durum', color: 'var(--color-brand)' },
+    { key: 'T', label: 'Görev', color: 'var(--color-brand)' },
+    { key: 'A', label: 'Eylem', color: 'var(--color-brand-600)' },
+    { key: 'R', label: 'Sonuç', color: 'var(--color-ok)' },
+];
+
+/**
+ * Yetkinlik satırları.
+ *
+ * ETİKETLER DÜZELTİLDİ: radar köşelerinde `cultureFit` "Liderlik" diye
+ * yazıyordu (öyle bir eksen yok) ve `adaptability` "Uyum" diye — oysa uyum
+ * cultureFit'in karşılığı. Köşe etiketleri mutlak konumla yerleştirildiği
+ * için hangi sayının hangi eksene ait olduğu da doğrulanamıyordu; çubukta
+ * etiket sayının yanında duruyor.
+ */
+const COMPETENCY_ROWS = [
+    { key: 'technical', label: 'Teknik' },
+    { key: 'communication', label: 'İletişim' },
+    { key: 'problemSolving', label: 'Problem çözme' },
+    { key: 'cultureFit', label: 'Kültür uyumu' },
+    { key: 'adaptability', label: 'Adaptasyon' },
+];
 
 export default function InterviewReportPage() {
     const { sessionId } = useParams();
@@ -94,6 +128,14 @@ export default function InterviewReportPage() {
         () => (typeof session?.transcript === 'string' ? session.transcript : ''),
         [session]
     );
+    // Transkript araması. Kutu vardı ama `value`/`onChange`'i yoktu —
+    // yazılan hiçbir şey listeye ulaşmıyordu.
+    const [transcriptSearch, setTranscriptSearch] = useState('');
+    const visibleTranscript = useMemo(() => {
+        const q = transcriptSearch.trim().toLocaleLowerCase('tr');
+        if (!q) return transcriptMessages;
+        return transcriptMessages.filter((m) => String(m?.text || '').toLocaleLowerCase('tr').includes(q));
+    }, [transcriptMessages, transcriptSearch]);
     // RAPORUN İÇERİĞİ KAYITTAN GELİR.
     //
     // Bu sayfa canlı mülakat akışı için yazılmıştı ve yalnızca onun yazdığı
@@ -109,10 +151,6 @@ export default function InterviewReportPage() {
         );
     }, [positions, session]);
     const report = useMemo(() => buildInterviewReport(session, position), [session, position]);
-
-    /** Belirli bir aday cümlesini bulur; dizi yoksa sessizce null döner. */
-    const findAdayQuote = (predicate) =>
-        transcriptMessages.find((t) => t?.role === 'ADAY' && predicate(String(t?.text || '')))?.text || null;
 
     // YENİDEN DEĞERLENDİRME.
     //
@@ -293,126 +331,137 @@ export default function InterviewReportPage() {
         : 'Tarih Belirtilmedi';
 
     return (
-        <div className="flex flex-col h-screen bg-[#F8FAFC] font-inter overflow-hidden">
-            {/* Self-contained Report Header */}
-            <header className="h-[72px] flex items-center justify-between px-8 bg-white/90 backdrop-blur-md border-b border-slate-100 sticky top-0 z-40 shrink-0">
-                <div className="flex items-center gap-4">
-                    <button onClick={() => navigate('/')} className="p-2 rounded-xl bg-slate-50 border border-slate-100 text-slate-500 hover:bg-[#0F172A] hover:text-white hover:border-transparent transition-all cursor-pointer">
-                        <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-[#0F172A] flex items-center justify-center">
-                            <Video className="w-4 h-4 text-white" />
-                        </div>
-                        <div>
-                            <h2 className="text-[14px] font-black text-[#0F172A] tracking-tighter italic uppercase leading-none">Mülakat <span className="text-blue-600">Raporu</span></h2>
-                            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{candidate.name}</p>
-                        </div>
-                    </div>
+        <div className="infoset flex flex-col h-screen bg-n25 overflow-hidden">
+            {/* ── Başlık (56px) ──────────────────────────────────────────── */}
+            <header className="h-14 shrink-0 bg-n0 border-b border-n200 px-5 flex items-center gap-3 sticky top-0 z-40">
+                <button
+                    onClick={() => navigate('/')}
+                    className="w-7 h-7 rounded-md text-n500 hover:bg-n50 hover:text-n900 flex items-center justify-center"
+                    aria-label="Geri"
+                >
+                    <ChevronLeft className="w-4 h-4" />
+                </button>
+                <div>
+                    <h1 className="text-[15px] font-semibold tracking-[-0.02em] m-0">Mülakat Raporu</h1>
+                    <span className="text-[11px] text-n400">
+                        {candidate.name}
+                        {candidate.position || candidate.bestTitle ? ` · ${candidate.position || candidate.bestTitle}` : ''}
+                        {` · ${formattedDate}`}
+                    </span>
                 </div>
-                <div className="flex items-center gap-2">
-                    <span className="px-3 py-1 bg-emerald-50 text-emerald-600 text-[8px] font-black uppercase tracking-widest rounded-lg border border-emerald-100">Tamamlandı</span>
-                    <span className="text-[10px] font-bold text-slate-400">{formattedDate}</span>
+                <div className="ml-auto flex items-center gap-2">
+                    {report.mode === 'manual' && (
+                        <span
+                            title="Sistem dışında yapılmış görüşme — canlı transkript yok, değerlendirme girilen soru-cevaptan üretildi."
+                            className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-n100 text-n600"
+                        >
+                            Manuel girildi
+                        </span>
+                    )}
+                    <button
+                        onClick={handleShare}
+                        className="flex items-center gap-1.5 text-[12px] font-medium text-n600 bg-n50 border border-n200 hover:bg-n100 rounded-md px-[11px] py-[5px]"
+                    >
+                        <Share2 className="w-[13px] h-[13px]" /> Paylaş
+                    </button>
+                    <button
+                        onClick={handleDownload}
+                        className="flex items-center gap-1.5 text-[12px] font-medium text-n600 bg-n0 border border-n200 hover:bg-n50 rounded-md px-[11px] py-[5px]"
+                    >
+                        <Download className="w-[13px] h-[13px]" /> PDF
+                    </button>
+                    {finalDecision && (
+                        <span className="text-[12px] font-semibold px-[11px] py-[5px] rounded-full bg-brand-50 text-brand">
+                            {finalDecision}
+                        </span>
+                    )}
                 </div>
             </header>
-            
+
             <main className="flex-1 overflow-y-auto custom-scrollbar">
-                <div className="max-w-[1200px] mx-auto p-8 space-y-6">
-                    
-                    {/* CANDIDATE HEADER SECTION */}
-                    <div className="flex items-center justify-between bg-white p-6 rounded-[24px] border border-[#E2E8F0] shadow-sm">
-                        <div className="flex items-center gap-5">
-                            <div className="w-20 h-20 rounded-2xl border-[3px] border-white shadow-xl overflow-hidden bg-slate-100 flex items-center justify-center shrink-0">
-                                {candidate.photo || candidate.photoUrl || candidate.profileImage
-                                    ? <img src={candidate.photo || candidate.photoUrl || candidate.profileImage} alt={candidate.name} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display='none'; e.currentTarget.nextSibling.style.display='flex'; }} />
-                                    : null}
-                                <span className="text-3xl font-black text-slate-500" style={{ display: (candidate.photo || candidate.photoUrl || candidate.profileImage) ? 'none' : 'flex' }}>
-                                    {candidate.name ? candidate.name.trim().split(/\s+/).filter(Boolean).map((p,i,a) => i===0||i===a.length-1 ? p[0] : '').join('').toUpperCase().slice(0,2) : '?'}
-                                </span>
-                            </div>
-                            <div className="space-y-1.5">
-                                <div className="flex items-center gap-3">
-                                    <h1 className="text-2xl font-black text-[#0F172A] tracking-tighter italic">{candidate.name}</h1>
-                                    <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-700 text-[9px] font-black uppercase tracking-widest rounded-lg border border-emerald-200">TAMAMLANDI</span>
-                                </div>
-                                <div className="flex items-center gap-4 text-[#64748B]">
-                                    <span className="text-[12px] font-bold flex items-center gap-1.5"><Briefcase className="w-3.5 h-3.5" /> {candidate.position || candidate.bestTitle}</span>
-                                    <div className="h-3 w-px bg-slate-200" />
-                                    {/* SKOR ROZETLERİ — kayıtta ne varsa o.
-                                        Eskiden `finalScore` yoksa CV skoru "GENEL"
-                                        etiketiyle basılıyordu: mülakat raporunda,
-                                        mülakattan gelmiş gibi. Manuel görüşmede
-                                        finalScore hiç yazılmıyor; gösterilen sayı
-                                        her seferinde CV'nin sayısıydı. */}
-                                    {session.finalScore != null && (
-                                        <span className="text-[12px] font-bold flex items-center gap-1.5 text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-100 italic" title="Mülakat skoru (%70) + CV skoru (%30) ağırlıklı ortalaması">
-                                            GENEL %{session.finalScore}
-                                        </span>
-                                    )}
-                                    {report.evidence?.score != null && (
-                                        <span className="text-[11px] font-bold flex items-center gap-1.5 text-purple-600 bg-purple-50 px-2 py-0.5 rounded-lg border border-purple-100 italic" title={`Odada sorulan ${report.evidence.asked} maddede çıkan kanıt oranı`}>
-                                            KANIT %{report.evidence.score}
-                                            <span className="text-purple-400 not-italic">({report.evidence.asked} madde)</span>
-                                        </span>
-                                    )}
-                                    {session.interviewScore != null && (
-                                        <span className="text-[11px] font-bold flex items-center gap-1.5 text-purple-600 bg-purple-50 px-2 py-0.5 rounded-lg border border-purple-100 italic" title="Bu mülakata özel skor">
-                                            MÜL. %{session.interviewScore}
-                                        </span>
-                                    )}
-                                    <div className="h-3 w-px bg-slate-200" />
-                                    <span className="text-[11px] font-bold flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> {formattedDate}</span>
-                                </div>
-                            </div>
+                <div className="max-w-[1240px] mx-auto px-5 py-[18px]">
+
+                    {/* Aday şeridi */}
+                    <div className="flex items-center gap-3.5 bg-n0 border border-n200 rounded-[14px] shadow-sm p-3.5 mb-3.5">
+                        <div className="w-12 h-12 rounded-full overflow-hidden bg-brand-50 text-brand flex items-center justify-center shrink-0 text-[15px] font-semibold">
+                            {candidate.photo || candidate.photoUrl || candidate.profileImage
+                                ? <img src={candidate.photo || candidate.photoUrl || candidate.profileImage} alt={candidate.name} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.style.display = 'flex'; }} />
+                                : null}
+                            <span className="w-full h-full items-center justify-center" style={{ display: (candidate.photo || candidate.photoUrl || candidate.profileImage) ? 'none' : 'flex' }}>
+                                {candidate.name ? candidate.name.trim().split(/\s+/).filter(Boolean).map((p, i, a) => (i === 0 || i === a.length - 1 ? p[0] : '')).join('').toLocaleUpperCase('tr').slice(0, 2) : '?'}
+                            </span>
                         </div>
-                        <div className="flex items-center gap-2">
-                             <button 
-                                onClick={handleShare}
-                                className="h-10 px-4 bg-slate-50 text-slate-600 rounded-xl border border-slate-200 text-[11px] font-black uppercase flex items-center gap-2 hover:bg-slate-100 transition-all cursor-pointer"
-                             >
-                                 <Share2 className="w-4 h-4" /> Paylaş
-                             </button>
-                             <button 
-                                onClick={handleDownload}
-                                className="h-10 px-4 bg-[#13294E] text-white rounded-xl text-[11px] font-black uppercase flex items-center gap-2 shadow-lg shadow-blue-900/10 hover:bg-blue-800 transition-all cursor-pointer"
-                             >
-                                 <DownloadCloud className="w-4 h-4" /> Raporu İndir
-                             </button>
+                        <div className="min-w-0">
+                            <h2 className="text-[15px] font-semibold tracking-[-0.01em] m-0">{candidate.name}</h2>
+                            <span className="text-[11px] text-n400">{candidate.position || candidate.bestTitle || 'Pozisyon atanmadı'}</span>
+                        </div>
+
+                        {/* SKOR ROZETLERİ — kayıtta ne varsa o.
+                            Eskiden `finalScore` yoksa CV skoru "GENEL" etiketiyle
+                            basılıyordu: mülakat raporunda, mülakattan gelmiş gibi.
+                            Manuel görüşmede finalScore hiç yazılmıyor. */}
+                        <div className="ml-auto flex flex-wrap items-center gap-2 justify-end">
+                            {session.finalScore != null && (
+                                <span
+                                    title="Mülakat skoru (%70) + CV skoru (%30) ağırlıklı ortalaması"
+                                    className="text-[12px] font-semibold px-2.5 py-1 rounded-md bg-brand-50 text-brand"
+                                >
+                                    Genel %{session.finalScore}
+                                </span>
+                            )}
+                            {session.interviewScore != null && (
+                                <span
+                                    title="Bu mülakata özel skor"
+                                    className="text-[12px] font-semibold px-2.5 py-1 rounded-md bg-n50 text-n600 border border-n200"
+                                >
+                                    Mülakat %{session.interviewScore}
+                                </span>
+                            )}
+                            {report.evidence?.score != null && (
+                                <span
+                                    title={`Odada sorulan ${report.evidence.asked} maddede çıkan kanıt oranı`}
+                                    className="text-[12px] font-semibold px-2.5 py-1 rounded-md bg-n50 text-n600 border border-n200"
+                                >
+                                    Kanıt %{report.evidence.score}
+                                    <span className="text-n400 font-normal"> ({report.evidence.asked} madde)</span>
+                                </span>
+                            )}
                         </div>
                     </div>
 
-                    {/* TOAST FEEDBACK */}
+                    {/* TOAST */}
                     {toast && (
-                        <div className="fixed bottom-12 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-bottom-5 fade-in duration-300">
-                            <div className="bg-[#0F172A] text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border border-white/10">
-                                <Sparkles className="w-4 h-4 text-blue-400 fill-blue-400" />
-                                <span className="text-[11px] font-black uppercase tracking-widest">{toast.message}</span>
+                        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100]">
+                            <div className="bg-n900 text-white px-4 py-2.5 rounded-md shadow-lg flex items-center gap-2">
+                                <Sparkles className="w-3.5 h-3.5" />
+                                <span className="text-[12px] font-medium">{toast.message}</span>
                             </div>
                         </div>
                     )}
 
-                    {/* TAB SWITCHER */}
-                    <div className="flex gap-8 border-b border-[#E2E8F0] px-4">
+                    {/* Sekmeler */}
+                    <div className="flex items-center gap-0.5 bg-n50 border border-n200 rounded-md p-0.5 w-fit mb-3.5">
                         {[
-                            { id: 'overview', label: 'GENEL BAKIŞ', icon: Brain },
-                            { id: 'transcript', label: 'TRANSKRİPT', icon: MessageSquare }
+                            { id: 'overview', label: 'Genel bakış', icon: Brain },
+                            { id: 'transcript', label: 'Transkript', icon: MessageSquare },
                         ].map(tab => (
-                            <button 
-                                key={tab.id} 
+                            <button
+                                key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
-                                className={`py-4 flex items-center gap-2.5 text-[10px] font-black uppercase tracking-widest relative transition-all ${activeTab === tab.id ? 'text-[#13294E]' : 'text-[#94A3B8] hover:text-[#475569]'}`}
+                                className={`flex items-center gap-1.5 text-[12px] font-semibold px-[11px] py-[5px] rounded ${
+                                    activeTab === tab.id ? 'bg-n0 text-n900 shadow-sm' : 'text-n500 hover:text-n700'
+                                }`}
                             >
-                                <tab.icon className={`w-3.5 h-3.5 ${activeTab === tab.id ? 'fill-blue-100' : ''}`} /> {tab.label}
-                                {activeTab === tab.id && <div className="absolute bottom-[-1px] left-0 right-0 h-0.5 bg-[#13294E] shadow-[0_4px_12px_rgba(19, 41, 78,0.3)]" />}
+                                <tab.icon className="w-[13px] h-[13px]" /> {tab.label}
                             </button>
                         ))}
                     </div>
 
                     {activeTab === 'overview' ? (
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-2 duration-400">
-                            
-                            {/* LEFT COLUMN: DEĞERLENDİRME */}
-                            <div className="lg:col-span-2 space-y-6">
+                        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-3.5 items-start">
+
+                            {/* ── SOL: değerlendirme ─────────────────────── */}
+                            <div className="flex flex-col gap-3.5 min-w-0">
                                 {/* SONUÇ — kanıt oranı damgalardan hesaplandı, modelden gelmedi */}
                                 <InterviewResultCard
                                     report={report}
@@ -421,320 +470,224 @@ export default function InterviewReportPage() {
                                     regradeNote={regradeNote}
                                 />
 
-                                {/* MADDE MADDE — adayın kendi sözüyle */}
-                                <RequirementVerdicts report={report} />
-
                                 {/* GÖZLEMLER — sayı üretmeyen, yalnızca anlatan kısım */}
                                 <InterviewNarrative report={report} />
 
-                                {/* STAR — YALNIZCA canlı mülakatta üretiliyor.
-                                    Manuel görüşmede dört boş kutu basıp "analiz
-                                    edilmedi" yazmak, ölçülmeyen bir şeyi
-                                    ölçülmüş gibi göstermenin yumuşak hâliydi. */}
-                                {hasStarScores(session) && (
-                                <div className="space-y-4">
-                                    <div className="flex items-center gap-2 px-1">
-                                        <h3 className="text-[12px] font-black text-slate-400 uppercase tracking-widest italic">STAR ANALİZ DETAYLARI</h3>
-                                    </div>
-                                    <div className="space-y-3">
-                                        {[
-                                            { 
-                                                key: 'S', 
-                                                label: 'Durum (Situation)', 
-                                                score: session.starScores?.S ?? null, 
-                                                color: 'bg-blue-900', 
-                                                desc: 'Adayın mülakat sırasında paylaştığı bağlam ve senaryo derinliği.',
-                                                quote: findAdayQuote((text) => text.length > 50)
-                                            },
-                                            { 
-                                                key: 'T', 
-                                                label: 'Görev (Task)', 
-                                                score: session.starScores?.T ?? null, 
-                                                color: 'bg-blue-800', 
-                                                desc: 'Çözülmesi beklenen problemin veya üstlenilen sorumluluğun netliği.',
-                                                quote: null
-                                            },
-                                            { 
-                                                key: 'A', 
-                                                label: 'Eylem (Action)', 
-                                                score: session.starScores?.A ?? null, 
-                                                color: 'bg-blue-700', 
-                                                desc: 'Adayın teknik ve operasyonel olarak sergilediği pratik çözümler.',
-                                                quote: findAdayQuote((text) => text.includes('yaptım'))
-                                            },
-                                            { 
-                                                key: 'R', 
-                                                label: 'Sonuç (Result)', 
-                                                score: session.starScores?.R ?? null, 
-                                                color: 'bg-emerald-600', 
-                                                desc: 'Eylemlerin yarattığı somut çıktı ve başarı ölçütleri.',
-                                                quote: null
-                                            }
-                                        ].map(star => (
-                                            <div key={star.key} className="bg-white rounded-2xl border border-[#E2E8F0] p-6 shadow-sm flex gap-6 hover:shadow-md transition-all">
-                                                <div className={`w-10 h-10 rounded-xl ${star.color} text-white flex items-center justify-center text-[18px] font-black shrink-0 shadow-lg`}>
-                                                    {star.key}
-                                                </div>
-                                                <div className="flex-1 space-y-3">
-                                                    <div className="flex items-center justify-between">
-                                                        <h4 className="text-[14px] font-black text-[#0F172A] tracking-tight">{star.label}</h4>
-                                                        {star.score !== null
-                                                            ? <span className="text-[10px] font-black bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100 text-[#13294E]">Skor: {star.score}/100</span>
-                                                            : <span className="text-[10px] font-bold bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100 text-slate-400">Analiz edilmedi</span>
-                                                        }
-                                                    </div>
-                                                    {star.score !== null && (
-                                                        <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                                            <div className="h-full bg-blue-600 rounded-full transition-all duration-700" style={{ width: `${star.score}%` }} />
-                                                        </div>
-                                                    )}
-                                                    <p className="text-[13px] text-slate-500 font-medium leading-relaxed">{star.desc}</p>
-                                                    {star.quote && (
-                                                        <div className="pl-4 border-l-2 border-slate-100 py-1">
-                                                            <p className="text-[12px] text-slate-400 font-bold italic">"{star.quote}"</p>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                                )}
-                            </div>
+                                {/* MADDE MADDE — adayın kendi sözüyle */}
+                                <RequirementVerdicts report={report} />
 
-                            {/* STRENGTHS & DEVELOPMENT AREAS — only shown when AI generated data */}
-                            {(session.strengths?.length > 0 || session.developmentAreas?.length > 0) && (
-                                <div className="grid grid-cols-2 gap-4 mb-6">
-                                    {session.strengths?.length > 0 && (
-                                        <div className="bg-emerald-50 rounded-2xl border border-emerald-100 p-5">
-                                            <h4 className="text-[10px] font-black text-emerald-700 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                                <span className="w-5 h-5 bg-emerald-600 text-white rounded-full flex items-center justify-center text-xs">✓</span>
-                                                Güçlü Yönler
-                                            </h4>
-                                            <ul className="space-y-2">
-                                                {session.strengths.map((s, i) => (
-                                                    <li key={i} className="flex items-start gap-2 text-[12px] text-emerald-800 font-medium">
-                                                        <span className="text-emerald-500 mt-0.5">•</span> {s}
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    )}
-                                    {session.developmentAreas?.length > 0 && (
-                                        <div className="bg-amber-50 rounded-2xl border border-amber-100 p-5">
-                                            <h4 className="text-[10px] font-black text-amber-700 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                                <span className="w-5 h-5 bg-amber-500 text-white rounded-full flex items-center justify-center text-xs">↑</span>
-                                                Gelişim Alanları
-                                            </h4>
-                                            <ul className="space-y-2">
-                                                {session.developmentAreas.map((d, i) => (
-                                                    <li key={i} className="flex items-start gap-2 text-[12px] text-amber-800 font-medium">
-                                                        <span className="text-amber-500 mt-0.5">•</span> {d}
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* RIGHT COLUMN: ANALYTICS & DECISION */}
-                            <div className="space-y-6">
-                                {/* COMPETENCY RADAR — beş eksenin BEŞİ de yoksa çizilmez.
-                                    Eksik eksen NaN köşe üretiyordu: poligon sessizce
-                                    kayboluyor, altındaki kutular "0.0 / 10" ve
-                                    "undefined/100" yazıyordu. Manuel görüşmede bu
-                                    alanların hiçbiri üretilmiyor. */}
-                                {hasCompetencyScores(session) && (
-                                <section className="bg-white rounded-[24px] border border-[#E2E8F0] p-6 shadow-sm flex flex-col items-center">
-                                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-8 w-full italic">YETKİNLİK ANALİZİ</h3>
-                                    
-                                    <div className="w-56 h-56 relative flex items-center justify-center mb-10">
-                                        <svg viewBox="0 0 100 100" className="w-full h-full transform rotate-[-18deg]">
-                                            {[20, 40, 60, 80, 100].map(r => (
-                                                <circle key={r} cx="50" cy="50" r={r/2} fill="none" stroke="#E2E8F0" strokeWidth="0.5" />
-                                            ))}
-                                            {[0, 72, 144, 216, 288].map(angle => (
-                                                <line key={angle} x1="50" y1="50" x2={50 + 50 * Math.cos(angle * Math.PI / 180)} y2={50 + 50 * Math.sin(angle * Math.PI / 180)} stroke="#E2E8F0" strokeWidth="0.5" />
-                                            ))}
-                                            <polygon
-                                                points={[
-                                                    starScores.technical,
-                                                    starScores.communication,
-                                                    starScores.problemSolving,
-                                                    starScores.cultureFit,
-                                                    starScores.adaptability
-                                                ].map((val, i) => {
-                                                    const angle = i * 72;
-                                                    const r = val / 2;
-                                                    return `${50 + r * Math.cos(angle * Math.PI / 180)},${50 + r * Math.sin(angle * Math.PI / 180)}`;
-                                                }).join(' ')}
-                                                fill="rgba(19, 41, 78, 0.15)"
-                                                stroke="#13294E"
-                                                strokeWidth="2"
-                                            />
-                                        </svg>
-                                        <div className="absolute inset-0 text-[7px] font-black text-slate-400 uppercase pointer-events-none italic">
-                                            <span className="absolute top-0 left-1/2 -translate-x-1/2">Teknik: {starScores.technical}</span>
-                                            <span className="absolute top-[35%] right-0 -translate-x-1 underline">İletişim: {starScores.communication}</span>
-                                            <span className="absolute bottom-5 right-6 -translate-x-full">Liderlik: {starScores.cultureFit}</span>
-                                            <span className="absolute bottom-5 left-10">Uyum: {starScores.adaptability}</span>
-                                            <span className="absolute top-[35%] left-0">Problem Çözme: {starScores.problemSolving}</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-3 w-full">
-                                        <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 flex flex-col gap-1">
-                                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">YETKİNLİK ORTALAMASI</span>
-                                            <span className="text-[14px] font-black text-[#13294E]">
-                                                {((Object.values(starScores).reduce((a, b) => a + b, 0) / 5) / 10).toFixed(1)} / 10
-                                            </span>
-                                        </div>
-                                        <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 flex flex-col gap-1">
-                                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">UYUM SKORU</span>
-                                            <span className="text-[14px] font-black text-[#13294E]">{starScores.cultureFit}/100</span>
-                                        </div>
-                                    </div>
-                                </section>
-                                )}
-
-                                {/* CRITICAL MOMENTS — canlı akışın ürettiği alan.
+                                {/* KRİTİK ANLAR — canlı akışın ürettiği alan.
                                     Kayıtta yoksa "kritik an tespit edilemedi" demek
                                     yanlış: tarama YAPILMADI, sonuç boş çıkmadı. */}
                                 {(session.criticalMoments || []).length > 0 && (
-                                <section className="bg-white rounded-[24px] border border-[#E2E8F0] p-6 shadow-sm space-y-6">
-                                    <div className="flex items-center justify-between">
-                                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] italic">KRİTİK ANLAR</h3>
-                                        <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded text-[7px] font-black uppercase border border-emerald-100">AI Taraması</span>
-                                    </div>
-                                    <div className="space-y-6">
-                                        {session.criticalMoments.map((moment, idx) => (
-                                            <div key={idx} className="relative pl-6 border-l border-slate-100 space-y-2">
-                                                <div className={`absolute -left-[4.5px] top-1 w-2 h-2 rounded-full ${moment.color}`} />
-                                                <div className="flex items-center gap-3">
-                                                    <span className="text-[9px] font-mono font-black text-slate-400 tabular-nums">{moment.time}</span>
-                                                    <span className={`text-[8px] font-black uppercase tracking-tight px-1.5 py-0.5 rounded text-white ${moment.color}`}>{moment.type}</span>
+                                    <section className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-[18px] flex flex-col gap-3.5">
+                                        <h3 className="text-[11px] font-semibold text-n500 tracking-[0.1em] uppercase m-0">Kritik anlar</h3>
+                                        <div className="flex flex-col gap-3.5">
+                                            {session.criticalMoments.map((moment, idx) => (
+                                                <div key={idx} className="relative pl-4 border-l border-n200">
+                                                    <div className={`absolute -left-[3.5px] top-1.5 w-1.5 h-1.5 rounded-full ${moment.color}`} />
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[11px] text-n400 tabular-nums">{moment.time}</span>
+                                                        <span className={`text-[11px] font-semibold px-1.5 rounded text-white ${moment.color}`}>{moment.type}</span>
+                                                    </div>
+                                                    <p className="text-[12px] text-n700 leading-relaxed mt-1 m-0">{moment.text}</p>
                                                 </div>
-                                                <p className="text-[11px] text-slate-500 font-medium leading-snug italic">"{moment.text}"</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <button onClick={() => setActiveTab('transcript')} className="w-full py-2.5 text-[9px] font-black text-[#13294E] uppercase hover:bg-slate-50 rounded-xl border border-slate-100 transition-all">Tüm Transkripti Görüntüle →</button>
-                                </section>
+                                            ))}
+                                        </div>
+                                        <button
+                                            onClick={() => setActiveTab('transcript')}
+                                            className="text-[12px] font-medium text-brand text-left"
+                                        >
+                                            Tüm transkripti görüntüle →
+                                        </button>
+                                    </section>
+                                )}
+                            </div>
+
+                            {/* ── SAĞ RAY (320px) ─────────────────────────── */}
+                            <div className="flex flex-col gap-3.5 min-w-0">
+
+                                {/* STAR — YALNIZCA canlı mülakatta üretiliyor.
+                                    Manuel görüşmede dört boş kutu basıp "analiz
+                                    edilmedi" yazmak, ölçülmeyen bir şeyi ölçülmüş
+                                    gibi göstermenin yumuşak hâliydi.
+
+                                    ÖLÇEK 0-100'DÜR, 0-3 DEĞİL. Bu alanı
+                                    `generateInterviewFinalReport` yazıyor ve şeması
+                                    açıkça 0-100 ("S": <0-100>). 0-3'lük çapa ölçeği
+                                    (starDimensions.js) CV analizinin `starAnalysis`
+                                    alanına ait — başka bir ölçüm. İkisini aynı
+                                    cetvelle göstermek 83'ü "83/3" yapardı. */}
+                                {hasStarScores(session) && (
+                                    <section className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-4">
+                                        <div className="flex items-center gap-2.5 mb-0.5">
+                                            <Star className="w-[15px] h-[15px] text-brand" />
+                                            <h3 className="text-[13px] font-semibold m-0">STAR kanıt analizi</h3>
+                                        </div>
+                                        <p className="text-[11px] text-n400 mb-3 m-0">Görüşmede bulunan kanıtın yoğunluğu</p>
+                                        {STAR_ROWS.map(row => {
+                                            const score = session.starScores?.[row.key];
+                                            if (!Number.isFinite(Number(score))) return null;
+                                            return (
+                                                <div key={row.key} className="py-1.5">
+                                                    <div className="flex items-center justify-between mb-1">
+                                                        <span className="text-[12px] text-n700">{row.label}</span>
+                                                        <span className="text-[12px] font-semibold">
+                                                            {score}<span className="text-n400 font-normal">/100</span>
+                                                        </span>
+                                                    </div>
+                                                    <div className="h-[5px] bg-n100 rounded-full overflow-hidden">
+                                                        <div
+                                                            className="h-full rounded-full"
+                                                            style={{ width: `${Math.min(100, Math.max(0, Number(score)))}%`, background: row.color }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </section>
                                 )}
 
-                                {/* DECISION CARD */}
-                                <section className="bg-[#0F172A] rounded-[24px] p-8 shadow-xl space-y-6 text-white border border-white/5 relative overflow-hidden">
-                                     <div className="absolute -right-12 -bottom-12 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl" />
-                                     <h3 className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] italic">DEĞERLENDİRME VE KARAR</h3>
+                                {/* YETKİNLİK — beş eksenin BEŞİ de yoksa çizilmez.
+                                    Eksik eksen NaN köşe üretiyordu: poligon sessizce
+                                    kayboluyor, altındaki kutular "0.0 / 10" ve
+                                    "undefined/100" yazıyordu.
 
-                                     {/* Recruiter notes — always editable */}
-                                     <div className="space-y-2">
-                                         <label className="text-[8px] font-black text-white/30 uppercase tracking-widest">MÜLAKATÇI NOTU</label>
-                                         <p className="text-[10px] text-white/20 font-medium">Mülakat sırasında veya sonrasında notlarınızı buraya ekleyebilirsiniz.</p>
-                                         <textarea
-                                             value={recruiterNotes}
-                                             onChange={(e) => setRecruiterNotes(e.target.value)}
-                                             rows={4}
-                                             className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-[12px] font-medium text-slate-200 focus:border-blue-500/60 focus:outline-none resize-none placeholder:text-white/20"
-                                             placeholder="Adayın güçlü/zayıf yönleri, genel izlenim, önerileriniz..."
-                                         />
-                                         <button
-                                             onClick={handleSaveNotes}
-                                             disabled={isSavingNotes}
-                                             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-all"
-                                         >
-                                             {isSavingNotes ? 'Kaydediliyor...' : 'Notu Kaydet'}
-                                         </button>
-                                     </div>
+                                    Radar yerine çubuk: beş eksenli poligonun köşe
+                                    etiketleri konumlandırma yüzünden yanlış eksene
+                                    denk geliyordu — `cultureFit` "Liderlik" diye
+                                    etiketlenmişti. Çubukta etiket sayının yanında. */}
+                                {hasCompetencyScores(session) && (
+                                    <section className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-4">
+                                        <h3 className="text-[13px] font-semibold mb-3 m-0">Yetkinlik analizi</h3>
+                                        {COMPETENCY_ROWS.map(row => (
+                                            <div key={row.key} className="py-1.5">
+                                                <div className="flex items-center justify-between mb-1">
+                                                    <span className="text-[12px] text-n700">{row.label}</span>
+                                                    <span className="text-[12px] font-semibold">
+                                                        {starScores[row.key]}<span className="text-n400 font-normal">/100</span>
+                                                    </span>
+                                                </div>
+                                                <div className="h-[5px] bg-n100 rounded-full overflow-hidden">
+                                                    <div
+                                                        className="h-full bg-brand rounded-full"
+                                                        style={{ width: `${Math.min(100, Math.max(0, Number(starScores[row.key]) || 0))}%` }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        ))}
+                                        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-n100">
+                                            <span className="text-[12px] text-n500 flex-1">Ortalama</span>
+                                            <span className="text-[13px] font-semibold text-brand tabular-nums">
+                                                %{Math.round(COMPETENCY_ROWS.reduce((sum, r) => sum + (Number(starScores[r.key]) || 0), 0) / COMPETENCY_ROWS.length)}
+                                            </span>
+                                        </div>
+                                    </section>
+                                )}
 
-                                     {/* Final decision buttons */}
-                                     <div className="space-y-3 pt-2">
-                                         <label className="text-[8px] font-black text-white/30 uppercase tracking-widest">FİNAL KARARI</label>
-                                         <div className="grid grid-cols-3 gap-2">
-                                             {[
-                                                 { label: 'İşe Al', value: 'İşe Al', active: 'bg-emerald-500 border-emerald-400', inactive: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20' },
-                                                 { label: 'Beklemede', value: 'Beklemede', active: 'bg-amber-500 border-amber-400', inactive: 'bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20' },
-                                                 { label: 'Uygun Değil', value: 'Uygun Değil', active: 'bg-rose-500 border-rose-400', inactive: 'bg-rose-500/10 border-rose-500/30 text-rose-400 hover:bg-rose-500/20' },
-                                             ].map(opt => (
-                                                 <button
-                                                     key={opt.value}
-                                                     onClick={() => handleSaveDecision(opt.value)}
-                                                     disabled={isSavingDecision}
-                                                     className={`py-3 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50 ${finalDecision === opt.value ? opt.active + ' text-white shadow-lg' : opt.inactive}`}
-                                                 >
-                                                     {opt.label}
-                                                 </button>
-                                             ))}
-                                         </div>
-                                         {finalDecision && (
-                                             <p className="text-[9px] font-black text-white/30 uppercase tracking-widest text-center">
-                                                 Mevcut Karar: <span className="text-white/60">{finalDecision}</span>
-                                             </p>
-                                         )}
-                                     </div>
+                                {/* KARAR */}
+                                <section className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-4 flex flex-col gap-3">
+                                    <h3 className="text-[11px] font-semibold text-n500 tracking-[0.08em] uppercase m-0">Karar</h3>
+
+                                    <div>
+                                        <textarea
+                                            value={recruiterNotes}
+                                            onChange={(e) => setRecruiterNotes(e.target.value)}
+                                            rows={4}
+                                            className="w-full bg-n50 border border-n200 rounded-md p-2.5 text-[12px] text-n800 leading-relaxed focus:outline-none focus:border-brand resize-none placeholder:text-n400"
+                                            placeholder="Kararınızı ve gerekçesini yazın…"
+                                        />
+                                        <button
+                                            onClick={handleSaveNotes}
+                                            disabled={isSavingNotes}
+                                            className="mt-2 text-[12px] font-medium text-n600 bg-n50 border border-n200 hover:bg-n100 rounded-md px-2.5 py-[5px] disabled:opacity-50"
+                                        >
+                                            {isSavingNotes ? 'Kaydediliyor…' : 'Notu kaydet'}
+                                        </button>
+                                    </div>
+
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {[
+                                            { label: 'İşe Al', value: 'İşe Al', bg: 'var(--color-ok)' },
+                                            { label: 'Beklemede', value: 'Beklemede', bg: 'var(--color-warn)' },
+                                            { label: 'Uygun Değil', value: 'Uygun Değil', bg: 'var(--color-bad)' },
+                                        ].map(opt => {
+                                            const on = finalDecision === opt.value;
+                                            return (
+                                                <button
+                                                    key={opt.value}
+                                                    onClick={() => handleSaveDecision(opt.value)}
+                                                    disabled={isSavingDecision}
+                                                    className={`text-[12px] font-semibold rounded-md py-2 border disabled:opacity-50 ${
+                                                        on ? 'text-white border-transparent' : 'bg-n0 text-n600 border-n200 hover:bg-n50'
+                                                    }`}
+                                                    style={on ? { background: opt.bg } : undefined}
+                                                >
+                                                    {opt.label}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                    {finalDecision && (
+                                        <p className="text-[11px] text-n400 text-center m-0">
+                                            Mevcut karar: <span className="text-n700 font-semibold">{finalDecision}</span>
+                                        </p>
+                                    )}
                                 </section>
 
-                                {/* RECRUITER EVALUATION CARD (Task #8) */}
-                                <section className="bg-white rounded-[24px] border border-[#E2E8F0] p-6 shadow-sm space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <Award className="w-4 h-4 text-violet-500" />
-                                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] italic">MÜLAKATÇı DEĞERLENDİRMESİ</h3>
-                                        </div>
+                                {/* MÜLAKATÇI DEĞERLENDİRMESİ */}
+                                <section className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-4 flex flex-col gap-3">
+                                    <div className="flex items-center gap-2">
+                                        <Award className="w-[15px] h-[15px] text-brand" />
+                                        <h3 className="text-[13px] font-semibold m-0">Mülakatçı değerlendirmesi</h3>
                                         <button
                                             onClick={runEvaluateInterviewer}
                                             disabled={evalLoading}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase bg-violet-50 text-violet-600 border border-violet-100 hover:bg-violet-100 transition-all disabled:opacity-50"
+                                            className="ml-auto flex items-center gap-1.5 text-[12px] font-medium text-n600 bg-n50 border border-n200 hover:bg-n100 rounded-md px-2.5 py-[5px] disabled:opacity-50"
                                         >
                                             {evalLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                                            {recruiterEval ? 'Yenile' : 'Analiz Et'}
+                                            {recruiterEval ? 'Yenile' : 'Analiz et'}
                                         </button>
                                     </div>
                                     {evalLoading && (
-                                        <div className="flex items-center gap-3 py-4">
-                                            <Loader2 className="w-5 h-5 text-violet-500 animate-spin" />
-                                            <p className="text-[11px] text-slate-500 font-medium">AI mülakatçı performansı analiz ediyor...</p>
-                                        </div>
+                                        <p className="text-[12px] text-n500 m-0">Mülakatçı performansı analiz ediliyor…</p>
                                     )}
                                     {!evalLoading && !recruiterEval && (
-                                        <p className="text-[11px] text-slate-400 italic py-2">
-                                            "Analiz Et" butonuna tıklayarak bu mülakata ait mülakatçı performans değerlendirmesini oluşturun.
+                                        <p className="text-[12px] text-n400 leading-relaxed m-0">
+                                            "Analiz et" ile bu görüşmenin mülakatçı performans değerlendirmesini üretin.
                                         </p>
                                     )}
                                     {!evalLoading && recruiterEval && (
-                                        <div className="space-y-4">
-                                            {/* Overall score */}
-                                            <div className="flex items-center gap-3 p-3 bg-violet-50 rounded-xl border border-violet-100">
-                                                <div className="w-12 h-12 rounded-xl bg-violet-100 flex items-center justify-center">
-                                                    <span className="text-[18px] font-black text-violet-700">{recruiterEval.overallScore}/5</span>
-                                                </div>
-                                                <p className="text-[11px] text-slate-700 leading-relaxed flex-1">{recruiterEval.summary}</p>
+                                        <div className="flex flex-col gap-3">
+                                            <div className="flex items-start gap-2.5 bg-n50 rounded-md p-2.5">
+                                                <span className="text-[15px] font-semibold text-brand shrink-0">
+                                                    {recruiterEval.overallScore}<span className="text-n400 text-[12px] font-normal">/5</span>
+                                                </span>
+                                                <p className="text-[12px] text-n700 leading-relaxed flex-1 m-0">{recruiterEval.summary}</p>
                                             </div>
-                                            {/* Dimension scores */}
                                             <button
                                                 onClick={() => setEvalOpen(v => !v)}
-                                                className="w-full flex items-center justify-between text-[9px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600 transition-colors"
+                                                className="flex items-center justify-between text-[11px] font-semibold text-n500 tracking-[0.08em] uppercase hover:text-n700"
                                             >
-                                                Boyut Puanları
+                                                Boyut puanları
                                                 <ChevronDown className={`w-3.5 h-3.5 transition-transform ${evalOpen ? 'rotate-180' : ''}`} />
                                             </button>
                                             {evalOpen && (
-                                                <div className="space-y-3">
+                                                <div className="flex flex-col gap-3">
                                                     {(recruiterEval.dimensions || []).map(dim => (
-                                                        <div key={dim.key} className="space-y-1.5">
-                                                            <div className="flex items-center justify-between">
-                                                                <span className="text-[10px] font-black text-slate-700">{dim.label}</span>
-                                                                <div className="flex items-center gap-1">
-                                                                    {[1,2,3,4,5].map(n => (
-                                                                        <div key={n} className={`w-3 h-3 rounded-full ${n <= dim.score ? 'bg-violet-500' : 'bg-slate-200'}`} />
+                                                        <div key={dim.key}>
+                                                            <div className="flex items-center justify-between mb-1">
+                                                                <span className="text-[12px] font-semibold text-n700">{dim.label}</span>
+                                                                <span className="flex items-center gap-1">
+                                                                    {[1, 2, 3, 4, 5].map(n => (
+                                                                        <span key={n} className={`w-2 h-2 rounded-full ${n <= dim.score ? 'bg-brand' : 'bg-n200'}`} />
                                                                     ))}
-                                                                    <span className="text-[9px] font-black text-slate-500 ml-1">{dim.score}/5</span>
-                                                                </div>
+                                                                    <span className="text-[11px] font-semibold text-n500 ml-1">{dim.score}/5</span>
+                                                                </span>
                                                             </div>
-                                                            <p className="text-[10px] text-slate-600 leading-relaxed">{dim.explanation}</p>
+                                                            <p className="text-[12px] text-n600 leading-relaxed m-0">{dim.explanation}</p>
                                                             {dim.tip && (
-                                                                <p className="text-[9px] text-violet-600 font-medium italic border-l-2 border-violet-200 pl-2">{dim.tip}</p>
+                                                                <p className="text-[12px] text-brand leading-relaxed border-l-2 border-brand-100 pl-2 mt-1 m-0">{dim.tip}</p>
                                                             )}
                                                         </div>
                                                     ))}
@@ -743,129 +696,136 @@ export default function InterviewReportPage() {
                                         </div>
                                     )}
                                 </section>
-
                             </div>
-
                         </div>
                     ) : (
-                        /* TRANSCRIPT VIEW */
-                        <div className="flex gap-6 animate-in fade-in duration-400">
-                             
-                             {/* TRANSCRIPT SIDEBAR */}
-                             <div className="w-80 shrink-0 space-y-6">
-                                 <div className="bg-white rounded-[24px] border border-[#E2E8F0] p-6 shadow-sm space-y-5">
-                                      <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">OTURUM BİLGİLERİ</h3>
-                                      <div className="space-y-4">
-                                          {[
-                                              { label: 'Süre', value: session.duration || 'N/A' },
-                                              { label: 'Tarih', value: session.date || 'Belirtilmedi' },
-                                              { label: 'Dil', value: session.language || 'Türkçe' }
-                                          ].map(item => (
-                                              <div key={item.label} className="flex items-center justify-between">
-                                                  <span className="text-[11px] font-bold text-slate-400">{item.label}</span>
-                                                  <span className="text-[11px] font-black text-[#0F172A]">{item.value}</span>
-                                              </div>
-                                          ))}
-                                      </div>
-                                 </div>
+                        /* ── TRANSKRİPT ─────────────────────────────────── */
+                        <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-3.5 items-start">
 
-                                 <div className="bg-white rounded-[24px] border border-[#E2E8F0] p-6 shadow-sm space-y-5">
-                                      <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">ANAHTAR KELİMELER</h3>
-                                      <div className="flex flex-wrap gap-2">
-                                          {(session.keywords || candidate.skills || ['Yorumlanıyor...']).map(tag => (
-                                              <span key={tag} className="px-3 py-1 bg-slate-50 border border-slate-100 rounded-lg text-[9px] font-bold text-slate-600 shadow-sm uppercase">{tag}</span>
-                                          ))}
-                                      </div>
-                                 </div>
+                            <div className="flex flex-col gap-3.5 min-w-0">
+                                <section className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-4">
+                                    <h3 className="text-[11px] font-semibold text-n500 tracking-[0.08em] uppercase mb-2.5 m-0">Oturum bilgileri</h3>
+                                    {/* YALNIZCA KAYITTA OLAN ALANLAR.
+                                        Eskiden dil alanı boşsa "Türkçe" yazıyordu ve
+                                        süre boşsa "N/A" basılıyordu — biri hiç
+                                        yapılmamış bir tespiti sonuç gibi gösteriyor,
+                                        diğeri boş satır üretiyordu. */}
+                                    {[
+                                        { label: 'Tür', value: report.mode === 'manual' ? 'Manuel görüşme' : 'Canlı mülakat' },
+                                        { label: 'Tarih', value: session.date ? formattedDate : null },
+                                        { label: 'Süre', value: session.duration || null },
+                                        { label: 'Dil', value: session.language || null },
+                                    ].filter(item => item.value).map(item => (
+                                        <div key={item.label} className="flex items-center justify-between py-1">
+                                            <span className="text-[12px] text-n500">{item.label}</span>
+                                            <span className="text-[12px] font-semibold text-n800">{item.value}</span>
+                                        </div>
+                                    ))}
+                                </section>
 
-                                 {/* BURADA BİR "DUYGU ANALİZİ" KARTI VARDI ve tamamen
-                                     uydurmaydı: yükseklikleri koda gömülü yedi çubuk
-                                     ve her mülakatta aynı cümle — "oturum genelinde
-                                     pozitif ve çözüm odaklı ton hakim". Hiçbir ölçüme
-                                     dayanmıyordu ama ekranda AI çıktısı gibi duruyordu.
-                                     Yapılmamış bir ölçümün sonucunu yazmak, yanlış
-                                     ölçümden daha kötüdür. Kaldırıldı. */}
-                             </div>
+                                {/* ANAHTAR KELİMELER — yalnızca kayıtta varsa.
+                                    Eskiden yoksa adayın CV becerilerine düşüyordu:
+                                    transkriptten çıkmamış kelimeler transkriptin
+                                    anahtar kelimesi gibi görünüyordu. İkisi de yoksa
+                                    'Yorumlanıyor...' diye hiç bitmeyen bir etiket
+                                    basılıyordu. */}
+                                {(session.keywords || []).length > 0 && (
+                                    <section className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-4">
+                                        <h3 className="text-[11px] font-semibold text-n500 tracking-[0.08em] uppercase mb-2.5 m-0">Anahtar kelimeler</h3>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {session.keywords.map(tag => (
+                                                <span key={tag} className="text-[11px] font-medium text-n600 bg-n50 border border-n200 rounded-full px-2 py-0.5">{tag}</span>
+                                            ))}
+                                        </div>
+                                    </section>
+                                )}
 
-                             {/* MAIN TRANSCRIPT FEED */}
-                             <div className="flex-1 space-y-6">
-                                 <div className="bg-white rounded-[24px] border border-[#E2E8F0] p-6 shadow-sm flex flex-col h-[700px]">
-                                      <div className="flex items-center justify-between mb-8 border-b border-slate-50 pb-6">
-                                          <div className="space-y-1">
-                                              <h3 className="text-[18px] font-black text-[#0F172A] italic uppercase tracking-tighter">Mülakat Tam Transkripti</h3>
-                                              <p className="text-[10px] font-bold text-slate-400 uppercase">Oturumun tam dökümü</p>
-                                          </div>
-                                          <div className="flex items-center gap-2">
-                                              <button onClick={handleDownload} className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-500 hover:text-blue-600 transition-all cursor-pointer"><Download className="w-4 h-4" /></button>
-                                              <button onClick={handleDownload} className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-500 hover:text-blue-600 transition-all cursor-pointer"><Printer className="w-4 h-4" /></button>
-                                              <button onClick={handleDownload} className="h-10 px-6 bg-blue-50 text-blue-600 rounded-xl border border-blue-100 text-[10px] font-black uppercase tracking-widest hover:bg-blue-100 transition-all cursor-pointer">Export PDF</button>
-                                          </div>
-                                      </div>
+                                {/* BURADA BİR "DUYGU ANALİZİ" KARTI VARDI ve tamamen
+                                    uydurmaydı: yükseklikleri koda gömülü yedi çubuk
+                                    ve her mülakatta aynı cümle. Kaldırıldı. */}
+                            </div>
 
-                                      <div className="relative mb-8">
-                                          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
-                                          <input 
-                                              type="text" 
-                                              placeholder="Transkript içinde ara..." 
-                                              className="w-full h-12 bg-slate-50 border border-slate-100 rounded-2xl pl-12 pr-6 text-[13px] font-medium outline-none focus:border-blue-500 transition-all" 
-                                          />
-                                      </div>
+                            <div className="flex flex-col gap-3.5 min-w-0">
+                                <section className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-[18px] flex flex-col h-[640px]">
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <h3 className="text-[13px] font-semibold m-0">Tam transkript</h3>
+                                        <button
+                                            onClick={handleDownload}
+                                            className="ml-auto flex items-center gap-1.5 text-[12px] font-medium text-n600 bg-n50 border border-n200 hover:bg-n100 rounded-md px-2.5 py-[5px]"
+                                        >
+                                            <Download className="w-3 h-3" /> PDF
+                                        </button>
+                                    </div>
 
-                                      <div className="flex-1 overflow-y-auto space-y-8 pr-4 custom-scrollbar">
-                                         {transcriptMessages.length === 0 && transcriptText ? (
-                                             /* Manuel görüşme: rol etiketi yok, kullanıcının
-                                                yapıştırdığı metin olduğu gibi gösteriliyor.
-                                                Uydurma bir rol ataması yapmıyoruz. */
-                                             <div className="p-6 rounded-[24px] bg-slate-50 text-[14px] leading-relaxed text-[#0F172A] whitespace-pre-wrap">
-                                                 {transcriptText}
-                                             </div>
-                                         ) : transcriptMessages.length > 0 ? (
-                                             transcriptMessages.map((msg, i) => {
-                                                 const isAday = msg.role === 'ADAY';
-                                                 const initial = msg.role === 'ADAY' ? 'A' : 'M';
-                                                 return (
-                                                     <div key={i} className={`flex gap-6 group ${isAday ? 'pl-12' : 'pr-12'}`}>
-                                                         {!isAday && (
-                                                             <div className="w-10 h-10 rounded-xl bg-[#13294E] text-white flex items-center justify-center font-black text-[12px] shrink-0 shadow-lg">{initial}</div>
-                                                         )}
-                                                         <div className="space-y-3 flex-1">
-                                                             <div className={`flex items-center gap-3 ${isAday ? 'justify-end' : ''}`}>
-                                                                 {isAday && <span className="text-[10px] font-mono text-slate-300 tabular-nums">{msg.time}</span>}
-                                                                 <h4 className="text-[12px] font-black text-[#0F172A]"><span className="text-slate-400 font-bold uppercase mr-1.5">{msg.role}</span></h4>
-                                                                 {!isAday && <span className="text-[10px] font-mono text-slate-300 tabular-nums">{msg.time}</span>}
-                                                             </div>
-                                                             <div className={`p-5 rounded-[24px] text-[14px] font-medium leading-relaxed relative ${isAday ? 'bg-blue-50 text-[#0F172A] italic' : 'bg-slate-50 text-[#475569]'}`}>
-                                                                 {msg.text}
-                                                             </div>
-                                                         </div>
-                                                         {isAday && (
-                                                             <div className="w-10 h-10 rounded-xl bg-[#3B82F6] text-white flex items-center justify-center font-black text-[12px] shrink-0 shadow-lg">{initial}</div>
-                                                         )}
-                                                     </div>
-                                                 );
-                                             })
-                                         ) : (
-                                             <div className="py-20 text-center space-y-4">
-                                                 <MessageSquare className="w-12 h-12 text-slate-200 mx-auto" />
-                                                 <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">Diyalog verisi bulunamadı</p>
-                                             </div>
-                                         )}
-                                      </div>
-                                  </div>
+                                    {/* Arama kutusu dekoratifti (value/onChange yoktu).
+                                        Artık gerçekten süzüyor. */}
+                                    <div className="relative mb-3">
+                                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-n400 pointer-events-none" />
+                                        <input
+                                            type="text"
+                                            value={transcriptSearch}
+                                            onChange={(e) => setTranscriptSearch(e.target.value)}
+                                            placeholder="Transkript içinde ara…"
+                                            className="w-full bg-n50 border border-n200 rounded-md pl-8 pr-3 py-2 text-[12px] focus:outline-none focus:border-brand"
+                                        />
+                                    </div>
 
-                                  {/* BOTTOM AI OVERLAY */}
-                                  <div className="bg-[#EBF4FF] rounded-[24px] border border-blue-100 p-6 flex items-center justify-between group">
-                                       <div className="flex items-center gap-4">
-                                           <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform"><Sparkles className="w-6 h-6 text-blue-600 fill-blue-600" /></div>
-                                           <div>
-                                               <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest italic mb-0.5">AI ÖZET</p>
-                                               <p className="text-[13px] font-bold text-[#13294E] italic">{session.aiSummary || "Adayın performansı ve cevapları gerçek zamanlı analiz edildi."}</p>
-                                           </div>
-                                       </div>
-                                       <ArrowRight className="w-5 h-5 text-blue-300" />
-                                  </div>
-                              </div>
-                         </div>
+                                    <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-2.5 pr-1">
+                                        {transcriptMessages.length === 0 && transcriptText ? (
+                                            /* Manuel görüşme: rol etiketi yok, kullanıcının
+                                               yapıştırdığı metin olduğu gibi gösteriliyor.
+                                               Uydurma bir rol ataması yapmıyoruz. */
+                                            <div className="bg-n50 border border-n200 rounded-md p-3.5 text-[13px] leading-relaxed text-n800 whitespace-pre-wrap">
+                                                {transcriptText}
+                                            </div>
+                                        ) : visibleTranscript.length > 0 ? (
+                                            visibleTranscript.map((msg, i) => {
+                                                const isCandidate = msg.role === 'ADAY';
+                                                return (
+                                                    <div
+                                                        key={i}
+                                                        className={`rounded-md border px-3 py-2 ${
+                                                            isCandidate ? 'bg-brand-50 border-brand-100' : 'bg-n50 border-n200 ml-8'
+                                                        }`}
+                                                    >
+                                                        <div className="flex items-center justify-between mb-0.5">
+                                                            <span className={`text-[11px] font-semibold tracking-[0.08em] uppercase ${isCandidate ? 'text-brand' : 'text-n400'}`}>
+                                                                {msg.role}
+                                                            </span>
+                                                            {msg.time && <span className="text-[11px] text-n400 tabular-nums">{msg.time}</span>}
+                                                        </div>
+                                                        <p className="text-[13px] leading-relaxed text-n700 m-0">{msg.text}</p>
+                                                    </div>
+                                                );
+                                            })
+                                        ) : (
+                                            <div className="flex-1 flex flex-col items-center justify-center text-center">
+                                                <MessageSquare className="w-6 h-6 text-n300 mb-2" />
+                                                <p className="text-[12px] text-n400 m-0">
+                                                    {transcriptSearch && transcriptMessages.length > 0
+                                                        ? 'Aramaya uyan satır yok.'
+                                                        : 'Diyalog verisi bulunamadı.'}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </section>
+
+                                {/* ÖZET yalnızca kayıtta varsa. Eskiden yoksa
+                                    "Adayın performansı ve cevapları gerçek zamanlı
+                                    analiz edildi." yazıyordu — yapılmamış bir analizi
+                                    yapılmış gibi gösteren sabit bir cümle. */}
+                                {session.aiSummary && (
+                                    <section className="bg-brand-50 border border-brand-100 rounded-[14px] p-4">
+                                        <div className="flex items-center gap-2 mb-1.5">
+                                            <Sparkles className="w-3.5 h-3.5 text-brand" />
+                                            <h3 className="text-[11px] font-semibold text-brand tracking-[0.08em] uppercase m-0">Özet</h3>
+                                        </div>
+                                        <p className="text-[13px] text-n700 leading-relaxed m-0">{session.aiSummary}</p>
+                                    </section>
+                                )}
+                            </div>
+                        </div>
                     )}
                 </div>
             </main>
