@@ -1,7 +1,7 @@
 // src/context/PositionsContext.jsx
 // Context provider for managing job positions
 
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect , useMemo } from 'react';
 import { useAuth } from './AuthContext';
 import { db } from '../config/firebase';
 import {
@@ -161,7 +161,17 @@ export function PositionsProvider({ children }) {
         await updatePosition(id, { status: newStatus });
     };
 
-    const value = {
+    /**
+     * Context değeri memoize.
+     *
+     * Düz nesne her render'da yeni referans üretiyor ve bu context'i tüketen
+     * HER bileşeni yeniden render ettiriyordu. Ekranlar arası yavaşlığın
+     * kaynaklarından biri buydu.
+     *
+     * Fonksiyonlar bilerek bağımlılıkta yok: hiçbiri bileşen state'ini
+     * okumuyor, yalnızca stabil setter'ları ve servis çağrılarını kullanıyor.
+     */
+    const value = useMemo(() => ({
         positions,
         loading,
         error,
@@ -183,7 +193,8 @@ export function PositionsProvider({ children }) {
         updatePosition,
         deletePosition,
         togglePositionStatus
-    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }), [positions, loading, error, positionDraft]);
 
     return (
         <PositionsContext.Provider value={value}>

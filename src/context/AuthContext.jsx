@@ -2,7 +2,7 @@
 // Authentication Context - Rule 3 Compliance
 // Uses onAuthStateChanged to bind user session to global state
 
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import {
     signInWithPopup,
     onAuthStateChanged,
@@ -408,13 +408,37 @@ export function AuthProvider({ children }) {
 
     const logout = () => signOut(auth);
 
-    const value = {
+    /**
+     * DEPARTMAN LİSTESİ HER RENDER'DA YENİ DİZİ OLMAMALI.
+     *
+     * Eskiden burada her render'da taze bir dizi üretiliyordu: departmanı
+     * olmayan bir recruiter için bile `[]` yeni bir referanstı. Bu dizi
+     * CandidatesContext'teki aday dinleyicisinin bağımlılık dizisinde
+     * duruyor — yani her render aboneliği yıkıp yeniden kuruyordu.
+     * Ölçüldü: tek sayfa açılışında koleksiyon dinleyicisi BEŞ KEZ
+     * kuruluyordu ve her biri tüm aday belgelerini baştan indiriyordu.
+     * "Ekran önce boş geliyor, sonra doluyor" bunun görünen yüzüydü.
+     */
+    const userDepartments = useMemo(
+        () => userProfile?.departments || (userProfile?.department ? [userProfile.department] : []),
+        [userProfile?.departments, userProfile?.department]
+    );
+
+    /**
+     * Context değeri de memoize: düz nesne her render'da yeni referans
+     * üretiyor ve bu context'i tüketen HER bileşeni yeniden render ettiriyordu.
+     *
+     * Fonksiyonlar bilerek bağımlılıkta yok: hiçbiri bileşen state'ini
+     * okumuyor, yalnızca stabil setter'ları (setLoading/setError) ve firebase
+     * API'lerini çağırıyorlar. Bağımlılığa eklenselerdi memo hiç tutmazdı.
+     */
+    const value = useMemo(() => ({
         user,
         userProfile,
         role: userProfile?.role || null,
         isSuperAdmin: userProfile?.role === 'super_admin',
         isDepartmentUser: userProfile?.role === 'department_user',
-        userDepartments: userProfile?.departments || (userProfile?.department ? [userProfile.department] : []),
+        userDepartments,
         userId: user?.uid || null,
         isAuthenticated: !!user && !!userProfile,
         loading,
@@ -424,7 +448,8 @@ export function AuthProvider({ children }) {
         registerWithEmail,
         resetPassword,
         logout
-    };
+     
+    }), [user, userProfile, userDepartments, loading, error]);
 
     return (
         <AuthContext.Provider value={value}>

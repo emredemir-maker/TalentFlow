@@ -10,6 +10,12 @@ import { useAuth } from './AuthContext';
 const CandidatesContext = createContext(null);
 
 // Firestore collection path for general candidate pool
+/**
+ * İlk snapshot için beklenecek süre. Aşılırsa ekran "bekliyor" yazısında
+ * donmak yerine sebebi söyler ve yeniden deneme sunar.
+ */
+const FIRST_SNAPSHOT_TIMEOUT_MS = 12000;
+
 const CANDIDATES_COLLECTION = 'artifacts/talent-flow/public/data/candidates';
 
 export function CandidatesProvider({ children }) {
@@ -110,6 +116,26 @@ export function CandidatesProvider({ children }) {
         setLoading(true);
         let unsubCandidates = () => {};
         let unsubSources = () => {};
+
+        /**
+         * İLK SNAPSHOT GELMEZSE EKRAN SONSUZA KADAR BEKLEMESİN.
+         *
+         * onSnapshot sunucuya ulaşamadığında (ağ kesintisi, kural reddi,
+         * çevrimdışı sekme) NE veri NE hata geri çağırması çalışıyor. `loading`
+         * true kalıyor ve ekranlar "yükleniyor" yazısında donuyor — kullanıcının
+         * "aday detayı hiç yüklenmiyor" dediği durum tam olarak bu.
+         *
+         * Zaman aşımı veriyi DEĞİŞTİRMİYOR: yalnızca beklemenin bittiğini ve
+         * sebebini söylüyor. Snapshot sonradan gelirse hata temizleniyor.
+         */
+        const firstSnapshotTimer = setTimeout(() => {
+            setLoading((wasLoading) => {
+                if (wasLoading) {
+                    setError('Aday listesine ulaşılamadı — bağlantı kurulamadı ya da izin verilmedi.');
+                }
+                return false;
+            });
+        }, FIRST_SNAPSHOT_TIMEOUT_MS);
 
         // onSnapshot for real-time listening for candidates
         const candidatesRef = collection(db, CANDIDATES_COLLECTION);
@@ -276,11 +302,13 @@ export function CandidatesProvider({ children }) {
                         const bTime = (typeof b.createdAt?.toMillis === 'function') ? b.createdAt.toMillis() : 0;
                         return bTime - aTime;
                     });
+                    clearTimeout(firstSnapshotTimer);
                     setCandidates(candidateList);
                     setLoading(false);
                     setError(null);
                 },
                 (err) => {
+                    clearTimeout(firstSnapshotTimer);
                     console.error('[TalentFlow] Candidates snapshot error:', err);
                     // If it's a public route, don't crash the UI with permission errors
                     if (isPublicAccessRoute && err.code === 'permission-denied') {
@@ -309,10 +337,19 @@ export function CandidatesProvider({ children }) {
 
 
         return () => {
+            clearTimeout(firstSnapshotTimer);
             if (unsubCandidates) unsubCandidates();
             if (unsubSources) unsubSources();
         };
-    }, [isAuthenticated, authLoading, user, isDepartmentUser, userDepartments]); // userDepartments change triggers re-subscription for dept_users
+    // BAĞIMLILIKLAR REFERANS DEĞİL DEĞER OLMALI.
+    //
+    // Eskiden burada `user` (nesne) duruyordu; her yeni nesne referansı
+    // koleksiyon dinleyicisini yıkıp yeniden kuruyordu. Efektin `user`dan
+    // okuduğu tek şey `isAnonymous`, kimliği ise `uid`. İkisini ayrı ayrı
+    // dinlemek aynı davranışı verir ama gereksiz yeniden aboneliği keser.
+    // `userDepartments` artık AuthContext'te memoize (bkz. oradaki not).
+     
+    }, [isAuthenticated, authLoading, user?.uid, user?.isAnonymous, isDepartmentUser, userDepartments]);
 
 
 
@@ -473,7 +510,17 @@ export function CandidatesProvider({ children }) {
         }, {}),
     }), [candidates, filteredCandidates]);
 
-    const value = {
+    /**
+     * Context değeri memoize.
+     *
+     * Düz nesne her render'da yeni referans üretiyor ve bu context'i tüketen
+     * HER bileşeni yeniden render ettiriyordu. Ekranlar arası yavaşlığın
+     * kaynaklarından biri buydu.
+     *
+     * Fonksiyonlar bilerek bağımlılıkta yok: hiçbiri bileşen state'ini
+     * okumuyor, yalnızca stabil setter'ları ve servis çağrılarını kullanıyor.
+     */
+    const value = useMemo(() => ({
         // Data
         candidates,
         filteredCandidates,
@@ -520,7 +567,8 @@ export function CandidatesProvider({ children }) {
         compareIds,
         toggleCompareCandidate,
         clearCompareSelection,
-    };
+     
+    }), [candidates, filteredCandidates, stats, departments, loading, error, searchQuery, departmentFilter, statusFilter, experienceFilter, positionFilter, matchPositions, enrichedCandidates, sourceFilter, sourcesOptions, subSourceFilter, subSourcesOptions, sourceColors, viewCandidateId, preselectedInterviewData, compareIds]);
 
     return (
         <CandidatesContext.Provider value={value}>
