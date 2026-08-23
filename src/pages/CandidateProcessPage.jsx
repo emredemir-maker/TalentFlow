@@ -39,7 +39,8 @@ import {
     AlertCircle, Trophy, Calendar, Edit3,
     CheckCircle2, Link2, ExternalLink, Video, Play, Award, User, Mail,
     ChevronRight, ChevronDown, BarChart2, MessageSquare, XCircle, Send, Loader2,
-    Sparkles, Trash2, RefreshCw, Layers, TrendingUp, Upload, FileQuestion, AlertTriangle
+    Sparkles, Trash2, RefreshCw, Layers, TrendingUp, Upload, FileQuestion, AlertTriangle,
+    Users
 } from 'lucide-react';
 
 const STATUS_CONFIG = {
@@ -77,7 +78,7 @@ const normalizePipelineStatus = (s) => (s === 'new' ? 'ai_analysis' : s);
 
 export default function CandidateProcessPage() {
     const navigate = useNavigate();
-    const { enrichedCandidates, viewCandidateId, setViewCandidateId, sourceColors, setPreselectedInterviewData, updateCandidate, deleteCandidate, addCandidate } = useCandidates();
+    const { enrichedCandidates, viewCandidateId, setViewCandidateId, sourceColors, setPreselectedInterviewData, updateCandidate, deleteCandidate, addCandidate, loading: candidatesLoading, error: candidatesError } = useCandidates();
     const { positions } = usePositions();
     const { user, userProfile, isSuperAdmin, role } = useAuth();
     const candidates = enrichedCandidates || [];
@@ -2539,9 +2540,69 @@ export default function CandidateProcessPage() {
                             </div>
                         </div>
                     ) : (
-                        <div className="flex-1 flex flex-col items-center justify-center text-n300">
-                            <Brain className="w-14 h-14 mb-3 animate-pulse" />
-                            <h2 className="text-[12px] font-semibold uppercase tracking-[0.08em]">Yükleniyor…</h2>
+                        /* ÜÇ AYRI DURUM, ÜÇ AYRI CÜMLE.
+                           Burada eskiden tek bir "Yükleniyor…" vardı ve aday
+                           null olduğu HER durumda çıkıyordu: yükleme sürerken
+                           de, hiç aday yokken de, aranan aday bulunamazken de.
+                           Dinleyici bir an boş dönerse ekran sonsuza kadar o
+                           yazıda kalıyordu — "aday detayı hiç yüklenmiyor"
+                           şikâyetinin sebebi buydu. Yükleme bittiyse artık
+                           sebebi söylüyoruz. */
+                        <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
+                            {candidatesLoading ? (
+                                <>
+                                    <Brain className="w-12 h-12 mb-3 text-n300 animate-pulse" />
+                                    <h2 className="text-[13px] font-semibold text-n600">Adaylar yükleniyor…</h2>
+                                </>
+                            ) : candidatesError ? (
+                                <>
+                                    <AlertCircle className="w-12 h-12 mb-3 text-bad" />
+                                    <h2 className="text-[13px] font-semibold text-n900 mb-1">Aday listesi okunamadı</h2>
+                                    <p className="text-[12px] text-n500 max-w-xs leading-relaxed mb-4">{candidatesError}</p>
+                                    <button
+                                        onClick={() => window.location.reload()}
+                                        className="text-[12px] font-semibold text-white bg-brand hover:bg-brand-600 rounded-md px-[13px] py-[7px]"
+                                    >
+                                        Yeniden dene
+                                    </button>
+                                </>
+                            ) : candidates.length === 0 ? (
+                                <>
+                                    <Users className="w-12 h-12 mb-3 text-n300" />
+                                    <h2 className="text-[13px] font-semibold text-n900 mb-1">Henüz aday yok</h2>
+                                    <p className="text-[12px] text-n500 max-w-xs leading-relaxed mb-4">
+                                        CV yükleyerek ya da toplu yükleme ile başlayabilirsiniz.
+                                    </p>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={openBulkImport}
+                                            className="text-[12px] font-medium text-n600 bg-n0 border border-n200 hover:bg-n50 rounded-md px-[11px] py-[7px]"
+                                        >
+                                            Toplu yükleme
+                                        </button>
+                                        <button
+                                            onClick={() => setIsAddModalOpen(true)}
+                                            className="text-[12px] font-semibold text-white bg-brand hover:bg-brand-600 rounded-md px-[13px] py-[7px]"
+                                        >
+                                            Yeni aday
+                                        </button>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <Users className="w-12 h-12 mb-3 text-n300" />
+                                    <h2 className="text-[13px] font-semibold text-n900 mb-1">Aday bulunamadı</h2>
+                                    <p className="text-[12px] text-n500 max-w-xs leading-relaxed mb-4">
+                                        Aradığınız aday silinmiş ya da görme yetkiniz olmayabilir.
+                                    </p>
+                                    <button
+                                        onClick={() => setViewCandidateId(null)}
+                                        className="text-[12px] font-semibold text-white bg-brand hover:bg-brand-600 rounded-md px-[13px] py-[7px]"
+                                    >
+                                        Listedeki ilk adaya dön
+                                    </button>
+                                </>
+                            )}
                         </div>
                     )}
                 </main>

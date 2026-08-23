@@ -2,7 +2,7 @@
 // User Settings Context - Per-user settings from Firestore
 // Path: /artifacts/talent-flow/users/{userId}/settings
 
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback , useMemo } from 'react';
 import { doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from './AuthContext';
@@ -102,12 +102,23 @@ export function UserSettingsProvider({ children }) {
         [settings.customPositions, updateSettings]
     );
 
-    const value = {
+    /**
+     * Context değeri memoize.
+     *
+     * Düz nesne her render'da yeni referans üretiyor ve bu context'i tüketen
+     * HER bileşeni yeniden render ettiriyordu. Ekranlar arası yavaşlığın
+     * kaynaklarından biri buydu.
+     *
+     * Fonksiyonlar bilerek bağımlılıkta yok: hiçbiri bileşen state'ini
+     * okumuyor, yalnızca stabil setter'ları ve servis çağrılarını kullanıyor.
+     */
+    const value = useMemo(() => ({
         settings,
         loading,
         updateSettings,
         saveCustomPosition
-    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }), [settings, loading]);
 
     return (
         <UserSettingsContext.Provider value={value}>
