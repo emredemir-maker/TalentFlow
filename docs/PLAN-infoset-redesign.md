@@ -46,15 +46,16 @@ Hepsi `Incomplete mockup request/design_handoff_talentflow/` altında:
 | 1 | Kontrol Paneli | `Dashboard.jsx` | ✅ merged (#194) |
 | 2 | Pipeline | `PipelinePage.jsx` | ✅ merged (#197) |
 | 3 | AI Match | `AIMatchPage.jsx` | ⛔ **atlandı** (aşağıda) |
-| 4 | Mülakat Listesi + Planlama | `InterviewManagementPage.jsx` | 🟡 **PR #199 açık** |
-| 5 | Canlı Mülakat | `LiveInterviewPage.jsx`, `AgentThoughtPanel.jsx` | ⬜ **sıradaki** |
-| 6 | Rapor | `InterviewReportPage.jsx`, `InterviewReportSections.jsx`, `StarScoreCard.jsx` | ⬜ |
+| 4 | Mülakat Listesi + Planlama | `InterviewManagementPage.jsx` | ✅ merged (#199) |
+| 5 | Canlı Mülakat | `LiveInterviewPage.jsx` | 🟡 **PR #201 açık** |
+| 6 | Rapor | `InterviewReportPage.jsx`, `InterviewReportSections.jsx`, `StarScoreCard.jsx` | ⬜ **sıradaki** |
 | 7 | İK Asistanı | `HrAssistantPanel.jsx` | ⬜ |
 | 8 | Aday Detayı | `CandidateProcessPage.jsx`, `CandidateCvPanel.jsx` | ⬜ |
 
 Ek olarak merged: #196 (yerel giriş COOP düzeltmesi), #198 (havuz skor
 tutarlılığı + aday tıklaması doğru sayfaya).
-**Açık PR: #199** — Ekran 4.
+Ekran 4 merged (#199), belge #200 ile `main`'e taşındı.
+**Açık PR: #201** — Ekran 5.
 
 > ⚠️ Bu belge #198 merge edildikten SONRA o dala işlendiği için `main`'e
 > hiç girmemişti; buraya cherry-pick ile taşındı. Belge güncellemeleri
@@ -134,7 +135,7 @@ olmaz, veri kesin.
 | Maaş modalı kendi pozisyon state'ini kullanır | ✅ Ekran 4 (#199) |
 | Aday Detayı 7 sekme + zorunlu kapısı + skor kırılımı + alt aksiyon çubuğu | ⬜ Ekran 8 |
 | Toolbar tek satır 28px pill | ⬜ Ekran 8 |
-| STAR ölçeği her yerde 0–3 | ⬜ Ekran 5/6 |
+| STAR ölçeği her yerde 0–3 | ⚠️ Ekran 5'te **veri yok** (aşağıda) · ⬜ Ekran 6 |
 
 ## Bu oturumda alınan kararlar
 
@@ -208,18 +209,64 @@ kullanıcının hesabında bir kez gözle görülmeli.
 diyor; seans henüz başlamadığı ve Kontrol Paneli (#194) "Görüntüle"
 kullandığı için "Görüntüle" seçildi.
 
-## Ekran 5 planı (sıradaki)
+## Ekran 5 — ne yapıldı (#201)
 
-`src/pages/LiveInterviewPage.jsx` + `src/components/AgentThoughtPanel.jsx`.
+`LiveInterviewPage.jsx`. Mülakatçının aktif oturum ekranı **kendi
+`return`'üne alındı** (`if (isRecruiter) { … }`) ve Infoset diline
+çevrildi. Aday görünümü koyu hâliyle dokunulmadan kaldı: prototipte
+karşılığı yok ve WebRTC + onay akışı orada.
 
-**Render bloğu prototip HTML'inde YOK** — spec `pdata.js` satır 364–410:
-`transcript` (konuşma balonları, mülakatçı/aday renkleri), `wave` (30
-çubuk ses dalgası), `liveAgentSteps` (Veri Ayıklama → Semantik Eşleşme →
-Risk Analizi → Otonom Karar), `qSets` (Derinleştir/Doğrula/Kapanış),
-`suggested` (3 soru önerisi), `starDims` (0–3, `ANCHOR_LABELS`).
+Değişenler: 52px açık başlık (süre, aday durumu, İçeri al, aday linki,
+Mülakatı tamamla, ⋮), sorular paneli, transkript (balon renkleri
+prototipin `transcript` bloğundan — mülakatçı nötr, aday marka tonu),
+"Mülakat tamamlandı" ekranı. Video karesi koyu bırakıldı.
 
-Dikkat: **STAR ölçeği 0–3**, etiketler `src/utils/starDimensions.js`'ten
-— uydurma etiket yok. Ekran 6 (Rapor) aynı ölçeği paylaşıyor.
+### Prototipte olup KONMAYANLAR — kasten
+
+| Prototip | Neden yok |
+|---|---|
+| **STAR 0–3, dört çubuk** | Canlı analiz `analyzeSTARRealTime` (`services/ai/interview.js`) **beş yetkinliği 0–100** döndürüyor: technical, communication, problemSolving, cultureFit, adaptability. S/T/A/R ÜRETMİYOR — STAR yalnızca prompt'ta yol gösterici olarak geçiyor. Dört çubuk basmak uydurma ölçüm olurdu |
+| 30 çubuklu ses dalgası | Mevcut dalga `Math.random()`; mikrofonun yanında ses seviyesi ölçer gibi okunur |
+| 3 soru kipi | Servis yalnızca `deepen` ve "henüz sorulmamış alan" dallarını destekliyor. İki gerçek kip kondu |
+| Ajan adımları | `AgentThoughtPanel.jsx`'in tek kullanıcısı `AIMatchPage` (DEAD_FILES) ve adımları 1.5sn'lik sahte `setInterval` |
+
+**Kullanıcıya sorulacak:** canlı ekranda STAR paneli isteniyorsa
+`services/ai/interview.js` prompt+şema değişmeli — ayrı bir iş.
+
+### Dürüstleştirilen etiketler
+
+"Logic Integrity" ve "LOYALTY SCORE" → **"Yetkinlik ortalaması"**.
+Hesaplanan şey beş yetkinliğin düz ortalaması. "REPORU" → "Raporu".
+
+### Silinen ölü kod
+
+Aday `return`'ündeki `isRecruiter && (…)` başlık bloğu (mülakatçı dalı
+ayrılınca erişilemez oldu) ve aktif ekrandaki cihaz ayarları modalı
+(`setShowSettings` yalnızca lobiden çağrılıyor; içindeki `<select>`'lerin
+`value`/`onChange`'i de yok).
+
+### ⚠️ Doğrulama boşluğu
+
+**Aktif mülakatçı ekranı tarayıcıda görülemedi.** Canlı seans kaydı ve
+kamera izni gerekiyor; mock-auth önizlemesinde ikisi de yok. eslint/build/
+vitest temiz ama Ekran 1/2/4'teki render doğrulaması burada yapılamadı.
+Bir kez gerçek seansla açılıp bakılmalı.
+
+## Ekran 6 planı (sıradaki)
+
+`InterviewReportPage.jsx`, `InterviewReportSections.jsx`,
+`StarScoreCard.jsx`. Prototip satırları **1018–1119**.
+
+Burada STAR **gerçekten var**: rapor `starAnalysis`/`starScores` okuyor ve
+`src/utils/starDimensions.js` (`STAR_MAX = 3`, `ANCHOR_LABELS`,
+`STAR_LABELS`, `normalizeStarAnalysis`, `starPercent`) tek kaynak.
+Onaylanmış "STAR 0–3" kararı asıl burada uygulanacak.
+
+Dikkat: `starDimensions.js` hem ESKİ 0–10 hem YENİ 0–3 biçimini okuyor;
+ölçek kayıt genelinde belirleniyor. Ekranda `/10` yazan bir yer kalırsa
+tam not alan boyut "3/10" görünür — belgede geçen gerçek hata bu.
+Ayrıca `InterviewReportPage` manuel görüşmeyi ayrı ele alıyor
+(`report.mode === 'manual'`), o dal korunmalı.
 
 ## Dersler — bunlar tekrar edilmemeli
 
