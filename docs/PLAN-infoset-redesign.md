@@ -49,13 +49,13 @@ Hepsi `Incomplete mockup request/design_handoff_talentflow/` altında:
 | 4 | Mülakat Listesi + Planlama | `InterviewManagementPage.jsx` | ✅ merged (#199) |
 | 5 | Canlı Mülakat | `LiveInterviewPage.jsx` | 🟡 **PR #201 açık** |
 | 6 | Rapor | `InterviewReportPage.jsx`, `InterviewReportSections.jsx` | 🟡 **PR #203 açık** |
-| 7 | İK Asistanı | `HrAssistantPanel.jsx` | ⬜ **sıradaki** |
-| 8 | Aday Detayı | `CandidateProcessPage.jsx`, `CandidateCvPanel.jsx` | ⬜ |
+| 7 | İK Asistanı | `HrAssistantPanel.jsx`, `PositionDraftCard.jsx` | 🟡 **PR #205 açık** |
+| 8 | Aday Detayı | `CandidateProcessPage.jsx`, `CandidateCvPanel.jsx` | ⬜ **sıradaki — son ekran** |
 
 Ek olarak merged: #196 (yerel giriş COOP düzeltmesi), #198 (havuz skor
 tutarlılığı + aday tıklaması doğru sayfaya).
 Ekran 4 merged (#199), belge #200 ile `main`'e taşındı.
-**Açık PR'lar: #201** (Ekran 5), **#203** (Ekran 6).
+**Açık PR: #205** (Ekran 7). Ekran 5 ve 6 merge edildi.
 
 > ⚠️ Bu belge #198 merge edildikten SONRA o dala işlendiği için `main`'e
 > hiç girmemişti; buraya cherry-pick ile taşındı. Belge güncellemeleri
@@ -312,19 +312,59 @@ boşluğu burada YOK.
 > Bu yöntem Ekran 5 için de denenebilir ama orada kamera izni de
 > gerekiyor; önizleme penceresi medya erişimini engelliyor.
 
-## Ekran 7 planı (sıradaki)
+## Ekran 7 — ne yapıldı (#205)
 
-`src/components/HrAssistantPanel.jsx` — prototipte "asistan paneli
-(4 araç)". Prototip satır haritasında ayrı bir blok yok; modaller
-bölümünde (1123–1313) "HR asistanı" geçiyor. `pdata.js`'te
-`asstExamples`, `asstRows`, `asstApplied`, `reviewBlocks`,
-`marketBenefits`, `marketSources`, `draftMustHaves`, `draftNiceToHaves`
-duruyor — panelin dört aracı bunlar.
+`HrAssistantPanel.jsx` + `PositionDraftCard.jsx` (taslak kartı panelin
+içinde render ediliyor, yarısı eski dilde kalmasın diye o da çevrildi).
 
-Dikkat: `docs/PLAN-ik-asistani.md` bu panelin kendi planını taşıyor,
-önce o okunmalı. Panelin ürettiği ilan taslağı `PositionsContext`'teki
-`positionDraft` üzerinden forma taşınıyor (olayla değil, çünkü kullanıcı
-pozisyonlar ekranında değilken olayı dinleyecek kimse olmuyor).
+Tetikleyici hap biçimli marka düğme; panel 440px → **400px**, 14px
+yarıçap, başlıkta 26px yuvarlak marka ikonu ve prototipin alt başlığı
+("havuzdaki veriye bakar, karar vermez"). Örnek sorular hap biçimli.
+cyan/teal aksanlar markaya, slate/amber/emerald/violet tonları
+n/warn/ok/bad tokenlarına indi. Eylem düğmelerinde VERSAL kalktı.
+
+**Metinlerin hiçbiri değişmedi.** Bu dosyalarda asıl iş hangi koşulda
+hangi cümlenin çıktığı: kaynaksız maaş rakamını gizlemek, "arama
+yapılamadı" ile "arama yapıldı ama kaynak gösterilmedi"yi ayırmak,
+ölçülemeyen görüşmeyi ortalamaya katmamak, modelin eklediği maddeyi
+"öneri" rozetiyle ayırmak.
+
+## ⚠️ `.infoset` sınıfını zemini olan öğeye koymayın
+
+Ekran 7'de canlıya çıkmadan yakalandı, **sonraki ekranlar için de
+geçerli**:
+
+`.infoset` kuralı `background` (kısayol) yazıyor ve `index.css`'te
+`@import "tailwindcss"`ten SONRA geliyor. İkisi de sınıf seçici, yani
+aynı özgüllükte — sonraki kazanıyor. Sınıfı doğrudan `bg-brand` taşıyan
+bir düğmeye koyunca düğme marka mavisi yerine `#FBFBFD` çıktı.
+
+**Kural:** `.infoset` sarmalayıcıda durur, zemin çocuk öğede. Zorunlu
+kalırsan `style={{ background: … }}` sınıf kuralını yener.
+
+## Ekran 8 planı (son ekran)
+
+`src/pages/CandidateProcessPage.jsx` + `src/components/CandidateCvPanel.jsx`.
+Prototip satırları **178–689** — en uzun blok.
+
+Onaylanmış kararlar (README):
+- **7 sekme:** STAR Analizi, CV, CV & Uyum, Pozisyon Eşleşmeleri,
+  Mülakatlar, Süreç Geçmişi, Mesajlar
+- Zorunlu gereksinim kapısı, skor kırılımı, alt aksiyon çubuğu
+  (sağda: Yorum, Mesaj Gönder, Sil, Aşama İlerlet)
+- Toolbar tek satır, 28px pill'ler
+- CV Uyum kolonu sağ padding ile genişletildi
+
+**STAR 0–3 kararının ASIL YERİ BURASI.** Bu ekran `candidate.starAnalysis`
+okuyor — `utils/starDimensions.js` (`STAR_MAX = 3`, `ANCHOR_LABELS`,
+`normalizeStarAnalysis`, `starPercent`, `anchorLabel`) tam olarak bu alan
+için yazıldı. Ekranda `/10` yazan bir yer kalırsa tam not alan boyut
+"3/10" görünür.
+
+Ayrıca bu sayfada `openBulkUpload` ve `openAddCandidate` olay
+dinleyicileri var (Kontrol Paneli ve Pipeline oradan tetikliyor) —
+korunmalı. `ScoreBreakdownPanel.jsx` de skor kırılımını çiziyor ve
+`starLabels.test.js` metnini denetliyor.
 
 ## Dersler — bunlar tekrar edilmemeli
 
