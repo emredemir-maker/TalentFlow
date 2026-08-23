@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-    MessageSquare, X, Send, Loader2, AlertTriangle, Info, ChevronRight, Sparkles, RotateCcw,
+    X, Send, Loader2, AlertTriangle, Info, ChevronRight, Sparkles, RotateCcw,
     ThumbsUp, ThumbsDown,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -294,26 +294,31 @@ export default function HrAssistantPanel() {
 
     if (!open) {
         return (
-            <button
-                onClick={() => setOpen(true)}
-                title="İK Asistanı"
-                className="fixed bottom-5 right-5 z-40 flex items-center gap-2 px-4 py-3 rounded-2xl bg-cyan-500 hover:bg-cyan-600 text-white shadow-lg shadow-cyan-500/25 transition-colors"
-            >
-                <MessageSquare className="w-4 h-4" />
-                <span className="text-[11px] font-black uppercase tracking-wider">İK Asistanı</span>
-            </button>
+            <div className="infoset fixed bottom-5 right-5 z-40" style={{ background: 'transparent' }}>
+                <button
+                    onClick={() => setOpen(true)}
+                    title="İK Asistanı"
+                    className="flex items-center gap-2 px-4 py-[11px] rounded-full bg-brand hover:bg-brand-600 text-white shadow-lg"
+                >
+                    <Sparkles className="w-[15px] h-[15px]" />
+                    <span className="text-[13px] font-semibold">İK Asistanı</span>
+                </button>
+            </div>
         );
     }
 
     return (
-        <div className="fixed bottom-0 right-0 sm:bottom-5 sm:right-5 z-40 w-full sm:w-[440px] h-[85vh] sm:h-[640px] flex flex-col rounded-t-2xl sm:rounded-2xl bg-white border border-slate-200 shadow-2xl overflow-hidden">
-            <header className="flex items-center justify-between gap-2 px-4 py-3 border-b border-slate-100 shrink-0">
-                <div className="min-w-0">
-                    <h2 className="flex items-center gap-1.5 text-[11px] font-black text-slate-700 uppercase tracking-widest">
-                        <Sparkles className="w-3.5 h-3.5 text-cyan-500" /> İK Asistanı
-                    </h2>
-                    <p className="text-[9px] text-slate-400 truncate">
-                        {contextPosition ? `Bağlam: ${contextPosition}` : `${enrichedCandidates?.length || 0} aday · yalnızca okur`}
+        <div className="infoset fixed bottom-0 right-0 sm:bottom-5 sm:right-5 z-40 w-full sm:w-[400px] h-[85vh] sm:h-[620px] flex flex-col rounded-t-[14px] sm:rounded-[14px] border border-n200 shadow-xl overflow-hidden" style={{ background: 'var(--color-n0)' }}>
+            <header className="flex items-center gap-2.5 px-3.5 py-3 border-b border-n200 shrink-0">
+                <span className="w-[26px] h-[26px] shrink-0 rounded-full bg-brand-50 text-brand flex items-center justify-center">
+                    <Sparkles className="w-3.5 h-3.5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                    <h2 className="text-[13px] font-semibold m-0">İK Asistanı</h2>
+                    <p className="text-[11px] text-n400 truncate m-0">
+                        {contextPosition
+                            ? `Bağlam: ${contextPosition}`
+                            : `${enrichedCandidates?.length || 0} aday · havuzdaki veriye bakar, karar vermez`}
                     </p>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
@@ -323,20 +328,20 @@ export default function HrAssistantPanel() {
                         <button
                             onClick={newTopic}
                             title="Yeni konu — önceki sorular bağlamdan çıkar"
-                            className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+                            className="flex items-center gap-1 px-2 py-1.5 rounded-md hover:bg-n100 text-n400 hover:text-n600 transition-colors"
                         >
                             <RotateCcw className="w-3 h-3" />
-                            <span className="text-[9px] font-black uppercase tracking-wider">Yeni konu</span>
+                            <span className="text-[11px] font-medium">Yeni konu</span>
                         </button>
                     )}
-                    <button onClick={() => setOpen(false)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
+                    <button onClick={() => setOpen(false)} className="p-1.5 rounded-md hover:bg-n100 text-n400">
                         <X className="w-4 h-4" />
                     </button>
                 </div>
             </header>
 
             {persistError && (
-                <p className="flex items-start gap-1.5 px-4 py-1.5 bg-amber-50 border-b border-amber-100 text-[10px] text-amber-800 shrink-0">
+                <p className="flex items-start gap-1.5 px-3.5 py-1.5 bg-warn-bg border-b border-n200 text-[11px] text-n700 shrink-0">
                     <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
                     {persistError} — sohbet ekranda duruyor ama sayfayı yenilerseniz kaybolur.
                 </p>
@@ -345,11 +350,11 @@ export default function HrAssistantPanel() {
             <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
                 {turns.length === 0 && (
                     <div className="space-y-2">
-                        <p className="text-[11px] text-slate-500 leading-relaxed">
+                        <p className="text-[12px] text-n500 leading-relaxed">
                             Aday havuzuna Türkçe soru sorun. Sayıları kod hesaplar, uydurma cevap
                             gelmez — her cevabın altında hangi filtrelerin uygulandığı yazar.
                         </p>
-                        <p className="text-[10px] text-slate-400 leading-relaxed">
+                        <p className="text-[11px] text-n400 leading-relaxed">
                             Takip sorusu sorabilirsiniz: &quot;peki onlardan İstanbul&apos;da
                             olanlar&quot; deyince önceki filtreler korunur. Konu değiştirirken
                             <strong> Yeni konu</strong> deyin.
@@ -358,7 +363,7 @@ export default function HrAssistantPanel() {
                             <button
                                 key={o}
                                 onClick={() => ask(o)}
-                                className="w-full text-left px-2.5 py-1.5 rounded-lg border border-slate-100 hover:border-cyan-300 text-[11px] text-slate-600 transition-colors"
+                                className="w-full text-left px-3 py-[7px] rounded-full border border-n200 hover:border-brand-200 hover:bg-brand-50 text-[12px] font-medium text-n700"
                             >
                                 {o}
                             </button>
@@ -381,7 +386,7 @@ export default function HrAssistantPanel() {
                 ))}
 
                 {busy && (
-                    <p className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                    <p className="flex items-center gap-1.5 text-[12px] text-n400">
                         <Loader2 className="w-3 h-3 animate-spin" /> Bakıyorum…
                     </p>
                 )}
@@ -390,18 +395,18 @@ export default function HrAssistantPanel() {
 
             <form
                 onSubmit={(e) => { e.preventDefault(); ask(question); }}
-                className="flex items-center gap-2 px-3 py-2.5 border-t border-slate-100 shrink-0"
+                className="flex items-center gap-2 px-3 py-2.5 border-t border-n200 shrink-0"
             >
                 <input
                     value={question}
                     onChange={(e) => setQuestion(e.target.value)}
                     placeholder="Örn: zorunlulukları geçen en iyi 5 aday"
-                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[12px] text-slate-700 outline-none focus:border-cyan-400 transition-colors"
+                    className="flex-1 bg-n50 border border-n200 rounded-md px-3 py-2 text-[12px] text-n700 outline-none focus:border-brand transition-colors"
                 />
                 <button
                     type="submit"
                     disabled={busy || !question.trim()}
-                    className="w-9 h-9 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-white flex items-center justify-center shrink-0 disabled:opacity-40 transition-colors"
+                    className="w-9 h-9 rounded-md bg-brand hover:bg-brand-600 text-white flex items-center justify-center shrink-0 disabled:opacity-40 transition-colors"
                 >
                     <Send className="w-4 h-4" />
                 </button>
@@ -416,13 +421,13 @@ function Turn({
 }) {
     if (turn.role === 'user') {
         return (
-            <p className="ml-8 px-3 py-1.5 rounded-xl bg-cyan-500 text-white text-[11px] leading-relaxed">
+            <p className="ml-8 px-3 py-1.5 rounded-md bg-brand text-white text-[12px] leading-relaxed">
                 {turn.text}
             </p>
         );
     }
     if (turn.error) {
-        return <p className="text-[11px] text-red-600">{turn.error}</p>;
+        return <p className="text-[12px] text-bad">{turn.error}</p>;
     }
     if (turn.unsupported) {
         // Modelin "bunu veriyle yanıtlayamam" demesi, uydurmasından iyidir —
@@ -430,9 +435,9 @@ function Turn({
         // iter. Metin artık yapabildiklerimizi de sayıyor (capabilityMessage).
         return (
             <div className="space-y-1.5">
-                <div className="flex items-start gap-2 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2">
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
-                    <p className="text-[11px] text-amber-800 leading-relaxed whitespace-pre-line">
+                <div className="flex items-start gap-2 rounded-md border bg-warn-bg px-3 py-2">
+                    <AlertTriangle className="w-3.5 h-3.5 text-warn shrink-0 mt-0.5" />
+                    <p className="text-[12px] text-n700 leading-relaxed whitespace-pre-line">
                         {turn.unsupported}
                     </p>
                 </div>
@@ -444,7 +449,7 @@ function Turn({
     if (turn.notice) {
         return (
             <div className="space-y-1.5">
-                <p className="text-[11px] text-slate-700 leading-relaxed">{turn.notice}</p>
+                <p className="text-[12px] text-n700 leading-relaxed">{turn.notice}</p>
                 <FeedbackBar value={turn.feedback} onSend={onFeedback} />
             </div>
         );
@@ -489,7 +494,7 @@ function Turn({
     // turu söylemek, sohbeti düşürmekten iyidir.
     if (!r) {
         return (
-            <p className="text-[11px] text-slate-400 italic">
+            <p className="text-[12px] text-n400 italic">
                 Bu cevabın ayrıntısı saklanmadı — soruyu tekrar sorabilirsiniz.
             </p>
         );
@@ -497,43 +502,43 @@ function Turn({
     return (
         <div className="space-y-2">
             {turn.comment && (
-                <p className="text-[11px] text-slate-700 leading-relaxed">{turn.comment}</p>
+                <p className="text-[12px] text-n700 leading-relaxed">{turn.comment}</p>
             )}
 
             {r.groups ? (
-                <div className="rounded-lg border border-slate-100 divide-y divide-slate-50">
+                <div className="rounded-md border border-n200 divide-y divide-n100">
                     {r.groups.map((g) => (
                         <div key={g.key} className="flex items-center justify-between px-2.5 py-1.5">
-                            <span className="text-[11px] text-slate-600 truncate">{g.key}</span>
-                            <span className="text-[11px] font-black text-slate-700 tabular-nums">{g.count}</span>
+                            <span className="text-[12px] text-n600 truncate">{g.key}</span>
+                            <span className="text-[12px] font-semibold text-n700 tabular-nums">{g.count}</span>
                         </div>
                     ))}
                 </div>
             ) : r.rows.length > 0 ? (
-                <div className="rounded-lg border border-slate-100 divide-y divide-slate-50 max-h-64 overflow-y-auto">
+                <div className="rounded-md border border-n200 divide-y divide-n100 max-h-64 overflow-y-auto">
                     {r.rows.map((v) => (
                         <button
                             key={v.candidate.id}
                             onClick={() => onCandidateClick(v.candidate)}
-                            className="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 hover:bg-slate-50 text-left transition-colors"
+                            className="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 hover:bg-n50 text-left transition-colors"
                         >
-                            <span className="text-[11px] font-bold text-slate-700 truncate">
+                            <span className="text-[12px] font-bold text-n700 truncate">
                                 {v.candidate.name || 'İsimsiz aday'}
                             </span>
                             <span className="flex items-center gap-1.5 shrink-0">
                                 {v.candidate.location && (
-                                    <span className="text-[9px] text-slate-400">{v.candidate.location}</span>
+                                    <span className="text-[11px] text-n400">{v.candidate.location}</span>
                                 )}
-                                <span className="text-[10px] font-black text-slate-600 tabular-nums">
+                                <span className="text-[11px] font-semibold text-n600 tabular-nums">
                                     {Number.isFinite(v.score) ? Math.round(v.score) : '—'}
                                 </span>
-                                <ChevronRight className="w-3 h-3 text-slate-300" />
+                                <ChevronRight className="w-3 h-3 text-n300" />
                             </span>
                         </button>
                     ))}
                 </div>
             ) : (
-                <p className="text-[11px] text-slate-500 italic">Bu sorguyla eşleşen aday yok.</p>
+                <p className="text-[12px] text-n500 italic">Bu sorguyla eşleşen aday yok.</p>
             )}
 
             {r.missingPosition && (
@@ -550,10 +555,10 @@ function ReviewBlock({ title, items, tone }) {
     if (!items || items.length === 0) return null;
     return (
         <div>
-            <p className={`text-[9px] font-black uppercase tracking-widest mb-1 ${tone}`}>{title}</p>
+            <p className={`text-[11px] font-semibold uppercase tracking-[0.08em] mb-1 ${tone}`}>{title}</p>
             <ul className="space-y-0.5">
                 {items.map((x, i) => (
-                    <li key={i} className="text-[11px] text-slate-600 leading-relaxed">• {x}</li>
+                    <li key={i} className="text-[12px] text-n600 leading-relaxed">• {x}</li>
                 ))}
             </ul>
         </div>
@@ -566,7 +571,7 @@ function ReviewTurn({ turn }) {
 
     if (review.interviewCount === 0) {
         return (
-            <p className="text-[11px] text-slate-600 leading-relaxed">
+            <p className="text-[12px] text-n600 leading-relaxed">
                 {loaded.matchedCandidates === 0
                     ? 'Bu tanıma uyan aday bulamadım.'
                     : `${loaded.matchedCandidates} aday buldum ama hiçbiriyle kayıtlı görüşme yok. `
@@ -578,23 +583,23 @@ function ReviewTurn({ turn }) {
     return (
         <div className="space-y-2">
             {narration?.ozet && (
-                <p className="text-[11px] text-slate-700 leading-relaxed">{narration.ozet}</p>
+                <p className="text-[12px] text-n700 leading-relaxed">{narration.ozet}</p>
             )}
             {narrationError && (
-                <p className="text-[10px] text-amber-700 leading-relaxed">
+                <p className="text-[11px] text-warn leading-relaxed">
                     Yorum üretilemedi ({narrationError}) — aşağıdaki sayılar yine de geçerli,
                     onları kod hesapladı.
                 </p>
             )}
-            <ReviewBlock title="Öne çıkanlar" items={narration?.one_cikanlar} tone="text-emerald-600" />
-            <ReviewBlock title="Mülakatta sorulacaklar" items={narration?.mulakatta_sorulacaklar} tone="text-amber-600" />
-            <ReviewBlock title="Uyarılar" items={narration?.uyarilar} tone="text-red-500" />
+            <ReviewBlock title="Öne çıkanlar" items={narration?.one_cikanlar} tone="text-ok" />
+            <ReviewBlock title="Mülakatta sorulacaklar" items={narration?.mulakatta_sorulacaklar} tone="text-warn" />
+            <ReviewBlock title="Uyarılar" items={narration?.uyarilar} tone="text-bad" />
 
-            <div className="rounded-lg bg-slate-50 border border-slate-100 px-2.5 py-2 space-y-1">
-                <p className="flex items-center gap-1 text-[9px] font-black text-slate-400 uppercase tracking-widest">
+            <div className="rounded-md bg-n50 border border-n200 px-2.5 py-2 space-y-1">
+                <p className="flex items-center gap-1 text-[11px] font-semibold text-n400 uppercase tracking-[0.08em]">
                     <Info className="w-2.5 h-2.5" /> Nasıl hesaplandı
                 </p>
-                <p className="text-[10px] text-slate-500 leading-relaxed">
+                <p className="text-[11px] text-n500 leading-relaxed">
                     {review.position ? <><strong>{review.position}</strong> · </> : null}
                     {review.interviewCount} görüşme okundu, <strong>{review.scored}</strong> tanesinde
                     sayısal sonuç var. Damgalar: {review.tally.met} karşılıyor, {review.tally.partial} kısmen,
@@ -603,13 +608,13 @@ function ReviewTurn({ turn }) {
                 {/* Ölçülemeyen görüşmeyi saymamak, olmayan bir ölçümü varmış
                     gibi göstermenin en sinsi hâli olurdu. */}
                 {review.unscored.length > 0 && (
-                    <p className="text-[10px] text-amber-700 leading-relaxed">
+                    <p className="text-[11px] text-warn leading-relaxed">
                         <strong>{review.unscored.length}</strong> görüşmede sayısal sonuç yok; ortalamaya
                         ve damga sayılarına girmediler.
                     </p>
                 )}
                 {review.staleCount > 0 && (
-                    <p className="text-[10px] text-amber-700 leading-relaxed">
+                    <p className="text-[11px] text-warn leading-relaxed">
                         <strong>{review.staleCount}</strong> görüşmenin damgaları ilanın ESKİ madde
                         listesine ait — bugünkü maddelerle karşılaştırılamaz.
                     </p>
@@ -619,14 +624,14 @@ function ReviewTurn({ turn }) {
                     yanıltma olur — seçim kuralı da yazsın ki keyfi olmadığı
                     görülsün. */}
                 {loaded.truncated > 0 && (
-                    <p className="text-[10px] text-amber-700 leading-relaxed">
+                    <p className="text-[11px] text-warn leading-relaxed">
                         Toplam <strong>{loaded.totalSessions}</strong> görüşme var; <strong>en yeni
                         {' '}{review.interviewCount}</strong> tanesi incelendi. Yukarıdaki dağılım
                         bütünün değil, bu alt kümenin dağılımıdır.
                     </p>
                 )}
                 {loaded.withoutInterview > 0 && (
-                    <p className="text-[10px] text-slate-500 leading-relaxed">
+                    <p className="text-[11px] text-n500 leading-relaxed">
                         {loaded.withoutInterview} aday bu tanıma uyuyor ama hiç görüşme yapılmamış.
                     </p>
                 )}
@@ -649,24 +654,24 @@ function MarketTurn({ market }) {
     return (
         <div className="space-y-2">
             {band ? (
-                <div className="rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2">
-                    <p className="text-[9px] font-black uppercase tracking-widest text-cyan-600">Piyasa bandı</p>
-                    <p className="text-[13px] font-black text-slate-800 tabular-nums">{formatBand(band)}</p>
+                <div className="rounded-md border border-brand-100 bg-brand-50 px-3 py-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand">Piyasa bandı</p>
+                    <p className="text-[13px] font-semibold text-n900 tabular-nums">{formatBand(band)}</p>
                     {/* Baz yoksa bu bant kendi bütçenizle KARŞILAŞTIRILAMAZ —
                         brüt/net farkı %30-40 ve makul göründüğü için fark
                         edilmez (gerekçe: utils/salaryBand.js). */}
                     {!band.basis && (
-                        <p className="text-[10px] text-amber-700 mt-0.5">
+                        <p className="text-[11px] text-warn mt-0.5">
                             Kaynaklar brüt mü net mi söylemiyor — kendi bandınızla doğrudan
                             karşılaştırmayın.
                         </p>
                     )}
-                    {date && <p className="text-[10px] text-slate-500 mt-0.5">Verinin dönemi: {date}</p>}
+                    {date && <p className="text-[11px] text-n500 mt-0.5">Verinin dönemi: {date}</p>}
                 </div>
             ) : withheld ? (
-                <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
-                    <p className="text-[11px] text-amber-800 leading-relaxed">
+                <div className="flex items-start gap-2 rounded-md border bg-warn-bg px-3 py-2">
+                    <AlertTriangle className="w-3.5 h-3.5 text-warn shrink-0 mt-0.5" />
+                    <p className="text-[12px] text-n700 leading-relaxed">
                         {/* İKİ AYRI DURUM, İKİ AYRI CÜMLE. Arama hiç yapılamamış olmakla,
                             arama yapılıp hiçbir sayfanın kaynak gösterilmemesi farklı
                             şeyler; ikisine aynı cümleyi yazmak ekranda Google'ın arama
@@ -686,7 +691,7 @@ function MarketTurn({ market }) {
                     </p>
                 </div>
             ) : (
-                <p className="text-[11px] text-slate-600 leading-relaxed">
+                <p className="text-[12px] text-n600 leading-relaxed">
                     Bu rol için kaynaklı bir ücret bandı bulunamadı.
                 </p>
             )}
@@ -694,39 +699,39 @@ function MarketTurn({ market }) {
             {/* Arama aracı çalışmadıysa cevap modelin kendi hatırladığıdır.
                 Sessizce kaynaklıymış gibi sunmak en kötüsü olurdu. */}
             {!grounded && (
-                <p className="text-[10px] text-amber-700 leading-relaxed">
+                <p className="text-[11px] text-warn leading-relaxed">
                     Arama yapılamadı — aşağıdaki bilgi modelin hatırladığıdır, doğrulanmamıştır.
                 </p>
             )}
 
             {benefits.length > 0 && (
                 <div>
-                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Yaygın yan haklar</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-n400 mb-1">Yaygın yan haklar</p>
                     <ul className="space-y-0.5">
                         {benefits.map((b, i) => (
-                            <li key={i} className="text-[11px] text-slate-600 leading-relaxed">• {b}</li>
+                            <li key={i} className="text-[12px] text-n600 leading-relaxed">• {b}</li>
                         ))}
                     </ul>
                 </div>
             )}
 
-            {caution && <p className="text-[10px] text-slate-500 italic leading-relaxed">{caution}</p>}
+            {caution && <p className="text-[11px] text-n500 italic leading-relaxed">{caution}</p>}
 
-            <div className="rounded-lg bg-slate-50 border border-slate-100 px-2.5 py-2 space-y-1">
-                <p className="flex items-center gap-1 text-[9px] font-black text-slate-400 uppercase tracking-widest">
+            <div className="rounded-md bg-n50 border border-n200 px-2.5 py-2 space-y-1">
+                <p className="flex items-center gap-1 text-[11px] font-semibold text-n400 uppercase tracking-[0.08em]">
                     <Info className="w-2.5 h-2.5" /> Ne arandı
                 </p>
-                <p className="text-[10px] text-slate-500 leading-relaxed">
+                <p className="text-[11px] text-n500 leading-relaxed">
                     <strong>{query?.title || '—'}</strong>
                     {query?.level ? ` · ${query.level}` : ' · seviye belirtilmedi'}
                     {query?.location ? ` · ${query.location}` : ' · konum belirtilmedi'}
                 </p>
-                {scope && <p className="text-[10px] text-slate-500 leading-relaxed">{scope}</p>}
+                {scope && <p className="text-[11px] text-n500 leading-relaxed">{scope}</p>}
                 {/* Modelin GERÇEKTEN arattığı sorgular. Kaynak gelmediğinde bile
                     kullanıcı aramanın çalıştığını görür ve aynı sorguyu kendisi
                     çalıştırabilir. */}
                 {market.searchQueries?.length > 0 && (
-                    <p className="text-[10px] text-slate-400 leading-relaxed">
+                    <p className="text-[11px] text-n400 leading-relaxed">
                         Arananlar: {market.searchQueries.join(' · ')}
                     </p>
                 )}
@@ -735,14 +740,14 @@ function MarketTurn({ market }) {
             {/* KAYNAKLAR — iddianın izi. Bunlar yoksa yukarıda rakam da yok. */}
             {sources.length > 0 && (
                 <div className="space-y-0.5">
-                    <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Kaynaklar</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-n400">Kaynaklar</p>
                     {sources.slice(0, 6).map((s) => (
                         <a
                             key={s.uri}
                             href={s.uri}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="block text-[10px] text-cyan-700 hover:underline truncate"
+                            className="block text-[11px] text-brand hover:underline truncate"
                         >
                             {s.title || s.uri}
                         </a>
@@ -769,20 +774,20 @@ function MarketTurn({ market }) {
 function PositionPicker({ positions, onPick }) {
     if (!positions.length) {
         return (
-            <p className="text-[11px] text-slate-500 italic">
+            <p className="text-[12px] text-n500 italic">
                 Açık pozisyon yok — bu soruyu cevaplayabilmek için önce bir ilan gerekiyor.
             </p>
         );
     }
     return (
         <div className="space-y-1.5">
-            <p className="text-[11px] text-slate-600 leading-relaxed">Hangi pozisyon için bakayım?</p>
+            <p className="text-[12px] text-n600 leading-relaxed">Hangi pozisyon için bakayım?</p>
             <div className="flex flex-wrap gap-1.5">
                 {positions.map((p) => (
                     <button
                         key={p.id || p.title}
                         onClick={() => onPick?.(p.title)}
-                        className="px-2.5 py-1 rounded-lg border border-cyan-200 bg-cyan-50 text-[11px] font-bold text-cyan-700 hover:bg-cyan-100 transition-colors"
+                        className="px-2.5 py-1 rounded-md border border-brand-100 bg-brand-50 text-[12px] font-bold text-brand hover:bg-brand-100 transition-colors"
                     >
                         {p.title}
                     </button>
@@ -809,7 +814,7 @@ function FeedbackBar({ value, onSend }) {
 
     if (value) {
         return (
-            <p className="text-[9px] text-slate-400">
+            <p className="text-[11px] text-n400">
                 {value === 'up' ? 'Kaydedildi — teşekkürler.' : 'Not alındı, asistanı geliştirmekte kullanılacak.'}
             </p>
         );
@@ -826,9 +831,9 @@ function FeedbackBar({ value, onSend }) {
                     onChange={(e) => setNote(e.target.value)}
                     placeholder="Neyi yanlış yaptı? (isteğe bağlı)"
                     autoFocus
-                    className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-[10px] text-slate-700 outline-none focus:border-cyan-400"
+                    className="flex-1 bg-n50 border border-n200 rounded-md px-2 py-1 text-[11px] text-n700 outline-none focus:border-brand"
                 />
-                <button type="submit" className="text-[9px] font-black uppercase text-cyan-600 px-1.5">
+                <button type="submit" className="text-[11px] font-semibold text-brand px-1.5">
                     Gönder
                 </button>
             </form>
@@ -837,11 +842,11 @@ function FeedbackBar({ value, onSend }) {
 
     return (
         <div className="flex items-center gap-1">
-            <span className="text-[9px] text-slate-300 uppercase tracking-wider">Bu cevap işine yaradı mı?</span>
-            <button onClick={() => onSend('up')} title="Yararlı" className="p-1 rounded hover:bg-slate-100 text-slate-300 hover:text-emerald-500">
+            <span className="text-[11px] text-n400">Bu cevap işine yaradı mı?</span>
+            <button onClick={() => onSend('up')} title="Yararlı" className="p-1 rounded hover:bg-n100 text-n300 hover:text-ok">
                 <ThumbsUp className="w-3 h-3" />
             </button>
-            <button onClick={() => setNoteOpen(true)} title="Yararsız" className="p-1 rounded hover:bg-slate-100 text-slate-300 hover:text-red-500">
+            <button onClick={() => setNoteOpen(true)} title="Yararsız" className="p-1 rounded hover:bg-n100 text-n300 hover:text-bad">
                 <ThumbsDown className="w-3 h-3" />
             </button>
         </div>
@@ -857,11 +862,11 @@ function FeedbackBar({ value, onSend }) {
  */
 function AuditBox({ result }) {
     return (
-        <div className="rounded-lg bg-slate-50 border border-slate-100 px-2.5 py-2 space-y-1">
-            <p className="flex items-center gap-1 text-[9px] font-black text-slate-400 uppercase tracking-widest">
+        <div className="rounded-md bg-n50 border border-n200 px-2.5 py-2 space-y-1">
+            <p className="flex items-center gap-1 text-[11px] font-semibold text-n400 uppercase tracking-[0.08em]">
                 <Info className="w-2.5 h-2.5" /> Nasıl hesaplandı
             </p>
-            <p className="text-[10px] text-slate-500 leading-relaxed">
+            <p className="text-[11px] text-n500 leading-relaxed">
                 {result.positionTitle ? <><strong>{result.positionTitle}</strong> · </> : null}
                 {result.pool} adaydan <strong>{result.total}</strong> tanesi eşleşti
                 {result.truncated ? ` (ilk ${result.limit} gösteriliyor)` : ''}.
@@ -869,7 +874,7 @@ function AuditBox({ result }) {
             {result.applied.length > 0 && (
                 <ul className="space-y-0.5">
                     {result.applied.map((a) => (
-                        <li key={a} className="text-[10px] text-slate-500">• {a}</li>
+                        <li key={a} className="text-[11px] text-n500">• {a}</li>
                     ))}
                 </ul>
             )}
@@ -878,20 +883,20 @@ function AuditBox({ result }) {
                 tamamı böyle elendi ve kullanıcı tarama yapmaya yönlendirildi —
                 tarama yapsa da değişmeyecekti. Sebep ayrı, mesaj da ayrı. */}
             {result.skipped > 0 && !result.missingPosition && (
-                <p className="text-[10px] text-amber-700 leading-relaxed">
+                <p className="text-[11px] text-warn leading-relaxed">
                     <strong>{result.skipped}</strong> aday sayıma girmedi: bu pozisyon için derin
                     taraması yok, karşılıyor da karşılamıyor da diyemeyiz.
                 </p>
             )}
             {result.missingPosition && (
-                <p className="text-[10px] text-amber-700 leading-relaxed">
+                <p className="text-[11px] text-warn leading-relaxed">
                     Bu soru bir pozisyona bağlı — puan, gereksinim maddesi, zorunlu kapısı ve STAR
                     hep bir ilana göre ölçülür. Pozisyon seçilmediği için hiçbir aday
                     değerlendirilemedi.
                 </p>
             )}
             {result.ignored.length > 0 && (
-                <p className="text-[10px] text-red-600 leading-relaxed">
+                <p className="text-[11px] text-bad leading-relaxed">
                     Uygulayamadığım filtre: {result.ignored.join(', ')} — bu alan sistemde tutulmuyor,
                     sonuç bu kısıt olmadan hesaplandı.
                 </p>
