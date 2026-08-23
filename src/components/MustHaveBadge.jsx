@@ -1,9 +1,9 @@
 import { AlertTriangle, CheckCircle2, AlertCircle, Mic } from 'lucide-react';
 
 const TONES = {
-    red:     { wrap: 'bg-red-50 border-red-100 text-red-700',           icon: AlertTriangle },
-    amber:   { wrap: 'bg-amber-50 border-amber-100 text-amber-700',     icon: AlertCircle },
-    emerald: { wrap: 'bg-emerald-50 border-emerald-100 text-emerald-700', icon: CheckCircle2 },
+    red:     { wrap: 'bg-bad-bg border-transparent text-bad',           icon: AlertTriangle },
+    amber:   { wrap: 'bg-warn-bg border-transparent text-warn',     icon: AlertCircle },
+    emerald: { wrap: 'bg-ok-bg border-transparent text-ok', icon: CheckCircle2 },
 };
 
 /**
@@ -23,19 +23,19 @@ export default function MustHaveBadge({ gate, label }) {
     const items = gate.status === 'missing' ? gate.missing : gate.partial;
 
     return (
-        <div className={`rounded-xl border px-3 py-2.5 ${tone.wrap}`}>
+        <div className={`rounded-md border px-3 py-2.5 ${tone.wrap}`}>
             <div className="flex items-center gap-2">
                 <Icon className="w-3.5 h-3.5 shrink-0" />
-                <span className="text-[10px] font-black uppercase tracking-widest">{label.text}</span>
+                <span className="text-[11px] font-semibold uppercase tracking-[0.08em]">{label.text}</span>
                 {gate.totalMust > 0 && (
-                    <span className="text-[9px] opacity-70">/ {gate.totalMust} zorunlu madde</span>
+                    <span className="text-[11px] opacity-70">/ {gate.totalMust} zorunlu madde</span>
                 )}
                 {/* Rozet dün kırmızıyken bugün yeşilse sebebi görünmeli.
                     Sessizce değişen bir yargı, açıklanamayan bir yargıdır. */}
                 {label.interview && (
                     <span
                         title={`${gate.fromInterview} zorunlu maddenin damgası mülakattan geldi`}
-                        className="ml-auto flex items-center gap-1 text-[9px] font-black uppercase tracking-widest opacity-70"
+                        className="ml-auto flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.08em] opacity-70"
                     >
                         <Mic className="w-2.5 h-2.5" /> mülakat
                     </span>
@@ -45,8 +45,8 @@ export default function MustHaveBadge({ gate, label }) {
             {items?.length > 0 && (
                 <ul className="mt-1.5 space-y-1 pl-5">
                     {items.map((it) => (
-                        <li key={it.index} className="text-[11px] leading-relaxed">
-                            <span className="font-bold">{it.text}</span>
+                        <li key={it.index} className="text-[12px] leading-relaxed">
+                            <span className="font-semibold">{it.text}</span>
                             {it.note && <span className="opacity-80"> — {it.note}</span>}
                             {/* Odadan gelen gerekçe adayın kendi cümlesi; CV
                                 notundan ayırt edilebilmeli. */}
