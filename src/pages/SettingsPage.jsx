@@ -251,8 +251,8 @@ export default function SettingsPage({ initialTab }) {
 
     if (loading || !userProfile) {
         return (
-            <div className="flex items-center justify-center h-64 bg-slate-50 min-h-screen">
-                <div className="w-7 h-7 border-2 border-slate-200 border-t-cyan-500 rounded-full animate-spin" />
+            <div className="infoset flex items-center justify-center h-64 min-h-screen">
+                <div className="w-7 h-7 border-2 border-n200 border-t-brand rounded-full animate-spin" />
             </div>
         );
     }
@@ -267,24 +267,24 @@ export default function SettingsPage({ initialTab }) {
     };
 
     return (
-        <div className="flex flex-col min-h-screen bg-slate-50">
+        <div className="infoset flex flex-col min-h-screen">
             {/* Top header */}
-            <header className="sticky top-0 z-40 bg-white border-b border-slate-200 px-6 lg:px-8 h-14 flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-cyan-50 border border-cyan-100 flex items-center justify-center">
-                    <Settings className="w-4 h-4 text-cyan-600" />
+            <header className="sticky top-0 z-40 bg-n0 border-b border-n200 px-6 lg:px-8 h-14 flex items-center gap-3">
+                <div className="w-8 h-8 rounded-md bg-brand-50 border border-brand-100 flex items-center justify-center">
+                    <Settings className="w-4 h-4 text-brand" />
                 </div>
-                <h1 className="text-base font-bold text-slate-800">Ayarlar</h1>
+                <h1 className="text-base font-semibold text-n900">Ayarlar</h1>
                 {currentItem && (
                     <>
-                        <ChevronRight className="w-4 h-4 text-slate-300" />
-                        <span className="text-sm text-slate-500 font-medium">{currentItem.label}</span>
+                        <ChevronRight className="w-4 h-4 text-n300" />
+                        <span className="text-sm text-n500 font-medium">{currentItem.label}</span>
                     </>
                 )}
             </header>
 
             <div className="flex flex-1 min-h-0">
                 {/* Sidebar */}
-                <aside className="w-56 shrink-0 bg-white border-r border-slate-200 overflow-y-auto hidden md:block">
+                <aside className="w-56 shrink-0 bg-n0 border-r border-n200 overflow-y-auto hidden md:block">
                     <nav className="py-4 px-3 space-y-6">
                         {NAV_GROUPS.map(group => {
                             const visibleItems = group.items.filter(i => !i.adminOnly || isSuperAdmin);
@@ -292,7 +292,7 @@ export default function SettingsPage({ initialTab }) {
                             if (visibleItems.length === 0) return null;
                             return (
                                 <div key={group.group}>
-                                    <p className="px-3 mb-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                    <p className="px-3 mb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-n400">
                                         {group.group}
                                     </p>
                                     <ul className="space-y-0.5">
@@ -303,13 +303,13 @@ export default function SettingsPage({ initialTab }) {
                                                 <li key={item.id}>
                                                     <button
                                                         onClick={() => handleNav(item.id)}
-                                                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all text-left ${
+                                                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-all text-left ${
                                                             isActive
-                                                                ? 'bg-cyan-50 text-cyan-700 border border-cyan-100'
-                                                                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800 border border-transparent'
+                                                                ? 'bg-brand-50 text-brand border border-brand-100'
+                                                                : 'text-n600 hover:bg-n50 hover:text-n900 border border-transparent'
                                                         }`}
                                                     >
-                                                        <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-cyan-600' : 'text-slate-400'}`} />
+                                                        <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-brand' : 'text-n400'}`} />
                                                         {item.label}
                                                     </button>
                                                 </li>
@@ -331,19 +331,19 @@ export default function SettingsPage({ initialTab }) {
                             <SectionHeader icon={Settings} title="Hesabım" desc="Görünüm, bildirimler ve bağlı hesaplar" />
 
                             {/* Tercihler */}
-                            <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-0">
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Tercihler</p>
+                            <div className="bg-n0 rounded-[14px] border border-n200 p-6 space-y-0">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-n400 mb-1">Tercihler</p>
                                 <SettingRow icon={Bell} label="Uygulama Bildirimleri" description="Bildirim rozeti ve paneli göster / gizle" noBorder>
                                     <Toggle checked={settings.notifications !== false} onChange={(v) => updateSettings({ notifications: v })} />
                                 </SettingRow>
                             </div>
 
                             {/* Entegrasyonlar */}
-                            <div className="bg-white rounded-2xl border border-slate-200 p-6">
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-4">Entegrasyonlar</p>
+                            <div className="bg-n0 rounded-[14px] border border-n200 p-6">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-n400 mb-4">Entegrasyonlar</p>
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-4">
-                                        <div className="w-11 h-11 rounded-full bg-white flex items-center justify-center shadow-sm shrink-0 overflow-hidden p-2 border border-slate-100">
+                                        <div className="w-11 h-11 rounded-full bg-n0 flex items-center justify-center shadow-sm shrink-0 overflow-hidden p-2 border border-n200">
                                             <svg viewBox="0 0 24 24" className="w-full h-full">
                                                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
                                                 <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
@@ -353,34 +353,34 @@ export default function SettingsPage({ initialTab }) {
                                             </svg>
                                         </div>
                                         <div className="min-w-0">
-                                            <div className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                                            <div className="text-sm font-semibold text-n900 flex items-center gap-2">
                                                 Google Workspace
-                                                {isGoogleConnected && <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />}
+                                                {isGoogleConnected && <CheckCircle className="w-3.5 h-3.5 text-ok" />}
                                             </div>
-                                            <div className="text-xs text-slate-400 mt-0.5">
+                                            <div className="text-xs text-n400 mt-0.5">
                                                 {isGoogleConnected
-                                                    ? <span>Bağlı: <span className="text-emerald-600 font-medium">{userProfile.integrations.google.email}</span></span>
+                                                    ? <span>Bağlı: <span className="text-ok font-medium">{userProfile.integrations.google.email}</span></span>
                                                     : 'Gmail ve Google Calendar ile entegre edin.'}
                                             </div>
                                         </div>
                                     </div>
                                     {isGoogleConnected ? (
                                         <button onClick={handleGoogleDisconnect} disabled={isConnectingGoogle}
-                                            className="px-4 py-2 rounded-xl text-xs font-bold text-red-500 bg-red-50 hover:bg-red-100 transition-all border border-red-100 disabled:opacity-50">
+                                            className="px-4 py-2 rounded-md text-xs font-semibold text-bad bg-bad-bg hover:opacity-90 transition-all border border-transparent disabled:opacity-50">
                                             {isConnectingGoogle ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Bağlantıyı Kes'}
                                         </button>
                                     ) : (
                                         <button onClick={handleGoogleConnect} disabled={isConnectingGoogle}
-                                            className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-cyan-500 hover:bg-cyan-600 transition-all flex items-center gap-2 disabled:opacity-50">
+                                            className="px-4 py-2 rounded-md text-xs font-semibold text-white bg-brand hover:bg-brand-600 transition-all flex items-center gap-2 disabled:opacity-50">
                                             {isConnectingGoogle ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Bağlan'}
                                         </button>
                                     )}
                                 </div>
 
                                 {/* Microsoft 365 */}
-                                <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
+                                <div className="flex items-center justify-between mt-4 pt-4 border-t border-n200">
                                     <div className="flex items-center gap-4">
-                                        <div className="w-11 h-11 rounded-full bg-white flex items-center justify-center shadow-sm shrink-0 overflow-hidden p-2 border border-slate-100">
+                                        <div className="w-11 h-11 rounded-full bg-n0 flex items-center justify-center shadow-sm shrink-0 overflow-hidden p-2 border border-n200">
                                             <svg viewBox="0 0 23 23" className="w-full h-full">
                                                 <path fill="#f25022" d="M0 0h11v11H0z" />
                                                 <path fill="#00a4ef" d="M12 0h11v11H12z" />
@@ -389,25 +389,25 @@ export default function SettingsPage({ initialTab }) {
                                             </svg>
                                         </div>
                                         <div className="min-w-0">
-                                            <div className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                                            <div className="text-sm font-semibold text-n900 flex items-center gap-2">
                                                 Microsoft 365
-                                                {isMicrosoftConnected && <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />}
+                                                {isMicrosoftConnected && <CheckCircle className="w-3.5 h-3.5 text-ok" />}
                                             </div>
-                                            <div className="text-xs text-slate-400 mt-0.5">
+                                            <div className="text-xs text-n400 mt-0.5">
                                                 {isMicrosoftConnected
-                                                    ? <span>Bağlı: <span className="text-emerald-600 font-medium">{userProfile.integrations.microsoft.email}</span></span>
+                                                    ? <span>Bağlı: <span className="text-ok font-medium">{userProfile.integrations.microsoft.email}</span></span>
                                                     : 'Outlook ve Microsoft Teams ile entegre edin.'}
                                             </div>
                                         </div>
                                     </div>
                                     {isMicrosoftConnected ? (
                                         <button onClick={handleMicrosoftDisconnect} disabled={isConnectingMicrosoft}
-                                            className="px-4 py-2 rounded-xl text-xs font-bold text-red-500 bg-red-50 hover:bg-red-100 transition-all border border-red-100 disabled:opacity-50">
+                                            className="px-4 py-2 rounded-md text-xs font-semibold text-bad bg-bad-bg hover:opacity-90 transition-all border border-transparent disabled:opacity-50">
                                             {isConnectingMicrosoft ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Bağlantıyı Kes'}
                                         </button>
                                     ) : (
                                         <button onClick={handleMicrosoftConnect} disabled={isConnectingMicrosoft}
-                                            className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 transition-all flex items-center gap-2 disabled:opacity-50">
+                                            className="px-4 py-2 rounded-md text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 transition-all flex items-center gap-2 disabled:opacity-50">
                                             {isConnectingMicrosoft ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Bağlan'}
                                         </button>
                                     )}
@@ -422,21 +422,21 @@ export default function SettingsPage({ initialTab }) {
                             <SectionHeader icon={Key} title="API & Ses Motoru" desc="Gemini API anahtarı ve ses tanıma motoru testi" />
 
                             {/* Gemini API Key */}
-                            <div className="bg-white rounded-2xl border border-slate-200 p-6">
-                                <div className="flex items-center gap-3 mb-5 pb-4 border-b border-slate-100">
-                                    <div className="w-9 h-9 rounded-xl bg-violet-50 border border-violet-100 flex items-center justify-center">
-                                        <Key className="w-4 h-4 text-violet-500" />
+                            <div className="bg-n0 rounded-[14px] border border-n200 p-6">
+                                <div className="flex items-center gap-3 mb-5 pb-4 border-b border-n200">
+                                    <div className="w-9 h-9 rounded-md bg-brand-50 border border-brand-100 flex items-center justify-center">
+                                        <Key className="w-4 h-4 text-brand" />
                                     </div>
                                     <div className="flex-1">
                                         <div className="flex items-center gap-2">
-                                            <h2 className="text-sm font-bold text-slate-800">Gemini API Anahtarı</h2>
+                                            <h2 className="text-sm font-semibold text-n900">Gemini API Anahtarı</h2>
                                             {hasSavedGeminiKey && (
-                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.08em] px-2 py-0.5 rounded-full bg-ok-bg text-ok border border-transparent">
                                                     <CheckCircle className="w-3 h-3" /> Aktif{savedKeyLast4 ? ` ••••${savedKeyLast4}` : ''}
                                                 </span>
                                             )}
                                         </div>
-                                        <p className="text-xs text-slate-400">CV analizi, mülakat soruları ve ses tanıma için gereklidir. Buraya kaydedilen anahtar tüm ekip için anında geçerli olur.</p>
+                                        <p className="text-xs text-n400">CV analizi, mülakat soruları ve ses tanıma için gereklidir. Buraya kaydedilen anahtar tüm ekip için anında geçerli olur.</p>
                                     </div>
                                 </div>
                                 <div className="space-y-3">
@@ -446,20 +446,20 @@ export default function SettingsPage({ initialTab }) {
                                             value={geminiKey}
                                             onChange={e => setGeminiKey(e.target.value)}
                                             placeholder={hasSavedGeminiKey ? 'Yeni anahtar girin (mevcut anahtar güvenlik gereği görüntülenemez)' : 'AIzaSy...'}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 pr-10 text-sm text-slate-700 font-mono outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition-all"
+                                            className="w-full bg-n50 border border-n200 rounded-md px-4 py-2.5 pr-10 text-sm text-n700 font-mono outline-none focus:border-brand focus:ring-2 focus:ring-brand-100 transition-all"
                                         />
                                         <button onClick={() => setShowGeminiKey(v => !v)}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-n400 hover:text-n600">
                                             {showGeminiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                         </button>
                                     </div>
-                                    <p className="text-xs text-slate-400">
+                                    <p className="text-xs text-n400">
                                         Google AI Studio'dan ücretsiz alabilirsiniz.{' '}
-                                        <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-cyan-600 hover:underline">Ücretsiz al →</a>
+                                        <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-brand hover:underline">Ücretsiz al →</a>
                                     </p>
                                     <button onClick={handleSaveGeminiKey} disabled={savingGeminiKey || !geminiKey.trim()}
-                                        className={`w-full py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50 ${
-                                            geminiKeySaved ? 'bg-emerald-500 text-white' : 'bg-cyan-500 hover:bg-cyan-600 text-white'
+                                        className={`w-full py-2.5 rounded-md font-semibold text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50 ${
+                                            geminiKeySaved ? 'bg-ok text-white' : 'bg-brand hover:bg-brand-600 text-white'
                                         }`}>
                                         {savingGeminiKey ? <><Loader2 className="w-4 h-4 animate-spin" /> Kaydediliyor...</>
                                             : geminiKeySaved ? <><CheckCircle className="w-4 h-4" /> Kaydedildi!</>
@@ -469,35 +469,35 @@ export default function SettingsPage({ initialTab }) {
                             </div>
 
                             {/* STT Test */}
-                            <div className="bg-white rounded-2xl border border-slate-200 p-6">
-                                <div className="flex items-center gap-3 mb-5 pb-4 border-b border-slate-100">
-                                    <div className="w-9 h-9 rounded-xl bg-cyan-50 border border-cyan-100 flex items-center justify-center">
-                                        <Activity className="w-4.5 h-4.5 text-cyan-600" />
+                            <div className="bg-n0 rounded-[14px] border border-n200 p-6">
+                                <div className="flex items-center gap-3 mb-5 pb-4 border-b border-n200">
+                                    <div className="w-9 h-9 rounded-md bg-brand-50 border border-brand-100 flex items-center justify-center">
+                                        <Activity className="w-4.5 h-4.5 text-brand" />
                                     </div>
                                     <div>
-                                        <h2 className="text-sm font-bold text-slate-800">Ses Tanıma Motoru Testi</h2>
-                                        <p className="text-xs text-slate-400">STT motorunun çalışırlığını doğrulayın</p>
+                                        <h2 className="text-sm font-semibold text-n900">Ses Tanıma Motoru Testi</h2>
+                                        <p className="text-xs text-n400">STT motorunun çalışırlığını doğrulayın</p>
                                     </div>
                                 </div>
-                                <div className="rounded-xl border border-slate-100 p-4 bg-slate-50">
+                                <div className="rounded-md border border-n200 p-4 bg-n50">
                                     <div className="flex items-center gap-4">
                                         <button onClick={toggleSttTest}
                                             className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 transition-all duration-300 ${
-                                                sttStatus === 'listening' ? 'bg-red-50 border-2 border-red-300 text-red-500 scale-110'
-                                                : sttStatus === 'success' ? 'bg-emerald-50 border-2 border-emerald-300 text-emerald-500'
-                                                : 'bg-white border border-slate-200 text-slate-400 hover:border-cyan-400 hover:text-cyan-500'
+                                                sttStatus === 'listening' ? 'bg-bad-bg border-2 border-bad text-bad scale-110'
+                                                : sttStatus === 'success' ? 'bg-ok-bg border-2 border-ok text-ok'
+                                                : 'bg-n0 border border-n200 text-n400 hover:border-brand hover:text-brand'
                                             }`}>
                                             {sttStatus === 'listening' ? <MicOff size={17} className="animate-pulse" /> : <Mic size={17} />}
                                         </button>
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 mb-1">
-                                                <Zap size={11} className={sttStatus === 'listening' ? 'text-cyan-500' : 'text-slate-400'} />
-                                                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">STT Nöral Motor</span>
-                                                <span className={`ml-auto text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${
-                                                    sttStatus === 'listening' ? 'bg-red-50 text-red-500 border border-red-200'
-                                                    : sttStatus === 'success' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
-                                                    : sttStatus === 'error' ? 'bg-red-50 text-red-500 border border-red-200'
-                                                    : 'bg-slate-100 text-slate-400'
+                                                <Zap size={11} className={sttStatus === 'listening' ? 'text-brand' : 'text-n400'} />
+                                                <span className="text-[12px] font-semibold uppercase tracking-[0.08em] text-n500">STT Nöral Motor</span>
+                                                <span className={`ml-auto text-[11px] font-semibold uppercase tracking-[0.08em] px-2 py-0.5 rounded-full ${
+                                                    sttStatus === 'listening' ? 'bg-bad-bg text-bad border border-transparent'
+                                                    : sttStatus === 'success' ? 'bg-ok-bg text-ok border border-transparent'
+                                                    : sttStatus === 'error' ? 'bg-bad-bg text-bad border border-transparent'
+                                                    : 'bg-n100 text-n400'
                                                 }`}>
                                                     {sttStatus === 'idle' && 'Hazır'}
                                                     {sttStatus === 'listening' && 'Dinleniyor'}
@@ -505,25 +505,25 @@ export default function SettingsPage({ initialTab }) {
                                                     {sttStatus === 'error' && 'Hata'}
                                                 </span>
                                             </div>
-                                            <div className="text-[12px] text-slate-500 min-h-[18px]">
+                                            <div className="text-[12px] text-n500 min-h-[18px]">
                                                 {sttStatus === 'idle' && 'Mikrofon butonuna basarak testi başlatın.'}
                                                 {sttStatus === 'listening' && (
-                                                    <span className="flex items-center gap-1 text-cyan-600">
+                                                    <span className="flex items-center gap-1 text-brand">
                                                         Konuşun, dinliyorum
                                                         <span className="animate-bounce inline-block" style={{ animationDelay: '0ms' }}>.</span>
                                                         <span className="animate-bounce inline-block" style={{ animationDelay: '150ms' }}>.</span>
                                                         <span className="animate-bounce inline-block" style={{ animationDelay: '300ms' }}>.</span>
                                                     </span>
                                                 )}
-                                                {sttStatus === 'success' && sttResult && <span className="text-emerald-600 italic">"{sttResult}"</span>}
-                                                {sttStatus === 'error' && <span className="text-red-500">Mikrofon erişimi sağlanamadı.</span>}
+                                                {sttStatus === 'success' && sttResult && <span className="text-ok italic">"{sttResult}"</span>}
+                                                {sttStatus === 'error' && <span className="text-bad">Mikrofon erişimi sağlanamadı.</span>}
                                             </div>
                                         </div>
                                         <button onClick={toggleSttTest}
-                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 border ${
+                                            className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all shrink-0 border ${
                                                 sttStatus === 'listening'
-                                                    ? 'bg-red-50 text-red-500 border-red-200 hover:bg-red-100'
-                                                    : 'bg-cyan-50 text-cyan-600 border-cyan-200 hover:bg-cyan-100'
+                                                    ? 'bg-bad-bg text-bad border-transparent hover:opacity-90'
+                                                    : 'bg-brand-50 text-brand border-brand-100 hover:bg-brand-100'
                                             }`}>
                                             {sttStatus === 'listening' ? 'Durdur' : sttStatus === 'success' ? 'Tekrar Test Et' : 'Testi Başlat'}
                                         </button>
@@ -540,9 +540,9 @@ export default function SettingsPage({ initialTab }) {
                                         ))}
                                     </div>
                                     {sttStatus === 'success' && sttEmotion && (
-                                        <div className="mt-4 border-t border-slate-100 pt-4">
-                                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3 flex items-center gap-1.5">
-                                                <Activity size={10} className="text-cyan-500" /> Ses Duygu Analizi
+                                        <div className="mt-4 border-t border-n200 pt-4">
+                                            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-n400 mb-3 flex items-center gap-1.5">
+                                                <Activity size={10} className="text-brand" /> Ses Duygu Analizi
                                             </p>
                                             <div className="grid grid-cols-2 gap-x-6 gap-y-2.5">
                                                 {[
@@ -553,10 +553,10 @@ export default function SettingsPage({ initialTab }) {
                                                 ].map(({ label, value, color }) => (
                                                     <div key={label}>
                                                         <div className="flex justify-between mb-1">
-                                                            <span className="text-[10px] text-slate-500">{label}</span>
-                                                            <span className="text-[10px] font-bold" style={{ color }}>{value}%</span>
+                                                            <span className="text-[11px] text-n500">{label}</span>
+                                                            <span className="text-[11px] font-semibold" style={{ color }}>{value}%</span>
                                                         </div>
-                                                        <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                                        <div className="h-1.5 bg-n100 rounded-full overflow-hidden">
                                                             <div className="h-full rounded-full transition-all duration-700" style={{ width: `${value}%`, backgroundColor: color }} />
                                                         </div>
                                                     </div>
@@ -565,7 +565,7 @@ export default function SettingsPage({ initialTab }) {
                                         </div>
                                     )}
                                 </div>
-                                <p className="text-[11px] text-slate-400 mt-3">
+                                <p className="text-[12px] text-n400 mt-3">
                                     Bu test, mülakatlarda kullanılan Gemini tabanlı ses tanıma motorunun cihazınızda düzgün çalışıp çalışmadığını doğrular.
                                 </p>
                             </div>
@@ -622,12 +622,12 @@ export default function SettingsPage({ initialTab }) {
 function SectionHeader({ icon: Icon, title, desc }) {
     return (
         <div className="flex items-center gap-3 mb-2">
-            <div className="w-9 h-9 rounded-xl bg-cyan-50 border border-cyan-100 flex items-center justify-center shrink-0">
-                <Icon className="w-4.5 h-4.5 text-cyan-600" />
+            <div className="w-9 h-9 rounded-md bg-brand-50 border border-brand-100 flex items-center justify-center shrink-0">
+                <Icon className="w-4.5 h-4.5 text-brand" />
             </div>
             <div>
-                <h2 className="text-base font-bold text-slate-800">{title}</h2>
-                <p className="text-xs text-slate-400">{desc}</p>
+                <h2 className="text-base font-semibold text-n900">{title}</h2>
+                <p className="text-xs text-n400">{desc}</p>
             </div>
         </div>
     );
@@ -635,12 +635,12 @@ function SectionHeader({ icon: Icon, title, desc }) {
 
 function SettingRow({ icon: Icon, label, description, children, noBorder }) {
     return (
-        <div className={`flex items-center justify-between py-4 ${!noBorder ? 'border-b border-slate-100' : ''}`}>
+        <div className={`flex items-center justify-between py-4 ${!noBorder ? 'border-b border-n200' : ''}`}>
             <div className="flex items-center gap-3">
-                <Icon className="w-4 h-4 text-slate-400 shrink-0" />
+                <Icon className="w-4 h-4 text-n400 shrink-0" />
                 <div>
-                    <p className="text-sm font-medium text-slate-700">{label}</p>
-                    {description && <p className="text-xs text-slate-400 mt-0.5">{description}</p>}
+                    <p className="text-sm font-medium text-n700">{label}</p>
+                    {description && <p className="text-xs text-n400 mt-0.5">{description}</p>}
                 </div>
             </div>
             <div className="ml-4 shrink-0">{children}</div>
@@ -653,7 +653,7 @@ function Select({ value, onChange, options }) {
         <select
             value={value}
             onChange={e => onChange(e.target.value)}
-            className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm text-slate-700 outline-none focus:border-cyan-400 cursor-pointer"
+            className="bg-n50 border border-n200 rounded-md px-3 py-1.5 text-sm text-n700 outline-none focus:border-brand cursor-pointer"
         >
             {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
@@ -664,9 +664,9 @@ function Toggle({ checked, onChange }) {
     return (
         <button
             onClick={() => onChange(!checked)}
-            className={`w-11 h-6 rounded-full transition-colors duration-200 relative ${checked ? 'bg-cyan-500' : 'bg-slate-200'}`}
+            className={`w-11 h-6 rounded-full transition-colors duration-200 relative ${checked ? 'bg-brand' : 'bg-n200'}`}
         >
-            <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${checked ? 'translate-x-5' : 'translate-x-0.5'}`} />
+            <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-n0 shadow-sm transition-transform duration-200 ${checked ? 'translate-x-5' : 'translate-x-0.5'}`} />
         </button>
     );
 }
