@@ -48,14 +48,14 @@ Hepsi `Incomplete mockup request/design_handoff_talentflow/` altında:
 | 3 | AI Match | `AIMatchPage.jsx` | ⛔ **atlandı** (aşağıda) |
 | 4 | Mülakat Listesi + Planlama | `InterviewManagementPage.jsx` | ✅ merged (#199) |
 | 5 | Canlı Mülakat | `LiveInterviewPage.jsx` | 🟡 **PR #201 açık** |
-| 6 | Rapor | `InterviewReportPage.jsx`, `InterviewReportSections.jsx`, `StarScoreCard.jsx` | ⬜ **sıradaki** |
-| 7 | İK Asistanı | `HrAssistantPanel.jsx` | ⬜ |
+| 6 | Rapor | `InterviewReportPage.jsx`, `InterviewReportSections.jsx` | 🟡 **PR #203 açık** |
+| 7 | İK Asistanı | `HrAssistantPanel.jsx` | ⬜ **sıradaki** |
 | 8 | Aday Detayı | `CandidateProcessPage.jsx`, `CandidateCvPanel.jsx` | ⬜ |
 
 Ek olarak merged: #196 (yerel giriş COOP düzeltmesi), #198 (havuz skor
 tutarlılığı + aday tıklaması doğru sayfaya).
 Ekran 4 merged (#199), belge #200 ile `main`'e taşındı.
-**Açık PR: #201** — Ekran 5.
+**Açık PR'lar: #201** (Ekran 5), **#203** (Ekran 6).
 
 > ⚠️ Bu belge #198 merge edildikten SONRA o dala işlendiği için `main`'e
 > hiç girmemişti; buraya cherry-pick ile taşındı. Belge güncellemeleri
@@ -135,7 +135,7 @@ olmaz, veri kesin.
 | Maaş modalı kendi pozisyon state'ini kullanır | ✅ Ekran 4 (#199) |
 | Aday Detayı 7 sekme + zorunlu kapısı + skor kırılımı + alt aksiyon çubuğu | ⬜ Ekran 8 |
 | Toolbar tek satır 28px pill | ⬜ Ekran 8 |
-| STAR ölçeği her yerde 0–3 | ⚠️ Ekran 5'te **veri yok** (aşağıda) · ⬜ Ekran 6 |
+| STAR ölçeği her yerde 0–3 | ⚠️ Ekran 5'te veri yok · ⚠️ Ekran 6'da alan zaten 0–100 · ⬜ **asıl yeri Ekran 8** |
 
 ## Bu oturumda alınan kararlar
 
@@ -252,21 +252,79 @@ kamera izni gerekiyor; mock-auth önizlemesinde ikisi de yok. eslint/build/
 vitest temiz ama Ekran 1/2/4'teki render doğrulaması burada yapılamadı.
 Bir kez gerçek seansla açılıp bakılmalı.
 
-## Ekran 6 planı (sıradaki)
+## Ekran 6 — ne yapıldı (#203)
 
-`InterviewReportPage.jsx`, `InterviewReportSections.jsx`,
-`StarScoreCard.jsx`. Prototip satırları **1018–1119**.
+`InterviewReportPage.jsx` + `InterviewReportSections.jsx`. Prototipin
+düzeni: 56px başlık, aday şeridi, sekmeler, `1fr / 320px` ızgara; sağ
+rayda STAR kartı, yetkinlik, karar, mülakatçı değerlendirmesi.
 
-Burada STAR **gerçekten var**: rapor `starAnalysis`/`starScores` okuyor ve
-`src/utils/starDimensions.js` (`STAR_MAX = 3`, `ANCHOR_LABELS`,
-`STAR_LABELS`, `normalizeStarAnalysis`, `starPercent`) tek kaynak.
-Onaylanmış "STAR 0–3" kararı asıl burada uygulanacak.
+Üç bölüm bileşeni yalnızca STİL olarak değişti — hangi koşulda hangi
+cümlenin çıktığı o dosyanın asıl işi, mantık aynı.
 
-Dikkat: `starDimensions.js` hem ESKİ 0–10 hem YENİ 0–3 biçimini okuyor;
-ölçek kayıt genelinde belirleniyor. Ekranda `/10` yazan bir yer kalırsa
-tam not alan boyut "3/10" görünür — belgede geçen gerçek hata bu.
-Ayrıca `InterviewReportPage` manuel görüşmeyi ayrı ele alıyor
-(`report.mode === 'manual'`), o dal korunmalı.
+### Kaldırılan uydurma ölçümler
+
+| Ne | Neden |
+|---|---|
+| STAR alıntıları | "Durum" kutusuna 50 karakterden uzun İLK aday cümlesi, "Eylem" kutusuna içinde **"yaptım" geçen** ilk cümle, o boyutun kanıtıymış gibi basılıyordu |
+| Anahtar kelimeler | Kayıtta yoksa adayın **CV becerilerine** düşüyordu; ikisi de yoksa `'Yorumlanıyor...'` diye hiç bitmeyen etiket |
+| "AI ÖZET" kutusu | `aiSummary` yoksa "…gerçek zamanlı analiz edildi." sabit cümlesi |
+| Dil alanı | Boşsa "Türkçe" yazıyordu — hiç tespit edilmemiş bilgi |
+
+### Düzeltilen etiketler
+
+Radar köşesinde `cultureFit` **"Liderlik"** diye etiketlenmişti (öyle bir
+eksen yok), `adaptability` ise "Uyum" (o cultureFit'in karşılığı). Radar
+çubuklara çevrildi: mutlak konumlu köşe etiketlerinde hangi sayının hangi
+eksene ait olduğu doğrulanamıyordu. STAR boyutları Türkçeleşti
+(Durum/Görev/Eylem/Sonuç) — ham `'Situation'` `lang="tr"` sayfada CSS ile
+büyütülünce **SİTUATİON** oluyor.
+
+Transkript araması dekoratifti (`value`/`onChange` yoktu), artık süzüyor.
+
+### ⚠️ STAR ölçeği: burada 0–3 YAPILMADI
+
+**Kodbazda iki ayrı STAR var, karıştırmayın:**
+
+| Alan | Ölçek | Kim yazıyor | Nerede gösteriliyor |
+|---|---|---|---|
+| `session.starScores.{S,T,A,R}` | **0–100** | `generateInterviewFinalReport` (şeması açıkça `"S": <0-100>`) | Mülakat raporu (Ekran 6) |
+| `candidate.starAnalysis` | **0–3** + `ANCHOR_LABELS` | CV analizi | Aday Detayı (Ekran 8) |
+
+`utils/starDimensions.js` (`STAR_MAX = 3`) **ikincisine** ait. Raporda
+0–3 cetveli uygulamak 83'ü "83/3" yapardı — belgedeki "3/10" hatasının
+ters yönden aynısı. **Onaylanmış "STAR 0–3" kararının asıl yeri
+Ekran 8.**
+
+### `StarScoreCard.jsx` ölü
+
+Plan bu ekranın dosyaları arasında sayıyordu ama **hiçbir yerden import
+edilmiyor** — yalnızca `starLabels.test.js` metnini okuyor. İçinde hâlâ
+`/10` ve `* 10` var. Dokunulmadı; testi kırmadan silmek ayrı bir iş.
+
+### Doğrulama
+
+Ekran **tarayıcıda açıldı ve doğrulandı**: sayfaya geçici bir fixture
+enjekte edip (`sessionStorage`) kanıt kartı, zorunlu madde kapısı, madde
+kartları, özet, STAR/yetkinlik çubukları, transkript sekmesi ve arama
+görüldü; fixture geri alındı, commit'e girmedi. Ekran 5'teki doğrulama
+boşluğu burada YOK.
+
+> Bu yöntem Ekran 5 için de denenebilir ama orada kamera izni de
+> gerekiyor; önizleme penceresi medya erişimini engelliyor.
+
+## Ekran 7 planı (sıradaki)
+
+`src/components/HrAssistantPanel.jsx` — prototipte "asistan paneli
+(4 araç)". Prototip satır haritasında ayrı bir blok yok; modaller
+bölümünde (1123–1313) "HR asistanı" geçiyor. `pdata.js`'te
+`asstExamples`, `asstRows`, `asstApplied`, `reviewBlocks`,
+`marketBenefits`, `marketSources`, `draftMustHaves`, `draftNiceToHaves`
+duruyor — panelin dört aracı bunlar.
+
+Dikkat: `docs/PLAN-ik-asistani.md` bu panelin kendi planını taşıyor,
+önce o okunmalı. Panelin ürettiği ilan taslağı `PositionsContext`'teki
+`positionDraft` üzerinden forma taşınıyor (olayla değil, çünkü kullanıcı
+pozisyonlar ekranında değilken olayı dinleyecek kimse olmuyor).
 
 ## Dersler — bunlar tekrar edilmemeli
 
