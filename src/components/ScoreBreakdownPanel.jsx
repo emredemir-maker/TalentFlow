@@ -172,6 +172,80 @@ function ProvenanceBlock({ analysis, position, candidate }) {
     );
 }
 
+/**
+ * SKOR NASIL OLUŞTU — prototipin üst kartı.
+ *
+ * ── PROTOTİPİN FORMÜLÜ BU UYGULAMADA YOK ────────────────────────────────────
+ * Prototip "CV analizi ×½ + Mülakat kanıtı ×½ = Endeks" diyor. Uygulama
+ * böyle çalışmıyor: mülakatta çıkan kanıt, madde damgalarının ÜZERİNE
+ * yazılıyor (utils/interviewCoverage.js → mergeInterviewCoverage) ve aynı
+ * hibrit skor yeniden hesaplanıyor. Yani mülakatın etkisi sabit bir yarım
+ * ağırlık değil, hangi maddeyi kapattığına bağlı.
+ *
+ * Ekrana ×½ yazmak, sistemin kullanmadığı bir formülü kullanıyormuş gibi
+ * göstermek olurdu. Kartın biçimi prototipten, sayılar gerçek yoldan:
+ * CV skoru → mülakatın getirdiği fark → endeks skoru.
+ */
+function FormulaBox({ label, value, hint, tone = 'n' }) {
+    return (
+        <div
+            className={`rounded-md px-3 py-2 ${
+                tone === 'brand' ? 'bg-brand-50 border border-brand-100'
+                    : tone === 'iv' ? 'bg-ok-bg'
+                        : 'bg-n50 border border-n200'
+            }`}
+        >
+            <div
+                className={`text-[11px] font-semibold uppercase tracking-[0.06em] ${
+                    tone === 'brand' ? 'text-brand' : tone === 'iv' ? 'text-ok' : 'text-n500'
+                }`}
+            >
+                {label}
+            </div>
+            <div className="text-[15px] font-semibold mt-0.5">{value}</div>
+            {hint && <div className="text-[11px] text-n400">{hint}</div>}
+        </div>
+    );
+}
+
+function ScoreFormula({ cvScore, indexScore, hasInterview, delta }) {
+    return (
+        <div className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-[18px]">
+            <div className="text-[11px] font-semibold text-n500 tracking-[0.1em] uppercase mb-3">
+                Skor nasıl oluştu
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap mb-3">
+                <FormulaBox label="CV analizi" value={cvScore} hint="zorunlu + tercihen puanı" tone="brand" />
+
+                {hasInterview ? (
+                    <>
+                        <span className="text-[14px] font-semibold text-n400">→</span>
+                        <Box
+                            label="Mülakat kanıtı"
+                            value={delta > 0 ? `+${delta}` : String(delta)}
+                            hint="odada kapanan maddeler"
+                            tone="iv"
+                        />
+                        <span className="text-[14px] font-semibold text-n400">=</span>
+                        <FormulaBox label="Endeks skoru" value={indexScore} hint="listelerde görünen sayı" />
+                    </>
+                ) : (
+                    <p className="text-[12px] leading-[1.5] text-n500 bg-n50 border border-n200 rounded-md px-3 py-2 max-w-[280px] m-0">
+                        Henüz mülakat yapılmadı — endeks skoru şu an yalnızca CV analizine eşit (%{indexScore}).
+                    </p>
+                )}
+
+                <p className="ml-auto text-[11px] text-n400 max-w-[300px] leading-[1.5] text-right m-0">
+                    CV analizi madde puanlarından geliyor: zorunlu kapsama %75, tercihen %25 ağırlıkla.
+                    Mülakat kanıtı ayrı bir yarım ağırlık değil; hangi maddeyi kapattığına göre
+                    madde damgalarını günceller.
+                </p>
+            </div>
+        </div>
+    );
+}
+
 export default function ScoreBreakdownPanel({ analysis, position, candidate = null }) {
     const [open, setOpen] = useState(false);
 
@@ -207,6 +281,17 @@ export default function ScoreBreakdownPanel({ analysis, position, candidate = nu
     const pct = (n) => Math.round(n * 100);
 
     return (
+        <div className="flex flex-col gap-3">
+        {/* Prototipin üst kartı: skorun nasıl oluştuğu HER ZAMAN görünür.
+            Eskiden bu bilgi katlanmış bir akordeonun içindeydi ve kullanıcı
+            açmadıkça skorun dayanağını hiç görmüyordu. */}
+        <ScoreFormula
+            cvScore={scoreDetail.cvScore}
+            indexScore={headlineScore}
+            hasInterview={scoreDetail.interviewed}
+            delta={headlineScore - scoreDetail.cvScore}
+        />
+
         <div className="rounded-md border border-n200 bg-n0 overflow-hidden">
             <button
                 onClick={() => setOpen((v) => !v)}
@@ -443,6 +528,7 @@ export default function ScoreBreakdownPanel({ analysis, position, candidate = nu
                     </p>
                 </div>
             )}
+        </div>
         </div>
     );
 }
