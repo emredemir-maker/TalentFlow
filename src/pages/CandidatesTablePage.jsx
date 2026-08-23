@@ -56,7 +56,7 @@ function StageChip({ status }) {
     return (
         <span
             style={{ color: stage.color, background: stage.bg, border: `1px solid ${stage.border}` }}
-            className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
+            className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
         >
             <span className="w-1.5 h-1.5 rounded-full" style={{ background: stage.color }} />
             {stage.label}
@@ -79,10 +79,10 @@ function MethodMark({ method }) {
     return (
         <span
             title={`${SCORE_METHOD_LABEL[method]} ile ölçüldü — bu ilana göre derin analiz yapılmamış, diğer adaylarla doğrudan karşılaştırılamaz`}
-            className={`mt-0.5 px-1 py-px rounded text-[8px] font-black uppercase tracking-wide whitespace-nowrap border ${
+            className={`mt-0.5 px-1 py-px rounded text-[11px] font-semibold uppercase tracking-wide whitespace-nowrap border ${
                 keyword
-                    ? 'bg-amber-50 border-amber-200 text-amber-700'
-                    : 'bg-slate-100 border-slate-200 text-slate-500'
+                    ? 'bg-warn-bg border-warn text-warn'
+                    : 'bg-n100 border-n200 text-n500'
             }`}
         >
             {keyword ? 'anahtar kelime' : 'ai'}
@@ -92,7 +92,7 @@ function MethodMark({ method }) {
 
 function ScoreCell({ value, gate, interviewed, method }) {
     if (value === null || value === undefined || value === '') {
-        return <span className="text-slate-300">—</span>;
+        return <span className="text-n300">—</span>;
     }
     const color = value >= 75 ? '#059669' : value >= 50 ? '#D97706' : '#DC2626';
     // Zorunlu bir madde karşılanmıyorsa çıplak yüzde yanıltıcı: aday yüksek
@@ -102,13 +102,13 @@ function ScoreCell({ value, gate, interviewed, method }) {
     return (
         <span className="inline-flex flex-col items-center leading-tight">
             <span className="inline-flex items-center gap-1">
-                <span style={{ color }} className="font-black">%{value}</span>
+                <span style={{ color }} className="font-semibold">%{value}</span>
                 {/* Skor mülakattan etkilendiyse hücre bunu söylemeli: dün 65
                     gördüğü adayı bugün 78'de bulan kullanıcı nedenini
                     bilmeli. Sessizce değişen sayı, açıklanamayan sayıdır. */}
                 {interviewed && (
                     <Mic
-                        className="w-2.5 h-2.5 text-slate-400"
+                        className="w-2.5 h-2.5 text-n400"
                         aria-label="Mülakat sonucu skora dahil"
                     />
                 )}
@@ -116,7 +116,7 @@ function ScoreCell({ value, gate, interviewed, method }) {
             {label && label.tone === 'red' && (
                 <span
                     title={gate.missing.map((m) => m.text).join(' · ')}
-                    className="mt-0.5 px-1 py-px rounded bg-red-50 border border-red-200 text-[8px] font-black text-red-600 uppercase tracking-wide whitespace-nowrap"
+                    className="mt-0.5 px-1 py-px rounded bg-bad-bg border border-transparent text-[11px] font-semibold text-bad uppercase tracking-wide whitespace-nowrap"
                 >
                     {label.text}
                 </span>
@@ -125,7 +125,7 @@ function ScoreCell({ value, gate, interviewed, method }) {
             {label && label.tone === 'amber' && (
                 <span
                     title={gate.partial.map((m) => m.text).join(' · ')}
-                    className="mt-0.5 px-1 py-px rounded bg-amber-50 border border-amber-200 text-[8px] font-black text-amber-700 uppercase tracking-wide whitespace-nowrap"
+                    className="mt-0.5 px-1 py-px rounded bg-warn-bg border border-warn text-[11px] font-semibold text-warn uppercase tracking-wide whitespace-nowrap"
                 >
                     {label.text}
                 </span>
@@ -138,20 +138,20 @@ function SortableHeader({ label, sortKey, activeKey, dir, onSort, align = 'left'
     const isActive = activeKey === sortKey;
     return (
         <th
-            className={`px-3 py-2.5 text-${align} select-none cursor-pointer whitespace-nowrap hover:bg-slate-100 transition-colors`}
+            className={`px-3 py-2.5 text-${align} select-none cursor-pointer whitespace-nowrap hover:bg-n100 transition-colors`}
             onClick={() => onSort(sortKey)}
         >
-            <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-slate-500">
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-n500">
                 {label}
                 {isActive && (dir === 'asc'
-                    ? <ChevronUp className="w-3 h-3 text-slate-700" />
-                    : <ChevronDown className="w-3 h-3 text-slate-700" />)}
+                    ? <ChevronUp className="w-3 h-3 text-n700" />
+                    : <ChevronDown className="w-3 h-3 text-n700" />)}
             </span>
         </th>
     );
 }
 
-const SELECT_CLS = 'text-[12px] border border-slate-200 rounded-lg bg-white px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-100 text-slate-700';
+const SELECT_CLS = 'text-[12px] border border-n200 rounded-md bg-n0 px-2.5 py-1.5 focus:outline-none focus:border-brand text-n700';
 
 // Toplu işlem modali — üç tür: aşama (pipelineStages'ten), kaynak (sources
 // koleksiyonundan, opsiyonel alt mecra) ve departmana açma (departments
@@ -201,23 +201,23 @@ function BulkActionModal({ isOpen, type, count, applying, onApply, onClose }) {
         else if (type === 'source') onApply({ type, source: sourceName, sourceDetail: subSource });
         else onApply({ type, department: departmentName });
     };
-    const OPTION_CLS = (active) => `flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-left transition-all ${active ? 'border-slate-400 bg-slate-50 shadow-sm' : 'border-slate-100 hover:border-slate-200'}`;
+    const OPTION_CLS = (active) => `flex items-center gap-2.5 px-3 py-2.5 rounded-md border text-left transition-all ${active ? 'border-brand bg-brand-50' : 'border-n200 hover:border-n200'}`;
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={applying ? undefined : onClose} />
-            <div className="relative w-full max-w-md bg-white rounded-2xl border border-slate-100 shadow-2xl p-5">
+            <div className="absolute inset-0 bg-n900/40 backdrop-blur-sm" onClick={applying ? undefined : onClose} />
+            <div className="relative w-full max-w-md bg-n0 rounded-[14px] border border-n200 shadow-2xl p-5">
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-[#13294E] flex items-center justify-center">
+                        <div className="w-9 h-9 rounded-md bg-brand flex items-center justify-center">
                             <Icon className="w-4.5 h-4.5 text-white" />
                         </div>
                         <div>
-                            <h3 className="text-[14px] font-black text-slate-900">{cfg.title}</h3>
-                            <p className="text-[10px] text-slate-400 font-bold">{count} aday seçildi</p>
+                            <h3 className="text-[14px] font-semibold text-n900">{cfg.title}</h3>
+                            <p className="text-[11px] text-n400 font-semibold">{count} aday seçildi</p>
                         </div>
                     </div>
-                    <button onClick={onClose} disabled={applying} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 transition-colors">
+                    <button onClick={onClose} disabled={applying} className="p-1.5 hover:bg-n100 rounded-md text-n400 transition-colors">
                         <X className="w-4 h-4" />
                     </button>
                 </div>
@@ -227,7 +227,7 @@ function BulkActionModal({ isOpen, type, count, applying, onApply, onClose }) {
                         {STAGES.map((s) => (
                             <button key={s.key} type="button" onClick={() => setStageKey(s.key)} className={OPTION_CLS(stageKey === s.key)}>
                                 <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: s.color }} />
-                                <span className={`text-[12px] font-bold ${stageKey === s.key ? 'text-slate-900' : 'text-slate-600'}`}>{s.label}</span>
+                                <span className={`text-[12px] font-semibold ${stageKey === s.key ? 'text-n900' : 'text-n600'}`}>{s.label}</span>
                             </button>
                         ))}
                     </div>
@@ -235,26 +235,26 @@ function BulkActionModal({ isOpen, type, count, applying, onApply, onClose }) {
 
                 {type === 'source' && (
                     sources === null ? (
-                        <div className="flex items-center gap-2 text-slate-400 text-[11px] py-4"><Loader2 className="w-4 h-4 animate-spin" /> Kaynaklar yükleniyor…</div>
+                        <div className="flex items-center gap-2 text-n400 text-[12px] py-4"><Loader2 className="w-4 h-4 animate-spin" /> Kaynaklar yükleniyor…</div>
                     ) : sources.length === 0 ? (
-                        <p className="text-[11px] text-slate-400 py-4">Tanımlı kaynak yok — Kaynak Yönetimi sayfasından ekleyebilirsiniz.</p>
+                        <p className="text-[12px] text-n400 py-4">Tanımlı kaynak yok — Kaynak Yönetimi sayfasından ekleyebilirsiniz.</p>
                     ) : (
                         <div className="space-y-3">
                             <div className="grid grid-cols-2 gap-2 max-h-52 overflow-y-auto pr-1">
                                 {sources.map((s) => (
                                     <button key={s.id} type="button" onClick={() => { setSourceName(s.name); setSubSource(''); }} className={OPTION_CLS(sourceName === s.name)}>
                                         <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: s.color || '#94A3B8' }} />
-                                        <span className={`text-[12px] font-bold truncate ${sourceName === s.name ? 'text-slate-900' : 'text-slate-600'}`}>{s.name}</span>
+                                        <span className={`text-[12px] font-semibold truncate ${sourceName === s.name ? 'text-n900' : 'text-n600'}`}>{s.name}</span>
                                     </button>
                                 ))}
                             </div>
                             {selectedSource?.subSources?.length > 0 && (
                                 <div>
-                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Alt Detay / Mecra (opsiyonel)</p>
+                                    <p className="text-[11px] font-semibold text-n400 uppercase tracking-[0.08em] mb-1.5">Alt Detay / Mecra (opsiyonel)</p>
                                     <div className="flex flex-wrap gap-1.5">
                                         {selectedSource.subSources.map((sub) => (
                                             <button key={sub} type="button" onClick={() => setSubSource(subSource === sub ? '' : sub)}
-                                                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all ${subSource === sub ? 'bg-[#13294E] text-white border-[#13294E]' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}>
+                                                className={`px-2.5 py-1 rounded-md text-[12px] font-semibold border transition-all ${subSource === sub ? 'bg-brand text-white border-[#13294E]' : 'border-n200 text-n500 hover:border-n300'}`}>
                                                 {sub}
                                             </button>
                                         ))}
@@ -267,31 +267,31 @@ function BulkActionModal({ isOpen, type, count, applying, onApply, onClose }) {
 
                 {type === 'department' && (
                     departments === null ? (
-                        <div className="flex items-center gap-2 text-slate-400 text-[11px] py-4"><Loader2 className="w-4 h-4 animate-spin" /> Departmanlar yükleniyor…</div>
+                        <div className="flex items-center gap-2 text-n400 text-[12px] py-4"><Loader2 className="w-4 h-4 animate-spin" /> Departmanlar yükleniyor…</div>
                     ) : departments.length === 0 ? (
-                        <p className="text-[11px] text-slate-400 py-4">Tanımlı departman yok — Departman Yönetimi sayfasından ekleyebilirsiniz.</p>
+                        <p className="text-[12px] text-n400 py-4">Tanımlı departman yok — Departman Yönetimi sayfasından ekleyebilirsiniz.</p>
                     ) : (
                         <div className="grid grid-cols-2 gap-2 max-h-52 overflow-y-auto pr-1">
                             {departments.map((d) => (
                                 <button key={d.id} type="button" onClick={() => setDepartmentName(d.name)} className={OPTION_CLS(departmentName === d.name)}>
-                                    <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                    <span className={`text-[12px] font-bold truncate ${departmentName === d.name ? 'text-slate-900' : 'text-slate-600'}`}>{d.name}</span>
+                                    <Building2 className="w-3.5 h-3.5 text-n400 shrink-0" />
+                                    <span className={`text-[12px] font-semibold truncate ${departmentName === d.name ? 'text-n900' : 'text-n600'}`}>{d.name}</span>
                                 </button>
                             ))}
                         </div>
                     )
                 )}
 
-                <div className="mt-4 flex items-start gap-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                <div className="mt-4 flex items-start gap-2 text-[12px] text-warn bg-warn-bg border border-transparent rounded-md px-3 py-2">
                     <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                     {cfg.warn(count)}
                 </div>
                 <div className="mt-4 flex gap-2">
-                    <button onClick={onClose} disabled={applying} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-[12px] font-bold text-slate-600 hover:bg-slate-50 transition-colors">
+                    <button onClick={onClose} disabled={applying} className="flex-1 py-2.5 rounded-md border border-n200 text-[12px] font-semibold text-n600 hover:bg-n50 transition-colors">
                         İptal
                     </button>
                     <button onClick={apply} disabled={!canApply || applying}
-                        className="flex-[2] py-2.5 rounded-xl bg-[#13294E] hover:bg-[#1E3A6E] text-white text-[12px] font-black disabled:opacity-50 flex items-center justify-center gap-2 transition-colors">
+                        className="flex-[2] py-2.5 rounded-md bg-brand hover:bg-[#1E3A6E] text-white text-[12px] font-semibold disabled:opacity-50 flex items-center justify-center gap-2 transition-colors">
                         {applying ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                         {applying ? 'Uygulanıyor…' : 'Uygula'}
                     </button>
@@ -634,49 +634,48 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
     };
 
     return (
-        <div className="flex flex-col min-h-screen bg-[#F8FAFC]">
+        <div className="infoset flex flex-col min-h-screen">
             {/* ── Header ───────────────────────────────────────────────────── */}
-            <div className="bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between gap-4 sticky top-0 z-20">
-                <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-[#13294E] flex items-center justify-center">
-                        <Table2 className="w-4.5 h-4.5 text-white" />
-                    </div>
-                    <div>
-                        <h1 className="text-xl font-black text-slate-900">Adaylar</h1>
-                        <p className="text-[11px] text-slate-400 mt-0.5">
-                            {sortedRows.length === enrichedCandidates.length
-                                ? `${enrichedCandidates.length} aday`
-                                : `${sortedRows.length} / ${enrichedCandidates.length} aday (filtreli)`}
-                            {selectedIds.size > 0 ? ` · ${selectedIds.size} seçili` : ''}
-                        </p>
-                    </div>
+            <header className="h-14 bg-n0 border-b border-n200 px-[18px] flex items-center gap-3.5 sticky top-0 z-20">
+                <div>
+                    <h1 className="text-[15px] font-semibold tracking-[-0.02em] m-0">Aday havuzu</h1>
+                    <span className="text-[11px] text-n400">
+                        {sortedRows.length === enrichedCandidates.length
+                            ? `${enrichedCandidates.length} aday`
+                            : `${sortedRows.length} / ${enrichedCandidates.length} aday (filtreli)`}
+                        {selectedIds.size > 0 ? ` · ${selectedIds.size} seçili` : ''}
+                    </span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="ml-auto flex items-center gap-2">
                     {canMaintain && (
                         <button
                             onClick={() => setShowMaintenance(v => !v)}
-                            className={`flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-lg transition-colors ${showMaintenance ? 'text-white bg-[#13294E]' : 'text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200'}`}
+                            className={`flex items-center gap-1.5 text-[12px] font-medium border rounded-md px-[11px] py-1.5 ${
+                                showMaintenance
+                                    ? 'bg-brand-50 text-brand border-brand-100'
+                                    : 'bg-n50 text-n600 border-n200 hover:bg-n100'
+                            }`}
                         >
-                            <Wrench className="w-3.5 h-3.5" /> Bakım
+                            <Wrench className="w-[13px] h-[13px]" /> Bakım
                         </button>
                     )}
                     <button
                         onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'candidate-process' }))}
-                        className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors"
+                        className="flex items-center gap-1.5 text-[12px] font-medium text-n600 bg-n50 border border-n200 hover:bg-n100 rounded-md px-[11px] py-1.5"
                         title="Detay görünümü — CV yükleme, sistem taraması ve aday profilleri"
                     >
-                        <Users className="w-3.5 h-3.5" /> Detay & Yükleme
+                        <Users className="w-[13px] h-[13px]" /> Detay &amp; yükleme
                     </button>
                     <button
                         onClick={handleExport}
                         disabled={exporting || sortedRows.length === 0}
-                        className="flex items-center gap-1.5 text-[11px] font-black text-white bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed px-3.5 py-1.5 rounded-lg transition-colors"
+                        className="flex items-center gap-1.5 text-[13px] font-semibold text-white bg-brand hover:bg-brand-600 disabled:opacity-40 disabled:cursor-not-allowed rounded-md px-[13px] py-[7px]"
                     >
                         <Download className="w-3.5 h-3.5" />
-                        {exporting ? 'Hazırlanıyor…' : "Excel'e Aktar"}
+                        {exporting ? 'Hazırlanıyor…' : "Excel'e aktar"}
                     </button>
                 </div>
-            </div>
+            </header>
 
             {/* ── Maintenance panel (toggle) ───────────────────────────────── */}
             {canMaintain && showMaintenance && (
@@ -687,15 +686,15 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
 
             {/* ── Filter bar ───────────────────────────────────────────────── */}
             <div className="px-6 pt-4">
-                <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-3 flex flex-wrap items-center gap-2">
+                <div className="bg-n0 rounded-md border border-n200 shadow-sm p-3 flex flex-wrap items-center gap-2">
                     <div className="relative">
-                        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        <Search className="w-3.5 h-3.5 text-n400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                         <input
                             type="text"
                             placeholder="İsim, e-posta, yetenek ara..."
                             value={filters.search}
                             onChange={(e) => setFilter('search', e.target.value)}
-                            className="pl-8 pr-3 py-1.5 text-[12px] border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 w-52"
+                            className="pl-8 pr-3 py-1.5 text-[12px] border border-n200 rounded-md bg-n0 focus:outline-none focus:border-brand w-52"
                         />
                     </div>
                     <select value={filters.stage} onChange={(e) => setFilter('stage', e.target.value)} className={SELECT_CLS}>
@@ -767,13 +766,13 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
                     />
                     <div className="flex items-center gap-1">
                         <input type="date" value={filters.dateFrom} onChange={(e) => setFilter('dateFrom', e.target.value)} className={SELECT_CLS} title="Başvuru tarihi (başlangıç)" />
-                        <span className="text-slate-300 text-[11px]">–</span>
+                        <span className="text-n300 text-[12px]">–</span>
                         <input type="date" value={filters.dateTo} onChange={(e) => setFilter('dateTo', e.target.value)} className={SELECT_CLS} title="Başvuru tarihi (bitiş)" />
                     </div>
                     {hasActiveFilters && (
                         <button
                             onClick={clearFilters}
-                            className="flex items-center gap-1 text-[11px] font-bold text-red-500 hover:text-red-600 bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-lg transition-colors"
+                            className="flex items-center gap-1 text-[12px] font-semibold text-bad hover:text-bad bg-bad-bg hover:opacity-90 px-2.5 py-1.5 rounded-md transition-colors"
                         >
                             <FilterX className="w-3.5 h-3.5" /> Temizle
                         </button>
@@ -788,7 +787,7 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
                     kaçtı. Çipler açık olanı görünür yapar ve tek tıkla kapattırır. */}
                 {activeFilterChips.length > 0 && (
                     <div className="flex flex-wrap items-center gap-1.5 mt-2 px-1">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mr-0.5">
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-n400 mr-0.5">
                             Aktif filtreler
                         </span>
                         {activeFilterChips.map((chip) => (
@@ -796,10 +795,10 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
                                 key={chip.key}
                                 onClick={() => clearFilter(chip.key)}
                                 title={`${chip.label} filtresini kaldır`}
-                                className="group inline-flex items-center gap-1.5 text-[11px] bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 rounded-lg pl-2 pr-1.5 py-1 transition-colors"
+                                className="group inline-flex items-center gap-1.5 text-[12px] bg-brand-50 hover:bg-brand-100 text-brand border border-brand-100 rounded-md pl-2 pr-1.5 py-1 transition-colors"
                             >
-                                <span className="font-bold opacity-60">{chip.label}:</span>
-                                <span className="font-black">{chip.value}</span>
+                                <span className="font-semibold opacity-60">{chip.label}:</span>
+                                <span className="font-semibold">{chip.value}</span>
                                 <X className="w-3 h-3 opacity-50 group-hover:opacity-100" />
                             </button>
                         ))}
@@ -813,9 +812,9 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
                 düzeltmeyi tek tık uzağa koymak gerekiyor. */}
             {selectedPosition && unalignedRows.length > 0 && !scanProgress && (
                 <div className="px-6 pt-3">
-                    <div className="flex items-center gap-3 flex-wrap text-[11px] bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5">
-                        <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                        <span className="text-amber-900">
+                    <div className="flex items-center gap-3 flex-wrap text-[12px] bg-warn-bg border border-warn rounded-md px-4 py-2.5">
+                        <AlertCircle className="w-3.5 h-3.5 text-warn shrink-0" />
+                        <span className="text-n700">
                             <strong>{unalignedRows.length} aday</strong> bu ilana göre derin analiz edilmemiş; skorları
                             anahtar kelime ya da başka bir pozisyonun analizinden geliyor ve
                             diğerleriyle doğrudan karşılaştırılamaz.
@@ -830,7 +829,7 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
                         <button
                             onClick={handleAlignToPosition}
                             disabled={bulkApplying || alignTargets.length === 0}
-                            className="ml-auto flex items-center gap-1.5 text-[11px] font-bold text-white bg-amber-600 hover:bg-amber-700 px-3 py-1.5 rounded-lg disabled:opacity-50 transition-colors"
+                            className="ml-auto flex items-center gap-1.5 text-[12px] font-semibold text-white bg-warn hover:opacity-90 px-3 py-1.5 rounded-md disabled:opacity-50 transition-colors"
                         >
                             <Brain className="w-3.5 h-3.5" />
                             {selectedIds.size > 0
@@ -845,8 +844,8 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
             {(selectedIds.size > 0 || bulkResult) && (
                 <div className="px-6 pt-3">
                     {selectedIds.size > 0 ? (
-                        <div className="flex items-center justify-between gap-3 flex-wrap bg-[#13294E] text-white rounded-xl px-4 py-2.5 shadow-sm">
-                            <span className="text-[12px] font-bold">
+                        <div className="flex items-center justify-between gap-3 flex-wrap bg-brand text-white rounded-md px-4 py-2.5 shadow-sm">
+                            <span className="text-[12px] font-semibold">
                                 {scanProgress
                                     ? `Otonom tarama: ${scanProgress.done} / ${scanProgress.total} aday…`
                                     : `${selectedIds.size} aday seçildi`}
@@ -856,7 +855,7 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
                                     onClick={handleBulkScan}
                                     disabled={Boolean(scanProgress)}
                                     title="Seçililerden henüz taranmamış olanlar için derin AI analizi çalıştırır"
-                                    className="flex items-center gap-1.5 text-[11px] font-black bg-violet-500/80 hover:bg-violet-500 disabled:opacity-60 px-3 py-1.5 rounded-lg transition-colors"
+                                    className="flex items-center gap-1.5 text-[12px] font-semibold bg-brand/80 hover:bg-brand disabled:opacity-60 px-3 py-1.5 rounded-md transition-colors"
                                 >
                                     {scanProgress ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Brain className="w-3.5 h-3.5" />}
                                     Otonom Tarama
@@ -865,45 +864,45 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
                                     onClick={() => setEvalModalOpen(true)}
                                     disabled={Boolean(scanProgress)}
                                     title="Seçili adayları uyum analizi ve detay linkleriyle iş arkadaşlarınıza e-postalayın (kendi hesabınızdan)"
-                                    className="flex items-center gap-1.5 text-[11px] font-black bg-emerald-500/80 hover:bg-emerald-500 disabled:opacity-60 px-3 py-1.5 rounded-lg transition-colors"
+                                    className="flex items-center gap-1.5 text-[12px] font-semibold bg-ok/80 hover:bg-ok disabled:opacity-60 px-3 py-1.5 rounded-md transition-colors"
                                 >
                                     <Mail className="w-3.5 h-3.5" /> Değerlendirmeye Gönder
                                 </button>
                                 <button
                                     onClick={() => openBulkModal('stage')}
                                     disabled={Boolean(scanProgress)}
-                                    className="flex items-center gap-1.5 text-[11px] font-black bg-white/10 hover:bg-white/20 disabled:opacity-50 px-3 py-1.5 rounded-lg transition-colors"
+                                    className="flex items-center gap-1.5 text-[12px] font-semibold bg-n0/10 hover:bg-n0/20 disabled:opacity-50 px-3 py-1.5 rounded-md transition-colors"
                                 >
                                     <Layers className="w-3.5 h-3.5" /> Aşama Değiştir
                                 </button>
                                 <button
                                     onClick={() => openBulkModal('source')}
                                     disabled={Boolean(scanProgress)}
-                                    className="flex items-center gap-1.5 text-[11px] font-black bg-white/10 hover:bg-white/20 disabled:opacity-50 px-3 py-1.5 rounded-lg transition-colors"
+                                    className="flex items-center gap-1.5 text-[12px] font-semibold bg-n0/10 hover:bg-n0/20 disabled:opacity-50 px-3 py-1.5 rounded-md transition-colors"
                                 >
                                     <Share2 className="w-3.5 h-3.5" /> Kaynak Değiştir
                                 </button>
                                 <button
                                     onClick={() => openBulkModal('department')}
                                     disabled={Boolean(scanProgress)}
-                                    className="flex items-center gap-1.5 text-[11px] font-black bg-white/10 hover:bg-white/20 disabled:opacity-50 px-3 py-1.5 rounded-lg transition-colors"
+                                    className="flex items-center gap-1.5 text-[12px] font-semibold bg-n0/10 hover:bg-n0/20 disabled:opacity-50 px-3 py-1.5 rounded-md transition-colors"
                                 >
                                     <Building2 className="w-3.5 h-3.5" /> Departmana Aç
                                 </button>
                                 <button
                                     onClick={() => setSelectedIds(new Set())}
                                     disabled={Boolean(scanProgress)}
-                                    className="flex items-center gap-1.5 text-[11px] font-bold text-white/70 hover:text-white disabled:opacity-50 px-2 py-1.5 transition-colors"
+                                    className="flex items-center gap-1.5 text-[12px] font-semibold text-white/70 hover:text-white disabled:opacity-50 px-2 py-1.5 transition-colors"
                                 >
                                     <X className="w-3.5 h-3.5" /> Seçimi Temizle
                                 </button>
                             </div>
                         </div>
                     ) : (
-                        <div className={`flex items-center gap-2 text-[11px] font-semibold rounded-xl px-4 py-2.5 border ${bulkResult.failed > 0 ? 'text-amber-700 bg-amber-50 border-amber-100' : 'text-emerald-700 bg-emerald-50 border-emerald-100'}`}>
+                        <div className={`flex items-center gap-2 text-[12px] font-semibold rounded-md px-4 py-2.5 border ${bulkResult.failed > 0 ? 'text-warn bg-warn-bg border-transparent' : 'text-ok bg-ok-bg border-transparent'}`}>
                             <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                             {bulkResult.message}{bulkResult.failed > 0 ? `, ${bulkResult.failed} güncelleme başarısız` : ''}.
-                            <button onClick={() => setBulkResult(null)} className="ml-auto text-slate-400 hover:text-slate-600"><X className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => setBulkResult(null)} className="ml-auto text-n400 hover:text-n600"><X className="w-3.5 h-3.5" /></button>
                         </div>
                     )}
                 </div>
@@ -911,16 +910,16 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
 
             {/* ── Table ────────────────────────────────────────────────────── */}
             <div className="flex-1 px-6 py-4">
-                <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+                <div className="bg-n0 rounded-md border border-n200 shadow-sm overflow-hidden">
                     <div className="overflow-x-auto">
                         <table className="w-full text-[12px]">
-                            <thead className="bg-slate-50 border-b border-slate-100">
+                            <thead className="bg-n50 border-b border-n200">
                                 <tr>
                                     <th className="px-3 py-2.5 w-9">
                                         <button
                                             onClick={toggleAllFiltered}
                                             title={allFilteredSelected ? 'Seçimi kaldır' : 'Filtrelenen tüm adayları seç'}
-                                            className="text-slate-400 hover:text-slate-700 transition-colors flex items-center"
+                                            className="text-n400 hover:text-n700 transition-colors flex items-center"
                                         >
                                             {allFilteredSelected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
                                         </button>
@@ -947,7 +946,7 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
                             <tbody>
                                 {loading && (
                                     <tr>
-                                        <td colSpan={selectedPosition ? 16 : 15} className="px-4 py-12 text-center text-slate-400 text-[12px]">
+                                        <td colSpan={selectedPosition ? 16 : 15} className="px-4 py-12 text-center text-n400 text-[12px]">
                                             Adaylar yükleniyor…
                                         </td>
                                     </tr>
@@ -955,11 +954,11 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
                                 {!loading && pageRows.length === 0 && (
                                     <tr>
                                         <td colSpan={selectedPosition ? 16 : 15} className="px-4 py-12 text-center">
-                                            <p className="text-slate-400 text-[12px] font-semibold">
+                                            <p className="text-n400 text-[12px] font-semibold">
                                                 {hasActiveFilters ? 'Filtrelere uyan aday bulunamadı.' : 'Henüz aday yok.'}
                                             </p>
                                             {hasActiveFilters && (
-                                                <button onClick={clearFilters} className="mt-2 text-[11px] font-bold text-blue-600 hover:underline">
+                                                <button onClick={clearFilters} className="mt-2 text-[12px] font-semibold text-brand hover:underline">
                                                     Filtreleri temizle
                                                 </button>
                                             )}
@@ -970,52 +969,52 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
                                     <tr
                                         key={c.id}
                                         onClick={() => openCandidate(c.id)}
-                                        className={`border-b border-slate-50 last:border-0 hover:bg-slate-50/70 cursor-pointer transition-colors ${selectedIds.has(c.id) ? 'bg-blue-50/50' : ''}`}
+                                        className={`border-b border-n100 last:border-0 hover:bg-n25 cursor-pointer ${selectedIds.has(c.id) ? 'bg-brand-50' : ''}`}
                                     >
                                         <td className="px-3 py-2.5" onClick={(e) => { e.stopPropagation(); toggleRow(c.id); }}>
-                                            <button className="text-slate-400 hover:text-slate-700 transition-colors flex items-center" aria-label="Adayı seç">
-                                                {selectedIds.has(c.id) ? <CheckSquare className="w-4 h-4 text-[#13294E]" /> : <Square className="w-4 h-4" />}
+                                            <button className="text-n400 hover:text-n700 transition-colors flex items-center" aria-label="Adayı seç">
+                                                {selectedIds.has(c.id) ? <CheckSquare className="w-4 h-4 text-brand" /> : <Square className="w-4 h-4" />}
                                             </button>
                                         </td>
                                         <td className="px-3 py-2.5">
-                                            <p className="font-bold text-slate-800 whitespace-nowrap">{c.name || 'İsimsiz'}</p>
-                                            <p className="text-[10px] text-slate-400 whitespace-nowrap">{c.email || '—'}</p>
+                                            <p className="font-semibold text-n900 whitespace-nowrap">{c.name || 'İsimsiz'}</p>
+                                            <p className="text-[11px] text-n400 whitespace-nowrap">{c.email || '—'}</p>
                                         </td>
                                         {/* Serbest metin kolonları genişlik sınırlı: AI'nın ürettiği
                                             uzun rol adları tabloyu yatayda taşırıyordu — kesilen
                                             metnin tamamı tooltip'te. */}
-                                        <td className="px-3 py-2.5 text-slate-600">
+                                        <td className="px-3 py-2.5 text-n600">
                                             {c.matchedPositionTitle === null
-                                                ? <p className="italic text-amber-600 font-semibold truncate max-w-[180px]">Uygun açık pozisyon yok</p>
+                                                ? <p className="italic text-warn font-semibold truncate max-w-[180px]">Uygun açık pozisyon yok</p>
                                                 : <p className="truncate max-w-[180px]" title={c.bestTitle || c.position || ''}>{c.bestTitle || c.position || '—'}</p>}
                                         </td>
                                         {/* CV'ye göre ideal rol — açık pozisyon eşleşmesinden AYRI kolon */}
-                                        <td className="px-3 py-2.5 text-slate-500">
+                                        <td className="px-3 py-2.5 text-n500">
                                             <p className="truncate max-w-[160px]" title={cleanRoleText(c.suggestedRole, c.position || '')}>{cleanRoleText(c.suggestedRole, c.position || '') || '—'}</p>
                                         </td>
-                                        <td className="px-3 py-2.5 text-slate-600">
+                                        <td className="px-3 py-2.5 text-n600">
                                             <p className="truncate max-w-[120px]" title={c.department || ''}>{c.department || '—'}</p>
                                         </td>
                                         {/* Konum: CV'den okunur. İstanbul içi/dışı ayrımı üstteki
                                             filtreyle yapılır; burada ham metin gösterilir. */}
-                                        <td className="px-3 py-2.5 text-slate-600">
+                                        <td className="px-3 py-2.5 text-n600">
                                             {c.location
-                                                ? <p className={`truncate max-w-[130px] ${isIstanbulLocation(c.location) ? '' : 'text-amber-700'}`} title={c.location}>{c.location}</p>
-                                                : <span className="text-slate-300">—</span>}
+                                                ? <p className={`truncate max-w-[130px] ${isIstanbulLocation(c.location) ? '' : 'text-warn'}`} title={c.location}>{c.location}</p>
+                                                : <span className="text-n300">—</span>}
                                         </td>
                                         <td className="px-3 py-2.5"><StageChip status={c.status} /></td>
-                                        <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap">{c.source || '—'}</td>
+                                        <td className="px-3 py-2.5 text-n500 whitespace-nowrap">{c.source || '—'}</td>
                                         <td className="px-3 py-2.5 text-center">
                                             {isDeepScanned(c) ? (
                                                 <span
-                                                    className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full text-emerald-700 bg-emerald-50 border border-emerald-100 whitespace-nowrap"
+                                                    className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full text-ok bg-ok-bg border border-transparent whitespace-nowrap"
                                                     title={c.lastScannedAt ? `Son tarama: ${new Date(c.lastScannedAt).toLocaleString('tr-TR')}` : 'Otonom tarama yapıldı'}
                                                 >
                                                     <Brain className="w-3 h-3" /> Tarandı
                                                 </span>
                                             ) : (
                                                 <span
-                                                    className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full text-amber-700 bg-amber-50 border border-amber-100 whitespace-nowrap"
+                                                    className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full text-warn bg-warn-bg border border-transparent whitespace-nowrap"
                                                     title="Henüz otonom tarama yapılmadı — seçip 'Otonom Tarama' ile başlatabilirsiniz"
                                                 >
                                                     Taranmadı
@@ -1031,11 +1030,11 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
                                             {c.badges?.length > 0 ? (
                                                 <CandidateBadges badges={c.badges} />
                                             ) : c.verification?.at ? (
-                                                <span className="text-[9px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded-md border bg-emerald-50 text-emerald-700 border-emerald-200 whitespace-nowrap" title="Doğrulama çalıştırıldı, bulgu çıkmadı">
+                                                <span className="text-[11px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-md border bg-ok-bg text-ok border-transparent whitespace-nowrap" title="Doğrulama çalıştırıldı, bulgu çıkmadı">
                                                     Temiz
                                                 </span>
                                             ) : (
-                                                <span className="text-slate-300" title="Bu aday için doğrulama henüz çalıştırılmadı">—</span>
+                                                <span className="text-n300" title="Bu aday için doğrulama henüz çalıştırılmadı">—</span>
                                             )}
                                         </td>
                                         <td className="px-3 py-2.5 text-center"><ScoreCell value={c.bestScore} method={c.scoreMethod} /></td>
@@ -1044,10 +1043,10 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
                                         )}
                                         <td className="px-3 py-2.5 text-center"><ScoreCell value={c.interviewScore} /></td>
                                         <td className="px-3 py-2.5 text-center"><ScoreCell value={c.combinedScore} /></td>
-                                        <td className="px-3 py-2.5 text-center text-slate-600">
+                                        <td className="px-3 py-2.5 text-center text-n600">
                                             {c.experience != null && c.experience !== '' ? `${c.experience} yıl` : '—'}
                                         </td>
-                                        <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap">{getAppliedDate(c) || '—'}</td>
+                                        <td className="px-3 py-2.5 text-n500 whitespace-nowrap">{getAppliedDate(c) || '—'}</td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -1056,26 +1055,26 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
 
                     {/* ── Pagination ───────────────────────────────────────── */}
                     {sortedRows.length > PAGE_SIZE && (
-                        <div className="flex items-center justify-between px-4 py-2.5 border-t border-slate-100 bg-slate-50/50">
-                            <span className="text-[11px] text-slate-400 font-semibold">
+                        <div className="flex items-center justify-between px-4 py-2.5 border-t border-n200 bg-n50/50">
+                            <span className="text-[12px] text-n400 font-semibold">
                                 {safePage * PAGE_SIZE + 1}–{Math.min((safePage + 1) * PAGE_SIZE, sortedRows.length)} / {sortedRows.length}
                             </span>
                             <div className="flex items-center gap-1">
                                 <button
                                     onClick={() => setPage((p) => Math.max(0, p - 1))}
                                     disabled={safePage === 0}
-                                    className="w-7 h-7 rounded-lg border border-slate-200 bg-white flex items-center justify-center text-slate-500 hover:text-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                    className="w-7 h-7 rounded-md border border-n200 bg-n0 flex items-center justify-center text-n500 hover:text-n900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                                     aria-label="Önceki sayfa"
                                 >
                                     <ChevronLeft className="w-3.5 h-3.5" />
                                 </button>
-                                <span className="text-[11px] font-bold text-slate-600 px-2">
+                                <span className="text-[12px] font-semibold text-n600 px-2">
                                     {safePage + 1} / {pageCount}
                                 </span>
                                 <button
                                     onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
                                     disabled={safePage >= pageCount - 1}
-                                    className="w-7 h-7 rounded-lg border border-slate-200 bg-white flex items-center justify-center text-slate-500 hover:text-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                    className="w-7 h-7 rounded-md border border-n200 bg-n0 flex items-center justify-center text-n500 hover:text-n900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                                     aria-label="Sonraki sayfa"
                                 >
                                     <ChevronRight className="w-3.5 h-3.5" />
