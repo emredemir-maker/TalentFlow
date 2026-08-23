@@ -215,8 +215,8 @@ export default function DepartmentManagementPage() {
         return (
             <div className="flex items-center justify-center py-24 text-center">
                 <div className="space-y-3">
-                    <Shield className="w-10 h-10 text-slate-300 mx-auto" />
-                    <p className="text-slate-500 font-medium text-sm">Bu bölüme erişim yetkiniz bulunmuyor.</p>
+                    <Shield className="w-10 h-10 text-n300 mx-auto" />
+                    <p className="text-n500 font-medium text-sm">Bu bölüme erişim yetkiniz bulunmuyor.</p>
                 </div>
             </div>
         );
@@ -228,17 +228,17 @@ export default function DepartmentManagementPage() {
             {/* Sub-header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-cyan-50 border border-cyan-100 flex items-center justify-center">
-                        <Building2 className="w-4.5 h-4.5 text-cyan-600" />
+                    <div className="w-9 h-9 rounded-md bg-brand-50 border border-brand-100 flex items-center justify-center">
+                        <Building2 className="w-4.5 h-4.5 text-brand" />
                     </div>
                     <div>
-                        <h2 className="text-base font-bold text-slate-800">Departmanlar</h2>
-                        <p className="text-xs text-slate-400">Departman yönetimi ve kullanıcı atamaları</p>
+                        <h2 className="text-base font-semibold text-n900">Departmanlar</h2>
+                        <p className="text-xs text-n400">Departman yönetimi ve kullanıcı atamaları</p>
                     </div>
                 </div>
                 <button
                     onClick={() => { resetForm(); setShowForm(true); }}
-                    className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-cyan-500 rounded-lg hover:bg-cyan-600 transition-all"
+                    className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-brand rounded-md hover:bg-brand-600 transition-all"
                 >
                     <Plus className="w-4 h-4" /> Yeni Departman
                 </button>
@@ -247,32 +247,32 @@ export default function DepartmentManagementPage() {
             {/* Stats Row */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {[
-                    { label: 'Toplam Departman', value: departments.length, color: 'text-cyan-600', bg: 'bg-cyan-50', border: 'border-cyan-100' },
-                    { label: 'Toplam Kullanıcı', value: allUsers.length, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
-                    { label: 'Dept. Kullanıcıları', value: allUsers.filter(u => u.role === 'department_user').length, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
+                    { label: 'Toplam Departman', value: departments.length, color: 'text-brand', bg: 'bg-brand-50', border: 'border-brand-100' },
+                    { label: 'Toplam Kullanıcı', value: allUsers.length, color: 'text-brand-600', bg: 'bg-brand-50', border: 'border-brand-100' },
+                    { label: 'Dept. Kullanıcıları', value: allUsers.filter(u => u.role === 'department_user').length, color: 'text-ok', bg: 'bg-ok-bg', border: 'border-transparent' },
                     {
                         label: 'Atanmamış', value: unassignedUsers.length,
-                        color: unassignedUsers.length > 0 ? 'text-red-600' : 'text-emerald-600',
-                        bg: unassignedUsers.length > 0 ? 'bg-red-50' : 'bg-emerald-50',
-                        border: unassignedUsers.length > 0 ? 'border-red-100' : 'border-emerald-100'
+                        color: unassignedUsers.length > 0 ? 'text-bad' : 'text-ok',
+                        bg: unassignedUsers.length > 0 ? 'bg-bad-bg' : 'bg-ok-bg',
+                        border: unassignedUsers.length > 0 ? 'border-transparent' : 'border-transparent'
                     },
                 ].map((s, i) => (
-                    <div key={i} className={`${s.bg} border ${s.border} rounded-xl p-4`}>
-                        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-1">{s.label}</p>
-                        <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
+                    <div key={i} className={`${s.bg} border ${s.border} rounded-md p-4`}>
+                        <p className="text-[11px] font-semibold text-n500 uppercase tracking-wide mb-1">{s.label}</p>
+                        <p className={`text-2xl font-semibold ${s.color}`}>{s.value}</p>
                     </div>
                 ))}
             </div>
 
             {/* Unassigned Warning */}
             {unassignedUsers.length > 0 && (
-                <div className="flex items-start gap-3 p-4 rounded-xl bg-red-50 border border-red-100">
-                    <AlertCircle className="w-4.5 h-4.5 text-red-500 shrink-0 mt-0.5" />
+                <div className="flex items-start gap-3 p-4 rounded-md bg-bad-bg border border-transparent">
+                    <AlertCircle className="w-4.5 h-4.5 text-bad shrink-0 mt-0.5" />
                     <div>
-                        <p className="text-sm font-semibold text-red-700">{unassignedUsers.length} departman kullanıcısı henüz atanmamış</p>
+                        <p className="text-sm font-semibold text-bad">{unassignedUsers.length} departman kullanıcısı henüz atanmamış</p>
                         <div className="flex flex-wrap gap-1.5 mt-2">
                             {unassignedUsers.map(u => (
-                                <span key={u.id} className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-lg font-medium">
+                                <span key={u.id} className="text-xs bg-bad-bg text-bad px-2 py-0.5 rounded-md font-medium">
                                     {u.displayName || u.email}
                                 </span>
                             ))}
@@ -284,20 +284,20 @@ export default function DepartmentManagementPage() {
             {/* Departments List */}
             {loading ? (
                 <div className="flex items-center justify-center py-20">
-                    <Loader2 className="w-7 h-7 text-cyan-500 animate-spin" />
+                    <Loader2 className="w-7 h-7 text-brand animate-spin" />
                 </div>
             ) : departments.length === 0 ? (
-                <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-200 space-y-4">
-                    <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-100 mx-auto flex items-center justify-center">
-                        <Building2 className="w-7 h-7 text-slate-300" />
+                <div className="text-center py-20 bg-n0 rounded-[14px] border border-dashed border-n200 space-y-4">
+                    <div className="w-14 h-14 rounded-[14px] bg-n50 border border-n200 mx-auto flex items-center justify-center">
+                        <Building2 className="w-7 h-7 text-n300" />
                     </div>
                     <div>
-                        <h3 className="text-base font-bold text-slate-700">Henüz Departman Yok</h3>
-                        <p className="text-sm text-slate-400 mt-1">İlk departmanı oluşturarak başlayın.</p>
+                        <h3 className="text-base font-semibold text-n700">Henüz Departman Yok</h3>
+                        <p className="text-sm text-n400 mt-1">İlk departmanı oluşturarak başlayın.</p>
                     </div>
                     <button
                         onClick={() => setShowForm(true)}
-                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-cyan-500 rounded-lg hover:bg-cyan-600 transition-all"
+                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-brand rounded-md hover:bg-brand-600 transition-all"
                     >
                         <Plus className="w-4 h-4" /> Departman Oluştur
                     </button>
@@ -310,33 +310,33 @@ export default function DepartmentManagementPage() {
                         const deptColor = dept.color || '#06b6d4';
 
                         return (
-                            <div key={dept.id} className={`bg-white rounded-2xl border overflow-hidden transition-all duration-300 ${isExpanded ? 'border-cyan-200 shadow-sm shadow-cyan-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                            <div key={dept.id} className={`bg-n0 rounded-[14px] border overflow-hidden transition-all duration-300 ${isExpanded ? 'border-brand-100 shadow-sm shadow-none' : 'border-n200 hover:border-n300'}`}>
                                 {/* Dept Header Row */}
                                 <div
                                     className="px-5 py-4 flex items-center gap-4 cursor-pointer"
                                     onClick={() => setExpandedDept(isExpanded ? null : dept.id)}
                                 >
-                                    <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${deptColor}18`, border: `1px solid ${deptColor}30` }}>
+                                    <div className="w-11 h-11 rounded-md flex items-center justify-center shrink-0" style={{ background: `${deptColor}18`, border: `1px solid ${deptColor}30` }}>
                                         <Building2 className="w-5 h-5" style={{ color: deptColor }} />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <h3 className="font-bold text-slate-800 text-sm truncate">{dept.name}</h3>
-                                        {dept.description && <p className="text-xs text-slate-400 truncate mt-0.5">{dept.description}</p>}
+                                        <h3 className="font-semibold text-n900 text-sm truncate">{dept.name}</h3>
+                                        {dept.description && <p className="text-xs text-n400 truncate mt-0.5">{dept.description}</p>}
                                     </div>
 
                                     {/* Stat Pills */}
                                     <div className="hidden sm:flex items-center gap-3">
-                                        <div className="text-center px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-100">
-                                            <p className="text-sm font-bold text-slate-700">{stats.userCount}</p>
-                                            <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wide">Kullanıcı</p>
+                                        <div className="text-center px-3 py-1.5 rounded-md bg-n50 border border-n200">
+                                            <p className="text-sm font-semibold text-n700">{stats.userCount}</p>
+                                            <p className="text-[11px] font-semibold text-n400 uppercase tracking-wide">Kullanıcı</p>
                                         </div>
-                                        <div className="text-center px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-100">
-                                            <p className="text-sm font-bold text-slate-700">{stats.positionCount}</p>
-                                            <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wide">Pozisyon</p>
+                                        <div className="text-center px-3 py-1.5 rounded-md bg-n50 border border-n200">
+                                            <p className="text-sm font-semibold text-n700">{stats.positionCount}</p>
+                                            <p className="text-[11px] font-semibold text-n400 uppercase tracking-wide">Pozisyon</p>
                                         </div>
-                                        <div className="text-center px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-100">
-                                            <p className="text-sm font-bold text-emerald-600">{stats.openPositions}</p>
-                                            <p className="text-[9px] font-semibold text-emerald-400 uppercase tracking-wide">Açık</p>
+                                        <div className="text-center px-3 py-1.5 rounded-md bg-ok-bg border border-transparent">
+                                            <p className="text-sm font-semibold text-ok">{stats.openPositions}</p>
+                                            <p className="text-[11px] font-semibold text-ok uppercase tracking-wide">Açık</p>
                                         </div>
                                     </div>
 
@@ -344,17 +344,17 @@ export default function DepartmentManagementPage() {
                                     <div className="flex items-center gap-1.5">
                                         <button
                                             onClick={(e) => { e.stopPropagation(); startEdit(dept); }}
-                                            className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all"
+                                            className="w-8 h-8 rounded-md bg-n50 border border-n200 flex items-center justify-center text-n400 hover:text-n600 hover:border-n300 transition-all"
                                         >
                                             <Edit3 className="w-3.5 h-3.5" />
                                         </button>
                                         <button
                                             onClick={(e) => { e.stopPropagation(); handleDeleteDept(dept); }}
-                                            className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400 hover:text-red-500 hover:border-red-200 transition-all"
+                                            className="w-8 h-8 rounded-md bg-n50 border border-n200 flex items-center justify-center text-n400 hover:text-bad hover:border-transparent transition-all"
                                         >
                                             <Trash2 className="w-3.5 h-3.5" />
                                         </button>
-                                        <div className={`w-8 h-8 flex items-center justify-center transition-all ${isExpanded ? 'text-cyan-500' : 'text-slate-300'}`}>
+                                        <div className={`w-8 h-8 flex items-center justify-center transition-all ${isExpanded ? 'text-brand' : 'text-n300'}`}>
                                             <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
                                         </div>
                                     </div>
@@ -362,42 +362,42 @@ export default function DepartmentManagementPage() {
 
                                 {/* Expanded Content */}
                                 {isExpanded && (
-                                    <div className="border-t border-slate-100 bg-slate-50/50 px-5 py-4 space-y-4">
+                                    <div className="border-t border-n200 bg-n50/50 px-5 py-4 space-y-4">
                                         {/* Users Section */}
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-2">
-                                                <Users className="w-3.5 h-3.5 text-slate-400" />
-                                                <span className="text-xs font-semibold text-slate-600">Departman Kullanıcıları ({stats.userCount})</span>
+                                                <Users className="w-3.5 h-3.5 text-n400" />
+                                                <span className="text-xs font-semibold text-n600">Departman Kullanıcıları ({stats.userCount})</span>
                                             </div>
                                             <button
                                                 onClick={() => { setAssignModal(dept.id); setSearchUser(''); }}
-                                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-cyan-600 bg-cyan-50 border border-cyan-100 hover:bg-cyan-100 transition-all"
+                                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold text-brand bg-brand-50 border border-brand-100 hover:bg-brand-100 transition-all"
                                             >
                                                 <UserPlus className="w-3.5 h-3.5" /> Kullanıcı Ekle
                                             </button>
                                         </div>
 
                                         {stats.users.length === 0 ? (
-                                            <div className="text-center py-6 border border-dashed border-slate-200 rounded-xl">
-                                                <p className="text-xs text-slate-400 italic">Bu departmana henüz kullanıcı atanmamış.</p>
+                                            <div className="text-center py-6 border border-dashed border-n200 rounded-md">
+                                                <p className="text-xs text-n400 italic">Bu departmana henüz kullanıcı atanmamış.</p>
                                             </div>
                                         ) : (
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                                                 {stats.users.map(u => (
-                                                    <div key={u.id} className="group flex items-center gap-3 p-3 rounded-xl bg-white border border-slate-100 hover:border-slate-200 transition-all">
-                                                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold text-white shrink-0" style={{ background: `linear-gradient(135deg, ${deptColor}, ${deptColor}aa)` }}>
+                                                    <div key={u.id} className="group flex items-center gap-3 p-3 rounded-md bg-n0 border border-n200 hover:border-n200 transition-all">
+                                                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-semibold text-white shrink-0" style={{ background: `linear-gradient(135deg, ${deptColor}, ${deptColor}aa)` }}>
                                                             {u.displayName?.substring(0, 2).toUpperCase() || 'U'}
                                                         </div>
                                                         <div className="flex-1 min-w-0">
-                                                            <p className="text-sm font-semibold text-slate-700 truncate">{u.displayName}</p>
-                                                            <p className="text-[10px] text-slate-400 truncate">{u.email}</p>
+                                                            <p className="text-sm font-semibold text-n700 truncate">{u.displayName}</p>
+                                                            <p className="text-[11px] text-n400 truncate">{u.email}</p>
                                                         </div>
-                                                        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500">
+                                                        <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-n100 text-n500">
                                                             {u.role === 'super_admin' ? 'Admin' : u.role === 'department_user' ? 'Dept' : 'Recruiter'}
                                                         </span>
                                                         <button
                                                             onClick={() => handleRemoveUser(u.id)}
-                                                            className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100"
+                                                            className="p-1.5 rounded-md text-n300 hover:text-bad hover:bg-bad-bg transition-all opacity-0 group-hover:opacity-100"
                                                         >
                                                             <UserMinus className="w-3.5 h-3.5" />
                                                         </button>
@@ -408,14 +408,14 @@ export default function DepartmentManagementPage() {
 
                                         {/* Positions */}
                                         {stats.positionCount > 0 && (
-                                            <div className="pt-3 border-t border-slate-100">
+                                            <div className="pt-3 border-t border-n200">
                                                 <div className="flex items-center gap-2 mb-2">
-                                                    <Briefcase className="w-3.5 h-3.5 text-slate-400" />
-                                                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Departman Pozisyonları</span>
+                                                    <Briefcase className="w-3.5 h-3.5 text-n400" />
+                                                    <span className="text-xs font-semibold text-n500 uppercase tracking-wide">Departman Pozisyonları</span>
                                                 </div>
                                                 <div className="flex flex-wrap gap-2">
                                                     {positions.filter(p => p.department === dept.name).map(p => (
-                                                        <span key={p.id} className={`px-2.5 py-1 rounded-lg text-xs font-medium border ${p.status === 'open' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-slate-50 text-slate-500 border-slate-100'}`}>
+                                                        <span key={p.id} className={`px-2.5 py-1 rounded-md text-xs font-medium border ${p.status === 'open' ? 'bg-ok-bg text-ok border-transparent' : 'bg-n50 text-n500 border-n200'}`}>
                                                             {p.title} · {p.status === 'open' ? 'Aktif' : 'Kapalı'}
                                                         </span>
                                                     ))}
@@ -434,51 +434,51 @@ export default function DepartmentManagementPage() {
             {showForm && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={resetForm} />
-                    <div className="relative w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-2xl">
-                        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100">
+                    <div className="relative w-full max-w-md bg-n0 rounded-[14px] border border-n200 shadow-2xl">
+                        <div className="flex items-center justify-between px-6 py-5 border-b border-n200">
                             <div className="flex items-center gap-3">
-                                <div className="w-9 h-9 rounded-xl bg-cyan-50 border border-cyan-100 flex items-center justify-center">
-                                    <Building2 className="w-4.5 h-4.5 text-cyan-600" />
+                                <div className="w-9 h-9 rounded-md bg-brand-50 border border-brand-100 flex items-center justify-center">
+                                    <Building2 className="w-4.5 h-4.5 text-brand" />
                                 </div>
                                 <div>
-                                    <h3 className="text-sm font-bold text-slate-800">
+                                    <h3 className="text-sm font-semibold text-n900">
                                         {editingDept ? 'Departman Düzenle' : 'Yeni Departman'}
                                     </h3>
-                                    <p className="text-xs text-slate-400">Departman Yönetimi</p>
+                                    <p className="text-xs text-n400">Departman Yönetimi</p>
                                 </div>
                             </div>
-                            <button onClick={resetForm} className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 transition-all">
+                            <button onClick={resetForm} className="w-8 h-8 rounded-md hover:bg-n100 flex items-center justify-center text-n400 transition-all">
                                 <X className="w-4 h-4" />
                             </button>
                         </div>
 
                         <form onSubmit={handleSaveDepartment} className="p-6 space-y-5">
                             <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Departman Adı</label>
+                                <label className="text-xs font-semibold text-n600 uppercase tracking-wide">Departman Adı</label>
                                 <input
                                     type="text" required value={formData.name}
                                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                     placeholder="Örn: Yazılım Geliştirme"
-                                    className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl bg-white outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-50 transition-all"
+                                    className="w-full px-4 py-3 text-sm border border-n200 rounded-md bg-n0 outline-none focus:border-brand focus:ring-2 focus:ring-brand-50 transition-all"
                                 />
                             </div>
                             <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Açıklama <span className="text-slate-400 font-normal normal-case">(opsiyonel)</span></label>
+                                <label className="text-xs font-semibold text-n600 uppercase tracking-wide">Açıklama <span className="text-n400 font-normal normal-case">(opsiyonel)</span></label>
                                 <textarea
                                     value={formData.description}
                                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                                     placeholder="Departman hakkında kısa bilgi..."
-                                    className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl bg-white outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-50 transition-all resize-none h-20"
+                                    className="w-full px-4 py-3 text-sm border border-n200 rounded-md bg-n0 outline-none focus:border-brand focus:ring-2 focus:ring-brand-50 transition-all resize-none h-20"
                                 />
                             </div>
                             <div className="space-y-2">
-                                <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Renk</label>
-                                <div className="flex flex-wrap gap-2 p-3 bg-slate-50 border border-slate-100 rounded-xl">
+                                <label className="text-xs font-semibold text-n600 uppercase tracking-wide">Renk</label>
+                                <div className="flex flex-wrap gap-2 p-3 bg-n50 border border-n200 rounded-md">
                                     {COLORS.map(c => (
                                         <button
                                             key={c} type="button"
                                             onClick={() => setFormData({ ...formData, color: c })}
-                                            className={`w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all ${formData.color === c ? 'border-slate-600 scale-110 shadow-sm' : 'border-white shadow-sm opacity-70 hover:opacity-100 hover:scale-105'}`}
+                                            className={`w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all ${formData.color === c ? 'border-n600 scale-110 shadow-sm' : 'border-white shadow-sm opacity-70 hover:opacity-100 hover:scale-105'}`}
                                             style={{ backgroundColor: c }}
                                         >
                                             {formData.color === c && <Check className="w-3.5 h-3.5 text-white" />}
@@ -486,22 +486,22 @@ export default function DepartmentManagementPage() {
                                     ))}
                                 </div>
                                 {/* Preview */}
-                                <div className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-100 rounded-xl">
-                                    <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: `${formData.color}18`, border: `1px solid ${formData.color}30` }}>
+                                <div className="flex items-center gap-3 p-3 bg-n50 border border-n200 rounded-md">
+                                    <div className="w-9 h-9 rounded-md flex items-center justify-center" style={{ background: `${formData.color}18`, border: `1px solid ${formData.color}30` }}>
                                         <Building2 className="w-4.5 h-4.5" style={{ color: formData.color }} />
                                     </div>
-                                    <span className="text-sm font-semibold text-slate-700">{formData.name || 'Önizleme...'}</span>
+                                    <span className="text-sm font-semibold text-n700">{formData.name || 'Önizleme...'}</span>
                                 </div>
                             </div>
 
                             <div className="flex gap-3 pt-1">
                                 <button type="button" onClick={resetForm}
-                                    className="flex-1 py-2.5 text-sm font-semibold text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200 transition-all"
+                                    className="flex-1 py-2.5 text-sm font-semibold text-n600 bg-n100 rounded-md hover:bg-n100 transition-all"
                                 >
                                     İptal
                                 </button>
                                 <button type="submit" disabled={saving || !formData.name.trim()}
-                                    className="flex-1 py-2.5 text-sm font-semibold text-white bg-cyan-500 rounded-xl hover:bg-cyan-600 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+                                    className="flex-1 py-2.5 text-sm font-semibold text-white bg-brand rounded-md hover:bg-brand-600 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
                                 >
                                     {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                                     {saving ? 'Kaydediliyor...' : editingDept ? 'Güncelle' : 'Oluştur'}
@@ -522,51 +522,51 @@ export default function DepartmentManagementPage() {
                 return (
                     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
                         <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setAssignModal(null)} />
-                        <div className="relative w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-2xl">
-                            <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100">
+                        <div className="relative w-full max-w-md bg-n0 rounded-[14px] border border-n200 shadow-2xl">
+                            <div className="flex items-center justify-between px-6 py-5 border-b border-n200">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-9 h-9 rounded-xl bg-cyan-50 border border-cyan-100 flex items-center justify-center">
-                                        <UserPlus className="w-4.5 h-4.5 text-cyan-600" />
+                                    <div className="w-9 h-9 rounded-md bg-brand-50 border border-brand-100 flex items-center justify-center">
+                                        <UserPlus className="w-4.5 h-4.5 text-brand" />
                                     </div>
                                     <div>
-                                        <h3 className="text-sm font-bold text-slate-800">Kullanıcı Ata</h3>
-                                        <p className="text-xs text-slate-400">{deptName}</p>
+                                        <h3 className="text-sm font-semibold text-n900">Kullanıcı Ata</h3>
+                                        <p className="text-xs text-n400">{deptName}</p>
                                     </div>
                                 </div>
-                                <button onClick={() => setAssignModal(null)} className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 transition-all">
+                                <button onClick={() => setAssignModal(null)} className="w-8 h-8 rounded-md hover:bg-n100 flex items-center justify-center text-n400 transition-all">
                                     <X className="w-4 h-4" />
                                 </button>
                             </div>
 
                             <div className="p-6 space-y-4">
                                 <div className="relative">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-n400" />
                                     <input
                                         type="text" value={searchUser}
                                         onChange={(e) => setSearchUser(e.target.value)}
                                         placeholder="İsim veya e-posta ara..."
-                                        className="w-full pl-9 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl bg-white outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-50 transition-all"
+                                        className="w-full pl-9 pr-4 py-2.5 text-sm border border-n200 rounded-md bg-n0 outline-none focus:border-brand focus:ring-2 focus:ring-brand-50 transition-all"
                                     />
                                 </div>
 
                                 <div className="space-y-2 max-h-72 overflow-y-auto">
                                     {assignable.length === 0 ? (
-                                        <div className="text-center py-10 text-slate-400 text-sm italic">
+                                        <div className="text-center py-10 text-n400 text-sm italic">
                                             {searchUser ? 'Eşleşen kullanıcı bulunamadı.' : 'Atanabilecek kullanıcı yok.'}
                                         </div>
                                     ) : (
                                         assignable.map(u => (
-                                            <div key={u.id} className="group flex items-center gap-3 p-3 rounded-xl border border-slate-100 hover:border-cyan-200 hover:bg-cyan-50/30 transition-all cursor-pointer"
+                                            <div key={u.id} className="group flex items-center gap-3 p-3 rounded-md border border-n200 hover:border-brand-100 hover:bg-brand-50/30 transition-all cursor-pointer"
                                                 onClick={() => { handleAssignUser(u.id, deptName); setAssignModal(null); }}
                                             >
-                                                <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-xs font-bold text-slate-600 shrink-0">
+                                                <div className="w-8 h-8 rounded-full bg-n100 border border-n200 flex items-center justify-center text-xs font-semibold text-n600 shrink-0">
                                                     {u.displayName?.substring(0, 2).toUpperCase() || 'U'}
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <p className="text-sm font-semibold text-slate-700 truncate">{u.displayName}</p>
-                                                    <p className="text-[10px] text-slate-400 truncate">{u.email} · {u.role === 'super_admin' ? 'Admin' : u.role === 'department_user' ? 'Dept Kullanıcısı' : 'Recruiter'}</p>
+                                                    <p className="text-sm font-semibold text-n700 truncate">{u.displayName}</p>
+                                                    <p className="text-[11px] text-n400 truncate">{u.email} · {u.role === 'super_admin' ? 'Admin' : u.role === 'department_user' ? 'Dept Kullanıcısı' : 'Recruiter'}</p>
                                                 </div>
-                                                <span className="text-xs font-semibold text-cyan-600 opacity-0 group-hover:opacity-100 transition-all">Ata →</span>
+                                                <span className="text-xs font-semibold text-brand opacity-0 group-hover:opacity-100 transition-all">Ata →</span>
                                             </div>
                                         ))
                                     )}

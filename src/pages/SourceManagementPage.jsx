@@ -170,8 +170,8 @@ export default function SourceManagementPage() {
         return (
             <div className="flex items-center justify-center py-24 text-center">
                 <div className="space-y-3">
-                    <Shield className="w-10 h-10 text-slate-300 mx-auto" />
-                    <p className="text-slate-500 font-medium text-sm">Bu bölüme erişim yetkiniz bulunmuyor.</p>
+                    <Shield className="w-10 h-10 text-n300 mx-auto" />
+                    <p className="text-n500 font-medium text-sm">Bu bölüme erişim yetkiniz bulunmuyor.</p>
                 </div>
             </div>
         );
@@ -182,34 +182,34 @@ export default function SourceManagementPage() {
             {/* Sub-header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
                 <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-cyan-50 border border-cyan-100 flex items-center justify-center">
-                        <Share2 className="w-4.5 h-4.5 text-cyan-600" />
+                    <div className="w-9 h-9 rounded-md bg-brand-50 border border-brand-100 flex items-center justify-center">
+                        <Share2 className="w-4.5 h-4.5 text-brand" />
                     </div>
                     <div>
-                        <h2 className="text-base font-bold text-slate-800">Kaynak Havuzu</h2>
-                        <p className="text-xs text-slate-400">Stratejik kanal yönetimi</p>
+                        <h2 className="text-base font-semibold text-n900">Kaynak Havuzu</h2>
+                        <p className="text-xs text-n400">Stratejik kanal yönetimi</p>
                     </div>
                 </div>
 
                 <div className="flex items-center gap-2">
                     <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-n400" />
                         <input
                             type="text" value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             placeholder="Kaynak ara..."
-                            className="pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg bg-white outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-50 transition-all w-48"
+                            className="pl-9 pr-3 py-2 text-sm border border-n200 rounded-md bg-n0 outline-none focus:border-brand focus:ring-2 focus:ring-brand-50 transition-all w-48"
                         />
                     </div>
                     <button
                         onClick={() => openModal('main')}
-                        className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:border-slate-300 transition-all"
+                        className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-n600 bg-n0 border border-n200 rounded-md hover:border-n300 transition-all"
                     >
                         <PlusCircle className="w-4 h-4" /> Ana Kaynak
                     </button>
                     <button
                         onClick={() => openModal('detail')}
-                        className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-white bg-cyan-500 rounded-lg hover:bg-cyan-600 transition-all"
+                        className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-white bg-brand rounded-md hover:bg-brand-600 transition-all"
                     >
                         <Plus className="w-4 h-4" /> Alt Detay
                     </button>
@@ -219,26 +219,26 @@ export default function SourceManagementPage() {
             {/* Content */}
             {loading ? (
                 <div className="flex items-center justify-center py-20">
-                    <Loader2 className="w-7 h-7 text-cyan-500 animate-spin" />
+                    <Loader2 className="w-7 h-7 text-brand animate-spin" />
                 </div>
             ) : sources.length === 0 ? (
-                <div className="text-center py-20 bg-white rounded-2xl border border-slate-200 border-dashed space-y-4">
-                    <div className="w-16 h-16 rounded-2xl bg-slate-50 border border-slate-100 mx-auto flex items-center justify-center">
-                        <Layers className="w-8 h-8 text-slate-300" />
+                <div className="text-center py-20 bg-n0 rounded-[14px] border border-n200 border-dashed space-y-4">
+                    <div className="w-16 h-16 rounded-[14px] bg-n50 border border-n200 mx-auto flex items-center justify-center">
+                        <Layers className="w-8 h-8 text-n300" />
                     </div>
                     <div>
-                        <h3 className="text-base font-bold text-slate-700">Kaynak Havuzu Boş</h3>
-                        <p className="text-sm text-slate-400 mt-1">İşe alım kanallarınızı tanımlayarak başlayın.</p>
+                        <h3 className="text-base font-semibold text-n700">Kaynak Havuzu Boş</h3>
+                        <p className="text-sm text-n400 mt-1">İşe alım kanallarınızı tanımlayarak başlayın.</p>
                     </div>
                     <div className="flex items-center justify-center gap-3">
-                        <button onClick={() => openModal('main')} className="px-4 py-2 text-sm font-semibold text-white bg-cyan-500 rounded-lg hover:bg-cyan-600 transition-all">
+                        <button onClick={() => openModal('main')} className="px-4 py-2 text-sm font-semibold text-white bg-brand rounded-md hover:bg-brand-600 transition-all">
                             Kaynak Ekle
                         </button>
                         <button
                             onClick={handleSeedDefaults} disabled={saving}
-                            className="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:border-slate-300 transition-all flex items-center gap-2"
+                            className="px-4 py-2 text-sm font-medium text-n600 bg-n0 border border-n200 rounded-md hover:border-n300 transition-all flex items-center gap-2"
                         >
-                            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 text-amber-500" />}
+                            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 text-warn" />}
                             Hazır Önerileri Yükle
                         </button>
                     </div>
@@ -251,35 +251,35 @@ export default function SourceManagementPage() {
                         const sourceColor = source.color || '#06b6d4';
 
                         return (
-                            <div key={source.id} className={`bg-white rounded-2xl border transition-all duration-300 overflow-hidden ${isExpanded ? 'border-cyan-200 shadow-sm shadow-cyan-100' : 'border-slate-200 hover:border-slate-300'}`}>
+                            <div key={source.id} className={`bg-n0 rounded-[14px] border transition-all duration-300 overflow-hidden ${isExpanded ? 'border-brand-100 shadow-sm shadow-none' : 'border-n200 hover:border-n300'}`}>
                                 <div
                                     className="p-5 cursor-pointer"
                                     onClick={() => setExpandedSource(isExpanded ? null : source.id)}
                                 >
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 rounded-xl flex items-center justify-center border" style={{ background: `${sourceColor}15`, borderColor: `${sourceColor}30` }}>
+                                            <div className="w-12 h-12 rounded-md flex items-center justify-center border" style={{ background: `${sourceColor}15`, borderColor: `${sourceColor}30` }}>
                                                 <SourceIcon className="w-6 h-6" style={{ color: sourceColor }} />
                                             </div>
                                             <div>
-                                                <h3 className="font-bold text-slate-800 text-sm">{source.name}</h3>
-                                                <span className="text-xs text-slate-400">{source.subSources?.length || 0} alt detay</span>
+                                                <h3 className="font-semibold text-n900 text-sm">{source.name}</h3>
+                                                <span className="text-xs text-n400">{source.subSources?.length || 0} alt detay</span>
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-1.5">
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); openModal('edit_main', source); }}
-                                                className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all"
+                                                className="w-8 h-8 rounded-md bg-n50 border border-n200 flex items-center justify-center text-n400 hover:text-n600 hover:border-n300 transition-all"
                                             >
                                                 <Edit3 className="w-3.5 h-3.5" />
                                             </button>
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); handleDeleteSource(source); }}
-                                                className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400 hover:text-red-500 hover:border-red-200 transition-all"
+                                                className="w-8 h-8 rounded-md bg-n50 border border-n200 flex items-center justify-center text-n400 hover:text-bad hover:border-transparent transition-all"
                                             >
                                                 <Trash2 className="w-3.5 h-3.5" />
                                             </button>
-                                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${isExpanded ? 'text-cyan-500' : 'text-slate-300'}`}>
+                                            <div className={`w-8 h-8 rounded-md flex items-center justify-center transition-all ${isExpanded ? 'text-brand' : 'text-n300'}`}>
                                                 <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
                                             </div>
                                         </div>
@@ -288,12 +288,12 @@ export default function SourceManagementPage() {
                                     {!isExpanded && source.subSources?.length > 0 && (
                                         <div className="mt-3 flex flex-wrap gap-1.5">
                                             {source.subSources.slice(0, 4).map(sub => (
-                                                <span key={sub} className="px-2 py-1 rounded-lg bg-slate-50 border border-slate-100 text-[11px] font-medium text-slate-500">
+                                                <span key={sub} className="px-2 py-1 rounded-md bg-n50 border border-n200 text-[12px] font-medium text-n500">
                                                     {sub}
                                                 </span>
                                             ))}
                                             {source.subSources.length > 4 && (
-                                                <span className="px-2 py-1 rounded-lg bg-cyan-50 border border-cyan-100 text-[11px] font-semibold text-cyan-600">
+                                                <span className="px-2 py-1 rounded-md bg-brand-50 border border-brand-100 text-[12px] font-semibold text-brand">
                                                     +{source.subSources.length - 4}
                                                 </span>
                                             )}
@@ -302,15 +302,15 @@ export default function SourceManagementPage() {
                                 </div>
 
                                 {isExpanded && (
-                                    <div className="border-t border-slate-100 bg-slate-50/50 p-5 space-y-4">
+                                    <div className="border-t border-n200 bg-n50/50 p-5 space-y-4">
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-2">
-                                                <LayoutGrid className="w-3.5 h-3.5 text-slate-400" />
-                                                <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Alt Detaylar</span>
+                                                <LayoutGrid className="w-3.5 h-3.5 text-n400" />
+                                                <span className="text-xs font-semibold text-n600 uppercase tracking-wide">Alt Detaylar</span>
                                             </div>
                                             <button
                                                 onClick={() => openModal('detail', source)}
-                                                className="text-xs font-semibold text-cyan-600 hover:text-cyan-700 flex items-center gap-1"
+                                                className="text-xs font-semibold text-brand hover:text-brand flex items-center gap-1"
                                             >
                                                 <Plus className="w-3.5 h-3.5" /> Detay Ekle
                                             </button>
@@ -318,20 +318,20 @@ export default function SourceManagementPage() {
 
                                         <div className="space-y-2">
                                             {source.subSources?.length === 0 ? (
-                                                <div className="py-6 text-center border border-dashed border-slate-200 rounded-xl">
-                                                    <Info className="w-5 h-5 text-slate-300 mx-auto mb-1.5" />
-                                                    <p className="text-xs text-slate-400">Henüz alt detay eklenmedi.</p>
+                                                <div className="py-6 text-center border border-dashed border-n200 rounded-md">
+                                                    <Info className="w-5 h-5 text-n300 mx-auto mb-1.5" />
+                                                    <p className="text-xs text-n400">Henüz alt detay eklenmedi.</p>
                                                 </div>
                                             ) : (
                                                 source.subSources.map(sub => (
-                                                    <div key={sub} className="group flex items-center justify-between px-3 py-2.5 rounded-lg bg-white border border-slate-100 hover:border-slate-200 transition-all">
+                                                    <div key={sub} className="group flex items-center justify-between px-3 py-2.5 rounded-md bg-n0 border border-n200 hover:border-n200 transition-all">
                                                         <div className="flex items-center gap-2">
                                                             <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: sourceColor }} />
-                                                            <span className="text-sm text-slate-700 font-medium">{sub}</span>
+                                                            <span className="text-sm text-n700 font-medium">{sub}</span>
                                                         </div>
                                                         <button
                                                             onClick={() => handleRemoveSubSource(source, sub)}
-                                                            className="p-1 rounded-lg text-slate-300 hover:text-red-400 hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100"
+                                                            className="p-1 rounded-md text-n300 hover:text-bad hover:bg-bad-bg transition-all opacity-0 group-hover:opacity-100"
                                                         >
                                                             <Trash2 className="w-3.5 h-3.5" />
                                                         </button>
@@ -351,21 +351,21 @@ export default function SourceManagementPage() {
             {showModal && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowModal(false)} />
-                    <div className="relative w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-2xl">
+                    <div className="relative w-full max-w-md bg-n0 rounded-[14px] border border-n200 shadow-2xl">
                         {/* Modal Header */}
-                        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100">
+                        <div className="flex items-center justify-between px-6 py-5 border-b border-n200">
                             <div className="flex items-center gap-3">
-                                <div className="w-9 h-9 rounded-xl bg-cyan-50 border border-cyan-100 flex items-center justify-center">
-                                    {(modalType === 'main' || modalType === 'edit_main') ? <Globe className="w-4.5 h-4.5 text-cyan-600" /> : <PlusCircle className="w-4.5 h-4.5 text-cyan-600" />}
+                                <div className="w-9 h-9 rounded-md bg-brand-50 border border-brand-100 flex items-center justify-center">
+                                    {(modalType === 'main' || modalType === 'edit_main') ? <Globe className="w-4.5 h-4.5 text-brand" /> : <PlusCircle className="w-4.5 h-4.5 text-brand" />}
                                 </div>
                                 <div>
-                                    <h3 className="text-sm font-bold text-slate-800">
+                                    <h3 className="text-sm font-semibold text-n900">
                                         {modalType === 'main' ? 'Yeni Ana Kaynak' : modalType === 'edit_main' ? 'Kaynağı Düzenle' : 'Yeni Alt Detay'}
                                     </h3>
-                                    <p className="text-xs text-slate-400">Kaynak Yönetimi</p>
+                                    <p className="text-xs text-n400">Kaynak Yönetimi</p>
                                 </div>
                             </div>
-                            <button onClick={() => setShowModal(false)} className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 transition-all">
+                            <button onClick={() => setShowModal(false)} className="w-8 h-8 rounded-md hover:bg-n100 flex items-center justify-center text-n400 transition-all">
                                 <X className="w-4 h-4" />
                             </button>
                         </div>
@@ -375,44 +375,44 @@ export default function SourceManagementPage() {
                             {modalType === 'detail' && (
                                 <>
                                     <div className="space-y-1.5">
-                                        <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Alt Detay Adı</label>
+                                        <label className="text-xs font-semibold text-n600 uppercase tracking-wide">Alt Detay Adı</label>
                                         <input
                                             type="text" required value={formData.name}
                                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                             placeholder="Örn: Kariyer.net, LinkedIn İlan..."
-                                            className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl bg-white outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-50 transition-all"
+                                            className="w-full px-4 py-3 text-sm border border-n200 rounded-md bg-n0 outline-none focus:border-brand focus:ring-2 focus:ring-brand-50 transition-all"
                                         />
                                     </div>
 
                                     <div className="space-y-2">
                                         <div className="flex items-center justify-between">
-                                            <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Ana Kaynak</label>
+                                            <label className="text-xs font-semibold text-n600 uppercase tracking-wide">Ana Kaynak</label>
                                             <button
                                                 type="button"
                                                 onClick={() => setFormData({ ...formData, isNewMain: !formData.isNewMain })}
-                                                className="text-xs font-semibold text-cyan-600 hover:text-cyan-700"
+                                                className="text-xs font-semibold text-brand hover:text-brand"
                                             >
                                                 {formData.isNewMain ? '← Mevcut Seç' : '+ Yeni Ana Kaynak'}
                                             </button>
                                         </div>
                                         {formData.isNewMain ? (
-                                            <div className="p-4 rounded-xl border border-cyan-100 bg-cyan-50/50 space-y-3">
+                                            <div className="p-4 rounded-md border border-brand-100 bg-brand-50/50 space-y-3">
                                                 <input
                                                     type="text" required={formData.isNewMain} value={formData.mainName}
                                                     onChange={(e) => setFormData({ ...formData, mainName: e.target.value })}
                                                     placeholder="Yeni ana kaynak adı..."
-                                                    className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-lg bg-white outline-none focus:border-cyan-400 transition-all"
+                                                    className="w-full px-4 py-2.5 text-sm border border-n200 rounded-md bg-n0 outline-none focus:border-brand transition-all"
                                                 />
                                                 <div className="grid grid-cols-2 gap-3">
                                                     <div>
-                                                        <p className="text-[10px] font-semibold text-slate-500 uppercase mb-2">İkon</p>
+                                                        <p className="text-[11px] font-semibold text-n500 uppercase mb-2">İkon</p>
                                                         <div className="flex flex-wrap gap-1">
                                                             {['Globe', 'Layers', 'Link2', 'Share2', 'Users', 'Zap', 'Search'].map(icon => {
                                                                 const IconComp = ICONS[icon];
                                                                 return (
                                                                     <button key={icon} type="button"
                                                                         onClick={() => setFormData({ ...formData, icon })}
-                                                                        className={`p-1.5 rounded-lg transition-all ${formData.icon === icon ? 'bg-cyan-500 text-white' : 'bg-white border border-slate-200 text-slate-400 hover:border-cyan-300'}`}
+                                                                        className={`p-1.5 rounded-md transition-all ${formData.icon === icon ? 'bg-brand text-white' : 'bg-n0 border border-n200 text-n400 hover:border-brand-200'}`}
                                                                     >
                                                                         <IconComp className="w-3.5 h-3.5" />
                                                                     </button>
@@ -421,12 +421,12 @@ export default function SourceManagementPage() {
                                                         </div>
                                                     </div>
                                                     <div>
-                                                        <p className="text-[10px] font-semibold text-slate-500 uppercase mb-2">Renk</p>
+                                                        <p className="text-[11px] font-semibold text-n500 uppercase mb-2">Renk</p>
                                                         <div className="flex flex-wrap gap-1.5">
                                                             {COLORS.slice(0, 6).map(c => (
                                                                 <button key={c} type="button"
                                                                     onClick={() => setFormData({ ...formData, color: c })}
-                                                                    className={`w-5 h-5 rounded-full border-2 transition-all ${formData.color === c ? 'border-slate-700 scale-110' : 'border-transparent opacity-60'}`}
+                                                                    className={`w-5 h-5 rounded-full border-2 transition-all ${formData.color === c ? 'border-n700 scale-110' : 'border-transparent opacity-60'}`}
                                                                     style={{ backgroundColor: c }}
                                                                 />
                                                             ))}
@@ -438,7 +438,7 @@ export default function SourceManagementPage() {
                                             <select
                                                 value={formData.parentSourceId}
                                                 onChange={(e) => setFormData({ ...formData, parentSourceId: e.target.value })}
-                                                className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl bg-white outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-50 transition-all"
+                                                className="w-full px-4 py-3 text-sm border border-n200 rounded-md bg-n0 outline-none focus:border-brand focus:ring-2 focus:ring-brand-50 transition-all"
                                                 required={!formData.isNewMain}
                                             >
                                                 <option value="" disabled>Ana kaynak seçin...</option>
@@ -455,24 +455,24 @@ export default function SourceManagementPage() {
                             {(modalType === 'main' || modalType === 'edit_main') && (
                                 <>
                                     <div className="space-y-1.5">
-                                        <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Kaynak Adı</label>
+                                        <label className="text-xs font-semibold text-n600 uppercase tracking-wide">Kaynak Adı</label>
                                         <input
                                             type="text" required value={formData.name}
                                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                             placeholder="Örn: Sosyal Medya, Kariyer Portalı..."
-                                            className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl bg-white outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-50 transition-all"
+                                            className="w-full px-4 py-3 text-sm border border-n200 rounded-md bg-n0 outline-none focus:border-brand focus:ring-2 focus:ring-brand-50 transition-all"
                                         />
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-2">
-                                            <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">İkon</label>
-                                            <div className="flex flex-wrap gap-1.5 p-3 bg-slate-50 border border-slate-100 rounded-xl">
+                                            <label className="text-xs font-semibold text-n600 uppercase tracking-wide">İkon</label>
+                                            <div className="flex flex-wrap gap-1.5 p-3 bg-n50 border border-n200 rounded-md">
                                                 {Object.keys(ICONS).map(icon => {
                                                     const IconComp = ICONS[icon];
                                                     return (
                                                         <button key={icon} type="button"
                                                             onClick={() => setFormData({ ...formData, icon })}
-                                                            className={`p-2 rounded-lg transition-all ${formData.icon === icon ? 'bg-cyan-500 text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-400 hover:border-cyan-300'}`}
+                                                            className={`p-2 rounded-md transition-all ${formData.icon === icon ? 'bg-brand text-white shadow-sm' : 'bg-n0 border border-n200 text-n400 hover:border-brand-200'}`}
                                                         >
                                                             <IconComp className="w-3.5 h-3.5" />
                                                         </button>
@@ -481,12 +481,12 @@ export default function SourceManagementPage() {
                                             </div>
                                         </div>
                                         <div className="space-y-2">
-                                            <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Renk</label>
-                                            <div className="flex flex-wrap gap-2 p-3 bg-slate-50 border border-slate-100 rounded-xl">
+                                            <label className="text-xs font-semibold text-n600 uppercase tracking-wide">Renk</label>
+                                            <div className="flex flex-wrap gap-2 p-3 bg-n50 border border-n200 rounded-md">
                                                 {COLORS.map(c => (
                                                     <button key={c} type="button"
                                                         onClick={() => setFormData({ ...formData, color: c })}
-                                                        className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${formData.color === c ? 'border-slate-700 scale-110' : 'border-white shadow-sm opacity-70 hover:opacity-100'}`}
+                                                        className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${formData.color === c ? 'border-n700 scale-110' : 'border-white shadow-sm opacity-70 hover:opacity-100'}`}
                                                         style={{ backgroundColor: c }}
                                                     >
                                                         {formData.color === c && <Check className="w-3 h-3 text-white" />}
@@ -496,23 +496,23 @@ export default function SourceManagementPage() {
                                         </div>
                                     </div>
                                     {/* Preview */}
-                                    <div className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-100 rounded-xl">
-                                        <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `${formData.color}20`, border: `1px solid ${formData.color}30` }}>
+                                    <div className="flex items-center gap-3 p-3 bg-n50 border border-n200 rounded-md">
+                                        <div className="w-10 h-10 rounded-md flex items-center justify-center" style={{ background: `${formData.color}20`, border: `1px solid ${formData.color}30` }}>
                                             {(() => { const IC = ICONS[formData.icon] || Globe; return <IC className="w-5 h-5" style={{ color: formData.color }} />; })()}
                                         </div>
-                                        <span className="text-sm font-semibold text-slate-700">{formData.name || 'Önizleme...'}</span>
+                                        <span className="text-sm font-semibold text-n700">{formData.name || 'Önizleme...'}</span>
                                     </div>
                                 </>
                             )}
 
                             <div className="flex gap-3 pt-1">
                                 <button type="button" onClick={() => setShowModal(false)}
-                                    className="flex-1 py-2.5 text-sm font-semibold text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200 transition-all"
+                                    className="flex-1 py-2.5 text-sm font-semibold text-n600 bg-n100 rounded-md hover:bg-n100 transition-all"
                                 >
                                     İptal
                                 </button>
                                 <button type="submit" disabled={saving}
-                                    className="flex-1 py-2.5 text-sm font-semibold text-white bg-cyan-500 rounded-xl hover:bg-cyan-600 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+                                    className="flex-1 py-2.5 text-sm font-semibold text-white bg-brand rounded-md hover:bg-brand-600 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
                                 >
                                     {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                                     {saving ? 'Kaydediliyor...' : 'Kaydet'}

@@ -41,11 +41,11 @@ import {
 } from 'lucide-react';
 
 const STATUS_CONFIG = {
-    draft: { label: 'Taslak', icon: Edit3, color: 'text-slate-500', bg: 'bg-slate-100', ring: 'ring-slate-200' },
-    ready_to_send: { label: 'Gönderime Hazır', icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50', ring: 'ring-amber-100' },
-    sending: { label: 'Gönderiliyor', icon: Loader2, color: 'text-blue-600', bg: 'bg-blue-50', ring: 'ring-blue-100' },
-    sent: { label: 'Gönderildi', icon: CheckCircle, color: 'text-emerald-600', bg: 'bg-emerald-50', ring: 'ring-emerald-100' },
-    failed: { label: 'Başarısız', icon: XCircle, color: 'text-red-600', bg: 'bg-red-50', ring: 'ring-red-100' },
+    draft: { label: 'Taslak', icon: Edit3, color: 'text-n500', bg: 'bg-n100', ring: 'ring-n200' },
+    ready_to_send: { label: 'Gönderime Hazır', icon: Clock, color: 'text-warn', bg: 'bg-warn-bg', ring: 'ring-warn-bg' },
+    sending: { label: 'Gönderiliyor', icon: Loader2, color: 'text-brand-600', bg: 'bg-brand-50', ring: 'ring-brand-100' },
+    sent: { label: 'Gönderildi', icon: CheckCircle, color: 'text-ok', bg: 'bg-ok-bg', ring: 'ring-ok-bg' },
+    failed: { label: 'Başarısız', icon: XCircle, color: 'text-bad', bg: 'bg-bad-bg', ring: 'ring-bad-bg' },
 };
 
 const FILTER_TABS = [
@@ -222,27 +222,27 @@ export default function MessagesPage() {
     const emailsWithReply = emailThreads.filter(t => t.hasReply).length;
 
     return (
-        <div className="min-h-screen bg-[#F0F4F8]">
+        <div className="infoset min-h-screen">
             <Header title="Mesajlar" />
 
             {/* Page sub-tabs strip — DM kuyruğu / E-posta yazışmaları / Bilgi talepleri */}
-            <div className="sticky top-[88px] z-30 px-6 lg:px-8 py-3 bg-white border-b border-slate-200 flex items-center justify-end">
-                <div className="flex gap-1 p-1 rounded-xl bg-slate-100 border border-slate-200">
+            <div className="sticky top-[88px] z-30 px-6 lg:px-8 py-3 bg-n0 border-b border-n200 flex items-center justify-end">
+                <div className="flex gap-1 p-1 rounded-md bg-n100 border border-n200">
                     {PAGE_TABS.map(tab => {
                         const Icon = tab.icon;
                         return (
                             <button
                                 key={tab.id}
                                 onClick={() => setPageTab(tab.id)}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all cursor-pointer ${pageTab === tab.id ? 'bg-white text-cyan-600 shadow-sm border border-slate-200' : 'text-slate-500 hover:text-slate-700'}`}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-semibold transition-all cursor-pointer ${pageTab === tab.id ? 'bg-n0 text-brand shadow-sm border border-n200' : 'text-n500 hover:text-n700'}`}
                             >
                                 <Icon className="w-3.5 h-3.5" />
                                 {tab.label}
                                 {tab.id === 'emails' && emailsWithReply > 0 && (
-                                    <span className="w-4 h-4 rounded-full bg-emerald-500 text-[9px] text-white font-bold flex items-center justify-center">{emailsWithReply}</span>
+                                    <span className="w-4 h-4 rounded-full bg-ok text-[11px] text-white font-semibold flex items-center justify-center">{emailsWithReply}</span>
                                 )}
                                 {tab.id === 'info_requests' && infoRequests.length > 0 && (
-                                    <span className="w-4 h-4 rounded-full bg-cyan-500 text-[9px] text-white font-bold flex items-center justify-center">{infoRequests.length}</span>
+                                    <span className="w-4 h-4 rounded-full bg-brand text-[11px] text-white font-semibold flex items-center justify-center">{infoRequests.length}</span>
                                 )}
                             </button>
                         );
@@ -256,23 +256,23 @@ export default function MessagesPage() {
                     {/* Stats */}
                     <div className="px-6 lg:px-8 py-5">
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                            <StatMini icon={FileText} label="Toplam" value={stats.total} color="text-slate-700" bg="bg-slate-50" />
-                            <StatMini icon={Clock} label="Gönderime Hazır" value={stats.readyToSend} color="text-amber-600" bg="bg-amber-50/60" />
-                            <StatMini icon={CheckCircle} label="Gönderilen" value={stats.sent} color="text-emerald-600" bg="bg-emerald-50/60" />
-                            <StatMini icon={XCircle} label="Başarısız" value={stats.failed} color="text-red-600" bg="bg-red-50/60" />
+                            <StatMini icon={FileText} label="Toplam" value={stats.total} color="text-n700" bg="bg-n50" />
+                            <StatMini icon={Clock} label="Gönderime Hazır" value={stats.readyToSend} color="text-warn" bg="bg-warn-bg/60" />
+                            <StatMini icon={CheckCircle} label="Gönderilen" value={stats.sent} color="text-ok" bg="bg-ok-bg/60" />
+                            <StatMini icon={XCircle} label="Başarısız" value={stats.failed} color="text-bad" bg="bg-bad-bg/60" />
                         </div>
                     </div>
 
                     {/* Filter tabs */}
                     <div className="px-6 lg:px-8 pb-4">
-                        <div className="flex gap-1 p-1 rounded-xl bg-white border border-slate-200 w-fit">
+                        <div className="flex gap-1 p-1 rounded-md bg-n0 border border-n200 w-fit">
                             {FILTER_TABS.map((tab) => (
                                 <button key={tab.id} onClick={() => setFilter(tab.id)}
-                                    className={`px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all cursor-pointer ${filter === tab.id ? 'bg-cyan-50 text-cyan-700' : 'text-slate-400 hover:text-slate-700'}`}
+                                    className={`px-3 py-1.5 rounded-md text-[12px] font-semibold transition-all cursor-pointer ${filter === tab.id ? 'bg-brand-50 text-brand' : 'text-n400 hover:text-n700'}`}
                                 >
                                     {tab.label}
                                     {tab.id !== 'all' && (
-                                        <span className="ml-1.5 text-[10px] opacity-60">
+                                        <span className="ml-1.5 text-[11px] opacity-60">
                                             {tab.id === 'ready_to_send' ? stats.readyToSend : tab.id === 'sent' ? stats.sent : tab.id === 'draft' ? stats.draft : tab.id === 'failed' ? stats.failed : ''}
                                         </span>
                                     )}
@@ -286,7 +286,7 @@ export default function MessagesPage() {
                         {loading && (
                             <div className="space-y-3">
                                 {Array.from({ length: 3 }).map((_, i) => (
-                                    <div key={i} className="bg-white border border-slate-200 shadow-sm rounded-2xl p-5">
+                                    <div key={i} className="bg-n0 border border-n200 shadow-sm rounded-[14px] p-5">
                                         <div className="flex items-center gap-3 mb-3">
                                             <div className="skeleton w-10 h-10 rounded-full" />
                                             <div className="flex-1 space-y-2">
@@ -303,11 +303,11 @@ export default function MessagesPage() {
 
                         {!loading && filtered.length === 0 && (
                             <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
-                                <div className="w-20 h-20 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center">
-                                    <MessageSquare className="w-8 h-8 text-slate-400" />
+                                <div className="w-20 h-20 rounded-full bg-n50 border border-n200 flex items-center justify-center">
+                                    <MessageSquare className="w-8 h-8 text-n400" />
                                 </div>
-                                <h3 className="text-lg font-bold text-slate-700">Mesaj Yok</h3>
-                                <p className="text-sm text-slate-400 max-w-sm">
+                                <h3 className="text-lg font-semibold text-n700">Mesaj Yok</h3>
+                                <p className="text-sm text-n400 max-w-sm">
                                     {filter !== 'all' ? 'Bu filtreye uygun mesaj bulunamadı.' : 'Henüz kuyrukta mesaj yok. Aday profilinden mesaj oluşturabilirsiniz.'}
                                 </p>
                             </div>
@@ -320,40 +320,40 @@ export default function MessagesPage() {
                             const isLoading = actionLoading === msg.id;
 
                             return (
-                                <div key={msg.id} className="bg-white border border-slate-200 shadow-sm rounded-2xl overflow-hidden transition-all duration-300 hover:bg-white">
+                                <div key={msg.id} className="bg-n0 border border-n200 shadow-sm rounded-[14px] overflow-hidden transition-all duration-300 hover:bg-n0">
                                     <div className="flex items-center gap-4 p-4 cursor-pointer" onClick={() => setExpandedId(isExpanded ? null : msg.id)}>
-                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-violet-500 flex items-center justify-center text-sm font-bold text-white shrink-0">
+                                        <div className="w-10 h-10 rounded-full from-brand to-brand flex items-center justify-center text-sm font-semibold text-white shrink-0">
                                             {msg.candidateName?.split(' ').map(n => n[0]).join('').substring(0, 2) || '?'}
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2">
-                                                <span className="text-[14px] font-semibold text-slate-800 truncate">{msg.candidateName}</span>
+                                                <span className="text-[14px] font-semibold text-n900 truncate">{msg.candidateName}</span>
                                                 {msg.matchScore && (
-                                                    <span className="text-[11px] font-bold text-cyan-700 bg-cyan-50 px-1.5 py-0.5 rounded">%{msg.matchScore}</span>
+                                                    <span className="text-[12px] font-semibold text-brand bg-brand-50 px-1.5 py-0.5 rounded">%{msg.matchScore}</span>
                                                 )}
                                             </div>
-                                            <div className="text-[11px] text-slate-400 truncate">{msg.candidatePosition}</div>
+                                            <div className="text-[12px] text-n400 truncate">{msg.candidatePosition}</div>
                                         </div>
-                                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ring-1 ring-inset ${statusConf.color} ${statusConf.bg} ${statusConf.ring} shrink-0`}>
+                                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-semibold ring-1 ring-inset ${statusConf.color} ${statusConf.bg} ${statusConf.ring} shrink-0`}>
                                             <StatusIcon className={`w-3 h-3 ${msg.status === 'sending' ? 'animate-spin' : ''}`} />
                                             {statusConf.label}
                                         </span>
-                                        <span className="text-[11px] text-slate-300 shrink-0 hidden sm:block">{formatDate(msg.createdAt)}</span>
+                                        <span className="text-[12px] text-n300 shrink-0 hidden sm:block">{formatDate(msg.createdAt)}</span>
                                     </div>
 
                                     {isExpanded && (
-                                        <div className="px-4 pb-4 space-y-3 border-t border-slate-100 pt-3 animate-fade-in">
-                                            <div className="p-3.5 rounded-xl bg-white border border-slate-100">
+                                        <div className="px-4 pb-4 space-y-3 border-t border-n200 pt-3 animate-fade-in">
+                                            <div className="p-3.5 rounded-md bg-n0 border border-n200">
                                                 <div className="flex items-center gap-1.5 mb-2">
-                                                    {msg.aiGenerated && <Sparkles className="w-3 h-3 text-violet-400" />}
-                                                    <span className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
+                                                    {msg.aiGenerated && <Sparkles className="w-3 h-3 text-brand" />}
+                                                    <span className="text-[11px] uppercase tracking-[0.08em] text-n400 font-semibold">
                                                         {msg.aiGenerated ? 'AI Tarafından Oluşturuldu' : 'Manuel'}
                                                     </span>
                                                 </div>
-                                                <p className="text-[13px] text-slate-700 leading-relaxed whitespace-pre-wrap">{msg.messageContent}</p>
+                                                <p className="text-[13px] text-n700 leading-relaxed whitespace-pre-wrap">{msg.messageContent}</p>
                                             </div>
                                             {msg.sentTimestamp && (
-                                                <div className="flex items-center gap-2 text-[11px] text-emerald-600/80">
+                                                <div className="flex items-center gap-2 text-[12px] text-ok/80">
                                                     <CheckCircle className="w-3 h-3" />
                                                     <span>Gönderildi: {formatDate(msg.sentTimestamp)}</span>
                                                 </div>
@@ -361,21 +361,21 @@ export default function MessagesPage() {
                                             <div className="flex items-center gap-2 pt-1">
                                                 {msg.status === 'ready_to_send' && (
                                                     <button onClick={() => handleSimulateSend(msg)} disabled={isLoading}
-                                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-[#0077B5] to-[#00A0DC] text-white text-[12px] font-semibold shadow-sm hover:shadow-md transition-all cursor-pointer disabled:opacity-50">
+                                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-md from-[#0077B5] to-[#00A0DC] text-white text-[12px] font-semibold shadow-sm hover:shadow-md transition-all cursor-pointer disabled:opacity-50">
                                                         {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
                                                         Gönderimi Simüle Et
                                                     </button>
                                                 )}
                                                 {msg.status === 'failed' && (
                                                     <button onClick={() => handleRetry(msg)} disabled={isLoading}
-                                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-500/20 text-amber-600 text-[12px] font-semibold hover:bg-amber-500/20 transition-all cursor-pointer disabled:opacity-50">
+                                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-warn-bg border border-warn/20 text-warn text-[12px] font-semibold hover:bg-warn/20 transition-all cursor-pointer disabled:opacity-50">
                                                         <RefreshCw className="w-3 h-3" />
                                                         Tekrar Dene
                                                     </button>
                                                 )}
                                                 <div className="flex-1" />
                                                 <button onClick={() => handleDelete(msg)} disabled={isLoading}
-                                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-red-600/70 hover:text-red-600 hover:bg-red-50 text-[12px] font-medium transition-all cursor-pointer disabled:opacity-50">
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-bad/70 hover:text-bad hover:bg-bad-bg text-[12px] font-medium transition-all cursor-pointer disabled:opacity-50">
                                                     <Trash2 className="w-3 h-3" />
                                                     Sil
                                                 </button>
@@ -394,18 +394,18 @@ export default function MessagesPage() {
                 <div className="px-6 lg:px-8 py-5 pb-24 md:pb-8 space-y-4">
                     {/* Stats row */}
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                        <StatMini icon={Mail} label="Toplam E-posta" value={emailThreads.length} color="text-slate-700" bg="bg-slate-50" />
-                        <StatMini icon={Reply} label="Yanıt Alınan" value={emailsWithReply} color="text-emerald-600" bg="bg-emerald-50/60" />
-                        <StatMini icon={Clock} label="Yanıt Beklenen" value={emailThreads.length - emailsWithReply} color="text-amber-600" bg="bg-amber-50/60" />
+                        <StatMini icon={Mail} label="Toplam E-posta" value={emailThreads.length} color="text-n700" bg="bg-n50" />
+                        <StatMini icon={Reply} label="Yanıt Alınan" value={emailsWithReply} color="text-ok" bg="bg-ok-bg/60" />
+                        <StatMini icon={Clock} label="Yanıt Beklenen" value={emailThreads.length - emailsWithReply} color="text-warn" bg="bg-warn-bg/60" />
                     </div>
 
                     {/* Info banner */}
                     {!userProfile?.integrations?.google?.connected && (
-                        <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-50/60 border border-amber-500/20">
-                            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                        <div className="flex items-center gap-3 p-4 rounded-md bg-warn-bg/60 border border-warn/20">
+                            <AlertCircle className="w-4 h-4 text-warn shrink-0" />
                             <div className="flex-1">
-                                <p className="text-[13px] text-amber-300 font-semibold">Gmail bağlantısı gerekli</p>
-                                <p className="text-[12px] text-amber-600/70 mt-0.5">E-posta yazışmalarını görmek için Gmail API erişimine izin verin.</p>
+                                <p className="text-[13px] text-warn font-semibold">Gmail bağlantısı gerekli</p>
+                                <p className="text-[12px] text-warn/70 mt-0.5">E-posta yazışmalarını görmek için Gmail API erişimine izin verin.</p>
                             </div>
                             <button
                                 onClick={async () => {
@@ -416,7 +416,7 @@ export default function MessagesPage() {
                                     else addNotification('success', 'Gmail başarıyla bağlandı.');
                                 }}
                                 disabled={connectingGoogle}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 text-[11px] font-semibold border border-amber-500/30 transition-all disabled:opacity-50 shrink-0"
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-warn/15 hover:bg-warn/25 text-warn text-[12px] font-semibold border border-warn/30 transition-all disabled:opacity-50 shrink-0"
                             >
                                 {connectingGoogle ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />}
                                 {connectingGoogle ? 'Bağlanıyor…' : 'Gmail\'e Bağlan'}
@@ -428,7 +428,7 @@ export default function MessagesPage() {
                     {emailsLoading && (
                         <div className="space-y-3">
                             {[1, 2, 3].map(i => (
-                                <div key={i} className="bg-white border border-slate-200 shadow-sm rounded-2xl p-5">
+                                <div key={i} className="bg-n0 border border-n200 shadow-sm rounded-[14px] p-5">
                                     <div className="flex items-center gap-3 mb-3">
                                         <div className="skeleton w-10 h-10 rounded-full" />
                                         <div className="flex-1 space-y-2">
@@ -444,11 +444,11 @@ export default function MessagesPage() {
                     {/* Empty state */}
                     {!emailsLoading && emailThreads.length === 0 && (
                         <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
-                            <div className="w-20 h-20 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center">
-                                <Mail className="w-8 h-8 text-slate-400" />
+                            <div className="w-20 h-20 rounded-full bg-n50 border border-n200 flex items-center justify-center">
+                                <Mail className="w-8 h-8 text-n400" />
                             </div>
-                            <h3 className="text-lg font-bold text-slate-700">E-posta Yok</h3>
-                            <p className="text-sm text-slate-400 max-w-sm">
+                            <h3 className="text-lg font-semibold text-n700">E-posta Yok</h3>
+                            <p className="text-sm text-n400 max-w-sm">
                                 Mülakat Yönetimi ekranından aday veya katılımcılara e-posta gönderdiğinizde burada görünür.
                             </p>
                         </div>
@@ -462,49 +462,49 @@ export default function MessagesPage() {
                         const replyCount = msgs.length > 1 ? msgs.length - 1 : 0;
 
                         return (
-                            <div key={thread.id} className="bg-white border border-slate-200 shadow-sm rounded-2xl overflow-hidden">
+                            <div key={thread.id} className="bg-n0 border border-n200 shadow-sm rounded-[14px] overflow-hidden">
                                 {/* Thread header */}
                                 <div
-                                    className="flex items-center gap-4 p-4 cursor-pointer hover:bg-white transition-all"
+                                    className="flex items-center gap-4 p-4 cursor-pointer hover:bg-n0 transition-all"
                                     onClick={() => setExpandedThread(isExpanded ? null : thread.id)}
                                 >
                                     {/* Avatar */}
-                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${thread.hasReply ? 'bg-gradient-to-br from-emerald-500 to-teal-600' : 'bg-gradient-to-br from-cyan-500 to-violet-500'}`}>
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold shrink-0 ${thread.hasReply ? 'from-ok to-brand-600' : 'from-brand to-brand'}`}>
                                         {thread.candidateName?.split(' ').map(n => n[0]).join('').substring(0, 2) || '?'}
                                     </div>
 
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 flex-wrap">
-                                            <span className="text-[14px] font-semibold text-slate-800 truncate">{thread.candidateName}</span>
+                                            <span className="text-[14px] font-semibold text-n900 truncate">{thread.candidateName}</span>
                                             {thread.hasReply && (
-                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-[10px] font-bold ring-1 ring-emerald-100">
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-ok-bg text-ok text-[11px] font-semibold ring-1 ring-ok-bg">
                                                     <Reply className="w-2.5 h-2.5" />
                                                     Yanıt Var
                                                 </span>
                                             )}
                                         </div>
-                                        <div className="text-[11px] text-slate-400 truncate">{thread.subject}</div>
-                                        <div className="text-[10px] text-slate-300 mt-0.5">{thread.candidateEmail}</div>
+                                        <div className="text-[12px] text-n400 truncate">{thread.subject}</div>
+                                        <div className="text-[11px] text-n300 mt-0.5">{thread.candidateEmail}</div>
                                     </div>
 
                                     <div className="flex flex-col items-end gap-1.5 shrink-0">
-                                        <span className="text-[10px] text-slate-300">{formatDate(thread.sentAt)}</span>
+                                        <span className="text-[11px] text-n300">{formatDate(thread.sentAt)}</span>
                                         <div className="flex items-center gap-1">
                                             {thread.hasReply
-                                                ? <MailOpen className="w-3.5 h-3.5 text-emerald-600" />
-                                                : <Mail className="w-3.5 h-3.5 text-slate-400" />
+                                                ? <MailOpen className="w-3.5 h-3.5 text-ok" />
+                                                : <Mail className="w-3.5 h-3.5 text-n400" />
                                             }
-                                            {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-slate-400" /> : <ChevronRight className="w-3.5 h-3.5 text-slate-400" />}
+                                            {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-n400" /> : <ChevronRight className="w-3.5 h-3.5 text-n400" />}
                                         </div>
                                     </div>
                                 </div>
 
                                 {/* Expanded thread */}
                                 {isExpanded && (
-                                    <div className="border-t border-slate-100 p-4 space-y-3 animate-fade-in">
+                                    <div className="border-t border-n200 p-4 space-y-3 animate-fade-in">
                                         {/* Check replies button */}
                                         <div className="flex items-center justify-between">
-                                            <span className="text-[12px] text-slate-400 font-medium">
+                                            <span className="text-[12px] text-n400 font-medium">
                                                 {msgs.length > 0
                                                     ? `${msgs.length} mesaj — ${replyCount > 0 ? `${replyCount} yanıt` : 'yanıt yok'}`
                                                     : 'Yanıtları kontrol etmek için butona tıklayın'}
@@ -512,7 +512,7 @@ export default function MessagesPage() {
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); handleCheckReplies(thread); }}
                                                 disabled={isChecking}
-                                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-50 border border-cyan-200 text-cyan-700 text-[12px] font-semibold hover:bg-cyan-100 transition-all cursor-pointer disabled:opacity-50"
+                                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-brand-50 border border-brand-100 text-brand text-[12px] font-semibold hover:bg-brand-100 transition-all cursor-pointer disabled:opacity-50"
                                             >
                                                 {isChecking ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
                                                 Yanıtları Kontrol Et
@@ -526,15 +526,15 @@ export default function MessagesPage() {
                                                     const isSentByUs = m.from?.toLowerCase().includes(thread.recruiterName?.toLowerCase() || '') || m.from?.toLowerCase().includes('@');
                                                     const isFirst = idx === 0;
                                                     return (
-                                                        <div key={m.id} className={`p-3 rounded-xl border ${isFirst ? 'bg-cyan-50/60 border-cyan-100' : 'bg-emerald-50/60 border-emerald-500/10'}`}>
+                                                        <div key={m.id} className={`p-3 rounded-md border ${isFirst ? 'bg-brand-50/60 border-brand-100' : 'bg-ok-bg/60 border-ok/10'}`}>
                                                             <div className="flex items-center justify-between mb-1.5">
-                                                                <span className={`text-[11px] font-semibold ${isFirst ? 'text-cyan-700' : 'text-emerald-600'}`}>
+                                                                <span className={`text-[12px] font-semibold ${isFirst ? 'text-brand' : 'text-ok'}`}>
                                                                     {isFirst ? 'Gönderilen' : 'Yanıt'}
                                                                 </span>
-                                                                <span className="text-[10px] text-slate-300">{parseEmailDate(m.date)}</span>
+                                                                <span className="text-[11px] text-n300">{parseEmailDate(m.date)}</span>
                                                             </div>
-                                                            <div className="text-[11px] text-slate-500 mb-1 truncate">Kimden: {m.from}</div>
-                                                            <p className="text-[12px] text-slate-700 leading-relaxed">{m.snippet}</p>
+                                                            <div className="text-[12px] text-n500 mb-1 truncate">Kimden: {m.from}</div>
+                                                            <p className="text-[12px] text-n700 leading-relaxed">{m.snippet}</p>
                                                         </div>
                                                     );
                                                 })}
@@ -552,14 +552,14 @@ export default function MessagesPage() {
                 <div className="px-6 lg:px-8 py-5 pb-24 md:pb-8 space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                         <div className="grid grid-cols-3 gap-3 flex-1">
-                            <StatMini icon={ClipboardList} label="Toplam Talep" value={infoRequests.length} color="text-cyan-400" bg="bg-cyan-500/5" />
-                            <StatMini icon={Clock} label="Bekleniyor" value={infoRequests.filter(r => r.status === 'pending').length} color="text-amber-600" bg="bg-amber-50/60" />
-                            <StatMini icon={CheckCircle} label="Yanıtlandı" value={infoRequests.filter(r => r.status === 'responded').length} color="text-emerald-600" bg="bg-emerald-50/60" />
+                            <StatMini icon={ClipboardList} label="Toplam Talep" value={infoRequests.length} color="text-brand" bg="bg-brand/5" />
+                            <StatMini icon={Clock} label="Bekleniyor" value={infoRequests.filter(r => r.status === 'pending').length} color="text-warn" bg="bg-warn-bg/60" />
+                            <StatMini icon={CheckCircle} label="Yanıtlandı" value={infoRequests.filter(r => r.status === 'responded').length} color="text-ok" bg="bg-ok-bg/60" />
                         </div>
                         <button
                             onClick={handleCheckInfoReplies}
                             disabled={checkingInfoReplies}
-                            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 text-[12px] font-semibold border border-cyan-500/20 transition-all disabled:opacity-50 shrink-0"
+                            className="flex items-center gap-2 px-4 py-2.5 rounded-md bg-brand/10 hover:bg-brand/20 text-brand text-[12px] font-semibold border border-brand/20 transition-all disabled:opacity-50 shrink-0"
                         >
                             {checkingInfoReplies
                                 ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Kontrol ediliyor…</>
@@ -568,7 +568,7 @@ export default function MessagesPage() {
                         </button>
                     </div>
                     {checkInfoResult && (
-                        <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-50/60 border border-emerald-500/15 text-[11px] text-emerald-600">
+                        <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-ok-bg/60 border border-ok/15 text-[12px] text-ok">
                             <CheckCircle className="w-3.5 h-3.5 shrink-0" />
                             {checkInfoResult.scanned} e-posta tarandı — {checkInfoResult.updated > 0 ? `${checkInfoResult.updated} yeni yanıt bulundu ve işaretlendi.` : 'yeni yanıt bulunamadı.'}
                         </div>
@@ -577,7 +577,7 @@ export default function MessagesPage() {
                     {infoReqLoading && (
                         <div className="space-y-3">
                             {[1, 2, 3].map(i => (
-                                <div key={i} className="bg-white border border-slate-200 shadow-sm rounded-2xl p-5">
+                                <div key={i} className="bg-n0 border border-n200 shadow-sm rounded-[14px] p-5">
                                     <div className="flex items-center gap-3 mb-3">
                                         <div className="skeleton w-10 h-10 rounded-full" />
                                         <div className="flex-1 space-y-2">
@@ -592,11 +592,11 @@ export default function MessagesPage() {
 
                     {!infoReqLoading && infoRequests.length === 0 && (
                         <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
-                            <div className="w-20 h-20 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center">
-                                <ClipboardList className="w-8 h-8 text-slate-400" />
+                            <div className="w-20 h-20 rounded-full bg-n50 border border-n200 flex items-center justify-center">
+                                <ClipboardList className="w-8 h-8 text-n400" />
                             </div>
-                            <h3 className="text-lg font-bold text-slate-700">Bilgi Talebi Yok</h3>
-                            <p className="text-sm text-slate-400 max-w-sm">Aday kartından "Mesaj Gönder → Bilgi İste" ile talep gönderdiğinizde burada görünür.</p>
+                            <h3 className="text-lg font-semibold text-n700">Bilgi Talebi Yok</h3>
+                            <p className="text-sm text-n400 max-w-sm">Aday kartından "Mesaj Gönder → Bilgi İste" ile talep gönderdiğinizde burada görünür.</p>
                         </div>
                     )}
 
@@ -605,71 +605,71 @@ export default function MessagesPage() {
                         const isExpanded = expandedInfoReq === req.id;
                         const createdAt = req.createdAt?.toDate?.()?.toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) || '—';
                         return (
-                            <div key={req.id} className="bg-white border border-slate-200 shadow-sm rounded-2xl overflow-hidden">
+                            <div key={req.id} className="bg-n0 border border-n200 shadow-sm rounded-[14px] overflow-hidden">
                                 <div
-                                    className="flex items-center gap-4 p-4 cursor-pointer hover:bg-white transition-all"
+                                    className="flex items-center gap-4 p-4 cursor-pointer hover:bg-n0 transition-all"
                                     onClick={() => setExpandedInfoReq(isExpanded ? null : req.id)}
                                 >
-                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-teal-600 flex items-center justify-center text-sm font-bold text-white shrink-0">
+                                    <div className="w-10 h-10 rounded-full from-brand to-brand-600 flex items-center justify-center text-sm font-semibold text-white shrink-0">
                                         {req.candidateName?.split(' ').map(n => n[0]).join('').substring(0, 2) || '?'}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 flex-wrap">
-                                            <span className="text-[14px] font-semibold text-slate-800 truncate">{req.candidateName}</span>
+                                            <span className="text-[14px] font-semibold text-n900 truncate">{req.candidateName}</span>
                                             {req.position && (
-                                                <span className="text-[10px] font-bold text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded">{req.position}</span>
+                                                <span className="text-[11px] font-semibold text-brand bg-brand/10 px-1.5 py-0.5 rounded">{req.position}</span>
                                             )}
                                         </div>
-                                        <div className="text-[11px] text-slate-400 truncate mt-0.5">{req.requestMessage || 'Bilgi talebi gönderildi'}</div>
+                                        <div className="text-[12px] text-n400 truncate mt-0.5">{req.requestMessage || 'Bilgi talebi gönderildi'}</div>
                                     </div>
                                     <div className="flex flex-col items-end gap-1.5 shrink-0">
-                                        <span className="text-[10px] text-slate-300">{createdAt}</span>
-                                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${isPending ? 'bg-amber-50 text-amber-600 ring-1 ring-amber-100' : 'bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100'}`}>
+                                        <span className="text-[11px] text-n300">{createdAt}</span>
+                                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${isPending ? 'bg-warn-bg text-warn ring-1 ring-warn-bg' : 'bg-ok-bg text-ok ring-1 ring-ok-bg'}`}>
                                             {isPending ? <Clock className="w-2.5 h-2.5" /> : <CheckCircle className="w-2.5 h-2.5" />}
                                             {isPending ? 'Bekleniyor' : 'Yanıtlandı'}
                                         </span>
-                                        {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-slate-400" /> : <ChevronRight className="w-3.5 h-3.5 text-slate-400" />}
+                                        {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-n400" /> : <ChevronRight className="w-3.5 h-3.5 text-n400" />}
                                     </div>
                                 </div>
 
                                 {isExpanded && (
-                                    <div className="border-t border-slate-100 p-4 space-y-3 animate-fade-in">
+                                    <div className="border-t border-n200 p-4 space-y-3 animate-fade-in">
                                         <div className="flex items-center gap-2 mb-1">
-                                            <User className="w-3 h-3 text-slate-400" />
-                                            <span className="text-[11px] text-slate-400">{req.candidateEmail || '—'}</span>
+                                            <User className="w-3 h-3 text-n400" />
+                                            <span className="text-[12px] text-n400">{req.candidateEmail || '—'}</span>
                                         </div>
                                         {req.requestMessage && (
-                                            <div className="p-3 rounded-xl bg-cyan-50/60 border border-cyan-100">
-                                                <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1.5">Mesaj</p>
-                                                <p className="text-[12px] text-slate-700 leading-relaxed whitespace-pre-wrap">{req.requestMessage}</p>
+                                            <div className="p-3 rounded-md bg-brand-50/60 border border-brand-100">
+                                                <p className="text-[11px] uppercase tracking-[0.08em] text-n400 font-semibold mb-1.5">Mesaj</p>
+                                                <p className="text-[12px] text-n700 leading-relaxed whitespace-pre-wrap">{req.requestMessage}</p>
                                             </div>
                                         )}
                                         {req.requestedItems?.length > 0 && (
-                                            <div className="p-3 rounded-xl bg-white border border-slate-100">
-                                                <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-2">Talep Edilen Belgeler</p>
+                                            <div className="p-3 rounded-md bg-n0 border border-n200">
+                                                <p className="text-[11px] uppercase tracking-[0.08em] text-n400 font-semibold mb-2">Talep Edilen Belgeler</p>
                                                 <ul className="space-y-1">
                                                     {req.requestedItems.map((item, i) => (
-                                                        <li key={i} className="flex items-center gap-1.5 text-[12px] text-slate-500">
-                                                            <Paperclip className="w-3 h-3 text-cyan-400 shrink-0" /> {item}
+                                                        <li key={i} className="flex items-center gap-1.5 text-[12px] text-n500">
+                                                            <Paperclip className="w-3 h-3 text-brand shrink-0" /> {item}
                                                         </li>
                                                     ))}
                                                 </ul>
                                             </div>
                                         )}
                                         {!isPending && req.replyBody && (
-                                            <div className="p-3 rounded-xl bg-emerald-50/60 border border-emerald-500/15">
-                                                <p className="text-[10px] uppercase tracking-wider text-emerald-600 font-semibold mb-1.5 flex items-center gap-1.5">
+                                            <div className="p-3 rounded-md bg-ok-bg/60 border border-ok/15">
+                                                <p className="text-[11px] uppercase tracking-[0.08em] text-ok font-semibold mb-1.5 flex items-center gap-1.5">
                                                     <CheckCircle className="w-3 h-3" /> Adayın Yanıtı
                                                 </p>
-                                                <p className="text-[12px] text-slate-700 leading-relaxed whitespace-pre-wrap">{req.replyBody}</p>
+                                                <p className="text-[12px] text-n700 leading-relaxed whitespace-pre-wrap">{req.replyBody}</p>
                                             </div>
                                         )}
                                         {!isPending && !req.replyBody && (
-                                            <div className="p-3 rounded-xl bg-emerald-50/60 border border-emerald-500/15">
-                                                <p className="text-[10px] uppercase tracking-wider text-emerald-600 font-semibold mb-1 flex items-center gap-1.5">
+                                            <div className="p-3 rounded-md bg-ok-bg/60 border border-ok/15">
+                                                <p className="text-[11px] uppercase tracking-[0.08em] text-ok font-semibold mb-1 flex items-center gap-1.5">
                                                     <CheckCircle className="w-3 h-3" /> Yanıt Alındı
                                                 </p>
-                                                <p className="text-[11px] text-slate-400">Yanıt içeriği kaydedilmemiş. Bir sonraki "Yanıtları Kontrol Et" taramasında otomatik güncellenir.</p>
+                                                <p className="text-[12px] text-n400">Yanıt içeriği kaydedilmemiş. Bir sonraki "Yanıtları Kontrol Et" taramasında otomatik güncellenir.</p>
                                             </div>
                                         )}
                                         {isPending && (
@@ -677,7 +677,7 @@ export default function MessagesPage() {
                                                 <button
                                                     onClick={e => { e.stopPropagation(); handleMarkReplied(req.id); }}
                                                     disabled={markingReplied === req.id}
-                                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-500/20 text-emerald-600 text-[11px] font-semibold border border-emerald-500/20 transition-all disabled:opacity-50"
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-ok-bg hover:bg-ok/20 text-ok text-[12px] font-semibold border border-ok/20 transition-all disabled:opacity-50"
                                                 >
                                                     {markingReplied === req.id
                                                         ? <Loader2 className="w-3 h-3 animate-spin" />
@@ -685,7 +685,7 @@ export default function MessagesPage() {
                                                     }
                                                     Yanıt Alındı
                                                 </button>
-                                                <span className="text-[10px] text-slate-300">Gelen kutunuzda yanıt gördüyseniz manuel olarak işaretleyebilirsiniz.</span>
+                                                <span className="text-[11px] text-n300">Gelen kutunuzda yanıt gördüyseniz manuel olarak işaretleyebilirsiniz.</span>
                                             </div>
                                         )}
                                     </div>
@@ -701,10 +701,10 @@ export default function MessagesPage() {
 
 function StatMini({ icon: Icon, label, value, color, bg }) {
     return (
-        <div className={`p-3.5 rounded-xl ${bg} border border-slate-200`}>
+        <div className={`p-3.5 rounded-md ${bg} border border-n200`}>
             <div className="flex items-center gap-2 mb-1">
                 <Icon className={`w-3.5 h-3.5 ${color}`} />
-                <span className="text-[11px] text-slate-400 font-medium">{label}</span>
+                <span className="text-[12px] text-n400 font-medium">{label}</span>
             </div>
             <div className={`text-xl font-extrabold ${color}`}>{value}</div>
         </div>

@@ -36,17 +36,17 @@ const FEATURES = [
             <div className="space-y-3">
                 <div className="grid grid-cols-3 gap-2">
                     {[{ l: 'Açık İlan', v: '12', c: '#3b82f6' }, { l: 'Aday', v: '48', c: '#10b981' }, { l: 'Bu Hafta', v: '5', c: '#f59e0b' }].map(k => (
-                        <div key={k.l} className="bg-white border border-slate-100 rounded-xl p-2.5 text-center">
-                            <div className="text-lg font-bold" style={{ color: k.c }}>{k.v}</div>
-                            <div className="text-[9px] text-slate-400 font-medium">{k.l}</div>
+                        <div key={k.l} className="bg-n0 border border-n200 rounded-md p-2.5 text-center">
+                            <div className="text-lg font-semibold" style={{ color: k.c }}>{k.v}</div>
+                            <div className="text-[11px] text-n400 font-medium">{k.l}</div>
                         </div>
                     ))}
                 </div>
                 <div className="space-y-1.5">
                     {['Ahmet Yılmaz eklenid • 2dk', 'Yazılım Müh. mülakatı planlandı • 1s'].map((t, i) => (
-                        <div key={i} className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-lg p-2">
-                            <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
-                            <span className="text-[10px] text-slate-500">{t}</span>
+                        <div key={i} className="flex items-center gap-2 bg-n50 border border-n200 rounded-md p-2">
+                            <div className="w-1.5 h-1.5 rounded-full bg-brand" />
+                            <span className="text-[11px] text-n500">{t}</span>
                         </div>
                     ))}
                 </div>
@@ -77,16 +77,16 @@ const FEATURES = [
                     { name: 'Mert A.', pos: 'Backend Dev', score: 78, status: 'Değerlendirme', sc: '#f59e0b' },
                     { name: 'Selin Y.', pos: 'UX Designer', score: 85, status: 'Yeni', sc: '#3b82f6' },
                 ].map((c, i) => (
-                    <div key={i} className="flex items-center gap-3 bg-white border border-slate-100 rounded-xl p-2.5">
-                        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-600">
+                    <div key={i} className="flex items-center gap-3 bg-n0 border border-n200 rounded-md p-2.5">
+                        <div className="w-8 h-8 rounded-full bg-n100 flex items-center justify-center text-xs font-semibold text-n600">
                             {c.name[0]}
                         </div>
                         <div className="flex-1 min-w-0">
-                            <div className="text-xs font-semibold text-slate-700">{c.name}</div>
-                            <div className="text-[9px] text-slate-400">{c.pos}</div>
+                            <div className="text-xs font-semibold text-n700">{c.name}</div>
+                            <div className="text-[11px] text-n400">{c.pos}</div>
                         </div>
-                        <div className="text-xs font-bold" style={{ color: c.sc }}>{c.score}%</div>
-                        <div className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: c.sc + '20', color: c.sc }}>{c.status}</div>
+                        <div className="text-xs font-semibold" style={{ color: c.sc }}>{c.score}%</div>
+                        <div className="text-[11px] px-1.5 py-0.5 rounded-full" style={{ background: c.sc + '20', color: c.sc }}>{c.status}</div>
                     </div>
                 ))}
             </div>
@@ -116,15 +116,15 @@ const FEATURES = [
                     { title: 'UX Designer', dept: 'Ürün', count: 5, status: 'Aktif' },
                     { title: 'Data Analyst', dept: 'Analitik', count: 3, status: 'Pasif' },
                 ].map((p, i) => (
-                    <div key={i} className="flex items-center gap-3 bg-white border border-slate-100 rounded-xl p-2.5">
-                        <div className="w-8 h-8 rounded-xl bg-violet-50 border border-violet-100 flex items-center justify-center">
-                            <Briefcase className="w-4 h-4 text-violet-500" />
+                    <div key={i} className="flex items-center gap-3 bg-n0 border border-n200 rounded-md p-2.5">
+                        <div className="w-8 h-8 rounded-md bg-brand-50 border border-brand-100 flex items-center justify-center">
+                            <Briefcase className="w-4 h-4 text-brand" />
                         </div>
                         <div className="flex-1 min-w-0">
-                            <div className="text-xs font-semibold text-slate-700">{p.title}</div>
-                            <div className="text-[9px] text-slate-400">{p.dept} · {p.count} aday</div>
+                            <div className="text-xs font-semibold text-n700">{p.title}</div>
+                            <div className="text-[11px] text-n400">{p.dept} · {p.count} aday</div>
                         </div>
-                        <div className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${p.status === 'Aktif' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>{p.status}</div>
+                        <div className={`text-[11px] px-1.5 py-0.5 rounded-full font-medium ${p.status === 'Aktif' ? 'bg-ok-bg text-ok' : 'bg-n100 text-n400'}`}>{p.status}</div>
                     </div>
                 ))}
             </div>
@@ -153,27 +153,27 @@ const FEATURES = [
         tags: ['mülakat', 'planlama', 'takvim', 'google calendar', 'davet', 'email', 'link', 'zamanlama', 'harici katılımcı', 'html email', 'marka', 'e-posta takibi', 'pozisyon seçimi'],
         mockup: (
             <div className="space-y-2.5">
-                <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
+                <div className="bg-warn-bg border border-transparent rounded-md p-3">
                     <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-semibold text-amber-700">Bugün — 14:00</span>
-                        <span className="text-[9px] bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded-full">Bekliyor</span>
+                        <span className="text-xs font-semibold text-warn">Bugün — 14:00</span>
+                        <span className="text-[11px] bg-warn-bg text-warn px-1.5 py-0.5 rounded-full">Bekliyor</span>
                     </div>
-                    <div className="text-[11px] text-slate-700 font-medium">Ahmet Yılmaz — Teknik Mülakat</div>
-                    <div className="text-[9px] text-slate-400 mt-0.5">Yazılım Müh. • meet.google.com/···</div>
+                    <div className="text-[12px] text-n700 font-medium">Ahmet Yılmaz — Teknik Mülakat</div>
+                    <div className="text-[11px] text-n400 mt-0.5">Yazılım Müh. • meet.google.com/···</div>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                     {[{ l: 'Ahmet B.', ext: false }, { l: 'dış@partner.com', ext: true }].map((p, i) => (
-                        <span key={i} className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-medium border ${p.ext ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-blue-50 border-blue-200 text-blue-700'}`}>
+                        <span key={i} className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border ${p.ext ? 'bg-warn-bg border-warn text-warn' : 'bg-brand-50 border-brand-200 text-brand-700'}`}>
                             {p.ext ? '@' : '✓'} {p.l}
                         </span>
                     ))}
                 </div>
                 <div className="flex gap-2">
-                    <div className="flex-1 bg-emerald-50 border border-emerald-100 rounded-lg px-2 py-1.5 text-center">
-                        <div className="text-[9px] text-emerald-600 font-semibold">Başlat →</div>
+                    <div className="flex-1 bg-ok-bg border border-transparent rounded-md px-2 py-1.5 text-center">
+                        <div className="text-[11px] text-ok font-semibold">Başlat →</div>
                     </div>
-                    <div className="flex-1 bg-slate-50 border border-slate-100 rounded-lg px-2 py-1.5 text-center">
-                        <div className="text-[9px] text-slate-500 font-semibold">E-posta Gönder</div>
+                    <div className="flex-1 bg-n50 border border-n200 rounded-md px-2 py-1.5 text-center">
+                        <div className="text-[11px] text-n500 font-semibold">E-posta Gönder</div>
                     </div>
                 </div>
             </div>
@@ -199,30 +199,30 @@ const FEATURES = [
         tags: ['canlı mülakat', 'webrtc', 'video', 'ses', 'gemini', 'stt', 'ai soru', 'star', 'gerçek zamanlı', 'sesli analiz'],
         mockup: (
             <div className="space-y-2.5">
-                <div className="bg-slate-800 rounded-xl p-3 flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-slate-700 flex items-center justify-center">
+                <div className="bg-n900 rounded-md p-3 flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-md bg-n700 flex items-center justify-center">
                         <Video className="w-5 h-5 text-white/60" />
                     </div>
                     <div>
-                        <div className="text-[10px] text-white font-semibold">Aday Bağlı</div>
+                        <div className="text-[11px] text-white font-semibold">Aday Bağlı</div>
                         <div className="flex items-center gap-1 mt-0.5">
-                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                            <span className="text-[9px] text-emerald-400">Canlı · 00:14:32</span>
+                            <div className="w-1.5 h-1.5 rounded-full bg-ok animate-pulse" />
+                            <span className="text-[11px] text-ok">Canlı · 00:14:32</span>
                         </div>
                     </div>
                 </div>
-                <div className="bg-cyan-50 border border-cyan-100 rounded-xl p-2.5">
-                    <div className="text-[9px] text-cyan-600 font-semibold mb-1 flex items-center gap-1">
+                <div className="bg-brand-50 border border-brand-100 rounded-md p-2.5">
+                    <div className="text-[11px] text-brand font-semibold mb-1 flex items-center gap-1">
                         <Brain className="w-3 h-3" /> AI Soru Önerisi
                     </div>
-                    <div className="text-[10px] text-slate-700">"Bu projede karşılaştığınız en büyük teknik engel neydi?"</div>
+                    <div className="text-[11px] text-n700">"Bu projede karşılaştığınız en büyük teknik engel neydi?"</div>
                 </div>
                 <div className="grid grid-cols-4 gap-1">
                     {['S', 'T', 'A', 'R'].map((s, i) => (
-                        <div key={s} className="bg-white border border-slate-100 rounded-lg p-1.5 text-center">
-                            <div className="text-[8px] font-bold text-slate-500">{s}</div>
-                            <div className="mt-1 h-1 bg-slate-100 rounded-full overflow-hidden">
-                                <div className="h-full rounded-full bg-cyan-400" style={{ width: `${[80, 60, 90, 70][i]}%` }} />
+                        <div key={s} className="bg-n0 border border-n200 rounded-md p-1.5 text-center">
+                            <div className="text-[11px] font-semibold text-n500">{s}</div>
+                            <div className="mt-1 h-1 bg-n100 rounded-full overflow-hidden">
+                                <div className="h-full rounded-full bg-brand" style={{ width: `${[80, 60, 90, 70][i]}%` }} />
                             </div>
                         </div>
                     ))}
@@ -251,32 +251,32 @@ const FEATURES = [
         tags: ['yüz yüze', 'face to face', 'tek cihaz', 'mikrofon', 'stt', 'star', 'soru seti', 'strateji', 'ai coach', 'gerçek zamanlı', 'face interview'],
         mockup: (
             <div className="space-y-2.5">
-                <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
+                <div className="bg-warn-bg border border-transparent rounded-md p-3">
                     <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-1.5">
-                            <Mic className="w-3.5 h-3.5 text-amber-600" />
-                            <span className="text-[10px] font-semibold text-amber-700">Yüz Yüze Mülakat</span>
+                            <Mic className="w-3.5 h-3.5 text-warn" />
+                            <span className="text-[11px] font-semibold text-warn">Yüz Yüze Mülakat</span>
                         </div>
                         <div className="flex items-center gap-1">
-                            <div className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
-                            <span className="text-[9px] text-red-500">Canlı</span>
+                            <div className="w-1.5 h-1.5 rounded-full bg-bad animate-pulse" />
+                            <span className="text-[11px] text-bad">Canlı</span>
                         </div>
                     </div>
                     <div className="flex gap-1 mb-2">
                         {['Set 1', 'Set 2', 'Set 3'].map((s, i) => (
-                            <div key={s} className={`text-[9px] px-2 py-0.5 rounded-full border font-medium ${i === 0 ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-amber-600 border-amber-200'}`}>{s}</div>
+                            <div key={s} className={`text-[11px] px-2 py-0.5 rounded-full border font-medium ${i === 0 ? 'bg-warn text-white border-warn' : 'bg-n0 text-warn border-warn'}`}>{s}</div>
                         ))}
                     </div>
-                    <div className="text-[10px] text-slate-600 bg-white rounded-lg p-1.5 border border-slate-100">
+                    <div className="text-[11px] text-n600 bg-n0 rounded-md p-1.5 border border-n200">
                         "Karmaşık bir teknik problemi ekiple nasıl çözdüğünüzü anlatın."
                     </div>
                 </div>
                 <div className="grid grid-cols-4 gap-1">
                     {['S', 'T', 'A', 'R'].map((s, i) => (
-                        <div key={s} className="bg-white border border-slate-100 rounded-lg p-1.5 text-center">
-                            <div className="text-[8px] font-bold text-slate-500">{s}</div>
-                            <div className="mt-1 h-1 bg-slate-100 rounded-full overflow-hidden">
-                                <div className="h-full rounded-full bg-amber-400" style={{ width: `${[75, 65, 88, 72][i]}%` }} />
+                        <div key={s} className="bg-n0 border border-n200 rounded-md p-1.5 text-center">
+                            <div className="text-[11px] font-semibold text-n500">{s}</div>
+                            <div className="mt-1 h-1 bg-n100 rounded-full overflow-hidden">
+                                <div className="h-full rounded-full bg-warn" style={{ width: `${[75, 65, 88, 72][i]}%` }} />
                             </div>
                         </div>
                     ))}
@@ -303,25 +303,25 @@ const FEATURES = [
         tags: ['iptal', 'askıya al', 'oturum', 'kontrol', 'durdur', 'devam et', 'cancel', 'suspend', 'hazırlık', 'lobby', 'iptal et'],
         mockup: (
             <div className="space-y-2">
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                    <div className="text-[9px] text-slate-400 mb-2 font-medium uppercase tracking-wider">Hazırlık Ekranı</div>
+                <div className="bg-n50 border border-n200 rounded-md p-3">
+                    <div className="text-[11px] text-n400 mb-2 font-medium uppercase tracking-[0.08em]">Hazırlık Ekranı</div>
                     <div className="space-y-1.5">
-                        <div className="w-full flex items-center justify-center gap-1.5 bg-red-50 border border-red-200 text-red-600 rounded-lg py-1.5 text-[10px] font-semibold">
+                        <div className="w-full flex items-center justify-center gap-1.5 bg-bad-bg border border-transparent text-bad rounded-md py-1.5 text-[11px] font-semibold">
                             <AlertCircle className="w-3 h-3" /> Mülakatı İptal Et
                         </div>
-                        <div className="w-full flex items-center justify-center gap-1.5 bg-slate-100 border border-slate-200 text-slate-500 rounded-lg py-1.5 text-[10px] font-semibold">
+                        <div className="w-full flex items-center justify-center gap-1.5 bg-n100 border border-n200 text-n500 rounded-md py-1.5 text-[11px] font-semibold">
                             <Clock className="w-3 h-3" /> Askıya Al
                         </div>
                     </div>
                 </div>
                 <div className="grid grid-cols-2 gap-1.5">
-                    <div className="bg-red-50 border border-red-100 rounded-lg p-2 text-center">
-                        <div className="text-[9px] font-bold text-red-600 mb-0.5">İptal</div>
-                        <div className="text-[8px] text-red-500">Kalıcı · Geri alınamaz</div>
+                    <div className="bg-bad-bg border border-transparent rounded-md p-2 text-center">
+                        <div className="text-[11px] font-semibold text-bad mb-0.5">İptal</div>
+                        <div className="text-[11px] text-bad">Kalıcı · Geri alınamaz</div>
                     </div>
-                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-2 text-center">
-                        <div className="text-[9px] font-bold text-slate-600 mb-0.5">Askıya Al</div>
-                        <div className="text-[8px] text-slate-400">Geçici · Devam edilebilir</div>
+                    <div className="bg-n50 border border-n200 rounded-md p-2 text-center">
+                        <div className="text-[11px] font-semibold text-n600 mb-0.5">Askıya Al</div>
+                        <div className="text-[11px] text-n400">Geçici · Devam edilebilir</div>
                     </div>
                 </div>
             </div>
@@ -345,15 +345,15 @@ const FEATURES = [
         tags: ['rapor', 'star', 'değerlendirme', 'analiz', 'skor', 'pdf', 'sonuç', 'yetkinlik'],
         mockup: (
             <div className="space-y-2">
-                <div className="bg-violet-50 border border-violet-100 rounded-xl p-3">
-                    <div className="text-[10px] font-semibold text-violet-700 mb-2">STAR Skoru — Zeynep K.</div>
+                <div className="bg-brand-50 border border-brand-100 rounded-md p-3">
+                    <div className="text-[11px] font-semibold text-brand-700 mb-2">STAR Skoru — Zeynep K.</div>
                     {[['Durum Analizi', 85], ['Görev Yönetimi', 72], ['Aksiyon Gücü', 91], ['Sonuç Odaklılık', 88]].map(([l, v]) => (
                         <div key={l} className="flex items-center gap-2 mb-1">
-                            <span className="text-[9px] text-slate-500 w-28">{l}</span>
-                            <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                <div className="h-full bg-violet-400 rounded-full" style={{ width: v + '%' }} />
+                            <span className="text-[11px] text-n500 w-28">{l}</span>
+                            <div className="flex-1 h-1.5 bg-n100 rounded-full overflow-hidden">
+                                <div className="h-full bg-brand rounded-full" style={{ width: v + '%' }} />
                             </div>
-                            <span className="text-[9px] font-bold text-violet-600">{v}</span>
+                            <span className="text-[11px] font-semibold text-brand">{v}</span>
                         </div>
                     ))}
                 </div>
@@ -380,10 +380,10 @@ const FEATURES = [
         tags: ['toplu', 'batch', 'cv', 'yükleme', 'upload', 'sıralı', 'kuyruğu', 'işleme', 'pdf', 'docx', 'çoklu', 'aday ekle'],
         mockup: (
             <div className="space-y-2">
-                <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+                <div className="bg-brand-50 border border-brand-100 rounded-md p-3">
                     <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] font-semibold text-blue-700">Yükleme Kuyruğu</span>
-                        <span className="text-[9px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full">3/5</span>
+                        <span className="text-[11px] font-semibold text-brand-700">Yükleme Kuyruğu</span>
+                        <span className="text-[11px] bg-brand-100 text-brand-600 px-1.5 py-0.5 rounded-full">3/5</span>
                     </div>
                     {[
                         { name: 'ahmet_yilmaz.pdf', status: 'Tamamlandı', color: '#10b981' },
@@ -391,20 +391,20 @@ const FEATURES = [
                         { name: 'mert_a.pdf', status: 'Bekliyor', color: '#94a3b8' },
                     ].map((f, i) => (
                         <div key={i} className="flex items-center gap-2 mb-1">
-                            <FileText className="w-3 h-3 text-blue-400 shrink-0" />
-                            <span className="text-[9px] text-slate-600 flex-1 truncate">{f.name}</span>
-                            <span className="text-[8px] font-medium" style={{ color: f.color }}>{f.status}</span>
+                            <FileText className="w-3 h-3 text-brand shrink-0" />
+                            <span className="text-[11px] text-n600 flex-1 truncate">{f.name}</span>
+                            <span className="text-[11px] font-medium" style={{ color: f.color }}>{f.status}</span>
                         </div>
                     ))}
                 </div>
                 <div className="flex gap-2 text-center">
-                    <div className="flex-1 bg-emerald-50 border border-emerald-100 rounded-lg p-1.5">
-                        <div className="text-xs font-bold text-emerald-600">3</div>
-                        <div className="text-[8px] text-emerald-500">Eklendi</div>
+                    <div className="flex-1 bg-ok-bg border border-transparent rounded-md p-1.5">
+                        <div className="text-xs font-semibold text-ok">3</div>
+                        <div className="text-[11px] text-ok">Eklendi</div>
                     </div>
-                    <div className="flex-1 bg-amber-50 border border-amber-100 rounded-lg p-1.5">
-                        <div className="text-xs font-bold text-amber-600">%78</div>
-                        <div className="text-[8px] text-amber-500">Ort. Skor</div>
+                    <div className="flex-1 bg-warn-bg border border-transparent rounded-md p-1.5">
+                        <div className="text-xs font-semibold text-warn">%78</div>
+                        <div className="text-[11px] text-warn">Ort. Skor</div>
                     </div>
                 </div>
             </div>
@@ -436,17 +436,17 @@ const FEATURES = [
                         { q: 'Takım çalışmasında zorlandığınız bir durumu anlatın.', badge: 'AI ✓' },
                         { q: 'En büyük teknik başarınız neydi?', badge: 'Düzenlendi' },
                     ].map((q, i) => (
-                        <div key={i} className="flex items-start gap-2 bg-violet-50 border border-violet-100 rounded-xl p-2">
-                            <FileQuestion className="w-3 h-3 text-violet-400 mt-0.5 shrink-0" />
-                            <span className="text-[9px] text-slate-600 flex-1 leading-relaxed">{q.q}</span>
-                            <span className="text-[7px] bg-violet-200 text-violet-700 px-1.5 rounded-full shrink-0">{q.badge}</span>
+                        <div key={i} className="flex items-start gap-2 bg-brand-50 border border-brand-100 rounded-md p-2">
+                            <FileQuestion className="w-3 h-3 text-brand mt-0.5 shrink-0" />
+                            <span className="text-[11px] text-n600 flex-1 leading-relaxed">{q.q}</span>
+                            <span className="text-[7px] bg-brand-200 text-brand-700 px-1.5 rounded-full shrink-0">{q.badge}</span>
                         </div>
                     ))}
                 </div>
                 <div className="flex gap-1 flex-wrap">
                     {[{ l: 'Çok İyi', c: '#10b981', v: 3 }, { l: 'İyi', c: '#3b82f6', v: 5 }, { l: 'Orta', c: '#f59e0b', v: 2 }, { l: 'Zayıf', c: '#ef4444', v: 1 }].map(b => (
-                        <div key={b.l} className="flex items-center gap-1 px-2 py-0.5 rounded-full border text-[8px]" style={{ borderColor: b.c + '40', background: b.c + '10', color: b.c }}>
-                            {b.l} <span className="font-bold">{b.v}</span>
+                        <div key={b.l} className="flex items-center gap-1 px-2 py-0.5 rounded-full border text-[11px]" style={{ borderColor: b.c + '40', background: b.c + '10', color: b.c }}>
+                            {b.l} <span className="font-semibold">{b.v}</span>
                         </div>
                     ))}
                 </div>
@@ -475,20 +475,20 @@ const FEATURES = [
             <div className="space-y-2">
                 <div className="flex gap-1 mb-2">
                     {['Genel Bakış', 'Edinme', 'Yanıtlar'].map((t, i) => (
-                        <div key={t} className={`px-2 py-1 rounded-lg text-[9px] font-medium ${i === 0 ? 'bg-cyan-500 text-white' : 'bg-slate-100 text-slate-500'}`}>{t}</div>
+                        <div key={t} className={`px-2 py-1 rounded-md text-[11px] font-medium ${i === 0 ? 'bg-brand text-white' : 'bg-n100 text-n500'}`}>{t}</div>
                     ))}
                 </div>
                 <div className="grid grid-cols-2 gap-1.5">
                     {[{ l: 'Toplam Aday', v: '124', c: '#3b82f6' }, { l: 'Ort. Skor', v: '%82', c: '#10b981' }, { l: 'Mülakatlar', v: '31', c: '#8b5cf6' }, { l: 'İşe Alım', v: '8', c: '#f59e0b' }].map(k => (
-                        <div key={k.l} className="bg-white border border-slate-100 rounded-lg p-2 text-center">
-                            <div className="text-sm font-bold" style={{ color: k.c }}>{k.v}</div>
-                            <div className="text-[9px] text-slate-400">{k.l}</div>
+                        <div key={k.l} className="bg-n0 border border-n200 rounded-md p-2 text-center">
+                            <div className="text-sm font-semibold" style={{ color: k.c }}>{k.v}</div>
+                            <div className="text-[11px] text-n400">{k.l}</div>
                         </div>
                     ))}
                 </div>
                 <div className="flex items-end gap-1 h-12 px-1">
                     {[40, 65, 55, 80, 70, 90, 75].map((h, i) => (
-                        <div key={i} className="flex-1 bg-cyan-100 rounded-sm" style={{ height: h + '%' }} />
+                        <div key={i} className="flex-1 bg-brand-100 rounded-sm" style={{ height: h + '%' }} />
                     ))}
                 </div>
             </div>
@@ -514,21 +514,21 @@ const FEATURES = [
         tags: ['mesaj', 'kuyruk', 'linkedin', 'email', 'e-posta', 'yazışma', 'yanıt', 'thread', 'gmail', 'takip', 'bildirim'],
         mockup: (
             <div className="space-y-2">
-                <div className="flex gap-1 p-0.5 bg-slate-100 rounded-lg">
-                    <div className="flex-1 bg-white rounded-md px-2 py-1 text-center text-[8px] font-semibold text-pink-600 shadow-sm">Mesaj Kuyruğu</div>
-                    <div className="flex-1 px-2 py-1 text-center text-[8px] text-slate-400">E-posta Yazışmaları</div>
+                <div className="flex gap-1 p-0.5 bg-n100 rounded-md">
+                    <div className="flex-1 bg-n0 rounded-md px-2 py-1 text-center text-[11px] font-semibold text-pink-600 shadow-sm">Mesaj Kuyruğu</div>
+                    <div className="flex-1 px-2 py-1 text-center text-[11px] text-n400">E-posta Yazışmaları</div>
                 </div>
                 {[
                     { name: 'Zeynep K.', sub: 'Teknik Mülakat Daveti', replied: true },
                     { name: 'Mert A.', sub: 'İK Mülakat Daveti', replied: false },
                 ].map((t, i) => (
-                    <div key={i} className="flex items-center gap-2 bg-white border border-slate-100 rounded-xl p-2">
-                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[9px] font-bold ${t.replied ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{t.name[0]}</div>
+                    <div key={i} className="flex items-center gap-2 bg-n0 border border-n200 rounded-md p-2">
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold ${t.replied ? 'bg-ok-bg text-ok' : 'bg-n100 text-n500'}`}>{t.name[0]}</div>
                         <div className="flex-1 min-w-0">
-                            <div className="text-[10px] font-semibold text-slate-700">{t.name}</div>
-                            <div className="text-[8px] text-slate-400 truncate">{t.sub}</div>
+                            <div className="text-[11px] font-semibold text-n700">{t.name}</div>
+                            <div className="text-[11px] text-n400 truncate">{t.sub}</div>
                         </div>
-                        {t.replied && <span className="text-[7px] bg-emerald-50 text-emerald-600 border border-emerald-100 px-1.5 py-0.5 rounded-full font-bold">Yanıt Var</span>}
+                        {t.replied && <span className="text-[7px] bg-ok-bg text-ok border border-transparent px-1.5 py-0.5 rounded-full font-semibold">Yanıt Var</span>}
                     </div>
                 ))}
             </div>
@@ -552,23 +552,23 @@ const FEATURES = [
         tags: ['email', 'e-posta', 'şablon', 'html', 'marka', 'logo', 'tasarım', 'davet', 'kurumsal', 'bildirim'],
         mockup: (
             <div className="space-y-2">
-                <div className="border border-slate-200 rounded-xl overflow-hidden text-[9px]">
-                    <div className="bg-[#13294E] px-3 py-2 text-center">
-                        <div className="inline-block bg-white/20 rounded-lg px-2 py-0.5 text-white font-bold">Şirket Adı</div>
+                <div className="border border-n200 rounded-md overflow-hidden text-[11px]">
+                    <div className="bg-brand px-3 py-2 text-center">
+                        <div className="inline-block bg-n0/20 rounded-md px-2 py-0.5 text-white font-semibold">Şirket Adı</div>
                         <div className="text-white/70 text-[7px] mt-0.5">Akıllı İK Platformu</div>
                     </div>
-                    <div className="bg-white px-3 py-2 space-y-1.5">
-                        <div className="font-bold text-slate-800 text-[10px]">Mülakat Davetiniz</div>
-                        <div className="text-slate-500 leading-relaxed">Merhaba <strong>Zeynep K.</strong>, sizinle tanışmak isteriz.</div>
-                        <div className="bg-blue-50 border-l-2 border-blue-500 pl-2 py-1 space-y-0.5">
-                            <div className="text-slate-600">📋 Frontend Developer</div>
-                            <div className="text-slate-600">📅 25 Mart 2026 · 14:00</div>
+                    <div className="bg-n0 px-3 py-2 space-y-1.5">
+                        <div className="font-semibold text-n900 text-[11px]">Mülakat Davetiniz</div>
+                        <div className="text-n500 leading-relaxed">Merhaba <strong>Zeynep K.</strong>, sizinle tanışmak isteriz.</div>
+                        <div className="bg-brand-50 border-l-2 border-brand pl-2 py-1 space-y-0.5">
+                            <div className="text-n600">📋 Frontend Developer</div>
+                            <div className="text-n600">📅 25 Mart 2026 · 14:00</div>
                         </div>
                         <div className="text-center">
-                            <span className="bg-[#13294E] text-white px-3 py-1 rounded text-[8px] font-bold inline-block">Mülakata Katıl →</span>
+                            <span className="bg-brand text-white px-3 py-1 rounded text-[11px] font-semibold inline-block">Mülakata Katıl →</span>
                         </div>
                     </div>
-                    <div className="bg-slate-50 border-t border-slate-100 px-3 py-1.5 text-center text-slate-400 text-[7px]">Talent-Inn Platformu</div>
+                    <div className="bg-n50 border-t border-n200 px-3 py-1.5 text-center text-n400 text-[7px]">Talent-Inn Platformu</div>
                 </div>
             </div>
         )
@@ -592,18 +592,18 @@ const FEATURES = [
         tags: ['google', 'gmail', 'takvim', 'calendar', 'entegrasyon', 'meet', 'email', 'bağlantı'],
         mockup: (
             <div className="space-y-2.5">
-                <div className="flex items-center gap-3 bg-white border border-slate-100 rounded-xl p-3">
-                    <div className="w-10 h-10 rounded-full bg-white border border-slate-100 shadow-sm flex items-center justify-center p-2">
+                <div className="flex items-center gap-3 bg-n0 border border-n200 rounded-md p-3">
+                    <div className="w-10 h-10 rounded-full bg-n0 border border-n200 shadow-sm flex items-center justify-center p-2">
                         <svg viewBox="0 0 24 24" className="w-full h-full"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" /><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" /><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" /><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" /></svg>
                     </div>
                     <div className="flex-1">
-                        <div className="text-xs font-semibold text-slate-700">Google Workspace</div>
-                        <div className="text-[9px] text-emerald-500 flex items-center gap-1">
+                        <div className="text-xs font-semibold text-n700">Google Workspace</div>
+                        <div className="text-[11px] text-ok flex items-center gap-1">
                             <CheckCircle className="w-2.5 h-2.5" /> Bağlı
                         </div>
                     </div>
                 </div>
-                <div className="bg-emerald-50 border border-emerald-100 rounded-lg p-2 text-center text-[9px] text-emerald-600 font-medium">
+                <div className="bg-ok-bg border border-transparent rounded-md p-2 text-center text-[11px] text-ok font-medium">
                     meet.google.com/abc-def-ghi — Hazır
                 </div>
             </div>
@@ -634,12 +634,12 @@ const FEATURES = [
                     { name: 'Kariyer Portalları', subs: 3, color: '#ec4899' },
                     { name: 'Referral / Öneri', subs: 3, color: '#10b981' },
                 ].map((s, i) => (
-                    <div key={i} className="flex items-center gap-3 bg-white border border-slate-100 rounded-xl p-2.5">
-                        <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: s.color + '20' }}>
+                    <div key={i} className="flex items-center gap-3 bg-n0 border border-n200 rounded-md p-2.5">
+                        <div className="w-7 h-7 rounded-md flex items-center justify-center" style={{ background: s.color + '20' }}>
                             <Share2 className="w-3.5 h-3.5" style={{ color: s.color }} />
                         </div>
-                        <div className="flex-1 text-xs font-medium text-slate-700">{s.name}</div>
-                        <div className="text-[9px] text-slate-400">{s.subs} alt detay</div>
+                        <div className="flex-1 text-xs font-medium text-n700">{s.name}</div>
+                        <div className="text-[11px] text-n400">{s.subs} alt detay</div>
                     </div>
                 ))}
             </div>
@@ -669,14 +669,14 @@ const FEATURES = [
                     { name: 'Ürün', users: 2, open: 1, color: '#8b5cf6' },
                     { name: 'Satış', users: 3, open: 2, color: '#f59e0b' },
                 ].map((d, i) => (
-                    <div key={i} className="flex items-center gap-3 bg-white border border-slate-100 rounded-xl p-2.5">
-                        <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: d.color + '18', border: `1px solid ${d.color}30` }}>
+                    <div key={i} className="flex items-center gap-3 bg-n0 border border-n200 rounded-md p-2.5">
+                        <div className="w-8 h-8 rounded-md flex items-center justify-center" style={{ background: d.color + '18', border: `1px solid ${d.color}30` }}>
                             <Building2 className="w-4 h-4" style={{ color: d.color }} />
                         </div>
-                        <div className="flex-1 text-xs font-medium text-slate-700">{d.name}</div>
+                        <div className="flex-1 text-xs font-medium text-n700">{d.name}</div>
                         <div className="flex items-center gap-2">
-                            <span className="text-[9px] text-slate-400">{d.users} kullanıcı</span>
-                            <span className="text-[9px] bg-emerald-50 text-emerald-600 px-1 rounded">{d.open} açık</span>
+                            <span className="text-[11px] text-n400">{d.users} kullanıcı</span>
+                            <span className="text-[11px] bg-ok-bg text-ok px-1 rounded">{d.open} açık</span>
                         </div>
                     </div>
                 ))}
@@ -703,20 +703,20 @@ const FEATURES = [
         tags: ['marka', 'logo', 'renk', 'kurumsal', 'kimlik', 'email', 'e-posta', 'ayarlar', 'şablon', 'slogan'],
         mockup: (
             <div className="space-y-2">
-                <div className="border border-slate-200 rounded-xl overflow-hidden">
-                    <div className="bg-[#13294E] p-2 text-center">
-                        <div className="inline-block bg-white/20 rounded px-2 py-0.5 text-white text-[9px] font-bold">LOGO</div>
+                <div className="border border-n200 rounded-md overflow-hidden">
+                    <div className="bg-brand p-2 text-center">
+                        <div className="inline-block bg-n0/20 rounded px-2 py-0.5 text-white text-[11px] font-semibold">LOGO</div>
                     </div>
-                    <div className="p-2 space-y-1.5 bg-white">
+                    <div className="p-2 space-y-1.5 bg-n0">
                         {[['Şirket Adı', 'BTC Türk A.Ş.'], ['Slogan', 'Kripto & Blockchain'], ['Ana Renk', '#13294E']].map(([l, v]) => (
                             <div key={l} className="flex items-center gap-2">
-                                <span className="text-[8px] text-slate-400 w-16">{l}</span>
-                                <span className="text-[9px] font-medium text-slate-700">{v}</span>
+                                <span className="text-[11px] text-n400 w-16">{l}</span>
+                                <span className="text-[11px] font-medium text-n700">{v}</span>
                             </div>
                         ))}
                     </div>
                 </div>
-                <div className="bg-emerald-50 border border-emerald-100 rounded-lg px-2 py-1.5 text-center text-[9px] text-emerald-600 font-medium">Canlı Önizleme Aktif</div>
+                <div className="bg-ok-bg border border-transparent rounded-md px-2 py-1.5 text-center text-[11px] text-ok font-medium">Canlı Önizleme Aktif</div>
             </div>
         )
     },
@@ -740,17 +740,17 @@ const FEATURES = [
         mockup: (
             <div className="space-y-2">
                 {[{ d: 'btcturk.com', users: 12 }, { d: 'infoset.app', users: 5 }].map((item, i) => (
-                    <div key={i} className="flex items-center gap-2 bg-white border border-slate-100 rounded-xl p-2.5">
-                        <div className="w-7 h-7 rounded-lg bg-cyan-50 border border-cyan-100 flex items-center justify-center">
-                            <Globe className="w-3.5 h-3.5 text-cyan-500" />
+                    <div key={i} className="flex items-center gap-2 bg-n0 border border-n200 rounded-md p-2.5">
+                        <div className="w-7 h-7 rounded-md bg-brand-50 border border-brand-100 flex items-center justify-center">
+                            <Globe className="w-3.5 h-3.5 text-brand" />
                         </div>
-                        <div className="flex-1 text-xs font-medium text-slate-700">@{item.d}</div>
-                        <span className="text-[8px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded-full">{item.users} kullanıcı</span>
+                        <div className="flex-1 text-xs font-medium text-n700">@{item.d}</div>
+                        <span className="text-[11px] bg-ok-bg text-ok px-1.5 py-0.5 rounded-full">{item.users} kullanıcı</span>
                     </div>
                 ))}
-                <div className="border border-dashed border-slate-200 rounded-xl px-3 py-2 flex items-center gap-2">
-                    <span className="text-[9px] text-slate-400 flex-1">yenidomain.com ekle…</span>
-                    <span className="text-[9px] bg-cyan-50 text-cyan-600 px-2 py-0.5 rounded font-medium">Ekle</span>
+                <div className="border border-dashed border-n200 rounded-md px-3 py-2 flex items-center gap-2">
+                    <span className="text-[11px] text-n400 flex-1">yenidomain.com ekle…</span>
+                    <span className="text-[11px] bg-brand-50 text-brand px-2 py-0.5 rounded font-medium">Ekle</span>
                 </div>
             </div>
         )
@@ -774,17 +774,17 @@ const FEATURES = [
         tags: ['süper admin', 'yetki', 'rol', 'kullanıcı', 'davet', 'sistem', 'güvenlik', 'izin'],
         mockup: (
             <div className="space-y-2">
-                <div className="flex items-center justify-between bg-red-50 border border-red-100 rounded-xl p-2.5">
+                <div className="flex items-center justify-between bg-bad-bg border border-transparent rounded-md p-2.5">
                     <div className="flex items-center gap-2">
-                        <Shield className="w-4 h-4 text-red-500" />
-                        <span className="text-xs font-medium text-slate-700">Süper Admin</span>
+                        <Shield className="w-4 h-4 text-bad" />
+                        <span className="text-xs font-medium text-n700">Süper Admin</span>
                     </div>
-                    <span className="text-[9px] bg-red-100 text-red-500 px-1.5 py-0.5 rounded-full">Tam Yetki</span>
+                    <span className="text-[11px] bg-bad-bg text-bad px-1.5 py-0.5 rounded-full">Tam Yetki</span>
                 </div>
                 {[{ role: 'Recruiter', color: '#3b82f6' }, { role: 'Dept. Kullanıcısı', color: '#f59e0b' }].map((r, i) => (
-                    <div key={i} className="flex items-center justify-between bg-white border border-slate-100 rounded-xl p-2.5">
-                        <span className="text-xs font-medium text-slate-600">{r.role}</span>
-                        <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: r.color + '15', color: r.color }}>Kısıtlı</span>
+                    <div key={i} className="flex items-center justify-between bg-n0 border border-n200 rounded-md p-2.5">
+                        <span className="text-xs font-medium text-n600">{r.role}</span>
+                        <span className="text-[11px] px-1.5 py-0.5 rounded-full" style={{ background: r.color + '15', color: r.color }}>Kısıtlı</span>
                     </div>
                 ))}
             </div>
@@ -809,14 +809,14 @@ const FEATURES = [
         mockup: (
             <div className="space-y-2">
                 {[['Tema', '🌙 Koyu'], ['Dil', '🇹🇷 Türkçe'], ['Bildirimler', '✅ Açık']].map(([l, v]) => (
-                    <div key={l} className="flex items-center justify-between bg-white border border-slate-100 rounded-lg px-3 py-2">
-                        <span className="text-xs text-slate-600">{l}</span>
-                        <span className="text-[10px] font-medium text-slate-700">{v}</span>
+                    <div key={l} className="flex items-center justify-between bg-n0 border border-n200 rounded-md px-3 py-2">
+                        <span className="text-xs text-n600">{l}</span>
+                        <span className="text-[11px] font-medium text-n700">{v}</span>
                     </div>
                 ))}
-                <div className="bg-cyan-50 border border-cyan-100 rounded-lg px-3 py-2 flex items-center gap-2">
-                    <Mic className="w-3.5 h-3.5 text-cyan-500" />
-                    <span className="text-[10px] text-cyan-600 font-medium">STT Motoru — Hazır</span>
+                <div className="bg-brand-50 border border-brand-100 rounded-md px-3 py-2 flex items-center gap-2">
+                    <Mic className="w-3.5 h-3.5 text-brand" />
+                    <span className="text-[11px] text-brand font-medium">STT Motoru — Hazır</span>
                 </div>
             </div>
         )
@@ -881,31 +881,31 @@ export default function GuidePage() {
     const toggle = (id) => setExpanded(prev => prev === id ? null : id);
 
     return (
-        <div className="min-h-screen bg-slate-50">
+        <div className="min-h-screen bg-n50">
             {/* ── HERO ── */}
-            <div className="bg-white border-b border-slate-200 px-6 lg:px-10 py-10">
+            <div className="bg-n0 border-b border-n200 px-6 lg:px-10 py-10">
                 <div className="max-w-3xl mx-auto text-center space-y-4">
-                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-cyan-50 border border-cyan-100 text-cyan-600 text-xs font-semibold">
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-50 border border-brand-100 text-brand text-xs font-semibold">
                         <BookOpen className="w-3.5 h-3.5" /> Platform Kılavuzu
                     </div>
-                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
+                    <h1 className="text-3xl font-semibold text-n900 tracking-tight">
                         Talent-Inn'i Nasıl Kullanırsınız?
                     </h1>
-                    <p className="text-slate-500 text-sm leading-relaxed max-w-xl mx-auto">
+                    <p className="text-n500 text-sm leading-relaxed max-w-xl mx-auto">
                         Aday yönetiminden canlı AI mülakatına, analitik raporlardan ekip izolasyonuna — tüm özellikleri adım adım öğrenin.
                     </p>
                     {/* Search Bar */}
                     <div className="relative max-w-lg mx-auto pt-2">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-n400" />
                         <input
                             type="text"
                             value={query}
                             onChange={e => setQuery(e.target.value)}
                             placeholder="Özellik, kavram veya adım ara... (ör: 'mülakat planla', 'cv yükle', 'kaynak')"
-                            className="w-full pl-11 pr-10 py-3 text-sm border border-slate-200 rounded-xl bg-white outline-none focus:border-cyan-400 focus:ring-3 focus:ring-cyan-50 transition-all shadow-sm"
+                            className="w-full pl-11 pr-10 py-3 text-sm border border-n200 rounded-md bg-n0 outline-none focus:border-brand focus:ring-3 focus:ring-brand-50 transition-all shadow-sm"
                         />
                         {query && (
-                            <button onClick={() => setQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 hover:bg-slate-200 transition-all">
+                            <button onClick={() => setQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-n100 flex items-center justify-center text-n400 hover:bg-n100 transition-all">
                                 <span className="text-xs">×</span>
                             </button>
                         )}
@@ -914,8 +914,8 @@ export default function GuidePage() {
                     <div className="flex items-center justify-center gap-8 pt-2">
                         {[['13', 'Özellik'], ['6', 'Kategori'], ['75+', 'Adım']].map(([v, l]) => (
                             <div key={l} className="text-center">
-                                <div className="text-xl font-bold text-slate-800">{v}</div>
-                                <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">{l}</div>
+                                <div className="text-xl font-semibold text-n900">{v}</div>
+                                <div className="text-[11px] text-n400 font-medium uppercase tracking-wide">{l}</div>
                             </div>
                         ))}
                     </div>
@@ -926,41 +926,41 @@ export default function GuidePage() {
 
                 {/* ── QUICK START ── */}
                 {!query && (
-                    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                    <div className="bg-n0 rounded-[14px] border border-n200 overflow-hidden">
                         <button
                             onClick={() => setShowQuickStart(p => !p)}
-                            className="w-full flex items-center justify-between px-6 py-4 hover:bg-slate-50 transition-all"
+                            className="w-full flex items-center justify-between px-6 py-4 hover:bg-n50 transition-all"
                         >
                             <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-lg bg-cyan-50 border border-cyan-100 flex items-center justify-center">
-                                    <Play className="w-4 h-4 text-cyan-600" />
+                                <div className="w-8 h-8 rounded-md bg-brand-50 border border-brand-100 flex items-center justify-center">
+                                    <Play className="w-4 h-4 text-brand" />
                                 </div>
                                 <div className="text-left">
-                                    <h2 className="text-sm font-bold text-slate-800">Hızlı Başlangıç</h2>
-                                    <p className="text-xs text-slate-400">İlk işe alımınızı 6 adımda tamamlayın</p>
+                                    <h2 className="text-sm font-semibold text-n900">Hızlı Başlangıç</h2>
+                                    <p className="text-xs text-n400">İlk işe alımınızı 6 adımda tamamlayın</p>
                                 </div>
                             </div>
-                            <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform duration-300 ${showQuickStart ? 'rotate-180' : ''}`} />
+                            <ChevronDown className={`w-5 h-5 text-n400 transition-transform duration-300 ${showQuickStart ? 'rotate-180' : ''}`} />
                         </button>
 
                         {showQuickStart && (
                             <div className="px-6 pb-6">
                                 <div className="relative">
-                                    <div className="absolute left-5 top-6 bottom-6 w-px bg-slate-100 hidden sm:block" />
+                                    <div className="absolute left-5 top-6 bottom-6 w-px bg-n100 hidden sm:block" />
                                     <div className="space-y-4">
                                         {QUICK_STEPS.map((step, i) => {
                                             const Icon = step.icon;
                                             return (
                                                 <div key={i} className="flex gap-4 relative">
-                                                    <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 relative z-10 border" style={{ background: step.color + '15', borderColor: step.color + '30' }}>
+                                                    <div className="w-10 h-10 rounded-md flex items-center justify-center shrink-0 relative z-10 border" style={{ background: step.color + '15', borderColor: step.color + '30' }}>
                                                         <Icon className="w-4.5 h-4.5" style={{ color: step.color }} />
                                                     </div>
                                                     <div className="flex-1 pt-1.5">
                                                         <div className="flex items-center gap-2">
-                                                            <span className="text-[10px] font-bold text-slate-300">ADIM {step.num}</span>
-                                                            <h3 className="text-sm font-bold text-slate-800">{step.title}</h3>
+                                                            <span className="text-[11px] font-semibold text-n300">ADIM {step.num}</span>
+                                                            <h3 className="text-sm font-semibold text-n900">{step.title}</h3>
                                                         </div>
-                                                        <p className="text-xs text-slate-500 mt-1 leading-relaxed">{step.desc}</p>
+                                                        <p className="text-xs text-n500 mt-1 leading-relaxed">{step.desc}</p>
                                                     </div>
                                                 </div>
                                             );
@@ -981,10 +981,10 @@ export default function GuidePage() {
                                 <button
                                     key={cat.id}
                                     onClick={() => setCategory(cat.id)}
-                                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all border ${
+                                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-all border ${
                                         category === cat.id
-                                            ? 'bg-cyan-500 text-white border-cyan-500 shadow-sm'
-                                            : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300 hover:text-slate-700'
+                                            ? 'bg-brand text-white border-brand shadow-sm'
+                                            : 'bg-n0 text-n500 border-n200 hover:border-n300 hover:text-n700'
                                     }`}
                                 >
                                     <Icon className="w-3.5 h-3.5" />
@@ -998,20 +998,20 @@ export default function GuidePage() {
                 {/* ── SEARCH STATUS ── */}
                 {query && (
                     <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2 text-sm text-slate-500">
-                            <Search className="w-4 h-4 text-slate-400" />
-                            <span>"{query}" için <span className="font-semibold text-slate-700">{filtered.length}</span> sonuç</span>
+                        <div className="flex items-center gap-2 text-sm text-n500">
+                            <Search className="w-4 h-4 text-n400" />
+                            <span>"{query}" için <span className="font-semibold text-n700">{filtered.length}</span> sonuç</span>
                         </div>
-                        <button onClick={() => setQuery('')} className="text-xs text-cyan-600 hover:text-cyan-700 font-medium">Temizle</button>
+                        <button onClick={() => setQuery('')} className="text-xs text-brand hover:text-brand font-medium">Temizle</button>
                     </div>
                 )}
 
                 {/* ── FEATURES LIST ── */}
                 {filtered.length === 0 ? (
-                    <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-200">
-                        <Search className="w-10 h-10 text-slate-200 mx-auto mb-3" />
-                        <h3 className="text-base font-semibold text-slate-600">Sonuç bulunamadı</h3>
-                        <p className="text-sm text-slate-400 mt-1 max-w-xs mx-auto">Farklı anahtar kelimeler deneyin: "mülakat", "aday", "rapor", "google"</p>
+                    <div className="text-center py-20 bg-n0 rounded-[14px] border border-dashed border-n200">
+                        <Search className="w-10 h-10 text-n200 mx-auto mb-3" />
+                        <h3 className="text-base font-semibold text-n600">Sonuç bulunamadı</h3>
+                        <p className="text-sm text-n400 mt-1 max-w-xs mx-auto">Farklı anahtar kelimeler deneyin: "mülakat", "aday", "rapor", "google"</p>
                     </div>
                 ) : (
                     <div className="space-y-3">
@@ -1020,59 +1020,59 @@ export default function GuidePage() {
                             const isOpen = expanded === feature.id;
 
                             return (
-                                <div key={feature.id} className={`bg-white rounded-2xl border overflow-hidden transition-all duration-300 ${isOpen ? 'border-cyan-200 shadow-sm' : 'border-slate-200 hover:border-slate-300'}`}>
+                                <div key={feature.id} className={`bg-n0 rounded-[14px] border overflow-hidden transition-all duration-300 ${isOpen ? 'border-brand-100 shadow-sm' : 'border-n200 hover:border-n300'}`}>
                                     {/* Card Header */}
                                     <button
                                         onClick={() => toggle(feature.id)}
                                         className="w-full flex items-center gap-4 px-5 py-4 text-left"
                                     >
-                                        <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border" style={{ background: feature.color + '15', borderColor: feature.color + '25' }}>
+                                        <div className="w-10 h-10 rounded-md flex items-center justify-center shrink-0 border" style={{ background: feature.color + '15', borderColor: feature.color + '25' }}>
                                             <Icon className="w-5 h-5" style={{ color: feature.color }} />
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2">
-                                                <h3 className="text-sm font-bold text-slate-800">{feature.title}</h3>
-                                                <span className="hidden sm:block text-[10px] text-slate-400 font-medium">{feature.subtitle}</span>
+                                                <h3 className="text-sm font-semibold text-n900">{feature.title}</h3>
+                                                <span className="hidden sm:block text-[11px] text-n400 font-medium">{feature.subtitle}</span>
                                             </div>
-                                            <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">{feature.description}</p>
+                                            <p className="text-xs text-n500 mt-0.5 line-clamp-1">{feature.description}</p>
                                         </div>
-                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all shrink-0 ${isOpen ? 'bg-cyan-50 text-cyan-500' : 'bg-slate-50 text-slate-300'}`}>
+                                        <div className={`w-8 h-8 rounded-md flex items-center justify-center transition-all shrink-0 ${isOpen ? 'bg-brand-50 text-brand' : 'bg-n50 text-n300'}`}>
                                             <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
                                         </div>
                                     </button>
 
                                     {/* Expanded Content */}
                                     {isOpen && (
-                                        <div className="border-t border-slate-100 px-5 py-5">
+                                        <div className="border-t border-n200 px-5 py-5">
                                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                                 {/* LEFT: Description + Steps + Tip */}
                                                 <div className="space-y-5">
-                                                    <p className="text-sm text-slate-600 leading-relaxed">{feature.description}</p>
+                                                    <p className="text-sm text-n600 leading-relaxed">{feature.description}</p>
 
                                                     {/* Steps */}
                                                     <div>
                                                         <div className="flex items-center gap-2 mb-3">
-                                                            <ArrowRight className="w-3.5 h-3.5 text-cyan-500" />
-                                                            <span className="text-xs font-bold text-slate-600 uppercase tracking-wide">Nasıl Kullanılır?</span>
+                                                            <ArrowRight className="w-3.5 h-3.5 text-brand" />
+                                                            <span className="text-xs font-semibold text-n600 uppercase tracking-wide">Nasıl Kullanılır?</span>
                                                         </div>
                                                         <div className="space-y-2.5">
                                                             {feature.steps.map((step, i) => (
                                                                 <div key={i} className="flex gap-3">
-                                                                    <div className="w-5 h-5 rounded-lg text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5 border" style={{ background: feature.color + '15', borderColor: feature.color + '25', color: feature.color }}>
+                                                                    <div className="w-5 h-5 rounded-md text-[11px] font-semibold flex items-center justify-center shrink-0 mt-0.5 border" style={{ background: feature.color + '15', borderColor: feature.color + '25', color: feature.color }}>
                                                                         {i + 1}
                                                                     </div>
-                                                                    <p className="text-sm text-slate-600 leading-relaxed flex-1">{step}</p>
+                                                                    <p className="text-sm text-n600 leading-relaxed flex-1">{step}</p>
                                                                 </div>
                                                             ))}
                                                         </div>
                                                     </div>
 
                                                     {/* Tip */}
-                                                    <div className="flex gap-3 p-3 bg-amber-50 border border-amber-100 rounded-xl">
-                                                        <Lightbulb className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                                                    <div className="flex gap-3 p-3 bg-warn-bg border border-transparent rounded-md">
+                                                        <Lightbulb className="w-4 h-4 text-warn shrink-0 mt-0.5" />
                                                         <div>
-                                                            <div className="text-[10px] font-bold text-amber-600 uppercase tracking-wide mb-1">Profesyonel İpucu</div>
-                                                            <p className="text-xs text-amber-700 leading-relaxed">{feature.tip}</p>
+                                                            <div className="text-[11px] font-semibold text-warn uppercase tracking-wide mb-1">Profesyonel İpucu</div>
+                                                            <p className="text-xs text-warn leading-relaxed">{feature.tip}</p>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1080,16 +1080,16 @@ export default function GuidePage() {
                                                 {/* RIGHT: Visual Mockup */}
                                                 <div>
                                                     <div className="flex items-center gap-2 mb-3">
-                                                        <Eye className="w-3.5 h-3.5 text-slate-400" />
-                                                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">Arayüz Önizlemesi</span>
+                                                        <Eye className="w-3.5 h-3.5 text-n400" />
+                                                        <span className="text-xs font-semibold text-n500 uppercase tracking-wide">Arayüz Önizlemesi</span>
                                                     </div>
-                                                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                                                    <div className="bg-n50 border border-n200 rounded-md p-4">
                                                         {/* Window chrome */}
                                                         <div className="flex items-center gap-1.5 mb-3">
-                                                            <div className="w-2 h-2 rounded-full bg-red-300" />
-                                                            <div className="w-2 h-2 rounded-full bg-amber-300" />
-                                                            <div className="w-2 h-2 rounded-full bg-emerald-300" />
-                                                            <div className="flex-1 mx-2 h-4 bg-white border border-slate-100 rounded-md" />
+                                                            <div className="w-2 h-2 rounded-full bg-bad" />
+                                                            <div className="w-2 h-2 rounded-full bg-warn" />
+                                                            <div className="w-2 h-2 rounded-full bg-ok" />
+                                                            <div className="flex-1 mx-2 h-4 bg-n0 border border-n200 rounded-md" />
                                                         </div>
                                                         {feature.mockup}
                                                     </div>
@@ -1115,7 +1115,7 @@ export default function GuidePage() {
                                                             const view = navMap[feature.id] || 'dashboard';
                                                             window.dispatchEvent(new CustomEvent('changeView', { detail: view }));
                                                         }}
-                                                        className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 text-xs font-semibold rounded-xl border transition-all hover:border-cyan-300 hover:text-cyan-600 hover:bg-cyan-50 text-slate-500 border-slate-200"
+                                                        className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 text-xs font-semibold rounded-md border transition-all hover:border-brand-200 hover:text-brand hover:bg-brand-50 text-n500 border-n200"
                                                     >
                                                         Sayfaya Git <ChevronRight className="w-3.5 h-3.5" />
                                                     </button>
@@ -1131,17 +1131,17 @@ export default function GuidePage() {
 
                 {/* ── FOOTER CTA ── */}
                 {!query && (
-                    <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center space-y-4">
-                        <div className="w-12 h-12 rounded-2xl bg-cyan-50 border border-cyan-100 flex items-center justify-center mx-auto">
-                            <Zap className="w-6 h-6 text-cyan-600" />
+                    <div className="bg-n0 rounded-[14px] border border-n200 p-8 text-center space-y-4">
+                        <div className="w-12 h-12 rounded-[14px] bg-brand-50 border border-brand-100 flex items-center justify-center mx-auto">
+                            <Zap className="w-6 h-6 text-brand" />
                         </div>
                         <div>
-                            <h3 className="text-base font-bold text-slate-800">Kullanmaya Hazır mısınız?</h3>
-                            <p className="text-sm text-slate-400 mt-1 max-w-md mx-auto">Hızlı başlangıç kılavuzunu tamamladınız. Kontrol Paneli'nden ilk pozisyonunuzu oluşturmaya başlayın.</p>
+                            <h3 className="text-base font-semibold text-n900">Kullanmaya Hazır mısınız?</h3>
+                            <p className="text-sm text-n400 mt-1 max-w-md mx-auto">Hızlı başlangıç kılavuzunu tamamladınız. Kontrol Paneli'nden ilk pozisyonunuzu oluşturmaya başlayın.</p>
                         </div>
                         <button
                             onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'dashboard' }))}
-                            className="inline-flex items-center gap-2 px-6 py-2.5 bg-cyan-500 hover:bg-cyan-600 text-white text-sm font-semibold rounded-xl transition-all"
+                            className="inline-flex items-center gap-2 px-6 py-2.5 bg-brand hover:bg-brand-600 text-white text-sm font-semibold rounded-md transition-all"
                         >
                             Kontrol Paneline Git <ArrowRight className="w-4 h-4" />
                         </button>
