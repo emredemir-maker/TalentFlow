@@ -1901,50 +1901,751 @@ export default function LiveInterviewPage() {
             return <CandidateExitPage />;
         }
         return (
-            <div className="min-h-screen bg-[#0F172A] flex flex-col items-center justify-center p-6 text-white font-sans italic">
-                <div className="bg-[#1E293B]/50 backdrop-blur-3xl p-12 rounded-[3rem] border border-white/10 shadow-2xl flex flex-col items-center gap-8 max-w-lg text-center animate-in zoom-in duration-500">
-                    <div className="w-24 h-24 rounded-3xl bg-emerald-500/20 flex items-center justify-center border border-emerald-500/30 relative">
-                        <CheckCircle2 className="w-12 h-12 text-emerald-400" />
-                        <div className="absolute -inset-2 bg-emerald-500/20 rounded-full blur-2xl animate-pulse" />
+            <div className="infoset min-h-screen bg-n25 flex flex-col items-center justify-center p-6">
+                <div className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-9 flex flex-col items-center gap-6 max-w-[440px] w-full text-center">
+                    <div className="w-14 h-14 rounded-full bg-ok-bg text-ok flex items-center justify-center">
+                        <CheckCircle2 className="w-7 h-7" />
                     </div>
-                    <div className="space-y-3">
-                        <h1 className="text-3xl font-black italic uppercase tracking-tighter">Mülakat Tamamlandı</h1>
-                        <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest max-w-xs mx-auto">
-                            Oturum verileri başarıyla kaydedildi ve analiz motoru raporu hazırladı.
+                    <div>
+                        <h1 className="text-[18px] font-semibold tracking-[-0.01em] m-0">Mülakat tamamlandı</h1>
+                        <p className="text-[12px] text-n500 mt-1.5 leading-relaxed m-0">
+                            Oturum kaydedildi ve rapor oluşturuldu.
                         </p>
                     </div>
 
-                    <div className="w-full h-px bg-white/5" />
+                    <div className="w-full h-px bg-n200" />
 
-                    <div className="grid grid-cols-2 gap-4 w-full">
-                        <div className="p-4 bg-white/5 rounded-2xl border border-white/5 flex flex-col gap-1">
-                            <span className="text-[8px] font-black text-white/30 uppercase tracking-widest">LOYALTY SCORE</span>
-                            <span className="text-xl font-black text-blue-400">%{logicIntegrity}</span>
+                    {/* Eskiden bu kutu "LOYALTY SCORE" yazıyordu — ölçülen şey o
+                        değil: canlı analizin ürettiği beş yetkinliğin düz
+                        ortalaması. Ad artık ölçtüğü şeyi söylüyor. */}
+                    <div className="w-full flex items-center gap-2 bg-n50 border border-n200 rounded-md px-3 py-2.5">
+                        <span className="text-[12px] text-n500">Yetkinlik ortalaması</span>
+                        <div className="flex-1 h-1.5 bg-n100 rounded-full overflow-hidden">
+                            <div className="h-full bg-brand rounded-full" style={{ width: `${logicIntegrity}%` }} />
                         </div>
-                        <div className="p-4 bg-white/5 rounded-2xl border border-white/5 flex flex-col gap-1">
-                            <span className="text-[8px] font-black text-white/30 uppercase tracking-widest">STATUS</span>
-                            <span className="text-[14px] font-black text-emerald-400 uppercase italic">SAVED</span>
-                        </div>
+                        <span className="text-[13px] font-semibold text-brand tabular-nums">%{logicIntegrity}</span>
                     </div>
 
-                    <div className="flex flex-col gap-3 w-full">
+                    <div className="flex flex-col gap-2 w-full">
                         <button
                             onClick={() => navigate(`/interview-report/${sessionId}`)}
-                            className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all shadow-xl shadow-blue-500/20 flex items-center justify-center gap-3"
+                            className="w-full flex items-center justify-center gap-2 text-[13px] font-semibold text-white bg-brand hover:bg-brand-600 rounded-md py-2.5"
                         >
-                            <FileText className="w-4 h-4" /> REPORU GÖRÜNTÜLE
+                            <FileText className="w-3.5 h-3.5" /> Raporu görüntüle
                         </button>
                         <button
                             onClick={() => navigate('/')}
-                            className="w-full h-14 bg-white/5 hover:bg-white/10 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all flex items-center justify-center gap-3"
+                            className="w-full flex items-center justify-center gap-2 text-[13px] font-medium text-n600 bg-n50 border border-n200 hover:bg-n100 rounded-md py-2.5"
                         >
-                            <ArrowLeft className="w-4 h-4" /> KONTROL PANELİNE DÖN
+                            <ArrowLeft className="w-3.5 h-3.5" /> Kontrol paneline dön
                         </button>
                     </div>
                 </div>
             </div>
         );
     }
+
+    // ═══ CANLI MÜLAKAT — MÜLAKATÇI GÖRÜNÜMÜ (Infoset) ══════════════════════
+    // Aday görünümü aşağıda, koyu hâliyle duruyor: prototipte aday ekranının
+    // karşılığı yok ve WebRTC/onay akışı burada. Dokunulmadı.
+    if (isRecruiter) {
+        const elapsedLabel =
+            `${Math.floor(elapsedTime / 60).toString().padStart(2, '0')}:${String(elapsedTime % 60).padStart(2, '0')}`;
+        const activeQuestion = questions[currentQuestionIndex];
+
+        return (
+            <div className="infoset fixed inset-0 z-[200] bg-n25 flex flex-col overflow-hidden">
+                {/* ── Başlık ─────────────────────────────────────────────── */}
+                <header className="h-[52px] shrink-0 bg-n0 border-b border-n200 px-[18px] flex items-center gap-3 z-20">
+                    <div className="flex items-center gap-2">
+                        <span className="w-7 h-7 rounded-md bg-bad-bg text-bad flex items-center justify-center">
+                            <Video className="w-[15px] h-[15px]" />
+                        </span>
+                        <div>
+                            <h1 className="text-[14px] font-semibold tracking-[-0.01em] m-0">Canlı Mülakat</h1>
+                            <span className="text-[11px] text-n400">
+                                {candidateData?.name}
+                                {candidateData?.position ? ` · ${candidateData.position}` : ''}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="ml-auto flex items-center gap-2">
+                        {phase === 'active' && (
+                            <>
+                                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-bad-bg">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-bad animate-pulse" />
+                                    <span className="text-[11px] font-semibold text-bad tabular-nums">{elapsedLabel}</span>
+                                </div>
+
+                                {/* Aday Durum Göstergesi — effectiveSession, apiSession
+                                    (Firestore) ile birleştirilmiş hâli okuyor. */}
+                                {(() => {
+                                    const cs = effectiveSession?.candidateStatus;
+                                    if (cs === 'admitted') {
+                                        return (
+                                            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-ok-bg text-ok text-[11px] font-semibold">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-ok" /> Aday oturumda
+                                            </span>
+                                        );
+                                    }
+                                    const inLobby = cs === 'waiting_room';
+                                    return (
+                                        <>
+                                            <span
+                                                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${
+                                                    inLobby ? 'bg-warn-bg text-warn' : 'bg-n100 text-n500'
+                                                }`}
+                                            >
+                                                <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${inLobby ? 'bg-warn' : 'bg-n400'}`} />
+                                                {inLobby ? 'Aday lobide' : 'Aday girmedi'}
+                                            </span>
+                                            <button
+                                                onClick={async () => {
+                                                    if (!inLobby) return;
+                                                    await persistSessionData({ candidateStatus: 'admitted' });
+                                                }}
+                                                disabled={!inLobby}
+                                                className={`flex items-center gap-1.5 text-[12px] font-semibold rounded-md px-[11px] py-[5px] border ${
+                                                    inLobby
+                                                        ? 'bg-warn text-white border-transparent hover:opacity-90'
+                                                        : 'bg-n50 text-n400 border-n200 cursor-not-allowed'
+                                                }`}
+                                                title={inLobby ? 'Adayı içeri al' : 'Aday lobide beklemiyor'}
+                                            >
+                                                <Users className="w-[13px] h-[13px]" /> İçeri al
+                                            </button>
+                                        </>
+                                    );
+                                })()}
+                            </>
+                        )}
+
+                        <button
+                            onClick={() => {
+                                navigator.clipboard.writeText(`${window.location.origin}/join/${sessionId}`);
+                                alert('Aday linki kopyalandı!');
+                            }}
+                            className="flex items-center gap-1.5 text-[12px] font-medium text-n600 bg-n50 border border-n200 hover:bg-n100 rounded-md px-[11px] py-[5px]"
+                        >
+                            <Copy className="w-[13px] h-[13px]" /> Aday linki
+                        </button>
+
+                        {showFinishConfirm ? (
+                            <div className="flex items-center gap-1.5 bg-bad-bg border border-bad/20 rounded-md px-2.5 py-1">
+                                <span className="text-[11px] font-medium text-n700 whitespace-nowrap">Mülakatı sonlandır?</span>
+                                <button
+                                    onClick={() => { setShowFinishConfirm(false); handleFinishInterview(); }}
+                                    className="text-[12px] font-semibold text-white bg-bad rounded px-2 py-0.5 hover:opacity-90"
+                                >
+                                    Evet
+                                </button>
+                                <button
+                                    onClick={() => setShowFinishConfirm(false)}
+                                    className="text-[12px] font-medium text-n600 hover:text-n900 px-1"
+                                >
+                                    Vazgeç
+                                </button>
+                            </div>
+                        ) : (
+                            <button
+                                onClick={() => setShowFinishConfirm(true)}
+                                className="flex items-center gap-1.5 text-[13px] font-semibold text-white bg-brand hover:bg-brand-600 rounded-md px-[13px] py-[7px]"
+                                title="Mülakatı tamamla ve raporu oluştur"
+                            >
+                                <CheckCircle2 className="w-3.5 h-3.5" /> Mülakatı tamamla
+                            </button>
+                        )}
+
+                        <div className="relative">
+                            <button
+                                onClick={() => setShowActionsMenu(!showActionsMenu)}
+                                className="w-7 h-7 flex items-center justify-center rounded-md text-n400 hover:bg-n50 hover:text-n900"
+                                aria-label="Diğer işlemler"
+                            >
+                                <MoreVertical className="w-4 h-4" />
+                            </button>
+                            {showActionsMenu && (
+                                <div className="absolute top-full right-0 mt-1.5 w-56 bg-n0 border border-n200 rounded-[10px] shadow-lg py-1 z-[400]">
+                                    <button
+                                        onClick={() => {
+                                            if (window.confirm('Mülakatı ertelemek ve daha sonra devam etmek istediğinize emin misiniz?')) {
+                                                persistSessionData({ status: 'scheduled' });
+                                                navigate('/');
+                                            }
+                                        }}
+                                        className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-semibold text-n700 hover:bg-n50 text-left"
+                                    >
+                                        <Clock className="w-3.5 h-3.5 text-brand" /> Ertele / Duraklat
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            if (window.confirm('Mülakatı iptal etmek istediğinize emin misiniz? Bu işlem geri alınamaz.')) {
+                                                persistSessionData({ status: 'cancelled' });
+                                                navigate('/');
+                                            }
+                                        }}
+                                        className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-semibold text-bad hover:bg-bad-bg text-left"
+                                    >
+                                        <AlertCircle className="w-3.5 h-3.5" /> Mülakatı iptal et
+                                    </button>
+                                    <div className="my-1 border-t border-n100" />
+                                    <button
+                                        onClick={() => navigate('/')}
+                                        className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-semibold text-n500 hover:bg-n50 text-left"
+                                    >
+                                        <ChevronLeft className="w-3.5 h-3.5" /> Sadece çık (canlı kalsın)
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </header>
+
+                <div className="flex-1 grid grid-cols-1 xl:grid-cols-[1fr_420px] gap-3 p-3 overflow-hidden">
+
+                    {/* ── SOL: sorular + transkript ─────────────────────── */}
+                    <div className="min-w-0 flex flex-col gap-3 overflow-hidden">
+
+                        {/* Sorular */}
+                        <section className="bg-n0 border border-n200 rounded-[14px] flex-1 flex flex-col overflow-hidden">
+                            <div className="flex items-center gap-2 px-4 py-2.5 border-b border-n200 shrink-0">
+                                <FileText className="w-3.5 h-3.5 text-brand" />
+                                <h2 className="text-[13px] font-semibold m-0">Mülakat soruları</h2>
+                                {questions.length > 0 && (
+                                    <span className="text-[11px] text-n400">{questions.length} soru</span>
+                                )}
+                                <div className="ml-auto flex items-center gap-1">
+                                    {[
+                                        { id: 'technical', icon: <Code className="w-3 h-3" />, label: 'Teknik' },
+                                        { id: 'product', icon: <Target className="w-3 h-3" />, label: 'Ürün' },
+                                        { id: 'culture', icon: <Users className="w-3 h-3" />, label: 'Kültür' },
+                                    ].map(p => (
+                                        <button
+                                            key={p.id}
+                                            onClick={() => {
+                                                if (activeStrategy === p.id) return;
+                                                // Clear local state
+                                                setQuestions([]);
+                                                setCurrentQuestionIndex(0);
+                                                setSuggestedQuestion(null);
+                                                setAvailablePaths([]);
+                                                setSelectedPathId(null);
+                                                // Reset one-time sync guard so new questions can be fetched
+                                                questionsSyncedRef.current = false;
+                                                setActiveStrategy(p.id);
+                                                setIsTypeSelected(true);
+                                                // Clear session questions so Guard 2 won't block new fetch
+                                                persistSessionData({ activeStrategy: p.id, questions: [], selectedPathId: null });
+                                            }}
+                                            title={p.label + (questions.length > 0 && activeStrategy !== p.id ? ' — soru seti sıfırlanacak' : '')}
+                                            className={`w-6 h-6 rounded flex items-center justify-center border ${
+                                                activeStrategy === p.id
+                                                    ? 'bg-brand-50 text-brand border-brand-100'
+                                                    : 'bg-n50 text-n400 border-n200 hover:bg-n100'
+                                            }`}
+                                        >
+                                            {p.icon}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Aktif soru */}
+                            {isTypeSelected && questions.length > 0 && (
+                                <div className="px-4 pt-3 shrink-0">
+                                    <div className="bg-brand-50 border border-brand-100 rounded-[10px] p-3.5">
+                                        <div className="flex items-start gap-2.5">
+                                            <div className="w-7 h-7 rounded-md bg-brand text-white flex items-center justify-center text-[12px] font-semibold shrink-0">
+                                                {currentQuestionIndex + 1}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                                                    <span className="text-[11px] font-semibold text-brand tracking-[0.08em] uppercase">Aktif soru</span>
+                                                    {activeQuestion?.category && (
+                                                        <span className="text-[11px] text-n500 border border-n200 bg-n0 px-1.5 rounded-full">
+                                                            {activeQuestion.category}
+                                                        </span>
+                                                    )}
+                                                    {activeQuestion?.visibleToCandidate && (
+                                                        <span className="text-[11px] font-semibold text-ok bg-ok-bg px-1.5 rounded-full flex items-center gap-1">
+                                                            <CheckCircle2 className="w-2.5 h-2.5" /> Adayda
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p className="text-[15px] font-medium leading-snug m-0">
+                                                    {activeQuestion?.text || '—'}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-2 mt-3 pt-2.5 border-t border-brand-100">
+                                            {/* İki üretim kipi de gerçek: servis 'deepen' ve
+                                                "henüz sorulmamış alan" dallarını destekliyor
+                                                (services/ai/interview.js). Desteklenmeyen bir
+                                                kip düğmesi konmadı. */}
+                                            <button
+                                                onClick={() => handleGenerateAIQuestion('deepen')}
+                                                disabled={coachGenerating || !candidateData}
+                                                title={!candidateData ? 'Aday verisi yüklenemedi' : 'Mevcut cevabı derinleştiren soru üret'}
+                                                className="flex items-center gap-1.5 text-[12px] font-semibold text-brand bg-n0 border border-brand-100 hover:bg-brand-100 disabled:opacity-40 disabled:cursor-not-allowed rounded-md px-2.5 py-[5px]"
+                                            >
+                                                {coachGenerating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />} Derinleştir
+                                            </button>
+                                            <button
+                                                onClick={() => handleGenerateAIQuestion('new')}
+                                                disabled={coachGenerating || !candidateData}
+                                                title={!candidateData ? 'Aday verisi yüklenemedi' : 'Henüz sorulmamış bir alandan soru üret'}
+                                                className="flex items-center gap-1.5 text-[12px] font-semibold text-n600 bg-n50 border border-n200 hover:bg-n100 disabled:opacity-40 disabled:cursor-not-allowed rounded-md px-2.5 py-[5px]"
+                                            >
+                                                <Sparkles className="w-3 h-3" /> Yeni alan
+                                            </button>
+
+                                            {activeQuestion && !activeQuestion.visibleToCandidate ? (
+                                                <button
+                                                    onClick={() => {
+                                                        const updated = questions.map((q, i) =>
+                                                            i === currentQuestionIndex ? { ...q, visibleToCandidate: true } : q
+                                                        );
+                                                        setQuestions(updated);
+                                                        persistSessionData({ questions: updated });
+                                                    }}
+                                                    className="flex items-center gap-1.5 text-[12px] font-semibold text-white bg-ok hover:opacity-90 rounded-md px-2.5 py-[5px]"
+                                                >
+                                                    <Send className="w-3 h-3" /> Adaya gönder
+                                                </button>
+                                            ) : activeQuestion?.visibleToCandidate ? (
+                                                <span className="flex items-center gap-1.5 text-[12px] font-semibold text-ok bg-ok-bg rounded-md px-2.5 py-[5px]">
+                                                    <CheckCircle2 className="w-3 h-3" /> Adayda yayında
+                                                </span>
+                                            ) : null}
+
+                                            <div className="flex-1" />
+                                            <button
+                                                onClick={() => {
+                                                    const prev = Math.max(0, currentQuestionIndex - 1);
+                                                    setCurrentQuestionIndex(prev);
+                                                    persistSessionData({ currentQuestionIndex: prev });
+                                                }}
+                                                disabled={currentQuestionIndex === 0}
+                                                className="w-6 h-6 rounded bg-n0 border border-n200 text-n500 flex items-center justify-center hover:bg-n50 disabled:opacity-30"
+                                                aria-label="Önceki soru"
+                                            >
+                                                <ChevronLeft className="w-3.5 h-3.5" />
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    const next = Math.min(questions.length - 1, currentQuestionIndex + 1);
+                                                    setCurrentQuestionIndex(next);
+                                                    persistSessionData({ currentQuestionIndex: next });
+                                                }}
+                                                disabled={currentQuestionIndex === questions.length - 1}
+                                                className="w-6 h-6 rounded bg-n0 border border-n200 text-n500 flex items-center justify-center hover:bg-n50 disabled:opacity-30"
+                                                aria-label="Sonraki soru"
+                                            >
+                                                <ChevronRight className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Soru listesi */}
+                            <div className="flex-1 overflow-y-auto custom-scrollbar px-4 pt-2">
+                                {!isTypeSelected ? (
+                                    <div className="border border-dashed border-n300 rounded-[10px] p-4 flex flex-col gap-2.5 mt-2">
+                                        <p className="text-[11px] font-semibold text-n500 tracking-[0.08em] uppercase text-center m-0">
+                                            Mülakat stratejisi seçin
+                                        </p>
+                                        {[
+                                            { id: 'technical', title: 'Teknik kültür', icon: <Code className="w-4 h-4" /> },
+                                            { id: 'product', title: 'Product / UX', icon: <Target className="w-4 h-4" /> },
+                                            { id: 'culture', title: 'Kültür & uyum', icon: <Users className="w-4 h-4" /> },
+                                        ].map(type => (
+                                            <button
+                                                key={type.id}
+                                                onClick={() => {
+                                                    setActiveStrategy(type.id);
+                                                    setIsTypeSelected(true);
+                                                }}
+                                                className="flex items-center gap-2.5 p-2.5 rounded-md bg-n50 border border-n200 hover:bg-n100 text-left"
+                                            >
+                                                <span className="w-8 h-8 rounded-md bg-brand-50 text-brand flex items-center justify-center">
+                                                    {type.icon}
+                                                </span>
+                                                <span className="text-[13px] font-semibold">{type.title}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                ) : pathLoading ? (
+                                    <div className="flex flex-col items-center justify-center py-10 gap-2.5">
+                                        <Loader2 className="w-5 h-5 text-brand animate-spin" />
+                                        <p className="text-[12px] text-n500 m-0">Sorular hazırlanıyor…</p>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col gap-1 pb-2">
+                                        {questions.map((q, idx) => (
+                                            <button
+                                                key={q.id || idx}
+                                                onClick={() => {
+                                                    setCurrentQuestionIndex(idx);
+                                                    persistSessionData({ currentQuestionIndex: idx });
+                                                }}
+                                                className={`flex items-start gap-2.5 p-2.5 rounded-md border text-left ${
+                                                    idx === currentQuestionIndex
+                                                        ? 'bg-brand-50 border-brand-100'
+                                                        : 'bg-n0 border-n200 hover:bg-n50'
+                                                }`}
+                                            >
+                                                <span className={`w-5 h-5 rounded flex items-center justify-center text-[11px] font-semibold shrink-0 ${
+                                                    idx === currentQuestionIndex
+                                                        ? 'bg-brand text-white'
+                                                        : q.visibleToCandidate
+                                                            ? 'bg-ok-bg text-ok'
+                                                            : 'bg-n100 text-n500'
+                                                }`}>
+                                                    {q.visibleToCandidate ? <Check className="w-2.5 h-2.5" /> : idx + 1}
+                                                </span>
+                                                <span className={`text-[12px] leading-snug flex-1 min-w-0 ${
+                                                    idx === currentQuestionIndex
+                                                        ? 'text-n900 font-medium'
+                                                        : q.visibleToCandidate
+                                                            ? 'text-n400 line-through'
+                                                            : 'text-n600'
+                                                }`}>
+                                                    {q.text}
+                                                </span>
+                                                {q.category && idx === currentQuestionIndex && (
+                                                    <span className="text-[11px] text-brand shrink-0">{q.category}</span>
+                                                )}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Özel soru — isteğe bağlı, gizli by default */}
+                            {isTypeSelected && !pathLoading && (
+                                <div className="px-4 py-2 border-t border-n200 shrink-0">
+                                    <button
+                                        onClick={() => setShowCustomInput(v => !v)}
+                                        className="w-full flex items-center justify-center gap-1.5 py-1 text-[11px] font-medium text-n400 hover:text-n600"
+                                    >
+                                        <span className="text-[13px] leading-none">{showCustomInput ? '−' : '+'}</span>
+                                        {showCustomInput ? 'Gizle' : 'Listeye özel soru ekle'}
+                                    </button>
+                                    {showCustomInput && (
+                                        <form
+                                            onSubmit={(e) => {
+                                                e.preventDefault();
+                                                const val = e.target.customQ.value.trim();
+                                                if (!val) return;
+                                                const newQ = {
+                                                    id: questions.length + 1,
+                                                    text: val,
+                                                    category: 'Özel',
+                                                    status: 'pending',
+                                                    visibleToCandidate: false
+                                                };
+                                                const updated = [...questions, newQ];
+                                                setQuestions(updated);
+                                                persistSessionData({ questions: updated });
+                                                setCurrentQuestionIndex(updated.length - 1);
+                                                e.target.customQ.value = '';
+                                                setShowCustomInput(false);
+                                            }}
+                                            className="flex gap-2 items-center mt-1.5"
+                                        >
+                                            <input
+                                                name="customQ"
+                                                type="text"
+                                                autoFocus
+                                                placeholder="Soruyu yaz, Enter ile listeye ekle…"
+                                                className="flex-1 min-w-0 bg-n50 border border-n200 rounded-md px-2.5 py-1.5 text-[12px] focus:outline-none focus:border-brand"
+                                            />
+                                            <button
+                                                type="submit"
+                                                className="w-7 h-7 rounded-md bg-brand text-white flex items-center justify-center hover:bg-brand-600 shrink-0"
+                                                aria-label="Ekle"
+                                            >
+                                                <ArrowRight className="w-3.5 h-3.5" />
+                                            </button>
+                                        </form>
+                                    )}
+                                </div>
+                            )}
+                        </section>
+
+                        {/* Transkript — balon renkleri prototipin `transcript`
+                            bloğundan: mülakatçı nötr, aday marka tonu. */}
+                        <section className="bg-n0 border border-n200 rounded-[14px] h-[220px] shrink-0 flex flex-col p-3.5">
+                            <div className="flex items-center gap-2 mb-2">
+                                <h2 className="text-[13px] font-semibold m-0">Canlı transkript</h2>
+                                <span className={`ml-auto flex items-center gap-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                                    isRecording ? 'bg-ok-bg text-ok' : 'bg-n100 text-n500'
+                                }`}>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${isRecording ? 'bg-ok animate-pulse' : 'bg-n400'}`} />
+                                    {isRecording ? 'Kaydediyor' : 'Beklemede'}
+                                </span>
+                                {!isRecording && isMicOn && (
+                                    <button
+                                        onClick={() => { try { recognitionRef.current?.start(); } catch { /* zaten çalışıyor */ } }}
+                                        className="text-[11px] font-medium text-brand border border-brand-100 bg-brand-50 rounded px-1.5 py-0.5"
+                                    >
+                                        Yeniden başlat
+                                    </button>
+                                )}
+                            </div>
+                            <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-1.5 pr-1" ref={transcriptRef}>
+                                {transcript.length === 0 && (
+                                    <div className="h-full flex flex-col items-center justify-center text-n400">
+                                        <MessageSquare className="w-5 h-5 mb-1.5" />
+                                        <p className="text-[12px] m-0">Konuşmalar burada görünecek</p>
+                                    </div>
+                                )}
+                                {transcript.slice(-8).map((line, idx) => {
+                                    const isCandidate = line.role === 'ADAY';
+                                    return (
+                                        <div
+                                            key={idx}
+                                            className={`rounded-md border px-2.5 py-1.5 ${
+                                                isCandidate
+                                                    ? 'bg-brand-50 border-brand-100'
+                                                    : 'bg-n50 border-n200 ml-6'
+                                            }`}
+                                        >
+                                            <div className="flex items-center justify-between mb-0.5">
+                                                <span className={`text-[11px] font-semibold tracking-[0.08em] uppercase ${
+                                                    isCandidate ? 'text-brand' : 'text-n400'
+                                                }`}>
+                                                    {line.role}
+                                                </span>
+                                                <span className="text-[11px] text-n400 tabular-nums">{line.time}</span>
+                                            </div>
+                                            <p className="text-[12px] leading-relaxed text-n700 m-0">{line.text}</p>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </section>
+                    </div>
+
+                    {/* ── SAĞ: video + kontroller + analiz ───────────────── */}
+                    <div className="min-w-0 flex flex-col gap-3 overflow-y-auto custom-scrollbar">
+
+                        {/* Video — zemin koyu kalıyor: görüntünün arkası her
+                            arayüzde koyudur, aydınlatma böyle doğru okunuyor. */}
+                        <div className="bg-ink rounded-[14px] relative overflow-hidden border border-n200 shrink-0 aspect-video">
+                            {remoteStream ? (
+                                <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
+                            ) : stream ? (
+                                <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover scale-x-[-1] opacity-40" />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                    <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center border border-white/10">
+                                        <User className="w-6 h-6 text-white/20" />
+                                    </div>
+                                </div>
+                            )}
+                            {stream && (
+                                <div className="absolute bottom-2 right-2 w-24 aspect-video bg-black rounded-md overflow-hidden border border-white/20 z-20">
+                                    <video ref={pipVideoRef} autoPlay muted playsInline className="w-full h-full object-cover scale-x-[-1]" />
+                                </div>
+                            )}
+                            <span className="absolute top-2 left-2 flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-bad text-white text-[11px] font-semibold">
+                                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> Canlı
+                            </span>
+                            <span className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-black/50 text-white/80 text-[11px] font-semibold tabular-nums">
+                                {elapsedLabel}
+                            </span>
+                        </div>
+
+                        {/* Medya kontrolleri */}
+                        <div className="flex items-center gap-2 shrink-0">
+                            <button
+                                onClick={() => setIsMicOn(!isMicOn)}
+                                className={`flex-1 flex items-center justify-center gap-1.5 text-[12px] font-semibold rounded-md px-3 py-2 border ${
+                                    isMicOn
+                                        ? 'bg-n0 text-n700 border-n200 hover:bg-n50'
+                                        : 'bg-bad text-white border-transparent'
+                                }`}
+                            >
+                                {isMicOn ? <Mic className="w-3.5 h-3.5" /> : <MicOff className="w-3.5 h-3.5" />}
+                                {isMicOn ? 'Mikrofon açık' : 'Mikrofon kapalı'}
+                            </button>
+                            <button
+                                onClick={() => setIsVideoOn(!isVideoOn)}
+                                className={`flex-1 flex items-center justify-center gap-1.5 text-[12px] font-semibold rounded-md px-3 py-2 border ${
+                                    isVideoOn
+                                        ? 'bg-n0 text-n700 border-n200 hover:bg-n50'
+                                        : 'bg-bad text-white border-transparent'
+                                }`}
+                            >
+                                {isVideoOn ? <Video className="w-3.5 h-3.5" /> : <VideoOff className="w-3.5 h-3.5" />}
+                                {isVideoOn ? 'Kamera açık' : 'Kamera kapalı'}
+                            </button>
+                        </div>
+
+                        {/* AI Coach */}
+                        <section className="bg-n0 border border-n200 rounded-[14px] p-3.5 shrink-0">
+                            <div className="flex items-center gap-2 mb-2">
+                                <Sparkles className="w-3.5 h-3.5 text-brand" />
+                                <h2 className="text-[13px] font-semibold m-0">Soru önerisi</h2>
+                                <span className="text-[11px] text-n400">yalnızca siz görürsünüz</span>
+                                {coachGenerating && <Loader2 className="ml-auto w-3.5 h-3.5 text-brand animate-spin" />}
+                            </div>
+                            <p className="text-[13px] leading-relaxed text-n700 border-l-2 border-brand-200 pl-2.5 m-0">
+                                {suggestedQuestion
+                                    ? suggestedQuestion.question
+                                    : 'Transkript otomatik takip ediyor — siz sesli sorun, sistem kaydeder. "Derinleştir" ile anlık soru önerisi alın.'}
+                            </p>
+                            {suggestedQuestion?.evaluationHint && (
+                                <p className="text-[12px] text-brand mt-1.5 pl-2.5 m-0">→ {suggestedQuestion.evaluationHint}</p>
+                            )}
+                            {suggestedQuestion && (
+                                <div className="flex gap-2 mt-3">
+                                    <button
+                                        onClick={() => {
+                                            const newQ = {
+                                                id: questions.length + 1,
+                                                text: suggestedQuestion.question,
+                                                category: 'AI Önerisi',
+                                                status: 'pending',
+                                                visibleToCandidate: false
+                                            };
+                                            const updated = [...questions, newQ];
+                                            setQuestions(updated);
+                                            persistSessionData({ questions: updated });
+                                            setCurrentQuestionIndex(updated.length - 1);
+                                            setSuggestedQuestion(null);
+                                        }}
+                                        className="flex-1 flex items-center justify-center gap-1.5 text-[12px] font-semibold text-white bg-brand hover:bg-brand-600 rounded-md py-1.5"
+                                    >
+                                        <FileText className="w-3 h-3" /> Listeye ekle
+                                    </button>
+                                    <button
+                                        onClick={() => setSuggestedQuestion(null)}
+                                        className="text-[12px] font-medium text-n600 bg-n50 border border-n200 hover:bg-n100 rounded-md px-3 py-1.5"
+                                    >
+                                        Yoksay
+                                    </button>
+                                </div>
+                            )}
+                        </section>
+
+                        {/* Analiz */}
+                        <section className="bg-n0 border border-n200 rounded-[14px] p-3.5 shrink-0 flex flex-col gap-3">
+                            <div className="flex items-center gap-2">
+                                <h2 className="text-[13px] font-semibold m-0">Canlı değerlendirme</h2>
+                                {starAnalyzing && <Loader2 className="w-3 h-3 text-brand animate-spin" />}
+                                <span className="ml-auto text-[11px] font-semibold text-brand bg-brand-50 px-2 py-0.5 rounded-full">
+                                    Anlık
+                                </span>
+                            </div>
+
+                            {biasWarning && (
+                                <div className="flex items-start gap-2 bg-warn-bg rounded-md p-2.5">
+                                    <AlertTriangle className="w-3.5 h-3.5 text-warn shrink-0 mt-0.5" />
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-[12px] font-semibold text-warn m-0">Önyargı uyarısı</p>
+                                        <p className="text-[12px] text-n700 mt-0.5 leading-snug m-0">{biasWarning}</p>
+                                    </div>
+                                    <button onClick={() => setBiasWarning(null)} className="text-n400 hover:text-n700 shrink-0" aria-label="Kapat">
+                                        <X className="w-3.5 h-3.5" />
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* YETKİNLİK ÇUBUKLARI — STAR DEĞİL.
+                                Canlı analiz (services/ai/interview.js
+                                `analyzeSTARRealTime`) beş yetkinliği 0-100
+                                döndürüyor; S/T/A/R çıkarmıyor. Prototipte bu
+                                panelde 0-3'lük dört STAR çubuğu var ama o
+                                sayılar canlı oturumda ÜRETİLMİYOR — dördünü
+                                basmak uydurma ölçüm olurdu. STAR kırılımı
+                                mülakat raporunda (Ekran 6) duruyor. */}
+                            <div className="flex flex-col gap-2">
+                                {[
+                                    { key: 'technical', label: 'Teknik' },
+                                    { key: 'communication', label: 'İletişim' },
+                                    { key: 'problemSolving', label: 'Problem çözme' },
+                                    { key: 'cultureFit', label: 'Kültür uyumu' },
+                                    { key: 'adaptability', label: 'Adaptasyon' },
+                                ].map(({ key, label }) => (
+                                    <div key={key} className="flex items-center gap-2">
+                                        <span className="text-[12px] text-n500 w-24 shrink-0">{label}</span>
+                                        <div className="flex-1 h-1.5 bg-n100 rounded-full overflow-hidden">
+                                            <div
+                                                className="h-full bg-brand rounded-full transition-all duration-700"
+                                                style={{ width: `${starScores[key] || 0}%` }}
+                                            />
+                                        </div>
+                                        <span className="text-[12px] font-semibold tabular-nums w-8 text-right">{starScores[key] || 0}</span>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Eskiden "Logic Integrity" yazıyordu; hesaplanan şey
+                                yukarıdaki beş yetkinliğin düz ortalaması. Ad
+                                artık ölçtüğü şeyi söylüyor. */}
+                            <div className="flex items-center gap-2 pt-2.5 border-t border-n100">
+                                <span className="text-[12px] text-n500 w-24 shrink-0">Ortalama</span>
+                                <div className="flex-1 h-1.5 bg-n100 rounded-full overflow-hidden">
+                                    <div className="h-full bg-brand-600 rounded-full transition-all duration-700" style={{ width: `${logicIntegrity}%` }} />
+                                </div>
+                                <span className="text-[12px] font-semibold text-brand tabular-nums w-8 text-right">{logicIntegrity}</span>
+                            </div>
+
+                            {aiInsights.length > 0 && (
+                                <div className="flex flex-col gap-1.5 pt-1">
+                                    <p className="text-[11px] font-semibold text-n500 tracking-[0.08em] uppercase m-0">Tespitler</p>
+                                    {aiInsights.slice(0, 5).map(ins => (
+                                        <div
+                                            key={ins.id}
+                                            className={`rounded-md p-2.5 text-[12px] leading-relaxed ${
+                                                ins.type === 'warning' ? 'bg-warn-bg text-n700' : 'bg-n50 text-n700'
+                                            }`}
+                                        >
+                                            {ins.text}
+                                            {ins.hint && <p className="mt-1 text-brand m-0">→ {ins.hint}</p>}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {emotionData && (
+                                <div className="flex flex-col gap-2 pt-1">
+                                    <p className="text-[11px] font-semibold text-n500 tracking-[0.08em] uppercase flex items-center gap-1.5 m-0">
+                                        <Activity className="w-3 h-3" /> Ses duygu analizi
+                                    </p>
+                                    <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+                                        {[
+                                            { label: 'Stres', value: emotionData.stress, color: 'var(--color-bad)' },
+                                            { label: 'Heyecan', value: emotionData.excitement, color: 'var(--color-warn)' },
+                                            { label: 'Özgüven', value: emotionData.confidence, color: 'var(--color-ok)' },
+                                            { label: 'Tereddüt', value: emotionData.hesitation, color: 'var(--color-brand)' },
+                                        ].map(({ label, value, color }) => (
+                                            <div key={label}>
+                                                <div className="flex justify-between mb-1">
+                                                    <span className="text-[12px] text-n500">{label}</span>
+                                                    <span className="text-[12px] font-semibold tabular-nums" style={{ color }}>%{value || 0}</span>
+                                                </div>
+                                                <div className="h-1.5 bg-n100 rounded-full overflow-hidden">
+                                                    <div className="h-full rounded-full transition-all duration-700" style={{ width: `${value || 0}%`, background: color }} />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </section>
+                    </div>
+                </div>
+
+            </div>
+        );
+    }
+
 
     return (
         <div className="fixed inset-0 z-[200] bg-[#07090F] flex flex-col overflow-hidden text-white font-sans">
@@ -1963,648 +2664,11 @@ export default function LiveInterviewPage() {
                         <span className="text-[10px] font-bold text-white/90 italic">{candidateData?.name}</span>
                     </div>
                 </div>
-
-                <div className="flex items-center gap-3">
-                    {isRecruiter && (
-                        <>
-                            <button
-                                onClick={() => {
-                                    navigator.clipboard.writeText(`${window.location.origin}/join/${sessionId}`);
-                                    alert("Aday linki kopyalandı!");
-                                }}
-                                className="h-8 px-3 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white font-black text-[9px] tracking-widest uppercase transition-all flex items-center gap-2 border border-blue-500/30 active:scale-95 cursor-pointer shadow-lg shadow-blue-500/10"
-                            >
-                                <Copy className="w-3 h-3" /> Aday Linki
-                            </button>
-
-                            {phase === 'active' && (
-                                <>
-                                    <div className="flex items-center gap-2 px-2.5 py-1.5 bg-white/5 rounded-lg border border-white/5">
-                                        <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
-                                        <span className="text-[9px] font-black text-emerald-500 tracking-widest tabular-nums italic">LIVE: {Math.floor(elapsedTime / 60).toString().padStart(2, '0')}:{String(elapsedTime % 60).padStart(2, '0')}</span>
-                                    </div>
-
-                                    {/* Aday Durum Göstergesi — reads from effectiveSession which merges apiSession (Firestore) */}
-                                    {(() => {
-                                        const cs = effectiveSession?.candidateStatus;
-                                        if (cs === 'admitted') {
-                                            return (
-                                                <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                                    <span className="text-[9px] font-black text-emerald-500 tracking-widest uppercase">Aday Oturumda</span>
-                                                </div>
-                                            );
-                                        }
-                                        const inLobby = cs === 'waiting_room';
-                                        return (
-                                            <>
-                                                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${inLobby ? 'bg-amber-500/10 border-amber-500/20' : 'bg-rose-500/10 border-rose-500/20'}`}>
-                                                    <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${inLobby ? 'bg-amber-500' : 'bg-rose-500'}`} />
-                                                    <span className={`text-[9px] font-black tracking-widest uppercase ${inLobby ? 'text-amber-500' : 'text-rose-500'}`}>
-                                                        {inLobby ? 'Aday Lobide Bekliyor' : 'Aday Henüz Girmedi'}
-                                                    </span>
-                                                </div>
-                                                <button
-                                                    onClick={async () => {
-                                                        if (!inLobby) return;
-                                                        await persistSessionData({ candidateStatus: 'admitted' });
-                                                    }}
-                                                    disabled={!inLobby}
-                                                    className={`h-8 px-4 rounded-lg text-white font-black text-[9px] tracking-widest uppercase transition-all shadow-lg flex items-center gap-2 border mr-2 ${inLobby ? 'bg-amber-500 hover:bg-amber-600 border-amber-400 shadow-amber-500/20 animate-pulse' : 'bg-slate-700 border-slate-600 opacity-40 cursor-not-allowed'}`}
-                                                    title={inLobby ? 'Adayı İçeri Al' : 'Aday Lobide Beklemiyor'}
-                                                >
-                                                    <Users className="w-3 h-3" /> {inLobby ? 'Adayı İçeri Al' : 'Lobide Değil'}
-                                                </button>
-                                            </>
-                                        );
-                                    })()}
-                                </>
-                            )}
-
-                            {showFinishConfirm ? (
-                                <div className="flex items-center gap-1.5 bg-rose-950/60 border border-rose-500/30 rounded-lg px-3 py-1 animate-in fade-in slide-in-from-top-1 duration-150">
-                                    <span className="text-[8px] text-rose-300 font-semibold mr-1 whitespace-nowrap">Mülakatı sonlandır?</span>
-                                    <button
-                                        onClick={() => { setShowFinishConfirm(false); handleFinishInterview(); }}
-                                        className="px-3 py-1 rounded-md bg-rose-600 hover:bg-rose-500 text-white font-black text-[8px] tracking-wide uppercase transition-all active:scale-95"
-                                    >
-                                        Evet
-                                    </button>
-                                    <button
-                                        onClick={() => setShowFinishConfirm(false)}
-                                        className="px-3 py-1 rounded-md bg-white/10 hover:bg-white/20 text-white/70 font-black text-[8px] tracking-wide uppercase transition-all active:scale-95"
-                                    >
-                                        Vazgeç
-                                    </button>
-                                </div>
-                            ) : (
-                                <button
-                                    onClick={() => setShowFinishConfirm(true)}
-                                    className="px-4 py-1.5 rounded-lg bg-emerald-600/90 hover:bg-emerald-600 text-white font-black text-[9px] tracking-[0.1em] uppercase transition-all shadow-lg active:scale-95 flex items-center gap-2"
-                                    title="Mülakatı Başarıyla Tamamla ve Raporu Oluştur"
-                                >
-                                    <CheckCircle2 className="w-3 h-3" /> Mülakatı Tamamla
-                                </button>
-                            )}
-
-                            <div className="relative">
-                                <button
-                                    onClick={() => setShowActionsMenu(!showActionsMenu)}
-                                    className="w-10 h-8 flex items-center justify-center rounded-lg bg-white/5 text-white/40 hover:bg-white/10 hover:text-white transition-all border border-white/5 cursor-pointer"
-                                >
-                                    <MoreVertical className="w-4 h-4" />
-                                </button>
-
-                                {showActionsMenu && (
-                                    <div className="absolute top-full right-0 mt-2 w-48 bg-[#1E293B] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-[400] animate-in fade-in slide-in-from-top-2 duration-200">
-                                        <button
-                                            onClick={() => {
-                                                if (window.confirm("Mülakatı ertelemek ve daha sonra devam etmek istediğinize emin misiniz?")) {
-                                                    persistSessionData({ status: 'scheduled' });
-                                                    navigate('/');
-                                                }
-                                            }}
-                                            className="w-full px-4 py-3 text-left text-[10px] font-bold text-slate-300 hover:bg-white/5 flex items-center gap-3 transition-colors"
-                                        >
-                                            <Clock className="w-3.5 h-3.5 text-blue-400" /> Ertele / Duraklat
-                                        </button>
-                                        <button
-                                            onClick={() => {
-                                                if (window.confirm("Mülakatı iptal etmek istediğinize emin misiniz? Bu işlem geri alınamaz.")) {
-                                                    persistSessionData({ status: 'cancelled' });
-                                                    navigate('/');
-                                                }
-                                            }}
-                                            className="w-full px-4 py-3 text-left text-[10px] font-bold text-red-400 hover:bg-red-500/10 flex items-center gap-3 transition-colors"
-                                        >
-                                            <AlertCircle className="w-3.5 h-3.5" /> Mülakatı İptal Et
-                                        </button>
-                                        <div className="h-px bg-white/5 mx-2" />
-                                        <button
-                                            onClick={() => navigate('/')}
-                                            className="w-full px-4 py-3 text-left text-[10px] font-bold text-slate-500 hover:bg-white/5 flex items-center gap-3 transition-colors"
-                                        >
-                                            <ChevronLeft className="w-3.5 h-3.5" /> Sadece Çık (Canlı Kalsın)
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        </>
-                    )}
-                </div>
             </header>
 
             <div className="flex-1 flex p-2 gap-2 overflow-hidden">
-                {isRecruiter ? (
-                    <>
-                        {/* LEFT COLUMN: QUESTIONS + TRANSCRIPT (58%) */}
-                        <div className="flex-[0_0_58%] min-w-0 flex flex-col gap-2 overflow-hidden h-full">
-
-                            {/* QUESTIONS PANEL */}
-                            <section className="bg-[#0F172A] rounded-2xl border border-white/5 flex-1 flex flex-col overflow-hidden shadow-2xl">
-                                {/* Header */}
-                                <div className="flex items-center justify-between px-4 pt-3 pb-2.5 border-b border-white/5 shrink-0">
-                                    <div className="flex items-center gap-2">
-                                        <div className="p-1.5 bg-blue-500/10 rounded-lg">
-                                            <FileText className="w-3.5 h-3.5 text-blue-400" />
-                                        </div>
-                                        <h3 className="text-[10px] font-black text-white/40 uppercase tracking-widest italic">Mülakat Soruları</h3>
-                                        {questions.length > 0 && (
-                                            <span className="text-[8px] text-white/20 font-mono">{questions.length} soru</span>
-                                        )}
-                                    </div>
-                                    <div className="flex gap-1">
-                                        {[
-                                            { id: 'technical', icon: <Code className="w-3 h-3" />, label: 'Teknik' },
-                                            { id: 'product', icon: <Target className="w-3 h-3" />, label: 'Ürün' },
-                                            { id: 'culture', icon: <Users className="w-3 h-3" />, label: 'Kültür' }
-                                        ].map(p => (
-                                            <button
-                                                key={p.id}
-                                                onClick={() => {
-                                                    if (activeStrategy === p.id) return;
-                                                    // Clear local state
-                                                    setQuestions([]);
-                                                    setCurrentQuestionIndex(0);
-                                                    setSuggestedQuestion(null);
-                                                    setAvailablePaths([]);
-                                                    setSelectedPathId(null);
-                                                    // Reset one-time sync guard so new questions can be fetched
-                                                    questionsSyncedRef.current = false;
-                                                    setActiveStrategy(p.id);
-                                                    setIsTypeSelected(true);
-                                                    // Clear session questions so Guard 2 won't block new fetch
-                                                    persistSessionData({ activeStrategy: p.id, questions: [], selectedPathId: null });
-                                                }}
-                                                title={p.label + (questions.length > 0 && activeStrategy !== p.id ? ' — soru seti sıfırlanacak' : '')}
-                                                className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${activeStrategy === p.id ? 'bg-blue-600 text-white border border-blue-400' : 'bg-white/5 text-white/30 hover:bg-blue-600/40 hover:text-white cursor-pointer'}`}
-                                            >
-                                                {p.icon}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* ACTIVE QUESTION — large, readable card */}
-                                {isTypeSelected && questions.length > 0 && (
-                                    <div className="px-4 pt-3 shrink-0">
-                                        <div className="bg-blue-600/10 border border-blue-500/30 rounded-xl p-3.5 shadow-lg shadow-blue-900/10">
-                                            <div className="flex items-start gap-3">
-                                                <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center text-[10px] font-black shrink-0 shadow-md shadow-blue-900/30 mt-0.5">
-                                                    {currentQuestionIndex + 1}
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
-                                                        <span className="text-[7px] font-black text-blue-400 uppercase tracking-widest">Aktif Soru</span>
-                                                        {questions[currentQuestionIndex]?.category && (
-                                                            <span className="text-[6px] font-bold text-white/30 border border-white/10 px-1.5 py-0.5 rounded-full uppercase">
-                                                                {questions[currentQuestionIndex].category}
-                                                            </span>
-                                                        )}
-                                                        {questions[currentQuestionIndex]?.visibleToCandidate && (
-                                                            <span className="text-[6px] font-black text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 rounded-full uppercase flex items-center gap-1">
-                                                                <CheckCircle2 className="w-2 h-2" /> ADAYDA
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                    <p className="text-[14px] font-bold text-white leading-snug italic">
-                                                        {questions[currentQuestionIndex]?.text || '—'}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-2 mt-3 pt-2.5 border-t border-white/5">
-                                                <button
-                                                    onClick={() => handleGenerateAIQuestion('deepen')}
-                                                    disabled={coachGenerating || !candidateData}
-                                                    title={!candidateData ? 'Aday verisi yüklenemedi' : 'Mevcut soruya göre AI derinleştirme sorusu üret'}
-                                                    className="px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/40 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg border border-blue-500/30 text-[10px] font-black text-blue-400 uppercase flex items-center gap-1.5 transition-all active:scale-95"
-                                                >
-                                                    {coachGenerating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />} Derinleştir
-                                                </button>
-                                                {questions[currentQuestionIndex] && !questions[currentQuestionIndex].visibleToCandidate ? (
-                                                    <button
-                                                        onClick={() => {
-                                                            const updated = questions.map((q, i) =>
-                                                                i === currentQuestionIndex ? { ...q, visibleToCandidate: true } : q
-                                                            );
-                                                            setQuestions(updated);
-                                                            persistSessionData({ questions: updated });
-                                                        }}
-                                                        className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-[10px] font-black uppercase flex items-center gap-1.5 hover:bg-emerald-500 transition-all shadow-md shadow-emerald-900/30 active:scale-95"
-                                                    >
-                                                        <Send className="w-3 h-3" /> Adaya Gönder
-                                                    </button>
-                                                ) : questions[currentQuestionIndex]?.visibleToCandidate ? (
-                                                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg border border-emerald-500/20 text-[10px] font-black uppercase">
-                                                        <CheckCircle2 className="w-3 h-3" /> Adayda Yayında
-                                                    </div>
-                                                ) : null}
-                                                <div className="flex-1" />
-                                                <button
-                                                    onClick={() => {
-                                                        const prev = Math.max(0, currentQuestionIndex - 1);
-                                                        setCurrentQuestionIndex(prev);
-                                                        persistSessionData({ currentQuestionIndex: prev });
-                                                    }}
-                                                    disabled={currentQuestionIndex === 0}
-                                                    className="w-6 h-6 rounded-lg bg-white/5 text-white/40 flex items-center justify-center hover:bg-white/10 disabled:opacity-20 transition-all"
-                                                >
-                                                    <ChevronLeft className="w-3.5 h-3.5" />
-                                                </button>
-                                                <button
-                                                    onClick={() => {
-                                                        const next = Math.min(questions.length - 1, currentQuestionIndex + 1);
-                                                        setCurrentQuestionIndex(next);
-                                                        persistSessionData({ currentQuestionIndex: next });
-                                                    }}
-                                                    disabled={currentQuestionIndex === questions.length - 1}
-                                                    className="w-6 h-6 rounded-lg bg-white/5 text-white/40 flex items-center justify-center hover:bg-white/10 disabled:opacity-20 transition-all"
-                                                >
-                                                    <ChevronRight className="w-3.5 h-3.5" />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Question list */}
-                                <div className="flex-1 overflow-y-auto px-4 pt-2 pb-0 custom-scrollbar">
-                                    {!isTypeSelected ? (
-                                        <div className="bg-[#1E293B]/50 rounded-xl p-4 border border-white/5 flex flex-col gap-3 mt-2">
-                                            <p className="text-[9px] font-black text-white/40 uppercase tracking-widest text-center">Mülakat Stratejisi Seçin</p>
-                                            <div className="grid grid-cols-1 gap-2">
-                                                {[
-                                                    { id: 'technical', title: 'Teknik Kültür', icon: <Code className="w-4 h-4" /> },
-                                                    { id: 'product', title: 'Product / UX', icon: <Target className="w-4 h-4" /> },
-                                                    { id: 'culture', title: 'Kültür & Uyum', icon: <Users className="w-4 h-4" /> }
-                                                ].map(type => (
-                                                    <button
-                                                        key={type.id}
-                                                        onClick={() => {
-                                                            setActiveStrategy(type.id);
-                                                            setIsTypeSelected(true);
-                                                        }}
-                                                        className="flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all text-left group"
-                                                    >
-                                                        <div className="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center group-hover:bg-blue-500 group-hover:text-white transition-all">
-                                                            {type.icon}
-                                                        </div>
-                                                        <span className="text-[10px] font-black text-white/80 uppercase italic">{type.title}</span>
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    ) : pathLoading ? (
-                                        <div className="flex flex-col items-center justify-center py-8 gap-3 opacity-50">
-                                            <Loader2 className="w-6 h-6 text-blue-400 animate-spin" />
-                                            <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Sorular Hazırlanıyor...</p>
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-1 pb-2 pt-1">
-                                            {questions.map((q, idx) => (
-                                                <div
-                                                    key={q.id || idx}
-                                                    onClick={() => {
-                                                        setCurrentQuestionIndex(idx);
-                                                        persistSessionData({ currentQuestionIndex: idx });
-                                                    }}
-                                                    className={`flex items-start gap-2.5 p-2.5 rounded-xl border cursor-pointer transition-all ${
-                                                        idx === currentQuestionIndex
-                                                            ? 'bg-blue-600/10 border-blue-500/30'
-                                                            : 'bg-white/2 border-white/5 hover:border-white/10 hover:bg-white/5'
-                                                    }`}
-                                                >
-                                                    <div className={`w-5 h-5 rounded-lg flex items-center justify-center text-[8px] font-black shrink-0 mt-0.5 ${
-                                                        idx === currentQuestionIndex
-                                                            ? 'bg-blue-600 text-white'
-                                                            : q.visibleToCandidate
-                                                            ? 'bg-emerald-600/30 text-emerald-400'
-                                                            : 'bg-white/5 text-white/30'
-                                                    }`}>
-                                                        {q.visibleToCandidate ? <Check className="w-2.5 h-2.5" /> : idx + 1}
-                                                    </div>
-                                                    <p className={`text-[10px] font-bold leading-snug flex-1 min-w-0 ${
-                                                        idx === currentQuestionIndex
-                                                            ? 'text-white'
-                                                            : q.visibleToCandidate
-                                                            ? 'text-white/35 line-through decoration-emerald-500/30'
-                                                            : 'text-white/50'
-                                                    }`}>
-                                                        {q.text}
-                                                    </p>
-                                                    {q.category && idx === currentQuestionIndex && (
-                                                        <span className="text-[6px] font-black uppercase tracking-widest text-blue-400/50 shrink-0 mt-1">
-                                                            {q.category}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Custom question input — isteğe bağlı, gizli by default */}
-                                {isTypeSelected && !pathLoading && (
-                                    <div className="px-4 pb-3 pt-2 border-t border-white/5 shrink-0">
-                                        <button
-                                            onClick={() => setShowCustomInput(v => !v)}
-                                            className="w-full flex items-center justify-center gap-1.5 py-1 text-[7px] font-black text-white/20 uppercase tracking-widest hover:text-white/40 transition-colors"
-                                        >
-                                            <span className="text-[10px] leading-none">{showCustomInput ? '−' : '+'}</span>
-                                            {showCustomInput ? 'Gizle' : 'Listeye özel soru ekle'}
-                                        </button>
-                                        {showCustomInput && (
-                                            <form
-                                                onSubmit={(e) => {
-                                                    e.preventDefault();
-                                                    const val = e.target.customQ.value.trim();
-                                                    if (!val) return;
-                                                    const newQ = {
-                                                        id: questions.length + 1,
-                                                        text: val,
-                                                        category: 'Özel',
-                                                        status: 'pending',
-                                                        visibleToCandidate: false
-                                                    };
-                                                    const updated = [...questions, newQ];
-                                                    setQuestions(updated);
-                                                    persistSessionData({ questions: updated });
-                                                    setCurrentQuestionIndex(updated.length - 1);
-                                                    e.target.customQ.value = '';
-                                                    setShowCustomInput(false);
-                                                }}
-                                                className="flex gap-2 items-center mt-1.5"
-                                            >
-                                                <input
-                                                    name="customQ"
-                                                    type="text"
-                                                    autoFocus
-                                                    placeholder="Soruyu yaz, Enter ile listeye ekle..."
-                                                    className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-[10px] font-bold text-white placeholder-white/20 focus:outline-none focus:border-blue-500/50 transition-all"
-                                                />
-                                                <button
-                                                    type="submit"
-                                                    className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center hover:bg-blue-500 transition-all shrink-0"
-                                                >
-                                                    <ArrowRight className="w-3.5 h-3.5" />
-                                                </button>
-                                            </form>
-                                        )}
-                                    </div>
-                                )}
-                            </section>
-
-                            {/* TRANSCRIPT PANEL */}
-                            <section className="bg-[#0F172A] rounded-2xl border border-white/5 h-[200px] shrink-0 flex flex-col p-3 shadow-xl">
-                                <div className="flex items-center justify-between mb-2">
-                                    <h3 className="text-[9px] font-black text-white/30 uppercase tracking-widest italic">Live Transcript</h3>
-                                    <div className="flex items-center gap-2">
-                                        {!isRecording && isMicOn && (
-                                            <button
-                                                onClick={() => { try { recognitionRef.current?.start(); } catch (e) { } }}
-                                                className="text-[6px] font-black text-blue-400 uppercase tracking-widest border border-blue-500/30 px-1.5 py-0.5 rounded hover:bg-blue-500/10 transition-colors"
-                                            >
-                                                Yeniden Başlat
-                                            </button>
-                                        )}
-                                        <div className="flex items-center gap-1 px-1.5 py-0.5 bg-emerald-500/10 rounded">
-                                            <div className={`w-1 h-1 rounded-full ${isRecording ? 'bg-emerald-500 animate-pulse' : 'bg-slate-500'}`} />
-                                            <span className={`text-[6px] font-black uppercase ${isRecording ? 'text-emerald-500' : 'text-slate-500'}`}>
-                                                {isRecording ? 'Active' : 'Standby'}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 custom-scrollbar" ref={transcriptRef}>
-                                    {transcript.length === 0 && (
-                                        <div className="h-full flex flex-col items-center justify-center opacity-20">
-                                            <MessageSquare className="w-4 h-4 mb-1" />
-                                            <p className="text-[7px] font-black uppercase tracking-widest">Konuşmalar burada görünecek</p>
-                                        </div>
-                                    )}
-                                    {transcript.slice(-8).map((line, idx) => (
-                                        <div key={idx} className={`p-1.5 rounded-lg border ${line.role === 'ADAY' ? 'bg-white/2 border-white/5' : 'bg-blue-500/5 border-blue-500/10 ml-3'}`}>
-                                            <div className="flex items-center justify-between mb-0.5">
-                                                <span className={`text-[6px] font-black uppercase tracking-widest ${line.role === 'ADAY' ? 'text-blue-400' : 'text-blue-200'}`}>{line.role}</span>
-                                                <span className="text-[6px] text-white/20 font-mono tabular-nums">{line.time}</span>
-                                            </div>
-                                            <p className="text-[9px] font-bold text-white/80 leading-relaxed">{line.text}</p>
-                                        </div>
-                                    ))}
-                                    {isRecording && (
-                                        <div className="flex items-center gap-1.5 p-1 opacity-30">
-                                            <div className="flex items-center gap-0.5">
-                                                <div className="w-0.5 h-1.5 bg-blue-500 animate-[bounce_0.8s_infinite_0ms]" />
-                                                <div className="w-0.5 h-2.5 bg-blue-500 animate-[bounce_0.8s_infinite_100ms]" />
-                                                <div className="w-0.5 h-1 bg-blue-500 animate-[bounce_0.8s_infinite_200ms]" />
-                                            </div>
-                                            <span className="text-[7px] font-bold text-white/40 italic">Ses bekleniyor...</span>
-                                        </div>
-                                    )}
-                                </div>
-                            </section>
-                        </div>
-
-                        {/* RIGHT COLUMN: VIDEO + AI COACH + ANALYTICS (42%) */}
-                        <div className="flex-[0_0_42%] min-w-0 flex flex-col gap-2 overflow-hidden h-full">
-
-                            {/* COMPACT VIDEO — flex-1 so it expands to fill available vertical space */}
-                            <div className="bg-[#07090F] rounded-2xl relative overflow-hidden border border-white/10 shadow-2xl flex-1 min-h-[220px]">
-                                {remoteStream ? (
-                                    <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
-                                ) : stream ? (
-                                    <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover scale-x-[-1] opacity-40" />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center">
-                                        <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center border border-white/10 animate-pulse">
-                                            <User className="w-6 h-6 text-white/10" />
-                                        </div>
-                                    </div>
-                                )}
-                                {stream && (
-                                    <div className="absolute bottom-2 right-2 w-20 aspect-video bg-black rounded-lg overflow-hidden border border-white/20 shadow-xl z-20">
-                                        <video ref={pipVideoRef} autoPlay muted playsInline className="w-full h-full object-cover scale-x-[-1]" />
-                                    </div>
-                                )}
-                                <div className="absolute top-2 left-2 flex items-center gap-1.5 px-2 py-1 bg-rose-600/90 rounded-lg border border-rose-500/60 shadow">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                                    <span className="text-[7px] font-black text-white uppercase tracking-widest">CANLI</span>
-                                </div>
-                                <div className="absolute top-2 right-2 px-2 py-1 bg-black/40 backdrop-blur-sm rounded-lg border border-white/5">
-                                    <span className="text-[7px] font-black text-white/50 uppercase tabular-nums">
-                                        {Math.floor(elapsedTime / 60).toString().padStart(2, '0')}:{(elapsedTime % 60).toString().padStart(2, '0')}
-                                    </span>
-                                </div>
-                            </div>
-
-                            {/* MEDIA CONTROLS */}
-                            <div className="flex items-center gap-1.5 shrink-0 bg-[#0F172A] rounded-xl p-2 border border-white/5">
-                                <button
-                                    onClick={() => setIsMicOn(!isMicOn)}
-                                    className={"flex-1 h-7 rounded-lg flex items-center justify-center gap-1.5 transition-all text-[7px] font-black uppercase border " + (isMicOn ? 'bg-white/5 text-white hover:bg-white/10 border-white/5' : 'bg-red-500 text-white border-red-600')}
-                                >
-                                    {isMicOn ? <Mic className="w-3 h-3" /> : <MicOff className="w-3 h-3" />}
-                                    <span className="hidden sm:inline">{isMicOn ? 'Mikrofon' : 'Kapalı'}</span>
-                                </button>
-                                <button
-                                    onClick={() => setIsVideoOn(!isVideoOn)}
-                                    className={"flex-1 h-7 rounded-lg flex items-center justify-center gap-1.5 transition-all text-[7px] font-black uppercase border " + (isVideoOn ? 'bg-blue-600/20 text-blue-300 border-blue-500/30' : 'bg-red-500 text-white border-red-600')}
-                                >
-                                    {isVideoOn ? <Video className="w-3 h-3" /> : <VideoOff className="w-3 h-3" />}
-                                    <span className="hidden sm:inline">{isVideoOn ? 'Kamera' : 'Kapalı'}</span>
-                                </button>
-                            </div>
-
-                            {/* AI COACH SUGGESTION */}
-                            <section className="bg-[#0F172A] rounded-2xl border border-white/5 p-4 shrink-0 shadow-xl">
-                                <div className="flex items-center justify-between mb-3">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-1 h-4 bg-blue-500 rounded-full" />
-                                        <p className="text-xs font-black text-blue-400 uppercase tracking-widest">AI Coach</p>
-                                        <span className="text-[10px] text-amber-400/70 font-bold">— sadece siz görürsünüz</span>
-                                    </div>
-                                    {coachGenerating && <Loader2 className="w-3.5 h-3.5 text-blue-400 animate-spin" />}
-                                </div>
-                                <p className="text-[13px] font-semibold text-white/90 leading-relaxed border-l-2 border-blue-500/50 pl-3">
-                                    {suggestedQuestion ? suggestedQuestion.question : "Transkript otomatik takip ediyor — siz sesli sorun, sistem kaydeder. 'Derinleştir' ile anlık soru önerisi alın."}
-                                </p>
-                                {suggestedQuestion?.evaluationHint && (
-                                    <p className="text-[11px] text-blue-400/80 mt-1.5 pl-3 italic">→ {suggestedQuestion.evaluationHint}</p>
-                                )}
-                                {suggestedQuestion && (
-                                    <div className="flex gap-2 mt-3">
-                                        <button
-                                            onClick={() => {
-                                                const newQ = {
-                                                    id: questions.length + 1,
-                                                    text: suggestedQuestion.question,
-                                                    category: 'AI Önerisi',
-                                                    status: 'pending',
-                                                    visibleToCandidate: false
-                                                };
-                                                const updated = [...questions, newQ];
-                                                setQuestions(updated);
-                                                persistSessionData({ questions: updated });
-                                                setCurrentQuestionIndex(updated.length - 1);
-                                                setSuggestedQuestion(null);
-                                            }}
-                                            className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-black uppercase flex items-center justify-center gap-1.5 transition-all"
-                                        >
-                                            <FileText className="w-3 h-3" /> Listeye Ekle
-                                        </button>
-                                        <button
-                                            onClick={() => setSuggestedQuestion(null)}
-                                            className="px-3 py-2 bg-white/5 hover:bg-white/10 text-white/50 rounded-lg text-[11px] font-black uppercase transition-all"
-                                        >
-                                            Yoksay
-                                        </button>
-                                    </div>
-                                )}
-                            </section>
-
-                            {/* ANALYTICS */}
-                            <section className="bg-[#0F172A] rounded-2xl p-3 border border-white/5 shadow-xl shrink-0 overflow-y-auto flex flex-col gap-2.5">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-1.5">
-                                        <Sparkles className="w-3 h-3 text-blue-400" />
-                                        <h3 className="text-[10px] font-black text-white/50 uppercase tracking-widest">Analytical Insight</h3>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                        {starAnalyzing && <Loader2 className="w-2.5 h-2.5 text-blue-400 animate-spin" />}
-                                        <div className="px-1.5 py-0.5 bg-blue-600/20 text-blue-400 border border-blue-500/20 rounded text-[9px] font-black uppercase">REAL-TIME</div>
-                                    </div>
-                                </div>
-
-                                {biasWarning && (
-                                    <div className="flex items-start gap-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-2.5">
-                                        <AlertTriangle className="w-3 h-3 text-yellow-400 shrink-0 mt-0.5" />
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-[10px] font-black text-yellow-400 uppercase">Önyargı Uyarısı</p>
-                                            <p className="text-[11px] text-yellow-300/90 mt-0.5 leading-snug">{biasWarning}</p>
-                                        </div>
-                                        <button onClick={() => setBiasWarning(null)} className="text-yellow-500/60 text-xs shrink-0">✕</button>
-                                    </div>
-                                )}
-
-                                {/* STAR scores as compact bars */}
-                                <div className="flex flex-col gap-2">
-                                    {[
-                                        { key: 'technical', label: 'Teknik' },
-                                        { key: 'communication', label: 'İletişim' },
-                                        { key: 'problemSolving', label: 'Problem' },
-                                        { key: 'cultureFit', label: 'Kültür' },
-                                        { key: 'adaptability', label: 'Adaptasyon' },
-                                    ].map(({ key, label }) => (
-                                        <div key={key} className="flex items-center gap-2">
-                                            <span className="text-[11px] text-white/50 w-18 shrink-0">{label}</span>
-                                            <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
-                                                <div className="h-full bg-blue-500 rounded-full transition-all duration-700" style={{ width: `${starScores[key] || 0}%` }} />
-                                            </div>
-                                            <span className="text-[11px] text-white/50 font-mono w-6 text-right">{starScores[key] || 0}</span>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                {/* AI insights */}
-                                {aiInsights.length > 0 && (
-                                    <div className="flex flex-col gap-1.5">
-                                        <p className="text-[10px] font-black text-white/30 uppercase tracking-widest">Tespitler</p>
-                                        {aiInsights.slice(0, 5).map(ins => (
-                                            <div
-                                                key={ins.id}
-                                                className={`rounded-lg p-2.5 border text-[12px] leading-relaxed ${
-                                                    ins.type === 'warning'
-                                                        ? 'bg-yellow-500/10 border-yellow-500/25 text-yellow-200'
-                                                        : 'bg-white/10 border-white/10 text-white/90'
-                                                }`}
-                                            >
-                                                {ins.text}
-                                                {ins.hint && <p className="mt-1.5 text-cyan-300 italic text-[11px] font-medium">→ {ins.hint}</p>}
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-
-                                {/* Emotion analysis */}
-                                {emotionData && (
-                                    <div className="flex flex-col gap-2">
-                                        <p className="text-[10px] font-black text-white/30 uppercase tracking-widest flex items-center gap-1.5">
-                                            <Activity className="w-2.5 h-2.5 text-purple-400" /> Ses Duygu Analizi
-                                        </p>
-                                        <div className="grid grid-cols-2 gap-x-3 gap-y-2">
-                                            {[
-                                                { label: 'Stres', value: emotionData.stress, color: '#EF4444' },
-                                                { label: 'Heyecan', value: emotionData.excitement, color: '#F59E0B' },
-                                                { label: 'Özgüven', value: emotionData.confidence, color: '#10B981' },
-                                                { label: 'Tereddüt', value: emotionData.hesitation, color: '#8B5CF6' },
-                                            ].map(({ label, value, color }) => (
-                                                <div key={label}>
-                                                    <div className="flex justify-between mb-1">
-                                                        <span className="text-[11px] text-white/50">{label}</span>
-                                                        <span className="text-[11px] font-bold tabular-nums" style={{ color }}>%{value || 0}</span>
-                                                    </div>
-                                                    <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-                                                        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${value || 0}%`, background: color }} />
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Logic Integrity */}
-                                <div className="flex items-center justify-between gap-3 pt-2 border-t border-white/5">
-                                    <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">Logic Integrity</span>
-                                    <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
-                                        <div className="h-full bg-gradient-to-r from-blue-600 to-indigo-600 transition-all duration-700 rounded-full" style={{ width: `${logicIntegrity}%` }} />
-                                    </div>
-                                    <span className="text-xs font-black text-blue-400 tabular-nums">%{logicIntegrity}</span>
-                                </div>
-                            </section>
-                        </div>
-                    </>
-                ) : (
-                    // CANDIDATE VIEW (Clean and focused)
+                {/* ADAY GÖRÜNÜMÜ — mülakatçı yolu yukarıda ayrı return ile
+                    karşılanıyor, buraya yalnızca aday düşüyor. */}
                     <div className="flex-1 flex gap-4 overflow-hidden animate-in fade-in duration-700">
                         {/* Main Stage: Recruiter View */}
                         <div className="flex-1 bg-[#0F172A] rounded-[2.5rem] relative overflow-hidden shadow-2xl border border-white/10 group/stage">
@@ -2741,7 +2805,6 @@ export default function LiveInterviewPage() {
                             </section>
                         </div>
                     </div>
-                )}
             </div>
 
             {showSettings && (
