@@ -43,7 +43,7 @@ import {
 } from 'lucide-react';
 
 const STATUS_CONFIG = {
-    live:       { label: 'CANLI',      bg: 'bg-rose-50',    text: 'text-rose-600',    border: 'border-rose-100',    pulse: true },
+    live:       { label: 'CANLI',      bg: 'bg-bad-bg',    text: 'text-bad',    border: 'border-bad-bg',    pulse: true },
     completed:  { label: 'TAMAMLANDI', bg: 'bg-ok-bg', text: 'text-ok', border: 'border-transparent', pulse: false },
     cancelled:  { label: 'İPTAL',      bg: 'bg-n100',  text: 'text-n500',   border: 'border-n200',   pulse: false },
     scheduled:  { label: 'PLANLANDI',  bg: 'bg-warn-bg',   text: 'text-warn',   border: 'border-transparent',   pulse: false },
@@ -1336,7 +1336,7 @@ export default function CandidateProcessPage() {
                             {activeFilterCount > 0 && (
                                 <button
                                     onClick={() => { setFilterSource(''); setFilterStatus(''); setFilterPosition(''); setFilterMinScore(0); }}
-                                    className="w-full text-[11px] font-semibold uppercase tracking-[0.08em] text-rose-500 hover:text-rose-700 py-1 transition-all"
+                                    className="w-full text-[11px] font-semibold uppercase tracking-[0.08em] text-bad hover:text-bad py-1 transition-all"
                                 >
                                     Filtreleri Temizle
                                 </button>
@@ -1871,13 +1871,13 @@ export default function CandidateProcessPage() {
                                         <div className="space-y-5 animate-in fade-in duration-300">
                                             {/* Domain header */}
                                             <div className="flex items-center gap-3 p-4 bg-n50 border border-n200 rounded-[14px]">
-                                                <div className="w-9 h-9 rounded-md bg-[#13294E]/10 flex items-center justify-center shrink-0">
-                                                    <Layers className="w-4.5 h-4.5 text-[#13294E]" />
+                                                <div className="w-9 h-9 rounded-md bg-brand/10 flex items-center justify-center shrink-0">
+                                                    <Layers className="w-4.5 h-4.5 text-brand" />
                                                 </div>
                                                 <div>
                                                     <p className="text-[12px] font-semibold text-n900">
                                                         Aday Meslek Alanı:
-                                                        <span className="ml-1.5 px-2 py-0.5 bg-[#13294E]/10 text-[#13294E] rounded-md">{domainLabel(candidateDomain)}</span>
+                                                        <span className="ml-1.5 px-2 py-0.5 bg-brand/10 text-brand rounded-md">{domainLabel(candidateDomain)}</span>
                                                     </p>
                                                     <p className="text-[11px] text-n400 mt-0.5">Her açık pozisyon ayrı skorlanır; otomatik eşleştirme uyumlu meslek alanına öncelik verir.</p>
                                                     {cleanRoleText(candidate.suggestedRole, candidate.position || '') && (
@@ -1975,7 +1975,7 @@ export default function CandidateProcessPage() {
                                                                         <span>·</span>
                                                                         <span>{pos.minExperience ? `min ${pos.minExperience} yıl` : 'Deneyim belirtilmemiş'}</span>
                                                                         <span>·</span>
-                                                                        <span className="text-blue-500 font-semibold">{domainLabel(positionDomain)}</span>
+                                                                        <span className="text-brand font-semibold">{domainLabel(positionDomain)}</span>
                                                                     </div>
                                                                     {match.summary && (
                                                                         <p className="text-[12px] text-n500 mt-1 leading-relaxed line-clamp-2 italic">{match.summary}</p>
@@ -2200,7 +2200,7 @@ export default function CandidateProcessPage() {
                                                                     {isLive && (
                                                                         <button
                                                                             onClick={e => { e.stopPropagation(); navigate(`/live-interview/${session.id}`); }}
-                                                                            className="bg-rose-500 text-white px-4 py-1.5 rounded-md text-[11px] font-semibold uppercase tracking-[0.08em] hover:bg-rose-600 transition-all shadow-sm animate-pulse"
+                                                                            className="bg-bad text-white px-4 py-1.5 rounded-md text-[11px] font-semibold uppercase tracking-[0.08em] hover:bg-bad transition-all shadow-sm animate-pulse"
                                                                         >
                                                                             SEANSA KATIL
                                                                         </button>
@@ -2289,8 +2289,8 @@ export default function CandidateProcessPage() {
                                             {/* Static: AI Analysis milestone */}
                                             <div className="bg-n0 border border-n200 rounded-md p-4 flex items-center justify-between shadow-sm">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="w-9 h-9 rounded-md bg-blue-50 border border-blue-100 flex items-center justify-center">
-                                                        <Brain className="w-4.5 h-4.5 text-blue-500" />
+                                                    <div className="w-9 h-9 rounded-md bg-brand-50 border border-brand-100 flex items-center justify-center">
+                                                        <Brain className="w-4.5 h-4.5 text-brand" />
                                                     </div>
                                                     <div>
                                                         <h4 className="text-[13px] font-semibold text-n900">AI Detaylı CV Analizi</h4>

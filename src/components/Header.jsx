@@ -33,10 +33,10 @@ const SETTINGS_ITEMS = [
 ];
 
 const NOTIF_CONFIG = {
-    success: { icon: CheckCircle, color: 'text-emerald-500', bg: 'bg-emerald-50' },
-    warning: { icon: AlertTriangle, color: 'text-amber-500', bg: 'bg-amber-50' },
-    error:   { icon: AlertTriangle, color: 'text-red-500',   bg: 'bg-red-50' },
-    info:    { icon: Info,          color: 'text-blue-500',  bg: 'bg-blue-50' },
+    success: { icon: CheckCircle, color: 'text-ok', bg: 'bg-ok-bg' },
+    warning: { icon: AlertTriangle, color: 'text-warn', bg: 'bg-warn-bg' },
+    error:   { icon: AlertTriangle, color: 'text-bad',   bg: 'bg-bad-bg' },
+    info:    { icon: Info,          color: 'text-brand',  bg: 'bg-brand-50' },
 };
 
 function dispatchView(view) {
@@ -262,7 +262,7 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
     const hasResults = total > 0;
 
     return (
-        <header className="h-[88px] flex items-center justify-between px-4 md:px-8 bg-white/80 backdrop-blur-md border-b border-[#F1F5F9] sticky top-0 z-40">
+        <header className="h-[88px] flex items-center justify-between px-4 md:px-8 bg-n0/80 backdrop-blur-md border-b border-n100 sticky top-0 z-40">
 
             {/* ── Mobile Hamburger + Page Title + Home ──
                 Brand identity lives in the sidebar (Talent-Inn + AI Recruitment).
@@ -271,20 +271,20 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
             <div className="flex items-center gap-2 md:gap-3 md:mr-6">
                 <button
                     onClick={() => window.dispatchEvent(new CustomEvent('openMobileSidebar'))}
-                    className="p-2 rounded-lg hover:bg-slate-100 text-slate-600 transition-all lg:hidden"
+                    className="p-2 rounded-md hover:bg-n100 text-n600 transition-all lg:hidden"
                     aria-label="Menüyü aç"
                 >
                     <Menu className="w-5 h-5" />
                 </button>
                 <button
                     onClick={() => dispatchView('dashboard')}
-                    className="p-2 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-blue-600 transition-all hidden sm:inline-flex"
+                    className="p-2 rounded-md hover:bg-n100 text-n500 hover:text-brand-600 transition-all hidden sm:inline-flex"
                     title="Anasayfa"
                 >
                     <Home className="w-5 h-5" />
                 </button>
                 {title && (
-                    <h2 className="hidden md:block text-[15px] font-bold text-[#0F172A] tracking-tight">
+                    <h2 className="hidden md:block text-[15px] font-semibold text-n900 tracking-tight">
                         {title}
                     </h2>
                 )}
@@ -293,7 +293,7 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
             {/* ── Search ── */}
             <div className="flex-1 max-w-[500px] relative mx-2 md:mx-4" ref={searchRef}>
                 <div className="relative group">
-                    <Search className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#94A3B8] group-focus-within:text-[#29A9E0] transition-colors pointer-events-none" />
+                    <Search className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-n400 group-focus-within:text-brand transition-colors pointer-events-none" />
                     <input
                         ref={inputRef}
                         type="text"
@@ -302,12 +302,12 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                         onFocus={() => setPanelOpen(true)}
                         onKeyDown={handleKeyDown}
                         placeholder={searchPlaceholder}
-                        className="w-full pl-10 md:pl-12 pr-8 md:pr-10 py-2 md:py-2.5 bg-[#F1F5F9] rounded-lg focus:bg-white focus:ring-1 focus:ring-[#29A9E0] outline-none transition-all text-[13px] md:text-[14px] text-[#0F172A] placeholder:text-[#94A3B8]"
+                        className="w-full pl-10 md:pl-12 pr-8 md:pr-10 py-2 md:py-2.5 bg-n100 rounded-md focus:bg-n0 focus:ring-1 focus:ring-brand outline-none transition-all text-[13px] md:text-[14px] text-n900 placeholder:text-n400"
                     />
                     {query && (
                         <button
                             onClick={() => { setQuery(''); setPanelOpen(false); }}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-n400 hover:text-n600 transition-colors"
                         >
                             <X className="w-4 h-4" />
                         </button>
@@ -316,29 +316,29 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
 
                 {/* Search Results Panel */}
                 {panelOpen && query.trim() && (
-                    <div className="absolute top-full mt-2 left-0 right-0 bg-white rounded-xl shadow-2xl border border-slate-100 overflow-hidden z-50">
+                    <div className="absolute top-full mt-2 left-0 right-0 bg-n0 rounded-md shadow-2xl border border-n200 overflow-hidden z-50">
 
                         {/* AI loading bar */}
                         {aiLoading && (
-                            <div className="flex items-center gap-2 px-4 py-2 border-b border-slate-100 bg-violet-50/60">
-                                <Loader2 className="w-3 h-3 text-violet-500 animate-spin shrink-0" />
-                                <span className="text-[10px] text-violet-600 font-semibold tracking-wide">Semantik analiz yapılıyor…</span>
+                            <div className="flex items-center gap-2 px-4 py-2 border-b border-n200 bg-brand-50/60">
+                                <Loader2 className="w-3 h-3 text-brand animate-spin shrink-0" />
+                                <span className="text-[11px] text-brand font-semibold tracking-wide">Semantik analiz yapılıyor…</span>
                             </div>
                         )}
 
                         <div className="max-h-[440px] overflow-y-auto">
                             {!hasResults && !aiLoading && (
-                                <div className="py-10 text-center text-sm text-slate-400">
-                                    <Search className="w-8 h-8 mx-auto mb-2 text-slate-200" />
+                                <div className="py-10 text-center text-sm text-n400">
+                                    <Search className="w-8 h-8 mx-auto mb-2 text-n200" />
                                     <p>"{query}" için sonuç bulunamadı</p>
-                                    <p className="text-xs mt-1 text-slate-300">AI analiz ediliyor olabilir…</p>
+                                    <p className="text-xs mt-1 text-n300">AI analiz ediliyor olabilir…</p>
                                 </div>
                             )}
 
                             {/* Candidates */}
                             {mergedCandidates.length > 0 && (
                                 <section>
-                                    <div className="px-4 py-1.5 text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 border-b border-slate-100">
+                                    <div className="px-4 py-1.5 text-[11px] font-semibold text-n400 uppercase tracking-[0.08em] bg-n50 border-b border-n200">
                                         Adaylar
                                     </div>
                                     {mergedCandidates.map((c, i) => (
@@ -346,31 +346,31 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                                             key={c.id}
                                             onClick={() => handleSelect({ type: 'candidate', data: c })}
                                             onMouseEnter={() => setSelIdx(i)}
-                                            className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-blue-50/60 transition-colors text-left border-b border-slate-50 ${selIdx === i ? 'bg-blue-50/60' : ''}`}
+                                            className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-brand-50/60 transition-colors text-left border-b border-n50 ${selIdx === i ? 'bg-brand-50/60' : ''}`}
                                         >
-                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                                            <div className="w-8 h-8 rounded-full from-brand to-brand-600 flex items-center justify-center text-white text-xs font-semibold shrink-0">
                                                 {c.name?.[0]?.toUpperCase() || '?'}
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-1.5 mb-0.5">
-                                                    <span className="text-[13px] font-semibold text-slate-800 truncate">{c.name}</span>
+                                                    <span className="text-[13px] font-semibold text-n900 truncate">{c.name}</span>
                                                     {c._isAi && (
-                                                        <span className="inline-flex items-center gap-0.5 text-[9px] bg-violet-100 text-violet-600 px-1.5 py-0.5 rounded-full font-bold shrink-0">
+                                                        <span className="inline-flex items-center gap-0.5 text-[11px] bg-brand-100 text-brand px-1.5 py-0.5 rounded-full font-semibold shrink-0">
                                                             <Sparkles className="w-2.5 h-2.5" /> AI
                                                         </span>
                                                     )}
                                                 </div>
-                                                <div className="text-[11px] text-slate-400 truncate">
+                                                <div className="text-[12px] text-n400 truncate">
                                                     {c.position || c.department || 'Pozisyon belirtilmemiş'}
                                                     {c.skills?.length > 0 && (
-                                                        <span className="text-slate-300"> · {c.skills.slice(0, 3).join(', ')}</span>
+                                                        <span className="text-n300"> · {c.skills.slice(0, 3).join(', ')}</span>
                                                     )}
                                                 </div>
                                             </div>
                                             {c.matchScore != null && (
-                                                <span className="text-[11px] font-bold text-blue-500 shrink-0">{Math.round(c.matchScore)}%</span>
+                                                <span className="text-[12px] font-semibold text-brand shrink-0">{Math.round(c.matchScore)}%</span>
                                             )}
-                                            <ChevronRight className="w-3.5 h-3.5 text-slate-200 shrink-0" />
+                                            <ChevronRight className="w-3.5 h-3.5 text-n200 shrink-0" />
                                         </button>
                                     ))}
                                 </section>
@@ -379,7 +379,7 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                             {/* Positions */}
                             {kwResults.positions.length > 0 && (
                                 <section>
-                                    <div className="px-4 py-1.5 text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 border-b border-slate-100 border-t border-t-slate-100">
+                                    <div className="px-4 py-1.5 text-[11px] font-semibold text-n400 uppercase tracking-[0.08em] bg-n50 border-b border-n200 border-t border-t-slate-100">
                                         Pozisyonlar
                                     </div>
                                     {kwResults.positions.map((p, i) => {
@@ -389,16 +389,16 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                                                 key={p.id}
                                                 onClick={() => handleSelect({ type: 'position', data: p })}
                                                 onMouseEnter={() => setSelIdx(idx)}
-                                                className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-blue-50/60 transition-colors text-left border-b border-slate-50 ${selIdx === idx ? 'bg-blue-50/60' : ''}`}
+                                                className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-brand-50/60 transition-colors text-left border-b border-n50 ${selIdx === idx ? 'bg-brand-50/60' : ''}`}
                                             >
-                                                <div className="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center shrink-0">
-                                                    <Briefcase className="w-4 h-4 text-violet-600" />
+                                                <div className="w-8 h-8 rounded-md bg-brand-100 flex items-center justify-center shrink-0">
+                                                    <Briefcase className="w-4 h-4 text-brand" />
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <div className="text-[13px] font-semibold text-slate-800 truncate">{p.title}</div>
-                                                    <div className="text-[11px] text-slate-400">{p.department}</div>
+                                                    <div className="text-[13px] font-semibold text-n900 truncate">{p.title}</div>
+                                                    <div className="text-[12px] text-n400">{p.department}</div>
                                                 </div>
-                                                <ChevronRight className="w-3.5 h-3.5 text-slate-200 shrink-0" />
+                                                <ChevronRight className="w-3.5 h-3.5 text-n200 shrink-0" />
                                             </button>
                                         );
                                     })}
@@ -408,7 +408,7 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                             {/* Pages */}
                             {kwResults.pages.length > 0 && (
                                 <section>
-                                    <div className="px-4 py-1.5 text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 border-b border-slate-100 border-t border-t-slate-100">
+                                    <div className="px-4 py-1.5 text-[11px] font-semibold text-n400 uppercase tracking-[0.08em] bg-n50 border-b border-n200 border-t border-t-slate-100">
                                         Sayfalar
                                     </div>
                                     {kwResults.pages.map((pg, i) => {
@@ -419,16 +419,16 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                                                 key={pg.view}
                                                 onClick={() => handleSelect({ type: 'page', data: pg })}
                                                 onMouseEnter={() => setSelIdx(idx)}
-                                                className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-blue-50/60 transition-colors text-left border-b border-slate-50 ${selIdx === idx ? 'bg-blue-50/60' : ''}`}
+                                                className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-brand-50/60 transition-colors text-left border-b border-n50 ${selIdx === idx ? 'bg-brand-50/60' : ''}`}
                                             >
-                                                <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
-                                                    <Icon className="w-4 h-4 text-slate-500" />
+                                                <div className="w-8 h-8 rounded-md bg-n100 flex items-center justify-center shrink-0">
+                                                    <Icon className="w-4 h-4 text-n500" />
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <div className="text-[13px] font-semibold text-slate-800">{pg.label}</div>
-                                                    <div className="text-[11px] text-slate-400">{pg.desc}</div>
+                                                    <div className="text-[13px] font-semibold text-n900">{pg.label}</div>
+                                                    <div className="text-[12px] text-n400">{pg.desc}</div>
                                                 </div>
-                                                <ArrowRight className="w-3.5 h-3.5 text-slate-200 shrink-0" />
+                                                <ArrowRight className="w-3.5 h-3.5 text-n200 shrink-0" />
                                             </button>
                                         );
                                     })}
@@ -437,10 +437,10 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                         </div>
 
                         {hasResults && (
-                            <div className="px-4 py-2 bg-slate-50 border-t border-slate-100 flex items-center gap-4 text-[10px] text-slate-400">
-                                <span className="flex items-center gap-1"><kbd className="bg-white border border-slate-200 rounded px-1 py-0.5 font-mono text-[9px]">↑↓</kbd> Gezin</span>
-                                <span className="flex items-center gap-1"><kbd className="bg-white border border-slate-200 rounded px-1 py-0.5 font-mono text-[9px]">↵</kbd> Seç</span>
-                                <span className="flex items-center gap-1"><kbd className="bg-white border border-slate-200 rounded px-1 py-0.5 font-mono text-[9px]">Esc</kbd> Kapat</span>
+                            <div className="px-4 py-2 bg-n50 border-t border-n200 flex items-center gap-4 text-[11px] text-n400">
+                                <span className="flex items-center gap-1"><kbd className="bg-n0 border border-n200 rounded px-1 py-0.5 font-mono text-[11px]">↑↓</kbd> Gezin</span>
+                                <span className="flex items-center gap-1"><kbd className="bg-n0 border border-n200 rounded px-1 py-0.5 font-mono text-[11px]">↵</kbd> Seç</span>
+                                <span className="flex items-center gap-1"><kbd className="bg-n0 border border-n200 rounded px-1 py-0.5 font-mono text-[11px]">Esc</kbd> Kapat</span>
                                 <span className="ml-auto">{total} sonuç</span>
                             </div>
                         )}
@@ -455,34 +455,34 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                 <div className="relative" ref={notifRef}>
                     <button
                         onClick={() => { if (notificationsEnabled) { setNotifOpen(o => !o); setSettOpen(false); } }}
-                        className={`p-2.5 rounded-lg transition-colors relative ${notifOpen ? 'bg-blue-50 text-blue-600' : notificationsEnabled ? 'text-slate-500 hover:bg-slate-100 hover:text-slate-800' : 'text-slate-300 cursor-not-allowed'}`}
+                        className={`p-2.5 rounded-md transition-colors relative ${notifOpen ? 'bg-brand-50 text-brand-600' : notificationsEnabled ? 'text-n500 hover:bg-n100 hover:text-n900' : 'text-n300 cursor-not-allowed'}`}
                         title={notificationsEnabled ? 'Bildirimler' : 'Bildirimler kapalı'}
                     >
                         <Bell className="w-5 h-5" />
                         {notificationsEnabled && unreadCount > 0 && (
-                            <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 bg-red-500 rounded-full border-2 border-white text-[9px] font-black text-white flex items-center justify-center px-0.5 leading-none">
+                            <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 bg-bad rounded-full border-2 border-white text-[11px] font-semibold text-white flex items-center justify-center px-0.5 leading-none">
                                 {unreadCount > 9 ? '9+' : unreadCount}
                             </span>
                         )}
                     </button>
 
                     {notificationsEnabled && notifOpen && (
-                        <div className="absolute right-0 top-full mt-2 w-[360px] bg-white rounded-xl shadow-2xl border border-slate-100 z-50 overflow-hidden">
-                            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+                        <div className="absolute right-0 top-full mt-2 w-[360px] bg-n0 rounded-md shadow-2xl border border-n200 z-50 overflow-hidden">
+                            <div className="flex items-center justify-between px-4 py-3 border-b border-n200">
                                 <div className="flex items-center gap-2">
-                                    <span className="text-sm font-bold text-slate-800">Bildirimler</span>
+                                    <span className="text-sm font-semibold text-n900">Bildirimler</span>
                                     {unreadCount > 0 && (
-                                        <span className="text-[10px] bg-red-100 text-red-600 font-bold px-1.5 py-0.5 rounded-full">{unreadCount} yeni</span>
+                                        <span className="text-[11px] bg-bad-bg text-bad font-semibold px-1.5 py-0.5 rounded-full">{unreadCount} yeni</span>
                                     )}
                                 </div>
                                 <div className="flex items-center gap-3">
                                     {unreadCount > 0 && (
-                                        <button onClick={markAllAsRead} className="text-[11px] text-blue-500 hover:text-blue-700 font-semibold transition-colors">
+                                        <button onClick={markAllAsRead} className="text-[12px] text-brand hover:text-brand-700 font-semibold transition-colors">
                                             Tümünü oku
                                         </button>
                                     )}
                                     {notifications.length > 0 && (
-                                        <button onClick={clearAll} className="text-[11px] text-slate-400 hover:text-red-500 font-medium transition-colors">
+                                        <button onClick={clearAll} className="text-[12px] text-n400 hover:text-bad font-medium transition-colors">
                                             Temizle
                                         </button>
                                     )}
@@ -492,9 +492,9 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                             <div className="max-h-[380px] overflow-y-auto">
                                 {notifications.length === 0 ? (
                                     <div className="py-14 text-center">
-                                        <Bell className="w-10 h-10 text-slate-100 mx-auto mb-3" />
-                                        <p className="text-sm font-medium text-slate-400">Henüz bildirim yok</p>
-                                        <p className="text-xs text-slate-300 mt-1">Yeni aday ve mülakat bildirimleri burada görünür</p>
+                                        <Bell className="w-10 h-10 text-n100 mx-auto mb-3" />
+                                        <p className="text-sm font-medium text-n400">Henüz bildirim yok</p>
+                                        <p className="text-xs text-n300 mt-1">Yeni aday ve mülakat bildirimleri burada görünür</p>
                                     </div>
                                 ) : (
                                     notifications.map(n => {
@@ -504,20 +504,20 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                                             <button
                                                 key={n.id}
                                                 onClick={() => markAsRead(n.id)}
-                                                className={`w-full flex items-start gap-3 px-4 py-3 hover:bg-slate-50 transition-colors border-b border-slate-50 text-left ${!n.read ? 'bg-blue-50/30' : ''}`}
+                                                className={`w-full flex items-start gap-3 px-4 py-3 hover:bg-n50 transition-colors border-b border-n50 text-left ${!n.read ? 'bg-brand-50/30' : ''}`}
                                             >
-                                                <div className={`w-8 h-8 rounded-xl ${cfg.bg} flex items-center justify-center shrink-0 mt-0.5`}>
+                                                <div className={`w-8 h-8 rounded-md ${cfg.bg} flex items-center justify-center shrink-0 mt-0.5`}>
                                                     <Icon className={`w-4 h-4 ${cfg.color}`} />
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     {n.title && (
-                                                        <div className="text-[12px] font-semibold text-slate-800 leading-snug mb-0.5">{n.title}</div>
+                                                        <div className="text-[12px] font-semibold text-n900 leading-snug mb-0.5">{n.title}</div>
                                                     )}
-                                                    <div className="text-[11px] text-slate-500 leading-relaxed">{n.message}</div>
-                                                    <div className="text-[10px] text-slate-300 mt-1">{formatTime(n.timestamp)}</div>
+                                                    <div className="text-[12px] text-n500 leading-relaxed">{n.message}</div>
+                                                    <div className="text-[11px] text-n300 mt-1">{formatTime(n.timestamp)}</div>
                                                 </div>
                                                 {!n.read && (
-                                                    <div className="w-2 h-2 rounded-full bg-blue-500 shrink-0 mt-1.5" />
+                                                    <div className="w-2 h-2 rounded-full bg-brand shrink-0 mt-1.5" />
                                                 )}
                                             </button>
                                         );
@@ -532,34 +532,34 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                 <div className="relative" ref={settRef}>
                     <button
                         onClick={() => { setSettOpen(o => !o); setNotifOpen(false); }}
-                        className={`p-2.5 rounded-lg transition-colors ${settOpen ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'}`}
+                        className={`p-2.5 rounded-md transition-colors ${settOpen ? 'bg-brand-50 text-brand-600' : 'text-n500 hover:bg-n100 hover:text-n900'}`}
                         title="Ayarlar"
                     >
                         <Settings className="w-5 h-5" />
                     </button>
 
                     {settOpen && (
-                        <div className="absolute right-0 top-full mt-2 w-[210px] bg-white rounded-xl shadow-2xl border border-slate-100 z-50 overflow-hidden py-1.5">
+                        <div className="absolute right-0 top-full mt-2 w-[210px] bg-n0 rounded-md shadow-2xl border border-n200 z-50 overflow-hidden py-1.5">
                             {SETTINGS_ITEMS.map(item => {
                                 const Icon = item.icon;
                                 return (
                                     <button
                                         key={item.label}
                                         onClick={() => { dispatchView(item.view); setSettOpen(false); }}
-                                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 transition-colors text-left"
+                                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-n50 transition-colors text-left"
                                     >
-                                        <Icon className="w-4 h-4 text-slate-400 shrink-0" />
-                                        <span className="text-[13px] text-slate-700 font-medium">{item.label}</span>
+                                        <Icon className="w-4 h-4 text-n400 shrink-0" />
+                                        <span className="text-[13px] text-n700 font-medium">{item.label}</span>
                                     </button>
                                 );
                             })}
-                            <div className="border-t border-slate-100 mt-1 pt-1">
+                            <div className="border-t border-n200 mt-1 pt-1">
                                 <button
                                     onClick={() => { logout(); setSettOpen(false); }}
-                                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-red-50 transition-colors text-left group"
+                                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-bad-bg transition-colors text-left group"
                                 >
-                                    <LogOut className="w-4 h-4 text-slate-400 group-hover:text-red-500 shrink-0 transition-colors" />
-                                    <span className="text-[13px] font-medium text-slate-700 group-hover:text-red-500 transition-colors">Çıkış Yap</span>
+                                    <LogOut className="w-4 h-4 text-n400 group-hover:text-bad shrink-0 transition-colors" />
+                                    <span className="text-[13px] font-medium text-n700 group-hover:text-bad transition-colors">Çıkış Yap</span>
                                 </button>
                             </div>
                         </div>
@@ -567,13 +567,13 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                 </div>
 
                 {/* Profile — name/role hidden on small screens */}
-                <div className="flex items-center gap-3 pl-2 sm:pl-4 ml-2 border-l border-[#E2E8F0]">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-violet-500 flex items-center justify-center text-white text-xs font-black shrink-0 select-none">
+                <div className="flex items-center gap-3 pl-2 sm:pl-4 ml-2 border-l border-n200">
+                    <div className="w-8 h-8 rounded-full from-brand to-brand flex items-center justify-center text-white text-xs font-semibold shrink-0 select-none">
                         {userName[0]?.toUpperCase() || 'U'}
                     </div>
                     <div className="hidden sm:block">
-                        <div className="text-[13px] font-bold text-[#0F172A] leading-none truncate max-w-[110px]">{userName}</div>
-                        <div className="text-[10px] text-[#64748B] font-medium mt-0.5">{roleText}</div>
+                        <div className="text-[13px] font-semibold text-n900 leading-none truncate max-w-[110px]">{userName}</div>
+                        <div className="text-[11px] text-n500 font-medium mt-0.5">{roleText}</div>
                     </div>
                 </div>
             </div>
