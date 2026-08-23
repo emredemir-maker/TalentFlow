@@ -3,7 +3,7 @@ import { normalizeStarAnalysis, anchorLabel } from '../utils/starDimensions';
 import TermText from './TermText';
 
 const STEPS = {
-    Situation: { k: 'S', l: 'DURUM', bg: 'bg-blue-50',    border: 'border-blue-100',    tc: 'text-blue-700' },
+    Situation: { k: 'S', l: 'DURUM', bg: 'bg-brand-50',   border: 'border-brand-100',   tc: 'text-brand' },
     Task:      { k: 'T', l: 'GÖREV', bg: 'bg-brand-50',   border: 'border-brand-100',   tc: 'text-brand' },
     Action:    { k: 'A', l: 'EYLEM', bg: 'bg-brand-50',  border: 'border-brand-100',  tc: 'text-brand-700' },
     Result:    { k: 'R', l: 'SONUÇ', bg: 'bg-ok-bg', border: 'border-transparent', tc: 'text-ok' },
