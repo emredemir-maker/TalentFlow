@@ -2,11 +2,11 @@ import { useState } from 'react';
 import { ChevronDown, ChevronRight, Check, Minus, X, Wrench, Brain, Calculator, Quote, GitCompareArrows, RotateCcw, AlertTriangle } from 'lucide-react';
 import { explainHybridScore } from '../services/geminiService';
 import { requirementsOf } from '../utils/positionRequirements';
-import { coverageDetailState, usesCurrentRubric } from '../utils/coverageDetail';
+import { coverageDetailState, usesCurrentRubric, assessmentsOf } from '../utils/coverageDetail';
 import { isStaleFor, analysisScoreDetail } from '../utils/positionScore';
 import { ShieldAlert, TrendingUp, Layers } from 'lucide-react';
 import { buildScoreProvenance, dominantSource } from '../utils/scoreProvenance';
-import { STAR_MAX, STAR_LABELS, anchorLabel } from '../utils/starDimensions';
+import { STAR_MAX, STAR_LABELS, anchorLabel, normalizeStarAnalysis, starPercent } from '../utils/starDimensions';
 
 /**
  * "Bu skor neden 54?" — skorun tam kırılımı.
@@ -208,6 +208,108 @@ function FormulaBox({ label, value, hint, tone = 'n' }) {
     );
 }
 
+
+/**
+ * Kanıt kovaları — maddelerin damgalarından sayılır.
+ *
+ * Damgası olmayan madde HİÇBİR kovaya girmez: sorulmamış bir soruyu
+ * "kanıt yok" saymak, ölçülmemiş bir şeyi ölçülmüş gibi göstermek olurdu.
+ */
+function evidenceBuckets(analysis) {
+    const list = assessmentsOf(analysis);
+    if (!Array.isArray(list) || list.length === 0) return null;
+    const by = (s) => list.filter((a) => String(a?.status || '').toLowerCase() === s).length;
+    return [
+        { label: 'Güçlü kanıt', hint: "CV'de doğrudan dayanak", count: by('met'), icon: Check, bg: 'var(--color-ok-bg)', fg: 'var(--color-ok)' },
+        { label: 'Kısmi kanıt', hint: 'İlgili ifade var, madde tam kapanmıyor', count: by('partial'), icon: Minus, bg: 'var(--color-warn-bg)', fg: 'var(--color-warn)' },
+        { label: 'Kanıt yok', hint: "CV'de dayanak bulunamadı — mülakata taşınır", count: by('missing'), icon: X, bg: 'var(--color-n100)', fg: 'var(--color-n500)' },
+    ];
+}
+/**
+ * STAR KANIT YOĞUNLUĞU + KANIT KOVALARI — prototipin ikili ızgarası.
+ *
+ * Solda dört boyut 0-3 ölçeğinde ve çapa etiketiyle; sağda maddelerin
+ * kanıt gücüne göre sayımı. İkisi de ÖZET: ayrıntılı kartlar aşağıda
+ * duruyor (StarEvidenceCards) ve prototipte de böyle — özet + ayrıntı.
+ *
+ * ÖLÇEK UYGULAMANIN: 0-3 ve çapalar utils/starDimensions.js'ten. Prototip
+ * madde satırlarında "/9,5" gibi başka bir ölçek gösteriyor ama hesap
+ * mantığı değişmiyor; ekran uygulamanın gerçek ölçüsünü yazar.
+ *
+ * KOVA SAYILARI UYDURULMUYOR: maddelerin damgalarından (met/partial/missing)
+ * geliyor. Damgası olmayan madde hiçbir kovaya girmez.
+ */
+function StarDensity({ dims, starPct, buckets }) {
+    if (!dims || dims.length === 0) return null;
+
+    return (
+        <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_1fr] gap-3">
+            <div className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-[18px]">
+                <div className="flex items-baseline gap-2 mb-2.5">
+                    <span className="text-[11px] font-semibold text-n500 tracking-[0.1em] uppercase">
+                        STAR kanıt yoğunluğu
+                    </span>
+                    {starPct != null && (
+                        <span className="ml-auto text-[20px] font-semibold tracking-[-0.02em] text-brand">
+                            %{starPct}
+                        </span>
+                    )}
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {dims.map((d) => (
+                        <div key={d.key} className="bg-n50 border border-n200 rounded-md px-[11px] py-2.5">
+                            <div className="text-[11px] font-semibold text-n500 uppercase tracking-[0.06em]">
+                                {STAR_LABELS[d.key] || d.key}
+                            </div>
+                            <div className="text-[16px] font-semibold mt-0.5">
+                                {d.score}
+                                <span className="text-[11px] text-n400 font-normal">/{d.max}</span>
+                            </div>
+                            <div className="h-1 bg-n100 rounded-full overflow-hidden mt-1.5">
+                                <div
+                                    className="h-full bg-brand rounded-full"
+                                    style={{ width: `${Math.round((d.score / (d.max || 1)) * 100)}%` }}
+                                />
+                            </div>
+                            <div className="text-[11px] text-n400 mt-1 leading-[1.4]">
+                                {anchorLabel(d.score, d.max) || '—'}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                <p className="text-[11px] text-n400 mt-2.5 leading-[1.5] m-0">
+                    Kanıtın ne kadar iyi belgelendiğini ölçer, adayın ne kadar iyi olduğunu değil.
+                </p>
+            </div>
+
+            {buckets && (
+                <div className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-[18px]">
+                    <div className="text-[11px] font-semibold text-n500 tracking-[0.1em] uppercase mb-2.5">
+                        Kanıt kovaları
+                    </div>
+                    {buckets.map((b) => (
+                        <div key={b.label} className="flex items-center gap-2.5 py-2 border-t border-n100">
+                            <span
+                                className="w-6 h-6 shrink-0 rounded flex items-center justify-center"
+                                style={{ background: b.bg, color: b.fg }}
+                            >
+                                <b.icon className="w-3.5 h-3.5" />
+                            </span>
+                            <div className="flex-1 min-w-0">
+                                <div className="text-[12px] font-semibold">{b.label}</div>
+                                <div className="text-[11px] text-n400">{b.hint}</div>
+                            </div>
+                            <span className="text-[16px] font-semibold" style={{ color: b.fg }}>
+                                {b.count}
+                            </span>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
 function ScoreFormula({ cvScore, indexScore, hasInterview, delta }) {
     return (
         <div className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-[18px]">
@@ -290,6 +392,12 @@ export default function ScoreBreakdownPanel({ analysis, position, candidate = nu
             indexScore={headlineScore}
             hasInterview={scoreDetail.interviewed}
             delta={headlineScore - scoreDetail.cvScore}
+        />
+
+        <StarDensity
+            dims={normalizeStarAnalysis(analysis?.starAnalysis)}
+            starPct={starPercent(analysis?.starAnalysis)}
+            buckets={evidenceBuckets(analysis)}
         />
 
         <div className="rounded-md border border-n200 bg-n0 overflow-hidden">
