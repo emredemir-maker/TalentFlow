@@ -254,7 +254,7 @@ function BulkActionModal({ isOpen, type, count, applying, onApply, onClose }) {
                                     <div className="flex flex-wrap gap-1.5">
                                         {selectedSource.subSources.map((sub) => (
                                             <button key={sub} type="button" onClick={() => setSubSource(subSource === sub ? '' : sub)}
-                                                className={`px-2.5 py-1 rounded-md text-[12px] font-semibold border transition-all ${subSource === sub ? 'bg-brand text-white border-[#13294E]' : 'border-n200 text-n500 hover:border-n300'}`}>
+                                                className={`px-2.5 py-1 rounded-md text-[12px] font-semibold border transition-all ${subSource === sub ? 'bg-brand text-white border-brand' : 'border-n200 text-n500 hover:border-n300'}`}>
                                                 {sub}
                                             </button>
                                         ))}
@@ -291,7 +291,7 @@ function BulkActionModal({ isOpen, type, count, applying, onApply, onClose }) {
                         İptal
                     </button>
                     <button onClick={apply} disabled={!canApply || applying}
-                        className="flex-[2] py-2.5 rounded-md bg-brand hover:bg-[#1E3A6E] text-white text-[12px] font-semibold disabled:opacity-50 flex items-center justify-center gap-2 transition-colors">
+                        className="flex-[2] py-2.5 rounded-md bg-brand hover:bg-brand-600 text-white text-[12px] font-semibold disabled:opacity-50 flex items-center justify-center gap-2 transition-colors">
                         {applying ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                         {applying ? 'Uygulanıyor…' : 'Uygula'}
                     </button>
