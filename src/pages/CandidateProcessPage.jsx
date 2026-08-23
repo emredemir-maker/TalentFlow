@@ -44,9 +44,9 @@ import {
 
 const STATUS_CONFIG = {
     live:       { label: 'CANLI',      bg: 'bg-rose-50',    text: 'text-rose-600',    border: 'border-rose-100',    pulse: true },
-    completed:  { label: 'TAMAMLANDI', bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-100', pulse: false },
-    cancelled:  { label: 'İPTAL',      bg: 'bg-slate-100',  text: 'text-slate-500',   border: 'border-slate-200',   pulse: false },
-    scheduled:  { label: 'PLANLANDI',  bg: 'bg-amber-50',   text: 'text-amber-600',   border: 'border-amber-100',   pulse: false },
+    completed:  { label: 'TAMAMLANDI', bg: 'bg-ok-bg', text: 'text-ok', border: 'border-transparent', pulse: false },
+    cancelled:  { label: 'İPTAL',      bg: 'bg-n100',  text: 'text-n500',   border: 'border-n200',   pulse: false },
+    scheduled:  { label: 'PLANLANDI',  bg: 'bg-warn-bg',   text: 'text-warn',   border: 'border-transparent',   pulse: false },
 };
 const getStatusCfg = (s) => STATUS_CONFIG[s] || STATUS_CONFIG.scheduled;
 
@@ -65,12 +65,12 @@ const PIPELINE_STATUS_LABELS = {
 // Canonical pipeline palette (see utils/pipelineStages):
 // Ön Eleme=cyan · İnceleme=teal · Mülakat=violet · Teklif=amber · İşe Alındı=emerald · Reddedildi=red
 const PIPELINE_STAGES = [
-    { value: 'ai_analysis', label: 'AI Analiz',   color: 'text-cyan-600',   bg: 'bg-cyan-50' },
-    { value: 'review',      label: 'İnceleme',     color: 'text-teal-600',   bg: 'bg-teal-50' },
-    { value: 'interview',   label: 'Mülakat',      color: 'text-violet-600', bg: 'bg-violet-50' },
-    { value: 'offer',       label: 'Teklif',       color: 'text-amber-600',  bg: 'bg-amber-50' },
-    { value: 'hired',       label: 'İşe Alındı',   color: 'text-emerald-600',bg: 'bg-emerald-50' },
-    { value: 'rejected',    label: 'Reddedildi',   color: 'text-red-600',    bg: 'bg-red-50' },
+    { value: 'ai_analysis', label: 'AI Analiz',   color: 'text-brand',   bg: 'bg-brand-50' },
+    { value: 'review',      label: 'İnceleme',     color: 'text-brand',     bg: 'bg-brand-50' },
+    { value: 'interview',   label: 'Mülakat',      color: 'text-brand', bg: 'bg-brand-50' },
+    { value: 'offer',       label: 'Teklif',       color: 'text-warn',  bg: 'bg-warn-bg' },
+    { value: 'hired',       label: 'İşe Alındı',   color: 'text-ok',bg: 'bg-ok-bg' },
+    { value: 'rejected',    label: 'Reddedildi',   color: 'text-bad',    bg: 'bg-bad-bg' },
 ];
 
 const normalizePipelineStatus = (s) => (s === 'new' ? 'ai_analysis' : s);
@@ -1176,116 +1176,117 @@ export default function CandidateProcessPage() {
     ];
 
     return (
-        <div className="h-screen bg-slate-50 flex flex-col font-sans overflow-hidden">
+        <div className="infoset h-screen flex flex-col overflow-hidden">
             <Header title="Adaylar" />
             {/* SUB-HEADER — page-level controls, the brand/title now lives in Header */}
-            <div className="bg-white border-b border-slate-200 px-8 py-3 flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'candidates-table' }))}
-                        className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors"
-                        title="Aday listesine (tablo görünümü) dön"
-                    >
-                        <ChevronRight className="w-3.5 h-3.5 rotate-180" /> Listeye Dön
-                    </button>
-                    <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-widest">Aday Yönetimi</span>
-                    <div className="rounded-full bg-slate-100 text-slate-500 text-[11px] px-2.5 py-0.5 font-bold">
-                        {candidates.length}
-                    </div>
-                </div>
-                <div className="flex items-center gap-2">
+            {/* ARAÇ ÇUBUĞU — prototipte TEK SATIR ve 28px yüksekliğinde
+                hap düğmeler. Eskiden iki farklı düğme yüksekliği ve üç ayrı
+                vurgu rengi yan yanaydı. */}
+            <div className="bg-n50 border-b border-n200 px-5 py-[9px] flex items-center gap-2.5 shrink-0">
+                <button
+                    onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'candidates-table' }))}
+                    className="flex items-center gap-1.5 h-7 px-[11px] rounded-md text-[12px] font-semibold text-n600 bg-n0 border border-n200 hover:bg-n50"
+                    title="Aday listesine (tablo görünümü) dön"
+                >
+                    <ChevronRight className="w-[13px] h-[13px] rotate-180" /> Listeye dön
+                </button>
+                <span className="text-[11px] font-semibold text-n500 uppercase tracking-[0.08em]">Aday yönetimi</span>
+                <span className="rounded-full bg-n100 text-n500 text-[11px] px-2.5 py-0.5 font-semibold">
+                    {candidates.length}
+                </span>
+                <div className="ml-auto flex items-center gap-2">
                     <SystemScanner />
                     <button
                         onClick={openBulkImport}
-                        className="bg-violet-500 hover:bg-violet-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-colors shadow-sm shadow-violet-200 flex items-center gap-1.5"
+                        className="flex items-center gap-1.5 h-7 px-[11px] rounded-md text-[12px] font-medium text-n600 bg-n0 border border-n200 hover:bg-n50"
                     >
-                        <Upload className="w-3.5 h-3.5" /> Toplu Yükleme
+                        <Upload className="w-[13px] h-[13px]" /> Toplu yükleme
                     </button>
                     <button
                         onClick={() => setIsAddModalOpen(true)}
-                        className="bg-cyan-500 hover:bg-cyan-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-colors shadow-sm shadow-cyan-200 flex items-center gap-1.5"
+                        className="flex items-center gap-1.5 h-7 px-[13px] rounded-md text-[12px] font-semibold text-white bg-brand hover:bg-brand-600"
                     >
-                        <Plus className="w-3.5 h-3.5" /> Yeni Aday
+                        <Plus className="w-[13px] h-[13px]" /> Yeni aday
                     </button>
                 </div>
             </div>
 
             {/* ONE-TIME MIGRATION BANNER — super_admin only */}
             {isSuperAdmin && legacyNewCandidates.length > 0 && migrateStatus !== 'done' && (
-                <div className="bg-amber-50 border-b border-amber-200 px-8 py-2 flex items-center justify-between shrink-0">
-                    <span className="text-amber-700 text-[11px] font-medium">
-                        <strong>{legacyNewCandidates.length} aday</strong> eski <code className="bg-amber-100 px-1 rounded text-[10px]">new</code> statüsüyle kayıtlı — pipeline tutarlılığı için <strong>ai_analysis</strong> olarak güncellenebilir.
+                <div className="bg-warn-bg border-b border-n200 px-8 py-2 flex items-center justify-between shrink-0">
+                    <span className="text-warn text-[12px] font-medium">
+                        <strong>{legacyNewCandidates.length} aday</strong> eski <code className="bg-warn-bg px-1 rounded text-[11px]">new</code> statüsüyle kayıtlı — pipeline tutarlılığı için <strong>ai_analysis</strong> olarak güncellenebilir.
                     </span>
                     <button
                         onClick={handleMigrateNewStatus}
                         disabled={migrateStatus === 'running'}
-                        className="text-[10px] font-bold bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg transition-colors disabled:opacity-60 ml-4 shrink-0"
+                        className="text-[11px] font-semibold bg-warn hover:opacity-90 text-white px-3 py-1.5 rounded-md transition-colors disabled:opacity-60 ml-4 shrink-0"
                     >
                         {migrateStatus === 'running' ? 'Güncelleniyor...' : 'Hepsini Düzelt'}
                     </button>
                 </div>
             )}
             {isSuperAdmin && migrateStatus === 'done' && (
-                <div className="bg-emerald-50 border-b border-emerald-200 px-8 py-2 flex items-center gap-2 shrink-0">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                    <span className="text-emerald-700 text-[11px] font-medium">Tüm kayıtlar başarıyla <strong>ai_analysis</strong> olarak güncellendi.</span>
+                <div className="bg-ok-bg border-b border-n200 px-8 py-2 flex items-center gap-2 shrink-0">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-ok" />
+                    <span className="text-ok text-[12px] font-medium">Tüm kayıtlar başarıyla <strong>ai_analysis</strong> olarak güncellendi.</span>
                 </div>
             )}
 
             <div className="flex-1 flex overflow-hidden">
                 {/* ── LEFT: CANDIDATE LIST ─────────────────────────────────── */}
-                <aside className="w-[260px] shrink-0 flex flex-col bg-white border-r border-slate-200">
+                <aside className="w-[260px] shrink-0 flex flex-col bg-n0 border-r border-n200">
 
                     {/* Logo + Branding */}
-                    <div className="flex items-center gap-3 px-4 pt-5 pb-4 border-b border-slate-100">
-                        <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-gradient-to-br from-teal-400 to-cyan-600 shadow-md shadow-cyan-500/20 shrink-0">
-                            <span className="font-black text-white text-sm tracking-tighter">TI</span>
+                    <div className="flex items-center gap-3 px-4 pt-5 pb-4 border-b border-n200">
+                        <div className="w-9 h-9 rounded-md flex items-center justify-center bg-brand shrink-0">
+                            <span className="font-semibold text-white text-sm tracking-tighter">TI</span>
                         </div>
                         <div className="flex flex-col min-w-0">
-                            <span className="text-sm font-bold text-slate-800 leading-tight">Talent-Inn</span>
-                            <span className="text-[10px] text-slate-400 font-medium">HR Platform</span>
+                            <span className="text-sm font-semibold text-n900 leading-tight">Talent-Inn</span>
+                            <span className="text-[11px] text-n400 font-medium">HR Platform</span>
                         </div>
                     </div>
 
                     {/* Search */}
                     <div className="px-4 pt-4 pb-2">
                         <div className="flex items-center justify-between mb-3">
-                            <div className="text-[9px] font-black text-slate-400 tracking-widest uppercase">
-                                ADAYLAR <span className="text-slate-300">({filtered.length})</span>
+                            <div className="text-[11px] font-semibold text-n400 tracking-[0.08em] uppercase">
+                                ADAYLAR <span className="text-n300">({filtered.length})</span>
                                 {filtered.some(c => c.screeningScore != null) && (
-                                    <span className="ml-1 text-indigo-400 normal-case font-medium">· Ön Eleme Puanına Göre Sıralı</span>
+                                    <span className="ml-1 text-brand normal-case font-medium">· Ön Eleme Puanına Göre Sıralı</span>
                                 )}
                             </div>
                             <button
                                 onClick={() => setShowFilters(f => !f)}
-                                className={`flex items-center gap-1 text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-lg transition-all ${showFilters || activeFilterCount > 0 ? 'bg-cyan-50 text-cyan-600 border border-cyan-200' : 'text-slate-400 hover:text-slate-600'}`}
+                                className={`flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.08em] px-2 py-1 rounded-md transition-all ${showFilters || activeFilterCount > 0 ? 'bg-brand-50 text-brand border border-brand-100' : 'text-n400 hover:text-n600'}`}
                             >
                                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" /></svg>
                                 FİLTRE{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
                             </button>
                         </div>
                         <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-n400" />
                             <input
                                 type="text"
                                 placeholder="Ad veya pozisyon ara..."
                                 value={searchQuery}
                                 onChange={e => setSearchQuery(e.target.value)}
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 pl-9 pr-3 text-[12px] text-slate-700 placeholder-slate-400 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition-all"
+                                className="w-full bg-n50 border border-n200 rounded-md py-2 pl-9 pr-3 text-[12px] text-n700 placeholder-n400 outline-none focus:border-brand focus:ring-0 transition-all"
                             />
                         </div>
                     </div>
 
                     {/* Filter Panel */}
                     {showFilters && (
-                        <div className="px-4 pb-3 space-y-2 border-b border-slate-100">
+                        <div className="px-4 pb-3 space-y-2 border-b border-n200">
                             {/* Source */}
                             <div>
-                                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest block mb-1">Kaynak</label>
+                                <label className="text-[11px] font-semibold text-n400 uppercase tracking-[0.08em] block mb-1">Kaynak</label>
                                 <select
                                     value={filterSource}
                                     onChange={e => setFilterSource(e.target.value)}
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg py-1.5 px-2 text-[10px] text-slate-700 outline-none focus:border-cyan-400 transition-all"
+                                    className="w-full bg-n50 border border-n200 rounded-md py-1.5 px-2 text-[11px] text-n700 outline-none focus:border-brand transition-all"
                                 >
                                     <option value="">Tümü</option>
                                     {filterOptions.sources.map(s => <option key={s} value={s}>{s}</option>)}
@@ -1293,11 +1294,11 @@ export default function CandidateProcessPage() {
                             </div>
                             {/* Stage */}
                             <div>
-                                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest block mb-1">Aşama</label>
+                                <label className="text-[11px] font-semibold text-n400 uppercase tracking-[0.08em] block mb-1">Aşama</label>
                                 <select
                                     value={filterStatus}
                                     onChange={e => setFilterStatus(e.target.value)}
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg py-1.5 px-2 text-[10px] text-slate-700 outline-none focus:border-cyan-400 transition-all"
+                                    className="w-full bg-n50 border border-n200 rounded-md py-1.5 px-2 text-[11px] text-n700 outline-none focus:border-brand transition-all"
                                 >
                                     <option value="">Tümü</option>
                                     {filterOptions.statuses.map(s => <option key={s} value={s}>{PIPELINE_STATUS_LABELS[s] || s}</option>)}
@@ -1305,11 +1306,11 @@ export default function CandidateProcessPage() {
                             </div>
                             {/* Position */}
                             <div>
-                                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest block mb-1">Pozisyon</label>
+                                <label className="text-[11px] font-semibold text-n400 uppercase tracking-[0.08em] block mb-1">Pozisyon</label>
                                 <select
                                     value={filterPosition}
                                     onChange={e => setFilterPosition(e.target.value)}
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg py-1.5 px-2 text-[10px] text-slate-700 outline-none focus:border-cyan-400 transition-all"
+                                    className="w-full bg-n50 border border-n200 rounded-md py-1.5 px-2 text-[11px] text-n700 outline-none focus:border-brand transition-all"
                                 >
                                     <option value="">Tümü</option>
                                     {filterOptions.positions.map(p => <option key={p} value={p}>{p}</option>)}
@@ -1317,7 +1318,7 @@ export default function CandidateProcessPage() {
                             </div>
                             {/* Min Score */}
                             <div>
-                                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest block mb-1">Min. Uyum Skoru: <span className="text-cyan-600">%{filterMinScore}</span></label>
+                                <label className="text-[11px] font-semibold text-n400 uppercase tracking-[0.08em] block mb-1">Min. Uyum Skoru: <span className="text-brand">%{filterMinScore}</span></label>
                                 <input
                                     type="range"
                                     min={0}
@@ -1325,9 +1326,9 @@ export default function CandidateProcessPage() {
                                     step={5}
                                     value={filterMinScore}
                                     onChange={e => setFilterMinScore(Number(e.target.value))}
-                                    className="w-full accent-cyan-500"
+                                    className="w-full accent-[var(--color-brand)]"
                                 />
-                                <div className="flex justify-between text-[7px] text-slate-300 font-bold mt-0.5">
+                                <div className="flex justify-between text-[7px] text-n300 font-semibold mt-0.5">
                                     <span>0%</span><span>50%</span><span>100%</span>
                                 </div>
                             </div>
@@ -1335,7 +1336,7 @@ export default function CandidateProcessPage() {
                             {activeFilterCount > 0 && (
                                 <button
                                     onClick={() => { setFilterSource(''); setFilterStatus(''); setFilterPosition(''); setFilterMinScore(0); }}
-                                    className="w-full text-[8px] font-black uppercase tracking-widest text-rose-500 hover:text-rose-700 py-1 transition-all"
+                                    className="w-full text-[11px] font-semibold uppercase tracking-[0.08em] text-rose-500 hover:text-rose-700 py-1 transition-all"
                                 >
                                     Filtreleri Temizle
                                 </button>
@@ -1346,9 +1347,9 @@ export default function CandidateProcessPage() {
                     {/* List */}
                     <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-0.5 custom-scrollbar">
                         {filtered.length === 0 && (
-                            <div className="py-10 flex flex-col items-center text-slate-400">
+                            <div className="py-10 flex flex-col items-center text-n400">
                                 <Search className="w-8 h-8 mb-2 opacity-30" />
-                                <p className="text-[10px] font-bold uppercase">Aday bulunamadı</p>
+                                <p className="text-[11px] font-semibold uppercase">Aday bulunamadı</p>
                             </div>
                         )}
                         {filtered.map(c => {
@@ -1360,40 +1361,40 @@ export default function CandidateProcessPage() {
                                 <button
                                     key={c.id}
                                     onClick={() => setViewCandidateId(c.id)}
-                                    className={`w-full text-left rounded-xl px-3 py-2.5 flex items-center gap-2.5 transition-colors border ${
+                                    className={`w-full text-left rounded-md px-3 py-2.5 flex items-center gap-2.5 transition-colors border ${
                                         isActive
-                                            ? 'bg-cyan-50 border-cyan-200'
-                                            : 'bg-transparent border-transparent hover:bg-slate-50'
+                                            ? 'bg-brand-50 border-brand-100'
+                                            : 'bg-transparent border-transparent hover:bg-n50'
                                     }`}
                                 >
-                                    {isActive && <div className="w-[6px] h-[6px] rounded-full bg-cyan-500 shrink-0" />}
+                                    {isActive && <div className="w-[6px] h-[6px] rounded-full bg-brand shrink-0" />}
                                     <CandidateAvatar
                                         name={mc.name}
                                         photo={c.photo}
                                         photoUrl={c.photoUrl}
                                         profileImage={c.profileImage}
                                         size="sm"
-                                        rounded="rounded-lg"
+                                        rounded="rounded-md"
                                     />
                                     <div className="flex-1 min-w-0">
-                                        <p className={`text-[12px] font-bold truncate leading-tight ${isActive ? 'text-cyan-700' : 'text-slate-700'}`}>{mc.name}</p>
+                                        <p className={`text-[12px] font-semibold truncate leading-tight ${isActive ? 'text-brand' : 'text-n700'}`}>{mc.name}</p>
                                         <div className="flex items-center gap-1 mt-0.5 flex-wrap">
                                             <span
-                                                className="text-[8px] font-bold px-1.5 py-0.5 rounded-md inline-flex items-center gap-0.5 uppercase"
+                                                className="text-[11px] font-semibold px-1.5 py-0.5 rounded-md inline-flex items-center gap-0.5 uppercase"
                                                 style={{ color: srcColor, backgroundColor: `${srcColor}15` }}
                                             >
                                                 {getSourceLabel(c)}
                                             </span>
                                             {c.screeningScore != null && (
-                                                <span className="text-[8px] font-black px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-600 border border-indigo-100 uppercase">
+                                                <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-md bg-brand-50 text-brand border border-brand-100 uppercase">
                                                     🎯 %{Math.round(c.screeningScore)}
                                                 </span>
                                             )}
                                         </div>
                                     </div>
                                     <div className="shrink-0">
-                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
-                                            isActive ? 'bg-cyan-100 text-cyan-700' : 'bg-slate-100 text-slate-500'
+                                        <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded-md ${
+                                            isActive ? 'bg-brand-100 text-brand' : 'bg-n100 text-n500'
                                         }`}>%{sc}</span>
                                     </div>
                                 </button>
@@ -1402,10 +1403,10 @@ export default function CandidateProcessPage() {
                     </div>
 
                     {/* Bottom AI card */}
-                    <div className="px-4 py-4 border-t border-slate-100">
-                        <div className="rounded-xl bg-cyan-50 border border-cyan-100 p-3 flex items-start gap-2">
-                            <Sparkles className="w-3.5 h-3.5 text-cyan-500 shrink-0 mt-0.5" />
-                            <span className="text-[11px] text-slate-500 leading-snug">
+                    <div className="px-4 py-4 border-t border-n200">
+                        <div className="rounded-md bg-brand-50 border border-brand-100 p-3 flex items-start gap-2">
+                            <Sparkles className="w-3.5 h-3.5 text-brand shrink-0 mt-0.5" />
+                            <span className="text-[12px] text-n500 leading-snug">
                                 {candidates.length} aday AI analiz sürecinde
                             </span>
                         </div>
@@ -1413,108 +1414,113 @@ export default function CandidateProcessPage() {
                 </aside>
 
                 {/* ── RIGHT: DETAIL PANEL ───────────────────────────────────── */}
-                <main className="flex-1 overflow-hidden flex flex-col bg-slate-50">
+                <main className="flex-1 overflow-hidden flex flex-col bg-n50">
                     {candidate ? (
-                        <div className="flex-1 overflow-hidden flex flex-col bg-white m-3 rounded-2xl border border-slate-200 shadow-sm">
+                        <div className="flex-1 overflow-hidden flex flex-col bg-n0">
 
-                            {/* Candidate header */}
-                            <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <CandidateAvatar
-                                        name={candidate.name}
-                                        photo={candidate.photo}
-                                        photoUrl={candidate.photoUrl}
-                                        profileImage={candidate.profileImage}
-                                        size="md"
-                                        rounded="rounded-xl"
-                                        className="border-2 border-white shadow-md ring-2 ring-cyan-100"
-                                    />
-                                    <div>
-                                        <div className="flex items-center gap-2">
-                                            <h2 className="text-[15px] font-black text-slate-900 tracking-tight leading-none">{candidate.name}</h2>
-                                            {isTop2Percent && (
-                                                <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 flex items-center gap-1">
-                                                    <Target className="w-2.5 h-2.5" /> İlk %2
-                                                </span>
-                                            )}
-                                            <span className="text-[9px] font-black text-cyan-600 bg-cyan-50 px-2 py-0.5 rounded-full border border-cyan-100 flex items-center gap-1">
-                                                <Zap className="w-2.5 h-2.5 fill-cyan-500" /> %{score} Uyum
+                            {/* ── ADAY BAŞLIĞI (prototip) ─────────────────
+                                44px köşeli avatar, ad + rozetler tek satırda,
+                                sağda STAR / Eleme ölçüleri. Rozetlerin her biri
+                                AYRI bir ölçü: endeks skoru, STAR kanıt
+                                yoğunluğu ve eleme skoru aynı sayı değil. */}
+                            <div className="px-5 py-3 border-b border-n200 flex items-center gap-3">
+                                <CandidateAvatar
+                                    name={candidate.name}
+                                    photo={candidate.photo}
+                                    photoUrl={candidate.photoUrl}
+                                    profileImage={candidate.profileImage}
+                                    size="md"
+                                    rounded="rounded-[10px]"
+                                    className="shrink-0"
+                                />
+                                <div className="min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <h2 className="text-[17px] font-semibold tracking-[-0.02em] m-0">{candidate.name}</h2>
+                                        {isTop2Percent && (
+                                            <span className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-ok-bg text-ok">
+                                                <Target className="w-[11px] h-[11px]" /> İlk %2
                                             </span>
-                                        </div>
-                                        <div className="flex items-center gap-3 mt-0.5">
-                                            {/*
-                                              Show the system's match (matchedPositionTitle) over the
-                                              CV-extracted title (candidate.position) so the header
-                                              reflects "what we'd consider this candidate for" rather
-                                              than "what the CV literally says". Falls back to
-                                              position/bestTitle when no AI match has run yet.
-                                            */}
-                                            {candidate.matchedPositionTitle === null ? (
-                                                // Açık sentinel: sistem bu adayı hiçbir AÇIK pozisyona
-                                                // bağlayamadı — CV'deki serbest başlık eşleşme gibi gösterilmez.
-                                                <p className="text-[11px] text-amber-600 font-semibold italic">
-                                                    Uygun açık pozisyon yok
-                                                </p>
-                                            ) : (
-                                                <p className="text-[11px] text-slate-500 font-medium">
-                                                    {candidate.matchedPositionTitle || candidate.position || candidate.bestTitle || '—'}
-                                                </p>
-                                            )}
-                                            {/* İki kavram ayrı ayrı görünür: açık pozisyon eşleşmesi
-                                                (yukarıda) + CV'ye göre ideal rol (açık pozisyonlardan
-                                                bağımsız) — farklıysa burada gösterilir. */}
-                                            {(() => {
-                                                const cvRole = cleanRoleText(candidate.suggestedRole, candidate.position || '');
-                                                return cvRole && cvRole !== candidate.matchedPositionTitle ? (
-                                                    <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">
-                                                        CV'ye göre: <span className="font-bold text-slate-500">{cvRole}</span>
-                                                    </span>
-                                                ) : null;
-                                            })()}
-                                            {candidate.email && (
-                                                <span className="text-[10px] text-slate-400 flex items-center gap-1">
-                                                    <Mail className="w-3 h-3" /> {candidate.email}
+                                        )}
+                                        <span
+                                            title="Endeks skoru — CV analizi ve (varsa) mülakat kanıtının birleşimi"
+                                            className="flex items-center gap-1.5 text-[12px] font-semibold px-2.5 py-[3px] rounded-full bg-brand-50 text-brand"
+                                        >
+                                            <Zap className="w-3 h-3" /> Endeks %{score}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-2.5 mt-[3px] text-[12px] text-n500 flex-wrap">
+                                        {/*
+                                          Show the system's match (matchedPositionTitle) over the
+                                          CV-extracted title (candidate.position) so the header
+                                          reflects "what we'd consider this candidate for" rather
+                                          than "what the CV literally says". Falls back to
+                                          position/bestTitle when no AI match has run yet.
+                                        */}
+                                        {candidate.matchedPositionTitle === null ? (
+                                            // Açık sentinel: sistem bu adayı hiçbir AÇIK pozisyona
+                                            // bağlayamadı — CV'deki serbest başlık eşleşme gibi gösterilmez.
+                                            <span className="text-warn font-medium">Uygun açık pozisyon yok</span>
+                                        ) : (
+                                            <span>{candidate.matchedPositionTitle || candidate.position || candidate.bestTitle || '—'}</span>
+                                        )}
+                                        {/* İki kavram ayrı ayrı görünür: açık pozisyon eşleşmesi
+                                            (yukarıda) + CV'ye göre ideal rol (açık pozisyonlardan
+                                            bağımsız) — farklıysa burada gösterilir. */}
+                                        {(() => {
+                                            const cvRole = cleanRoleText(candidate.suggestedRole, candidate.position || '');
+                                            return cvRole && cvRole !== candidate.matchedPositionTitle ? (
+                                                <span className="text-n400 whitespace-nowrap">
+                                                    CV&apos;ye göre: <span className="font-semibold text-n700">{cvRole}</span>
                                                 </span>
-                                            )}
-                                        </div>
+                                            ) : null;
+                                        })()}
+                                        {candidate.email && (
+                                            <span className="text-n400 flex items-center gap-1.5">
+                                                <Mail className="w-3 h-3" /> {candidate.email}
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
 
-                                {/* Stat pills.
-                                    Previously rendered three indicators that all read off the same
-                                    score: a "%X Uyum" badge next to the name, a STAR-flavoured
-                                    sub-score pill, AND a category chip ("GÜÇLÜ / ORTA / ZAYIF").
-                                    The category chip duplicated what the badge already conveyed
-                                    via colour + percentage; dropped it. STAR (methodology score)
-                                    and Eleme (screening) stay because they're distinct metrics. */}
-                                <div className="flex items-center gap-2">
-                                    <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5" title={starScore == null ? 'STAR analizi henüz çalıştırılmadı' : "CV'de ne kadar kanıt bulunduğunu ölçer — adayın ne kadar iyi olduğunu değil. Yüksek değer, iyi belgelenmiş bir CV demektir."}>
-                                        <span className="text-[9px] font-bold text-slate-400 uppercase">STAR</span>
-                                        <span className="text-[13px] font-black text-slate-800">{starScore != null ? `${starScore}%` : '—'}</span>
+                                {/* Ölçüler.
+                                    Eskiden aynı skoru okuyan ÜÇ gösterge vardı: adın
+                                    yanında "%X Uyum", bir STAR alt-skoru ve bir
+                                    kategori çipi ("GÜÇLÜ / ORTA / ZAYIF"). Çip,
+                                    rozetin renk + yüzde ile zaten söylediğini
+                                    tekrarlıyordu; kaldırıldı. STAR (kanıt yoğunluğu)
+                                    ve Eleme (screening) ayrı ölçüler, kalıyorlar. */}
+                                <div className="ml-auto flex items-center gap-2 shrink-0">
+                                    <div
+                                        className="flex items-baseline gap-[7px] bg-n50 border border-n200 rounded-md px-3 py-1.5"
+                                        title={starScore == null ? 'STAR analizi henüz çalıştırılmadı' : "CV'de ne kadar kanıt bulunduğunu ölçer — adayın ne kadar iyi olduğunu değil. Yüksek değer, iyi belgelenmiş bir CV demektir."}
+                                    >
+                                        <span className="text-[11px] font-semibold text-n400 uppercase tracking-[0.06em]">STAR</span>
+                                        <span className="text-[15px] font-semibold">{starScore != null ? `%${starScore}` : '—'}</span>
                                     </div>
                                     {candidate.screeningScore != null && (
-                                        <div className="flex items-center gap-1.5 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-1.5">
-                                            <span className="text-[9px] font-bold text-indigo-400 uppercase">Eleme</span>
-                                            <span className="text-[13px] font-black text-indigo-600">%{Math.round(candidate.screeningScore)}</span>
+                                        <div className="flex items-baseline gap-[7px] bg-brand-50 border border-brand-100 rounded-md px-3 py-1.5">
+                                            <span className="text-[11px] font-semibold text-brand uppercase tracking-[0.06em]">Eleme</span>
+                                            <span className="text-[15px] font-semibold text-brand">%{Math.round(candidate.screeningScore)}</span>
                                         </div>
                                     )}
                                 </div>
                             </div>
 
-                            {/* Tabs */}
-                            <div className="flex border-b border-slate-100 px-5 bg-white">
+                            {/* SEKMELER — prototipte 12px, alt çizgi 2px.
+                                VERSAL yazım kalktı: sekme adı bir etiket değil,
+                                gezinme bağlantısı. */}
+                            <div className="flex items-center gap-0.5 px-5 border-b border-n200 bg-n0 overflow-x-auto">
                                 {TABS.map(tab => (
                                     <button
                                         key={tab.id}
                                         onClick={() => setActiveTab(tab.id)}
-                                        className={`flex items-center gap-1.5 py-2.5 px-1 mr-5 text-[9px] font-black uppercase tracking-widest relative whitespace-nowrap transition-colors ${
-                                            activeTab === tab.id ? 'text-cyan-600' : 'text-slate-400 hover:text-slate-600'
+                                        className={`flex items-center gap-[7px] text-[12px] font-semibold px-3.5 py-[11px] whitespace-nowrap border-b-2 ${
+                                            activeTab === tab.id
+                                                ? 'text-brand border-brand'
+                                                : 'text-n500 border-transparent hover:text-n700'
                                         }`}
                                     >
                                         {tab.icon} {tab.label}
-                                        {activeTab === tab.id && (
-                                            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-500 rounded-full" />
-                                        )}
                                     </button>
                                 ))}
                             </div>
@@ -1528,10 +1534,10 @@ export default function CandidateProcessPage() {
                                         {/* Header row */}
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-2">
-                                                <div className="w-1 h-3.5 rounded-full bg-cyan-500" />
-                                                <h3 className="text-[10px] font-black text-slate-700 uppercase tracking-widest">STAR Kanıt Değerlendirmesi</h3>
+                                                <div className="w-1 h-3.5 rounded-full bg-brand" />
+                                                <h3 className="text-[11px] font-semibold text-n700 uppercase tracking-[0.08em]">STAR Kanıt Değerlendirmesi</h3>
                                                 {candidate.aiAnalysis?.lastAnalyzedAt && (
-                                                    <span className="text-[9px] text-slate-400">
+                                                    <span className="text-[11px] text-n400">
                                                         · {new Date(candidate.aiAnalysis.lastAnalyzedAt).toLocaleDateString('tr-TR')}
                                                     </span>
                                                 )}
@@ -1549,13 +1555,13 @@ export default function CandidateProcessPage() {
                                                         onClick={() => handleRunStarAnalysis(candidate)}
                                                         disabled={analyzingIds.has(candidate.id)}
                                                         title="Bu aday için analizi güncel modelle yeniden çalıştır"
-                                                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 text-[9px] font-black text-slate-500 hover:border-cyan-300 hover:text-cyan-600 hover:bg-cyan-50 transition-colors disabled:opacity-50"
+                                                        className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-n50 border border-n200 text-[11px] font-semibold text-n500 hover:border-brand-200 hover:text-brand hover:bg-brand-50 transition-colors disabled:opacity-50"
                                                     >
                                                         {analyzingIds.has(candidate.id)
                                                             ? <><Loader2 size={10} className="animate-spin" /> Analiz ediliyor…</>
                                                             : <><RefreshCw size={10} /> Yeniden Analiz Et</>}
                                                     </button>
-                                                    <span className="text-[9px] text-slate-400 italic hidden sm:inline">
+                                                    <span className="text-[11px] text-n400 italic hidden sm:inline">
                                                         Toplu yenileme için Sistem Taraması
                                                     </span>
                                                 </div>
@@ -1604,7 +1610,7 @@ export default function CandidateProcessPage() {
 
                                         {/* Error banner */}
                                         {analysisError && (
-                                            <div className="flex items-center gap-2 bg-red-50 border border-red-100 rounded-lg px-3 py-2 text-[11px] text-red-600">
+                                            <div className="flex items-center gap-2 bg-bad-bg rounded-md px-3 py-2 text-[12px] text-bad">
                                                 <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {analysisError}
                                             </div>
                                         )}
@@ -1612,14 +1618,14 @@ export default function CandidateProcessPage() {
                                         {/* Per-candidate loading state */}
                                         {analyzingIds.has(candidate.id) && (
                                             <div className="flex flex-col items-center justify-center py-12 gap-3">
-                                                <div className="w-12 h-12 rounded-2xl bg-cyan-50 border border-cyan-100 flex items-center justify-center">
-                                                    <Sparkles className="w-6 h-6 text-cyan-500 animate-pulse" />
+                                                <div className="w-12 h-12 rounded-[14px] bg-brand-50 border border-brand-100 flex items-center justify-center">
+                                                    <Sparkles className="w-6 h-6 text-brand animate-pulse" />
                                                 </div>
-                                                <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Otonom Ajan Analiz Ediyor…</p>
-                                                <div className="flex items-center gap-3 text-[10px] text-slate-400">
-                                                    <span className="flex items-center gap-1"><Brain className="w-3 h-3 text-violet-400" /> Analyst</span>
-                                                    <span className="text-slate-200">→</span>
-                                                    <span className="flex items-center gap-1"><ShieldCheck className="w-3 h-3 text-emerald-400" /> Recruiter</span>
+                                                <p className="text-[12px] font-semibold text-n500 uppercase tracking-[0.08em]">Otonom Ajan Analiz Ediyor…</p>
+                                                <div className="flex items-center gap-3 text-[11px] text-n400">
+                                                    <span className="flex items-center gap-1"><Brain className="w-3 h-3 text-brand" /> Analyst</span>
+                                                    <span className="text-n200">→</span>
+                                                    <span className="flex items-center gap-1"><ShieldCheck className="w-3 h-3 text-ok" /> Recruiter</span>
                                                 </div>
                                             </div>
                                         )}
@@ -1627,19 +1633,19 @@ export default function CandidateProcessPage() {
                                         {/* Empty state — no STAR analysis yet */}
                                         {!analyzingIds.has(candidate.id) && !displayedStar && (
                                             <div className="flex flex-col items-center justify-center py-12 gap-4 text-center">
-                                                <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center">
-                                                    <Brain className="w-7 h-7 text-slate-300" />
+                                                <div className="w-14 h-14 rounded-[14px] bg-n50 border border-n200 flex items-center justify-center">
+                                                    <Brain className="w-7 h-7 text-n300" />
                                                 </div>
                                                 <div>
-                                                    <p className="text-[12px] font-black text-slate-700 mb-1">STAR Analizi Henüz Yapılmadı</p>
-                                                    <p className="text-[11px] text-slate-400 max-w-xs leading-relaxed">
+                                                    <p className="text-[12px] font-semibold text-n700 mb-1">STAR Analizi Henüz Yapılmadı</p>
+                                                    <p className="text-[12px] text-n400 max-w-xs leading-relaxed">
                                                         Adayın CV'si ve pozisyon gereksinimleri STAR metodolojisiyle otonom ajan sistemi üzerinden analiz edilecektir.
                                                     </p>
                                                 </div>
                                                 <button
                                                     onClick={() => handleRunStarAnalysis(candidate)}
                                                     disabled={analyzingIds.has(candidate.id)}
-                                                    className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-white font-black text-sm shadow-xl shadow-cyan-500/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:scale-100"
+                                                    className="flex items-center gap-2 px-6 py-2.5 rounded-md bg-brand hover:bg-brand-600 text-white font-semibold text-sm shadow-xl shadow-none transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:scale-100"
                                                 >
                                                     <Sparkles className="w-4 h-4" />
                                                     Otonom Analizi Başlat
@@ -1678,15 +1684,15 @@ export default function CandidateProcessPage() {
                                 {activeTab === 'cv_match' && (
                                     <div className="space-y-6 animate-in fade-in duration-300">
                                         {/* Summary */}
-                                        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 relative overflow-hidden">
-                                            <Brain className="absolute -right-6 -top-6 w-24 h-24 text-slate-200" />
+                                        <div className="bg-n50 border border-n200 rounded-[14px] p-5 relative overflow-hidden">
+                                            <Brain className="absolute -right-6 -top-6 w-24 h-24 text-n200" />
                                             <div className="flex items-start justify-between mb-3">
                                                 <div className="flex items-center gap-2">
-                                                    <Target className="w-4 h-4 text-cyan-500" />
-                                                    <h3 className="text-[12px] font-black text-slate-800 uppercase tracking-widest">Pozisyon Uyum Analizi</h3>
+                                                    <Target className="w-4 h-4 text-brand" />
+                                                    <h3 className="text-[12px] font-semibold text-n900 uppercase tracking-[0.08em]">Pozisyon Uyum Analizi</h3>
                                                 </div>
                                                 <span
-                                                    className="text-[8px] font-black px-2.5 py-1 rounded-lg border flex items-center gap-1 bg-white shadow-sm"
+                                                    className="text-[11px] font-semibold px-2.5 py-1 rounded-md border flex items-center gap-1 bg-n0 shadow-sm"
                                                     style={{ color: getSourceColor(candidate.source), borderColor: `${getSourceColor(candidate.source)}40` }}
                                                 >
                                                     <Link2 className="w-2 h-2" /> {getSourceLabel(candidate)}
@@ -1695,7 +1701,7 @@ export default function CandidateProcessPage() {
                                             {/* Metin, GÖSTERİLEN pozisyonun analizinden gelir. Eskiden her
                                                 zaman tek bir aiAnalysis.summary basılıyordu; aday hangi
                                                 pozisyon bağlamında açılırsa açılsın aynı yorum görünüyordu. */}
-                                            <p className="text-[12px] text-slate-600 leading-relaxed italic font-medium pr-16">
+                                            <p className="text-[12px] text-n600 leading-relaxed italic font-medium pr-16">
                                                 "{displayedAnalysis?.summary
                                                     || candidate.aiAnalysis?.summary
                                                     || `${candidate.name} teknik profili, ${candidate.matchedPositionTitle || candidate.position || 'Hedef Pozisyon'} pozisyonu ile %${score} uyum göstermektedir.`}"
@@ -1707,33 +1713,33 @@ export default function CandidateProcessPage() {
                                                 candidate.aiAnalysis?.analyzedForPosition &&
                                                 candidate.matchedPositionTitle &&
                                                 candidate.aiAnalysis.analyzedForPosition !== candidate.matchedPositionTitle && (
-                                                <p className="mt-1.5 text-[10px] text-amber-600 font-semibold flex items-center gap-1">
+                                                <p className="mt-1.5 text-[11px] text-warn font-semibold flex items-center gap-1">
                                                     <AlertTriangle className="w-3 h-3 shrink-0" />
                                                     Bu değerlendirme metni "{candidate.aiAnalysis.analyzedForPosition}" pozisyonu için üretilmiş eski bir analizdir; güncel eşleşme ({candidate.matchedPositionTitle}) için AI Analiz'i yeniden çalıştırın.
                                                 </p>
                                             )}
-                                            <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 bg-white border border-slate-200 rounded-lg text-[10px] font-black text-cyan-600 shadow-sm">
-                                                <Zap className="w-3 h-3 text-amber-400 fill-amber-400" /> %{score} Uyum{candidate.matchedPositionTitle ? ` — ${candidate.matchedPositionTitle}` : ''}
+                                            <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 bg-n0 border border-n200 rounded-md text-[11px] font-semibold text-brand shadow-sm">
+                                                <Zap className="w-3 h-3 text-warn fill-current" /> %{score} Uyum{candidate.matchedPositionTitle ? ` — ${candidate.matchedPositionTitle}` : ''}
                                             </div>
                                         </div>
 
                                         {/* ── Screening Result Breakdown ── */}
                                         {candidate.screeningResult && (
-                                            <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-5 space-y-3">
+                                            <div className="bg-brand-50 border border-brand-100 rounded-[14px] p-5 space-y-3">
                                                 <div className="flex items-center justify-between">
                                                     <div className="flex items-center gap-2">
-                                                        <div className="w-6 h-6 rounded-lg bg-indigo-100 flex items-center justify-center shrink-0">
-                                                            <span className="text-[11px]">🎯</span>
+                                                        <div className="w-6 h-6 rounded-md bg-brand-100 flex items-center justify-center shrink-0">
+                                                            <span className="text-[12px]">🎯</span>
                                                         </div>
-                                                        <h3 className="text-[11px] font-black text-indigo-700 uppercase tracking-widest">Ön Eleme Değerlendirmesi</h3>
+                                                        <h3 className="text-[12px] font-semibold text-brand-700 uppercase tracking-[0.08em]">Ön Eleme Değerlendirmesi</h3>
                                                     </div>
-                                                    <div className="flex items-center gap-1.5 bg-white border border-indigo-200 rounded-lg px-3 py-1">
-                                                        <span className="text-[9px] font-bold text-indigo-400 uppercase">Genel Skor</span>
-                                                        <span className="text-[15px] font-black text-indigo-600">%{Math.round(candidate.screeningResult.aggregateScore ?? candidate.screeningScore ?? 0)}</span>
+                                                    <div className="flex items-center gap-1.5 bg-n0 border border-brand-100 rounded-md px-3 py-1">
+                                                        <span className="text-[11px] font-semibold text-brand uppercase">Genel Skor</span>
+                                                        <span className="text-[15px] font-semibold text-brand">%{Math.round(candidate.screeningResult.aggregateScore ?? candidate.screeningScore ?? 0)}</span>
                                                     </div>
                                                 </div>
                                                 {candidate.screeningResult.summary && (
-                                                    <p className="text-[11px] text-indigo-700 leading-relaxed italic bg-white border border-indigo-100 rounded-xl px-4 py-2.5">
+                                                    <p className="text-[12px] text-brand-700 leading-relaxed italic bg-n0 border border-brand-100 rounded-md px-4 py-2.5">
                                                         {candidate.screeningResult.summary}
                                                     </p>
                                                 )}
@@ -1741,26 +1747,26 @@ export default function CandidateProcessPage() {
                                                     <div className="space-y-2">
                                                         {(candidate.screeningResult.scores || []).map((item, idx) => {
                                                             const s = item.score ?? 0;
-                                                            const barColor = s >= 75 ? 'bg-emerald-400' : s >= 50 ? 'bg-amber-400' : 'bg-red-400';
-                                                            const textColor = s >= 75 ? 'text-emerald-600' : s >= 50 ? 'text-amber-600' : 'text-red-500';
+                                                            const barColor = s >= 75 ? 'bg-ok' : s >= 50 ? 'bg-warn' : 'bg-bad';
+                                                            const textColor = s >= 75 ? 'text-ok' : s >= 50 ? 'text-warn' : 'text-bad';
                                                             const answer = candidate.screeningResult.answers?.[idx]?.answer || '';
                                                             return (
-                                                                <div key={idx} className="bg-white border border-indigo-100 rounded-xl p-3 space-y-2">
+                                                                <div key={idx} className="bg-n0 border border-brand-100 rounded-md p-3 space-y-2">
                                                                     <div className="flex items-start gap-2">
-                                                                        <span className="text-[9px] font-black text-indigo-400 mt-0.5 shrink-0">{idx + 1}.</span>
-                                                                        <p className="text-[12px] font-semibold text-slate-700 leading-snug flex-1">{item.question}</p>
-                                                                        <span className={`shrink-0 text-[12px] font-black ${textColor}`}>%{s}</span>
+                                                                        <span className="text-[11px] font-semibold text-brand mt-0.5 shrink-0">{idx + 1}.</span>
+                                                                        <p className="text-[12px] font-semibold text-n700 leading-snug flex-1">{item.question}</p>
+                                                                        <span className={`shrink-0 text-[12px] font-semibold ${textColor}`}>%{s}</span>
                                                                     </div>
-                                                                    <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
+                                                                    <div className="h-1 bg-n100 rounded-full overflow-hidden">
                                                                         <div className={`h-full rounded-full ${barColor} transition-all`} style={{ width: `${s}%` }} />
                                                                     </div>
                                                                     {answer && (
-                                                                        <p className="text-[10px] text-slate-500 leading-relaxed bg-slate-50 rounded-lg px-2.5 py-1.5 border border-slate-100">
-                                                                            <span className="font-black text-slate-400 uppercase text-[9px] mr-1">Cevap:</span>{answer}
+                                                                        <p className="text-[11px] text-n500 leading-relaxed bg-n50 rounded-md px-2.5 py-1.5 border border-n200">
+                                                                            <span className="font-semibold text-n400 uppercase text-[11px] mr-1">Cevap:</span>{answer}
                                                                         </p>
                                                                     )}
                                                                     {item.rationale && (
-                                                                        <p className="text-[10px] text-indigo-500 italic leading-relaxed">{item.rationale}</p>
+                                                                        <p className="text-[11px] text-brand italic leading-relaxed">{item.rationale}</p>
                                                                     )}
                                                                 </div>
                                                             );
@@ -1773,17 +1779,17 @@ export default function CandidateProcessPage() {
                                         <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
                                             {/* Career timeline */}
                                             <div className="md:col-span-8 space-y-4">
-                                                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                                                <div className="flex items-center justify-between pb-2 border-b border-n200">
                                                     <div className="flex items-center gap-2">
-                                                        <Clock className="w-4 h-4 text-cyan-500" />
-                                                        <h3 className="text-[10px] font-black text-slate-700 uppercase tracking-widest">Kariyer Kronolojisi</h3>
+                                                        <Clock className="w-4 h-4 text-brand" />
+                                                        <h3 className="text-[11px] font-semibold text-n700 uppercase tracking-[0.08em]">Kariyer Kronolojisi</h3>
                                                     </div>
                                                     {(candidate?.cvText || candidate?.cvData) && (
                                                         <button
                                                             onClick={handleReparseCareer}
                                                             disabled={reparsingCareer}
                                                             title="CV metninden kariyer verilerini yeniden çek"
-                                                            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 text-[9px] font-black text-slate-500 hover:border-cyan-300 hover:text-cyan-600 hover:bg-cyan-50 transition-colors disabled:opacity-50"
+                                                            className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-n50 border border-n200 text-[11px] font-semibold text-n500 hover:border-brand-200 hover:text-brand hover:bg-brand-50 transition-colors disabled:opacity-50"
                                                         >
                                                             {reparsingCareer
                                                                 ? <><Loader2 size={10} className="animate-spin" /> Güncelleniyor...</>
@@ -1798,29 +1804,29 @@ export default function CandidateProcessPage() {
                                                             ? careerHistory
                                                             : parseCareerFromCvData(candidate?.cvData || candidate?.cvText || '');
                                                         if (items.length === 0) {
-                                                            return <p className="text-[12px] text-slate-400 italic">Kariyer bilgisi bulunamadı.</p>;
+                                                            return <p className="text-[12px] text-n400 italic">Kariyer bilgisi bulunamadı.</p>;
                                                         }
                                                         return items.map((exp, i) => (
-                                                            <div key={i} className="relative pl-5 border-l-2 border-cyan-100 pb-4 last:pb-0">
-                                                                <div className="absolute -left-[5px] top-1 w-2.5 h-2.5 rounded-full bg-white border-2 border-cyan-400 shadow-sm" />
+                                                            <div key={i} className="relative pl-5 border-l-2 border-brand-100 pb-4 last:pb-0">
+                                                                <div className="absolute -left-[5px] top-1 w-2.5 h-2.5 rounded-full bg-n0 border-2 border-brand shadow-sm" />
                                                                 {(exp.role || exp.company || exp.duration) && (
                                                                     <div className="flex justify-between items-start mb-1.5 flex-wrap gap-1">
                                                                         <div>
-                                                                            {exp.role && <h4 className="text-[14px] font-black text-slate-800">{exp.role}</h4>}
-                                                                            {exp.company && <p className="text-[11px] font-bold text-slate-500 uppercase">{exp.company}</p>}
+                                                                            {exp.role && <h4 className="text-[14px] font-semibold text-n900">{exp.role}</h4>}
+                                                                            {exp.company && <p className="text-[12px] font-semibold text-n500 uppercase">{exp.company}</p>}
                                                                         </div>
                                                                         {exp.duration && (
-                                                                            <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200 shrink-0">{exp.duration}</span>
+                                                                            <span className="text-[11px] font-semibold text-n400 bg-n100 px-2 py-0.5 rounded-md border border-n200 shrink-0">{exp.duration}</span>
                                                                         )}
                                                                     </div>
                                                                 )}
                                                                 {exp.desc && (
-                                                                    <p className="text-[12px] text-slate-500 leading-relaxed bg-slate-50 p-2 rounded-lg border border-slate-100">{exp.desc}</p>
+                                                                    <p className="text-[12px] text-n500 leading-relaxed bg-n50 p-2 rounded-md border border-n200">{exp.desc}</p>
                                                                 )}
                                                                 {exp.milestones?.length > 0 && (
                                                                     <div className="flex flex-wrap gap-1.5 mt-2">
                                                                         {exp.milestones.map((m, idx) => (
-                                                                            <span key={idx} className="flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-black rounded-lg border border-emerald-100">
+                                                                            <span key={idx} className="flex items-center gap-1 px-2 py-0.5 bg-ok-bg text-ok text-[11px] font-semibold rounded-md border border-transparent">
                                                                                 <Trophy className="w-2 h-2" /> {m}
                                                                             </span>
                                                                         ))}
@@ -1835,20 +1841,20 @@ export default function CandidateProcessPage() {
                                             {/* Skills + Education */}
                                             <div className="md:col-span-4 space-y-5">
                                                 <div>
-                                                    <div className="flex items-center gap-2 pb-2 border-b border-slate-100 mb-3">
-                                                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Teknik Ekosistem</h3>
+                                                    <div className="flex items-center gap-2 pb-2 border-b border-n200 mb-3">
+                                                        <h3 className="text-[11px] font-semibold text-n400 uppercase tracking-[0.08em]">Teknik Ekosistem</h3>
                                                     </div>
                                                     <div className="flex flex-wrap gap-1.5">
                                                         {(candidate.skills || ['React', 'Node.js', 'AWS', 'Redis']).map((s, i) => (
-                                                            <span key={i} className="px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[10px] font-black text-slate-600 shadow-sm uppercase">{s}</span>
+                                                            <span key={i} className="px-2.5 py-1 bg-n0 border border-n200 rounded-md text-[11px] font-semibold text-n600 shadow-sm uppercase">{s}</span>
                                                         ))}
                                                     </div>
                                                 </div>
-                                                <div className="pt-4 border-t border-slate-100">
-                                                    <div className="flex items-center gap-2 pb-2 border-b border-slate-100 mb-3">
-                                                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Eğitim & Sertifika</h3>
+                                                <div className="pt-4 border-t border-n200">
+                                                    <div className="flex items-center gap-2 pb-2 border-b border-n200 mb-3">
+                                                        <h3 className="text-[11px] font-semibold text-n400 uppercase tracking-[0.08em]">Eğitim & Sertifika</h3>
                                                     </div>
-                                                    <p className="text-[12px] font-medium text-slate-600 italic leading-relaxed">
+                                                    <p className="text-[12px] font-medium text-n600 italic leading-relaxed">
                                                         {candidate.education || candidate.educationDetail || 'Eğitim bilgisi bulunamadı.'}
                                                     </p>
                                                 </div>
@@ -1864,33 +1870,33 @@ export default function CandidateProcessPage() {
                                     return (
                                         <div className="space-y-5 animate-in fade-in duration-300">
                                             {/* Domain header */}
-                                            <div className="flex items-center gap-3 p-4 bg-slate-50 border border-slate-100 rounded-2xl">
-                                                <div className="w-9 h-9 rounded-xl bg-[#13294E]/10 flex items-center justify-center shrink-0">
+                                            <div className="flex items-center gap-3 p-4 bg-n50 border border-n200 rounded-[14px]">
+                                                <div className="w-9 h-9 rounded-md bg-[#13294E]/10 flex items-center justify-center shrink-0">
                                                     <Layers className="w-4.5 h-4.5 text-[#13294E]" />
                                                 </div>
                                                 <div>
-                                                    <p className="text-[11px] font-black text-slate-800">
+                                                    <p className="text-[12px] font-semibold text-n900">
                                                         Aday Meslek Alanı:
                                                         <span className="ml-1.5 px-2 py-0.5 bg-[#13294E]/10 text-[#13294E] rounded-md">{domainLabel(candidateDomain)}</span>
                                                     </p>
-                                                    <p className="text-[10px] text-slate-400 mt-0.5">Her açık pozisyon ayrı skorlanır; otomatik eşleştirme uyumlu meslek alanına öncelik verir.</p>
+                                                    <p className="text-[11px] text-n400 mt-0.5">Her açık pozisyon ayrı skorlanır; otomatik eşleştirme uyumlu meslek alanına öncelik verir.</p>
                                                     {cleanRoleText(candidate.suggestedRole, candidate.position || '') && (
-                                                        <p className="text-[10px] text-slate-500 mt-1">
+                                                        <p className="text-[11px] text-n500 mt-1">
                                                             CV'ye göre ideal rol:
-                                                            <span className="ml-1 font-black text-slate-700">{cleanRoleText(candidate.suggestedRole, candidate.position || '')}</span>
-                                                            <span className="ml-1 text-slate-300">(açık pozisyonlardan bağımsız)</span>
+                                                            <span className="ml-1 font-semibold text-n700">{cleanRoleText(candidate.suggestedRole, candidate.position || '')}</span>
+                                                            <span className="ml-1 text-n300">(açık pozisyonlardan bağımsız)</span>
                                                         </p>
                                                     )}
                                                 </div>
                                                 <div className="ml-auto flex items-center gap-3 text-center shrink-0">
                                                     <div>
-                                                        <p className="text-[13px] font-black text-emerald-600">{compatible.length}</p>
-                                                        <p className="text-[8px] text-slate-400 font-medium">Uyumlu</p>
+                                                        <p className="text-[13px] font-semibold text-ok">{compatible.length}</p>
+                                                        <p className="text-[11px] text-n400 font-medium">Uyumlu</p>
                                                     </div>
-                                                    <div className="w-px h-8 bg-slate-200" />
+                                                    <div className="w-px h-8 bg-n200" />
                                                     <div>
-                                                        <p className="text-[13px] font-black text-slate-400">{incompatible.length}</p>
-                                                        <p className="text-[8px] text-slate-400 font-medium">Ayrı Alan</p>
+                                                        <p className="text-[13px] font-semibold text-n400">{incompatible.length}</p>
+                                                        <p className="text-[11px] text-n400 font-medium">Ayrı Alan</p>
                                                     </div>
                                                 </div>
                                             </div>
@@ -1898,13 +1904,13 @@ export default function CandidateProcessPage() {
                                             {/* Compatible positions */}
                                             {compatible.length === 0 ? (
                                                 <div className="text-center py-10">
-                                                    <Layers className="w-10 h-10 text-slate-200 mx-auto mb-3" />
-                                                    <p className="text-[12px] text-slate-400 font-medium">Uyumlu açık pozisyon bulunamadı.</p>
-                                                    <p className="text-[10px] text-slate-300 mt-1">Yeni pozisyon eklendikten sonra burası güncellenecek.</p>
+                                                    <Layers className="w-10 h-10 text-n200 mx-auto mb-3" />
+                                                    <p className="text-[12px] text-n400 font-medium">Uyumlu açık pozisyon bulunamadı.</p>
+                                                    <p className="text-[11px] text-n300 mt-1">Yeni pozisyon eklendikten sonra burası güncellenecek.</p>
                                                 </div>
                                             ) : (
                                                 <div className="space-y-2.5">
-                                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Eşleşen Pozisyonlar ({compatible.length})</p>
+                                                    <p className="text-[11px] font-semibold text-n400 uppercase tracking-[0.15em]">Eşleşen Pozisyonlar ({compatible.length})</p>
                                                     {compatible.map(({ position: pos, match, positionDomain, isAssigned }) => {
                                                     const saved = candidate.positionAnalyses?.[pos.title];
                                                     const busy = evaluatingTitle === pos.title;
@@ -1916,7 +1922,7 @@ export default function CandidateProcessPage() {
                                                         ? new Date(saved.analyzedAt).toLocaleDateString('tr-TR')
                                                         : null;
                                                     return (
-                                                        <div key={pos.id} className="bg-white border border-slate-100 hover:border-slate-200 rounded-2xl p-4 transition-all">
+                                                        <div key={pos.id} className="bg-n0 border border-n200 hover:border-n200 rounded-[14px] p-4 transition-all">
                                                             <div className="flex items-center gap-3">
                                                                 {/* Score ring */}
                                                                 <div className="relative w-11 h-11 flex items-center justify-center shrink-0">
@@ -1927,19 +1933,19 @@ export default function CandidateProcessPage() {
                                                                             strokeDasharray={`${(match.score / 100) * 113.1} 113.1`}
                                                                             strokeLinecap="round" />
                                                                     </svg>
-                                                                    <span className="text-[10px] font-black" style={{ color: scoreColor(match.score) }}>%{match.score}</span>
+                                                                    <span className="text-[11px] font-semibold" style={{ color: scoreColor(match.score) }}>%{match.score}</span>
                                                                 </div>
                                                                 {/* Info */}
                                                                 <div className="flex-1 min-w-0">
                                                                     <div className="flex items-center gap-2 mb-0.5">
-                                                                        <p className="text-[13px] font-black text-slate-800 truncate">{pos.title}</p>
+                                                                        <p className="text-[13px] font-semibold text-n900 truncate">{pos.title}</p>
                                                                         {match.isAi && (
-                                                                            <span className="shrink-0 inline-flex items-center gap-1 text-[7px] font-black px-1.5 py-0.5 bg-violet-50 text-violet-600 border border-violet-100 rounded-full">
+                                                                            <span className="shrink-0 inline-flex items-center gap-1 text-[7px] font-semibold px-1.5 py-0.5 bg-brand-50 text-brand border border-brand-100 rounded-full">
                                                                                 <Sparkles className="w-2 h-2" /> AI
                                                                             </span>
                                                                         )}
                                                                         {match.score >= 70 && (
-                                                                            <span className="shrink-0 inline-flex items-center gap-1 text-[7px] font-black px-1.5 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-full">
+                                                                            <span className="shrink-0 inline-flex items-center gap-1 text-[7px] font-semibold px-1.5 py-0.5 bg-ok-bg text-ok border border-transparent rounded-full">
                                                                                 <TrendingUp className="w-2 h-2" /> Yüksek
                                                                             </span>
                                                                         )}
@@ -1948,7 +1954,7 @@ export default function CandidateProcessPage() {
                                                                         {stale && (
                                                                             <span
                                                                                 title="Bu analiz ilanın ESKİ madde listesine ait; skor bugünkü ölçüyle uyumsuz"
-                                                                                className="shrink-0 text-[7px] font-black px-1.5 py-0.5 bg-amber-50 text-amber-600 border border-amber-100 rounded-full"
+                                                                                className="shrink-0 text-[7px] font-semibold px-1.5 py-0.5 bg-warn-bg text-warn border border-transparent rounded-full"
                                                                             >
                                                                                 BAYAT
                                                                             </span>
@@ -1958,26 +1964,26 @@ export default function CandidateProcessPage() {
                                                                         {isAssigned && (
                                                                             <span
                                                                                 title="Bu adayı bu ilana siz atadınız; otonom tarama da bu ilanı esas alır"
-                                                                                className="shrink-0 inline-flex items-center gap-1 text-[7px] font-black px-1.5 py-0.5 bg-cyan-50 text-cyan-700 border border-cyan-100 rounded-full"
+                                                                                className="shrink-0 inline-flex items-center gap-1 text-[7px] font-semibold px-1.5 py-0.5 bg-brand-50 text-brand border border-brand-100 rounded-full"
                                                                             >
                                                                                 <Target className="w-2 h-2" /> ATANDI
                                                                             </span>
                                                                         )}
                                                                     </div>
-                                                                    <div className="flex items-center gap-2 text-[10px] text-slate-400">
+                                                                    <div className="flex items-center gap-2 text-[11px] text-n400">
                                                                         <span>{pos.department || '—'}</span>
                                                                         <span>·</span>
                                                                         <span>{pos.minExperience ? `min ${pos.minExperience} yıl` : 'Deneyim belirtilmemiş'}</span>
                                                                         <span>·</span>
-                                                                        <span className="text-blue-500 font-bold">{domainLabel(positionDomain)}</span>
+                                                                        <span className="text-blue-500 font-semibold">{domainLabel(positionDomain)}</span>
                                                                     </div>
                                                                     {match.summary && (
-                                                                        <p className="text-[11px] text-slate-500 mt-1 leading-relaxed line-clamp-2 italic">{match.summary}</p>
+                                                                        <p className="text-[12px] text-n500 mt-1 leading-relaxed line-clamp-2 italic">{match.summary}</p>
                                                                     )}
                                                                     {match.reasons.length > 0 && !match.summary && (
                                                                         <div className="flex flex-wrap gap-1 mt-1.5">
                                                                             {match.reasons.slice(0, 3).map((r, ri) => (
-                                                                                <span key={ri} className="text-[8px] font-medium px-1.5 py-0.5 bg-slate-50 border border-slate-100 rounded-md text-slate-500">{r}</span>
+                                                                                <span key={ri} className="text-[11px] font-medium px-1.5 py-0.5 bg-n50 border border-n200 rounded-md text-n500">{r}</span>
                                                                             ))}
                                                                         </div>
                                                                     )}
@@ -1999,10 +2005,10 @@ export default function CandidateProcessPage() {
                                                                         title={isAssigned
                                                                             ? 'Atamayı kaldır'
                                                                             : 'Bu adayı bu ilana ata — otonom tarama da bu ilanı esas alır'}
-                                                                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-wider transition-colors disabled:opacity-40 ${
+                                                                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-[11px] font-semibold uppercase tracking-[0.08em] transition-colors disabled:opacity-40 ${
                                                                             isAssigned
-                                                                                ? 'border-cyan-200 bg-cyan-50 text-cyan-700 hover:bg-cyan-100'
-                                                                                : 'border-slate-200 text-slate-600 hover:border-cyan-300 hover:text-cyan-700'
+                                                                                ? 'border-brand-100 bg-brand-50 text-brand hover:bg-brand-100'
+                                                                                : 'border-n200 text-n600 hover:border-brand-200 hover:text-brand'
                                                                         }`}
                                                                     >
                                                                         <Target className="w-3 h-3" />
@@ -2014,7 +2020,7 @@ export default function CandidateProcessPage() {
                                                                         title={match.isAi
                                                                             ? 'Bu adayı bu ilana göre yeniden değerlendir (1 AI çağrısı)'
                                                                             : 'Bu adayı bu ilana göre değerlendir (1 AI çağrısı)'}
-                                                                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200 text-[10px] font-black uppercase tracking-wider text-slate-600 hover:border-cyan-300 hover:text-cyan-700 transition-colors disabled:opacity-40"
+                                                                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-n200 text-[11px] font-semibold uppercase tracking-[0.08em] text-n600 hover:border-brand-200 hover:text-brand transition-colors disabled:opacity-40"
                                                                     >
                                                                         {busy
                                                                             ? <><Loader2 className="w-3 h-3 animate-spin" /> Değerlendiriliyor</>
@@ -2026,12 +2032,12 @@ export default function CandidateProcessPage() {
                                                             {(analyzedAt || evalError) && (
                                                                 <div className="mt-2 pl-14 space-y-0.5">
                                                                     {analyzedAt && (
-                                                                        <p className="text-[9px] text-slate-400">
+                                                                        <p className="text-[11px] text-n400">
                                                                             Değerlendirme tarihi: {analyzedAt}
                                                                             {stale && ' — ilanın o günkü madde listesine göre'}
                                                                         </p>
                                                                     )}
-                                                                    {evalError && <p className="text-[10px] text-red-500 leading-relaxed">{evalError}</p>}
+                                                                    {evalError && <p className="text-[11px] text-bad leading-relaxed">{evalError}</p>}
                                                                 </div>
                                                             )}
                                                         </div>
@@ -2042,28 +2048,28 @@ export default function CandidateProcessPage() {
 
                                             {/* Incompatible — her biri yine de ayrı skorla listelenir */}
                                             {incompatible.length > 0 && (
-                                                <div className="border border-dashed border-slate-200 rounded-2xl p-4">
-                                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.1em] mb-1">
+                                                <div className="border border-dashed border-n200 rounded-[14px] p-4">
+                                                    <p className="text-[11px] font-semibold text-n400 uppercase tracking-[0.1em] mb-1">
                                                         Farklı Meslek Alanı ({incompatible.length} pozisyon)
                                                     </p>
-                                                    <p className="text-[11px] text-slate-400">
+                                                    <p className="text-[12px] text-n400">
                                                         Bu pozisyonlar aday profiliyle farklı meslek alanında; otomatik eşleştirme önceliği almaz ama her biri ayrıca skorlanır.
                                                     </p>
                                                     {/* MESLEK ALANI BİR SEZGİ, KİLİT DEĞİL. Tespit yanılabilir
                                                         ve yanıldığında aday hiçbir yere ilerleyemiyor: otonom
                                                         tarama uyumlu pozisyon bulamayınca analiz edecek bir şey
                                                         bulamıyor. "Ata" bu kararı insana geri veriyor. */}
-                                                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
+                                                    <p className="text-[11px] text-n400 mt-1 leading-relaxed">
                                                         Alan tespiti yanılmış olabilir. <strong>Ata</strong> derseniz bu ilan bağlayıcı
                                                         olur: otonom tarama da onu esas alır ve aday uyumlu listeye taşınır.
                                                     </p>
                                                     <div className="space-y-1 mt-2">
                                                         {incompatible.map(({ position: pos, match }) => (
-                                                            <div key={pos.id} className="flex items-center gap-2 text-[10px]">
-                                                                <span className="font-black w-9 text-right shrink-0" style={{ color: scoreColor(match.score) }}>%{match.score}</span>
-                                                                <span className="text-slate-500 truncate">{pos.title}</span>
+                                                            <div key={pos.id} className="flex items-center gap-2 text-[11px]">
+                                                                <span className="font-semibold w-9 text-right shrink-0" style={{ color: scoreColor(match.score) }}>%{match.score}</span>
+                                                                <span className="text-n500 truncate">{pos.title}</span>
                                                                 {match.isAi && (
-                                                                    <span className="shrink-0 inline-flex items-center gap-0.5 text-[7px] font-black px-1 py-0.5 bg-violet-50 text-violet-600 border border-violet-100 rounded-full">
+                                                                    <span className="shrink-0 inline-flex items-center gap-0.5 text-[7px] font-semibold px-1 py-0.5 bg-brand-50 text-brand border border-brand-100 rounded-full">
                                                                         <Sparkles className="w-2 h-2" /> AI
                                                                     </span>
                                                                 )}
@@ -2075,18 +2081,18 @@ export default function CandidateProcessPage() {
                                                                     onClick={() => assignToPosition(pos)}
                                                                     disabled={Boolean(assigningId)}
                                                                     title="Bu adayı bu ilana ata — alan tespitini ez, otonom tarama da bu ilanı esas alsın"
-                                                                    className="shrink-0 ml-auto inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-cyan-600 hover:text-cyan-700 disabled:opacity-40"
+                                                                    className="shrink-0 ml-auto inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-brand hover:text-brand disabled:opacity-40"
                                                                 >
                                                                     <Target className="w-2.5 h-2.5" /> ata
                                                                 </button>
                                                                 <button
                                                                     onClick={() => evaluateForPosition(pos)}
                                                                     disabled={Boolean(evaluatingTitle)}
-                                                                    className="shrink-0 text-[9px] font-black uppercase tracking-wider text-slate-400 hover:text-cyan-600 disabled:opacity-40"
+                                                                    className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-n400 hover:text-brand disabled:opacity-40"
                                                                 >
                                                                     {evaluatingTitle === pos.title ? 'değerlendiriliyor…' : 'değerlendir'}
                                                                 </button>
-                                                                <span className="text-slate-300 text-[9px] shrink-0">{pos.department || ''}</span>
+                                                                <span className="text-n300 text-[11px] shrink-0">{pos.department || ''}</span>
                                                             </div>
                                                         ))}
                                                     </div>
@@ -2099,17 +2105,17 @@ export default function CandidateProcessPage() {
                                 {/* ── MÜLAKATLAr ── */}
                                 {activeTab === 'sessions' && (
                                     <div className="space-y-4 animate-in fade-in duration-300">
-                                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                                        <div className="flex items-center justify-between border-b border-n200 pb-3">
                                             <div className="flex items-center gap-2">
-                                                <div className="w-1 h-4 rounded-full bg-cyan-500" />
-                                                <h3 className="text-[12px] font-black text-slate-800 uppercase tracking-widest">Planlanmış ve Gerçekleşen Görüşmeler</h3>
+                                                <div className="w-1 h-4 rounded-full bg-brand" />
+                                                <h3 className="text-[12px] font-semibold text-n900 uppercase tracking-[0.08em]">Planlanmış ve Gerçekleşen Görüşmeler</h3>
                                             </div>
                                             <button
                                                 onClick={() => {
                                                     setPreselectedInterviewData({ candidateId: candidate.id });
                                                     window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }));
                                                 }}
-                                                className="text-[9px] font-black text-cyan-600 uppercase flex items-center gap-1 hover:underline transition-all"
+                                                className="text-[11px] font-semibold text-brand uppercase flex items-center gap-1 hover:underline transition-all"
                                             >
                                                 <Plus className="w-3 h-3" /> MÜLAKAT PLANLA
                                             </button>
@@ -2140,20 +2146,20 @@ export default function CandidateProcessPage() {
 
                                                     return (
                                                         <CardWrapper key={sidx}>
-                                                            <div className={`rounded-xl border p-4 transition-all flex items-center justify-between gap-4 ${
+                                                            <div className={`rounded-md border p-4 transition-all flex items-center justify-between gap-4 ${
                                                                 isCompleted
-                                                                    ? 'bg-emerald-50 border-emerald-200 hover:border-emerald-400 hover:shadow-md hover:shadow-emerald-100'
-                                                                    : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm'
+                                                                    ? 'bg-ok-bg border-transparent hover:border-ok'
+                                                                    : 'bg-n0 border-n200 hover:border-n300 hover:shadow-sm'
                                                             }`}>
                                                                 <div className="flex items-center gap-3">
                                                                     {/* Icon */}
-                                                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center border shrink-0 ${
+                                                                    <div className={`w-10 h-10 rounded-md flex items-center justify-center border shrink-0 ${
                                                                         isCompleted
-                                                                            ? 'bg-emerald-100 border-emerald-200'
+                                                                            ? 'bg-ok-bg border-transparent'
                                                                             : `${cfg.bg} ${cfg.border} ${cfg.pulse ? 'animate-pulse' : ''}`
                                                                     }`}>
                                                                         {isCompleted
-                                                                            ? <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                                                                            ? <CheckCircle2 className="w-5 h-5 text-ok" />
                                                                             : <Video className={`w-5 h-5 ${cfg.text}`} />
                                                                         }
                                                                     </div>
@@ -2161,27 +2167,27 @@ export default function CandidateProcessPage() {
                                                                     {/* Info */}
                                                                     <div>
                                                                         <div className="flex items-center gap-2">
-                                                                            <h4 className={`text-[12px] font-black ${isCompleted ? 'text-emerald-900' : 'text-slate-800'}`}>
+                                                                            <h4 className={`text-[12px] font-semibold ${isCompleted ? 'text-ok' : 'text-n900'}`}>
                                                                                 {session.title || 'Mülakat Seansı'}
                                                                             </h4>
-                                                                            <span className={`text-[8px] font-black px-2 py-0.5 rounded-lg border ${cfg.bg} ${cfg.text} ${cfg.border} ${cfg.pulse ? 'animate-pulse' : ''}`}>
+                                                                            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-md border ${cfg.bg} ${cfg.text} ${cfg.border} ${cfg.pulse ? 'animate-pulse' : ''}`}>
                                                                                 {cfg.label}
                                                                             </span>
                                                                         </div>
                                                                         <div className="flex flex-wrap items-center gap-2 mt-0.5">
                                                                             {session.date && (
-                                                                                <span className="text-[9px] font-bold text-slate-500 flex items-center gap-0.5">
+                                                                                <span className="text-[11px] font-semibold text-n500 flex items-center gap-0.5">
                                                                                     <Calendar className="w-2.5 h-2.5" />
                                                                                     {(session.date || '').split('T')[0]}
                                                                                 </span>
                                                                             )}
                                                                             {session.time && (
-                                                                                <span className="text-[9px] font-bold text-slate-500 flex items-center gap-0.5">
+                                                                                <span className="text-[11px] font-semibold text-n500 flex items-center gap-0.5">
                                                                                     <Clock className="w-2.5 h-2.5" /> {session.time}
                                                                                 </span>
                                                                             )}
                                                                             {session.interviewer && (
-                                                                                <span className="text-[8.5px] font-black text-cyan-700 bg-cyan-50 px-2 py-0.5 rounded-lg border border-cyan-100">
+                                                                                <span className="text-[8.5px] font-semibold text-brand bg-brand-50 px-2 py-0.5 rounded-md border border-brand-100">
                                                                                     {session.interviewer}
                                                                                 </span>
                                                                             )}
@@ -2194,14 +2200,14 @@ export default function CandidateProcessPage() {
                                                                     {isLive && (
                                                                         <button
                                                                             onClick={e => { e.stopPropagation(); navigate(`/live-interview/${session.id}`); }}
-                                                                            className="bg-rose-500 text-white px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-rose-600 transition-all shadow-sm animate-pulse"
+                                                                            className="bg-rose-500 text-white px-4 py-1.5 rounded-md text-[11px] font-semibold uppercase tracking-[0.08em] hover:bg-rose-600 transition-all shadow-sm animate-pulse"
                                                                         >
                                                                             SEANSA KATIL
                                                                         </button>
                                                                     )}
 
                                                                     {isCompleted && (
-                                                                        <span className="flex items-center gap-1.5 text-[9px] font-black text-emerald-700 bg-white border border-emerald-200 px-3 py-1.5 rounded-lg shadow-sm group-hover:bg-emerald-600 group-hover:text-white group-hover:border-emerald-600 transition-all">
+                                                                        <span className="flex items-center gap-1.5 text-[11px] font-semibold text-ok bg-n0 border border-transparent px-3 py-1.5 rounded-md shadow-sm group-hover:bg-ok group-hover:text-white group-hover:border-ok transition-all">
                                                                             <Award className="w-3 h-3" /> Raporu Gör
                                                                             <ChevronRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
                                                                         </span>
@@ -2215,7 +2221,7 @@ export default function CandidateProcessPage() {
                                                                                     setPreselectedInterviewData({ candidateId: candidate.id, session });
                                                                                     window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }));
                                                                                 }}
-                                                                                className="p-1.5 text-slate-300 hover:text-cyan-500 transition-colors"
+                                                                                className="p-1.5 text-n300 hover:text-brand transition-colors"
                                                                                 title="Düzenle"
                                                                             >
                                                                                 <Edit3 className="w-3.5 h-3.5" />
@@ -2226,7 +2232,7 @@ export default function CandidateProcessPage() {
                                                                                     setPreselectedInterviewData({ candidateId: candidate.id, sessionId: session.id });
                                                                                     window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }));
                                                                                 }}
-                                                                                className="p-1.5 text-slate-300 hover:text-slate-600 transition-colors"
+                                                                                className="p-1.5 text-n300 hover:text-n600 transition-colors"
                                                                                 title="Mülakat sayfasına git"
                                                                             >
                                                                                 <ExternalLink className="w-3.5 h-3.5" />
@@ -2240,17 +2246,17 @@ export default function CandidateProcessPage() {
                                                 })}
                                             </div>
                                         ) : (
-                                            <div className="py-16 flex flex-col items-center border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
-                                                <div className="w-14 h-14 rounded-2xl bg-cyan-50 border border-cyan-100 flex items-center justify-center mb-3">
-                                                    <Video className="w-7 h-7 text-cyan-300" />
+                                            <div className="py-16 flex flex-col items-center border-2 border-dashed border-n200 rounded-[14px] bg-n50/50">
+                                                <div className="w-14 h-14 rounded-[14px] bg-brand-50 border border-brand-100 flex items-center justify-center mb-3">
+                                                    <Video className="w-7 h-7 text-n300" />
                                                 </div>
-                                                <p className="text-[12px] text-slate-400 font-bold italic mb-4">Henüz mülakat planlanmamış</p>
+                                                <p className="text-[12px] text-n400 font-semibold italic mb-4">Henüz mülakat planlanmamış</p>
                                                 <button
                                                     onClick={() => {
                                                         setPreselectedInterviewData({ candidateId: candidate.id });
                                                         window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }));
                                                     }}
-                                                    className="px-5 py-2 bg-cyan-500 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-cyan-600 transition-all shadow-sm"
+                                                    className="px-5 py-2 bg-brand text-white rounded-md text-[11px] font-semibold uppercase tracking-[0.08em] hover:bg-brand-600 transition-all shadow-sm"
                                                 >
                                                     Mülakat Planla
                                                 </button>
@@ -2263,17 +2269,17 @@ export default function CandidateProcessPage() {
                                 {/* ── SÜREÇ GEÇMİŞİ ── */}
                                 {activeTab === 'history' && (
                                     <div className="space-y-4 animate-in fade-in duration-300">
-                                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                                        <div className="flex items-center justify-between border-b border-n200 pb-3">
                                             <div className="flex items-center gap-2">
-                                                <div className="w-1 h-4 rounded-full bg-cyan-500" />
-                                                <h3 className="text-[12px] font-black text-slate-800 uppercase tracking-widest">Süreç Yol Haritası</h3>
+                                                <div className="w-1 h-4 rounded-full bg-brand" />
+                                                <h3 className="text-[12px] font-semibold text-n900 uppercase tracking-[0.08em]">Süreç Yol Haritası</h3>
                                             </div>
                                             <button
                                                 onClick={() => {
                                                     setPreselectedInterviewData({ candidateId: candidate.id });
                                                     window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }));
                                                 }}
-                                                className="text-[9px] font-black text-cyan-600 uppercase flex items-center gap-1 hover:underline"
+                                                className="text-[11px] font-semibold text-brand uppercase flex items-center gap-1 hover:underline"
                                             >
                                                 <Plus className="w-3 h-3" /> MÜLAKAT EKLE
                                             </button>
@@ -2281,34 +2287,34 @@ export default function CandidateProcessPage() {
 
                                         <div className="space-y-2">
                                             {/* Static: AI Analysis milestone */}
-                                            <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between shadow-sm">
+                                            <div className="bg-n0 border border-n200 rounded-md p-4 flex items-center justify-between shadow-sm">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center">
+                                                    <div className="w-9 h-9 rounded-md bg-blue-50 border border-blue-100 flex items-center justify-center">
                                                         <Brain className="w-4.5 h-4.5 text-blue-500" />
                                                     </div>
                                                     <div>
-                                                        <h4 className="text-[13px] font-black text-slate-800">AI Detaylı CV Analizi</h4>
-                                                        <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
-                                                            <CheckCircle2 className="w-2.5 h-2.5 text-emerald-500" /> Tamamlandı
+                                                        <h4 className="text-[13px] font-semibold text-n900">AI Detaylı CV Analizi</h4>
+                                                        <span className="text-[11px] font-semibold text-n400 flex items-center gap-1">
+                                                            <CheckCircle2 className="w-2.5 h-2.5 text-ok" /> Tamamlandı
                                                         </span>
                                                     </div>
                                                 </div>
-                                                <span className="text-[18px] font-black text-emerald-500">%{score}</span>
+                                                <span className="text-[18px] font-semibold text-ok">%{score}</span>
                                             </div>
 
                                             {/* Screening Result */}
                                             {candidate.screeningScore != null && (
-                                                <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 flex items-start justify-between">
+                                                <div className="bg-brand-50 border border-brand-100 rounded-md p-4 flex items-start justify-between">
                                                     <div className="flex items-center gap-3">
-                                                        <div className="w-9 h-9 rounded-xl bg-indigo-100 border border-indigo-200 flex items-center justify-center shrink-0">
+                                                        <div className="w-9 h-9 rounded-md bg-brand-100 border border-brand-100 flex items-center justify-center shrink-0">
                                                             <span className="text-[15px]">🎯</span>
                                                         </div>
                                                         <div>
-                                                            <h4 className="text-[13px] font-black text-slate-800">Ön Eleme Sonucu</h4>
-                                                            <span className="text-[10px] text-slate-400">{candidate.screeningResult?.summary || 'AI değerlendirmesi tamamlandı'}</span>
+                                                            <h4 className="text-[13px] font-semibold text-n900">Ön Eleme Sonucu</h4>
+                                                            <span className="text-[11px] text-n400">{candidate.screeningResult?.summary || 'AI değerlendirmesi tamamlandı'}</span>
                                                         </div>
                                                     </div>
-                                                    <span className="text-[18px] font-black text-indigo-600">%{Math.round(candidate.screeningScore)}</span>
+                                                    <span className="text-[18px] font-semibold text-brand">%{Math.round(candidate.screeningScore)}</span>
                                                 </div>
                                             )}
 
@@ -2318,14 +2324,14 @@ export default function CandidateProcessPage() {
                                             ).map((session, sidx) => {
                                                 const cfg = getStatusCfg(session.status);
                                                 return (
-                                                    <div key={sidx} className="bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between hover:border-slate-300 transition-all group shadow-sm">
+                                                    <div key={sidx} className="bg-n0 border border-n200 rounded-md p-4 flex items-center justify-between hover:border-n300 transition-all group shadow-sm">
                                                         <div className="flex items-center gap-3">
-                                                            <div className={`w-9 h-9 rounded-xl border flex items-center justify-center ${cfg.bg} ${cfg.border}`}>
+                                                            <div className={`w-9 h-9 rounded-md border flex items-center justify-center ${cfg.bg} ${cfg.border}`}>
                                                                 <Play className={`w-4 h-4 ${cfg.text}`} />
                                                             </div>
                                                             <div>
-                                                                <h4 className="text-[13px] font-black text-slate-800">{session.title || 'Mülakat'}</h4>
-                                                                <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
+                                                                <h4 className="text-[13px] font-semibold text-n900">{session.title || 'Mülakat'}</h4>
+                                                                <span className="text-[11px] font-semibold text-n400 flex items-center gap-1">
                                                                     <Calendar className="w-2.5 h-2.5" />
                                                                     {(session.date || '').split('T')[0] || '—'}
                                                                     {' • '}
@@ -2339,7 +2345,7 @@ export default function CandidateProcessPage() {
                                                                     setPreselectedInterviewData({ candidateId: candidate.id, sessionId: session.id });
                                                                     window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }));
                                                                 }}
-                                                                className="px-3 py-1 bg-slate-800 text-white rounded-lg text-[8px] font-black uppercase tracking-widest hover:bg-cyan-600 transition-all"
+                                                                className="px-3 py-1 bg-n900 text-white rounded-md text-[11px] font-semibold uppercase tracking-[0.08em] hover:bg-brand-600 transition-all"
                                                             >
                                                                 YÖNET
                                                             </button>
@@ -2348,7 +2354,7 @@ export default function CandidateProcessPage() {
                                                                     setPreselectedInterviewData({ candidateId: candidate.id, session });
                                                                     window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }));
                                                                 }}
-                                                                className="p-1.5 text-slate-300 hover:text-cyan-500 transition-colors"
+                                                                className="p-1.5 text-n300 hover:text-brand transition-colors"
                                                             >
                                                                 <Edit3 className="w-3.5 h-3.5" />
                                                             </button>
@@ -2358,14 +2364,14 @@ export default function CandidateProcessPage() {
                                             })}
 
                                             {/* Static: future milestone */}
-                                            <div className="bg-white border border-dashed border-slate-200 rounded-xl p-4 flex items-center justify-between opacity-40">
+                                            <div className="bg-n0 border border-dashed border-n200 rounded-md p-4 flex items-center justify-between opacity-40">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="w-9 h-9 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center">
-                                                        <Trophy className="w-4 h-4 text-slate-400" />
+                                                    <div className="w-9 h-9 rounded-md bg-n50 border border-n200 flex items-center justify-center">
+                                                        <Trophy className="w-4 h-4 text-n400" />
                                                     </div>
                                                     <div>
-                                                        <h4 className="text-[13px] font-black text-slate-500">Final Kararı ve Teklif</h4>
-                                                        <span className="text-[10px] font-bold text-slate-400">Hedeflenen Aşama</span>
+                                                        <h4 className="text-[13px] font-semibold text-n500">Final Kararı ve Teklif</h4>
+                                                        <span className="text-[11px] font-semibold text-n400">Hedeflenen Aşama</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -2376,22 +2382,22 @@ export default function CandidateProcessPage() {
                                 {/* ── MESAJLAR TAB ────────────────────────────────── */}
                                 {activeTab === 'messages' && (
                                     <div className="space-y-3 animate-in fade-in duration-300">
-                                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                                        <div className="flex items-center justify-between border-b border-n200 pb-3">
                                             <div className="flex items-center gap-2">
-                                                <div className="w-1 h-4 rounded-full bg-cyan-500" />
-                                                <h3 className="text-[12px] font-black text-slate-800 uppercase tracking-widest">Bilgi Talepleri</h3>
+                                                <div className="w-1 h-4 rounded-full bg-brand" />
+                                                <h3 className="text-[12px] font-semibold text-n900 uppercase tracking-[0.08em]">Bilgi Talepleri</h3>
                                             </div>
                                             {candidateInfoReqs.length > 0 && (
-                                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{candidateInfoReqs.length} talep</span>
+                                                <span className="text-[11px] font-semibold text-n400 uppercase tracking-[0.08em]">{candidateInfoReqs.length} talep</span>
                                             )}
                                         </div>
 
                                         {infoReqsLoading && (
                                             <div className="space-y-2">
                                                 {[1, 2].map(i => (
-                                                    <div key={i} className="bg-slate-50 border border-slate-200 rounded-xl p-4 animate-pulse">
-                                                        <div className="h-3 bg-slate-200 rounded w-1/2 mb-2" />
-                                                        <div className="h-2 bg-slate-200 rounded w-3/4" />
+                                                    <div key={i} className="bg-n50 border border-n200 rounded-md p-4 animate-pulse">
+                                                        <div className="h-3 bg-n200 rounded w-1/2 mb-2" />
+                                                        <div className="h-2 bg-n200 rounded w-3/4" />
                                                     </div>
                                                 ))}
                                             </div>
@@ -2399,10 +2405,10 @@ export default function CandidateProcessPage() {
 
                                         {!infoReqsLoading && candidateInfoReqs.length === 0 && (
                                             <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
-                                                <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center">
-                                                    <MessageSquare className="w-6 h-6 text-slate-300" />
+                                                <div className="w-14 h-14 rounded-[14px] bg-n50 border border-n200 flex items-center justify-center">
+                                                    <MessageSquare className="w-6 h-6 text-n300" />
                                                 </div>
-                                                <p className="text-[11px] text-slate-400">Bu aday için henüz bilgi talebi gönderilmedi.</p>
+                                                <p className="text-[12px] text-n400">Bu aday için henüz bilgi talebi gönderilmedi.</p>
                                             </div>
                                         )}
 
@@ -2410,33 +2416,33 @@ export default function CandidateProcessPage() {
                                             const isPending = req.status === 'pending';
                                             const createdAt = req.createdAt?.toDate?.()?.toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) || '—';
                                             return (
-                                                <div key={req.id} className="bg-white border border-slate-200 rounded-xl p-4 space-y-2 shadow-sm">
+                                                <div key={req.id} className="bg-n0 border border-n200 rounded-md p-4 space-y-2 shadow-sm">
                                                     <div className="flex items-center justify-between">
                                                         <div className="flex items-center gap-2">
-                                                            <FileText className="w-3.5 h-3.5 text-cyan-500" />
-                                                            <span className="text-[11px] font-black text-slate-700">Bilgi Talebi</span>
+                                                            <FileText className="w-3.5 h-3.5 text-brand" />
+                                                            <span className="text-[12px] font-semibold text-n700">Bilgi Talebi</span>
                                                         </div>
                                                         <div className="flex items-center gap-2">
-                                                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black ${isPending ? 'bg-amber-50 text-amber-600 border border-amber-200' : 'bg-emerald-50 text-emerald-600 border border-emerald-200'}`}>
+                                                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${isPending ? 'bg-warn-bg text-warn border border-warn' : 'bg-ok-bg text-ok border border-transparent'}`}>
                                                                 {isPending ? <Clock className="w-2.5 h-2.5" /> : <CheckCircle2 className="w-2.5 h-2.5" />}
                                                                 {isPending ? 'Bekliyor' : 'Yanıtlandı'}
                                                             </span>
-                                                            <span className="text-[9px] text-slate-400">{createdAt}</span>
+                                                            <span className="text-[11px] text-n400">{createdAt}</span>
                                                         </div>
                                                     </div>
                                                     {req.requestMessage && (
-                                                        <p className="text-[11px] text-slate-500 bg-slate-50 rounded-lg px-3 py-2 leading-relaxed">{req.requestMessage}</p>
+                                                        <p className="text-[12px] text-n500 bg-n50 rounded-md px-3 py-2 leading-relaxed">{req.requestMessage}</p>
                                                     )}
                                                     {req.requestedItems?.length > 0 && (
                                                         <ul className="space-y-1 pl-1">
                                                             {req.requestedItems.map((item, i) => (
-                                                                <li key={i} className="flex items-center gap-1.5 text-[10px] text-slate-500">
-                                                                    <span className="w-1 h-1 rounded-full bg-cyan-400 shrink-0" /> {item}
+                                                                <li key={i} className="flex items-center gap-1.5 text-[11px] text-n500">
+                                                                    <span className="w-1 h-1 rounded-full bg-brand shrink-0" /> {item}
                                                                 </li>
                                                             ))}
                                                         </ul>
                                                     )}
-                                                    <p className="text-[9px] text-slate-400">Gönderen: {req.recruiterName || '—'}</p>
+                                                    <p className="text-[11px] text-n400">Gönderen: {req.recruiterName || '—'}</p>
                                                 </div>
                                             );
                                         })}
@@ -2445,11 +2451,11 @@ export default function CandidateProcessPage() {
                             </div>
 
                             {/* Footer actions */}
-                            <div className="border-t border-slate-100 px-5 py-2.5 flex items-center justify-between bg-white shrink-0">
+                            <div className="border-t border-n200 px-5 py-2.5 flex items-center justify-between bg-n0 shrink-0">
                                 {/* Success toast */}
                                 {actionSuccess && (
-                                    <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 bg-slate-900 text-white text-[10px] font-black rounded-xl shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                                    <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 bg-n900 text-white text-[11px] font-semibold rounded-md shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                        <CheckCircle2 className="w-3.5 h-3.5 text-ok" />
                                         {actionSuccess === 'comment' && 'Yorum kaydedildi'}
                                         {actionSuccess === 'reject' && 'Aday reddedildi'}
                                         {actionSuccess === 'final' && 'Final turuna taşındı'}
@@ -2460,11 +2466,11 @@ export default function CandidateProcessPage() {
                                 <div className="flex gap-2">
                                     <button
                                         onClick={() => setCommentModal(true)}
-                                        className="h-8 px-4 bg-slate-50 text-slate-600 rounded-lg text-[9px] font-black uppercase border border-slate-200 hover:bg-slate-100 transition-all flex items-center gap-1.5"
+                                        className="h-7 px-[11px] bg-n0 text-n600 rounded-md text-[12px] font-medium border border-n200 hover:bg-n50 flex items-center gap-1.5"
                                     >
                                         <MessageSquare className="w-3 h-3" /> Yorum
                                         {candidate?.hrComments?.length > 0 && (
-                                            <span className="ml-0.5 bg-cyan-500 text-white text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center">
+                                            <span className="ml-0.5 bg-brand text-white text-[11px] font-semibold px-1.5 rounded-full">
                                                 {candidate.hrComments.length}
                                             </span>
                                         )}
@@ -2472,7 +2478,7 @@ export default function CandidateProcessPage() {
                                     {candidate?.email && (
                                         <button
                                             onClick={() => { setFeedbackText(''); setFeedbackOutcome('positive'); setInfoMessage(''); setInfoItems([]); setMsgTab('feedback'); setFeedbackModal(true); }}
-                                            className="h-8 px-3 bg-emerald-50 text-emerald-600 rounded-lg text-[9px] font-black uppercase border border-emerald-200 hover:bg-emerald-100 transition-all flex items-center gap-1.5"
+                                            className="h-7 px-[11px] bg-n0 text-n600 rounded-md text-[12px] font-medium border border-n200 hover:bg-n50 flex items-center gap-1.5"
                                             title="Adaya Mesaj Gönder"
                                         >
                                             <Mail className="w-3 h-3" /> Mesaj Gönder
@@ -2480,7 +2486,7 @@ export default function CandidateProcessPage() {
                                     )}
                                     <button
                                         onClick={() => setDeleteModal(true)}
-                                        className="h-8 w-8 flex items-center justify-center rounded-lg text-slate-400 border border-slate-200 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-all"
+                                        className="h-7 w-7 flex items-center justify-center rounded-md text-n400 border border-n200 hover:text-bad hover:bg-bad-bg"
                                         title="Adayı Sil"
                                     >
                                         <Trash2 className="w-3.5 h-3.5" />
@@ -2492,7 +2498,7 @@ export default function CandidateProcessPage() {
                                     <button
                                         disabled={actionLoading}
                                         onClick={() => setStatusDropdownOpen(v => !v)}
-                                        className="h-8 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest shadow-sm flex items-center gap-1.5 transition-all bg-cyan-500 hover:bg-cyan-600 text-white disabled:opacity-50"
+                                        className="h-7 px-[13px] rounded-md text-[12px] font-semibold flex items-center gap-1.5 bg-brand hover:bg-brand-600 text-white disabled:opacity-50"
                                     >
                                         {actionLoading
                                             ? <Loader2 className="w-3 h-3 animate-spin" />
@@ -2504,7 +2510,7 @@ export default function CandidateProcessPage() {
                                         <ChevronDown className="w-3 h-3" />
                                     </button>
                                     {statusDropdownOpen && (
-                                        <div className="absolute bottom-10 right-0 z-50 bg-white border border-slate-200 rounded-xl shadow-xl py-1 min-w-[140px] animate-in fade-in zoom-in-95 duration-150">
+                                        <div className="absolute bottom-9 right-0 z-50 bg-n0 border border-n200 rounded-[10px] shadow-lg py-1 min-w-[150px]">
                                             {PIPELINE_STAGES.map(stage => {
                                                 const isCurrent = stage.value === normalizePipelineStatus(candidate?.status);
                                                 return (
@@ -2512,10 +2518,10 @@ export default function CandidateProcessPage() {
                                                         key={stage.value}
                                                         disabled={isCurrent}
                                                         onClick={() => handleStatusChange(stage.value)}
-                                                        className={`w-full text-left px-3 py-1.5 text-[10px] font-bold flex items-center gap-2 transition-colors ${
+                                                        className={`w-full text-left px-3 py-1.5 text-[11px] font-semibold flex items-center gap-2 transition-colors ${
                                                             isCurrent
                                                                 ? `${stage.bg} ${stage.color} cursor-default`
-                                                                : 'hover:bg-slate-50 text-slate-700'
+                                                                : 'hover:bg-n50 text-n700'
                                                         }`}
                                                     >
                                                         {isCurrent && <CheckCircle2 className="w-3 h-3 shrink-0" />}
@@ -2533,9 +2539,9 @@ export default function CandidateProcessPage() {
                             </div>
                         </div>
                     ) : (
-                        <div className="flex-1 flex flex-col items-center justify-center text-slate-300">
+                        <div className="flex-1 flex flex-col items-center justify-center text-n300">
                             <Brain className="w-14 h-14 mb-3 animate-pulse" />
-                            <h2 className="text-[11px] font-black uppercase tracking-widest">Yükleniyor…</h2>
+                            <h2 className="text-[12px] font-semibold uppercase tracking-[0.08em]">Yükleniyor…</h2>
                         </div>
                     )}
                 </main>
@@ -2544,13 +2550,13 @@ export default function CandidateProcessPage() {
             {/* ── YORUM MODALI ─────────────────────────────────────────────── */}
             {commentModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md animate-in zoom-in-95 duration-200">
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                    <div className="bg-n0 rounded-[14px] shadow-2xl border border-n200 w-full max-w-md animate-in zoom-in-95 duration-200">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-n200">
                             <div className="flex items-center gap-2">
-                                <MessageSquare className="w-4 h-4 text-cyan-500" />
-                                <h3 className="text-[13px] font-black text-slate-800">HR Yorumu Ekle</h3>
+                                <MessageSquare className="w-4 h-4 text-brand" />
+                                <h3 className="text-[13px] font-semibold text-n900">HR Yorumu Ekle</h3>
                             </div>
-                            <button onClick={() => setCommentModal(false)} className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-50">
+                            <button onClick={() => setCommentModal(false)} className="p-1 text-n400 hover:text-n600 rounded-md hover:bg-n50">
                                 <X className="w-4 h-4" />
                             </button>
                         </div>
@@ -2558,11 +2564,11 @@ export default function CandidateProcessPage() {
                         {/* Existing comments */}
                         {candidate?.hrComments?.length > 0 && (
                             <div className="px-6 pt-4 space-y-2 max-h-40 overflow-y-auto">
-                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Önceki Yorumlar</p>
+                                <p className="text-[11px] font-semibold text-n400 uppercase tracking-[0.08em] mb-2">Önceki Yorumlar</p>
                                 {candidate.hrComments.map((c, i) => (
-                                    <div key={i} className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                                        <p className="text-[11px] text-slate-700 leading-relaxed">{c.text}</p>
-                                        <p className="text-[9px] font-bold text-slate-400 mt-1">{c.author} • {c.createdAt?.split('T')[0]}</p>
+                                    <div key={i} className="bg-n50 border border-n200 rounded-md p-3">
+                                        <p className="text-[12px] text-n700 leading-relaxed">{c.text}</p>
+                                        <p className="text-[11px] font-semibold text-n400 mt-1">{c.author} • {c.createdAt?.split('T')[0]}</p>
                                     </div>
                                 ))}
                             </div>
@@ -2573,17 +2579,17 @@ export default function CandidateProcessPage() {
                                 value={commentText}
                                 onChange={e => setCommentText(e.target.value)}
                                 placeholder={`${candidate?.name} hakkında yorumunuzu yazın...`}
-                                className="w-full h-28 bg-slate-50 border border-slate-200 rounded-xl p-3 text-[12px] text-slate-700 placeholder-slate-400 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-50 resize-none transition-all"
+                                className="w-full h-28 bg-n50 border border-n200 rounded-md p-3 text-[12px] text-n700 placeholder-n400 outline-none focus:border-brand focus:ring-0 resize-none transition-all"
                             />
                             <div className="flex gap-2 justify-end">
-                                <button onClick={() => setCommentModal(false)} className="h-9 px-4 rounded-xl text-[10px] font-black text-slate-500 border border-slate-200 hover:bg-slate-50 transition-all">İptal</button>
+                                <button onClick={() => setCommentModal(false)} className="h-9 px-4 rounded-md text-[11px] font-semibold text-n500 border border-n200 hover:bg-n50 transition-all">İptal</button>
                                 <button
                                     onClick={handleComment}
                                     disabled={!commentText.trim() || actionLoading}
-                                    className={`h-9 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all ${
+                                    className={`h-9 px-5 rounded-md text-[11px] font-semibold uppercase tracking-[0.08em] flex items-center gap-2 transition-all ${
                                         commentText.trim() && !actionLoading
-                                            ? 'bg-cyan-500 hover:bg-cyan-600 text-white shadow-sm'
-                                            : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                            ? 'bg-brand hover:bg-brand-600 text-white shadow-sm'
+                                            : 'bg-n100 text-n400 cursor-not-allowed'
                                     }`}
                                 >
                                     {actionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
@@ -2598,29 +2604,29 @@ export default function CandidateProcessPage() {
             {/* ── RET MODALI ───────────────────────────────────────────────── */}
             {rejectModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm animate-in zoom-in-95 duration-200">
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                    <div className="bg-n0 rounded-[14px] shadow-2xl border border-n200 w-full max-w-sm animate-in zoom-in-95 duration-200">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-n200">
                             <div className="flex items-center gap-2">
-                                <XCircle className="w-4 h-4 text-red-500" />
-                                <h3 className="text-[13px] font-black text-slate-800">Adayı Reddet</h3>
+                                <XCircle className="w-4 h-4 text-bad" />
+                                <h3 className="text-[13px] font-semibold text-n900">Adayı Reddet</h3>
                             </div>
-                            <button onClick={() => setRejectModal(false)} className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-50">
+                            <button onClick={() => setRejectModal(false)} className="p-1 text-n400 hover:text-n600 rounded-md hover:bg-n50">
                                 <X className="w-4 h-4" />
                             </button>
                         </div>
                         <div className="px-6 py-4 space-y-4">
-                            <div className="bg-red-50 border border-red-100 rounded-xl p-3 flex items-start gap-2">
-                                <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-                                <p className="text-[11px] text-red-700 leading-relaxed">
-                                    <span className="font-black">{candidate?.name}</span> adlı adayı süreçten çıkarmak üzeresiniz. Bu işlem Firestore'a kaydedilir.
+                            <div className="bg-bad-bg rounded-md p-3 flex items-start gap-2">
+                                <AlertCircle className="w-4 h-4 text-bad shrink-0 mt-0.5" />
+                                <p className="text-[12px] text-bad leading-relaxed">
+                                    <span className="font-semibold">{candidate?.name}</span> adlı adayı süreçten çıkarmak üzeresiniz. Bu işlem Firestore'a kaydedilir.
                                 </p>
                             </div>
                             <div>
-                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Red Nedeni (İsteğe Bağlı)</label>
+                                <label className="text-[11px] font-semibold text-n400 uppercase tracking-[0.08em] block mb-1.5">Red Nedeni (İsteğe Bağlı)</label>
                                 <select
                                     value={rejectReason}
                                     onChange={e => setRejectReason(e.target.value)}
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[12px] text-slate-700 outline-none focus:border-red-300 focus:ring-2 focus:ring-red-50 transition-all"
+                                    className="w-full bg-n50 border border-n200 rounded-md px-3 py-2 text-[12px] text-n700 outline-none focus:border-bad focus:ring-0 transition-all"
                                 >
                                     <option value="">Neden seçin...</option>
                                     <option value="Teknik Yetersizlik">Teknik Yetersizlik</option>
@@ -2632,11 +2638,11 @@ export default function CandidateProcessPage() {
                                 </select>
                             </div>
                             <div className="flex gap-2 justify-end pt-1">
-                                <button onClick={() => setRejectModal(false)} className="h-9 px-4 rounded-xl text-[10px] font-black text-slate-500 border border-slate-200 hover:bg-slate-50 transition-all">İptal</button>
+                                <button onClick={() => setRejectModal(false)} className="h-9 px-4 rounded-md text-[11px] font-semibold text-n500 border border-n200 hover:bg-n50 transition-all">İptal</button>
                                 <button
                                     onClick={handleReject}
                                     disabled={actionLoading}
-                                    className="h-9 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white shadow-sm transition-all disabled:opacity-60"
+                                    className="h-9 px-5 rounded-md text-[11px] font-semibold uppercase tracking-[0.08em] flex items-center gap-2 bg-bad hover:opacity-90 text-white shadow-sm transition-all disabled:opacity-60"
                                 >
                                     {actionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
                                     Reddet
@@ -2650,32 +2656,32 @@ export default function CandidateProcessPage() {
             {/* ── FİNAL TURU MODALI ────────────────────────────────────────── */}
             {finalModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm animate-in zoom-in-95 duration-200">
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                    <div className="bg-n0 rounded-[14px] shadow-2xl border border-n200 w-full max-w-sm animate-in zoom-in-95 duration-200">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-n200">
                             <div className="flex items-center gap-2">
-                                <Trophy className="w-4 h-4 text-amber-500" />
-                                <h3 className="text-[13px] font-black text-slate-800">Final Turuna Taşı</h3>
+                                <Trophy className="w-4 h-4 text-warn" />
+                                <h3 className="text-[13px] font-semibold text-n900">Final Turuna Taşı</h3>
                             </div>
-                            <button onClick={() => setFinalModal(false)} className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-50">
+                            <button onClick={() => setFinalModal(false)} className="p-1 text-n400 hover:text-n600 rounded-md hover:bg-n50">
                                 <X className="w-4 h-4" />
                             </button>
                         </div>
                         <div className="px-6 py-4 space-y-4">
-                            <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 text-center">
-                                <div className="w-12 h-12 rounded-2xl bg-amber-100 border border-amber-200 flex items-center justify-center mx-auto mb-3">
-                                    <Trophy className="w-6 h-6 text-amber-500" />
+                            <div className="bg-warn-bg rounded-md p-4 text-center">
+                                <div className="w-12 h-12 rounded-[14px] bg-warn-bg border border-warn flex items-center justify-center mx-auto mb-3">
+                                    <Trophy className="w-6 h-6 text-warn" />
                                 </div>
-                                <p className="text-[12px] font-black text-amber-800 mb-1">{candidate?.name}</p>
-                                <p className="text-[11px] text-amber-700 leading-relaxed">
+                                <p className="text-[12px] font-semibold text-n700 mb-1">{candidate?.name}</p>
+                                <p className="text-[12px] text-warn leading-relaxed">
                                     Bu adayı final turuna taşımak istediğinizi onaylıyor musunuz? Durum Firestore'da güncellenecektir.
                                 </p>
                             </div>
                             <div className="flex gap-2 justify-end">
-                                <button onClick={() => setFinalModal(false)} className="h-9 px-4 rounded-xl text-[10px] font-black text-slate-500 border border-slate-200 hover:bg-slate-50 transition-all">İptal</button>
+                                <button onClick={() => setFinalModal(false)} className="h-9 px-4 rounded-md text-[11px] font-semibold text-n500 border border-n200 hover:bg-n50 transition-all">İptal</button>
                                 <button
                                     onClick={handleFinal}
                                     disabled={actionLoading}
-                                    className="h-9 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 bg-cyan-500 hover:bg-cyan-600 text-white shadow-sm transition-all disabled:opacity-60"
+                                    className="h-9 px-5 rounded-md text-[11px] font-semibold uppercase tracking-[0.08em] flex items-center gap-2 bg-brand hover:bg-brand-600 text-white shadow-sm transition-all disabled:opacity-60"
                                 >
                                     {actionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArrowRight className="w-3.5 h-3.5" />}
                                     Onayla ve Taşı
@@ -2689,32 +2695,32 @@ export default function CandidateProcessPage() {
             {/* ── SİL MODALI ───────────────────────────────────────────────── */}
             {deleteModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm animate-in zoom-in-95 duration-200">
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                    <div className="bg-n0 rounded-[14px] shadow-2xl border border-n200 w-full max-w-sm animate-in zoom-in-95 duration-200">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-n200">
                             <div className="flex items-center gap-2">
-                                <Trash2 className="w-4 h-4 text-red-500" />
-                                <h3 className="text-[13px] font-black text-slate-800">Adayı Sil</h3>
+                                <Trash2 className="w-4 h-4 text-bad" />
+                                <h3 className="text-[13px] font-semibold text-n900">Adayı Sil</h3>
                             </div>
-                            <button onClick={() => setDeleteModal(false)} className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-50">
+                            <button onClick={() => setDeleteModal(false)} className="p-1 text-n400 hover:text-n600 rounded-md hover:bg-n50">
                                 <X className="w-4 h-4" />
                             </button>
                         </div>
                         <div className="px-6 py-5 space-y-4">
-                            <div className="bg-red-50 border border-red-100 rounded-xl p-4 text-center">
-                                <div className="w-12 h-12 rounded-2xl bg-red-100 border border-red-200 flex items-center justify-center mx-auto mb-3">
-                                    <Trash2 className="w-6 h-6 text-red-500" />
+                            <div className="bg-bad-bg rounded-md p-4 text-center">
+                                <div className="w-12 h-12 rounded-[14px] bg-bad-bg border border-transparent flex items-center justify-center mx-auto mb-3">
+                                    <Trash2 className="w-6 h-6 text-bad" />
                                 </div>
-                                <p className="text-[12px] font-black text-red-800 mb-1">{candidate?.name}</p>
-                                <p className="text-[11px] text-red-700 leading-relaxed">
+                                <p className="text-[12px] font-semibold text-n900 mb-1">{candidate?.name}</p>
+                                <p className="text-[12px] text-bad leading-relaxed">
                                     Bu adayı kalıcı olarak silmek istediğinizi onaylıyor musunuz? Bu işlem geri alınamaz.
                                 </p>
                             </div>
                             <div className="flex gap-2 justify-end">
-                                <button onClick={() => setDeleteModal(false)} className="h-9 px-4 rounded-xl text-[10px] font-black text-slate-500 border border-slate-200 hover:bg-slate-50 transition-all">İptal</button>
+                                <button onClick={() => setDeleteModal(false)} className="h-9 px-4 rounded-md text-[11px] font-semibold text-n500 border border-n200 hover:bg-n50 transition-all">İptal</button>
                                 <button
                                     onClick={handleDelete}
                                     disabled={actionLoading}
-                                    className="h-9 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white shadow-sm transition-all disabled:opacity-60"
+                                    className="h-9 px-5 rounded-md text-[11px] font-semibold uppercase tracking-[0.08em] flex items-center gap-2 bg-bad hover:opacity-90 text-white shadow-sm transition-all disabled:opacity-60"
                                 >
                                     {actionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                                     Evet, Sil
@@ -2728,45 +2734,45 @@ export default function CandidateProcessPage() {
             {/* ── GERİ BİLDİRİM MAİLİ MODALI ──────────────────────────────── */}
             {feedbackModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg animate-in zoom-in-95 duration-200">
+                    <div className="bg-n0 rounded-[14px] shadow-2xl border border-n200 w-full max-w-lg animate-in zoom-in-95 duration-200">
 
                         {/* Header */}
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-n200">
                             <div className="flex items-center gap-2">
-                                <Mail className="w-4 h-4 text-emerald-500" />
-                                <h3 className="text-[13px] font-black text-slate-800">Adaya Mesaj Gönder</h3>
+                                <Mail className="w-4 h-4 text-ok" />
+                                <h3 className="text-[13px] font-semibold text-n900">Adaya Mesaj Gönder</h3>
                             </div>
-                            <button onClick={() => setFeedbackModal(false)} className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-50">
+                            <button onClick={() => setFeedbackModal(false)} className="p-1 text-n400 hover:text-n600 rounded-md hover:bg-n50">
                                 <X className="w-4 h-4" />
                             </button>
                         </div>
 
                         {feedbackSuccess ? (
                             <div className="px-6 py-10 flex flex-col items-center gap-3">
-                                <CheckCircle2 className="w-12 h-12 text-emerald-500" />
-                                <p className="text-[13px] font-black text-emerald-700">Mail başarıyla gönderildi!</p>
-                                <p className="text-[11px] text-slate-400">{candidate?.email}</p>
+                                <CheckCircle2 className="w-12 h-12 text-ok" />
+                                <p className="text-[13px] font-semibold text-ok">Mail başarıyla gönderildi!</p>
+                                <p className="text-[12px] text-n400">{candidate?.email}</p>
                             </div>
                         ) : (
                             <div className="px-6 py-4 space-y-4">
 
                                 {/* Alıcı */}
                                 <div>
-                                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Alıcı</label>
-                                    <div className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[12px] text-slate-600 font-medium">{candidate?.email}</div>
+                                    <label className="text-[11px] font-semibold text-n400 uppercase tracking-[0.08em] block mb-1">Alıcı</label>
+                                    <div className="bg-n50 border border-n200 rounded-md px-3 py-2 text-[12px] text-n600 font-medium">{candidate?.email}</div>
                                 </div>
 
                                 {/* Tab switcher */}
-                                <div className="flex rounded-xl overflow-hidden border border-slate-200 bg-slate-50 p-0.5 gap-0.5">
+                                <div className="flex rounded-md overflow-hidden border border-n200 bg-n50 p-0.5 gap-0.5">
                                     <button
                                         onClick={() => setMsgTab('feedback')}
-                                        className={`flex-1 h-8 flex items-center justify-center gap-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${msgTab === 'feedback' ? 'bg-white text-emerald-600 shadow-sm border border-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
+                                        className={`flex-1 h-8 flex items-center justify-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] rounded-md transition-all ${msgTab === 'feedback' ? 'bg-n0 text-ok shadow-sm border border-n200' : 'text-n400 hover:text-n600'}`}
                                     >
                                         <Send className="w-3 h-3" /> Geri Bildirim
                                     </button>
                                     <button
                                         onClick={() => setMsgTab('info')}
-                                        className={`flex-1 h-8 flex items-center justify-center gap-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${msgTab === 'info' ? 'bg-white text-cyan-600 shadow-sm border border-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
+                                        className={`flex-1 h-8 flex items-center justify-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] rounded-md transition-all ${msgTab === 'info' ? 'bg-n0 text-brand shadow-sm border border-n200' : 'text-n400 hover:text-n600'}`}
                                     >
                                         <FileQuestion className="w-3 h-3" /> Bilgi İste
                                     </button>
@@ -2777,15 +2783,15 @@ export default function CandidateProcessPage() {
                                     <div className="space-y-4 animate-in fade-in duration-200">
                                         {/* Sonuç */}
                                         <div>
-                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Sonuç</label>
+                                            <label className="text-[11px] font-semibold text-n400 uppercase tracking-[0.08em] block mb-1.5">Sonuç</label>
                                             <div className="flex gap-2">
                                                 {[
-                                                    { v: 'positive', label: 'Olumlu',    active: 'bg-emerald-500 text-white border-emerald-500', inactive: 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100' },
-                                                    { v: 'hold',     label: 'Beklemede', active: 'bg-amber-500 text-white border-amber-500',   inactive: 'bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100' },
-                                                    { v: 'negative', label: 'Olumsuz',   active: 'bg-red-500 text-white border-red-500',       inactive: 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100' },
+                                                    { v: 'positive', label: 'Olumlu',    active: 'bg-ok text-white border-transparent', inactive: 'bg-ok-bg text-ok border-transparent hover:opacity-90' },
+                                                    { v: 'hold',     label: 'Beklemede', active: 'bg-warn text-white border-transparent',   inactive: 'bg-warn-bg text-warn border-warn hover:bg-warn-bg' },
+                                                    { v: 'negative', label: 'Olumsuz',   active: 'bg-bad text-white border-transparent',       inactive: 'bg-bad-bg text-bad border-transparent hover:opacity-90' },
                                                 ].map(({ v, label, active, inactive }) => (
                                                     <button key={v} onClick={() => setFeedbackOutcome(v)}
-                                                        className={`flex-1 h-8 rounded-lg text-[9px] font-black uppercase tracking-wide border transition-all ${feedbackOutcome === v ? active : inactive}`}
+                                                        className={`flex-1 h-8 rounded-md text-[11px] font-semibold uppercase tracking-wide border transition-all ${feedbackOutcome === v ? active : inactive}`}
                                                     >{label}</button>
                                                 ))}
                                             </div>
@@ -2793,9 +2799,9 @@ export default function CandidateProcessPage() {
                                         {/* Feedback text */}
                                         <div>
                                             <div className="flex items-center justify-between mb-1.5">
-                                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Geri Bildirim Metni</label>
+                                                <label className="text-[11px] font-semibold text-n400 uppercase tracking-[0.08em]">Geri Bildirim Metni</label>
                                                 <button onClick={handleGenerateFeedbackText} disabled={feedbackAiLoading}
-                                                    className="flex items-center gap-1 px-2.5 py-1 bg-violet-50 text-violet-600 border border-violet-200 rounded-lg text-[9px] font-black hover:bg-violet-100 transition-all disabled:opacity-60"
+                                                    className="flex items-center gap-1 px-2.5 py-1 bg-brand-50 text-brand border border-brand-100 rounded-md text-[11px] font-semibold hover:bg-brand-100 transition-all disabled:opacity-60"
                                                 >
                                                     {feedbackAiLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Brain className="w-3 h-3" />}
                                                     AI ile Oluştur
@@ -2804,13 +2810,13 @@ export default function CandidateProcessPage() {
                                             <textarea value={feedbackText} onChange={e => setFeedbackText(e.target.value)}
                                                 placeholder="Adaya iletmek istediğiniz geri bildirimi yazın..."
                                                 rows={5}
-                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-[12px] text-slate-700 placeholder-slate-400 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-50 resize-none transition-all"
+                                                className="w-full bg-n50 border border-n200 rounded-md p-3 text-[12px] text-n700 placeholder-n400 outline-none focus:border-brand resize-none transition-all"
                                             />
                                         </div>
                                         <div className="flex gap-2 justify-end pt-1">
-                                            <button onClick={() => setFeedbackModal(false)} className="h-9 px-4 rounded-xl text-[10px] font-black text-slate-500 border border-slate-200 hover:bg-slate-50 transition-all">İptal</button>
+                                            <button onClick={() => setFeedbackModal(false)} className="h-9 px-4 rounded-md text-[11px] font-semibold text-n500 border border-n200 hover:bg-n50 transition-all">İptal</button>
                                             <button onClick={handleSendFeedback} disabled={!feedbackText.trim() || feedbackLoading}
-                                                className="h-9 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm transition-all disabled:opacity-60"
+                                                className="h-9 px-5 rounded-md text-[11px] font-semibold uppercase tracking-[0.08em] flex items-center gap-2 bg-ok hover:opacity-90 text-white shadow-sm transition-all disabled:opacity-60"
                                             >
                                                 {feedbackLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                                                 Gönder
@@ -2823,41 +2829,41 @@ export default function CandidateProcessPage() {
                                 {msgTab === 'info' && (
                                     <div className="space-y-4 animate-in fade-in duration-200">
                                         <div>
-                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Mesajınız</label>
+                                            <label className="text-[11px] font-semibold text-n400 uppercase tracking-[0.08em] block mb-1.5">Mesajınız</label>
                                             <textarea value={infoMessage} onChange={e => setInfoMessage(e.target.value)}
                                                 placeholder="Adaya iletmek istediğiniz mesaj veya açıklama..."
                                                 rows={4}
-                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-[12px] text-slate-700 placeholder-slate-400 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-50 resize-none transition-all"
+                                                className="w-full bg-n50 border border-n200 rounded-md p-3 text-[12px] text-n700 placeholder-n400 outline-none focus:border-brand focus:ring-0 resize-none transition-all"
                                             />
                                         </div>
                                         <div>
-                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Talep Edilen Belgeler / Bilgiler</label>
+                                            <label className="text-[11px] font-semibold text-n400 uppercase tracking-[0.08em] block mb-1.5">Talep Edilen Belgeler / Bilgiler</label>
                                             <div className="flex gap-2 mb-2">
                                                 <input value={newInfoItem} onChange={e => setNewInfoItem(e.target.value)}
                                                     onKeyDown={e => { if (e.key === 'Enter' && newInfoItem.trim()) { setInfoItems(p => [...p, newInfoItem.trim()]); setNewInfoItem(''); } }}
                                                     placeholder="Örn: CV, Diploma fotokopisi, Referans mektubu..."
-                                                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[12px] text-slate-700 outline-none focus:border-cyan-400 transition-all"
+                                                    className="flex-1 bg-n50 border border-n200 rounded-md px-3 py-2 text-[12px] text-n700 outline-none focus:border-brand transition-all"
                                                 />
                                                 <button onClick={() => { if (newInfoItem.trim()) { setInfoItems(p => [...p, newInfoItem.trim()]); setNewInfoItem(''); } }}
-                                                    className="w-9 h-9 rounded-xl bg-cyan-50 border border-cyan-200 text-cyan-600 hover:bg-cyan-100 transition-all flex items-center justify-center shrink-0"
+                                                    className="w-9 h-9 rounded-md bg-brand-50 border border-brand-100 text-brand hover:bg-brand-100 transition-all flex items-center justify-center shrink-0"
                                                 ><Plus className="w-4 h-4" /></button>
                                             </div>
                                             {infoItems.length > 0 && (
                                                 <ul className="space-y-1.5">
                                                     {infoItems.map((item, i) => (
-                                                        <li key={i} className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-[11px] text-slate-600 font-medium">
-                                                            <FileQuestion className="w-3 h-3 text-cyan-500 shrink-0" />
+                                                        <li key={i} className="flex items-center gap-2 bg-n50 border border-n200 rounded-md px-3 py-1.5 text-[12px] text-n600 font-medium">
+                                                            <FileQuestion className="w-3 h-3 text-brand shrink-0" />
                                                             <span className="flex-1">{item}</span>
-                                                            <button onClick={() => setInfoItems(p => p.filter((_, j) => j !== i))} className="text-slate-300 hover:text-red-400 transition-colors"><Trash2 className="w-3 h-3" /></button>
+                                                            <button onClick={() => setInfoItems(p => p.filter((_, j) => j !== i))} className="text-n300 hover:text-bad transition-colors"><Trash2 className="w-3 h-3" /></button>
                                                         </li>
                                                     ))}
                                                 </ul>
                                             )}
                                         </div>
                                         <div className="flex gap-2 justify-end pt-1">
-                                            <button onClick={() => setFeedbackModal(false)} className="h-9 px-4 rounded-xl text-[10px] font-black text-slate-500 border border-slate-200 hover:bg-slate-50 transition-all">İptal</button>
+                                            <button onClick={() => setFeedbackModal(false)} className="h-9 px-4 rounded-md text-[11px] font-semibold text-n500 border border-n200 hover:bg-n50 transition-all">İptal</button>
                                             <button onClick={handleInfoRequestSend} disabled={infoSending || (!infoMessage.trim() && infoItems.length === 0)}
-                                                className="h-9 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 bg-cyan-500 hover:bg-cyan-600 text-white shadow-sm transition-all disabled:opacity-60"
+                                                className="h-9 px-5 rounded-md text-[11px] font-semibold uppercase tracking-[0.08em] flex items-center gap-2 bg-brand hover:bg-brand-600 text-white shadow-sm transition-all disabled:opacity-60"
                                             >
                                                 {infoSending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                                                 Gönder
@@ -2875,15 +2881,15 @@ export default function CandidateProcessPage() {
             {/* ── TOPLU YÜKLEME MODALI ──────────────────────────────────────── */}
             {bulkImportModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg animate-in zoom-in-95 duration-200">
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                    <div className="bg-n0 rounded-[14px] shadow-2xl border border-n200 w-full max-w-lg animate-in zoom-in-95 duration-200">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-n200">
                             <div className="flex items-center gap-2">
-                                <Upload className="w-4 h-4 text-violet-500" />
-                                <h3 className="text-[13px] font-black text-slate-800">Toplu CV Yükleme</h3>
+                                <Upload className="w-4 h-4 text-brand" />
+                                <h3 className="text-[13px] font-semibold text-n900">Toplu CV Yükleme</h3>
                             </div>
                             <button
                                 onClick={() => setBulkImportModal(false)}
-                                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-50"
+                                className="p-1 text-n400 hover:text-n600 rounded-md hover:bg-n50"
                             >
                                 <X className="w-4 h-4" />
                             </button>
@@ -2894,16 +2900,16 @@ export default function CandidateProcessPage() {
                             {!bulkImporting && bulkProgress.total === 0 && (
                                 <>
                                     {/* Tab switcher */}
-                                    <div className="flex rounded-xl overflow-hidden border border-slate-200 bg-slate-50 p-0.5">
+                                    <div className="flex rounded-md overflow-hidden border border-n200 bg-n50 p-0.5">
                                         <button
                                             onClick={() => setBulkTab('files')}
-                                            className={`flex-1 h-7 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${bulkTab === 'files' ? 'bg-white text-violet-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                                            className={`flex-1 h-7 text-[11px] font-semibold uppercase tracking-[0.08em] rounded-md transition-all ${bulkTab === 'files' ? 'bg-n0 text-brand shadow-sm' : 'text-n400 hover:text-n600'}`}
                                         >
                                             Dosya Yükle
                                         </button>
                                         <button
                                             onClick={() => setBulkTab('json')}
-                                            className={`flex-1 h-7 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${bulkTab === 'json' ? 'bg-white text-violet-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                                            className={`flex-1 h-7 text-[11px] font-semibold uppercase tracking-[0.08em] rounded-md transition-all ${bulkTab === 'json' ? 'bg-n0 text-brand shadow-sm' : 'text-n400 hover:text-n600'}`}
                                         >
                                             JSON Kayıt
                                         </button>
@@ -2919,7 +2925,7 @@ export default function CandidateProcessPage() {
                                                     setBulkFiles(prev => [...prev, ...files].slice(0, MAX_SOURCES));
                                                 }}
                                                 onClick={() => document.getElementById('bulk-cv-input')?.click()}
-                                                className="border-2 border-dashed border-violet-200 rounded-xl p-8 text-center cursor-pointer hover:border-violet-400 hover:bg-violet-50/30 transition-all"
+                                                className="border-2 border-dashed border-brand-100 rounded-md p-8 text-center cursor-pointer hover:border-brand hover:bg-brand-50/30 transition-all"
                                             >
                                                 <input
                                                     id="bulk-cv-input"
@@ -2932,10 +2938,10 @@ export default function CandidateProcessPage() {
                                                         setBulkFiles(prev => [...prev, ...files].slice(0, MAX_SOURCES));
                                                     }}
                                                 />
-                                                <Upload className="w-8 h-8 text-violet-300 mx-auto mb-2" />
-                                                <p className="text-[13px] font-bold text-slate-500">Sürükleyin veya tıklayın</p>
-                                                <p className="text-[10px] text-slate-400 mt-1">PDF, DOCX veya ZIP (içinde PDF/DOCX) • Maks. {MAX_SOURCES} dosya, her biri {formatBytes(MAX_SOURCE_BYTES)}</p>
-                                                <p className="text-[10px] text-slate-400 mt-0.5">Bir ZIP&apos;in içinde kaç CV olduğu sınırlı değil — hepsini tek arşive koyabilirsiniz.</p>
+                                                <Upload className="w-8 h-8 text-brand-200 mx-auto mb-2" />
+                                                <p className="text-[13px] font-semibold text-n500">Sürükleyin veya tıklayın</p>
+                                                <p className="text-[11px] text-n400 mt-1">PDF, DOCX veya ZIP (içinde PDF/DOCX) • Maks. {MAX_SOURCES} dosya, her biri {formatBytes(MAX_SOURCE_BYTES)}</p>
+                                                <p className="text-[11px] text-n400 mt-0.5">Bir ZIP&apos;in içinde kaç CV olduğu sınırlı değil — hepsini tek arşive koyabilirsiniz.</p>
                                             </div>
 
                                             {bulkFiles.length > 0 && (
@@ -2944,13 +2950,13 @@ export default function CandidateProcessPage() {
                                                         {bulkFiles.map((f, i) => {
                                                             const tooBig = (f.size || 0) > MAX_SOURCE_BYTES;
                                                             return (
-                                                                <div key={i} className={`flex items-center justify-between px-3 py-1.5 rounded-lg border ${tooBig ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-200'}`}>
-                                                                    <span className={`text-[11px] font-medium truncate ${tooBig ? 'text-red-600' : 'text-slate-600'}`}>{f.name}</span>
+                                                                <div key={i} className={`flex items-center justify-between px-3 py-1.5 rounded-md border ${tooBig ? 'bg-bad-bg border-transparent' : 'bg-n50 border-n200'}`}>
+                                                                    <span className={`text-[12px] font-medium truncate ${tooBig ? 'text-bad' : 'text-n600'}`}>{f.name}</span>
                                                                     <div className="flex items-center gap-2 shrink-0 ml-2">
-                                                                        <span className={`text-[10px] font-semibold ${tooBig ? 'text-red-400' : 'text-slate-400'}`}>{formatBytes(f.size)}</span>
+                                                                        <span className={`text-[11px] font-semibold ${tooBig ? 'text-bad' : 'text-n400'}`}>{formatBytes(f.size)}</span>
                                                                         <button
                                                                             onClick={() => setBulkFiles(prev => prev.filter((_, j) => j !== i))}
-                                                                            className="text-slate-300 hover:text-red-400"
+                                                                            className="text-n300 hover:text-bad"
                                                                         >
                                                                             <X className="w-3 h-3" />
                                                                         </button>
@@ -2960,13 +2966,13 @@ export default function CandidateProcessPage() {
                                                         })}
                                                     </div>
                                                     <div className="flex items-center justify-between px-1">
-                                                        <span className="text-[10px] text-slate-400 font-semibold">
+                                                        <span className="text-[11px] text-n400 font-semibold">
                                                             Toplam: {formatBytes(totalBytes(bulkFiles))}
                                                         </span>
                                                         {(() => {
                                                             const oversized = oversizedFiles(bulkFiles);
                                                             if (oversized.length > 0) return (
-                                                                <span className="text-[10px] text-red-500 font-bold">
+                                                                <span className="text-[11px] text-bad font-semibold">
                                                                     {oversized.length} dosya {formatBytes(MAX_SOURCE_BYTES)} sınırını aşıyor
                                                                 </span>
                                                             );
@@ -2980,25 +2986,25 @@ export default function CandidateProcessPage() {
 
                                     {bulkTab === 'json' && (
                                         <div className="space-y-2">
-                                            <p className="text-[10px] text-slate-400">Şu formatta bir JSON dizisi yapıştırın:</p>
-                                            <pre className="text-[9px] text-slate-400 bg-slate-50 rounded-lg px-3 py-2 border border-slate-200 overflow-x-auto">{`[{"name":"Ali Veli","email":"ali@sirket.com","cvText":"..."}]`}</pre>
+                                            <p className="text-[11px] text-n400">Şu formatta bir JSON dizisi yapıştırın:</p>
+                                            <pre className="text-[11px] text-n400 bg-n50 rounded-md px-3 py-2 border border-n200 overflow-x-auto">{`[{"name":"Ali Veli","email":"ali@sirket.com","cvText":"..."}]`}</pre>
                                             <textarea
                                                 value={bulkJsonText}
                                                 onChange={e => setBulkJsonText(e.target.value)}
                                                 placeholder='[{"name":"...","email":"...","cvText":"..."}]'
                                                 rows={5}
-                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[11px] text-slate-700 outline-none focus:border-violet-300 transition-all resize-none font-mono"
+                                                className="w-full bg-n50 border border-n200 rounded-md px-3 py-2 text-[12px] text-n700 outline-none focus:border-brand-200 transition-all resize-none font-mono"
                                             />
                                         </div>
                                     )}
 
                                     {/* Position selector */}
                                     <div>
-                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Hedef Pozisyon</label>
+                                        <label className="text-[11px] font-semibold text-n400 uppercase tracking-[0.08em] block mb-1.5">Hedef Pozisyon</label>
                                         <select
                                             value={bulkPositionId}
                                             onChange={e => setBulkPositionId(e.target.value)}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[12px] text-slate-700 outline-none focus:border-violet-300 transition-all"
+                                            className="w-full bg-n50 border border-n200 rounded-md px-3 py-2 text-[12px] text-n700 outline-none focus:border-brand-200 transition-all"
                                         >
                                             <option value="">— Pozisyon seçin —</option>
                                             {positions.filter(p => p.status === 'open').map(p => (
@@ -3006,7 +3012,7 @@ export default function CandidateProcessPage() {
                                             ))}
                                         </select>
                                         {!bulkPositionId && (
-                                            <p className="mt-1.5 text-[10px] text-amber-600 font-semibold flex items-start gap-1">
+                                            <p className="mt-1.5 text-[11px] text-warn font-semibold flex items-start gap-1">
                                                 <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
                                                 Pozisyon seçilmezse adaylar genel havuza alınır ve sizin belirlediğiniz bir pozisyona göre puanlanmaz — sistem en uygun açık pozisyonu kendisi seçer.
                                             </p>
@@ -3014,11 +3020,11 @@ export default function CandidateProcessPage() {
                                     </div>
 
                                     <div className="flex gap-2 justify-end">
-                                        <button onClick={() => setBulkImportModal(false)} className="h-9 px-4 rounded-xl text-[10px] font-black text-slate-500 border border-slate-200 hover:bg-slate-50 transition-all">İptal</button>
+                                        <button onClick={() => setBulkImportModal(false)} className="h-9 px-4 rounded-md text-[11px] font-semibold text-n500 border border-n200 hover:bg-n50 transition-all">İptal</button>
                                         <button
                                             onClick={handleBulkImport}
                                             disabled={bulkTab === 'files' ? !bulkFiles.length : !bulkJsonText.trim()}
-                                            className="h-9 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 bg-violet-500 hover:bg-violet-600 text-white shadow-sm transition-all disabled:opacity-60"
+                                            className="h-9 px-5 rounded-md text-[11px] font-semibold uppercase tracking-[0.08em] flex items-center gap-2 bg-brand hover:bg-brand-600 text-white shadow-sm transition-all disabled:opacity-60"
                                         >
                                             <Upload className="w-3.5 h-3.5" />
                                             {bulkTab === 'json' ? 'Kayıtları İçe Aktar' : `Yüklemeyi Başlat (${bulkFiles.length} dosya)`}
@@ -3037,14 +3043,14 @@ export default function CandidateProcessPage() {
                                     {bulkUploadProgress ? (
                                         <div>
                                             <div className="flex items-center justify-between mb-1">
-                                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Yükleniyor</span>
-                                                <span className="text-[10px] font-bold text-slate-400">
+                                                <span className="text-[11px] font-semibold text-n500 uppercase tracking-[0.08em]">Yükleniyor</span>
+                                                <span className="text-[11px] font-semibold text-n400">
                                                     {formatBytes(bulkUploadProgress.transferred)} / {formatBytes(bulkUploadProgress.total)}
                                                 </span>
                                             </div>
-                                            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                                            <div className="w-full h-2 bg-n100 rounded-full overflow-hidden">
                                                 <div
-                                                    className="h-full rounded-full bg-violet-500 transition-all duration-300"
+                                                    className="h-full rounded-full bg-brand transition-all duration-300"
                                                     style={{ width: `${bulkUploadProgress.total > 0 ? (bulkUploadProgress.transferred / bulkUploadProgress.total) * 100 : 0}%` }}
                                                 />
                                             </div>
@@ -3052,12 +3058,12 @@ export default function CandidateProcessPage() {
                                     ) : (
                                         <div>
                                             <div className="flex items-center justify-between mb-1">
-                                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">İlerleme</span>
-                                                <span className="text-[10px] font-bold text-slate-400">{bulkProgress.completed + bulkProgress.failed} / {bulkProgress.total}</span>
+                                                <span className="text-[11px] font-semibold text-n500 uppercase tracking-[0.08em]">İlerleme</span>
+                                                <span className="text-[11px] font-semibold text-n400">{bulkProgress.completed + bulkProgress.failed} / {bulkProgress.total}</span>
                                             </div>
-                                            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                                            <div className="w-full h-2 bg-n100 rounded-full overflow-hidden">
                                                 <div
-                                                    className={`h-full rounded-full transition-all duration-500 ${bulkProgress.failed > 0 && bulkProgress.completed === 0 ? 'bg-red-400' : 'bg-violet-500'}`}
+                                                    className={`h-full rounded-full transition-all duration-500 ${bulkProgress.failed > 0 && bulkProgress.completed === 0 ? 'bg-bad' : 'bg-brand'}`}
                                                     style={{ width: `${bulkProgress.total > 0 ? ((bulkProgress.completed + bulkProgress.failed) / bulkProgress.total) * 100 : 0}%` }}
                                                 />
                                             </div>
@@ -3076,18 +3082,18 @@ export default function CandidateProcessPage() {
                                                 (bulkProgress.status === 'processing' && rank === doneCount + failedCount + 1) ? 'processing' :
                                                 'pending';
                                             return (
-                                                <div key={i} className={`flex items-center justify-between px-3 py-2 rounded-lg border text-[11px] ${
-                                                    itemStatus === 'done' ? 'bg-emerald-50 border-emerald-200' :
-                                                    itemStatus === 'error' ? 'bg-red-50 border-red-200' :
-                                                    itemStatus === 'processing' ? 'bg-violet-50 border-violet-200' :
-                                                    'bg-slate-50 border-slate-200'
+                                                <div key={i} className={`flex items-center justify-between px-3 py-2 rounded-md border text-[12px] ${
+                                                    itemStatus === 'done' ? 'bg-ok-bg border-transparent' :
+                                                    itemStatus === 'error' ? 'bg-bad-bg border-transparent' :
+                                                    itemStatus === 'processing' ? 'bg-brand-50 border-brand-100' :
+                                                    'bg-n50 border-n200'
                                                 }`}>
-                                                    <span className="font-medium text-slate-700 truncate">{item.name}</span>
+                                                    <span className="font-medium text-n700 truncate">{item.name}</span>
                                                     <span className="shrink-0 ml-2">
-                                                        {itemStatus === 'done' && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
-                                                        {itemStatus === 'error' && <XCircle className="w-3.5 h-3.5 text-red-500" />}
-                                                        {itemStatus === 'processing' && <Loader2 className="w-3.5 h-3.5 text-violet-500 animate-spin" />}
-                                                        {itemStatus === 'pending' && <Clock className="w-3.5 h-3.5 text-slate-300" />}
+                                                        {itemStatus === 'done' && <CheckCircle2 className="w-3.5 h-3.5 text-ok" />}
+                                                        {itemStatus === 'error' && <XCircle className="w-3.5 h-3.5 text-bad" />}
+                                                        {itemStatus === 'processing' && <Loader2 className="w-3.5 h-3.5 text-brand animate-spin" />}
+                                                        {itemStatus === 'pending' && <Clock className="w-3.5 h-3.5 text-n300" />}
                                                     </span>
                                                 </div>
                                             );
@@ -3096,11 +3102,11 @@ export default function CandidateProcessPage() {
 
                                     {/* Status badge */}
                                     {bulkProgress.status && (
-                                        <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-bold ${
-                                            bulkProgress.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                                            bulkProgress.status === 'error' ? 'bg-red-50 text-red-700 border border-red-200' :
-                                            ['processing', 'uploading', 'unpacking'].includes(bulkProgress.status) ? 'bg-violet-50 text-violet-700 border border-violet-200' :
-                                            'bg-slate-50 text-slate-500 border border-slate-200'
+                                        <div className={`flex items-center gap-2 px-3 py-2 rounded-md text-[12px] font-semibold ${
+                                            bulkProgress.status === 'completed' ? 'bg-ok-bg text-ok border border-transparent' :
+                                            bulkProgress.status === 'error' ? 'bg-bad-bg text-bad border border-transparent' :
+                                            ['processing', 'uploading', 'unpacking'].includes(bulkProgress.status) ? 'bg-brand-50 text-brand-700 border border-brand-100' :
+                                            'bg-n50 text-n500 border border-n200'
                                         }`}>
                                             {['processing', 'uploading', 'unpacking'].includes(bulkProgress.status) && <Loader2 className="w-3 h-3 animate-spin" />}
                                             {bulkProgress.status === 'completed' && <CheckCircle2 className="w-3 h-3" />}
@@ -3121,7 +3127,7 @@ export default function CandidateProcessPage() {
                                     {!bulkImporting && (
                                         <button
                                             onClick={() => { setBulkImportModal(false); setBulkProgress({ total: 0, completed: 0, failed: 0, items: [], avgScore: null, status: null }); setBulkJobIds([]); setBulkFiles([]); setBulkTab('files'); setBulkJsonText(''); }}
-                                            className="w-full h-9 rounded-xl text-[10px] font-black text-white bg-slate-800 hover:bg-slate-900 uppercase tracking-widest transition-all"
+                                            className="w-full h-9 rounded-md text-[11px] font-semibold text-white bg-n900 hover:bg-n900 uppercase tracking-[0.08em] transition-all"
                                         >
                                             Kapat
                                         </button>
@@ -3135,26 +3141,26 @@ export default function CandidateProcessPage() {
 
             {/* Bulk Import completion toast */}
             {bulkToast && (
-                <div className="fixed bottom-6 right-6 z-[200] flex items-start gap-3 px-4 py-3 bg-white rounded-2xl shadow-2xl border border-emerald-200 max-w-xs animate-in slide-in-from-bottom-4 duration-300">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
+                <div className="fixed bottom-6 right-6 z-[200] flex items-start gap-3 px-4 py-3 bg-n0 rounded-[14px] shadow-2xl border border-transparent max-w-xs animate-in slide-in-from-bottom-4 duration-300">
+                    <CheckCircle2 className="w-5 h-5 text-ok shrink-0 mt-0.5" />
                     <div className="flex-1 min-w-0">
-                        <p className="text-[12px] font-black text-slate-800">Toplu Yükleme Tamamlandı</p>
-                        <p className="text-[11px] text-slate-500 mt-0.5">
-                            {bulkToast.completed - (bulkToast.duplicates || 0)} aday eklendi{(bulkToast.duplicates || 0) > 0 && <span className="text-amber-600">, {bulkToast.duplicates} mükerrer atlandı</span>}{bulkToast.failed > 0 && <span className="text-red-500">, {bulkToast.failed} hata</span>}
+                        <p className="text-[12px] font-semibold text-n900">Toplu Yükleme Tamamlandı</p>
+                        <p className="text-[12px] text-n500 mt-0.5">
+                            {bulkToast.completed - (bulkToast.duplicates || 0)} aday eklendi{(bulkToast.duplicates || 0) > 0 && <span className="text-warn">, {bulkToast.duplicates} mükerrer atlandı</span>}{bulkToast.failed > 0 && <span className="text-bad">, {bulkToast.failed} hata</span>}
                         </p>
                         {bulkToast.avgScoreByPosition && Object.keys(bulkToast.avgScoreByPosition).length > 0 ? (
                             <div className="mt-1 space-y-0.5">
                                 {Object.entries(bulkToast.avgScoreByPosition).map(([pId, entry]) => (
-                                    <p key={pId} className="text-[10px] text-violet-600 truncate">
-                                        {entry.positionTitle || pId}: <span className="font-bold">%{entry.avgScore}</span> ort. eşleşme ({entry.count} aday)
+                                    <p key={pId} className="text-[11px] text-brand truncate">
+                                        {entry.positionTitle || pId}: <span className="font-semibold">%{entry.avgScore}</span> ort. eşleşme ({entry.count} aday)
                                     </p>
                                 ))}
                             </div>
                         ) : bulkToast.avgScore != null && (
-                            <p className="text-[11px] text-violet-600 mt-0.5">Ort. eşleşme: %{bulkToast.avgScore}</p>
+                            <p className="text-[12px] text-brand mt-0.5">Ort. eşleşme: %{bulkToast.avgScore}</p>
                         )}
                     </div>
-                    <button onClick={() => setBulkToast(null)} className="text-slate-300 hover:text-slate-500 ml-2 shrink-0">
+                    <button onClick={() => setBulkToast(null)} className="text-n300 hover:text-n500 ml-2 shrink-0">
                         <X className="w-3.5 h-3.5" />
                     </button>
                 </div>

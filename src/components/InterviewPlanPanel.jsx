@@ -23,11 +23,11 @@ import { generateProbeQuestions } from '../services/ai/interviewPlanner';
 const DURATIONS = [30, 45, 60, 90];
 
 const TONE = {
-    red: 'bg-red-50 text-red-700 border-red-200',
-    amber: 'bg-amber-50 text-amber-700 border-amber-200',
+    red: 'bg-bad-bg text-bad border-transparent',
+    amber: 'bg-warn-bg text-warn border-warn',
     sky: 'bg-sky-50 text-sky-700 border-sky-200',
-    slate: 'bg-slate-50 text-slate-600 border-slate-200',
-    emerald: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    slate: 'bg-n50 text-n600 border-n200',
+    emerald: 'bg-ok-bg text-ok border-transparent',
 };
 
 const STATUS_TEXT = {
@@ -105,7 +105,7 @@ export default function InterviewPlanPanel({ candidate, position, analysis, onSa
     if (!plan.scanned) {
         return (
             <Shell>
-                <p className="text-[11px] text-slate-500 leading-relaxed">
+                <p className="text-[12px] text-n500 leading-relaxed">
                     Bu aday <strong>{position?.title || 'bu pozisyon'}</strong> için derin taramadan
                     geçmemiş. Plan, taramanın açık bıraktığı maddelerden çıkarılıyor —
                     önce <strong>tarama</strong> yapılmalı.
@@ -117,9 +117,9 @@ export default function InterviewPlanPanel({ candidate, position, analysis, onSa
     if (plan.stale) {
         return (
             <Shell>
-                <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
-                    <p className="text-[10px] text-amber-800 leading-relaxed">
+                <div className="flex items-start gap-2 rounded-md border bg-warn-bg px-3 py-2">
+                    <AlertTriangle className="w-3.5 h-3.5 text-warn shrink-0 mt-0.5" />
+                    <p className="text-[11px] text-n700 leading-relaxed">
                         <strong>İlan bu taramadan sonra değişti.</strong> Kayıtlı değerlendirmeler madde
                         numaralarına bağlı; yeni listeye uygulanırsa plan <strong>yanlış maddeyi
                         sormaya</strong> gönderir ve bu hata odada, adayın karşısında ortaya çıkar.
@@ -136,28 +136,28 @@ export default function InterviewPlanPanel({ candidate, position, analysis, onSa
         <Shell>
             {/* Süre seçimi — plan buna göre yeniden dağılır */}
             <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Süre</span>
+                <span className="text-[11px] font-semibold text-n400 uppercase tracking-[0.08em]">Süre</span>
                 {DURATIONS.map((d) => (
                     <button
                         key={d}
                         type="button"
                         onClick={() => setMinutes(d)}
-                        className={`px-2.5 py-1 rounded-lg border text-[10px] font-black transition-colors ${
+                        className={`px-2.5 py-1 rounded-md border text-[11px] font-semibold transition-colors ${
                             minutes === d
-                                ? 'bg-cyan-500 border-cyan-500 text-white'
-                                : 'bg-white border-slate-200 text-slate-500 hover:border-cyan-300'
+                                ? 'bg-brand border-transparent text-white'
+                                : 'bg-n0 border-n200 text-n500 hover:border-brand-200'
                         }`}
                     >
                         {d} dk
                     </button>
                 ))}
-                <span className="text-[10px] text-slate-400 ml-auto">{planSummary(plan)}</span>
+                <span className="text-[11px] text-n400 ml-auto">{planSummary(plan)}</span>
             </div>
 
             {plan.probes.length === 0 ? (
-                <div className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
-                    <p className="text-[10px] text-emerald-800 leading-relaxed">
+                <div className="flex items-start gap-2 rounded-md border border-transparent bg-ok-bg px-3 py-2">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-ok shrink-0 mt-0.5" />
+                    <p className="text-[11px] text-ok leading-relaxed">
                         Taramada açık kalan madde yok — her gereksinimin CV'de karşılığı bulunmuş ve
                         fark notu düşülmemiş. Mülakat burada <strong>doğrulama</strong> için yapılır,
                         boşluk kapatmak için değil.
@@ -167,9 +167,9 @@ export default function InterviewPlanPanel({ candidate, position, analysis, onSa
                 <>
                     {/* Bütçe aşımı: plan boş bırakılmadı ama görüşme dar */}
                     {plan.minutes.overBudget && (
-                        <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                            <CalendarClock className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
-                            <p className="text-[10px] text-amber-800 leading-relaxed">
+                        <div className="flex items-start gap-2 rounded-md border bg-warn-bg px-3 py-2">
+                            <CalendarClock className="w-3.5 h-3.5 text-warn shrink-0 mt-0.5" />
+                            <p className="text-[11px] text-n700 leading-relaxed">
                                 {minutes} dakika bu adayın açık maddeleri için dar. En öncelikli madde
                                 korundu ama süreye <strong>tam sığmıyor</strong>; daha uzun bir görüşme
                                 ya da ikinci tur gerekebilir.
@@ -182,7 +182,7 @@ export default function InterviewPlanPanel({ candidate, position, analysis, onSa
                             type="button"
                             onClick={handleWrite}
                             disabled={writing}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-600 text-white text-[10px] font-black transition-colors disabled:opacity-50"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-brand hover:bg-brand-600 text-white text-[11px] font-semibold transition-colors disabled:opacity-50"
                         >
                             {writing
                                 ? <><Loader2 className="w-3 h-3 animate-spin" /> Sorular yazılıyor…</>
@@ -191,19 +191,19 @@ export default function InterviewPlanPanel({ candidate, position, analysis, onSa
                         <button
                             type="button"
                             onClick={handleCopy}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 text-[10px] font-black hover:border-cyan-300 hover:text-cyan-600 transition-colors"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-n0 border border-n200 text-n600 text-[11px] font-semibold hover:border-brand-200 hover:text-brand transition-colors"
                         >
                             <ClipboardCopy className="w-3 h-3" /> {copied ? 'Kopyalandı' : 'Planı kopyala'}
                         </button>
                         {criticalCount > 0 && (
-                            <span className="text-[10px] text-red-600 font-black ml-auto">
+                            <span className="text-[11px] text-bad font-semibold ml-auto">
                                 {criticalCount} kritik madde
                             </span>
                         )}
                     </div>
 
                     {error && (
-                        <p className="text-[10px] text-red-600">{error}</p>
+                        <p className="text-[11px] text-bad">{error}</p>
                     )}
 
                     {/* AI HİÇBİR SORUYU YAZAMADI.
@@ -213,9 +213,9 @@ export default function InterviewPlanPanel({ candidate, position, analysis, onSa
                         "AI'ın adaya özel yazdığı sorular" sanır. Canlıda
                         harcama tavanı dolunca tam olarak bu oldu. */}
                     {written && written.length > 0 && written.every((p) => !p.generated) && (
-                        <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                            <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
-                            <p className="text-[10px] text-amber-800 leading-relaxed">
+                        <div className="flex items-start gap-2 rounded-md border bg-warn-bg px-3 py-2">
+                            <AlertTriangle className="w-3.5 h-3.5 text-warn shrink-0 mt-0.5" />
+                            <p className="text-[11px] text-n700 leading-relaxed">
                                 <strong>Sorular AI ile yazılamadı</strong> — aşağıdakiler hazır yedek
                                 sorular. Plan yine geçerli: hangi maddeyi neden soracağınız doğru.
                                 Yalnızca cümleler adaya özel değil, kendi sözlerinizle sorabilirsiniz.
@@ -237,20 +237,20 @@ export default function InterviewPlanPanel({ candidate, position, analysis, onSa
 
                     {/* STAR — soru değil, dinleme talimatı */}
                     {plan.starGaps.length > 0 && (
-                        <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2.5">
+                        <div className="rounded-md border border-brand-100 bg-brand-50 px-3 py-2.5">
                             <div className="flex items-center gap-1.5 mb-1.5">
-                                <Ear className="w-3 h-3 text-violet-500" />
-                                <span className="text-[10px] font-black text-violet-700 uppercase tracking-widest">
+                                <Ear className="w-3 h-3 text-brand" />
+                                <span className="text-[11px] font-semibold text-brand-700 uppercase tracking-[0.08em]">
                                     Dinlerken bastır
                                 </span>
                             </div>
-                            <p className="text-[10px] text-violet-700/80 mb-1.5 leading-relaxed">
+                            <p className="text-[11px] text-brand-700/80 mb-1.5 leading-relaxed">
                                 Bunlar ayrı soru değil. CV bu boyutlarda suskun — hangi soruyu sorarsanız
                                 sorun, cevap buralara gelmiyorsa üstüne gidin.
                             </p>
                             <ul className="space-y-1">
                                 {plan.starGaps.map((g) => (
-                                    <li key={g.key} className="text-[10px] text-violet-800 leading-relaxed">
+                                    <li key={g.key} className="text-[11px] text-n700 leading-relaxed">
                                         <strong>{g.label}:</strong> {g.why}
                                     </li>
                                 ))}
@@ -260,15 +260,15 @@ export default function InterviewPlanPanel({ candidate, position, analysis, onSa
 
                     {/* Süreye sığmayanlar — sessizce kaybolmasınlar */}
                     {plan.dropped.length > 0 && (
-                        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
-                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
+                        <div className="rounded-md border border-n200 bg-n50 px-3 py-2.5">
+                            <p className="text-[11px] font-semibold text-n500 uppercase tracking-[0.08em] mb-1.5">
                                 Süreye sığmadı — ikinci görüşmeye
                             </p>
                             <ul className="space-y-0.5">
                                 {plan.dropped.map((d) => (
-                                    <li key={d.requirementIndex} className="text-[10px] text-slate-600">
+                                    <li key={d.requirementIndex} className="text-[11px] text-n600">
                                         · {d.text}
-                                        {d.must && <span className="text-red-500 font-black ml-1">zorunlu</span>}
+                                        {d.must && <span className="text-bad font-semibold ml-1">zorunlu</span>}
                                     </li>
                                 ))}
                             </ul>
@@ -287,10 +287,10 @@ export default function InterviewPlanPanel({ candidate, position, analysis, onSa
 
 function Shell({ children }) {
     return (
-        <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+        <div className="rounded-md border border-n200 bg-n0 p-4 space-y-3">
             <div className="flex items-center gap-2">
-                <Target className="w-3.5 h-3.5 text-cyan-500" />
-                <span className="text-[10px] font-black text-slate-700 uppercase tracking-widest">
+                <Target className="w-3.5 h-3.5 text-brand" />
+                <span className="text-[11px] font-semibold text-n700 uppercase tracking-[0.08em]">
                     Mülakat Planı
                 </span>
             </div>
@@ -301,11 +301,11 @@ function Shell({ children }) {
 
 function Block({ minutes, title, children }) {
     return (
-        <div className="flex items-start gap-2 rounded-lg bg-slate-50 border border-slate-100 px-3 py-2">
-            <span className="text-[10px] font-black text-slate-400 shrink-0 w-10">{minutes} dk</span>
+        <div className="flex items-start gap-2 rounded-md bg-n50 border border-n200 px-3 py-2">
+            <span className="text-[11px] font-semibold text-n400 shrink-0 w-10">{minutes} dk</span>
             <div>
-                <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">{title}</p>
-                <p className="text-[10px] text-slate-500 leading-relaxed">{children}</p>
+                <p className="text-[11px] font-semibold text-n600 uppercase tracking-[0.08em]">{title}</p>
+                <p className="text-[11px] text-n500 leading-relaxed">{children}</p>
             </div>
         </div>
     );
@@ -314,47 +314,47 @@ function Block({ minutes, title, children }) {
 function ProbeCard({ probe, order }) {
     const tier = priorityLabel(probe.priority);
     return (
-        <li className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+        <li className="rounded-md border border-n200 bg-n0 px-3 py-2.5">
             <div className="flex flex-wrap items-center gap-1.5 mb-1">
-                <span className="text-[10px] font-black text-slate-400">{order}.</span>
-                <span className={`px-1.5 py-0.5 rounded border text-[9px] font-black ${TONE[tier.tone]}`}>
+                <span className="text-[11px] font-semibold text-n400">{order}.</span>
+                <span className={`px-1.5 py-0.5 rounded border text-[11px] font-semibold ${TONE[tier.tone]}`}>
                     {tier.text}
                 </span>
-                <span className="text-[10px] font-black text-slate-500">{probe.minutes} dk</span>
+                <span className="text-[11px] font-semibold text-n500">{probe.minutes} dk</span>
                 {probe.must && (
-                    <span className="px-1.5 py-0.5 rounded border border-red-200 bg-red-50 text-red-600 text-[9px] font-black">
+                    <span className="px-1.5 py-0.5 rounded border border-transparent bg-bad-bg text-bad text-[11px] font-semibold">
                         zorunlu
                     </span>
                 )}
-                <span className="text-[10px] text-slate-400">
+                <span className="text-[11px] text-n400">
                     {STATUS_TEXT[probe.status] || probe.status}
                 </span>
                 {probe.priority === VERIFY && (
-                    <span className="text-[10px] text-emerald-600 italic">{VERIFY_HINT}</span>
+                    <span className="text-[11px] text-ok italic">{VERIFY_HINT}</span>
                 )}
             </div>
 
-            <p className="text-[11px] font-bold text-slate-700 leading-snug">{probe.text}</p>
-            <p className="text-[10px] text-slate-400 leading-relaxed mt-0.5">{probe.why}</p>
+            <p className="text-[12px] font-semibold text-n700 leading-snug">{probe.text}</p>
+            <p className="text-[11px] text-n400 leading-relaxed mt-0.5">{probe.why}</p>
 
             {/* Soru henüz yazılmadıysa kart yine de anlamlı: mülakatçı neyi
                 soracağını biliyor, yalnızca cümle kurulmamış. */}
             {probe.question ? (
-                <div className="mt-2 space-y-1 border-l-2 border-cyan-200 pl-2.5">
-                    <p className="text-[11px] text-slate-800 leading-relaxed">{probe.question}</p>
+                <div className="mt-2 space-y-1 border-l-2 border-brand-100 pl-2.5">
+                    <p className="text-[12px] text-n900 leading-relaxed">{probe.question}</p>
                     {probe.followUp && (
-                        <p className="text-[10px] text-slate-500 leading-relaxed">
-                            <span className="font-black">Yüzeysel kalırsa:</span> {probe.followUp}
+                        <p className="text-[11px] text-n500 leading-relaxed">
+                            <span className="font-semibold">Yüzeysel kalırsa:</span> {probe.followUp}
                         </p>
                     )}
                     {probe.listenFor && (
-                        <p className="text-[10px] text-emerald-700 leading-relaxed">
-                            <span className="font-black">İyi cevapta:</span> {probe.listenFor}
+                        <p className="text-[11px] text-ok leading-relaxed">
+                            <span className="font-semibold">İyi cevapta:</span> {probe.listenFor}
                         </p>
                     )}
                 </div>
             ) : (
-                <p className="mt-1.5 text-[10px] text-slate-400 italic">
+                <p className="mt-1.5 text-[11px] text-n400 italic">
                     Soru henüz yazılmadı — “Soruları yaz”a basın.
                 </p>
             )}
