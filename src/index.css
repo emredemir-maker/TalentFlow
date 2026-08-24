@@ -226,3 +226,28 @@ h1, h2, h3, h4 {
               border-color 120ms cubic-bezier(.2,.7,.2,1),
               color 120ms cubic-bezier(.2,.7,.2,1);
 }
+
+/* ── HAREKET AZALTMA TERCİHİ ────────────────────────────────────────────────
+ *
+ * İşletim sisteminde "hareketi azalt" seçili olan kullanıcı için animasyonlar
+ * durur. Bu bir tercih değil, erişilebilirlik gereği: vestibüler duyarlılığı
+ * olan kişilerde kayan/ölçeklenen hareket baş dönmesi ve mide bulantısı
+ * yapabiliyor.
+ *
+ * NEDEN GLOBAL: uygulamada 65 dosya geçiş/animasyon kullanıyor ve hiçbirinde
+ * bu denetim yoktu. Tek tek eklemek, 66'ncısı yazıldığında yine unutulur.
+ *
+ * Sıfır yerine 0.01ms: bazı tarayıcılarda süre tam sıfır olduğunda
+ * `transitionend` olayı hiç ateşlemiyor ve o olayı bekleyen kod askıda
+ * kalıyor. 0.01ms göze anında görünür ama olay yine tetiklenir.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
