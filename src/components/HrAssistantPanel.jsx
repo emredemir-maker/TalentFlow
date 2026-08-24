@@ -301,7 +301,7 @@ export default function HrAssistantPanel() {
                     className="flex items-center gap-2 px-4 py-[11px] rounded-full bg-brand hover:bg-brand-600 text-white shadow-lg"
                 >
                     <Sparkles className="w-[15px] h-[15px]" />
-                    <span className="text-[13px] font-semibold">İK Asistanı</span>
+                    <span className="text-[12px] font-semibold">İK Asistanı</span>
                 </button>
             </div>
         );
@@ -314,8 +314,8 @@ export default function HrAssistantPanel() {
                     <Sparkles className="w-3.5 h-3.5" />
                 </span>
                 <div className="min-w-0 flex-1">
-                    <h2 className="text-[13px] font-semibold m-0">İK Asistanı</h2>
-                    <p className="text-[11px] text-n400 truncate m-0">
+                    <h2 className="text-[12px] font-semibold m-0">İK Asistanı</h2>
+                    <p className="text-[10px] text-n400 truncate m-0">
                         {contextPosition
                             ? `Bağlam: ${contextPosition}`
                             : `${enrichedCandidates?.length || 0} aday · havuzdaki veriye bakar, karar vermez`}
@@ -331,7 +331,7 @@ export default function HrAssistantPanel() {
                             className="flex items-center gap-1 px-2 py-1.5 rounded-md hover:bg-n100 text-n400 hover:text-n600 transition-colors"
                         >
                             <RotateCcw className="w-3 h-3" />
-                            <span className="text-[11px] font-medium">Yeni konu</span>
+                            <span className="text-[10px] font-medium">Yeni konu</span>
                         </button>
                     )}
                     <button onClick={() => setOpen(false)} className="p-1.5 rounded-md hover:bg-n100 text-n400">
@@ -341,7 +341,7 @@ export default function HrAssistantPanel() {
             </header>
 
             {persistError && (
-                <p className="flex items-start gap-1.5 px-3.5 py-1.5 bg-warn-bg border-b border-n200 text-[11px] text-n700 shrink-0">
+                <p className="flex items-start gap-1.5 px-3.5 py-1.5 bg-warn-bg border-b border-n200 text-[10px] text-n700 shrink-0">
                     <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
                     {persistError} — sohbet ekranda duruyor ama sayfayı yenilerseniz kaybolur.
                 </p>
@@ -350,11 +350,11 @@ export default function HrAssistantPanel() {
             <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
                 {turns.length === 0 && (
                     <div className="space-y-2">
-                        <p className="text-[12px] text-n500 leading-relaxed">
+                        <p className="text-[11px] text-n500 leading-relaxed">
                             Aday havuzuna Türkçe soru sorun. Sayıları kod hesaplar, uydurma cevap
                             gelmez — her cevabın altında hangi filtrelerin uygulandığı yazar.
                         </p>
-                        <p className="text-[11px] text-n400 leading-relaxed">
+                        <p className="text-[10px] text-n400 leading-relaxed">
                             Takip sorusu sorabilirsiniz: &quot;peki onlardan İstanbul&apos;da
                             olanlar&quot; deyince önceki filtreler korunur. Konu değiştirirken
                             <strong> Yeni konu</strong> deyin.
@@ -386,7 +386,7 @@ export default function HrAssistantPanel() {
                 ))}
 
                 {busy && (
-                    <p className="flex items-center gap-1.5 text-[12px] text-n400">
+                    <p className="flex items-center gap-1.5 text-[11px] text-n400">
                         <Loader2 className="w-3 h-3 animate-spin" /> Bakıyorum…
                     </p>
                 )}
@@ -427,7 +427,7 @@ function Turn({
         );
     }
     if (turn.error) {
-        return <p className="text-[12px] text-bad">{turn.error}</p>;
+        return <p className="text-[11px] text-bad">{turn.error}</p>;
     }
     if (turn.unsupported) {
         // Modelin "bunu veriyle yanıtlayamam" demesi, uydurmasından iyidir —
@@ -437,7 +437,7 @@ function Turn({
             <div className="space-y-1.5">
                 <div className="flex items-start gap-2 rounded-md border bg-warn-bg px-3 py-2">
                     <AlertTriangle className="w-3.5 h-3.5 text-warn shrink-0 mt-0.5" />
-                    <p className="text-[12px] text-n700 leading-relaxed whitespace-pre-line">
+                    <p className="text-[11px] text-n700 leading-relaxed whitespace-pre-line">
                         {turn.unsupported}
                     </p>
                 </div>
@@ -449,7 +449,7 @@ function Turn({
     if (turn.notice) {
         return (
             <div className="space-y-1.5">
-                <p className="text-[12px] text-n700 leading-relaxed">{turn.notice}</p>
+                <p className="text-[11px] text-n700 leading-relaxed">{turn.notice}</p>
                 <FeedbackBar value={turn.feedback} onSend={onFeedback} />
             </div>
         );
@@ -494,7 +494,7 @@ function Turn({
     // turu söylemek, sohbeti düşürmekten iyidir.
     if (!r) {
         return (
-            <p className="text-[12px] text-n400 italic">
+            <p className="text-[11px] text-n400 italic">
                 Bu cevabın ayrıntısı saklanmadı — soruyu tekrar sorabilirsiniz.
             </p>
         );
@@ -502,15 +502,15 @@ function Turn({
     return (
         <div className="space-y-2">
             {turn.comment && (
-                <p className="text-[12px] text-n700 leading-relaxed">{turn.comment}</p>
+                <p className="text-[11px] text-n700 leading-relaxed">{turn.comment}</p>
             )}
 
             {r.groups ? (
                 <div className="rounded-md border border-n200 divide-y divide-n100">
                     {r.groups.map((g) => (
                         <div key={g.key} className="flex items-center justify-between px-2.5 py-1.5">
-                            <span className="text-[12px] text-n600 truncate">{g.key}</span>
-                            <span className="text-[12px] font-semibold text-n700 tabular-nums">{g.count}</span>
+                            <span className="text-[11px] text-n600 truncate">{g.key}</span>
+                            <span className="text-[11px] font-semibold text-n700 tabular-nums">{g.count}</span>
                         </div>
                     ))}
                 </div>
@@ -522,14 +522,14 @@ function Turn({
                             onClick={() => onCandidateClick(v.candidate)}
                             className="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 hover:bg-n50 text-left transition-colors"
                         >
-                            <span className="text-[12px] font-bold text-n700 truncate">
+                            <span className="text-[11px] font-bold text-n700 truncate">
                                 {v.candidate.name || 'İsimsiz aday'}
                             </span>
                             <span className="flex items-center gap-1.5 shrink-0">
                                 {v.candidate.location && (
-                                    <span className="text-[11px] text-n400">{v.candidate.location}</span>
+                                    <span className="text-[10px] text-n400">{v.candidate.location}</span>
                                 )}
-                                <span className="text-[11px] font-semibold text-n600 tabular-nums">
+                                <span className="text-[10px] font-semibold text-n600 tabular-nums">
                                     {Number.isFinite(v.score) ? Math.round(v.score) : '—'}
                                 </span>
                                 <ChevronRight className="w-3 h-3 text-n300" />
@@ -538,7 +538,7 @@ function Turn({
                     ))}
                 </div>
             ) : (
-                <p className="text-[12px] text-n500 italic">Bu sorguyla eşleşen aday yok.</p>
+                <p className="text-[11px] text-n500 italic">Bu sorguyla eşleşen aday yok.</p>
             )}
 
             {r.missingPosition && (
@@ -555,10 +555,10 @@ function ReviewBlock({ title, items, tone }) {
     if (!items || items.length === 0) return null;
     return (
         <div>
-            <p className={`text-[11px] font-semibold uppercase tracking-[0.08em] mb-1 ${tone}`}>{title}</p>
+            <p className={`text-[10px] font-semibold uppercase tracking-[0.08em] mb-1 ${tone}`}>{title}</p>
             <ul className="space-y-0.5">
                 {items.map((x, i) => (
-                    <li key={i} className="text-[12px] text-n600 leading-relaxed">• {x}</li>
+                    <li key={i} className="text-[11px] text-n600 leading-relaxed">• {x}</li>
                 ))}
             </ul>
         </div>
@@ -571,7 +571,7 @@ function ReviewTurn({ turn }) {
 
     if (review.interviewCount === 0) {
         return (
-            <p className="text-[12px] text-n600 leading-relaxed">
+            <p className="text-[11px] text-n600 leading-relaxed">
                 {loaded.matchedCandidates === 0
                     ? 'Bu tanıma uyan aday bulamadım.'
                     : `${loaded.matchedCandidates} aday buldum ama hiçbiriyle kayıtlı görüşme yok. `
@@ -583,10 +583,10 @@ function ReviewTurn({ turn }) {
     return (
         <div className="space-y-2">
             {narration?.ozet && (
-                <p className="text-[12px] text-n700 leading-relaxed">{narration.ozet}</p>
+                <p className="text-[11px] text-n700 leading-relaxed">{narration.ozet}</p>
             )}
             {narrationError && (
-                <p className="text-[11px] text-warn leading-relaxed">
+                <p className="text-[10px] text-warn leading-relaxed">
                     Yorum üretilemedi ({narrationError}) — aşağıdaki sayılar yine de geçerli,
                     onları kod hesapladı.
                 </p>
@@ -596,10 +596,10 @@ function ReviewTurn({ turn }) {
             <ReviewBlock title="Uyarılar" items={narration?.uyarilar} tone="text-bad" />
 
             <div className="rounded-md bg-n50 border border-n200 px-2.5 py-2 space-y-1">
-                <p className="flex items-center gap-1 text-[11px] font-semibold text-n400 uppercase tracking-[0.08em]">
+                <p className="flex items-center gap-1 text-[10px] font-semibold text-n400 uppercase tracking-[0.08em]">
                     <Info className="w-2.5 h-2.5" /> Nasıl hesaplandı
                 </p>
-                <p className="text-[11px] text-n500 leading-relaxed">
+                <p className="text-[10px] text-n500 leading-relaxed">
                     {review.position ? <><strong>{review.position}</strong> · </> : null}
                     {review.interviewCount} görüşme okundu, <strong>{review.scored}</strong> tanesinde
                     sayısal sonuç var. Damgalar: {review.tally.met} karşılıyor, {review.tally.partial} kısmen,
@@ -608,13 +608,13 @@ function ReviewTurn({ turn }) {
                 {/* Ölçülemeyen görüşmeyi saymamak, olmayan bir ölçümü varmış
                     gibi göstermenin en sinsi hâli olurdu. */}
                 {review.unscored.length > 0 && (
-                    <p className="text-[11px] text-warn leading-relaxed">
+                    <p className="text-[10px] text-warn leading-relaxed">
                         <strong>{review.unscored.length}</strong> görüşmede sayısal sonuç yok; ortalamaya
                         ve damga sayılarına girmediler.
                     </p>
                 )}
                 {review.staleCount > 0 && (
-                    <p className="text-[11px] text-warn leading-relaxed">
+                    <p className="text-[10px] text-warn leading-relaxed">
                         <strong>{review.staleCount}</strong> görüşmenin damgaları ilanın ESKİ madde
                         listesine ait — bugünkü maddelerle karşılaştırılamaz.
                     </p>
@@ -624,14 +624,14 @@ function ReviewTurn({ turn }) {
                     yanıltma olur — seçim kuralı da yazsın ki keyfi olmadığı
                     görülsün. */}
                 {loaded.truncated > 0 && (
-                    <p className="text-[11px] text-warn leading-relaxed">
+                    <p className="text-[10px] text-warn leading-relaxed">
                         Toplam <strong>{loaded.totalSessions}</strong> görüşme var; <strong>en yeni
                         {' '}{review.interviewCount}</strong> tanesi incelendi. Yukarıdaki dağılım
                         bütünün değil, bu alt kümenin dağılımıdır.
                     </p>
                 )}
                 {loaded.withoutInterview > 0 && (
-                    <p className="text-[11px] text-n500 leading-relaxed">
+                    <p className="text-[10px] text-n500 leading-relaxed">
                         {loaded.withoutInterview} aday bu tanıma uyuyor ama hiç görüşme yapılmamış.
                     </p>
                 )}
@@ -655,23 +655,23 @@ function MarketTurn({ market }) {
         <div className="space-y-2">
             {band ? (
                 <div className="rounded-md border border-brand-100 bg-brand-50 px-3 py-2">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand">Piyasa bandı</p>
-                    <p className="text-[13px] font-semibold text-n900 tabular-nums">{formatBand(band)}</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-brand">Piyasa bandı</p>
+                    <p className="text-[12px] font-semibold text-n900 tabular-nums">{formatBand(band)}</p>
                     {/* Baz yoksa bu bant kendi bütçenizle KARŞILAŞTIRILAMAZ —
                         brüt/net farkı %30-40 ve makul göründüğü için fark
                         edilmez (gerekçe: utils/salaryBand.js). */}
                     {!band.basis && (
-                        <p className="text-[11px] text-warn mt-0.5">
+                        <p className="text-[10px] text-warn mt-0.5">
                             Kaynaklar brüt mü net mi söylemiyor — kendi bandınızla doğrudan
                             karşılaştırmayın.
                         </p>
                     )}
-                    {date && <p className="text-[11px] text-n500 mt-0.5">Verinin dönemi: {date}</p>}
+                    {date && <p className="text-[10px] text-n500 mt-0.5">Verinin dönemi: {date}</p>}
                 </div>
             ) : withheld ? (
                 <div className="flex items-start gap-2 rounded-md border bg-warn-bg px-3 py-2">
                     <AlertTriangle className="w-3.5 h-3.5 text-warn shrink-0 mt-0.5" />
-                    <p className="text-[12px] text-n700 leading-relaxed">
+                    <p className="text-[11px] text-n700 leading-relaxed">
                         {/* İKİ AYRI DURUM, İKİ AYRI CÜMLE. Arama hiç yapılamamış olmakla,
                             arama yapılıp hiçbir sayfanın kaynak gösterilmemesi farklı
                             şeyler; ikisine aynı cümleyi yazmak ekranda Google'ın arama
@@ -691,7 +691,7 @@ function MarketTurn({ market }) {
                     </p>
                 </div>
             ) : (
-                <p className="text-[12px] text-n600 leading-relaxed">
+                <p className="text-[11px] text-n600 leading-relaxed">
                     Bu rol için kaynaklı bir ücret bandı bulunamadı.
                 </p>
             )}
@@ -699,39 +699,39 @@ function MarketTurn({ market }) {
             {/* Arama aracı çalışmadıysa cevap modelin kendi hatırladığıdır.
                 Sessizce kaynaklıymış gibi sunmak en kötüsü olurdu. */}
             {!grounded && (
-                <p className="text-[11px] text-warn leading-relaxed">
+                <p className="text-[10px] text-warn leading-relaxed">
                     Arama yapılamadı — aşağıdaki bilgi modelin hatırladığıdır, doğrulanmamıştır.
                 </p>
             )}
 
             {benefits.length > 0 && (
                 <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-n400 mb-1">Yaygın yan haklar</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-n400 mb-1">Yaygın yan haklar</p>
                     <ul className="space-y-0.5">
                         {benefits.map((b, i) => (
-                            <li key={i} className="text-[12px] text-n600 leading-relaxed">• {b}</li>
+                            <li key={i} className="text-[11px] text-n600 leading-relaxed">• {b}</li>
                         ))}
                     </ul>
                 </div>
             )}
 
-            {caution && <p className="text-[11px] text-n500 italic leading-relaxed">{caution}</p>}
+            {caution && <p className="text-[10px] text-n500 italic leading-relaxed">{caution}</p>}
 
             <div className="rounded-md bg-n50 border border-n200 px-2.5 py-2 space-y-1">
-                <p className="flex items-center gap-1 text-[11px] font-semibold text-n400 uppercase tracking-[0.08em]">
+                <p className="flex items-center gap-1 text-[10px] font-semibold text-n400 uppercase tracking-[0.08em]">
                     <Info className="w-2.5 h-2.5" /> Ne arandı
                 </p>
-                <p className="text-[11px] text-n500 leading-relaxed">
+                <p className="text-[10px] text-n500 leading-relaxed">
                     <strong>{query?.title || '—'}</strong>
                     {query?.level ? ` · ${query.level}` : ' · seviye belirtilmedi'}
                     {query?.location ? ` · ${query.location}` : ' · konum belirtilmedi'}
                 </p>
-                {scope && <p className="text-[11px] text-n500 leading-relaxed">{scope}</p>}
+                {scope && <p className="text-[10px] text-n500 leading-relaxed">{scope}</p>}
                 {/* Modelin GERÇEKTEN arattığı sorgular. Kaynak gelmediğinde bile
                     kullanıcı aramanın çalıştığını görür ve aynı sorguyu kendisi
                     çalıştırabilir. */}
                 {market.searchQueries?.length > 0 && (
-                    <p className="text-[11px] text-n400 leading-relaxed">
+                    <p className="text-[10px] text-n400 leading-relaxed">
                         Arananlar: {market.searchQueries.join(' · ')}
                     </p>
                 )}
@@ -740,14 +740,14 @@ function MarketTurn({ market }) {
             {/* KAYNAKLAR — iddianın izi. Bunlar yoksa yukarıda rakam da yok. */}
             {sources.length > 0 && (
                 <div className="space-y-0.5">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-n400">Kaynaklar</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-n400">Kaynaklar</p>
                     {sources.slice(0, 6).map((s) => (
                         <a
                             key={s.uri}
                             href={s.uri}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="block text-[11px] text-brand hover:underline truncate"
+                            className="block text-[10px] text-brand hover:underline truncate"
                         >
                             {s.title || s.uri}
                         </a>
@@ -774,14 +774,14 @@ function MarketTurn({ market }) {
 function PositionPicker({ positions, onPick }) {
     if (!positions.length) {
         return (
-            <p className="text-[12px] text-n500 italic">
+            <p className="text-[11px] text-n500 italic">
                 Açık pozisyon yok — bu soruyu cevaplayabilmek için önce bir ilan gerekiyor.
             </p>
         );
     }
     return (
         <div className="space-y-1.5">
-            <p className="text-[12px] text-n600 leading-relaxed">Hangi pozisyon için bakayım?</p>
+            <p className="text-[11px] text-n600 leading-relaxed">Hangi pozisyon için bakayım?</p>
             <div className="flex flex-wrap gap-1.5">
                 {positions.map((p) => (
                     <button
@@ -814,7 +814,7 @@ function FeedbackBar({ value, onSend }) {
 
     if (value) {
         return (
-            <p className="text-[11px] text-n400">
+            <p className="text-[10px] text-n400">
                 {value === 'up' ? 'Kaydedildi — teşekkürler.' : 'Not alındı, asistanı geliştirmekte kullanılacak.'}
             </p>
         );
@@ -833,7 +833,7 @@ function FeedbackBar({ value, onSend }) {
                     autoFocus
                     className="flex-1 bg-n50 border border-n200 rounded-md px-2 py-1 text-[11px] text-n700 outline-none focus:border-brand"
                 />
-                <button type="submit" className="text-[11px] font-semibold text-brand px-1.5">
+                <button type="submit" className="text-[10px] font-semibold text-brand px-1.5">
                     Gönder
                 </button>
             </form>
@@ -842,7 +842,7 @@ function FeedbackBar({ value, onSend }) {
 
     return (
         <div className="flex items-center gap-1">
-            <span className="text-[11px] text-n400">Bu cevap işine yaradı mı?</span>
+            <span className="text-[10px] text-n400">Bu cevap işine yaradı mı?</span>
             <button onClick={() => onSend('up')} title="Yararlı" className="p-1 rounded hover:bg-n100 text-n300 hover:text-ok">
                 <ThumbsUp className="w-3 h-3" />
             </button>
@@ -863,10 +863,10 @@ function FeedbackBar({ value, onSend }) {
 function AuditBox({ result }) {
     return (
         <div className="rounded-md bg-n50 border border-n200 px-2.5 py-2 space-y-1">
-            <p className="flex items-center gap-1 text-[11px] font-semibold text-n400 uppercase tracking-[0.08em]">
+            <p className="flex items-center gap-1 text-[10px] font-semibold text-n400 uppercase tracking-[0.08em]">
                 <Info className="w-2.5 h-2.5" /> Nasıl hesaplandı
             </p>
-            <p className="text-[11px] text-n500 leading-relaxed">
+            <p className="text-[10px] text-n500 leading-relaxed">
                 {result.positionTitle ? <><strong>{result.positionTitle}</strong> · </> : null}
                 {result.pool} adaydan <strong>{result.total}</strong> tanesi eşleşti
                 {result.truncated ? ` (ilk ${result.limit} gösteriliyor)` : ''}.
@@ -874,7 +874,7 @@ function AuditBox({ result }) {
             {result.applied.length > 0 && (
                 <ul className="space-y-0.5">
                     {result.applied.map((a) => (
-                        <li key={a} className="text-[11px] text-n500">• {a}</li>
+                        <li key={a} className="text-[10px] text-n500">• {a}</li>
                     ))}
                 </ul>
             )}
@@ -883,20 +883,20 @@ function AuditBox({ result }) {
                 tamamı böyle elendi ve kullanıcı tarama yapmaya yönlendirildi —
                 tarama yapsa da değişmeyecekti. Sebep ayrı, mesaj da ayrı. */}
             {result.skipped > 0 && !result.missingPosition && (
-                <p className="text-[11px] text-warn leading-relaxed">
+                <p className="text-[10px] text-warn leading-relaxed">
                     <strong>{result.skipped}</strong> aday sayıma girmedi: bu pozisyon için derin
                     taraması yok, karşılıyor da karşılamıyor da diyemeyiz.
                 </p>
             )}
             {result.missingPosition && (
-                <p className="text-[11px] text-warn leading-relaxed">
+                <p className="text-[10px] text-warn leading-relaxed">
                     Bu soru bir pozisyona bağlı — puan, gereksinim maddesi, zorunlu kapısı ve STAR
                     hep bir ilana göre ölçülür. Pozisyon seçilmediği için hiçbir aday
                     değerlendirilemedi.
                 </p>
             )}
             {result.ignored.length > 0 && (
-                <p className="text-[11px] text-bad leading-relaxed">
+                <p className="text-[10px] text-bad leading-relaxed">
                     Uygulayamadığım filtre: {result.ignored.join(', ')} — bu alan sistemde tutulmuyor,
                     sonuç bu kısıt olmadan hesaplandı.
                 </p>

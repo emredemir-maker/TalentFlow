@@ -72,7 +72,7 @@ function SectionHeader({ icon: Icon, title, right = null }) {
         <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
                 <Icon className="w-4 h-4 text-brand" />
-                <h3 className="text-[12px] font-semibold text-n900 uppercase tracking-[0.08em]">{title}</h3>
+                <h3 className="text-[11px] font-semibold text-n900 uppercase tracking-[0.08em]">{title}</h3>
             </div>
             {right}
         </div>
@@ -83,17 +83,17 @@ function FlagCard({ flag }) {
     const style = SEVERITY_STYLE[flag.severity] || SEVERITY_STYLE.bilgi;
     const Icon = style.icon;
     return (
-        <div className={`rounded-[14px] border p-4 ${style.box}`}>
-            <div className="flex items-start gap-3">
+        <div className={`rounded-[14px] border p-3 ${style.box}`}>
+            <div className="flex items-start gap-2">
                 <Icon className={`w-4 h-4 mt-0.5 shrink-0 ${style.iconColor}`} />
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <span className="text-[12px] font-semibold text-n900">{flag.title}</span>
+                        <span className="text-[11px] font-semibold text-n900">{flag.title}</span>
                         <span className={`text-[11px] font-semibold uppercase tracking-[0.08em] px-2 py-0.5 rounded-md border ${style.chip}`}>
                             {style.label}
                         </span>
                     </div>
-                    <p className="text-[12px] text-n600 leading-relaxed">{flag.detail}</p>
+                    <p className="text-[11px] text-n600 leading-relaxed">{flag.detail}</p>
                 </div>
             </div>
         </div>
@@ -134,11 +134,11 @@ function CompanyRow({ item }) {
     ].filter(Boolean);
 
     return (
-        <div className="border border-n200 rounded-[14px] p-4 bg-n0">
-            <div className="flex items-start justify-between gap-3 mb-2">
+        <div className="border border-n200 rounded-[14px] p-3 bg-n0">
+            <div className="flex items-start justify-between gap-2 mb-2">
                 <div className="min-w-0">
-                    <div className="text-[13px] font-semibold text-n900 truncate">{item.company}</div>
-                    <div className="text-[12px] text-n500">
+                    <div className="text-[12px] font-semibold text-n900 truncate">{item.company}</div>
+                    <div className="text-[11px] text-n500">
                         {item.claim?.role || 'Rol belirtilmemiş'} · {item.claim?.duration || 'Tarih yok'}
                     </div>
                 </div>
@@ -148,13 +148,13 @@ function CompanyRow({ item }) {
             </div>
 
             {facts.length > 0 && (
-                <div className="flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-n500">
+                <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-n500">
                     {facts.map((f) => <span key={f}>{f}</span>)}
                 </div>
             )}
 
             {ev?.withheld && (
-                <p className="text-[12px] text-n500 mt-2 italic">
+                <p className="text-[11px] text-n500 mt-2 italic">
                     {ev.withheldReason === 'searched-uncited'
                         ? 'Arama yapıldı ama hiçbir sayfa kaynak olarak gösterilemedi — bulgular gizlendi.'
                         : 'Arama yapılamadı — bu şirket için hiçbir bilgi gösterilmiyor.'}
@@ -171,7 +171,7 @@ function SectorFitBlock({ fit, onOpenSettings }) {
     const noTarget = fit?.verdict === VERDICT.NO_TARGET;
 
     return (
-        <div className="bg-n50 border border-n200 rounded-[14px] p-5">
+        <div className="bg-n50 border border-n200 rounded-[14px] p-3.5">
             <SectionHeader
                 icon={Target}
                 title="Sektör Uyumu"
@@ -182,12 +182,12 @@ function SectorFitBlock({ fit, onOpenSettings }) {
                 }
             />
 
-            <p className="text-[12px] text-n600 leading-relaxed">{describeSectorFit(fit)}</p>
+            <p className="text-[11px] text-n600 leading-relaxed">{describeSectorFit(fit)}</p>
 
             {noTarget ? (
                 <button
                     onClick={onOpenSettings}
-                    className="mt-3 inline-flex items-center gap-1.5 text-[12px] font-semibold text-brand hover:text-brand"
+                    className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-semibold text-brand hover:text-brand"
                 >
                     <Settings2 className="w-3.5 h-3.5" /> Kurumsal Kimlik ayarlarından hedef sektörü tanımla
                 </button>
@@ -200,8 +200,8 @@ function SectorFitBlock({ fit, onOpenSettings }) {
                             { label: `Son 5 yılda`, value: formatMonths(fit.recentExactMonths) },
                         ].map((s) => (
                             <div key={s.label} className="bg-n0 border border-n200 rounded-md p-3 text-center">
-                                <div className="text-[13px] font-semibold text-n900">{s.value}</div>
-                                <div className="text-[11px] font-semibold text-n400 uppercase tracking-wide mt-0.5">{s.label}</div>
+                                <div className="text-[12px] font-semibold text-n900">{s.value}</div>
+                                <div className="text-[10px] font-semibold text-n400 uppercase tracking-wide mt-0.5">{s.label}</div>
                             </div>
                         ))}
                     </div>
@@ -268,9 +268,9 @@ function ScoreImpactBlock({ report, candidate, position }) {
 
     if (!effect.applied) {
         return (
-            <div className="bg-ok-bg rounded-[14px] p-4 flex items-start gap-3">
+            <div className="bg-ok-bg rounded-[14px] p-3 flex items-start gap-2">
                 <CheckCircle2 className="w-4 h-4 text-ok mt-0.5 shrink-0" />
-                <p className="text-[12px] text-n700">
+                <p className="text-[11px] text-n700">
                     <strong>Bu bulgular skoru değiştirmedi.</strong> Dikkat maddeleri mülakatta sorulacak
                     soru üretir ama tek başlarına puan kesmez; kaynak bulunamaması da ceza değildir.
                 </p>
@@ -288,20 +288,20 @@ function ScoreImpactBlock({ report, candidate, position }) {
     const delta = hasConcrete ? detail.score - detail.preVerificationScore : 0;
 
     return (
-        <div className={`rounded-[14px] border p-5 ${tone.box}`}>
+        <div className={`rounded-[14px] border p-3.5 ${tone.box}`}>
             <SectionHeader
                 icon={tone.icon}
                 title="Skora Etkisi"
                 right={
                     hasConcrete ? (
-                        <span className={`text-[12px] font-semibold ${tone.text}`}>
+                        <span className={`text-[11px] font-semibold ${tone.text}`}>
                             {detail.preVerificationScore} → {detail.score}
-                            <span className="text-[11px] font-semibold ml-1.5 opacity-80">
+                            <span className="text-[10px] font-semibold ml-1.5 opacity-80">
                                 {delta > 0 ? '+' : ''}{delta} puan
                             </span>
                         </span>
                     ) : (
-                        <span className={`text-[12px] font-semibold ${tone.text}`}>
+                        <span className={`text-[11px] font-semibold ${tone.text}`}>
                             ×{effect.multiplier.toFixed(2)}
                         </span>
                     )
@@ -310,7 +310,7 @@ function ScoreImpactBlock({ report, candidate, position }) {
 
             <ul className="space-y-1.5">
                 {reasons.map((r) => (
-                    <li key={r.code} className={`flex items-start justify-between gap-3 text-[12px] text-n700 bg-n0 border rounded-md px-3 py-2 ${tone.chip}`}>
+                    <li key={r.code} className={`flex items-start justify-between gap-2 text-[12px] text-n700 bg-n0 border rounded-md px-3 py-2 ${tone.chip}`}>
                         <span className="leading-relaxed">{r.label}</span>
                         <span className={`font-semibold shrink-0 ${r.factor > 1 ? 'text-ok' : 'text-rose-600'}`}>
                             ×{r.factor}
@@ -319,7 +319,7 @@ function ScoreImpactBlock({ report, candidate, position }) {
                 ))}
             </ul>
 
-            <p className="text-[11px] text-n500 mt-2.5 leading-relaxed">
+            <p className="text-[10px] text-n500 mt-2.5 leading-relaxed">
                 {hasConcrete
                     ? `"${position.title}" ilanındaki skora uygulandı. Diğer ilanlarda da aynı oran geçerli.`
                     : 'Bu oran, adayın taranmış olduğu her ilandaki skoruna uygulanır.'}
@@ -416,18 +416,18 @@ export default function VerificationPanel({ candidate, position = null }) {
     return (
         <div className="space-y-6 animate-in fade-in duration-300">
             {/* ── Başlık + çalıştır ── */}
-            <div className="bg-n50 border border-n200 rounded-[14px] p-5">
-                <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="bg-n50 border border-n200 rounded-[14px] p-3.5">
+                <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div className="min-w-0">
                         <SectionHeader icon={ShieldCheck} title="CV Doğrulama" />
-                        <p className="text-[12px] text-n600 leading-relaxed max-w-2xl">
+                        <p className="text-[11px] text-n600 leading-relaxed max-w-2xl">
                             CV&apos;deki tarihleri kendi içinde tutarlılık için denetler, şirketleri kamuya açık
                             kaynaklardan doğrular ve sektör uyumunu ölçer. Mülakatta sorulacak sorular üretir ve{' '}
                             <strong className="text-n700">ölçülmüş bulgular skoru düşürebilir</strong> —
                             kaynak bulunamaması tek başına ceza değildir.
                         </p>
                         {report?.verifiedAt && (
-                            <p className="text-[12px] text-n400 mt-1.5">
+                            <p className="text-[11px] text-n400 mt-1.5">
                                 Son tarama: {new Date(report.verifiedAt).toLocaleString('tr-TR')}
                             </p>
                         )}
@@ -456,19 +456,19 @@ export default function VerificationPanel({ candidate, position = null }) {
                 </div>
 
                 {running && progress.total > 0 && (
-                    <p className="text-[12px] text-n500 mt-3">
+                    <p className="text-[11px] text-n500 mt-3">
                         Şirketler çözümleniyor: {progress.done} / {progress.total}
                     </p>
                 )}
                 {error && (
-                    <p className="text-[12px] text-rose-600 font-semibold mt-3">{error}</p>
+                    <p className="text-[11px] text-rose-600 font-semibold mt-3">{error}</p>
                 )}
             </div>
 
             {!report && !running && (
                 <div className="text-center py-10 text-n400">
                     <ShieldCheck className="w-10 h-10 mx-auto mb-3 opacity-40" />
-                    <p className="text-[12px] font-semibold">Bu aday için henüz doğrulama çalıştırılmadı.</p>
+                    <p className="text-[11px] font-semibold">Bu aday için henüz doğrulama çalıştırılmadı.</p>
                 </div>
             )}
 
@@ -481,9 +481,9 @@ export default function VerificationPanel({ candidate, position = null }) {
                             { key: 'dikkat', label: 'Dikkat', value: report.counts.dikkat, cls: 'text-warn' },
                             { key: 'bilgi', label: 'Bilgi', value: report.counts.bilgi, cls: 'text-n500' },
                         ].map((c) => (
-                            <div key={c.key} className="bg-n0 border border-n200 rounded-[14px] p-4 text-center">
+                            <div key={c.key} className="bg-n0 border border-n200 rounded-[14px] p-3 text-center">
                                 <div className={`text-[22px] font-semibold ${c.cls}`}>{c.value}</div>
-                                <div className="text-[11px] font-semibold text-n400 uppercase tracking-[0.08em] mt-0.5">{c.label}</div>
+                                <div className="text-[10px] font-semibold text-n400 uppercase tracking-[0.08em] mt-0.5">{c.label}</div>
                             </div>
                         ))}
                     </div>
@@ -492,12 +492,12 @@ export default function VerificationPanel({ candidate, position = null }) {
 
                     {/* ── Mülakat soruları: raporun ASIL çıktısı, o yüzden en üstte ── */}
                     {report.questions.length > 0 && (
-                        <div className="bg-brand-50 border border-brand-100 rounded-[14px] p-5">
+                        <div className="bg-brand-50 border border-brand-100 rounded-[14px] p-3.5">
                             <SectionHeader icon={HelpCircle} title="Mülakat Öncesi Sorulacaklar" />
                             <ol className="space-y-2">
                                 {report.questions.map((q, i) => (
-                                    <li key={q} className="flex gap-2.5 text-[12px] text-n700 leading-relaxed">
-                                        <span className="shrink-0 w-5 h-5 rounded-md bg-n0 border border-brand-100 text-brand text-[11px] font-semibold flex items-center justify-center">
+                                    <li key={q} className="flex gap-2.5 text-[11px] text-n700 leading-relaxed">
+                                        <span className="shrink-0 w-5 h-5 rounded-md bg-n0 border border-brand-100 text-brand text-[10px] font-semibold flex items-center justify-center">
                                             {i + 1}
                                         </span>
                                         <span>{q}</span>
@@ -514,9 +514,9 @@ export default function VerificationPanel({ candidate, position = null }) {
                             {report.flags.map((f, i) => <FlagCard key={`${f.id}-${i}`} flag={f} />)}
                         </div>
                     ) : (
-                        <div className="bg-ok-bg rounded-[14px] p-5 flex items-center gap-3">
+                        <div className="bg-ok-bg rounded-[14px] p-3.5 flex items-center gap-2">
                             <CheckCircle2 className="w-5 h-5 text-ok shrink-0" />
-                            <p className="text-[12px] text-n700">
+                            <p className="text-[11px] text-n700">
                                 Tutarsızlık ya da çelişki bulunmadı. Bu, her iddianın doğrulandığı anlamına gelmez —
                                 yalnızca denetlenen noktalarda sorun çıkmadı.
                             </p>
@@ -532,7 +532,7 @@ export default function VerificationPanel({ candidate, position = null }) {
                                 icon={Building2}
                                 title="Şirket Doğrulaması"
                                 right={
-                                    <span className="text-[11px] font-semibold text-n400">
+                                    <span className="text-[10px] font-semibold text-n400">
                                         {report.lookup.fromCache > 0 && `${report.lookup.fromCache} önbellekten · `}
                                         {report.lookup.looked} arama
                                     </span>
@@ -552,7 +552,7 @@ export default function VerificationPanel({ candidate, position = null }) {
                             : null
                     ))}
 
-                    <p className="text-[11px] text-n400 text-center">
+                    <p className="text-[10px] text-n400 text-center">
                         Bu rapor bir karar değil, bir başlangıç noktasıdır. &quot;Doğrulanamadı&quot; bulgusu
                         adayın beyanının yanlış olduğunu göstermez.
                     </p>
@@ -560,9 +560,9 @@ export default function VerificationPanel({ candidate, position = null }) {
             )}
 
             {targetLoaded && !target && (
-                <div className="bg-warn-bg rounded-[14px] p-4 flex items-start gap-3">
+                <div className="bg-warn-bg rounded-[14px] p-3 flex items-start gap-2">
                     <Info className="w-4 h-4 text-warn mt-0.5 shrink-0" />
-                    <p className="text-[12px] text-n600">
+                    <p className="text-[11px] text-n600">
                         Kurumun hedef sektörü tanımlı değil; sektör uyumu ölçülemeyecek.{' '}
                         <button onClick={openSettings} className="font-semibold text-brand hover:underline">
                             Ayarlar → Kurumsal Kimlik

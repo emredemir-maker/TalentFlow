@@ -1271,7 +1271,7 @@ export default function LiveInterviewPage() {
 
                 <button
                     onClick={() => navigate('/')}
-                    className="w-full h-14 bg-white text-black rounded-2xl font-black text-[11px] uppercase tracking-widest hover:scale-105 transition-all shadow-xl"
+                    className="w-full h-14 bg-white text-black rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-105 transition-all shadow-xl"
                 >
                     Ana Sayfaya Dön
                 </button>
@@ -1296,7 +1296,7 @@ export default function LiveInterviewPage() {
                 </div>
                 <button
                     onClick={() => navigate('/')}
-                    className="px-10 py-4 rounded-2xl bg-white text-black text-[11px] font-black uppercase tracking-widest shadow-2xl hover:scale-105 transition-all"
+                    className="px-10 py-3 rounded-2xl bg-white text-black text-[11px] font-black uppercase tracking-widest shadow-2xl hover:scale-105 transition-all"
                 >
                     Kontrol Paneline Dön
                 </button>
@@ -1323,10 +1323,10 @@ export default function LiveInterviewPage() {
                             </div>
                             <div>
                                 <h1 className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none">Live</h1>
-                                <h2 className="text-[12px] font-black text-[#0F172A] uppercase tracking-tighter italic leading-none">Preparation Hub</h2>
+                                <h2 className="text-[11px] font-black text-[#0F172A] uppercase tracking-tighter italic leading-none">Preparation Hub</h2>
                             </div>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
                             <button
                                 onClick={async () => {
                                     if (window.confirm('Mülakatı kalıcı olarak iptal etmek istiyor musunuz?\n\nBu işlem geri alınamaz — seans "İptal Edildi" olarak işaretlenecek.')) {
@@ -1355,12 +1355,12 @@ export default function LiveInterviewPage() {
                     </header>
 
                     {/* COMPACT MAIN - fills remaining space */}
-                    <main className="flex-1 p-3 flex gap-3 w-full overflow-hidden" style={{ maxHeight: 'calc(100vh - 48px)' }}>
+                    <main className="flex-1 p-3 flex gap-2 w-full overflow-hidden" style={{ maxHeight: 'calc(100vh - 48px)' }}>
                         {/* Sol Panel: Aday Compact Info */}
                         <div className="w-[300px] flex flex-col gap-2 shrink-0 overflow-hidden">
-                            <div className="bg-white rounded-[2rem] p-5 border border-slate-100 shadow-xl flex-1 flex flex-col gap-4 overflow-y-auto custom-scrollbar pb-8">
+                            <div className="bg-white rounded-[2rem] p-3.5 border border-slate-100 shadow-xl flex-1 flex flex-col gap-3 overflow-y-auto custom-scrollbar pb-8">
                                 {/* Name Row */}
-                                <div className="flex items-center gap-4">
+                                <div className="flex items-center gap-3">
                                     <div className="w-14 h-14 rounded-2xl bg-slate-50 overflow-hidden border border-white shadow-xl shrink-0">
                                         <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${candidateData?.name}`} alt="C" className="w-full h-full" />
                                     </div>
@@ -1376,20 +1376,20 @@ export default function LiveInterviewPage() {
                                 </div>
 
                                 {/* Stats Grid */}
-                                <div className="grid grid-cols-2 gap-3">
+                                <div className="grid grid-cols-2 gap-2">
                                     <div className="p-3 bg-slate-50/80 rounded-2xl border border-slate-100">
                                         <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-1 italic">Tecrübe</p>
-                                        <p className="text-[12px] font-black text-[#0F172A] italic">{candidateData?.experience || '8'} Yıl</p>
+                                        <p className="text-[11px] font-black text-[#0F172A] italic">{candidateData?.experience || '8'} Yıl</p>
                                     </div>
                                     <div className="p-3 bg-slate-50/80 rounded-2xl border border-slate-100">
                                         <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-1 italic">Lokasyon</p>
-                                        <p className="text-[12px] font-black text-[#0F172A] italic truncate">{candidateData?.location || 'TR (Remote)'}</p>
+                                        <p className="text-[11px] font-black text-[#0F172A] italic truncate">{candidateData?.location || 'TR (Remote)'}</p>
                                     </div>
                                 </div>
 
                                 {/* Join Link Section */}
                                 <div className="mt-2 pt-4 border-t border-slate-100">
-                                    <div className="bg-blue-50/50 rounded-2xl p-4 border border-blue-100 flex flex-col gap-2.5 group/link">
+                                    <div className="bg-blue-50/50 rounded-2xl p-3 border border-blue-100 flex flex-col gap-2.5 group/link">
                                         <div className="flex items-center justify-between">
                                             <span className="text-[8px] font-black text-blue-600 uppercase tracking-widest italic">Aday Katılım Linki</span>
                                             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -1477,13 +1477,13 @@ export default function LiveInterviewPage() {
 
                                 {/* AI Summary */}
                                 <div className="mt-2 bg-[#0F172A] rounded-[2rem] p-6 text-white relative border border-white/10 shadow-2xl overflow-visible group/summary">
-                                    <div className="absolute -top-3 -right-3 p-4 bg-blue-600 rounded-2xl shadow-xl shadow-blue-900/40 z-10 transition-transform group-hover/summary:scale-110">
+                                    <div className="absolute -top-3 -right-3 p-3 bg-blue-600 rounded-2xl shadow-xl shadow-blue-900/40 z-10 transition-transform group-hover/summary:scale-110">
                                         <Sparkles className="w-5 h-5 text-white" />
                                     </div>
                                     <h4 className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-4 italic flex items-center gap-2.5">
                                         <Brain className="w-4 h-4" /> AI Evaluation
                                     </h4>
-                                    <p className="text-[13px] font-bold leading-relaxed italic border-l-4 border-blue-500 pl-5 py-2 text-blue-50/90 mb-4">
+                                    <p className="text-[12px] font-bold leading-relaxed italic border-l-4 border-blue-500 pl-5 py-2 text-blue-50/90 mb-4">
                                         {candidateData?.aiAnalysis?.summary || "Bu aday teknik profiliyle öne çıkıyor. Backend sistemlerdeki tecrübesi dikkat çekici."}
                                     </p>
                                     <div className="pt-4 border-t border-white/5 flex items-center justify-between">
@@ -1497,25 +1497,25 @@ export default function LiveInterviewPage() {
                         </div>
 
                         {/* Orta Panel: Kamera Preview (Center) */}
-                        <div className="flex-1 flex flex-col gap-3">
+                        <div className="flex-1 flex flex-col gap-2">
                             <div className="relative flex-1 rounded-[3rem] bg-[#07090F] overflow-hidden shadow-2xl group border border-white/10">
                                 {isVideoOn && stream ? (
                                     <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover scale-x-[-1]" />
                                 ) : (
-                                    <div className="w-full h-full flex flex-col items-center justify-center gap-3">
+                                    <div className="w-full h-full flex flex-col items-center justify-center gap-2">
                                         <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center border border-white/10">
                                             <Camera className="w-8 h-8 text-white/10" />
                                         </div>
                                         <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em] italic">Yayın Bekleniyor</span>
                                     </div>
                                 )}
-                                <div className="absolute top-8 left-8 flex items-center gap-3">
+                                <div className="absolute top-8 left-8 flex items-center gap-2">
                                     <div className="px-4 py-2 bg-black/40 backdrop-blur-2xl rounded-2xl border border-white/10 flex items-center gap-2.5">
                                         <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                                         <span className="text-[9px] font-black text-white uppercase tracking-widest italic">ÖNİZLEME AKTİF</span>
                                     </div>
                                 </div>
-                                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-[#1E293B]/80 backdrop-blur-3xl px-6 py-4 rounded-3xl border border-white/10 shadow-2xl">
+                                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-[#1E293B]/80 backdrop-blur-3xl px-6 py-3 rounded-3xl border border-white/10 shadow-2xl">
                                     <button onClick={() => setIsVideoOn(!isVideoOn)} className={"w-12 h-12 rounded-2xl flex items-center justify-center cursor-pointer transition-all " + (isVideoOn ? 'bg-white/5 text-white hover:bg-white/10' : 'bg-red-500 text-white')}>
                                         {isVideoOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
                                     </button>
@@ -1527,7 +1527,7 @@ export default function LiveInterviewPage() {
                         </div>
 
                         {/* Sağ Panel: Mülakat Rotası (Vertical) */}
-                        <div className="w-[340px] flex flex-col gap-3 shrink-0 overflow-hidden">
+                        <div className="w-[340px] flex flex-col gap-2 shrink-0 overflow-hidden">
                             {!isTypeSelected ? (
                                 <div className="bg-white rounded-[3rem] p-8 border border-slate-200 shadow-2xl flex-1 flex flex-col gap-8 overflow-y-auto custom-scrollbar">
                                     <div className="text-center pt-4">
@@ -1535,7 +1535,7 @@ export default function LiveInterviewPage() {
                                         <p className="text-slate-400 font-bold uppercase text-[9px] tracking-[0.25em] max-w-[200px] mx-auto leading-relaxed italic">Adayın profiline özel soru setleri oluşturulacaktır.</p>
                                     </div>
 
-                                    <div className="flex flex-col gap-4">
+                                    <div className="flex flex-col gap-3">
                                         {[
                                             { id: 'technical', title: 'Teknik Kültür', desc: 'Mimari ve mühendislik yaklaşımı ölçülür.', icon: <Code className="w-6 h-6" />, color: 'blue' },
                                             { id: 'product', title: 'Product / UX', desc: 'Ürün vizyonu ve kullanıcı odağı ölçülür.', icon: <Target className="w-6 h-6" />, color: 'indigo' },
@@ -1553,7 +1553,7 @@ export default function LiveInterviewPage() {
                                                     {type.icon}
                                                 </div>
                                                 <div className="min-w-0">
-                                                    <h4 className="text-[13px] font-black text-[#0F172A] uppercase italic mb-1">{type.title}</h4>
+                                                    <h4 className="text-[12px] font-black text-[#0F172A] uppercase italic mb-1">{type.title}</h4>
                                                     <p className="text-[10px] font-medium text-slate-400 italic leading-snug">{type.desc}</p>
                                                 </div>
                                                 <ChevronRight className={`w-5 h-5 ml-auto text-slate-300 group-hover:text-${type.color}-500 transition-colors shrink-0`} />
@@ -1593,7 +1593,7 @@ export default function LiveInterviewPage() {
                                     </div>
 
                                     {pathLoading ? (
-                                        <div className="flex-1 flex flex-col items-center justify-center gap-4 opacity-50">
+                                        <div className="flex-1 flex flex-col items-center justify-center gap-3 opacity-50">
                                             <div className="relative">
                                                 <Loader2 className="w-12 h-12 animate-spin text-blue-600" />
                                                 <Sparkles className="absolute -top-2 -right-2 w-6 h-6 text-amber-500 animate-pulse" />
@@ -1601,7 +1601,7 @@ export default function LiveInterviewPage() {
                                             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 italic text-center">Yapay Zeka Soruları Hazırlıyor...</p>
                                         </div>
                                     ) : (
-                                        <div className="flex-1 flex flex-col gap-4 overflow-hidden">
+                                        <div className="flex-1 flex flex-col gap-3 overflow-hidden">
                                             <div className="flex gap-2 p-1.5 bg-slate-50 rounded-2xl border border-slate-100 shrink-0">
                                                 {availablePaths.map(path => (
                                                     <button
@@ -1616,12 +1616,12 @@ export default function LiveInterviewPage() {
 
                                             <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar pb-4">
                                                 {questions.map((q, idx) => (
-                                                    <div key={q.id} className="group flex items-start gap-3 p-4 rounded-[1.5rem] border border-slate-50 bg-white hover:border-blue-100 hover:shadow-lg hover:shadow-blue-900/5 transition-all">
+                                                    <div key={q.id} className="group flex items-start gap-2 p-3 rounded-[1.5rem] border border-slate-50 bg-white hover:border-blue-100 hover:shadow-lg hover:shadow-blue-900/5 transition-all">
                                                         <div className="w-7 h-7 rounded-xl bg-slate-50 flex items-center justify-center text-[10px] font-black text-[#0F172A] group-hover:bg-blue-600 group-hover:text-white transition-all shrink-0">
                                                             {idx + 1}
                                                         </div>
                                                         <div className="flex-1 min-w-0">
-                                                            <p className="text-[11px] font-bold text-[#475569] leading-snug italic">
+                                                            <p className="text-[10px] font-bold text-[#475569] leading-snug italic">
                                                                 {q.text}
                                                             </p>
                                                             <span className="px-2 py-0.5 rounded-lg bg-slate-50 border border-slate-100 text-[8px] font-black text-slate-400 uppercase tracking-widest inline-block mt-2 italic">{q.category}</span>
@@ -1630,9 +1630,9 @@ export default function LiveInterviewPage() {
                                                 ))}
                                             </div>
 
-                                            <div className="pt-4 border-t border-slate-100 shrink-0 mt-auto flex flex-col gap-4">
+                                            <div className="pt-4 border-t border-slate-100 shrink-0 mt-auto flex flex-col gap-3">
                                                 {/* STT Engine Diagnostic for Recruiter */}
-                                                <div className="p-4 bg-slate-50/50 rounded-[1.5rem] border border-slate-100/50 flex flex-col gap-3">
+                                                <div className="p-3 bg-slate-50/50 rounded-[1.5rem] border border-slate-100/50 flex flex-col gap-2">
                                                     <div className="flex items-center justify-between">
                                                         <div className="flex items-center gap-2">
                                                             <div className={`w-1.5 h-1.5 rounded-full ${isMicOn ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
@@ -1683,7 +1683,7 @@ export default function LiveInterviewPage() {
                                                         setPhase('active');
                                                     }}
                                                     disabled={!selectedPathId || pathLoading}
-                                                    className="w-full h-16 rounded-[1.5rem] bg-[#0F172A] hover:bg-black text-white font-black text-[12px] uppercase tracking-[0.2em] transition-all shadow-2xl shadow-blue-900/40 flex items-center justify-center gap-3 italic group px-5"
+                                                    className="w-full h-16 rounded-[1.5rem] bg-[#0F172A] hover:bg-black text-white font-black text-[12px] uppercase tracking-[0.2em] transition-all shadow-2xl shadow-blue-900/40 flex items-center justify-center gap-2 italic group px-5"
                                                 >
                                                     MÜLAKATИ BAŞLAT <ArrowRight className="w-5 h-5 group-hover:translate-x-2 transition-transform" />
                                                 </button>
@@ -1701,13 +1701,13 @@ export default function LiveInterviewPage() {
             return (
                 <div className="min-h-screen bg-[#F8FAFC] font-sans flex flex-col italic overflow-hidden">
                     <header className="h-[56px] bg-white border-b border-slate-200 flex items-center justify-between px-8 shrink-0 z-20">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
                             <div className="w-9 h-9 rounded-xl bg-[#0F172A] flex items-center justify-center">
                                 <Video className="w-4.5 h-4.5 text-white" />
                             </div>
                             <h2 className="text-[15px] font-black text-[#0F172A] tracking-tighter uppercase italic leading-none">Talent-Inn <span className="text-slate-400">Live</span></h2>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
                             <button
                                 onClick={handleCandidateLeave}
                                 className="px-4 py-1.5 rounded-lg bg-white text-red-600 border border-red-100 text-[9px] font-black uppercase tracking-wider hover:bg-red-600 hover:text-white transition-all shadow-sm cursor-pointer"
@@ -1717,7 +1717,7 @@ export default function LiveInterviewPage() {
                             <button onClick={() => setShowSettings(true)} className="p-2 rounded-lg bg-slate-50 text-slate-500 hover:bg-black hover:text-white transition-all border border-slate-100 cursor-pointer"><Settings className="w-4.5 h-4.5" /></button>
                         </div>
                     </header>
-                    <div className="flex-1 flex flex-col items-center justify-center p-4">
+                    <div className="flex-1 flex flex-col items-center justify-center p-3">
                         <div className="max-w-[1200px] w-full flex flex-col gap-6">
                             <div className="flex flex-col items-center text-center">
                                 <h1 className="text-[36px] font-black text-[#0F172A] tracking-tighter uppercase italic leading-[0.9] mb-2">Mülakata <span className="text-blue-600 underline underline-offset-4 decoration-4">Hazır Mısın?</span></h1>
@@ -1730,20 +1730,20 @@ export default function LiveInterviewPage() {
                                         {isVideoOn && stream ? (
                                             <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover scale-x-[-1]" />
                                         ) : (
-                                            <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-zinc-950">
+                                            <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-zinc-950">
                                                 <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center">
                                                     <VideoOff className="w-8 h-8 text-white/20" />
                                                 </div>
                                                 <p className="text-[10px] font-black text-white/20 uppercase tracking-widest">Kamera Devre Dışı</p>
                                             </div>
                                         )}
-                                        <div className="absolute top-6 left-6 flex items-center gap-3">
+                                        <div className="absolute top-6 left-6 flex items-center gap-2">
                                             <div className="px-3 py-1.5 bg-black/40 backdrop-blur-xl rounded-xl border border-white/10 flex items-center gap-2">
                                                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                                                 <span className="text-[8px] font-black text-white uppercase tracking-widest">Hazırlık Odası</span>
                                             </div>
                                         </div>
-                                        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 z-30">
+                                        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 z-30">
                                             <button onClick={() => setIsMicOn(!isMicOn)} className={"w-12 h-12 rounded-xl flex items-center justify-center bg-black/40 backdrop-blur-xl border border-white/10 text-white shadow-2xl transition-all " + (!isMicOn && 'bg-red-500 border-red-400')}>
                                                 {isMicOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
                                             </button>
@@ -1753,13 +1753,13 @@ export default function LiveInterviewPage() {
                                         </div>
                                     </div>
 
-                                    <div className="grid grid-cols-3 gap-3">
+                                    <div className="grid grid-cols-3 gap-2">
                                         {[
                                             { icon: <Mic className="w-4 h-4" />, label: 'MİKROFON', status: isMicOn ? 'AKTİF' : 'KAPALI', ok: isMicOn },
                                             { icon: <Camera className="w-4 h-4" />, label: 'KAMERA', status: isVideoOn ? 'AKTİF' : 'KAPALI', ok: isVideoOn },
                                             { icon: <Zap className="w-4 h-4" />, label: 'BAĞLANTI', status: 'STABİL', ok: true }
                                         ].map((stat, i) => (
-                                            <div key={i} className="bg-white rounded-2xl p-4 border border-slate-100 flex items-center gap-3 shadow-sm">
+                                            <div key={i} className="bg-white rounded-2xl p-3 border border-slate-100 flex items-center gap-2 shadow-sm">
                                                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center border ${stat.ok ? 'bg-blue-50 text-blue-600 border-blue-50' : 'bg-red-50 text-red-500 border-red-50'}`}>
                                                     {stat.icon}
                                                 </div>
@@ -1778,7 +1778,7 @@ export default function LiveInterviewPage() {
                                         <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-blue-500/10 transition-colors" />
 
                                         <div className="space-y-6">
-                                            <div className="flex items-center gap-4">
+                                            <div className="flex items-center gap-3">
                                                 <div className="w-14 h-14 rounded-2xl bg-[#0F172A] p-0.5 shadow-xl border border-slate-100 flex items-center justify-center shrink-0">
                                                     <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${userProfile?.name || 'Recruiter'}`} alt="R" className="w-full h-full rounded-xl" />
                                                 </div>
@@ -1788,13 +1788,13 @@ export default function LiveInterviewPage() {
                                                 </div>
                                             </div>
 
-                                            <p className="text-[12px] font-bold text-slate-500 leading-relaxed italic border-l-4 border-blue-600 pl-4 py-1">
+                                            <p className="text-[11px] font-bold text-slate-500 leading-relaxed italic border-l-4 border-blue-600 pl-4 py-1">
                                                 Hoş geldiniz. Mülakatçı sizi odaya kabul ettiğinde görüşme otomatik olarak başlayacaktır. Lütfen tarayıcınızdan kamera ve mikrofon erişimine izin verdiğinizden emin olun.
                                             </p>
 
                                             <div className="space-y-3">
                                                  <div className="px-4 py-3 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between group-hover:bg-white transition-colors">
-                                                    <div className="flex items-center gap-3">
+                                                    <div className="flex items-center gap-2">
                                                         <ShieldCheck className="w-4 h-4 text-emerald-500" />
                                                         <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">KVKK Onayı</span>
                                                     </div>
@@ -1827,7 +1827,7 @@ export default function LiveInterviewPage() {
                                                 </div>
 
                                                 {/* Phase 5: Premium Waiting State */}
-                                                <div className={`relative overflow-hidden flex items-center gap-4 p-5 rounded-3xl border transition-all duration-500 ${isRecruiterActive ? 'bg-emerald-50/50 border-emerald-100 shadow-lg shadow-emerald-500/5' : 'bg-amber-50/50 border-amber-100 shadow-lg shadow-amber-500/5'}`}>
+                                                <div className={`relative overflow-hidden flex items-center gap-3 p-3.5 rounded-3xl border transition-all duration-500 ${isRecruiterActive ? 'bg-emerald-50/50 border-emerald-100 shadow-lg shadow-emerald-500/5' : 'bg-amber-50/50 border-amber-100 shadow-lg shadow-amber-500/5'}`}>
                                                     {!isRecruiterActive && (
                                                         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full animate-shimmer pointer-events-none" />
                                                     )}
@@ -1867,7 +1867,7 @@ export default function LiveInterviewPage() {
                                                         setPhase('lobby_ready');
                                                         await persistSessionData({ candidateStatus: 'waiting_room' });
                                                     }}
-                                                    className={`w-full h-16 rounded-2xl text-white font-black text-[12px] uppercase tracking-[0.2em] shadow-2xl flex items-center justify-center gap-3 transition-all hover:scale-[1.02] active:scale-95 group italic ${effectiveSession ? 'bg-[#0F172A] shadow-blue-900/40' : 'bg-slate-800 opacity-50 cursor-not-allowed'}`}
+                                                    className={`w-full h-16 rounded-2xl text-white font-black text-[11px] uppercase tracking-[0.2em] shadow-2xl flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-95 group italic ${effectiveSession ? 'bg-[#0F172A] shadow-blue-900/40' : 'bg-slate-800 opacity-50 cursor-not-allowed'}`}
                                                     disabled={!hasConsent || !effectiveSession}
                                                 >
                                                     KATILMAYA HAZIRIM <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -1898,7 +1898,7 @@ export default function LiveInterviewPage() {
 
                     <div className="space-y-4">
                         <h2 className="text-3xl font-black text-[#0F172A] tracking-tighter uppercase italic leading-none">Bağlantı <span className="text-blue-600">Bekleniyor</span></h2>
-                        <p className="text-[12px] font-bold text-slate-400 uppercase tracking-widest max-w-[240px] mx-auto leading-relaxed">
+                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest max-w-[240px] mx-auto leading-relaxed">
                             Mülakatçı sizi odaya aldığında görüşme otomatik olarak başlayacaktır. Sekmeyi kapatmayın.
                         </p>
                     </div>
@@ -1933,7 +1933,7 @@ export default function LiveInterviewPage() {
                     </div>
                     <div>
                         <h1 className="text-[18px] font-semibold tracking-[-0.01em] m-0">Mülakat tamamlandı</h1>
-                        <p className="text-[12px] text-n500 mt-1.5 leading-relaxed m-0">
+                        <p className="text-[11px] text-n500 mt-1.5 leading-relaxed m-0">
                             Oturum kaydedildi ve rapor oluşturuldu.
                         </p>
                     </div>
@@ -1944,23 +1944,23 @@ export default function LiveInterviewPage() {
                         değil: canlı analizin ürettiği beş yetkinliğin düz
                         ortalaması. Ad artık ölçtüğü şeyi söylüyor. */}
                     <div className="w-full flex items-center gap-2 bg-n50 border border-n200 rounded-md px-3 py-2.5">
-                        <span className="text-[12px] text-n500">Yetkinlik ortalaması</span>
+                        <span className="text-[11px] text-n500">Yetkinlik ortalaması</span>
                         <div className="flex-1 h-1.5 bg-n100 rounded-full overflow-hidden">
                             <div className="h-full bg-brand rounded-full" style={{ width: `${logicIntegrity}%` }} />
                         </div>
-                        <span className="text-[13px] font-semibold text-brand tabular-nums">%{logicIntegrity}</span>
+                        <span className="text-[12px] font-semibold text-brand tabular-nums">%{logicIntegrity}</span>
                     </div>
 
                     <div className="flex flex-col gap-2 w-full">
                         <button
                             onClick={() => navigate(`/interview-report/${sessionId}`)}
-                            className="w-full flex items-center justify-center gap-2 text-[13px] font-semibold text-white bg-brand hover:bg-brand-600 rounded-md py-2.5"
+                            className="w-full flex items-center justify-center gap-2 text-[12px] font-semibold text-white bg-brand hover:bg-brand-600 rounded-md py-2.5"
                         >
                             <FileText className="w-3.5 h-3.5" /> Raporu görüntüle
                         </button>
                         <button
                             onClick={() => navigate('/')}
-                            className="w-full flex items-center justify-center gap-2 text-[13px] font-medium text-n600 bg-n50 border border-n200 hover:bg-n100 rounded-md py-2.5"
+                            className="w-full flex items-center justify-center gap-2 text-[12px] font-medium text-n600 bg-n50 border border-n200 hover:bg-n100 rounded-md py-2.5"
                         >
                             <ArrowLeft className="w-3.5 h-3.5" /> Kontrol paneline dön
                         </button>
@@ -1981,14 +1981,14 @@ export default function LiveInterviewPage() {
         return (
             <div className="infoset fixed inset-0 z-[200] bg-n25 flex flex-col overflow-hidden">
                 {/* ── Başlık ─────────────────────────────────────────────── */}
-                <header className="h-[52px] shrink-0 bg-n0 border-b border-n200 px-[18px] flex items-center gap-3 z-20">
+                <header className="h-[52px] shrink-0 bg-n0 border-b border-n200 px-[18px] flex items-center gap-2 z-20">
                     <div className="flex items-center gap-2">
                         <span className="w-7 h-7 rounded-md bg-bad-bg text-bad flex items-center justify-center">
                             <Video className="w-[15px] h-[15px]" />
                         </span>
                         <div>
-                            <h1 className="text-[14px] font-semibold tracking-[-0.01em] m-0">Canlı Mülakat</h1>
-                            <span className="text-[11px] text-n400">
+                            <h1 className="text-[13px] font-semibold tracking-[-0.01em] m-0">Canlı Mülakat</h1>
+                            <span className="text-[10px] text-n400">
                                 {candidateData?.name}
                                 {candidateData?.position ? ` · ${candidateData.position}` : ''}
                             </span>
@@ -2000,7 +2000,7 @@ export default function LiveInterviewPage() {
                             <>
                                 <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-bad-bg">
                                     <span className="w-1.5 h-1.5 rounded-full bg-bad animate-pulse" />
-                                    <span className="text-[11px] font-semibold text-bad tabular-nums">{elapsedLabel}</span>
+                                    <span className="text-[10px] font-semibold text-bad tabular-nums">{elapsedLabel}</span>
                                 </div>
 
                                 {/* Aday Durum Göstergesi — effectiveSession, apiSession
@@ -2058,7 +2058,7 @@ export default function LiveInterviewPage() {
 
                         {showFinishConfirm ? (
                             <div className="flex items-center gap-1.5 bg-bad-bg border border-bad/20 rounded-md px-2.5 py-1">
-                                <span className="text-[11px] font-medium text-n700 whitespace-nowrap">Mülakatı sonlandır?</span>
+                                <span className="text-[10px] font-medium text-n700 whitespace-nowrap">Mülakatı sonlandır?</span>
                                 <button
                                     onClick={() => { setShowFinishConfirm(false); handleFinishInterview(); }}
                                     className="text-[12px] font-semibold text-white bg-bad rounded px-2 py-0.5 hover:opacity-90"
@@ -2067,7 +2067,7 @@ export default function LiveInterviewPage() {
                                 </button>
                                 <button
                                     onClick={() => setShowFinishConfirm(false)}
-                                    className="text-[12px] font-medium text-n600 hover:text-n900 px-1"
+                                    className="text-[11px] font-medium text-n600 hover:text-n900 px-1"
                                 >
                                     Vazgeç
                                 </button>
@@ -2099,7 +2099,7 @@ export default function LiveInterviewPage() {
                                                 navigate('/');
                                             }
                                         }}
-                                        className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-semibold text-n700 hover:bg-n50 text-left"
+                                        className="w-full flex items-center gap-2 px-3 py-2 text-[11px] font-semibold text-n700 hover:bg-n50 text-left"
                                     >
                                         <Clock className="w-3.5 h-3.5 text-brand" /> Ertele / Duraklat
                                     </button>
@@ -2110,14 +2110,14 @@ export default function LiveInterviewPage() {
                                                 navigate('/');
                                             }
                                         }}
-                                        className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-semibold text-bad hover:bg-bad-bg text-left"
+                                        className="w-full flex items-center gap-2 px-3 py-2 text-[11px] font-semibold text-bad hover:bg-bad-bg text-left"
                                     >
                                         <AlertCircle className="w-3.5 h-3.5" /> Mülakatı iptal et
                                     </button>
                                     <div className="my-1 border-t border-n100" />
                                     <button
                                         onClick={() => navigate('/')}
-                                        className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-semibold text-n500 hover:bg-n50 text-left"
+                                        className="w-full flex items-center gap-2 px-3 py-2 text-[11px] font-semibold text-n500 hover:bg-n50 text-left"
                                     >
                                         <ChevronLeft className="w-3.5 h-3.5" /> Sadece çık (canlı kalsın)
                                     </button>
@@ -2127,18 +2127,18 @@ export default function LiveInterviewPage() {
                     </div>
                 </header>
 
-                <div className="flex-1 grid grid-cols-1 xl:grid-cols-[1fr_420px] gap-3 p-3 overflow-hidden">
+                <div className="flex-1 grid grid-cols-1 xl:grid-cols-[1fr_420px] gap-2 p-3 overflow-hidden">
 
                     {/* ── SOL: sorular + transkript ─────────────────────── */}
-                    <div className="min-w-0 flex flex-col gap-3 overflow-hidden">
+                    <div className="min-w-0 flex flex-col gap-2 overflow-hidden">
 
                         {/* Sorular */}
                         <section className="bg-n0 border border-n200 rounded-[14px] flex-1 flex flex-col overflow-hidden">
                             <div className="flex items-center gap-2 px-4 py-2.5 border-b border-n200 shrink-0">
                                 <FileText className="w-3.5 h-3.5 text-brand" />
-                                <h2 className="text-[13px] font-semibold m-0">Mülakat soruları</h2>
+                                <h2 className="text-[12px] font-semibold m-0">Mülakat soruları</h2>
                                 {questions.length > 0 && (
-                                    <span className="text-[11px] text-n400">{questions.length} soru</span>
+                                    <span className="text-[10px] text-n400">{questions.length} soru</span>
                                 )}
                                 <div className="ml-auto flex items-center gap-1">
                                     {[
@@ -2181,12 +2181,12 @@ export default function LiveInterviewPage() {
                                 <div className="px-4 pt-3 shrink-0">
                                     <div className="bg-brand-50 border border-brand-100 rounded-[10px] p-3.5">
                                         <div className="flex items-start gap-2.5">
-                                            <div className="w-7 h-7 rounded-md bg-brand text-white flex items-center justify-center text-[12px] font-semibold shrink-0">
+                                            <div className="w-7 h-7 rounded-md bg-brand text-white flex items-center justify-center text-[11px] font-semibold shrink-0">
                                                 {currentQuestionIndex + 1}
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex flex-wrap items-center gap-1.5 mb-1">
-                                                    <span className="text-[11px] font-semibold text-brand tracking-[0.08em] uppercase">Aktif soru</span>
+                                                    <span className="text-[10px] font-semibold text-brand tracking-[0.08em] uppercase">Aktif soru</span>
                                                     {activeQuestion?.category && (
                                                         <span className="text-[11px] text-n500 border border-n200 bg-n0 px-1.5 rounded-full">
                                                             {activeQuestion.category}
@@ -2278,8 +2278,8 @@ export default function LiveInterviewPage() {
                             {/* Soru listesi */}
                             <div className="flex-1 overflow-y-auto custom-scrollbar px-4 pt-2">
                                 {!isTypeSelected ? (
-                                    <div className="border border-dashed border-n300 rounded-[10px] p-4 flex flex-col gap-2.5 mt-2">
-                                        <p className="text-[11px] font-semibold text-n500 tracking-[0.08em] uppercase text-center m-0">
+                                    <div className="border border-dashed border-n300 rounded-[10px] p-3 flex flex-col gap-2.5 mt-2">
+                                        <p className="text-[10px] font-semibold text-n500 tracking-[0.08em] uppercase text-center m-0">
                                             Mülakat stratejisi seçin
                                         </p>
                                         {[
@@ -2298,14 +2298,14 @@ export default function LiveInterviewPage() {
                                                 <span className="w-8 h-8 rounded-md bg-brand-50 text-brand flex items-center justify-center">
                                                     {type.icon}
                                                 </span>
-                                                <span className="text-[13px] font-semibold">{type.title}</span>
+                                                <span className="text-[12px] font-semibold">{type.title}</span>
                                             </button>
                                         ))}
                                     </div>
                                 ) : pathLoading ? (
                                     <div className="flex flex-col items-center justify-center py-10 gap-2.5">
                                         <Loader2 className="w-5 h-5 text-brand animate-spin" />
-                                        <p className="text-[12px] text-n500 m-0">Sorular hazırlanıyor…</p>
+                                        <p className="text-[11px] text-n500 m-0">Sorular hazırlanıyor…</p>
                                     </div>
                                 ) : (
                                     <div className="flex flex-col gap-1 pb-2">
@@ -2322,7 +2322,7 @@ export default function LiveInterviewPage() {
                                                         : 'bg-n0 border-n200 hover:bg-n50'
                                                 }`}
                                             >
-                                                <span className={`w-5 h-5 rounded flex items-center justify-center text-[11px] font-semibold shrink-0 ${
+                                                <span className={`w-5 h-5 rounded flex items-center justify-center text-[10px] font-semibold shrink-0 ${
                                                     idx === currentQuestionIndex
                                                         ? 'bg-brand text-white'
                                                         : q.visibleToCandidate
@@ -2331,7 +2331,7 @@ export default function LiveInterviewPage() {
                                                 }`}>
                                                     {q.visibleToCandidate ? <Check className="w-2.5 h-2.5" /> : idx + 1}
                                                 </span>
-                                                <span className={`text-[12px] leading-snug flex-1 min-w-0 ${
+                                                <span className={`text-[11px] leading-snug flex-1 min-w-0 ${
                                                     idx === currentQuestionIndex
                                                         ? 'text-n900 font-medium'
                                                         : q.visibleToCandidate
@@ -2341,7 +2341,7 @@ export default function LiveInterviewPage() {
                                                     {q.text}
                                                 </span>
                                                 {q.category && idx === currentQuestionIndex && (
-                                                    <span className="text-[11px] text-brand shrink-0">{q.category}</span>
+                                                    <span className="text-[10px] text-brand shrink-0">{q.category}</span>
                                                 )}
                                             </button>
                                         ))}
@@ -2354,9 +2354,9 @@ export default function LiveInterviewPage() {
                                 <div className="px-4 py-2 border-t border-n200 shrink-0">
                                     <button
                                         onClick={() => setShowCustomInput(v => !v)}
-                                        className="w-full flex items-center justify-center gap-1.5 py-1 text-[11px] font-medium text-n400 hover:text-n600"
+                                        className="w-full flex items-center justify-center gap-1.5 py-1 text-[10px] font-medium text-n400 hover:text-n600"
                                     >
-                                        <span className="text-[13px] leading-none">{showCustomInput ? '−' : '+'}</span>
+                                        <span className="text-[12px] leading-none">{showCustomInput ? '−' : '+'}</span>
                                         {showCustomInput ? 'Gizle' : 'Listeye özel soru ekle'}
                                     </button>
                                     {showCustomInput && (
@@ -2405,7 +2405,7 @@ export default function LiveInterviewPage() {
                             bloğundan: mülakatçı nötr, aday marka tonu. */}
                         <section className="bg-n0 border border-n200 rounded-[14px] h-[220px] shrink-0 flex flex-col p-3.5">
                             <div className="flex items-center gap-2 mb-2">
-                                <h2 className="text-[13px] font-semibold m-0">Canlı transkript</h2>
+                                <h2 className="text-[12px] font-semibold m-0">Canlı transkript</h2>
                                 <span className={`ml-auto flex items-center gap-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full ${
                                     isRecording ? 'bg-ok-bg text-ok' : 'bg-n100 text-n500'
                                 }`}>
@@ -2425,7 +2425,7 @@ export default function LiveInterviewPage() {
                                 {transcript.length === 0 && (
                                     <div className="h-full flex flex-col items-center justify-center text-n400">
                                         <MessageSquare className="w-5 h-5 mb-1.5" />
-                                        <p className="text-[12px] m-0">Konuşmalar burada görünecek</p>
+                                        <p className="text-[11px] m-0">Konuşmalar burada görünecek</p>
                                     </div>
                                 )}
                                 {transcript.slice(-8).map((line, idx) => {
@@ -2440,14 +2440,14 @@ export default function LiveInterviewPage() {
                                             }`}
                                         >
                                             <div className="flex items-center justify-between mb-0.5">
-                                                <span className={`text-[11px] font-semibold tracking-[0.08em] uppercase ${
+                                                <span className={`text-[10px] font-semibold tracking-[0.08em] uppercase ${
                                                     isCandidate ? 'text-brand' : 'text-n400'
                                                 }`}>
                                                     {line.role}
                                                 </span>
-                                                <span className="text-[11px] text-n400 tabular-nums">{line.time}</span>
+                                                <span className="text-[10px] text-n400 tabular-nums">{line.time}</span>
                                             </div>
-                                            <p className="text-[12px] leading-relaxed text-n700 m-0">{line.text}</p>
+                                            <p className="text-[11px] leading-relaxed text-n700 m-0">{line.text}</p>
                                         </div>
                                     );
                                 })}
@@ -2456,7 +2456,7 @@ export default function LiveInterviewPage() {
                     </div>
 
                     {/* ── SAĞ: video + kontroller + analiz ───────────────── */}
-                    <div className="min-w-0 flex flex-col gap-3 overflow-y-auto custom-scrollbar">
+                    <div className="min-w-0 flex flex-col gap-2 overflow-y-auto custom-scrollbar">
 
                         {/* Video — zemin koyu kalıyor: görüntünün arkası her
                             arayüzde koyudur, aydınlatma böyle doğru okunuyor. */}
@@ -2515,17 +2515,17 @@ export default function LiveInterviewPage() {
                         <section className="bg-n0 border border-n200 rounded-[14px] p-3.5 shrink-0">
                             <div className="flex items-center gap-2 mb-2">
                                 <Sparkles className="w-3.5 h-3.5 text-brand" />
-                                <h2 className="text-[13px] font-semibold m-0">Soru önerisi</h2>
-                                <span className="text-[11px] text-n400">yalnızca siz görürsünüz</span>
+                                <h2 className="text-[12px] font-semibold m-0">Soru önerisi</h2>
+                                <span className="text-[10px] text-n400">yalnızca siz görürsünüz</span>
                                 {coachGenerating && <Loader2 className="ml-auto w-3.5 h-3.5 text-brand animate-spin" />}
                             </div>
-                            <p className="text-[13px] leading-relaxed text-n700 border-l-2 border-brand-200 pl-2.5 m-0">
+                            <p className="text-[12px] leading-relaxed text-n700 border-l-2 border-brand-200 pl-2.5 m-0">
                                 {suggestedQuestion
                                     ? suggestedQuestion.question
                                     : 'Transkript otomatik takip ediyor — siz sesli sorun, sistem kaydeder. "Derinleştir" ile anlık soru önerisi alın.'}
                             </p>
                             {suggestedQuestion?.evaluationHint && (
-                                <p className="text-[12px] text-brand mt-1.5 pl-2.5 m-0">→ {suggestedQuestion.evaluationHint}</p>
+                                <p className="text-[11px] text-brand mt-1.5 pl-2.5 m-0">→ {suggestedQuestion.evaluationHint}</p>
                             )}
                             {suggestedQuestion && (
                                 <div className="flex gap-2 mt-3">
@@ -2544,7 +2544,7 @@ export default function LiveInterviewPage() {
                                             setCurrentQuestionIndex(updated.length - 1);
                                             setSuggestedQuestion(null);
                                         }}
-                                        className="flex-1 flex items-center justify-center gap-1.5 text-[12px] font-semibold text-white bg-brand hover:bg-brand-600 rounded-md py-1.5"
+                                        className="flex-1 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-white bg-brand hover:bg-brand-600 rounded-md py-1.5"
                                     >
                                         <FileText className="w-3 h-3" /> Listeye ekle
                                     </button>
@@ -2559,9 +2559,9 @@ export default function LiveInterviewPage() {
                         </section>
 
                         {/* Analiz */}
-                        <section className="bg-n0 border border-n200 rounded-[14px] p-3.5 shrink-0 flex flex-col gap-3">
+                        <section className="bg-n0 border border-n200 rounded-[14px] p-3.5 shrink-0 flex flex-col gap-2">
                             <div className="flex items-center gap-2">
-                                <h2 className="text-[13px] font-semibold m-0">Canlı değerlendirme</h2>
+                                <h2 className="text-[12px] font-semibold m-0">Canlı değerlendirme</h2>
                                 {starAnalyzing && <Loader2 className="w-3 h-3 text-brand animate-spin" />}
                                 <span className="ml-auto text-[11px] font-semibold text-brand bg-brand-50 px-2 py-0.5 rounded-full">
                                     Anlık
@@ -2572,8 +2572,8 @@ export default function LiveInterviewPage() {
                                 <div className="flex items-start gap-2 bg-warn-bg rounded-md p-2.5">
                                     <AlertTriangle className="w-3.5 h-3.5 text-warn shrink-0 mt-0.5" />
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-[12px] font-semibold text-warn m-0">Önyargı uyarısı</p>
-                                        <p className="text-[12px] text-n700 mt-0.5 leading-snug m-0">{biasWarning}</p>
+                                        <p className="text-[11px] font-semibold text-warn m-0">Önyargı uyarısı</p>
+                                        <p className="text-[11px] text-n700 mt-0.5 leading-snug m-0">{biasWarning}</p>
                                     </div>
                                     <button onClick={() => setBiasWarning(null)} className="text-n400 hover:text-n700 shrink-0" aria-label="Kapat">
                                         <X className="w-3.5 h-3.5" />
@@ -2598,14 +2598,14 @@ export default function LiveInterviewPage() {
                                     { key: 'adaptability', label: 'Adaptasyon' },
                                 ].map(({ key, label }) => (
                                     <div key={key} className="flex items-center gap-2">
-                                        <span className="text-[12px] text-n500 w-24 shrink-0">{label}</span>
+                                        <span className="text-[11px] text-n500 w-24 shrink-0">{label}</span>
                                         <div className="flex-1 h-1.5 bg-n100 rounded-full overflow-hidden">
                                             <div
                                                 className="h-full bg-brand rounded-full transition-all duration-700"
                                                 style={{ width: `${starScores[key] || 0}%` }}
                                             />
                                         </div>
-                                        <span className="text-[12px] font-semibold tabular-nums w-8 text-right">{starScores[key] || 0}</span>
+                                        <span className="text-[11px] font-semibold tabular-nums w-8 text-right">{starScores[key] || 0}</span>
                                     </div>
                                 ))}
                             </div>
@@ -2614,20 +2614,20 @@ export default function LiveInterviewPage() {
                                 yukarıdaki beş yetkinliğin düz ortalaması. Ad
                                 artık ölçtüğü şeyi söylüyor. */}
                             <div className="flex items-center gap-2 pt-2.5 border-t border-n100">
-                                <span className="text-[12px] text-n500 w-24 shrink-0">Ortalama</span>
+                                <span className="text-[11px] text-n500 w-24 shrink-0">Ortalama</span>
                                 <div className="flex-1 h-1.5 bg-n100 rounded-full overflow-hidden">
                                     <div className="h-full bg-brand-600 rounded-full transition-all duration-700" style={{ width: `${logicIntegrity}%` }} />
                                 </div>
-                                <span className="text-[12px] font-semibold text-brand tabular-nums w-8 text-right">{logicIntegrity}</span>
+                                <span className="text-[11px] font-semibold text-brand tabular-nums w-8 text-right">{logicIntegrity}</span>
                             </div>
 
                             {aiInsights.length > 0 && (
                                 <div className="flex flex-col gap-1.5 pt-1">
-                                    <p className="text-[11px] font-semibold text-n500 tracking-[0.08em] uppercase m-0">Tespitler</p>
+                                    <p className="text-[10px] font-semibold text-n500 tracking-[0.08em] uppercase m-0">Tespitler</p>
                                     {aiInsights.slice(0, 5).map(ins => (
                                         <div
                                             key={ins.id}
-                                            className={`rounded-md p-2.5 text-[12px] leading-relaxed ${
+                                            className={`rounded-md p-2.5 text-[11px] leading-relaxed ${
                                                 ins.type === 'warning' ? 'bg-warn-bg text-n700' : 'bg-n50 text-n700'
                                             }`}
                                         >
@@ -2640,7 +2640,7 @@ export default function LiveInterviewPage() {
 
                             {emotionData && (
                                 <div className="flex flex-col gap-2 pt-1">
-                                    <p className="text-[11px] font-semibold text-n500 tracking-[0.08em] uppercase flex items-center gap-1.5 m-0">
+                                    <p className="text-[10px] font-semibold text-n500 tracking-[0.08em] uppercase flex items-center gap-1.5 m-0">
                                         <Activity className="w-3 h-3" /> Ses duygu analizi
                                     </p>
                                     <div className="grid grid-cols-2 gap-x-3 gap-y-2">
@@ -2652,8 +2652,8 @@ export default function LiveInterviewPage() {
                                         ].map(({ label, value, color }) => (
                                             <div key={label}>
                                                 <div className="flex justify-between mb-1">
-                                                    <span className="text-[12px] text-n500">{label}</span>
-                                                    <span className="text-[12px] font-semibold tabular-nums" style={{ color }}>%{value || 0}</span>
+                                                    <span className="text-[11px] text-n500">{label}</span>
+                                                    <span className="text-[11px] font-semibold tabular-nums" style={{ color }}>%{value || 0}</span>
                                                 </div>
                                                 <div className="h-1.5 bg-n100 rounded-full overflow-hidden">
                                                     <div className="h-full rounded-full transition-all duration-700" style={{ width: `${value || 0}%`, background: color }} />
@@ -2676,7 +2676,7 @@ export default function LiveInterviewPage() {
         <div className="fixed inset-0 z-[200] bg-[#07090F] flex flex-col overflow-hidden text-white font-sans">
             {/* COMPACT DARK HEADER */}
             <header className="h-[48px] shrink-0 border-b border-white/5 bg-[#0F172A] px-5 flex items-center justify-between z-20">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                     <div className="flex items-center gap-2">
                         <Video className="w-3.5 h-3.5 text-blue-500" />
                         <h2 className="text-[10px] font-black uppercase tracking-[0.15em] italic">Live Session Hub</h2>
@@ -2694,7 +2694,7 @@ export default function LiveInterviewPage() {
             <div className="flex-1 flex p-2 gap-2 overflow-hidden">
                 {/* ADAY GÖRÜNÜMÜ — mülakatçı yolu yukarıda ayrı return ile
                     karşılanıyor, buraya yalnızca aday düşüyor. */}
-                    <div className="flex-1 flex gap-4 overflow-hidden animate-in fade-in duration-700">
+                    <div className="flex-1 flex gap-3 overflow-hidden animate-in fade-in duration-700">
                         {/* Main Stage: Recruiter View */}
                         <div className="flex-1 bg-[#0F172A] rounded-[2.5rem] relative overflow-hidden shadow-2xl border border-white/10 group/stage">
                             {/* Recruiter Feed — remote stream (NOT muted so audio plays) */}
@@ -2742,7 +2742,7 @@ export default function LiveInterviewPage() {
                             </div>
 
                             {/* Controls Overlay */}
-                            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-4 z-30 bg-[#1E293B]/80 backdrop-blur-2xl px-6 py-4 rounded-2xl border border-white/10 shadow-2xl">
+                            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-3 z-30 bg-[#1E293B]/80 backdrop-blur-2xl px-6 py-3 rounded-2xl border border-white/10 shadow-2xl">
                                 <button onClick={() => setIsMicOn(!isMicOn)} className={"w-12 h-12 rounded-xl flex items-center justify-center transition-all " + (isMicOn ? 'bg-white/10 text-white' : 'bg-red-500 text-white')}>
                                     {isMicOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
                                 </button>
@@ -2759,7 +2759,7 @@ export default function LiveInterviewPage() {
                             </div>
 
                             {/* Indicator */}
-                            <div className="absolute top-8 left-8 flex items-center gap-3">
+                            <div className="absolute top-8 left-8 flex items-center gap-2">
                                 <div className="px-4 py-2 bg-rose-600 rounded-xl flex items-center gap-2.5 shadow-xl border border-rose-500">
                                     <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
                                     <span className="text-[10px] font-black text-white uppercase tracking-widest italic">Mülakat CANLI</span>
@@ -2772,9 +2772,9 @@ export default function LiveInterviewPage() {
                         </div>
 
                         {/* Side Panel: Context (Questions) */}
-                        <div className="w-[340px] flex flex-col gap-4">
+                        <div className="w-[340px] flex flex-col gap-3">
                             <section className="bg-white rounded-[2.5rem] border border-slate-200 flex-1 flex flex-col overflow-hidden shadow-2xl p-8">
-                                <div className="flex items-center gap-3 mb-8">
+                                <div className="flex items-center gap-2 mb-8">
                                     <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
                                         <MessageSquare className="w-5 h-5" />
                                     </div>
@@ -2800,7 +2800,7 @@ export default function LiveInterviewPage() {
 
                                             return (
                                                 <div key={idx} className={"p-6 rounded-3xl border transition-all duration-700 " + (isLastShared ? 'border-blue-500 bg-blue-50/50 shadow-lg scale-[1.02]' : 'opacity-40 border-slate-100 grayscale scale-[0.98]')}>
-                                                    <div className="flex items-center gap-3 mb-3">
+                                                    <div className="flex items-center gap-2 mb-3">
                                                         <div className={"w-6 h-6 rounded-xl flex items-center justify-center text-[10px] font-black " + (isLastShared ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-500')}>
                                                             {originalIndex + 1}
                                                         </div>
@@ -2859,7 +2859,7 @@ export default function LiveInterviewPage() {
                                 </select>
                             </div>
                         </div>
-                        <button onClick={() => setShowSettings(false)} className="w-full h-14 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black text-[11px] tracking-widest uppercase mt-8 transition-all shadow-xl shadow-blue-500/20 italic">
+                        <button onClick={() => setShowSettings(false)} className="w-full h-14 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black text-[10px] tracking-widest uppercase mt-8 transition-all shadow-xl shadow-blue-500/20 italic">
                             AYARLARI KAYDET
                         </button>
                     </div>

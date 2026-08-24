@@ -41,10 +41,10 @@ export default function RequirementNormalizeModal({
     const setMust = (i, must) => setItems((prev) => prev.map((r, j) => (j === i ? { ...r, must } : r)));
 
     return (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/40 p-4">
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/40 p-3">
             <div className="w-full max-w-2xl max-h-[85vh] flex flex-col rounded-2xl bg-white border border-slate-200 shadow-2xl overflow-hidden">
                 <header className="flex items-center justify-between gap-2 px-4 py-3 border-b border-slate-100 shrink-0">
-                    <h2 className="flex items-center gap-1.5 text-[11px] font-black text-slate-700 uppercase tracking-widest">
+                    <h2 className="flex items-center gap-1.5 text-[10px] font-black text-slate-700 uppercase tracking-widest">
                         <Wand2 className="w-3.5 h-3.5 text-cyan-500" /> Maddelere Ayır — Önizleme
                     </h2>
                     <button type="button" onClick={onCancel} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
@@ -54,12 +54,12 @@ export default function RequirementNormalizeModal({
 
                 <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
                     {loading && (
-                        <p className="text-[11px] text-slate-500">Maddeler ayrıştırılıyor…</p>
+                        <p className="text-[10px] text-slate-500">Maddeler ayrıştırılıyor…</p>
                     )}
-                    {error && <p className="text-[11px] text-red-600">{error}</p>}
+                    {error && <p className="text-[10px] text-red-600">{error}</p>}
 
                     {!loading && !error && items.length === 0 && (
-                        <p className="text-[11px] text-slate-500 italic">
+                        <p className="text-[10px] text-slate-500 italic">
                             Ayrılacak bir şey bulunamadı — maddeler zaten tekil görünüyor.
                         </p>
                     )}
@@ -110,7 +110,7 @@ export default function RequirementNormalizeModal({
                                                 onChange={() => toggle(i)}
                                                 className="mt-0.5 accent-cyan-500 shrink-0"
                                             />
-                                            <span className="text-[11px] text-slate-700 leading-relaxed">{it.text}</span>
+                                            <span className="text-[10px] text-slate-700 leading-relaxed">{it.text}</span>
                                         </label>
                                         {/* Öncelik burada DEĞİŞTİRİLEBİLİR: model kefeyi yanlış
                                             seçebiliyor ve bunu kutulara yazmadan önce düzeltmek,

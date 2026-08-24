@@ -131,17 +131,17 @@ export default function RescanPositionModal({
     if (!isOpen || !position) return null;
 
     return (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-3">
             <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={running ? undefined : onClose} />
-            <div className="relative w-full max-w-md bg-white rounded-2xl border border-slate-100 shadow-2xl p-5">
+            <div className="relative w-full max-w-md bg-white rounded-2xl border border-slate-100 shadow-2xl p-3.5">
                 <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                         <div className="w-9 h-9 rounded-xl bg-[#13294E] flex items-center justify-center shrink-0">
                             <Target className="w-4 h-4 text-white" />
                         </div>
                         <div>
-                            <h3 className="text-[14px] font-black text-slate-900">Adayları Yeniden Tara</h3>
-                            <p className="text-[11px] text-slate-500 font-semibold truncate max-w-[220px]">{position.title}</p>
+                            <h3 className="text-[13px] font-black text-slate-900">Adayları Yeniden Tara</h3>
+                            <p className="text-[10px] text-slate-500 font-semibold truncate max-w-[220px]">{position.title}</p>
                         </div>
                     </div>
                     <button
@@ -156,7 +156,7 @@ export default function RescanPositionModal({
                 {reason && (
                     <div className="flex gap-2 px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-200 mb-4">
                         <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
-                        <p className="text-[11px] text-amber-700 leading-relaxed">{reason}</p>
+                        <p className="text-[10px] text-amber-700 leading-relaxed">{reason}</p>
                     </div>
                 )}
 
@@ -166,7 +166,7 @@ export default function RescanPositionModal({
                         AI çağrısı demek. Düzeltilmesi gereken küme bayat
                         olanlar ve parmak izi onu kesin biliyor. */}
                     <div className={manual ? 'opacity-40 pointer-events-none' : ''}>
-                        <label className="block text-[11px] font-bold text-slate-600 mb-1.5">
+                        <label className="block text-[10px] font-bold text-slate-600 mb-1.5">
                             Kimler taransın?
                         </label>
                         <div className="space-y-1">
@@ -186,7 +186,7 @@ export default function RescanPositionModal({
                                         className="mt-0.5 accent-cyan-500 shrink-0"
                                     />
                                     <span className="min-w-0">
-                                        <span className="text-[11px] font-bold text-slate-700">
+                                        <span className="text-[10px] font-bold text-slate-700">
                                             {cfg.label} <span className="tabular-nums text-slate-500">({counts[key]})</span>
                                         </span>
                                         <span className="block text-[10px] text-slate-400 leading-snug">{cfg.hint}</span>
@@ -209,7 +209,7 @@ export default function RescanPositionModal({
                         çoğu zaman seçili kapsamın dışında kalıyor. */}
                     <div>
                         <div className="flex items-center justify-between mb-1.5">
-                            <label className="text-[11px] font-bold text-slate-600">
+                            <label className="text-[10px] font-bold text-slate-600">
                                 Ya da tek tek seçin
                             </label>
                             {manual && (
@@ -231,13 +231,13 @@ export default function RescanPositionModal({
                                 onChange={(e) => setSearch(e.target.value)}
                                 disabled={running}
                                 placeholder="Aday ara — isim ya da e-posta"
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-[12px] text-slate-800 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 disabled:opacity-50"
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-2 text-[11px] text-slate-800 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 disabled:opacity-50"
                             />
                         </div>
                         {(search.trim() || manual) && (
                             <div className="mt-1.5 max-h-44 overflow-y-auto rounded-xl border border-slate-200 divide-y divide-slate-100">
                                 {searchable.length === 0 && (
-                                    <p className="px-3 py-3 text-[11px] text-slate-400">
+                                    <p className="px-3 py-3 text-[10px] text-slate-400">
                                         Bu aramayla eşleşen aday yok.
                                     </p>
                                 )}
@@ -253,7 +253,7 @@ export default function RescanPositionModal({
                                             disabled={running}
                                             className="accent-cyan-500 shrink-0"
                                         />
-                                        <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-slate-700">
+                                        <span className="min-w-0 flex-1 truncate text-[10px] font-semibold text-slate-700">
                                             {s.candidate.name || '—'}
                                         </span>
                                         {s.stale && (
@@ -299,10 +299,10 @@ export default function RescanPositionModal({
                     </div>
 
                     <div className={manual ? 'opacity-40 pointer-events-none' : ''}>
-                        <label className="block text-[11px] font-bold text-slate-600 mb-1.5">
+                        <label className="block text-[10px] font-bold text-slate-600 mb-1.5">
                             Minimum uyum skoru
                         </label>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
                             <input
                                 type="number"
                                 min="0"
@@ -312,7 +312,7 @@ export default function RescanPositionModal({
                                 disabled={running}
                                 className="w-24 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 disabled:opacity-50"
                             />
-                            <p className="text-[11px] text-slate-500 leading-snug">
+                            <p className="text-[10px] text-slate-500 leading-snug">
                                 Seçilen kapsamda skoru <strong>%{threshold}</strong> ve üzerinde olan
                                 <strong> {selected.length}</strong> aday taranacak.
                             </p>
@@ -323,7 +323,7 @@ export default function RescanPositionModal({
                     </div>
 
                     <div className="px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-100">
-                        <p className="text-[11px] text-slate-500 leading-relaxed">
+                        <p className="text-[10px] text-slate-500 leading-relaxed">
                             Her aday için <strong>1 AI çağrısı</strong> yapılır — bu tarama{' '}
                             <strong>{selected.length} çağrı</strong> demek. Bu pozisyona ait analiz yeni
                             gereksinimlere göre yeniden üretilir; diğer pozisyonların analizlerine
@@ -334,14 +334,14 @@ export default function RescanPositionModal({
                     {running && progress && (
                         <div className="px-3 py-2.5 rounded-xl bg-blue-50 border border-blue-200 flex items-center gap-2">
                             <Loader2 className="w-3.5 h-3.5 text-blue-500 animate-spin shrink-0" />
-                            <p className="text-[11px] font-semibold text-blue-700">
+                            <p className="text-[10px] font-semibold text-blue-700">
                                 Taranıyor — {progress.done} / {progress.total}
                             </p>
                         </div>
                     )}
                 </div>
 
-                <div className="mt-5 flex gap-3">
+                <div className="mt-5 flex gap-2">
                     <button
                         onClick={onClose}
                         disabled={running}

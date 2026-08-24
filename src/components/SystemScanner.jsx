@@ -444,12 +444,12 @@ export default function SystemScanner() {
             && (scanScope !== 'filtered' || (targetPosition && filteredQueue.length > 0));
 
         return createPortal(
-            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-sm">
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 bg-navy-950/80 backdrop-blur-sm">
                 <div className="bg-navy-900 border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl animate-in zoom-in-95 mx-auto flex flex-col max-h-[90vh]">
 
                     {/* Header */}
-                    <div className="p-5 border-b border-white/5 flex items-center justify-between shrink-0">
-                        <div className="flex items-center gap-3">
+                    <div className="p-3.5 border-b border-white/5 flex items-center justify-between shrink-0">
+                        <div className="flex items-center gap-2">
                             <div className="w-9 h-9 rounded-xl bg-electric/10 flex items-center justify-center">
                                 <Brain className="w-5 h-5 text-electric" />
                             </div>
@@ -464,7 +464,7 @@ export default function SystemScanner() {
                     </div>
 
                     {/* Scrollable body */}
-                    <div className="overflow-y-auto flex-1 p-5 space-y-4">
+                    <div className="overflow-y-auto flex-1 p-3.5 space-y-4">
 
                         {/* Scope selector */}
                         <div>
@@ -483,7 +483,7 @@ export default function SystemScanner() {
                                         <button
                                             key={opt.id}
                                             onClick={() => setScanScope(opt.id)}
-                                            className={`w-full flex items-start gap-3 p-3 rounded-xl border text-left transition-all ${
+                                            className={`w-full flex items-start gap-2 p-3 rounded-xl border text-left transition-all ${
                                                 active
                                                     ? `${opt.bg} ${opt.border}`
                                                     : 'bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.05]'
@@ -539,7 +539,7 @@ export default function SystemScanner() {
                                         <option key={p.id} value={p.id} className="bg-navy-900">{p.title}</option>
                                     ))}
                                 </select>
-                                <div className="flex items-center gap-3 flex-wrap">
+                                <div className="flex items-center gap-2 flex-wrap">
                                     <label className="flex items-center gap-2 text-xs text-navy-400">
                                         Min. ön skor
                                         <input
@@ -615,7 +615,7 @@ export default function SystemScanner() {
                                 {/* Candidate list */}
                                 <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
                                     {filteredForSelection.length === 0 && (
-                                        <p className="text-center text-navy-500 text-xs py-4">Aday bulunamadı</p>
+                                        <p className="text-center text-navy-500 text-xs py-3">Aday bulunamadı</p>
                                     )}
                                     {filteredForSelection.map(c => {
                                         const checked  = selectedIds.has(c.id);
@@ -624,7 +624,7 @@ export default function SystemScanner() {
                                             <button
                                                 key={c.id}
                                                 onClick={() => toggleCandidate(c.id)}
-                                                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg border text-left transition-all ${
+                                                className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg border text-left transition-all ${
                                                     checked
                                                         ? 'bg-violet-400/10 border-violet-400/30'
                                                         : 'bg-white/[0.02] border-white/[0.05] hover:bg-white/[0.05]'
@@ -664,7 +664,7 @@ export default function SystemScanner() {
                     </div>
 
                     {/* Footer */}
-                    <div className="p-5 border-t border-white/5 flex gap-3 shrink-0">
+                    <div className="p-3.5 border-t border-white/5 flex gap-2 shrink-0">
                         <button
                             onClick={() => setShowConfirm(false)}
                             className="flex-1 py-2.5 rounded-xl border border-white/10 text-navy-300 hover:text-white font-medium transition-all"
@@ -703,7 +703,7 @@ export default function SystemScanner() {
 
             {/* Scan Monitor Modal */}
             {showMonitor && createPortal(
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
                     <div className="bg-navy-900 border border-white/10 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col relative mx-auto my-auto">
 
                         {/* Status Header */}
@@ -758,7 +758,7 @@ export default function SystemScanner() {
                                     </div>
                                     <h3 className="text-xl font-bold text-white mb-1">{currentCandidate.name}</h3>
                                     <p className="text-sm text-navy-400 mb-6">{currentCandidate.position}</p>
-                                    <div className="flex items-center gap-3 px-4 py-2 rounded-full bg-white/5 border border-white/10">
+                                    <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10">
                                         <Loader2 className="w-4 h-4 animate-spin text-electric" />
                                         <span className="text-sm font-medium text-electric-light uppercase tracking-wide">
                                             {activeStage === 'scout'      && 'Profil Taranıyor...'}
@@ -790,15 +790,15 @@ export default function SystemScanner() {
 
                         {/* Stats Footer */}
                         <div className="grid grid-cols-3 divide-x divide-white/5 border-t border-white/5 bg-navy-950/30">
-                            <div className="p-4 text-center">
+                            <div className="p-3 text-center">
                                 <div className="text-xs text-navy-500 uppercase font-bold tracking-wider mb-1">Taranan</div>
                                 <div className="text-xl font-bold text-white">{processedCount} / {totalQueued}</div>
                             </div>
-                            <div className="p-4 text-center">
+                            <div className="p-3 text-center">
                                 <div className="text-xs text-navy-500 uppercase font-bold tracking-wider mb-1">AI Analiz</div>
                                 <div className="text-xl font-bold text-electric">{aiCount}</div>
                             </div>
-                            <div className="p-4 text-center">
+                            <div className="p-3 text-center">
                                 <div className="text-xs text-navy-500 uppercase font-bold tracking-wider mb-1">Güncellenen</div>
                                 <div className="text-xl font-bold text-emerald-400">{updatedCount}</div>
                             </div>

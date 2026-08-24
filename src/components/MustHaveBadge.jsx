@@ -41,16 +41,16 @@ export default function MustHaveBadge({ gate, label }) {
         <div className={`rounded-md border px-3 py-2.5 ${tone.wrap}`}>
             <div className={`flex items-center gap-2 ${tone.head}`}>
                 <Icon className="w-3.5 h-3.5 shrink-0" />
-                <span className="text-[11px] font-semibold uppercase tracking-[0.08em]">{label.text}</span>
+                <span className="text-[10px] font-semibold uppercase tracking-[0.08em]">{label.text}</span>
                 {gate.totalMust > 0 && (
-                    <span className="text-[11px] opacity-70">/ {gate.totalMust} zorunlu madde</span>
+                    <span className="text-[10px] opacity-70">/ {gate.totalMust} zorunlu madde</span>
                 )}
                 {/* Rozet dün kırmızıyken bugün yeşilse sebebi görünmeli.
                     Sessizce değişen bir yargı, açıklanamayan bir yargıdır. */}
                 {label.interview && (
                     <span
                         title={`${gate.fromInterview} zorunlu maddenin damgası mülakattan geldi`}
-                        className="ml-auto flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.08em] opacity-70"
+                        className="ml-auto flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.08em] opacity-70"
                     >
                         <Mic className="w-2.5 h-2.5" /> mülakat
                     </span>
@@ -67,7 +67,7 @@ export default function MustHaveBadge({ gate, label }) {
                 // sınırlandı (~90 karakter).
                 <ul className="mt-2 space-y-2 pl-5 max-w-[78ch]">
                     {items.map((it) => (
-                        <li key={it.index} className="text-[12px] leading-[1.55]">
+                        <li key={it.index} className="text-[11px] leading-[1.55]">
                             <span className="font-semibold text-n900">
                                 {it.text}
                                 {it.fromInterview && (

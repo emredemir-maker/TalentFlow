@@ -46,7 +46,7 @@ export default function InterviewHistory({ sessions = [], onStartSession, onDele
                     <Video className="w-10 h-10 text-slate-200" />
                 </div>
                 <h3 className="text-xl font-black text-slate-900 mb-2 relative z-10 uppercase tracking-tighter italic">Henüz Oturum Yok</h3>
-                <p className="text-[11px] text-slate-400 relative z-10 max-w-[280px] leading-relaxed font-black uppercase tracking-widest opacity-60">
+                <p className="text-[10px] text-slate-400 relative z-10 max-w-[280px] leading-relaxed font-black uppercase tracking-widest opacity-60">
                     Değerlendirme sürecini başlatmak için yeni bir mülakat planlayın.
                 </p>
                 <div className="absolute top-0 right-0 w-64 h-64 bg-blue-50/50 rounded-full blur-[80px] -z-10" />
@@ -120,7 +120,7 @@ export default function InterviewHistory({ sessions = [], onStartSession, onDele
 
     return (
         <div className="space-y-6 italic">
-            <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-[#13294E] mb-6 flex items-center gap-3 opacity-60">
+            <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-[#13294E] mb-6 flex items-center gap-2 opacity-60">
                 <Clock className="w-4 h-4" /> MÜLAKAT OTURUMLARI ({sorted.length})
             </h3>
             
@@ -142,7 +142,7 @@ export default function InterviewHistory({ sessions = [], onStartSession, onDele
                                     <TypeIcon className="w-6 h-6" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-3 mb-1.5">
+                                    <div className="flex items-center gap-2 mb-1.5">
                                         <h4 className="text-[15px] font-black text-slate-900 tracking-tight uppercase italic">{session.typeLabel || 'Tanımlanmamış Mülakat'}</h4>
                                         {session.status === 'live' ? (
                                             <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-rose-50 text-rose-600 border border-rose-100 animate-pulse text-[9px] font-black">
@@ -166,7 +166,7 @@ export default function InterviewHistory({ sessions = [], onStartSession, onDele
                                             </div>
                                         )}
                                     </div>
-                                    <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest text-slate-400 opacity-80">
+                                    <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-slate-400 opacity-80">
                                         <div className="flex items-center gap-1.5">
                                             <Calendar className="w-3.5 h-3.5 text-blue-600" />
                                             {session.date ? new Date(session.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' }) : 'Belirtilmedi'}
@@ -194,28 +194,28 @@ export default function InterviewHistory({ sessions = [], onStartSession, onDele
                                     {isPlanned ? (
                                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
                                             <div className="bg-white rounded-[2rem] p-8 border border-slate-100 shadow-sm space-y-6">
-                                                <div className="flex items-center gap-3">
+                                                <div className="flex items-center gap-2">
                                                     <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center border border-blue-100">
                                                         <Video className="w-5 h-5 text-blue-600" />
                                                     </div>
                                                     <div>
-                                                        <h5 className="text-[12px] font-black text-slate-900 uppercase tracking-tight">Oturum Detayı</h5>
+                                                        <h5 className="text-[11px] font-black text-slate-900 uppercase tracking-tight">Oturum Detayı</h5>
                                                         <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Mülakat Planlaması</p>
                                                     </div>
                                                 </div>
                                                 <div className="space-y-3">
-                                                    <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                                    <div className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl border border-slate-100">
                                                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Süre</span>
                                                         <span className="text-sm font-black text-slate-800">{session.duration || '30'} Dakika</span>
                                                     </div>
-                                                    <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                                    <div className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl border border-slate-100">
                                                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Platform</span>
                                                         <span className="text-sm font-black text-slate-800">Talent-Inn Live</span>
                                                     </div>
                                                 </div>
                                                 <button 
                                                     onClick={() => onStartSession?.(session)}
-                                                    className="w-full h-14 rounded-2xl bg-blue-600 text-white font-black text-[12px] uppercase tracking-[0.2em] shadow-xl shadow-blue-500/20 hover:bg-blue-500 transition-all flex items-center justify-center gap-3 italic"
+                                                    className="w-full h-14 rounded-2xl bg-blue-600 text-white font-black text-[11px] uppercase tracking-[0.2em] shadow-xl shadow-blue-500/20 hover:bg-blue-500 transition-all flex items-center justify-center gap-2 italic"
                                                 >
                                                     OTURUMU BAŞLAT <ExternalLink className="w-4 h-4" />
                                                 </button>
@@ -223,15 +223,15 @@ export default function InterviewHistory({ sessions = [], onStartSession, onDele
 
                                             <div className="bg-white rounded-[2rem] p-8 border border-slate-100 shadow-sm flex flex-col justify-between">
                                                 <div className="space-y-4">
-                                                    <div className="flex items-center gap-3">
+                                                    <div className="flex items-center gap-2">
                                                         <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center border border-amber-100">
                                                             <AlertCircle className="w-5 h-5 text-amber-600" />
                                                         </div>
-                                                        <h5 className="text-[12px] font-black text-slate-900 uppercase tracking-tight">Eylem Merkezi</h5>
+                                                        <h5 className="text-[11px] font-black text-slate-900 uppercase tracking-tight">Eylem Merkezi</h5>
                                                     </div>
-                                                    <p className="text-[11px] text-slate-500 font-bold leading-relaxed">Gerekirse oturumu erteleyebilir veya iptal edebilirsiniz. Adaya bildirim gönderilecektir.</p>
+                                                    <p className="text-[10px] text-slate-500 font-bold leading-relaxed">Gerekirse oturumu erteleyebilir veya iptal edebilirsiniz. Adaya bildirim gönderilecektir.</p>
                                                 </div>
-                                                <div className="flex gap-4 mt-6">
+                                                <div className="flex gap-3 mt-6">
                                                    <button
                                                         onClick={(e) => { e.stopPropagation(); onDeleteSession?.(session); }}
                                                         className="flex-1 h-12 rounded-xl border border-red-100 text-red-500 hover:bg-red-50 transition-all text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2"
@@ -271,7 +271,7 @@ export default function InterviewHistory({ sessions = [], onStartSession, onDele
                                             {session.aiSummary && (
                                                 <div className="bg-blue-600 rounded-[2.5rem] p-8 relative overflow-hidden group">
                                                     <Brain className="absolute -right-10 -bottom-10 w-44 h-44 text-white/5 group-hover:scale-110 transition-transform duration-1000" />
-                                                    <div className="flex items-center gap-3 mb-4 relative z-10">
+                                                    <div className="flex items-center gap-2 mb-4 relative z-10">
                                                         <ShieldCheck className="w-5 h-5 text-white/50" />
                                                         <h5 className="text-[10px] font-black text-white/40 uppercase tracking-[0.3em]">AI Stratejik Değerlendirme</h5>
                                                     </div>
@@ -281,12 +281,12 @@ export default function InterviewHistory({ sessions = [], onStartSession, onDele
 
                                             <div className="space-y-6">
                                                 <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-4">Soru & Cevap Analizi</h5>
-                                                <div className="grid grid-cols-1 gap-4">
+                                                <div className="grid grid-cols-1 gap-3">
                                                     {session.questions?.map((q, i) => (
                                                         <div key={i} className="bg-white rounded-[2rem] p-8 border border-slate-100 shadow-sm space-y-6 group/qa">
                                                             <div className="flex items-start justify-between">
                                                                 <div className="flex-1">
-                                                                    <div className="text-[9px] font-black text-blue-600 uppercase tracking-widest mb-4 flex items-center gap-3">
+                                                                    <div className="text-[9px] font-black text-blue-600 uppercase tracking-widest mb-4 flex items-center gap-2">
                                                                         <div className="w-1.5 h-1.5 rounded-full bg-blue-600" />
                                                                         Soru {i + 1}
                                                                     </div>
@@ -303,9 +303,9 @@ export default function InterviewHistory({ sessions = [], onStartSession, onDele
                                                                 )}
                                                             </div>
                                                             {q.aiFeedback && (
-                                                                <div className="pt-4 border-t border-slate-50 flex items-start gap-4">
+                                                                <div className="pt-4 border-t border-slate-50 flex items-start gap-3">
                                                                      <Sparkles className="w-4 h-4 text-blue-400 mt-0.5" />
-                                                                     <p className="text-[11px] font-bold text-slate-400 uppercase leading-relaxed">{q.aiFeedback}</p>
+                                                                     <p className="text-[10px] font-bold text-slate-400 uppercase leading-relaxed">{q.aiFeedback}</p>
                                                                 </div>
                                                             )}
                                                         </div>

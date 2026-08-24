@@ -140,7 +140,7 @@ export default function RequirementReviewPanel({
     const selected = applicable.filter((s) => toApply.has(Number(s.index)));
 
     return (
-        <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+        <div className="rounded-xl border border-slate-200 bg-white p-3 space-y-3">
             <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2">
                     <div className="w-1 h-3.5 rounded-full bg-cyan-500" />
@@ -166,7 +166,7 @@ export default function RequirementReviewPanel({
                             ? 'bg-amber-50 border-amber-100 text-amber-700'
                             : 'bg-emerald-50 border-emerald-100 text-emerald-700'
                 }`}>
-                    <p className="text-[11px] leading-relaxed">
+                    <p className="text-[10px] leading-relaxed">
                         Değerlendirilen <strong>{review.mustEvaluated}</strong> adayın{' '}
                         <strong>{review.mustPass}</strong> tanesi{' '}
                         <strong>{review.mustCount} zorunlu maddenin tamamını</strong> karşılıyor
@@ -184,7 +184,7 @@ export default function RequirementReviewPanel({
             {review.stale > 0 && (
                 <div className="flex items-start gap-2 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
                     <RotateCcw className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
-                    <p className="text-[11px] text-amber-700 leading-relaxed">
+                    <p className="text-[10px] text-amber-700 leading-relaxed">
                         <strong>{review.stale}</strong> adayın analizi gereksinimlerin ESKİ hâline ait
                         {review.fresh > 0 ? <> (yalnızca {review.fresh} tanesi güncel)</> : null}.
                         Aşağıdaki bulgular ve öneriler o eski metne göre hesaplandı —
@@ -200,7 +200,7 @@ export default function RequirementReviewPanel({
             {!review.enoughData && (
                 <div className="flex items-start gap-2 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
                     <Info className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
-                    <p className="text-[11px] text-amber-700 leading-relaxed">
+                    <p className="text-[10px] text-amber-700 leading-relaxed">
                         Bu pozisyon için derin taraması yapılmış <strong>{review.scanned}</strong> aday var;
                         oran üretmek için en az {MIN_SAMPLE} gerekiyor. Önce eşikli derin taramayı
                         çalıştırın — aksi hâlde buradaki sayılar yanıltıcı olur.
@@ -225,7 +225,7 @@ export default function RequirementReviewPanel({
                                         onChange={() => togglePick(it.index)}
                                         className="mt-0.5 accent-cyan-500 shrink-0"
                                     />
-                                    <span className="text-[11px] font-bold text-slate-700 min-w-0">
+                                    <span className="text-[10px] font-bold text-slate-700 min-w-0">
                                         {it.index}. {it.text}
                                     </span>
                                 </label>
@@ -315,7 +315,7 @@ export default function RequirementReviewPanel({
                                         </p>
                                     )}
                                     {s.suggestion && (
-                                        <p className="text-[11px] text-slate-700 leading-relaxed">
+                                        <p className="text-[10px] text-slate-700 leading-relaxed">
                                             <span className="font-black uppercase text-[9px] text-cyan-600">Öneri: </span>
                                             {s.suggestion}
                                         </p>
@@ -336,7 +336,7 @@ export default function RequirementReviewPanel({
             {pickedList.length > 0 && (
                 <div className="rounded-lg border border-cyan-100 bg-cyan-50/40 px-3 py-2.5 space-y-2">
                     <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <p className="text-[11px] text-slate-700">
+                        <p className="text-[10px] text-slate-700">
                             <strong>{pickedList.length}</strong> madde seçili ·{' '}
                             <strong>{filtered.matched.length}</strong> aday{' '}
                             {mode === 'meets' ? 'tamamını karşılıyor' : 'en az birinde eleniyor'}
@@ -373,7 +373,7 @@ export default function RequirementReviewPanel({
                     )}
 
                     {filtered.matched.length === 0 ? (
-                        <p className="text-[11px] text-slate-500 italic">
+                        <p className="text-[10px] text-slate-500 italic">
                             Bu seçimle eşleşen aday yok.
                         </p>
                     ) : (
@@ -385,7 +385,7 @@ export default function RequirementReviewPanel({
                                     disabled={!onCandidateClick}
                                     className="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-white border border-slate-100 hover:border-cyan-300 transition-colors text-left disabled:cursor-default disabled:hover:border-slate-100"
                                 >
-                                    <span className="text-[11px] font-bold text-slate-700 truncate">
+                                    <span className="text-[10px] font-bold text-slate-700 truncate">
                                         {c.name || 'İsimsiz aday'}
                                     </span>
                                     <span className="flex items-center gap-1.5 shrink-0">
@@ -415,7 +415,7 @@ export default function RequirementReviewPanel({
                 <div className="flex items-start gap-2 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2">
                     <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
                     <div className="min-w-0">
-                        <p className="text-[11px] text-amber-800 leading-relaxed">
+                        <p className="text-[10px] text-amber-800 leading-relaxed">
                             <strong>Metin ile işaret çelişiyor.</strong> Aşağıdaki maddelerin metninde
                             öncelik ifadesi geçiyor; değerlendirme yapan model işarete değil{' '}
                             <strong>metne inanıyor</strong>. Öncelik yalnızca Zorunlu/Tercihen
@@ -463,7 +463,7 @@ export default function RequirementReviewPanel({
             )}
 
             {error && (
-                <p className="text-[11px] text-red-600">{error}</p>
+                <p className="text-[10px] text-red-600">{error}</p>
             )}
 
             {/* SEÇİLENLERİ UYGULA.

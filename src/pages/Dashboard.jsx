@@ -55,7 +55,7 @@ function Trend({ val, goodness }) {
     const Icon = isDown ? ArrowDownRight : ArrowUpRight;
     const isGood = typeof goodness === 'boolean' ? goodness : !isDown;
     return (
-        <span className={`inline-flex items-center gap-0.5 text-[11px] font-semibold ${isGood ? 'text-ok' : 'text-bad'}`}>
+        <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold ${isGood ? 'text-ok' : 'text-bad'}`}>
             <Icon className="w-3 h-3" />
             {val}
         </span>
@@ -429,7 +429,7 @@ export default function Dashboard() {
 
     const shownRows = poolRows.slice(0, 9);
 
-    if (error) return <div className="p-10 text-[11px] font-black text-red-500 uppercase tracking-widest text-center">Sistem Hatası: Veri Senkronizasyonu Başarısız.</div>;
+    if (error) return <div className="p-10 text-[10px] font-black text-red-500 uppercase tracking-widest text-center">Sistem Hatası: Veri Senkronizasyonu Başarısız.</div>;
 
     return (
         <div className="infoset min-h-screen bg-n25">
@@ -440,7 +440,7 @@ export default function Dashboard() {
                 Paneli</h2> basıyor ve ikisi birlikte başlığı ekranda iki kez
                 gösteriyordu. */}
             <header className="h-[52px] flex items-center gap-3.5 px-[18px] border-b border-n200 bg-n0">
-                <span className="text-[13px] font-medium text-n700">
+                <span className="text-[12px] font-medium text-n700">
                     {new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'long' })}
                 </span>
                 <div className="ml-auto flex items-center gap-3.5">
@@ -456,7 +456,7 @@ export default function Dashboard() {
                                 title={`${k.label} — ${k.desc}`}
                                 className="hidden md:flex items-baseline gap-1.5 pl-3.5 border-l border-n200"
                             >
-                                <span className="text-[11px] text-n500">{k.short}</span>
+                                <span className="text-[10px] text-n500">{k.short}</span>
                                 <span className="text-[16px] font-semibold tracking-[-0.02em]">{k.value}</span>
                                 {k.change && <Trend val={k.change} goodness={k.goodness} />}
                             </div>
@@ -478,18 +478,18 @@ export default function Dashboard() {
             </header>
 
             {/* BUGÜN ÖNCE BUNLAR — kural bazlı iş kuyruğu */}
-            <div className="px-[18px] py-3.5 bg-n25 border-b border-n200">
+            <div className="px-[18px] py-2.5 bg-n25 border-b border-n200">
                 <div className="flex items-center gap-2.5 mb-2.5 flex-wrap">
                     <ListChecks className="w-4 h-4 text-brand" />
-                    <h2 className="m-0 text-[14px] font-semibold tracking-[-0.01em]">Bugün önce bunlar</h2>
+                    <h2 className="m-0 text-[13px] font-semibold tracking-[-0.01em]">Bugün önce bunlar</h2>
                     <span className="text-[11px] font-semibold px-2 py-0.5 bg-brand-50 text-brand rounded-full">
                         {visibleQueue.length} iş
                     </span>
-                    <span className="text-[12px] text-n500">aciliyet kuralına göre sıralandı</span>
+                    <span className="text-[11px] text-n500">aciliyet kuralına göre sıralandı</span>
                     {dismissed.size > 0 && (
                         <button
                             onClick={() => setDismissed(new Set())}
-                            className="ml-auto text-[12px] font-medium text-brand hover:text-brand-600"
+                            className="ml-auto text-[11px] font-medium text-brand hover:text-brand-600"
                         >
                             Kuyruğu geri al
                         </button>
@@ -498,8 +498,8 @@ export default function Dashboard() {
 
                 {visibleQueue.length === 0 ? (
                     <div className="border border-dashed border-n300 rounded-[10px] p-[26px] text-center">
-                        <div className="text-[13px] font-semibold mb-[3px]">Kuyruk boş</div>
-                        <div className="text-[12px] text-n500">
+                        <div className="text-[12px] font-semibold mb-[3px]">Kuyruk boş</div>
+                        <div className="text-[11px] text-n500">
                             {queueHiddenByUser
                                 ? 'Bugünün işlerini kenara aldınız. "Kuyruğu geri al" ile geri getirebilirsiniz.'
                                 : 'Bekleyen bir iş yok. Yeni iş çıktığında burada belirir.'}
@@ -518,23 +518,23 @@ export default function Dashboard() {
                                     <div className="flex items-center gap-2">
                                         <div
                                             style={{ background: tone.avatarBg, color: tone.accent }}
-                                            className="w-[26px] h-[26px] flex-none rounded-full flex items-center justify-center text-[11px] font-semibold"
+                                            className="w-[26px] h-[26px] flex-none rounded-full flex items-center justify-center text-[10px] font-semibold"
                                         >
                                             {initialOf(q.name)}
                                         </div>
                                         <div className="min-w-0 flex-1">
-                                            <div className="text-[13px] font-semibold truncate">{q.name}</div>
-                                            <div className="text-[11px] text-n400 truncate">{q.role}</div>
+                                            <div className="text-[12px] font-semibold truncate">{q.name}</div>
+                                            <div className="text-[10px] text-n400 truncate">{q.role}</div>
                                         </div>
                                         {q.score > 0 && (
-                                            <span className="text-[13px] font-semibold" style={{ color: tone.accent }}>%{q.score}</span>
+                                            <span className="text-[12px] font-semibold" style={{ color: tone.accent }}>%{q.score}</span>
                                         )}
                                     </div>
-                                    <div className="text-[12px] leading-[1.4] text-n600 min-h-[34px]">{q.why}</div>
+                                    <div className="text-[11px] leading-[1.4] text-n600 min-h-[34px]">{q.why}</div>
                                     <div className="flex items-center gap-1.5">
                                         <button
                                             onClick={q.onCta}
-                                            className="flex-1 text-center text-[12px] font-semibold text-white bg-brand hover:bg-brand-600 py-1.5 rounded-md"
+                                            className="flex-1 text-center text-[11px] font-semibold text-white bg-brand hover:bg-brand-600 py-1.5 rounded-md"
                                         >
                                             {q.cta}
                                         </button>
@@ -559,8 +559,8 @@ export default function Dashboard() {
                 {/* SOL — ADAY HAVUZU */}
                 <div className="xl:border-r border-n200 bg-n0">
                     <div className="flex items-center gap-2.5 px-[18px] pt-2.5 flex-wrap">
-                        <h2 className="m-0 text-[13px] font-semibold">Aday havuzu</h2>
-                        <span className="text-[12px] text-n400">
+                        <h2 className="m-0 text-[12px] font-semibold">Aday havuzu</h2>
+                        <span className="text-[11px] text-n400">
                             {candidates.length} aday{poolFilter ? ` · ${poolRows.length} süzüldü` : ''}
                         </span>
                         <div className="ml-auto flex items-center gap-2">
@@ -600,7 +600,7 @@ export default function Dashboard() {
                             </button>
                         ))}
                         {poolFilter && (
-                            <button onClick={() => setPoolFilter(null)} className="flex-none text-[12px] font-medium text-brand">Temizle</button>
+                            <button onClick={() => setPoolFilter(null)} className="flex-none text-[11px] font-medium text-brand">Temizle</button>
                         )}
                         <button
                             onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'candidates-table' }))}
@@ -610,7 +610,7 @@ export default function Dashboard() {
                         </button>
                     </div>
 
-                    <div className="hidden md:grid grid-cols-[1.6fr_1.3fr_96px_88px_96px_84px] px-[18px] py-2 border-b border-n200 bg-n50 text-[11px] font-semibold text-n500">
+                    <div className="hidden md:grid grid-cols-[1.6fr_1.3fr_96px_88px_96px_84px] px-[18px] py-2 border-b border-n200 bg-n50 text-[10px] font-semibold text-n500">
                         <span>Aday</span>
                         <span>Pozisyon</span>
                         <span className="text-right pr-3.5">CV uyumu</span>
@@ -628,7 +628,7 @@ export default function Dashboard() {
                             </div>
                         ))
                     ) : shownRows.length === 0 ? (
-                        <div className="px-[18px] py-12 text-center text-[12px] text-n400">
+                        <div className="px-[18px] py-12 text-center text-[11px] text-n400">
                             {poolFilter ? 'Bu aşamada aday yok.' : 'Havuzda aday yok.'}
                         </div>
                     ) : shownRows.map((r) => {
@@ -638,10 +638,10 @@ export default function Dashboard() {
                             <div
                                 key={r.id}
                                 onClick={() => openCandidate(r.id)}
-                                className={`grid grid-cols-[1fr_84px] md:grid-cols-[1.6fr_1.3fr_96px_88px_96px_84px] items-center px-[18px] py-[9px] border-b border-n100 text-[13px] cursor-pointer hover:bg-n50 ${queuedIds.has(r.id) ? 'bg-brand-50/40' : ''}`}
+                                className={`grid grid-cols-[1fr_84px] md:grid-cols-[1.6fr_1.3fr_96px_88px_96px_84px] items-center px-[18px] py-[9px] border-b border-n100 text-[12px] cursor-pointer hover:bg-n50 ${queuedIds.has(r.id) ? 'bg-brand-50/40' : ''}`}
                             >
                                 <div className="flex items-center gap-2.5 min-w-0">
-                                    <div className="w-[26px] h-[26px] flex-none rounded-full bg-brand-50 text-brand flex items-center justify-center text-[11px] font-semibold">
+                                    <div className="w-[26px] h-[26px] flex-none rounded-full bg-brand-50 text-brand flex items-center justify-center text-[10px] font-semibold">
                                         {initialOf(r.name)}
                                     </div>
                                     <div className="min-w-0">
@@ -651,7 +651,7 @@ export default function Dashboard() {
                                                 <span className="flex-none text-[11px] font-semibold text-brand bg-brand-50 px-1.5 rounded-full">kuyrukta</span>
                                             )}
                                         </div>
-                                        <div className="text-[11px] text-n400 truncate">{r.city}</div>
+                                        <div className="text-[10px] text-n400 truncate">{r.city}</div>
                                     </div>
                                 </div>
                                 <div className="hidden md:block min-w-0 text-n600 truncate">{r.role}</div>
@@ -669,10 +669,10 @@ export default function Dashboard() {
                                         {r.stage.label}
                                     </span>
                                 </div>
-                                <div className="hidden md:block text-[11px] text-n500">{r.last}</div>
+                                <div className="hidden md:block text-[10px] text-n500">{r.last}</div>
                                 <button
                                     onClick={(e) => { e.stopPropagation(); action.onClick(); }}
-                                    className="text-right text-[12px] font-medium text-brand hover:text-brand-600"
+                                    className="text-right text-[11px] font-medium text-brand hover:text-brand-600"
                                 >
                                     {action.label}
                                 </button>
@@ -680,7 +680,7 @@ export default function Dashboard() {
                         );
                     })}
 
-                    <div className="px-[18px] py-2.5 flex items-center gap-2.5 text-[12px] text-n500">
+                    <div className="px-[18px] py-2.5 flex items-center gap-2.5 text-[11px] text-n500">
                         <span>{poolRows.length} adaydan {shownRows.length} tanesi gösteriliyor</span>
                         <button
                             onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'candidates-table' }))}
@@ -692,19 +692,19 @@ export default function Dashboard() {
                 </div>
 
                 {/* SAĞ RAY — yaklaşan mülakatlar · açık pozisyonlar · sistem durumu */}
-                <div className="p-3.5 flex flex-col gap-3 bg-n25">
+                <div className="p-3.5 flex flex-col gap-2 bg-n25">
                     <div>
                         <div className="flex items-center justify-between mb-2.5">
-                            <span className="text-[11px] font-semibold text-n500 tracking-[0.08em] uppercase">Yaklaşan mülakatlar</span>
+                            <span className="text-[10px] font-semibold text-n500 tracking-[0.08em] uppercase">Yaklaşan mülakatlar</span>
                             <button
                                 onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }))}
-                                className="text-[11px] text-brand font-medium"
+                                className="text-[10px] text-brand font-medium"
                             >
                                 Tümü
                             </button>
                         </div>
                         {weeklyPlan.length === 0 ? (
-                            <div className="text-[12px] text-n400 py-3">Planlı mülakat bulunmuyor.</div>
+                            <div className="text-[11px] text-n400 py-3">Planlı mülakat bulunmuyor.</div>
                         ) : weeklyPlan.map((s) => {
                             const todayStr = new Date().toISOString().split('T')[0];
                             const isToday = s.date === todayStr;
@@ -728,10 +728,10 @@ export default function Dashboard() {
                                     }}
                                     className="w-full flex items-center gap-2.5 py-2 border-t border-n100 text-left hover:bg-n50"
                                 >
-                                    <span className="w-[38px] flex-none text-[12px] font-semibold">{s.time}</span>
+                                    <span className="w-[38px] flex-none text-[11px] font-semibold">{s.time}</span>
                                     <div className="flex-1 min-w-0">
-                                        <div className="text-[12px] font-medium truncate">{s.name}</div>
-                                        <div className="text-[11px] text-n400 truncate">
+                                        <div className="text-[11px] font-medium truncate">{s.name}</div>
+                                        <div className="text-[10px] text-n400 truncate">
                                             {s.role}
                                             {!isToday && s.date ? ` · ${new Date(s.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}` : ''}
                                         </div>
@@ -746,8 +746,8 @@ export default function Dashboard() {
 
                     <div>
                         <div className="flex items-center justify-between mb-2.5">
-                            <span className="text-[11px] font-semibold text-n500 tracking-[0.08em] uppercase">Açık pozisyonlar</span>
-                            <span className="text-[11px] text-n400">{allOpenCount} aktif</span>
+                            <span className="text-[10px] font-semibold text-n500 tracking-[0.08em] uppercase">Açık pozisyonlar</span>
+                            <span className="text-[10px] text-n400">{allOpenCount} aktif</span>
                         </div>
                         {activePositions.map((pos) => {
                             const posCount = candidates.filter(c => c.position === pos.title || c.bestTitle === pos.title).length;
@@ -763,15 +763,15 @@ export default function Dashboard() {
                                     className="w-full flex items-center gap-2.5 py-2 border-t border-n100 text-left hover:bg-n50"
                                 >
                                     <div className="flex-1 min-w-0">
-                                        <div className="text-[12px] font-medium truncate">{pos.title}</div>
-                                        <div className="text-[11px] text-n400">{posCount} aday</div>
+                                        <div className="text-[11px] font-medium truncate">{pos.title}</div>
+                                        <div className="text-[10px] text-n400">{posCount} aday</div>
                                     </div>
                                 </button>
                             );
                         })}
                         <button
                             onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'positions' }))}
-                            className="mt-2 text-[12px] font-medium text-brand hover:text-brand-600"
+                            className="mt-2 text-[11px] font-medium text-brand hover:text-brand-600"
                         >
                             Tüm pozisyonlar →
                         </button>
@@ -780,7 +780,7 @@ export default function Dashboard() {
                     <div className="h-px bg-n200" />
 
                     <div>
-                        <div className="text-[11px] font-semibold text-n500 tracking-[0.08em] uppercase mb-2.5">Sistem durumu</div>
+                        <div className="text-[10px] font-semibold text-n500 tracking-[0.08em] uppercase mb-2.5">Sistem durumu</div>
                         {[
                             { label: 'Skorlama motoru', val: 98 },
                             { label: 'Önyargı denetimi', val: 100 },
@@ -797,8 +797,8 @@ export default function Dashboard() {
                                         <Icon className="w-[11px] h-[11px]" />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <div className="text-[12px] font-semibold">{e.label}</div>
-                                        <div className="text-[11px] leading-[1.4] text-n400">%{e.val} kullanılabilirlik</div>
+                                        <div className="text-[11px] font-semibold">{e.label}</div>
+                                        <div className="text-[10px] leading-[1.4] text-n400">%{e.val} kullanılabilirlik</div>
                                     </div>
                                 </div>
                             );

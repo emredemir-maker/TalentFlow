@@ -271,13 +271,13 @@ export default function SuperAdminPage() {
 
             {/* Header */}
             <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                     <div className="w-8 h-8 rounded-md bg-brand-50 border border-brand-100 flex items-center justify-center">
                         <Shield className="w-4 h-4 text-brand" />
                     </div>
                     <div>
                         <h1 className="text-[15px] font-semibold text-n900 tracking-tight">Sistem Yönetimi</h1>
-                        <p className="text-[11px] text-n400 font-medium">Kullanıcı ve yetki yönetimi</p>
+                        <p className="text-[10px] text-n400 font-medium">Kullanıcı ve yetki yönetimi</p>
                     </div>
                 </div>
                 <button
@@ -289,7 +289,7 @@ export default function SuperAdminPage() {
             </div>
 
             {/* Stats Row */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-2">
                 {[
                     { label: 'Aktif Kullanıcı', value: users.length, color: 'text-ok', bg: 'bg-ok-bg', border: 'border-transparent', icon: ShieldCheck },
                     { label: 'Bekleyen Davet', value: pendingInvites.length, color: 'text-warn', bg: 'bg-warn-bg', border: 'border-transparent', icon: Mail },
@@ -297,7 +297,7 @@ export default function SuperAdminPage() {
                 ].map((s, i) => (
                     <div key={i} className={`bg-n0 rounded-md border border-n200 px-4 py-3 flex items-center justify-between`}>
                         <div>
-                            <p className="text-[11px] font-semibold text-n400 uppercase tracking-[0.08em]">{s.label}</p>
+                            <p className="text-[10px] font-semibold text-n400 uppercase tracking-[0.08em]">{s.label}</p>
                             <p className={`text-[22px] font-semibold ${s.color} leading-tight`}>{s.value}</p>
                         </div>
                         <div className={`w-9 h-9 rounded-md ${s.bg} border ${s.border} flex items-center justify-center`}>
@@ -328,20 +328,20 @@ export default function SuperAdminPage() {
 
             {activeTab === 'domains' && (
                 <div className="max-w-lg space-y-4">
-                    <div className="bg-n0 rounded-[14px] border border-n200 p-5 space-y-4">
-                        <div className="flex items-center gap-3 pb-4 border-b border-n200">
+                    <div className="bg-n0 rounded-[14px] border border-n200 p-3.5 space-y-4">
+                        <div className="flex items-center gap-2 pb-4 border-b border-n200">
                             <div className="w-8 h-8 rounded-md bg-brand-50 border border-brand-100 flex items-center justify-center">
                                 <Globe className="w-4 h-4 text-brand-600" />
                             </div>
                             <div>
-                                <h2 className="text-[13px] font-semibold text-n900">Domain Beyaz Listesi</h2>
-                                <p className="text-[11px] text-n400">Davet zorunluluğu olmadan giriş yapabilecek e-posta domainleri</p>
+                                <h2 className="text-[12px] font-semibold text-n900">Domain Beyaz Listesi</h2>
+                                <p className="text-[10px] text-n400">Davet zorunluluğu olmadan giriş yapabilecek e-posta domainleri</p>
                             </div>
                         </div>
 
                         <div className="bg-warn-bg border border-warn rounded-md p-3 flex gap-2">
                             <AlertCircle className="w-4 h-4 text-warn shrink-0 mt-0.5" />
-                            <p className="text-[12px] text-warn leading-relaxed">
+                            <p className="text-[11px] text-warn leading-relaxed">
                                 Bu listedeki domaine sahip e-posta adresleri <strong>davetiye olmadan</strong> platforma kayıt olabilir.
                                 Örn: <span className="font-mono bg-warn-bg px-1 rounded">btcturk.com</span> eklendiğinde
                                 tüm @btcturk.com adresleri doğrudan kayıt olabilir.
@@ -369,7 +369,7 @@ export default function SuperAdminPage() {
 
                         {/* Domain listesi */}
                         {allowedDomains.length === 0 ? (
-                            <p className="text-center text-[12px] text-n400 italic py-4">Henüz beyaz listeye alınmış domain yok.</p>
+                            <p className="text-center text-[11px] text-n400 italic py-3">Henüz beyaz listeye alınmış domain yok.</p>
                         ) : (
                             <div className="space-y-2">
                                 {allowedDomains.map(d => (
@@ -402,12 +402,12 @@ export default function SuperAdminPage() {
             )}
 
             {activeTab === 'users' && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                     {/* Users Table */}
                     <div className="bg-n0 rounded-[14px] border border-n200 overflow-hidden">
                         <div className="px-4 py-3 border-b border-n200 flex items-center gap-2">
                             <ShieldCheck className="w-4 h-4 text-ok" />
-                            <h2 className="text-[12px] font-semibold text-n900">Aktif Kullanıcılar</h2>
+                            <h2 className="text-[11px] font-semibold text-n900">Aktif Kullanıcılar</h2>
                             <span className="ml-auto text-[11px] font-semibold bg-n100 text-n500 px-2 py-0.5 rounded-full">{users.length}</span>
                         </div>
                         <div className="divide-y divide-n100">
@@ -416,13 +416,13 @@ export default function SuperAdminPage() {
                             ) : users.length === 0 ? (
                                 <p className="py-8 text-center text-xs text-n400 italic">Henüz kullanıcı yok.</p>
                             ) : users.map(u => (
-                                <div key={u.id} className="px-4 py-3 flex items-center gap-3 group hover:bg-n50 transition-colors">
-                                    <div className="w-8 h-8 rounded-md from-brand to-brand flex items-center justify-center text-[11px] font-semibold text-white shrink-0">
+                                <div key={u.id} className="px-4 py-3 flex items-center gap-2 group hover:bg-n50 transition-colors">
+                                    <div className="w-8 h-8 rounded-md from-brand to-brand flex items-center justify-center text-[10px] font-semibold text-white shrink-0">
                                         {u.displayName?.substring(0, 2).toUpperCase() || 'U'}
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-[12px] font-semibold text-n900 truncate">{u.displayName}</p>
-                                        <p className="text-[11px] text-n400 font-mono truncate">{u.email}</p>
+                                        <p className="text-[11px] font-semibold text-n900 truncate">{u.displayName}</p>
+                                        <p className="text-[10px] text-n400 font-mono truncate">{u.email}</p>
                                     </div>
                                     <div className="flex items-center gap-1.5 shrink-0">
                                         <RolePill role={u.role} />
@@ -457,19 +457,19 @@ export default function SuperAdminPage() {
                     <div className="bg-n0 rounded-[14px] border border-n200 overflow-hidden">
                         <div className="px-4 py-3 border-b border-n200 flex items-center gap-2">
                             <Mail className="w-4 h-4 text-warn" />
-                            <h2 className="text-[12px] font-semibold text-n900">Bekleyen Davetler</h2>
+                            <h2 className="text-[11px] font-semibold text-n900">Bekleyen Davetler</h2>
                             <span className="ml-auto text-[11px] font-semibold bg-warn-bg text-warn border border-transparent px-2 py-0.5 rounded-full">{pendingInvites.length}</span>
                         </div>
                         <div className="divide-y divide-n100">
                             {pendingInvites.length === 0 ? (
                                 <p className="py-8 text-center text-xs text-n400 italic">Bekleyen davet bulunmuyor.</p>
                             ) : pendingInvites.map(i => (
-                                <div key={i.id} className="px-4 py-3 flex items-center gap-3">
+                                <div key={i.id} className="px-4 py-3 flex items-center gap-2">
                                     <div className="w-8 h-8 rounded-md bg-warn-bg border border-transparent flex items-center justify-center shrink-0">
                                         <Mail className="w-3.5 h-3.5 text-warn" />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-[12px] font-medium text-n700 truncate">{i.email}</p>
+                                        <p className="text-[11px] font-medium text-n700 truncate">{i.email}</p>
                                         <RolePill role={i.role} small />
                                     </div>
                                     <div className="flex items-center gap-1 shrink-0">
@@ -498,19 +498,19 @@ export default function SuperAdminPage() {
             )}
 
             {activeTab === 'settings' && (
-                <div className="max-w-lg bg-n0 rounded-[14px] border border-n200 p-5 space-y-4">
-                    <div className="flex items-center gap-3 pb-4 border-b border-n200">
+                <div className="max-w-lg bg-n0 rounded-[14px] border border-n200 p-3.5 space-y-4">
+                    <div className="flex items-center gap-2 pb-4 border-b border-n200">
                         <div className="w-8 h-8 rounded-md bg-brand-50 border border-brand-100 flex items-center justify-center">
                             <Key className="w-4 h-4 text-brand" />
                         </div>
                         <div>
-                            <h2 className="text-[13px] font-semibold text-n900">API Anahtarları</h2>
-                            <p className="text-[11px] text-n400">Uygulama genelinde kullanılan servis anahtarları</p>
+                            <h2 className="text-[12px] font-semibold text-n900">API Anahtarları</h2>
+                            <p className="text-[10px] text-n400">Uygulama genelinde kullanılan servis anahtarları</p>
                         </div>
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-[11px] font-semibold text-n400 uppercase tracking-[0.08em] flex items-center gap-1">
+                        <label className="text-[10px] font-semibold text-n400 uppercase tracking-[0.08em] flex items-center gap-1">
                             <Key className="w-2.5 h-2.5" /> Gemini API Key
                             {savedKeyLast4 && (
                                 <span className="normal-case tracking-normal font-semibold text-ok ml-1">
@@ -533,7 +533,7 @@ export default function SuperAdminPage() {
                                 {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                             </button>
                         </div>
-                        <p className="text-[11px] text-n400">
+                        <p className="text-[10px] text-n400">
                             CV ayrıştırma ve otomatik soru oluşturma için kullanılır.
                             <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-brand hover:underline ml-1">Ücretsiz al →</a>
                         </p>
@@ -552,20 +552,20 @@ export default function SuperAdminPage() {
 
             {/* Invite Modal */}
             {showInviteModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-3 animate-in fade-in duration-200">
                     <div className="bg-n0 rounded-[14px] shadow-2xl border border-n200 w-full max-w-sm animate-in zoom-in-95 duration-200">
-                        <div className="flex items-center justify-between px-5 py-4 border-b border-n200">
+                        <div className="flex items-center justify-between px-5 py-3 border-b border-n200">
                             <div className="flex items-center gap-2">
                                 <UserPlus className="w-4 h-4 text-brand" />
-                                <h3 className="text-[13px] font-semibold text-n900">Yeni Kullanıcı Davet Et</h3>
+                                <h3 className="text-[12px] font-semibold text-n900">Yeni Kullanıcı Davet Et</h3>
                             </div>
                             <button onClick={() => setShowInviteModal(false)} className="p-1 text-n400 hover:text-n600 rounded-md hover:bg-n50">
                                 <X className="w-4 h-4" />
                             </button>
                         </div>
-                        <form onSubmit={handleSendInvite} className="px-5 py-4 space-y-3">
+                        <form onSubmit={handleSendInvite} className="px-5 py-3 space-y-3">
                             <div>
-                                <label className="text-[11px] font-semibold text-n400 uppercase tracking-[0.08em] block mb-1.5">E-posta Adresi</label>
+                                <label className="text-[10px] font-semibold text-n400 uppercase tracking-[0.08em] block mb-1.5">E-posta Adresi</label>
                                 <input
                                     type="email" required value={inviteEmail}
                                     onChange={(e) => setInviteEmail(e.target.value)}
@@ -574,7 +574,7 @@ export default function SuperAdminPage() {
                                 />
                             </div>
                             <div>
-                                <label className="text-[11px] font-semibold text-n400 uppercase tracking-[0.08em] block mb-1.5">Kullanıcı Rolü</label>
+                                <label className="text-[10px] font-semibold text-n400 uppercase tracking-[0.08em] block mb-1.5">Kullanıcı Rolü</label>
                                 <select
                                     value={inviteRole}
                                     onChange={(e) => setInviteRole(e.target.value)}
@@ -587,7 +587,7 @@ export default function SuperAdminPage() {
                             </div>
                             {inviteRole === 'department_user' && (
                                 <div>
-                                    <label className="text-[11px] font-semibold text-n400 uppercase tracking-[0.08em] block mb-1.5">Departmanlar</label>
+                                    <label className="text-[10px] font-semibold text-n400 uppercase tracking-[0.08em] block mb-1.5">Departmanlar</label>
                                     <div className="grid grid-cols-2 gap-1.5 max-h-32 overflow-y-auto">
                                         {departmentOptions.map(dept => (
                                             <button
@@ -609,10 +609,10 @@ export default function SuperAdminPage() {
                             )}
                             {error && <p className="text-[12px] text-bad bg-bad-bg border border-transparent rounded-md px-3 py-2">{error}</p>}
                             <div className="flex gap-2 pt-1">
-                                <button type="button" onClick={() => setShowInviteModal(false)} className="flex-1 h-9 rounded-md text-[12px] font-semibold text-n500 border border-n200 hover:bg-n50 transition-all">İptal</button>
+                                <button type="button" onClick={() => setShowInviteModal(false)} className="flex-1 h-9 rounded-md text-[11px] font-semibold text-n500 border border-n200 hover:bg-n50 transition-all">İptal</button>
                                 <button
                                     type="submit" disabled={sending || !inviteEmail}
-                                    className="flex-[2] h-9 rounded-md text-[12px] font-semibold bg-brand hover:bg-brand-600 text-white flex items-center justify-center gap-1.5 transition-all disabled:opacity-60 shadow-sm"
+                                    className="flex-[2] h-9 rounded-md text-[11px] font-semibold bg-brand hover:bg-brand-600 text-white flex items-center justify-center gap-1.5 transition-all disabled:opacity-60 shadow-sm"
                                 >
                                     {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
                                     Davet Gönder
@@ -625,24 +625,24 @@ export default function SuperAdminPage() {
 
             {/* Edit User Modal */}
             {showEditModal && editingUser && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-3 animate-in fade-in duration-200">
                     <div className="bg-n0 rounded-[14px] shadow-2xl border border-n200 w-full max-w-sm animate-in zoom-in-95 duration-200">
-                        <div className="flex items-center justify-between px-5 py-4 border-b border-n200">
+                        <div className="flex items-center justify-between px-5 py-3 border-b border-n200">
                             <div className="flex items-center gap-2">
                                 <Edit2 className="w-4 h-4 text-brand" />
-                                <h3 className="text-[13px] font-semibold text-n900">Kullanıcıyı Düzenle</h3>
+                                <h3 className="text-[12px] font-semibold text-n900">Kullanıcıyı Düzenle</h3>
                             </div>
                             <button onClick={() => setShowEditModal(false)} className="p-1 text-n400 hover:text-n600 rounded-md hover:bg-n50">
                                 <X className="w-4 h-4" />
                             </button>
                         </div>
-                        <form onSubmit={handleUpdateUser} className="px-5 py-4 space-y-3">
+                        <form onSubmit={handleUpdateUser} className="px-5 py-3 space-y-3">
                             <div className="bg-n50 border border-n200 rounded-md px-3 py-2.5">
-                                <p className="text-[12px] font-semibold text-n700">{editingUser.displayName}</p>
-                                <p className="text-[11px] text-n400 font-mono">{editingUser.email}</p>
+                                <p className="text-[11px] font-semibold text-n700">{editingUser.displayName}</p>
+                                <p className="text-[10px] text-n400 font-mono">{editingUser.email}</p>
                             </div>
                             <div>
-                                <label className="text-[11px] font-semibold text-n400 uppercase tracking-[0.08em] block mb-1.5">Rol</label>
+                                <label className="text-[10px] font-semibold text-n400 uppercase tracking-[0.08em] block mb-1.5">Rol</label>
                                 <select
                                     value={editingUser.role}
                                     onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value })}
@@ -655,7 +655,7 @@ export default function SuperAdminPage() {
                             </div>
                             {editingUser.role === 'department_user' && (
                                 <div>
-                                    <label className="text-[11px] font-semibold text-n400 uppercase tracking-[0.08em] block mb-1.5">Departmanlar</label>
+                                    <label className="text-[10px] font-semibold text-n400 uppercase tracking-[0.08em] block mb-1.5">Departmanlar</label>
                                     <div className="grid grid-cols-2 gap-1.5 max-h-32 overflow-y-auto">
                                         {departmentOptions.map(dept => (
                                             <button
@@ -681,7 +681,7 @@ export default function SuperAdminPage() {
                                 <button
                                     type="button"
                                     onClick={() => handleToggleUserStatus(editingUser.id, users.find(u => u.id === editingUser.id)?.status)}
-                                    className={`flex-1 h-9 rounded-md text-[11px] font-semibold flex items-center justify-center gap-1.5 border transition-all ${
+                                    className={`flex-1 h-9 rounded-md text-[10px] font-semibold flex items-center justify-center gap-1.5 border transition-all ${
                                         users.find(u => u.id === editingUser.id)?.status === 'disabled'
                                             ? 'bg-ok-bg border-transparent text-ok hover:bg-ok-bg'
                                             : 'bg-warn-bg border-warn text-warn hover:bg-warn-bg'
@@ -692,7 +692,7 @@ export default function SuperAdminPage() {
                                 </button>
                                 <button
                                     type="submit" disabled={sending}
-                                    className="flex-[2] h-9 rounded-md text-[12px] font-semibold bg-brand hover:bg-brand-600 text-white flex items-center justify-center gap-1.5 transition-all disabled:opacity-60 shadow-sm"
+                                    className="flex-[2] h-9 rounded-md text-[11px] font-semibold bg-brand hover:bg-brand-600 text-white flex items-center justify-center gap-1.5 transition-all disabled:opacity-60 shadow-sm"
                                 >
                                     {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
                                     Güncelle

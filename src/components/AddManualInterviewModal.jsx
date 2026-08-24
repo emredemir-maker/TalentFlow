@@ -431,7 +431,7 @@ export default function AddManualInterviewModal({
 
     // ── Render
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-3">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
                 {/* Header */}
                 <div className="px-8 py-5 border-b border-slate-200 flex items-center justify-between bg-gradient-to-r from-indigo-50 to-blue-50">
@@ -555,7 +555,7 @@ export default function AddManualInterviewModal({
 
                 {/* Footer — only on form step */}
                 {step === 'form' && (
-                    <div className="px-8 py-4 border-t border-slate-200 flex items-center justify-between bg-slate-50">
+                    <div className="px-8 py-3 border-t border-slate-200 flex items-center justify-between bg-slate-50">
                         <div className="text-xs text-slate-500">
                             {!isFormValid ? (
                                 <span className="text-amber-600">
@@ -711,7 +711,7 @@ function FormBody(props) {
 
             {/* Görüşme detayları */}
             <Section title="Görüşme Detayları" required>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2">
                     <div>
                         <label className="text-xs font-semibold text-slate-600 mb-1 block">
                             Görüşme Tipi
@@ -751,7 +751,7 @@ function FormBody(props) {
                         />
                     </div>
                 </div>
-                <div className="grid grid-cols-3 gap-3 mt-3">
+                <div className="grid grid-cols-3 gap-2 mt-3">
                     <div>
                         <label className="text-xs font-semibold text-slate-600 mb-1 block">
                             Tarih
@@ -872,7 +872,7 @@ function FormBody(props) {
                                 ve cevabı yazarken en çok işe yaradığı yer
                                 burası: mülakatçı neyi kaçırdığını görür. */}
                             {q.listenFor && (
-                                <p className="ml-6 mb-1.5 text-[11px] text-emerald-700 leading-relaxed">
+                                <p className="ml-6 mb-1.5 text-[10px] text-emerald-700 leading-relaxed">
                                     <span className="font-bold">İyi cevapta:</span> {q.listenFor}
                                 </p>
                             )}
@@ -938,12 +938,12 @@ function FormBody(props) {
                             ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Dağıtılıyor…</>
                             : <><Sparkles className="w-3.5 h-3.5" /> Transkriptten cevapları doldur</>}
                     </button>
-                    <span className="text-[11px] text-slate-400">
+                    <span className="text-[10px] text-slate-400">
                         Yalnızca boş kutuları doldurur, yazdıklarınıza dokunmaz.
                     </span>
                 </div>
                 {splitNote && (
-                    <p className="mt-1.5 text-[11px] text-cyan-700 leading-relaxed">{splitNote}</p>
+                    <p className="mt-1.5 text-[10px] text-cyan-700 leading-relaxed">{splitNote}</p>
                 )}
                 <label className="text-xs font-semibold text-slate-600 mb-1 mt-3 block">
                     Görüşmeci notları (izlenimler, gözlemler)
@@ -1008,7 +1008,7 @@ function FormBody(props) {
                     anlamsızlaştırır. */}
                 {salaryHint && (
                     <div className="rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 space-y-1.5">
-                        <p className="text-[11px] text-violet-900">
+                        <p className="text-[10px] text-violet-900">
                             Transkriptte bulundu:{' '}
                             <strong>{formatBand(salaryHint)}</strong>
                         </p>
@@ -1095,7 +1095,7 @@ function ResultPanel({ result, onClose }) {
     const recommendedOutcome = result?.recommendedOutcome;
     return (
         <div className="p-6">
-            <div className="flex items-center gap-3 mb-4">
+            <div className="flex items-center gap-2 mb-4">
                 <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center">
                     <CheckCircle2 className="w-6 h-6 text-emerald-500" />
                 </div>
@@ -1116,7 +1116,7 @@ function ResultPanel({ result, onClose }) {
                         damgalarından kodda hesaplanıyor ve tek başına değil,
                         kaç maddeden çıktığıyla birlikte gösteriliyor. */}
                     {evidence?.score != null ? (
-                        <div className="bg-white border border-slate-200 rounded-xl p-4">
+                        <div className="bg-white border border-slate-200 rounded-xl p-3">
                             <div className="text-xs font-bold uppercase text-slate-500 mb-1">
                                 Kanıt oranı
                             </div>
@@ -1157,7 +1157,7 @@ function ResultPanel({ result, onClose }) {
                            gelmişti, bağ vardı, eksik olan cevaptı. Kullanıcı
                            zaten yaptığı işi tekrar yapmaya gönderildi. Sebebi
                            artık sunucu söylüyor. */
-                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
                             <div className="text-xs font-bold uppercase text-slate-500 mb-1">
                                 Sayısal sonuç üretilmedi
                             </div>
@@ -1168,7 +1168,7 @@ function ResultPanel({ result, onClose }) {
                         </div>
                     )}
                     {ai?.summary && (
-                        <div className="bg-white border border-slate-200 rounded-lg p-4">
+                        <div className="bg-white border border-slate-200 rounded-lg p-3">
                             <div className="text-xs font-bold uppercase text-slate-500 mb-2">
                                 Özet
                             </div>
@@ -1176,7 +1176,7 @@ function ResultPanel({ result, onClose }) {
                         </div>
                     )}
                     {(ai?.strengths?.length > 0 || ai?.concerns?.length > 0) && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             {ai.strengths?.length > 0 && (
                                 <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
                                     <div className="text-xs font-bold uppercase text-emerald-700 mb-1.5">
@@ -1229,7 +1229,7 @@ function ResultPanel({ result, onClose }) {
                     )}
                 </div>
             ) : (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
                     ⚠️ AI değerlendirme başarısız oldu. Görüşme kaydedildi; daha sonra
                     yeniden değerlendirme yapılabilir.
                 </div>

@@ -45,7 +45,7 @@ export default function AgentThoughtPanel({ isProcessing, reasoning, decision })
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-electric to-transparent opacity-50" />
 
             {/* Header */}
-            <div className="flex items-center gap-3 mb-6 relative z-10">
+            <div className="flex items-center gap-2 mb-6 relative z-10">
                 <div className={`p-2 rounded-xl bg-electric/10 border border-electric/20 text-electric ${isProcessing ? 'animate-pulse' : ''}`}>
                     <BrainCircuit className="w-5 h-5" />
                 </div>
@@ -64,7 +64,7 @@ export default function AgentThoughtPanel({ isProcessing, reasoning, decision })
                     const Icon = step.icon;
 
                     return (
-                        <div key={step.id} className={`flex items-start gap-4 transition-all duration-500 ${status === 'pending' ? 'opacity-30 blur-[1px]' : 'opacity-100'}`}>
+                        <div key={step.id} className={`flex items-start gap-3 transition-all duration-500 ${status === 'pending' ? 'opacity-30 blur-[1px]' : 'opacity-100'}`}>
                             {/* Connector Line */}
                             {index !== STEPS.length - 1 && (
                                 <div className={`absolute left-[19px] top-8 w-[2px] h-10 -z-10 transition-colors duration-500 ${status === 'completed' ? 'bg-electric' : 'bg-navy-800'}`} />

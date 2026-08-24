@@ -72,7 +72,7 @@ export default function Logo({ size = 40, showText = true, className = "" }) {
                     <span className="text-[10px] font-black tracking-[0.2em] text-text-primary uppercase leading-none drop-shadow-[0_0_10px_rgba(255,255,255,0.1)]">
                         TALENT
                     </span>
-                    <span className="text-[12px] font-black tracking-[0.25em] bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-violet-500 uppercase leading-none italic">
+                    <span className="text-[11px] font-black tracking-[0.25em] bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-violet-500 uppercase leading-none italic">
                         FLOW
                     </span>
                     <div className="h-[1px] w-8 bg-gradient-to-r from-cyan-400/50 via-blue-500/50 to-violet-500/50 rounded-full mt-1" />

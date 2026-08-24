@@ -174,7 +174,7 @@ export default function CandidateRespondPage() {
                                             : 'Yanıtınız Kaydedildi'
                                     }
                                 </h1>
-                                <p className="text-[13px] text-slate-500 leading-relaxed">
+                                <p className="text-[12px] text-slate-500 leading-relaxed">
                                     {type === 'info'
                                         ? 'Gönderdiğiniz bilgiler için teşekkür ederiz. İK ekibimiz inceleyip sizinle iletişime geçecektir.'
                                         : selectedAction === 'confirm'
@@ -195,7 +195,7 @@ export default function CandidateRespondPage() {
                                         <FileText className="w-8 h-8 text-cyan-500" />
                                     </div>
                                     <h1 className="text-[22px] font-black text-slate-900 tracking-tight mb-1">Bilgi Talebi</h1>
-                                    <p className="text-[13px] text-slate-500">
+                                    <p className="text-[12px] text-slate-500">
                                         Merhaba, <span className="font-bold text-slate-700">{data.candidateName || 'Sayın Aday'}</span>
                                     </p>
                                     {data.position && (
@@ -207,19 +207,19 @@ export default function CandidateRespondPage() {
 
                                 {/* Recruiter message */}
                                 {data.requestMessage && (
-                                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3">
                                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Mesaj</p>
-                                        <p className="text-[13px] text-slate-600 leading-relaxed whitespace-pre-line">{data.requestMessage}</p>
+                                        <p className="text-[12px] text-slate-600 leading-relaxed whitespace-pre-line">{data.requestMessage}</p>
                                     </div>
                                 )}
 
                                 {/* Requested items */}
                                 {data.requestedItems?.length > 0 && (
-                                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3">
                                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3">Talep Edilenler</p>
                                         <ul className="space-y-2">
                                             {data.requestedItems.map((item, i) => (
-                                                <li key={i} className="flex items-center gap-2 text-[13px] text-slate-600">
+                                                <li key={i} className="flex items-center gap-2 text-[12px] text-slate-600">
                                                     <Paperclip className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
                                                     {item}
                                                 </li>
@@ -229,9 +229,9 @@ export default function CandidateRespondPage() {
                                 )}
 
                                 {/* Instruction */}
-                                <div className="bg-cyan-50 border border-cyan-100 rounded-2xl p-4 text-center space-y-1">
-                                    <p className="text-[11px] font-black text-cyan-700 uppercase tracking-widest">Nasıl yanıtlarsınız?</p>
-                                    <p className="text-[12px] text-slate-500 leading-relaxed">
+                                <div className="bg-cyan-50 border border-cyan-100 rounded-2xl p-3 text-center space-y-1">
+                                    <p className="text-[10px] font-black text-cyan-700 uppercase tracking-widest">Nasıl yanıtlarsınız?</p>
+                                    <p className="text-[11px] text-slate-500 leading-relaxed">
                                         Aldığınız e-postayı <span className="font-bold text-slate-700">doğrudan yanıtlayarak</span> belge veya bilgilerinizi ekleyebilirsiniz.
                                     </p>
                                 </div>
@@ -258,13 +258,13 @@ export default function CandidateRespondPage() {
                                         <Calendar className="w-8 h-8 text-cyan-500" />
                                     </div>
                                     <h1 className="text-[22px] font-black text-slate-900 tracking-tight mb-1">Mülakat Daveti</h1>
-                                    <p className="text-[13px] text-slate-500">
+                                    <p className="text-[12px] text-slate-500">
                                         Merhaba, <span className="font-bold text-slate-700">{data.candidateName || 'Sayın Aday'}</span>
                                     </p>
                                 </div>
 
                                 {(data.date || data.time) && (
-                                    <div className="bg-cyan-50 border border-cyan-100 rounded-2xl p-4 space-y-2">
+                                    <div className="bg-cyan-50 border border-cyan-100 rounded-2xl p-3 space-y-2">
                                         {data.date && (
                                             <div className="flex items-center gap-2 text-cyan-700 text-sm font-semibold">
                                                 <Calendar className="w-4 h-4 text-cyan-400" /> {data.date}
@@ -276,14 +276,14 @@ export default function CandidateRespondPage() {
                                             </div>
                                         )}
                                         {data.positionTitle && (
-                                            <p className="text-[11px] text-slate-400 font-medium">Pozisyon: {data.positionTitle}</p>
+                                            <p className="text-[10px] text-slate-400 font-medium">Pozisyon: {data.positionTitle}</p>
                                         )}
                                     </div>
                                 )}
 
-                                <p className="text-[13px] text-slate-500 text-center">Mülakat davetine katılıp katılamayacağınızı lütfen belirtin.</p>
+                                <p className="text-[12px] text-slate-500 text-center">Mülakat davetine katılıp katılamayacağınızı lütfen belirtin.</p>
 
-                                <div className="flex gap-3">
+                                <div className="flex gap-2">
                                     <button
                                         onClick={() => handleInviteResponse('confirm')}
                                         className="flex-1 h-12 rounded-xl font-black text-[10px] uppercase tracking-widest bg-emerald-500 hover:bg-emerald-600 text-white transition-all flex items-center justify-center gap-2 shadow-sm shadow-emerald-100"

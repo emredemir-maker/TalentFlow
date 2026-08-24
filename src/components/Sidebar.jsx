@@ -66,14 +66,14 @@ export default function Sidebar({
         return (
             <button
                 onClick={() => onNavigate(item.id)}
-                className={`w-full flex items-center gap-4 px-6 py-3.5 transition-all duration-200 group relative
+                className={`w-full flex items-center gap-3 px-6 py-2.5 transition-all duration-200 group relative
                     ${isActive
                         ? 'bg-brand-50 text-brand'
                         : 'text-n600 hover:text-n900 hover:bg-n100'
                     }`}
             >
                 <item.icon className={`w-4.5 h-4.5 shrink-0 ${isActive ? 'text-brand' : 'text-n400 group-hover:text-n700'}`} />
-                <span className={`text-[13px] font-medium tracking-tight truncate ${labelClass}`}>{item.label}</span>
+                <span className={`text-[12px] font-medium tracking-tight truncate ${labelClass}`}>{item.label}</span>
 
                 {isActive && (
                     <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-brand" />
@@ -116,7 +116,7 @@ export default function Sidebar({
                 )}
 
                 {/* Logo Section */}
-                <div className={`h-20 flex items-center px-6 ${collapsed ? 'lg:justify-center lg:px-0' : ''}`}>
+                <div className={`h-14 flex items-center px-6 ${collapsed ? 'lg:justify-center lg:px-0' : ''}`}>
                     {/* Collapsed desktop → icon only. Mobile + expanded desktop → full logo */}
                     {collapsed ? (
                         <>
@@ -135,14 +135,14 @@ export default function Sidebar({
                 {/* Navigation Items */}
                 <nav className="flex-1 mt-2 space-y-0.5 overflow-y-auto custom-scrollbar">
                     <div className="mb-4">
-                        <h5 className={`text-[11px] text-n400 font-semibold px-8 mb-2 uppercase tracking-[0.08em] ${sectionHeaderClass}`}>
+                        <h5 className={`text-[10px] text-n400 font-semibold px-8 mb-2 uppercase tracking-[0.08em] ${sectionHeaderClass}`}>
                             Ana Menü
                         </h5>
                         {menuItems.map(item => <MenuItem key={item.id} item={item} />)}
                     </div>
 
                     <div className="pt-4">
-                        <h5 className={`text-[11px] text-n400 font-semibold px-8 mb-2 uppercase tracking-[0.08em] ${sectionHeaderClass}`}>
+                        <h5 className={`text-[10px] text-n400 font-semibold px-8 mb-2 uppercase tracking-[0.08em] ${sectionHeaderClass}`}>
                             Yönetim
                         </h5>
                         {adminItems.map(item => <MenuItem key={item.id} item={item} />)}
@@ -150,7 +150,7 @@ export default function Sidebar({
 
                     {userProfile?.role === 'super_admin' && (
                         <div className="pt-4">
-                            <h5 className={`text-[11px] text-n400 font-semibold px-8 mb-2 uppercase tracking-[0.08em] ${sectionHeaderClass}`}>
+                            <h5 className={`text-[10px] text-n400 font-semibold px-8 mb-2 uppercase tracking-[0.08em] ${sectionHeaderClass}`}>
                                 Geliştirici
                             </h5>
                             {docsItems.map(item => <MenuItem key={item.id} item={item} />)}
@@ -159,8 +159,8 @@ export default function Sidebar({
                 </nav>
 
                 {/* Bottom Profile Section */}
-                <div className="p-4 border-t border-n200">
-                    <div className={`flex items-center gap-3 px-2 py-2 ${collapsed ? 'lg:justify-center lg:px-0' : ''}`}>
+                <div className="p-3 border-t border-n200">
+                    <div className={`flex items-center gap-2 px-2 py-2 ${collapsed ? 'lg:justify-center lg:px-0' : ''}`}>
                         <div className="w-9 h-9 rounded-full bg-brand-50 border border-n200 overflow-hidden shrink-0">
                              {userProfile?.imgUrl ? (
                                 <img src={userProfile.imgUrl} alt="User" className="w-full h-full object-cover" />
@@ -171,13 +171,13 @@ export default function Sidebar({
                             )}
                         </div>
                         <div className={`flex flex-col flex-1 min-w-0 ${collapsed ? 'flex lg:hidden' : 'flex'}`}>
-                            <span className="text-n900 text-[13px] font-semibold truncate">{userProfile?.displayName || userProfile?.email || 'Kullanıcı'}</span>
-                            <span className="text-n500 text-[11px] truncate">{roleLabel(userProfile?.role)}</span>
+                            <span className="text-n900 text-[12px] font-semibold truncate">{userProfile?.displayName || userProfile?.email || 'Kullanıcı'}</span>
+                            <span className="text-n500 text-[10px] truncate">{roleLabel(userProfile?.role)}</span>
                         </div>
                     </div>
                     <button
                         onClick={logout}
-                        className={`w-full items-center gap-3 px-2 py-2 text-n500 hover:text-n900 transition-colors mt-1 ${collapsed ? 'flex lg:hidden' : 'flex'}`}
+                        className={`w-full items-center gap-2 px-2 py-2 text-n500 hover:text-n900 transition-colors mt-1 ${collapsed ? 'flex lg:hidden' : 'flex'}`}
                     >
                         <LogOut className="w-4 h-4" />
                         <span className="text-xs font-medium">Çıkış Yap</span>

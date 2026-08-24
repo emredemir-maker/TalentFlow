@@ -314,7 +314,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                 {/* ===== HEADER ===== */}
                 <div className="shrink-0 p-6 border-b border-border-subtle print:border-black relative z-10">
                     <div className="flex items-start justify-between mb-5">
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-3">
                             <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-xl font-black text-white shadow-lg shadow-cyan-500/20 print:bg-none print:text-black print:border print:border-black">
                                 {candidate.name?.[0]}
                             </div>
@@ -339,7 +339,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                                 <button
                                                     key={key}
                                                     onClick={() => updateCandidate(candidate.id, { status: key, rejectionReason: null })}
-                                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-left text-[11px] font-black uppercase tracking-tight transition-all ${candidate.status === key ? 'bg-cyan-500 text-white shadow-lg shadow-cyan-500/20' : 'text-text-muted hover:bg-bg-primary hover:text-text-primary'}`}
+                                                    className={`w-full flex items-center gap-2 px-4 py-3 rounded-2xl text-left text-[11px] font-black uppercase tracking-tight transition-all ${candidate.status === key ? 'bg-cyan-500 text-white shadow-lg shadow-cyan-500/20' : 'text-text-muted hover:bg-bg-primary hover:text-text-primary'}`}
                                                 >
                                                     <span className={`w-2 h-2 rounded-full ${config.dot} ${candidate.status === key ? 'shadow-[0_0_8px_white]' : ''}`} />
                                                     {config.label}
@@ -454,7 +454,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                             </span>
                         </div>
 
-                        <div className="flex items-end gap-3">
+                        <div className="flex items-end gap-2">
                             <div className="text-4xl font-black text-text-primary tracking-tight">
                                 %{activeMatch.score}
                             </div>
@@ -533,14 +533,14 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                         <div className="space-y-6">
                             <Section title="AI INSIGHTS & HIGHLIGHTS">
                                 <div className="space-y-4">
-                                    <p className="text-[13px] text-text-secondary leading-relaxed italic border-l-2 border-cyan-500/30 pl-4 py-1 font-bold">
+                                    <p className="text-[12px] text-text-secondary leading-relaxed italic border-l-2 border-cyan-500/30 pl-4 py-1 font-bold">
                                         {candidate.aiAnalysis?.summary || activeMatch.reasons[0] || candidate.summary || candidate.about || 'Aday hakkında özet bilgi bulunmuyor.'}
                                     </p>
 
                                     {candidate.aiAnalysis?.reasons?.length > 0 && (
                                         <div className="grid grid-cols-1 gap-2 mt-2">
                                             {candidate.aiAnalysis.reasons.map((r, i) => (
-                                                <div key={i} className="flex gap-2 p-3 rounded-xl bg-bg-primary border border-border-subtle text-[11px] text-text-secondary font-bold shadow-inner">
+                                                <div key={i} className="flex gap-2 p-3 rounded-xl bg-bg-primary border border-border-subtle text-[10px] text-text-secondary font-bold shadow-inner">
                                                     <Sparkles className="w-3.5 h-3.5 text-cyan-500 shrink-0 mt-0.5" />
                                                     <span>{r}</span>
                                                 </div>
@@ -552,7 +552,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
 
                             <Section title="Eğitim & Deneyim">
 
-                                <div className="grid grid-cols-2 gap-3">
+                                <div className="grid grid-cols-2 gap-2">
                                     <MiniCard label="Deneyim" value={`${candidate.experience || 0} Yıl`} icon={Briefcase} />
                                     <MiniCard label="Eğitim" value={candidate.education || 'Belirtilmemiş'} icon={GraduationCap} />
                                     <MiniCard label="Departman" value={candidate.department} icon={Layers} />
@@ -676,11 +676,11 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                     return (
                                         <div key={pos.id} className={`rounded-[2.5rem] border transition-all duration-300 overflow-hidden ${isExpanded ? 'bg-bg-primary border-cyan-500/30 shadow-xl' : 'bg-bg-primary/50 border-border-subtle hover:bg-bg-primary'}`}>
                                             <div
-                                                className="p-4 cursor-pointer flex justify-between items-center group select-none"
+                                                className="p-3 cursor-pointer flex justify-between items-center group select-none"
                                                 onClick={() => setExpandedPositionId(isExpanded ? null : pos.id)}
                                             >
-                                                <div className="flex items-center gap-3">
-                                                    <h4 className={`font-bold text-[14px] transition-colors ${isExpanded ? 'text-text-primary' : 'text-text-secondary group-hover:text-text-primary'}`}>{pos.title}</h4>
+                                                <div className="flex items-center gap-2">
+                                                    <h4 className={`font-bold text-[13px] transition-colors ${isExpanded ? 'text-text-primary' : 'text-text-secondary group-hover:text-text-primary'}`}>{pos.title}</h4>
                                                     {hasAI && (
                                                         <span className="text-[9px] font-bold uppercase tracking-widest bg-violet-500/10 text-violet-400 border border-violet-500/20 px-2 py-0.5 rounded flex items-center gap-1 shadow-sm">
                                                             <Sparkles className="w-2.5 h-2.5" /> AI Analizli
@@ -700,7 +700,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                                         <span className="text-[9px] text-text-muted">{analyzedAt}</span>
                                                     )}
                                                 </div>
-                                                <div className="flex items-center gap-4">
+                                                <div className="flex items-center gap-3">
                                                     <span className={`text-[11px] font-black px-3 py-1 rounded-xl flex items-center gap-1.5 shadow-sm ${match.score >= 70 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' : 'bg-bg-primary text-text-muted border-border-subtle'}`}>
                                                         {match.score >= 70 ? '🟢' : '🟡'} %{match.score}
                                                     </span>
@@ -723,13 +723,13 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                                                 targetScore={match.score}
                                                             />
                                                             {stale && (
-                                                                <p className="text-[11px] text-amber-600 dark:text-amber-400 leading-relaxed">
+                                                                <p className="text-[10px] text-amber-600 dark:text-amber-400 leading-relaxed">
                                                                     Bu değerlendirme ilanın <strong>eski madde listesine</strong> ait —
                                                                     madde yargıları bugünkü numaralara denk gelmiyor olabilir.
                                                                 </p>
                                                             )}
                                                             {scanError && (
-                                                                <p className="text-[11px] text-red-500 leading-relaxed">{scanError}</p>
+                                                                <p className="text-[10px] text-red-500 leading-relaxed">{scanError}</p>
                                                             )}
                                                             <button
                                                                 onClick={(e) => { e.stopPropagation(); evaluateForPosition(pos); }}
@@ -744,7 +744,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                                     ) : (
                                                         <div className="text-center py-8">
                                                             {busy ? (
-                                                                <div className="flex flex-col items-center gap-3">
+                                                                <div className="flex flex-col items-center gap-2">
                                                                     <Loader2 className="w-8 h-8 text-cyan-500 animate-spin" />
                                                                     <p className="text-xs font-black uppercase tracking-widest text-cyan-600 dark:text-cyan-400">
                                                                         {pos.title} için değerlendiriliyor…
@@ -755,7 +755,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                                                     <div className="w-20 h-20 rounded-[1.5rem] bg-bg-primary border border-border-subtle flex items-center justify-center mx-auto mb-4 italic shadow-inner">
                                                                         <Brain className="w-10 h-10 text-text-muted opacity-30" />
                                                                     </div>
-                                                                    <p className="text-[13px] text-text-muted mb-2 max-w-[300px] mx-auto font-black italic opacity-60 uppercase tracking-tight leading-relaxed">Bu pozisyon için henüz detaylı yapay zeka analizi yapılmamış.</p>
+                                                                    <p className="text-[12px] text-text-muted mb-2 max-w-[300px] mx-auto font-black italic opacity-60 uppercase tracking-tight leading-relaxed">Bu pozisyon için henüz detaylı yapay zeka analizi yapılmamış.</p>
                                                                     {/* Düğme artık YAZDIĞI İŞİ yapıyor: yalnızca bu
                                                                         ilan, tek AI çağrısı. Eskiden tüm açık
                                                                         pozisyonları tarayıp en yüksek skorlunun
@@ -764,7 +764,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                                                         Yalnızca bu ilan için çalışır — diğer pozisyonların analizine dokunmaz.
                                                                     </p>
                                                                     {scanError && (
-                                                                        <p className="text-[11px] text-red-500 mb-4 max-w-[320px] mx-auto leading-relaxed">{scanError}</p>
+                                                                        <p className="text-[10px] text-red-500 mb-4 max-w-[320px] mx-auto leading-relaxed">{scanError}</p>
                                                                     )}
                                                                     <button
                                                                         onClick={(e) => { e.stopPropagation(); evaluateForPosition(pos); }}
@@ -813,7 +813,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                         navigate(`/live-interview/${sessId}`);
                                     }
                                 }}
-                                className="w-full py-4 rounded-3xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-cyan-500/20 transition-all active:scale-[0.98] flex items-center justify-center gap-3"
+                                className="w-full py-3 rounded-3xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-cyan-500/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
                             >
                                 <ClipboardCheck className="w-5 h-5" /> YENİ CANLI MÜLAKAT
                             </button>
@@ -865,7 +865,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                 <p className="text-4xl font-black">%{candidate.interviewSessions?.length > 0 ? candidate.interviewSessions[candidate.interviewSessions.length - 1].finalScore : 0}</p>
                             </div>
                         </div>
-                        <div className="p-4 bg-gray-50 border border-gray-200">
+                        <div className="p-3 bg-gray-50 border border-gray-200">
                             <h3 className="font-black mb-2">KARAR VERİCİ NOTLARI</h3>
                             <p className="text-sm italic">{candidate.interviewSessions?.length > 0 ? (candidate.interviewSessions[candidate.interviewSessions.length - 1].interviewerNotes || 'Not girilmemiştir.') : 'Not girilmemiştir.'}</p>
                         </div>
@@ -878,7 +878,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                 </div>
 
                 {/* ===== FOOTER ===== */}
-                <div className="shrink-0 p-4 border-t border-border-subtle flex gap-3 print:hidden">
+                <div className="shrink-0 p-3 border-t border-border-subtle flex gap-2 print:hidden">
                     {candidate.cvUrl && (
                         <a
                             href={candidate.cvUrl}
@@ -914,12 +914,12 @@ function Section({ title, children }) {
 
 function MiniCard({ label, value, icon: Icon }) {
     return (
-        <div className="p-4 rounded-2xl bg-bg-primary border border-border-subtle shadow-inner">
+        <div className="p-3 rounded-2xl bg-bg-primary border border-border-subtle shadow-inner">
             <div className="flex items-center gap-1.5 mb-2 opacity-70">
                 <Icon className="w-3.5 h-3.5 text-text-muted" />
                 <span className="text-[10px] uppercase tracking-widest text-text-muted font-black">{label}</span>
             </div>
-            <div className="text-[13px] font-black text-text-secondary truncate">{value || '---'}</div>
+            <div className="text-[12px] font-black text-text-secondary truncate">{value || '---'}</div>
         </div>
     );
 }

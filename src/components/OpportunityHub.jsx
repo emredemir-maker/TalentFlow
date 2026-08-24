@@ -99,7 +99,7 @@ export default function OpportunityHub({ isCompact, onSelectCandidate }) {
 
     if (groupedOpportunities.length === 0) {
         return (
-            <div className={`${isCompact ? 'p-4' : 'p-6'} text-center opacity-40`}>
+            <div className={`${isCompact ? 'p-3' : 'p-6'} text-center opacity-40`}>
                 <Layout className="w-8 h-8 mx-auto mb-2" />
                 <p className="text-[10px] font-bold uppercase tracking-widest">Kriterlere uygun fırsat yok</p>
             </div>
@@ -115,18 +115,18 @@ export default function OpportunityHub({ isCompact, onSelectCandidate }) {
                 return (
                     <div
                         key={c.id}
-                        className={`group relative rounded-xl bg-white border border-outline-variant/10 hover:border-primary/20 transition-all overflow-hidden ${isCompact ? 'p-3' : 'p-4'}`}
+                        className={`group relative rounded-xl bg-white border border-outline-variant/10 hover:border-primary/20 transition-all overflow-hidden ${isCompact ? 'p-3' : 'p-3'}`}
                     >
-                        <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center justify-between gap-2">
                             <div
-                                className="flex items-center gap-3 cursor-pointer flex-1 min-w-0"
+                                className="flex items-center gap-2 cursor-pointer flex-1 min-w-0"
                                 onClick={() => handleNavigateToCandidate(c.id)}
                             >
                                 <div className="w-8 h-8 rounded-lg bg-surface-container-low border border-outline-variant/10 flex items-center justify-center text-[10px] font-black text-on-surface shrink-0">
                                     {c.name?.split(' ').map(n => n[0]).join('').toUpperCase() || '?'}
                                 </div>
                                 <div className="min-w-0">
-                                    <h4 className="font-bold text-on-surface text-[11px] truncate uppercase tracking-tight">{c.name}</h4>
+                                    <h4 className="font-bold text-on-surface text-[10px] truncate uppercase tracking-tight">{c.name}</h4>
                                     <p className="text-[8px] text-text-muted font-bold truncate opacity-60 uppercase">{c.position}</p>
                                 </div>
                             </div>

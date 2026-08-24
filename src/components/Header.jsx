@@ -263,13 +263,13 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
     const hasResults = total > 0;
 
     return (
-        <header className="h-[88px] flex items-center justify-between px-4 md:px-8 bg-n0/80 backdrop-blur-md border-b border-n100 sticky top-0 z-40">
+        <header className="h-14 flex items-center justify-between px-4 md:px-8 bg-n0/80 backdrop-blur-md border-b border-n100 sticky top-0 z-40">
 
             {/* ── Mobile Hamburger + Page Title + Home ──
                 Brand identity lives in the sidebar (Talent-Inn + AI Recruitment).
                 Top-bar shows page-level context only — no second brand wordmark.
                 On <lg the hamburger opens the sidebar drawer. */}
-            <div className="flex items-center gap-2 md:gap-3 md:mr-6">
+            <div className="flex items-center gap-2 md:gap-2 md:mr-6">
                 <button
                     onClick={() => window.dispatchEvent(new CustomEvent('openMobileSidebar'))}
                     className="p-2 rounded-md hover:bg-n100 text-n600 transition-all lg:hidden"
@@ -303,7 +303,7 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                         onFocus={() => setPanelOpen(true)}
                         onKeyDown={handleKeyDown}
                         placeholder={searchPlaceholder}
-                        className="w-full pl-10 md:pl-12 pr-8 md:pr-10 py-2 md:py-2.5 bg-n100 rounded-md focus:bg-n0 focus:ring-1 focus:ring-brand outline-none transition-all text-[13px] md:text-[14px] text-n900 placeholder:text-n400"
+                        className="w-full pl-10 md:pl-12 pr-8 md:pr-10 py-2 md:py-2.5 bg-n100 rounded-md focus:bg-n0 focus:ring-1 focus:ring-brand outline-none transition-all text-[12px] md:text-[13px] text-n900 placeholder:text-n400"
                     />
                     {query && (
                         <button
@@ -323,7 +323,7 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                         {aiLoading && (
                             <div className="flex items-center gap-2 px-4 py-2 border-b border-n200 bg-brand-50/60">
                                 <Loader2 className="w-3 h-3 text-brand animate-spin shrink-0" />
-                                <span className="text-[11px] text-brand font-semibold tracking-wide">Semantik analiz yapılıyor…</span>
+                                <span className="text-[10px] text-brand font-semibold tracking-wide">Semantik analiz yapılıyor…</span>
                             </div>
                         )}
 
@@ -339,7 +339,7 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                             {/* Candidates */}
                             {mergedCandidates.length > 0 && (
                                 <section>
-                                    <div className="px-4 py-1.5 text-[11px] font-semibold text-n400 uppercase tracking-[0.08em] bg-n50 border-b border-n200">
+                                    <div className="px-4 py-1.5 text-[10px] font-semibold text-n400 uppercase tracking-[0.08em] bg-n50 border-b border-n200">
                                         Adaylar
                                     </div>
                                     {mergedCandidates.map((c, i) => (
@@ -347,21 +347,21 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                                             key={c.id}
                                             onClick={() => handleSelect({ type: 'candidate', data: c })}
                                             onMouseEnter={() => setSelIdx(i)}
-                                            className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-brand-50/60 transition-colors text-left border-b border-n50 ${selIdx === i ? 'bg-brand-50/60' : ''}`}
+                                            className={`w-full flex items-center gap-2 px-4 py-3 hover:bg-brand-50/60 transition-colors text-left border-b border-n50 ${selIdx === i ? 'bg-brand-50/60' : ''}`}
                                         >
                                             <div className="w-8 h-8 rounded-full from-brand to-brand-600 flex items-center justify-center text-white text-xs font-semibold shrink-0">
                                                 {c.name?.[0]?.toUpperCase() || '?'}
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-1.5 mb-0.5">
-                                                    <span className="text-[13px] font-semibold text-n900 truncate">{c.name}</span>
+                                                    <span className="text-[12px] font-semibold text-n900 truncate">{c.name}</span>
                                                     {c._isAi && (
                                                         <span className="inline-flex items-center gap-0.5 text-[11px] bg-brand-100 text-brand px-1.5 py-0.5 rounded-full font-semibold shrink-0">
                                                             <Sparkles className="w-2.5 h-2.5" /> AI
                                                         </span>
                                                     )}
                                                 </div>
-                                                <div className="text-[12px] text-n400 truncate">
+                                                <div className="text-[11px] text-n400 truncate">
                                                     {c.position || c.department || 'Pozisyon belirtilmemiş'}
                                                     {c.skills?.length > 0 && (
                                                         <span className="text-n300"> · {c.skills.slice(0, 3).join(', ')}</span>
@@ -369,7 +369,7 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                                                 </div>
                                             </div>
                                             {c.matchScore != null && (
-                                                <span className="text-[12px] font-semibold text-brand shrink-0">{Math.round(c.matchScore)}%</span>
+                                                <span className="text-[11px] font-semibold text-brand shrink-0">{Math.round(c.matchScore)}%</span>
                                             )}
                                             <ChevronRight className="w-3.5 h-3.5 text-n200 shrink-0" />
                                         </button>
@@ -380,7 +380,7 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                             {/* Positions */}
                             {kwResults.positions.length > 0 && (
                                 <section>
-                                    <div className="px-4 py-1.5 text-[11px] font-semibold text-n400 uppercase tracking-[0.08em] bg-n50 border-b border-n200 border-t border-t-slate-100">
+                                    <div className="px-4 py-1.5 text-[10px] font-semibold text-n400 uppercase tracking-[0.08em] bg-n50 border-b border-n200 border-t border-t-slate-100">
                                         Pozisyonlar
                                     </div>
                                     {kwResults.positions.map((p, i) => {
@@ -390,14 +390,14 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                                                 key={p.id}
                                                 onClick={() => handleSelect({ type: 'position', data: p })}
                                                 onMouseEnter={() => setSelIdx(idx)}
-                                                className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-brand-50/60 transition-colors text-left border-b border-n50 ${selIdx === idx ? 'bg-brand-50/60' : ''}`}
+                                                className={`w-full flex items-center gap-2 px-4 py-3 hover:bg-brand-50/60 transition-colors text-left border-b border-n50 ${selIdx === idx ? 'bg-brand-50/60' : ''}`}
                                             >
                                                 <div className="w-8 h-8 rounded-md bg-brand-100 flex items-center justify-center shrink-0">
                                                     <Briefcase className="w-4 h-4 text-brand" />
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <div className="text-[13px] font-semibold text-n900 truncate">{p.title}</div>
-                                                    <div className="text-[12px] text-n400">{p.department}</div>
+                                                    <div className="text-[12px] font-semibold text-n900 truncate">{p.title}</div>
+                                                    <div className="text-[11px] text-n400">{p.department}</div>
                                                 </div>
                                                 <ChevronRight className="w-3.5 h-3.5 text-n200 shrink-0" />
                                             </button>
@@ -409,7 +409,7 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                             {/* Pages */}
                             {kwResults.pages.length > 0 && (
                                 <section>
-                                    <div className="px-4 py-1.5 text-[11px] font-semibold text-n400 uppercase tracking-[0.08em] bg-n50 border-b border-n200 border-t border-t-slate-100">
+                                    <div className="px-4 py-1.5 text-[10px] font-semibold text-n400 uppercase tracking-[0.08em] bg-n50 border-b border-n200 border-t border-t-slate-100">
                                         Sayfalar
                                     </div>
                                     {kwResults.pages.map((pg, i) => {
@@ -420,14 +420,14 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                                                 key={pg.view}
                                                 onClick={() => handleSelect({ type: 'page', data: pg })}
                                                 onMouseEnter={() => setSelIdx(idx)}
-                                                className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-brand-50/60 transition-colors text-left border-b border-n50 ${selIdx === idx ? 'bg-brand-50/60' : ''}`}
+                                                className={`w-full flex items-center gap-2 px-4 py-3 hover:bg-brand-50/60 transition-colors text-left border-b border-n50 ${selIdx === idx ? 'bg-brand-50/60' : ''}`}
                                             >
                                                 <div className="w-8 h-8 rounded-md bg-n100 flex items-center justify-center shrink-0">
                                                     <Icon className="w-4 h-4 text-n500" />
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <div className="text-[13px] font-semibold text-n900">{pg.label}</div>
-                                                    <div className="text-[12px] text-n400">{pg.desc}</div>
+                                                    <div className="text-[12px] font-semibold text-n900">{pg.label}</div>
+                                                    <div className="text-[11px] text-n400">{pg.desc}</div>
                                                 </div>
                                                 <ArrowRight className="w-3.5 h-3.5 text-n200 shrink-0" />
                                             </button>
@@ -438,7 +438,7 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                         </div>
 
                         {hasResults && (
-                            <div className="px-4 py-2 bg-n50 border-t border-n200 flex items-center gap-4 text-[11px] text-n400">
+                            <div className="px-4 py-2 bg-n50 border-t border-n200 flex items-center gap-3 text-[10px] text-n400">
                                 <span className="flex items-center gap-1"><kbd className="bg-n0 border border-n200 rounded px-1 py-0.5 font-mono text-[11px]">↑↓</kbd> Gezin</span>
                                 <span className="flex items-center gap-1"><kbd className="bg-n0 border border-n200 rounded px-1 py-0.5 font-mono text-[11px]">↵</kbd> Seç</span>
                                 <span className="flex items-center gap-1"><kbd className="bg-n0 border border-n200 rounded px-1 py-0.5 font-mono text-[11px]">Esc</kbd> Kapat</span>
@@ -476,14 +476,14 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                                         <span className="text-[11px] bg-bad-bg text-bad font-semibold px-1.5 py-0.5 rounded-full">{unreadCount} yeni</span>
                                     )}
                                 </div>
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2">
                                     {unreadCount > 0 && (
-                                        <button onClick={markAllAsRead} className="text-[12px] text-brand hover:text-brand-700 font-semibold transition-colors">
+                                        <button onClick={markAllAsRead} className="text-[11px] text-brand hover:text-brand-700 font-semibold transition-colors">
                                             Tümünü oku
                                         </button>
                                     )}
                                     {notifications.length > 0 && (
-                                        <button onClick={clearAll} className="text-[12px] text-n400 hover:text-bad font-medium transition-colors">
+                                        <button onClick={clearAll} className="text-[11px] text-n400 hover:text-bad font-medium transition-colors">
                                             Temizle
                                         </button>
                                     )}
@@ -505,17 +505,17 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                                             <button
                                                 key={n.id}
                                                 onClick={() => markAsRead(n.id)}
-                                                className={`w-full flex items-start gap-3 px-4 py-3 hover:bg-n50 transition-colors border-b border-n50 text-left ${!n.read ? 'bg-brand-50/30' : ''}`}
+                                                className={`w-full flex items-start gap-2 px-4 py-3 hover:bg-n50 transition-colors border-b border-n50 text-left ${!n.read ? 'bg-brand-50/30' : ''}`}
                                             >
                                                 <div className={`w-8 h-8 rounded-md ${cfg.bg} flex items-center justify-center shrink-0 mt-0.5`}>
                                                     <Icon className={`w-4 h-4 ${cfg.color}`} />
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     {n.title && (
-                                                        <div className="text-[12px] font-semibold text-n900 leading-snug mb-0.5">{n.title}</div>
+                                                        <div className="text-[11px] font-semibold text-n900 leading-snug mb-0.5">{n.title}</div>
                                                     )}
-                                                    <div className="text-[12px] text-n500 leading-relaxed">{n.message}</div>
-                                                    <div className="text-[11px] text-n300 mt-1">{formatTime(n.timestamp)}</div>
+                                                    <div className="text-[11px] text-n500 leading-relaxed">{n.message}</div>
+                                                    <div className="text-[10px] text-n300 mt-1">{formatTime(n.timestamp)}</div>
                                                 </div>
                                                 {!n.read && (
                                                     <div className="w-2 h-2 rounded-full bg-brand shrink-0 mt-1.5" />
@@ -547,20 +547,20 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                                     <button
                                         key={item.label}
                                         onClick={() => { dispatchView(item.view); setSettOpen(false); }}
-                                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-n50 transition-colors text-left"
+                                        className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-n50 transition-colors text-left"
                                     >
                                         <Icon className="w-4 h-4 text-n400 shrink-0" />
-                                        <span className="text-[13px] text-n700 font-medium">{item.label}</span>
+                                        <span className="text-[12px] text-n700 font-medium">{item.label}</span>
                                     </button>
                                 );
                             })}
                             <div className="border-t border-n200 mt-1 pt-1">
                                 <button
                                     onClick={() => { logout(); setSettOpen(false); }}
-                                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-bad-bg transition-colors text-left group"
+                                    className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-bad-bg transition-colors text-left group"
                                 >
                                     <LogOut className="w-4 h-4 text-n400 group-hover:text-bad shrink-0 transition-colors" />
-                                    <span className="text-[13px] font-medium text-n700 group-hover:text-bad transition-colors">Çıkış Yap</span>
+                                    <span className="text-[12px] font-medium text-n700 group-hover:text-bad transition-colors">Çıkış Yap</span>
                                 </button>
                             </div>
                         </div>
@@ -568,13 +568,13 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                 </div>
 
                 {/* Profile — name/role hidden on small screens */}
-                <div className="flex items-center gap-3 pl-2 sm:pl-4 ml-2 border-l border-n200">
+                <div className="flex items-center gap-2 pl-2 sm:pl-4 ml-2 border-l border-n200">
                     <div className="w-8 h-8 rounded-full from-brand to-brand flex items-center justify-center text-white text-xs font-semibold shrink-0 select-none">
                         {userName[0]?.toUpperCase() || 'U'}
                     </div>
                     <div className="hidden sm:block">
-                        <div className="text-[13px] font-semibold text-n900 leading-none truncate max-w-[110px]">{userName}</div>
-                        <div className="text-[11px] text-n500 font-medium mt-0.5">{roleText}</div>
+                        <div className="text-[12px] font-semibold text-n900 leading-none truncate max-w-[110px]">{userName}</div>
+                        <div className="text-[10px] text-n500 font-medium mt-0.5">{roleText}</div>
                     </div>
                 </div>
             </div>

@@ -150,7 +150,7 @@ export default function AIMatchPage() {
                                 {!isAddingNewPosition ? (
                                     <button
                                         onClick={() => setIsAddingNewPosition(true)}
-                                        className="text-[11px] font-bold text-electric hover:text-text-primary transition-colors flex items-center gap-1 uppercase tracking-wider"
+                                        className="text-[10px] font-bold text-electric hover:text-text-primary transition-colors flex items-center gap-1 uppercase tracking-wider"
                                     >
                                         <PlusCircle className="w-3.5 h-3.5" />
                                         Yeni Pozisyon
@@ -180,17 +180,17 @@ export default function AIMatchPage() {
                                 </div>
                             )}
 
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                                 {allPositions.map(pos => (
                                     <button
                                         key={pos.id}
                                         onClick={() => setSelectedPositionId(pos.id)}
-                                        className={`p-4 rounded-2xl border text-left transition-all group ${selectedPositionId === pos.id
+                                        className={`p-3 rounded-2xl border text-left transition-all group ${selectedPositionId === pos.id
                                             ? 'bg-electric/10 border-electric/50 ring-1 ring-electric/20'
                                             : 'bg-white/[0.02] border-white/5 hover:border-white/10 hover:bg-white/[0.04]'
                                             }`}
                                     >
-                                        <p className={`text-[13px] font-bold truncate ${selectedPositionId === pos.id ? 'text-text-primary' : 'text-navy-300'}`}>
+                                        <p className={`text-[12px] font-bold truncate ${selectedPositionId === pos.id ? 'text-text-primary' : 'text-navy-300'}`}>
                                             {pos.title}
                                         </p>
                                         <p className="text-[10px] text-navy-500 font-medium mt-1">
@@ -300,8 +300,8 @@ export default function AIMatchPage() {
                                     </div>
                                 </div>
 
-                                <div className="p-4 rounded-2xl bg-blue-500/5 border border-blue-500/10">
-                                    <p className="text-[11px] text-navy-400 leading-relaxed font-medium">
+                                <div className="p-3 rounded-2xl bg-blue-500/5 border border-blue-500/10">
+                                    <p className="text-[10px] text-navy-400 leading-relaxed font-medium">
                                         <span className="text-blue-400 font-bold">Zeki Sistem Notu:</span> Analiz motoru objeltiflik ilkesine göre çalışır. Demografik veriler (yaş, cinsiyet, uyruk vb.) değerlendirmeye alınmaz.
                                     </p>
                                 </div>
@@ -367,12 +367,12 @@ export default function AIMatchPage() {
                     </div>
 
                     {matches.length > 0 ? (
-                        <div className="grid grid-cols-1 gap-4">
+                        <div className="grid grid-cols-1 gap-3">
                             {matches.map((match, index) => (
                                 <div
                                     key={match.id}
                                     onClick={() => setSelectedCandidate(match)}
-                                    className="glass rounded-2xl p-4 border border-white/[0.06] flex items-center gap-5 hover:bg-white/[0.03] transition-all group animate-in fade-in slide-in-from-bottom-4 cursor-pointer"
+                                    className="glass rounded-2xl p-3 border border-white/[0.06] flex items-center gap-5 hover:bg-white/[0.03] transition-all group animate-in fade-in slide-in-from-bottom-4 cursor-pointer"
                                     style={{ animationDelay: `${index * 50}ms` }}
                                 >
                                     <div className="text-base font-black text-navy-700 w-8 text-center bg-white/5 py-2 rounded-xl group-hover:text-electric transition-colors">#{index + 1}</div>

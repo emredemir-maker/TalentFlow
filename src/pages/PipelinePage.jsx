@@ -75,20 +75,20 @@ function CandidateCard({ candidate, stageColor, selected, onSelect }) {
         >
             <div className="flex items-start gap-2.5">
                 <div
-                    className="w-[30px] h-[30px] rounded-full flex items-center justify-center text-[11px] font-semibold text-white shrink-0"
+                    className="w-[30px] h-[30px] rounded-full flex items-center justify-center text-[10px] font-semibold text-white shrink-0"
                     style={{ background: stageColor }}
                 >
                     {initials(candidate.name)}
                 </div>
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
-                        <span className="text-[12px] font-semibold truncate">{candidate.name || 'İsimsiz'}</span>
+                        <span className="text-[11px] font-semibold truncate">{candidate.name || 'İsimsiz'}</span>
                         <span className="ml-auto"><ScoreBadge score={score} /></span>
                     </div>
-                    <div className="text-[11px] text-n500 mt-0.5 truncate">
+                    <div className="text-[10px] text-n500 mt-0.5 truncate">
                         {candidate.position || candidate.matchedPositionTitle || '—'}
                     </div>
-                    {candidate.source && <div className="text-[11px] text-n400 mt-[3px] truncate">{candidate.source}</div>}
+                    {candidate.source && <div className="text-[10px] text-n400 mt-[3px] truncate">{candidate.source}</div>}
                 </div>
             </div>
         </button>
@@ -104,13 +104,13 @@ function KanbanColumn({ stage, candidates, selectedId, onSelectCandidate }) {
             >
                 <div className="flex items-center gap-1.5">
                     <span className="w-[7px] h-[7px] rounded-full" style={{ background: stage.color }} />
-                    <span className="text-[12px] font-semibold" style={{ color: stage.color }}>{stage.label}</span>
+                    <span className="text-[11px] font-semibold" style={{ color: stage.color }}>{stage.label}</span>
                 </div>
-                <span className="text-[12px] font-semibold text-n500">{candidates.length}</span>
+                <span className="text-[11px] font-semibold text-n500">{candidates.length}</span>
             </div>
             <div className="flex flex-col gap-2">
                 {candidates.length === 0
-                    ? <div className="h-14 rounded-[10px] border border-dashed border-n200 flex items-center justify-center text-[11px] text-n400">Aday yok</div>
+                    ? <div className="h-14 rounded-[10px] border border-dashed border-n200 flex items-center justify-center text-[10px] text-n400">Aday yok</div>
                     : candidates.map(c => (
                         <CandidateCard
                             key={c.id}
@@ -254,7 +254,7 @@ export default function PipelinePage() {
             <header className="h-14 bg-n0 border-b border-n200 px-[18px] flex items-center gap-3.5 sticky top-0 z-20">
                 <div>
                     <h1 className="text-[15px] font-semibold tracking-[-0.02em] m-0">Aday Pipeline</h1>
-                    <span className="text-[11px] text-n400">
+                    <span className="text-[10px] text-n400">
                         {totalCandidates} aday · {allInterviews.length} mülakat
                     </span>
                 </div>
@@ -267,7 +267,7 @@ export default function PipelinePage() {
                                 placeholder="Aday ara..."
                                 value={search}
                                 onChange={e => setSearch(e.target.value)}
-                                className="pl-8 pr-3 py-1.5 text-[12px] border border-n200 rounded-md bg-n0 focus:outline-none focus:border-brand w-44"
+                                className="pl-8 pr-3 py-1.5 text-[11px] border border-n200 rounded-md bg-n0 focus:outline-none focus:border-brand w-44"
                             />
                         </div>
                     )}
@@ -281,7 +281,7 @@ export default function PipelinePage() {
                     >
                         <List className="w-[13px] h-[13px]" /> Mülakatlar
                         {allInterviews.length > 0 && (
-                            <span className="text-[11px] font-semibold text-n400">{allInterviews.length}</span>
+                            <span className="text-[10px] font-semibold text-n400">{allInterviews.length}</span>
                         )}
                     </button>
                     <button
@@ -305,7 +305,7 @@ export default function PipelinePage() {
             {/* ── Kanban + seçim rayı ──────────────────────────────────────── */}
             {tab === 'kanban' && (
                 <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] items-start">
-                    <div className="px-[18px] py-3.5 xl:border-r border-n200 overflow-x-auto">
+                    <div className="px-[18px] py-2.5 xl:border-r border-n200 overflow-x-auto">
                         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2.5 items-start">
                             {STAGE_DEFS.map(stage => (
                                 <KanbanColumn
@@ -325,21 +325,21 @@ export default function PipelinePage() {
                                 <div className="w-11 h-11 mx-auto mb-2.5 rounded-full bg-n50 flex items-center justify-center">
                                     <MousePointerClick className="w-5 h-5 text-n400" />
                                 </div>
-                                <div className="text-[13px] font-semibold mb-1">Bir aday seçin</div>
-                                <p className="text-[12px] leading-[1.5] text-n500 m-0">
+                                <div className="text-[12px] font-semibold mb-1">Bir aday seçin</div>
+                                <p className="text-[11px] leading-[1.5] text-n500 m-0">
                                     Karttan seçtiğiniz adayın aşamasını buradan taşıyabilir, mülakat planlayabilir
                                     veya süreçten çıkarabilirsiniz.
                                 </p>
                             </div>
                         ) : (
-                            <div className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-4">
+                            <div className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-3">
                                 <div className="flex items-center gap-2.5 mb-3">
-                                    <div className="w-9 h-9 flex-none rounded-full bg-brand-50 text-brand flex items-center justify-center text-[13px] font-semibold">
+                                    <div className="w-9 h-9 flex-none rounded-full bg-brand-50 text-brand flex items-center justify-center text-[12px] font-semibold">
                                         {initials(selected.name)}
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <div className="text-[14px] font-semibold tracking-[-0.01em] truncate">{selected.name || 'İsimsiz'}</div>
-                                        <div className="text-[12px] text-n500 truncate">
+                                        <div className="text-[13px] font-semibold tracking-[-0.01em] truncate">{selected.name || 'İsimsiz'}</div>
+                                        <div className="text-[11px] text-n500 truncate">
                                             {selected.position || selected.matchedPositionTitle || '—'}
                                         </div>
                                     </div>
@@ -349,8 +349,8 @@ export default function PipelinePage() {
                                 </div>
 
                                 <div className="flex items-center gap-2 px-[11px] py-2.5 bg-n50 rounded-md mb-3">
-                                    <span className="text-[12px] text-n500">Aşama</span>
-                                    <span className="ml-auto text-[12px] font-semibold" style={{ color: selectedStage?.color }}>
+                                    <span className="text-[11px] text-n500">Aşama</span>
+                                    <span className="ml-auto text-[11px] font-semibold" style={{ color: selectedStage?.color }}>
                                         {selectedStage?.label}
                                     </span>
                                 </div>
@@ -359,19 +359,19 @@ export default function PipelinePage() {
                                     <button
                                         onClick={() => nextKey && updateCandidate(selected.id, { status: nextKey, rejectionReason: null })}
                                         disabled={!nextKey}
-                                        className="text-center text-[13px] font-semibold text-white bg-brand hover:bg-brand-600 py-2.5 rounded-md disabled:opacity-40 disabled:cursor-not-allowed"
+                                        className="text-center text-[12px] font-semibold text-white bg-brand hover:bg-brand-600 py-2.5 rounded-md disabled:opacity-40 disabled:cursor-not-allowed"
                                     >
                                         {nextStage ? `${nextStage.label} aşamasına taşı` : 'Son aşamada'}
                                     </button>
                                     <button
                                         onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }))}
-                                        className="text-center text-[13px] font-medium text-n600 border border-n200 py-2.5 rounded-md hover:bg-n50"
+                                        className="text-center text-[12px] font-medium text-n600 border border-n200 py-2.5 rounded-md hover:bg-n50"
                                     >
                                         Mülakat planla
                                     </button>
                                     <button
                                         onClick={() => openCandidateDetail(selected.id)}
-                                        className="text-center text-[13px] font-medium text-n600 border border-n200 py-2.5 rounded-md hover:bg-n50"
+                                        className="text-center text-[12px] font-medium text-n600 border border-n200 py-2.5 rounded-md hover:bg-n50"
                                     >
                                         Aday detayını aç
                                     </button>
@@ -382,7 +382,7 @@ export default function PipelinePage() {
                                         Modalı"sı modal çalışmasıyla gelecek. */}
                                     <button
                                         onClick={() => openCandidateDetail(selected.id)}
-                                        className="text-center text-[12px] font-semibold text-bad py-1.5 hover:underline"
+                                        className="text-center text-[11px] font-semibold text-bad py-1.5 hover:underline"
                                     >
                                         Süreçten çıkar
                                     </button>
@@ -395,7 +395,7 @@ export default function PipelinePage() {
 
             {/* ── Mülakatlar sekmesi ───────────────────────────────────────── */}
             {tab === 'interviews' && (
-                <div className="flex-1 px-[18px] py-3.5">
+                <div className="flex-1 px-[18px] py-2.5">
                     <div className="flex items-center justify-between mb-3.5 gap-2 flex-wrap">
                         <div className="flex items-center gap-2">
                             {[
@@ -416,7 +416,7 @@ export default function PipelinePage() {
                         </div>
                         <button
                             onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }))}
-                            className="flex items-center gap-1.5 text-[12px] font-medium text-brand hover:text-brand-600"
+                            className="flex items-center gap-1.5 text-[11px] font-medium text-brand hover:text-brand-600"
                         >
                             Mülakat Yönetimi <ArrowUpRight className="w-3.5 h-3.5" />
                         </button>
@@ -426,8 +426,8 @@ export default function PipelinePage() {
                         {visibleInterviews.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-20 text-n400">
                                 <Calendar className="w-12 h-12 mb-3 opacity-20" />
-                                <p className="text-[14px] font-semibold text-n600">Mülakat bulunamadı</p>
-                                <p className="text-[12px] mt-1">
+                                <p className="text-[13px] font-semibold text-n600">Mülakat bulunamadı</p>
+                                <p className="text-[11px] mt-1">
                                     {allInterviews.length === 0
                                         ? 'Henüz hiç mülakat planlanmamış. Mülakat yönetiminden yeni mülakat ekleyebilirsiniz.'
                                         : 'Bu filtreye uygun mülakat yok.'}
@@ -443,7 +443,7 @@ export default function PipelinePage() {
                             </div>
                         ) : (
                             <>
-                                <div className="grid grid-cols-[2fr_1.5fr_1.2fr_0.8fr_0.8fr_70px] gap-3 px-5 py-2 text-[11px] font-semibold text-n500 border-b border-n200 bg-n50">
+                                <div className="grid grid-cols-[2fr_1.5fr_1.2fr_0.8fr_0.8fr_70px] gap-2 px-5 py-2 text-[10px] font-semibold text-n500 border-b border-n200 bg-n50">
                                     <span>Aday</span>
                                     <span>Pozisyon</span>
                                     <span>Tarih &amp; Saat</span>
@@ -454,36 +454,36 @@ export default function PipelinePage() {
                                 {visibleInterviews.map((iv, idx) => (
                                     <div
                                         key={iv.id || idx}
-                                        className={`grid grid-cols-[2fr_1.5fr_1.2fr_0.8fr_0.8fr_70px] gap-3 px-5 py-2.5 items-center border-b border-n100 last:border-0 ${
+                                        className={`grid grid-cols-[2fr_1.5fr_1.2fr_0.8fr_0.8fr_70px] gap-2 px-5 py-2.5 items-center border-b border-n100 last:border-0 ${
                                             iv.status === 'live' ? 'bg-bad-bg/40' : 'hover:bg-n50'
                                         }`}
                                     >
                                         <div className="flex items-center gap-2.5 min-w-0">
-                                            <div className="w-8 h-8 rounded-full bg-brand-50 flex items-center justify-center text-[11px] font-semibold text-brand shrink-0">
+                                            <div className="w-8 h-8 rounded-full bg-brand-50 flex items-center justify-center text-[10px] font-semibold text-brand shrink-0">
                                                 {initials(iv.candidateName)}
                                             </div>
                                             <div className="min-w-0">
-                                                <p className="text-[12px] font-semibold truncate leading-tight">{iv.candidateName}</p>
+                                                <p className="text-[11px] font-semibold truncate leading-tight">{iv.candidateName}</p>
                                                 {iv.interviewerName && (
-                                                    <p className="text-[11px] text-n400 truncate">{iv.interviewerName}</p>
+                                                    <p className="text-[10px] text-n400 truncate">{iv.interviewerName}</p>
                                                 )}
                                             </div>
                                         </div>
-                                        <p className="text-[12px] text-n600 truncate">{iv.position}</p>
-                                        <div className="flex items-center gap-1 text-[12px] text-n500">
+                                        <p className="text-[11px] text-n600 truncate">{iv.position}</p>
+                                        <div className="flex items-center gap-1 text-[11px] text-n500">
                                             <Clock className="w-3 h-3 shrink-0 text-n300" />
                                             <span>{(iv.date || '').split('T')[0] || '—'} {iv.time || ''}</span>
                                         </div>
-                                        <span className="text-[12px] text-n500">{TYPE_MAP[iv.type] || iv.type || 'Genel'}</span>
+                                        <span className="text-[11px] text-n500">{TYPE_MAP[iv.type] || iv.type || 'Genel'}</span>
                                         <StatusBadge status={iv.status} />
                                         <div className="flex justify-end">
                                             {(iv.finalScore || iv.aiOverallScore) ? (
-                                                <span className="flex items-center gap-0.5 text-[12px] font-semibold text-warn">
+                                                <span className="flex items-center gap-0.5 text-[11px] font-semibold text-warn">
                                                     <Star className="w-3 h-3 fill-warn text-warn" />
                                                     {iv.finalScore || iv.aiOverallScore}
                                                 </span>
                                             ) : (
-                                                <span className="text-[11px] text-n300">—</span>
+                                                <span className="text-[10px] text-n300">—</span>
                                             )}
                                         </div>
                                     </div>

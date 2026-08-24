@@ -62,11 +62,11 @@ function ProvenanceBlock({ analysis, position, candidate }) {
             <div className="rounded-md border border-n200 bg-n50 px-3 py-2.5">
                 <div className="flex items-center gap-2 mb-1">
                     <Layers className="w-3.5 h-3.5 text-n400" />
-                    <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-n500">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-n500">
                         Bu skorun dayanağı
                     </span>
                 </div>
-                <p className="text-[11px] text-n500 leading-relaxed">
+                <p className="text-[10px] text-n500 leading-relaxed">
                     Bu analiz madde bazında dayanak taşımıyor (eski sürümle yapılmış).
                     Skorun hangi işlerden geldiğini görmek için adayı <strong>yeniden taratın</strong>.
                 </p>
@@ -79,7 +79,7 @@ function ProvenanceBlock({ analysis, position, candidate }) {
         <div className="rounded-md border border-n200 bg-n0 px-3 py-2.5">
             <div className="flex items-center gap-2 mb-2">
                 <Layers className="w-3.5 h-3.5 text-brand" />
-                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-n600">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-n600">
                     Bu skorun dayanağı
                 </span>
                 {top && prov.attributed > 1 && (
@@ -90,7 +90,7 @@ function ProvenanceBlock({ analysis, position, candidate }) {
                     // "Atfedilebilen" da önemli: payda TÜM maddeler değil, işe
                     // bağlanabilenler. Başlık bunu söylemezse okuyan 8'i toplam
                     // sanıyor — oysa aşağıda ayrıca atfedilemeyenler yazıyor.
-                    <span className="text-[11px] font-semibold text-n500 ml-auto">
+                    <span className="text-[10px] font-semibold text-n500 ml-auto">
                         Atfedilebilen {prov.attributed} maddenin {top.count} tanesi bu işi gösteriyor
                     </span>
                 )}
@@ -100,8 +100,8 @@ function ProvenanceBlock({ analysis, position, candidate }) {
                 {prov.groups.map((g) => (
                     <div key={`${g.company}-${g.duration}`} className="border border-n200 rounded-md px-2.5 py-2 bg-n50">
                         <div className="flex items-baseline justify-between gap-2 flex-wrap">
-                            <span className="text-[12px] font-semibold text-n900">{g.company}</span>
-                            <span className="text-[11px] text-n500">
+                            <span className="text-[11px] font-semibold text-n900">{g.company}</span>
+                            <span className="text-[10px] text-n500">
                                 {[g.role, g.duration].filter(Boolean).join(' · ')}
                             </span>
                         </div>
@@ -144,13 +144,13 @@ function ProvenanceBlock({ analysis, position, candidate }) {
                             atfedilenden fazla çıkıyor ve okuyan haklı olarak
                             "sayılar tutmuyor" diye düşünüyor. */}
                         {g.sharedCount > 0 && (
-                            <p className="text-[11px] text-n400 mt-1">
+                            <p className="text-[10px] text-n400 mt-1">
                                 {g.sharedCount === g.count
                                     ? 'Bu maddelerin hepsi başka bir işi de gösteriyor.'
                                     : `Bu maddelerin ${g.sharedCount} tanesi başka bir işi de gösteriyor.`}
                             </p>
                         )}
-                        <p className="text-[11px] text-n600 mt-1.5 leading-relaxed">
+                        <p className="text-[10px] text-n600 mt-1.5 leading-relaxed">
                             <strong>{g.count} madde:</strong>{' '}
                             {g.items.map((i, n) => (
                                 <span key={i.index} title={i.text || `#${i.index}`}>
@@ -164,7 +164,7 @@ function ProvenanceBlock({ analysis, position, candidate }) {
             </div>
 
             {prov.unattributed > 0 && (
-                <p className="text-[11px] text-n400 mt-2">
+                <p className="text-[10px] text-n400 mt-2">
                     Atfedilemedi: {prov.unattributed} madde — dayanak metni bir işe bağlanamadı.
                 </p>
             )}
@@ -196,14 +196,14 @@ function FormulaBox({ label, value, hint, tone = 'n' }) {
             }`}
         >
             <div
-                className={`text-[11px] font-semibold uppercase tracking-[0.06em] ${
+                className={`text-[10px] font-semibold uppercase tracking-[0.06em] ${
                     tone === 'brand' ? 'text-brand' : tone === 'iv' ? 'text-ok' : 'text-n500'
                 }`}
             >
                 {label}
             </div>
             <div className="text-[15px] font-semibold mt-0.5">{value}</div>
-            {hint && <div className="text-[11px] text-n400">{hint}</div>}
+            {hint && <div className="text-[10px] text-n400">{hint}</div>}
         </div>
     );
 }
@@ -246,7 +246,7 @@ function StarDensity({ dims, starPct, buckets }) {
         <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_1fr] gap-2.5">
             <div className="bg-n0 border border-n200 rounded-[14px] shadow-sm px-4 py-3">
                 <div className="flex items-baseline gap-2 mb-2.5">
-                    <span className="text-[11px] font-semibold text-n500 tracking-[0.1em] uppercase">
+                    <span className="text-[10px] font-semibold text-n500 tracking-[0.1em] uppercase">
                         STAR kanıt yoğunluğu
                     </span>
                     {starPct != null && (
@@ -258,12 +258,12 @@ function StarDensity({ dims, starPct, buckets }) {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {dims.map((d) => (
                         <div key={d.key} className="bg-n50 border border-n200 rounded-md px-[11px] py-2.5">
-                            <div className="text-[11px] font-semibold text-n500 uppercase tracking-[0.06em]">
+                            <div className="text-[10px] font-semibold text-n500 uppercase tracking-[0.06em]">
                                 {STAR_LABELS[d.key] || d.key}
                             </div>
                             <div className="text-[16px] font-semibold mt-0.5">
                                 {d.score}
-                                <span className="text-[11px] text-n400 font-normal">/{d.max}</span>
+                                <span className="text-[10px] text-n400 font-normal">/{d.max}</span>
                             </div>
                             <div className="h-1 bg-n100 rounded-full overflow-hidden mt-1.5">
                                 <div
@@ -271,20 +271,20 @@ function StarDensity({ dims, starPct, buckets }) {
                                     style={{ width: `${Math.round((d.score / (d.max || 1)) * 100)}%` }}
                                 />
                             </div>
-                            <div className="text-[11px] text-n400 mt-1 leading-[1.4]">
+                            <div className="text-[10px] text-n400 mt-1 leading-[1.4]">
                                 {anchorLabel(d.score, d.max) || '—'}
                             </div>
                         </div>
                     ))}
                 </div>
-                <p className="text-[11px] text-n400 mt-2.5 leading-[1.5] m-0">
+                <p className="text-[10px] text-n400 mt-2.5 leading-[1.5] m-0">
                     Kanıtın ne kadar iyi belgelendiğini ölçer, adayın ne kadar iyi olduğunu değil.
                 </p>
             </div>
 
             {buckets && (
                 <div className="bg-n0 border border-n200 rounded-[14px] shadow-sm px-4 py-3">
-                    <div className="text-[11px] font-semibold text-n500 tracking-[0.1em] uppercase mb-2.5">
+                    <div className="text-[10px] font-semibold text-n500 tracking-[0.1em] uppercase mb-2.5">
                         Kanıt kovaları
                     </div>
                     {buckets.map((b) => (
@@ -296,8 +296,8 @@ function StarDensity({ dims, starPct, buckets }) {
                                 <b.icon className="w-3.5 h-3.5" />
                             </span>
                             <div className="flex-1 min-w-0">
-                                <div className="text-[12px] font-semibold">{b.label}</div>
-                                <div className="text-[11px] text-n400">{b.hint}</div>
+                                <div className="text-[11px] font-semibold">{b.label}</div>
+                                <div className="text-[10px] text-n400">{b.hint}</div>
                             </div>
                             <span className="text-[16px] font-semibold" style={{ color: b.fg }}>
                                 {b.count}
@@ -313,7 +313,7 @@ function StarDensity({ dims, starPct, buckets }) {
 function ScoreFormula({ cvScore, indexScore, hasInterview, delta }) {
     return (
         <div className="bg-n0 border border-n200 rounded-[14px] shadow-sm px-4 py-3">
-            <div className="text-[11px] font-semibold text-n500 tracking-[0.1em] uppercase mb-3">
+            <div className="text-[10px] font-semibold text-n500 tracking-[0.1em] uppercase mb-3">
                 Skor nasıl oluştu
             </div>
 
@@ -322,14 +322,14 @@ function ScoreFormula({ cvScore, indexScore, hasInterview, delta }) {
 
                 {hasInterview ? (
                     <>
-                        <span className="text-[14px] font-semibold text-n400">→</span>
+                        <span className="text-[13px] font-semibold text-n400">→</span>
                         <FormulaBox
                             label="Mülakat kanıtı"
                             value={delta > 0 ? `+${delta}` : String(delta)}
                             hint="odada kapanan maddeler"
                             tone="iv"
                         />
-                        <span className="text-[14px] font-semibold text-n400">=</span>
+                        <span className="text-[13px] font-semibold text-n400">=</span>
                         <FormulaBox label="Endeks skoru" value={indexScore} hint="listelerde görünen sayı" />
                     </>
                 ) : (
@@ -338,7 +338,7 @@ function ScoreFormula({ cvScore, indexScore, hasInterview, delta }) {
                     </p>
                 )}
 
-                <p className="ml-auto text-[11px] text-n400 max-w-[300px] leading-[1.5] text-right m-0">
+                <p className="ml-auto text-[10px] text-n400 max-w-[300px] leading-[1.5] text-right m-0">
                     CV analizi madde puanlarından geliyor: zorunlu kapsama %75, tercihen %25 ağırlıkla.
                     Mülakat kanıtı ayrı bir yarım ağırlık değil; hangi maddeyi kapattığına göre
                     madde damgalarını günceller.
@@ -407,10 +407,10 @@ export default function ScoreBreakdownPanel({ analysis, position, candidate = nu
             >
                 <div className="flex items-center gap-2">
                     <Calculator className="w-3.5 h-3.5 text-brand" />
-                    <span className="text-[11px] font-semibold text-n700 uppercase tracking-[0.08em]">
+                    <span className="text-[10px] font-semibold text-n700 uppercase tracking-[0.08em]">
                         Skor Nasıl Hesaplandı
                     </span>
-                    <span className="text-[12px] font-semibold text-brand">{headlineScore}</span>
+                    <span className="text-[11px] font-semibold text-brand">{headlineScore}</span>
                 </div>
                 {open ? <ChevronDown className="w-4 h-4 text-n400" /> : <ChevronRight className="w-4 h-4 text-n400" />}
             </button>
@@ -436,16 +436,16 @@ export default function ScoreBreakdownPanel({ analysis, position, candidate = nu
                             <div className={`rounded-md border px-3 py-2.5 ${box}`}>
                                 <div className="flex items-center gap-2 mb-1.5">
                                     <Icon className={`w-3.5 h-3.5 shrink-0 ${txt}`} />
-                                    <span className={`text-[11px] font-semibold uppercase tracking-[0.08em] ${txt}`}>
+                                    <span className={`text-[10px] font-semibold uppercase tracking-[0.08em] ${txt}`}>
                                         {bonus ? 'Doğrulama katkısı' : 'Doğrulama kesintisi'}
                                     </span>
-                                    <span className={`text-[11px] font-semibold ml-auto ${txt}`}>
+                                    <span className={`text-[10px] font-semibold ml-auto ${txt}`}>
                                         {preVerification} → {headlineScore}
                                     </span>
                                 </div>
                                 <ul className="space-y-1">
                                     {deductions.map((d) => (
-                                        <li key={d.code} className="flex items-start justify-between gap-2 text-[11px] text-n700">
+                                        <li key={d.code} className="flex items-start justify-between gap-2 text-[10px] text-n700">
                                             <span className="leading-relaxed">{d.label}</span>
                                             <span className={`font-semibold shrink-0 ${d.factor > 1 ? 'text-ok' : 'text-rose-600'}`}>
                                                 ×{d.factor}
@@ -453,7 +453,7 @@ export default function ScoreBreakdownPanel({ analysis, position, candidate = nu
                                         </li>
                                     ))}
                                 </ul>
-                                <p className="text-[11px] text-n500 mt-1.5 leading-relaxed">
+                                <p className="text-[10px] text-n500 mt-1.5 leading-relaxed">
                                     Kaynak bulunamayan şirketler tek başına etki yaratmaz; ayrıntı için
                                     Doğrulama sekmesine bakın.
                                 </p>
@@ -472,7 +472,7 @@ export default function ScoreBreakdownPanel({ analysis, position, candidate = nu
                     {staleRequirements && (
                         <div className="flex items-start gap-2 rounded-md border bg-warn-bg px-3 py-2">
                             <AlertTriangle className="w-3.5 h-3.5 text-warn shrink-0 mt-0.5" />
-                            <p className="text-[11px] text-n700 leading-relaxed">
+                            <p className="text-[10px] text-n700 leading-relaxed">
                                 <strong>Bu skor eski gereksinim listesine göre hesaplandı.</strong> İlan o
                                 günden beri değişti; kayıtlı değerlendirmeler madde numaralarına bağlı
                                 olduğu için yeni listeye uygulanamaz. Güncel skoru görmek istiyorsanız
@@ -484,7 +484,7 @@ export default function ScoreBreakdownPanel({ analysis, position, candidate = nu
                     {oldRubric && (
                         <div className="flex items-start gap-2 rounded-md border border-n200 bg-n50 px-3 py-2">
                             <RotateCcw className="w-3 h-3 text-n400 shrink-0 mt-0.5" />
-                            <p className="text-[11px] text-n600 leading-relaxed">
+                            <p className="text-[10px] text-n600 leading-relaxed">
                                 Bu analiz, damgalama kuralı netleştirilmeden önce üretildi. Skor yanlış
                                 değil ama <strong>bugünkü ölçüyle üretilmiş skorlarla kıyaslanamaz</strong> —
                                 aynı listede iki farklı ölçü var demektir. Adayı yeniden tarayın.
@@ -503,13 +503,13 @@ export default function ScoreBreakdownPanel({ analysis, position, candidate = nu
                         )}
                         {!staleRequirements && exp.coverage && exp.star && (
                             <>
-                                <span className="text-[13px] font-semibold text-n300">×</span>
+                                <span className="text-[12px] font-semibold text-n300">×</span>
                                 <Chip
                                     label={`CV'deki Kanıt · STAR %${exp.star.score}`}
                                     value={exp.confidence.toFixed(2).replace('.', ',')}
                                     tone="violet"
                                 />
-                                <span className="text-[13px] font-semibold text-n300">=</span>
+                                <span className="text-[12px] font-semibold text-n300">=</span>
                                 <Chip label="Skor" value={`${exp.score}`} tone="slate" />
                             </>
                         )}
@@ -527,7 +527,7 @@ export default function ScoreBreakdownPanel({ analysis, position, candidate = nu
                     {!staleRequirements && exp.starMissing && (
                         <div className="flex items-start gap-2 rounded-md border border-n200 bg-n50 px-3 py-2">
                             <RotateCcw className="w-3 h-3 text-n400 shrink-0 mt-0.5" />
-                            <p className="text-[11px] text-n600 leading-relaxed">
+                            <p className="text-[10px] text-n600 leading-relaxed">
                                 Bu kayıtta <strong>CV kanıt yoğunluğu (STAR) ölçülmemiş</strong>. Skor
                                 kanıt güveniyle çarpılmadı, yani mümkün olan en iyi katsayıyı aldı.
                                 STAR'ı ölçülmüş adaylarla doğrudan kıyaslamayın; adayı{' '}
@@ -537,7 +537,7 @@ export default function ScoreBreakdownPanel({ analysis, position, candidate = nu
                     )}
 
                     {!staleRequirements && exp.star && exp.star.penalty > 0.5 && (
-                        <p className="text-[11px] text-n500 leading-relaxed">
+                        <p className="text-[10px] text-n500 leading-relaxed">
                             CV'de kanıt eksik olduğu için uyum skorundan{' '}
                             <strong>{Math.round(exp.star.penalty)} puan</strong> düşüldü. Bu bir
                             nitelik yargısı değil: adayın ne yaptığını CV'den yeterince
@@ -553,7 +553,7 @@ export default function ScoreBreakdownPanel({ analysis, position, candidate = nu
                     {detail.outdated && (
                         <div className="flex items-start gap-2 rounded-md border border-n200 bg-n50 px-3 py-2">
                             <RotateCcw className="w-3 h-3 text-n400 shrink-0 mt-0.5" />
-                            <p className="text-[11px] text-n600 leading-relaxed">
+                            <p className="text-[10px] text-n600 leading-relaxed">
                                 Bu analiz, madde bazlı dayanak alanları eklenmeden önce yapıldı.
                                 Her maddenin CV'deki dayanağını ve ilanla farkını görmek için
                                 adayı yeniden tarayın.
@@ -566,17 +566,17 @@ export default function ScoreBreakdownPanel({ analysis, position, candidate = nu
                             {exp.coverage.tiers.map((tier) => (
                                 <div key={tier.key} className="space-y-1.5">
                                     <div className="flex items-baseline gap-2">
-                                        <h5 className="text-[11px] font-semibold text-n500 uppercase tracking-[0.08em]">
+                                        <h5 className="text-[10px] font-semibold text-n500 uppercase tracking-[0.08em]">
                                             {tier.label}
                                         </h5>
-                                        <span className="text-[11px] text-n400">
+                                        <span className="text-[10px] text-n400">
                                             kapsamanın %{tier.weight}'i · karşılanma %{pct(tier.ratio)}
                                         </span>
                                     </div>
                                     {tier.groups.map((group) => (
                                         <div key={group.kind} className="space-y-1">
                                             {tier.groups.length > 1 && (
-                                                <p className="text-[11px] text-n400 pl-0.5">
+                                                <p className="text-[10px] text-n400 pl-0.5">
                                                     {group.label} · bu kefenin %{pct(group.share)}'i
                                                 </p>
                                             )}
@@ -592,7 +592,7 @@ export default function ScoreBreakdownPanel({ analysis, position, candidate = nu
 
                     {/* Madde bazlı değerlendirmesi olmayan eski kayıtlar */}
                     {exp.coverage && exp.coverage.tiers.length === 0 && (
-                        <p className="text-[12px] text-n400 italic">
+                        <p className="text-[11px] text-n400 italic">
                             Bu analiz madde bazlı değerlendirme içermiyor (eski kayıt). Ayrıntılı
                             kırılım için adayı yeniden analiz edin.
                         </p>
@@ -602,7 +602,7 @@ export default function ScoreBreakdownPanel({ analysis, position, candidate = nu
                         <div className="space-y-1.5">
                             <div className="flex items-baseline gap-2">
                                 <Brain className="w-3 h-3 text-brand" />
-                                <h5 className="text-[11px] font-semibold text-n500 uppercase tracking-[0.08em]">
+                                <h5 className="text-[10px] font-semibold text-n500 uppercase tracking-[0.08em]">
                                     STAR Kırılımı
                                 </h5>
                             </div>
@@ -615,11 +615,11 @@ export default function ScoreBreakdownPanel({ analysis, position, candidate = nu
                                       not alan boyut "3/10" görünüyordu */}
                                 {exp.star.dimensions.map((d) => (
                                     <div key={d.key} className="rounded-md border border-n200 bg-n50 px-2 py-1.5">
-                                        <p className="text-[11px] font-semibold text-n400 uppercase">
+                                        <p className="text-[10px] font-semibold text-n400 uppercase">
                                             {STAR_LABELS[d.key] || d.key}
                                         </p>
-                                        <p className="text-[13px] font-semibold text-n700">{d.score}/{STAR_MAX}</p>
-                                        <p className="text-[11px] text-n400">{anchorLabel(d.score, STAR_MAX)}</p>
+                                        <p className="text-[12px] font-semibold text-n700">{d.score}/{STAR_MAX}</p>
+                                        <p className="text-[10px] text-n400">{anchorLabel(d.score, STAR_MAX)}</p>
                                     </div>
                                 ))}
                             </div>
@@ -629,7 +629,7 @@ export default function ScoreBreakdownPanel({ analysis, position, candidate = nu
                     {/* Bayatken "madde puanları toplandığında bu skoru verir"
                         demek yanlış olur: o puanlar zaten gösterilmiyor ve
                         başlıktaki sayı saklanan skor. */}
-                    <p className="text-[11px] text-n400 leading-relaxed border-t border-n200 pt-2">
+                    <p className="text-[10px] text-n400 leading-relaxed border-t border-n200 pt-2">
                         {staleRequirements
                             ? 'Bu skor bir öneridir, karar değildir. Yukarıdaki sayı, ilanın ESKİ hâline göre ölçülmüş kayıtlı skordur; güncel gereksinimlere göre kırılım ancak yeniden taramadan sonra gösterilebilir.'
                             : 'Bu skor bir öneridir, karar değildir. Madde puanları toplandığında yukarıdaki skoru verir; ekran gerçek hesabı gösterir, yaklaşık bir açıklama değil.'}
@@ -649,8 +649,8 @@ function Chip({ label, value, tone }) {
     };
     return (
         <div className={`rounded-md border px-3 py-2 ${tones[tone]}`}>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] opacity-70">{label}</p>
-            <p className="text-[13px] font-semibold">{value}</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.08em] opacity-70">{label}</p>
+            <p className="text-[12px] font-semibold">{value}</p>
         </div>
     );
 }
@@ -671,36 +671,36 @@ function RequirementRow({ item }) {
             </span>
             <div className="min-w-0 flex-1">
                 <div className="flex items-baseline gap-1.5 flex-wrap">
-                    <span className="text-[12px] font-semibold text-n700">{item.text}</span>
+                    <span className="text-[11px] font-semibold text-n700">{item.text}</span>
                     {item.kind === 'arac' && (
-                        <span className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-n400 uppercase">
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-n400 uppercase">
                             <Wrench className="w-2 h-2" /> araç
                         </span>
                     )}
                 </div>
-                {item.note && <p className="text-[11px] text-n500 leading-relaxed mt-0.5">{item.note}</p>}
+                {item.note && <p className="text-[10px] text-n500 leading-relaxed mt-0.5">{item.note}</p>}
 
                 {/* NASIL KARŞILIYOR.
                     Damga tek başına yetmiyordu: iki aday aynı "karşılıyor"
                     damgasını alıp bambaşka insanlar olabilir. Dayanak CV'den
                     gelir; fark, adayın ilanla NEREDE ayrıştığıdır. */}
                 {item.evidence && (
-                    <p className="flex items-start gap-1 text-[11px] text-n600 leading-relaxed mt-1">
+                    <p className="flex items-start gap-1 text-[10px] text-n600 leading-relaxed mt-1">
                         <Quote className="w-2.5 h-2.5 text-n300 shrink-0 mt-0.5" />
                         <span>{item.evidence}</span>
                     </p>
                 )}
                 {item.gap && (
-                    <p className="flex items-start gap-1 text-[11px] text-warn leading-relaxed mt-0.5">
+                    <p className="flex items-start gap-1 text-[10px] text-warn leading-relaxed mt-0.5">
                         <GitCompareArrows className="w-2.5 h-2.5 text-warn shrink-0 mt-0.5" />
                         <span>
-                            <span className="font-semibold uppercase text-[11px] text-warn">Fark: </span>
+                            <span className="font-semibold uppercase text-[10px] text-warn">Fark: </span>
                             {item.gap}
                         </span>
                     </p>
                 )}
             </div>
-            <span className="shrink-0 text-[11px] font-semibold text-n600 tabular-nums">
+            <span className="shrink-0 text-[10px] font-semibold text-n600 tabular-nums">
                 {item.earned.toFixed(1)}
                 <span className="text-n300"> / {item.max.toFixed(1)}</span>
             </span>

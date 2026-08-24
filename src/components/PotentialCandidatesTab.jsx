@@ -70,10 +70,10 @@ export default function PotentialCandidatesTab({ position, candidates, onCandida
                         onClick={() => onCandidateClick?.(candidate)}
                         className="group relative p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.04] hover:border-electric/30 transition-all cursor-pointer"
                     >
-                        <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-start justify-between gap-3">
 
                             {/* Candidate Info */}
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2">
                                 <span className={`flex-shrink-0 w-8 h-8 rounded-full bg-navy-800 flex items-center justify-center text-xs font-bold ${idx === 0 ? 'text-emerald-400 border border-emerald-500/30' : 'text-navy-400'}`}>
                                     {idx + 1}
                                 </span>
@@ -103,7 +103,7 @@ export default function PotentialCandidatesTab({ position, candidates, onCandida
                         <div className="mt-3 pl-11">
                             <div className="relative p-2.5 rounded-lg bg-electric/5 border border-electric/10">
                                 <div className="absolute top-3 left-0 w-0.5 h-4 bg-electric rounded-r-full" />
-                                <p className="text-[11px] text-navy-200 leading-relaxed italic">
+                                <p className="text-[10px] text-navy-200 leading-relaxed italic">
                                     <span className="not-italic text-electric font-bold mr-1">AI Analiz:</span>
                                     {candidate.aiInsight}
                                 </p>

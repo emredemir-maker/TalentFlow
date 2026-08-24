@@ -28,7 +28,7 @@ export default function InterviewOutcomePanel({ candidate, position, analysis })
                 <Shell>
                     <div className="flex items-start gap-2 rounded-md border bg-warn-bg px-3 py-2">
                         <AlertTriangle className="w-3.5 h-3.5 text-warn shrink-0 mt-0.5" />
-                        <p className="text-[11px] text-n700 leading-relaxed">
+                        <p className="text-[10px] text-n700 leading-relaxed">
                             Mülakat kaydı var ama <strong>CV taraması eski gereksinim listesine ait</strong>.
                             İki kanıtı birleştirmek için ortak bir taban gerekiyor — adayı yeniden tarayın,
                             mülakat damgaları korunuyor.
@@ -48,8 +48,8 @@ export default function InterviewOutcomePanel({ candidate, position, analysis })
             {/* Skor: önce ve sonra. Aynı ölçek, o yüzden yan yana durabiliyorlar. */}
             <div className="flex flex-wrap items-center gap-2">
                 <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-n50 border border-n200">
-                    <span className="text-[11px] font-semibold text-n400 uppercase tracking-[0.08em]">CV</span>
-                    <span className="text-[13px] font-semibold text-n600">{cvScore}</span>
+                    <span className="text-[10px] font-semibold text-n400 uppercase tracking-[0.08em]">CV</span>
+                    <span className="text-[12px] font-semibold text-n600">{cvScore}</span>
                 </div>
                 <ArrowRight className="w-3 h-3 text-n300" />
                 <div
@@ -61,19 +61,19 @@ export default function InterviewOutcomePanel({ candidate, position, analysis })
                               : 'bg-bad-bg border-transparent'
                     }`}
                 >
-                    <span className="text-[11px] font-semibold text-n400 uppercase tracking-[0.08em]">Mülakat sonrası</span>
-                    <span className={`text-[13px] font-semibold ${delta === 0 ? 'text-n600' : up ? 'text-ok' : 'text-bad'}`}>
+                    <span className="text-[10px] font-semibold text-n400 uppercase tracking-[0.08em]">Mülakat sonrası</span>
+                    <span className={`text-[12px] font-semibold ${delta === 0 ? 'text-n600' : up ? 'text-ok' : 'text-bad'}`}>
                         {score}
                     </span>
                     {delta !== 0 && (
-                        <span className={`flex items-center gap-0.5 text-[11px] font-semibold ${up ? 'text-ok' : 'text-bad'}`}>
+                        <span className={`flex items-center gap-0.5 text-[10px] font-semibold ${up ? 'text-ok' : 'text-bad'}`}>
                             {up ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
                             {up ? '+' : ''}{delta}
                         </span>
                     )}
                 </div>
                 {merged.unchanged > 0 && (
-                    <span className="text-[11px] text-n400 ml-auto">
+                    <span className="text-[10px] text-n400 ml-auto">
                         {merged.unchanged} madde doğrulandı
                     </span>
                 )}
@@ -81,7 +81,7 @@ export default function InterviewOutcomePanel({ candidate, position, analysis })
 
             {/* Değişiklikler — panelin asıl işi */}
             {merged.changes.length === 0 ? (
-                <p className="text-[11px] text-n500 leading-relaxed">
+                <p className="text-[10px] text-n500 leading-relaxed">
                     Mülakat, CV taramasının vardığı sonuçları <strong>değiştirmedi</strong>. Bu bir
                     başarısızlık değil: cevaplar mevcut yargıyı doğruladı.
                 </p>
@@ -102,9 +102,9 @@ export default function InterviewOutcomePanel({ candidate, position, analysis })
                                             zorunlu
                                         </span>
                                     )}
-                                    <span className="text-[12px] font-semibold text-n700">{c.text}</span>
+                                    <span className="text-[11px] font-semibold text-n700">{c.text}</span>
                                 </div>
-                                <div className="flex items-center gap-1.5 text-[11px] font-semibold">
+                                <div className="flex items-center gap-1.5 text-[10px] font-semibold">
                                     <span className="text-n400 line-through">{statusLabel(c.from)}</span>
                                     <ArrowRight className="w-3 h-3 text-n300" />
                                     <span className={better ? 'text-ok' : 'text-bad'}>
@@ -114,7 +114,7 @@ export default function InterviewOutcomePanel({ candidate, position, analysis })
                                 {/* Alıntı damganın hesabıdır: adayın kendi cümlesi
                                     olmadan "odada kapandı" iddiası denetlenemez. */}
                                 {c.quote && (
-                                    <p className="mt-1.5 flex items-start gap-1.5 text-[11px] text-n600 italic leading-relaxed">
+                                    <p className="mt-1.5 flex items-start gap-1.5 text-[10px] text-n600 italic leading-relaxed">
                                         <MessageSquareQuote className="w-3 h-3 text-n300 shrink-0 mt-0.5" />
                                         “{c.quote}”
                                     </p>
@@ -130,18 +130,18 @@ export default function InterviewOutcomePanel({ candidate, position, analysis })
                 <div className="rounded-md border border-n200 bg-n50 px-3 py-2.5">
                     <div className="flex items-center gap-1.5 mb-1.5">
                         <HelpCircle className="w-3 h-3 text-n400" />
-                        <span className="text-[11px] font-semibold text-n500 uppercase tracking-[0.08em]">
+                        <span className="text-[10px] font-semibold text-n500 uppercase tracking-[0.08em]">
                             Karar verilemedi
                         </span>
                     </div>
-                    <p className="text-[11px] text-n500 mb-1.5 leading-relaxed">
+                    <p className="text-[10px] text-n500 mb-1.5 leading-relaxed">
                         Bu maddelerde cevap hüküm vermeye yetmedi — soru atlanmış, kısa kalmış ya da
                         konuya girmemiş olabilir. <strong>Adayın eksiği sayılmadı</strong>, skoru
                         değişmedi.
                     </p>
                     <ul className="space-y-0.5">
                         {merged.inconclusive.map((i) => (
-                            <li key={i.requirementIndex} className="text-[11px] text-n600">
+                            <li key={i.requirementIndex} className="text-[10px] text-n600">
                                 · {i.text}
                                 {i.must && <span className="text-bad font-semibold ml-1">zorunlu</span>}
                             </li>
@@ -155,13 +155,13 @@ export default function InterviewOutcomePanel({ candidate, position, analysis })
 
 function Shell({ date, children }) {
     return (
-        <div className="rounded-md border border-n200 bg-n0 p-4 space-y-3">
+        <div className="rounded-md border border-n200 bg-n0 p-3 space-y-3">
             <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-3.5 h-3.5 text-ok" />
-                <span className="text-[11px] font-semibold text-n700 uppercase tracking-[0.08em]">
+                <span className="text-[10px] font-semibold text-n700 uppercase tracking-[0.08em]">
                     Mülakat Sonucu
                 </span>
-                {date && <span className="text-[11px] text-n400">· {date}</span>}
+                {date && <span className="text-[10px] text-n400">· {date}</span>}
             </div>
             {children}
         </div>

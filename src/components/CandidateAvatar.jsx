@@ -6,9 +6,9 @@ function getInitials(name) {
 }
 
 const SIZE_CLASSES = {
-    sm:  'w-8  h-8  text-[11px]',
-    md:  'w-10 h-10 text-[13px]',
-    lg:  'w-11 h-11 text-[13px]',
+    sm:  'w-8  h-8  text-[10px]',
+    md:  'w-10 h-10 text-[12px]',
+    lg:  'w-11 h-11 text-[12px]',
     xl:  'w-20 h-20 text-3xl',
 };
 

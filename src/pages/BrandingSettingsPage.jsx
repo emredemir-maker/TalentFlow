@@ -117,7 +117,7 @@ export default function BrandingSettingsPage() {
                         <div className="w-3 h-3 rounded-full bg-ok" />
                         <span className="ml-2 text-xs text-n400">E-posta Önizleme</span>
                     </div>
-                    <div className="p-4 bg-n100">
+                    <div className="p-3 bg-n100">
                         <div className="max-w-[500px] mx-auto bg-n0 rounded-md overflow-hidden shadow-sm border border-n200">
                             {/* Header */}
                             <div
@@ -142,7 +142,7 @@ export default function BrandingSettingsPage() {
                                     {branding.companyName || 'Şirketiniz'} İK ekibi olarak sizinle tanışmak isteriz.
                                 </p>
                                 <div
-                                    className="rounded-r-xl p-4 mb-4"
+                                    className="rounded-r-xl p-3 mb-4"
                                     style={{
                                         backgroundColor: branding.primaryColor + '14',
                                         borderLeft: `4px solid ${branding.primaryColor}`
@@ -175,12 +175,12 @@ export default function BrandingSettingsPage() {
                 /* EDIT FORM */
                 <div className="space-y-5">
                     {/* Logo Upload */}
-                    <div className="bg-n0 border border-n200 rounded-[14px] p-5">
+                    <div className="bg-n0 border border-n200 rounded-[14px] p-3.5">
                         <div className="flex items-center gap-2 mb-4">
                             <Image className="w-4 h-4 text-brand" />
                             <h3 className="text-sm font-semibold text-n900">Şirket Logosu</h3>
                         </div>
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-3">
                             <div className="w-20 h-20 rounded-md border-2 border-dashed border-n200 bg-n25 flex items-center justify-center overflow-hidden flex-shrink-0">
                                 {branding.logoUrl ? (
                                     <img src={branding.logoUrl} alt="Logo" className="w-full h-full object-contain p-1" />
@@ -214,7 +214,7 @@ export default function BrandingSettingsPage() {
                     </div>
 
                     {/* Company Info */}
-                    <div className="bg-n0 border border-n200 rounded-[14px] p-5 space-y-4">
+                    <div className="bg-n0 border border-n200 rounded-[14px] p-3.5 space-y-4">
                         <div className="flex items-center gap-2 mb-1">
                             <Type className="w-4 h-4 text-brand" />
                             <h3 className="text-sm font-semibold text-n900">Şirket Bilgileri</h3>
@@ -261,12 +261,12 @@ export default function BrandingSettingsPage() {
                     </div>
 
                     {/* Brand Color */}
-                    <div className="bg-n0 border border-n200 rounded-[14px] p-5">
+                    <div className="bg-n0 border border-n200 rounded-[14px] p-3.5">
                         <div className="flex items-center gap-2 mb-4">
                             <Palette className="w-4 h-4 text-brand" />
                             <h3 className="text-sm font-semibold text-n900">Marka Rengi</h3>
                         </div>
-                        <div className="flex items-center gap-3 flex-wrap">
+                        <div className="flex items-center gap-2 flex-wrap">
                             {PRESET_COLORS.map(c => (
                                 <button
                                     key={c}
@@ -300,8 +300,8 @@ export default function BrandingSettingsPage() {
                 ile bir B2B SaaS aynı dikeyde sayılabilir ama işe alımda ayırt
                 eden çoğu zaman kime ve nasıl satıldığı. */}
             {!previewMode && (
-                <div className="border border-n200 rounded-[14px] p-5 space-y-4">
-                    <div className="flex items-start gap-3">
+                <div className="border border-n200 rounded-[14px] p-3.5 space-y-4">
+                    <div className="flex items-start gap-2">
                         <Target className="w-5 h-5 text-brand mt-0.5 shrink-0" />
                         <div>
                             <h3 className="text-sm font-semibold text-n900">Sektör Profili</h3>
@@ -312,7 +312,7 @@ export default function BrandingSettingsPage() {
                         </div>
                     </div>
 
-                    <div className="grid gap-4 sm:grid-cols-3">
+                    <div className="grid gap-3 sm:grid-cols-3">
                         {[
                             { key: 'sector', label: 'Faaliyet alanı', options: SECTOR_OPTIONS, hint: 'Hangi dikey alanda çalışıyorsunuz' },
                             { key: 'model', label: 'İş modeli', options: MODEL_OPTIONS, hint: 'Kime satıyorsunuz' },
@@ -337,7 +337,7 @@ export default function BrandingSettingsPage() {
                                     <option value="">Belirtilmemiş</option>
                                     {options.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
                                 </select>
-                                <p className="text-[11px] text-n400 mt-1">{hint}</p>
+                                <p className="text-[10px] text-n400 mt-1">{hint}</p>
                             </div>
                         ))}
                     </div>

@@ -122,7 +122,7 @@ function CodeBlock({ children, lang = 'bash' }) {
                         {copied ? 'Kopyalandı' : 'Kopyala'}
                     </button>
                 </div>
-                <pre className="p-4 text-xs text-slate-300 font-mono overflow-x-auto leading-relaxed whitespace-pre-wrap">{children}</pre>
+                <pre className="p-3 text-xs text-slate-300 font-mono overflow-x-auto leading-relaxed whitespace-pre-wrap">{children}</pre>
             </div>
         </div>
     );
@@ -137,7 +137,7 @@ function InfoBox({ type = 'info', children }) {
     const s = styles[type];
     const Icon = s.icon;
     return (
-        <div className={`flex gap-3 p-3.5 rounded-xl border my-3 ${s.bg}`}>
+        <div className={`flex gap-2 p-3.5 rounded-xl border my-3 ${s.bg}`}>
             <Icon className={`w-4 h-4 shrink-0 mt-0.5 ${s.iconColor}`} />
             <p className={`text-xs leading-relaxed ${s.text}`}>{children}</p>
         </div>
@@ -1021,7 +1021,7 @@ export default function TechDocsPage() {
             <div className="max-w-4xl mx-auto px-6 lg:px-10 py-8 space-y-3">
 
                 {/* Version badge */}
-                <div className="flex items-center gap-3 pb-2">
+                <div className="flex items-center gap-2 pb-2">
                     <span className="text-xs text-slate-400">v2.0 · Mart 2026</span>
                     <span className="w-1 h-1 rounded-full bg-slate-300" />
                     <a
@@ -1047,7 +1047,7 @@ export default function TechDocsPage() {
                         >
                             <button
                                 onClick={() => toggle(section.id)}
-                                className="w-full flex items-center gap-4 px-6 py-4 text-left hover:bg-slate-50/50 transition-all"
+                                className="w-full flex items-center gap-3 px-6 py-3 text-left hover:bg-slate-50/50 transition-all"
                             >
                                 <div
                                     className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"

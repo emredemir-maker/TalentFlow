@@ -255,10 +255,10 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                             </button>
                         </div>
                     </div>
-                    <h2 className="text-[20px] font-semibold text-n900 mt-2">{pos.title}</h2>
+                    <h2 className="text-[17px] font-semibold text-n900 mt-2">{pos.title}</h2>
                     <div className="inline-flex items-center gap-1.5 mt-1">
                         <Building2 size={12} className="text-n400" />
-                        <span className="text-[12px] text-n500">{pos.department}</span>
+                        <span className="text-[11px] text-n500">{pos.department}</span>
                     </div>
 
                     {/* Tabs */}
@@ -267,7 +267,7 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                             <button
                                 key={t.id}
                                 onClick={() => setActiveTab(t.id)}
-                                className={`flex-1 py-2 rounded-md text-[12px] font-semibold transition-all flex items-center justify-center gap-1.5 ${activeTab === t.id ? 'bg-n0 text-n900 shadow-sm' : 'text-n400 hover:text-n600'}`}
+                                className={`flex-1 py-2 rounded-md text-[11px] font-semibold transition-all flex items-center justify-center gap-1.5 ${activeTab === t.id ? 'bg-n0 text-n900 shadow-sm' : 'text-n400 hover:text-n600'}`}
                             >
                                 {t.label}
                                 {t.badge ? (
@@ -282,25 +282,25 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                 {activeTab === 'detail' && (
                     <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
                         {/* Stats */}
-                        <div className="grid grid-cols-3 gap-3">
-                            <div className="bg-n50 rounded-[14px] border border-n200 p-4 text-center">
+                        <div className="grid grid-cols-3 gap-2">
+                            <div className="bg-n50 rounded-[14px] border border-n200 p-3 text-center">
                                 <div className="text-[24px] font-semibold text-n900 leading-none">{candidateCount}</div>
-                                <div className="text-[11px] text-n400 uppercase tracking-[0.08em] mt-1">Aday</div>
+                                <div className="text-[10px] text-n400 uppercase tracking-[0.08em] mt-1">Aday</div>
                             </div>
-                            <div className="bg-n50 rounded-[14px] border border-n200 p-4 text-center">
+                            <div className="bg-n50 rounded-[14px] border border-n200 p-3 text-center">
                                 <div className="text-[24px] font-semibold text-n900 leading-none">{pos.minExperience || 0} yıl+</div>
-                                <div className="text-[11px] text-n400 uppercase tracking-[0.08em] mt-1">Min. Tecrübe</div>
+                                <div className="text-[10px] text-n400 uppercase tracking-[0.08em] mt-1">Min. Tecrübe</div>
                             </div>
-                            <div className="bg-n50 rounded-[14px] border border-n200 p-4 text-center">
+                            <div className="bg-n50 rounded-[14px] border border-n200 p-3 text-center">
                                 <div className="text-[24px] font-semibold text-brand leading-none">{openDays !== null ? `${openDays}g` : '—'}</div>
-                                <div className="text-[11px] text-n400 uppercase tracking-[0.08em] mt-1">Açık Süre</div>
+                                <div className="text-[10px] text-n400 uppercase tracking-[0.08em] mt-1">Açık Süre</div>
                             </div>
                         </div>
 
                         {/* Requirements */}
                         {pos.requirements?.length > 0 && (
                             <div>
-                                <h3 className="text-[11px] font-semibold text-n400 tracking-[0.08em] uppercase mb-2">GEREKSİNİMLER</h3>
+                                <h3 className="text-[10px] font-semibold text-n400 tracking-[0.08em] uppercase mb-2">GEREKSİNİMLER</h3>
                                 <div className="flex flex-wrap gap-2">
                                     {pos.requirements.map(req => (
                                         <span key={req} className="px-3 py-1.5 rounded-md bg-n100 text-n600 text-xs font-semibold border border-n200">{req}</span>
@@ -327,7 +327,7 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                         {/* Description */}
                         {pos.description && (
                             <div>
-                                <h3 className="text-[11px] font-semibold text-n400 tracking-[0.08em] uppercase mb-2">AÇIKLAMA</h3>
+                                <h3 className="text-[10px] font-semibold text-n400 tracking-[0.08em] uppercase mb-2">AÇIKLAMA</h3>
                                 <p className="text-sm text-n600 leading-relaxed">{pos.description}</p>
                             </div>
                         )}
@@ -335,7 +335,7 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                         {/* Matched Candidates — computed live from current candidate pool */}
                         {pos.status === 'open' && (
                             <div>
-                                <h3 className="text-[11px] font-semibold text-n400 tracking-[0.08em] uppercase mb-2">EŞLEŞEN ADAYLAR</h3>
+                                <h3 className="text-[10px] font-semibold text-n400 tracking-[0.08em] uppercase mb-2">EŞLEŞEN ADAYLAR</h3>
                                 {liveMatchedCandidates.length > 0 ? (
                                     <div className="space-y-2">
                                         {liveMatchedCandidates.slice(0, 5).map((mc, idx) => {
@@ -345,14 +345,14 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                                                 <div
                                                     key={idx}
                                                     onClick={() => fullCandidate && onCandidateClick(fullCandidate)}
-                                                    className="bg-n0 border border-n200 rounded-[14px] p-3.5 flex items-center gap-3 hover:border-brand-100 transition-colors cursor-pointer group"
+                                                    className="bg-n0 border border-n200 rounded-[14px] p-3.5 flex items-center gap-2 hover:border-brand-100 transition-colors cursor-pointer group"
                                                 >
                                                     <div className="w-9 h-9 rounded-full from-brand to-brand flex items-center justify-center text-white text-xs font-semibold shrink-0 shadow-sm">
                                                         {initials}
                                                     </div>
                                                     <div className="flex-1 min-w-0">
-                                                        <div className="text-[13px] font-semibold text-n900 truncate">{mc.name}</div>
-                                                        <div className="text-[12px] text-n400">{mc.reason || 'Eşleşme'}</div>
+                                                        <div className="text-[12px] font-semibold text-n900 truncate">{mc.name}</div>
+                                                        <div className="text-[11px] text-n400">{mc.reason || 'Eşleşme'}</div>
                                                     </div>
                                                     <div className="flex flex-col items-end shrink-0">
                                                         <div className="text-[14px] font-semibold text-brand">{mc.score}%</div>
@@ -402,7 +402,7 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                                         return (
                                             <div key={st} className={`rounded-[14px] border p-3 text-center ${cfg.pill}`}>
                                                 <div className="text-[22px] font-semibold leading-none">{count}</div>
-                                                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] mt-1 opacity-70">{cfg.label}</div>
+                                                <div className="text-[10px] font-semibold uppercase tracking-[0.08em] mt-1 opacity-70">{cfg.label}</div>
                                             </div>
                                         );
                                     })}
@@ -458,8 +458,8 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
 
                                         {/* Bulk action bar */}
                                         {selectedAppIds.size > 0 && (
-                                            <div className="flex items-center gap-3 mb-3 px-3 py-2.5 bg-brand-50 border border-brand-100 rounded-md">
-                                                <span className="text-[12px] font-semibold text-brand-700 flex-1">{selectedAppIds.size} başvuru seçildi</span>
+                                            <div className="flex items-center gap-2 mb-3 px-3 py-2.5 bg-brand-50 border border-brand-100 rounded-md">
+                                                <span className="text-[11px] font-semibold text-brand-700 flex-1">{selectedAppIds.size} başvuru seçildi</span>
                                                 <select
                                                     value={shortlistDept}
                                                     onChange={e => setShortlistDept(e.target.value)}
@@ -489,7 +489,7 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
 
                                         {/* Select all checkbox row */}
                                         {filteredApps.length > 0 && (
-                                            <label className="flex items-center gap-2 mb-2 cursor-pointer text-[11px] text-n400 font-semibold">
+                                            <label className="flex items-center gap-2 mb-2 cursor-pointer text-[10px] text-n400 font-semibold">
                                                 <input
                                                     type="checkbox"
                                                     checked={allSelected}
@@ -513,8 +513,8 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                                                 return next;
                                             });
                                             return (
-                                        <div key={app.id} className={`bg-n0 border rounded-[14px] p-4 hover:border-brand-100 transition-colors ${isSelected ? 'border-brand bg-brand-50/30' : 'border-n200'}`}>
-                                            <div className="flex items-start gap-3">
+                                        <div key={app.id} className={`bg-n0 border rounded-[14px] p-3 hover:border-brand-100 transition-colors ${isSelected ? 'border-brand bg-brand-50/30' : 'border-n200'}`}>
+                                            <div className="flex items-start gap-2">
                                                 <div className="flex flex-col items-center gap-2 shrink-0">
                                                     <input
                                                         type="checkbox"
@@ -528,10 +528,10 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2 flex-wrap">
-                                                        <span className="text-[13px] font-semibold text-n900 truncate">{app.name}</span>
+                                                        <span className="text-[12px] font-semibold text-n900 truncate">{app.name}</span>
                                                         <span className={`inline-flex px-2 py-0.5 rounded-full border text-[11px] font-semibold ${sc.bg} ${sc.text} ${sc.border}`}>{app.source}</span>
                                                     </div>
-                                                    <div className="text-[12px] text-n400 truncate">{app.email}</div>
+                                                    <div className="text-[11px] text-n400 truncate">{app.email}</div>
                                                     <div className="flex items-center gap-2 mt-2 flex-wrap">
                                                         <span className={`inline-flex px-2.5 py-0.5 rounded-full border text-[11px] font-semibold ${stCfg.pill}`}>{stCfg.label}</span>
                                                         {(app.screeningLevel || app.screeningScore != null) && (
@@ -545,7 +545,7 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                                                             </span>
                                                         )}
                                                         {app.cvFileName && (
-                                                            <span className="inline-flex items-center gap-1 text-[11px] text-n400">
+                                                            <span className="inline-flex items-center gap-1 text-[10px] text-n400">
                                                                 <FileText size={10} />{app.cvFileName}
                                                             </span>
                                                         )}
@@ -553,7 +553,7 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                                                 </div>
                                                 <div className="shrink-0 text-right flex flex-col items-end gap-2">
                                                     <div className={`text-[18px] font-semibold leading-none ${scoreColor}`}>{app.aiScore || 0}%</div>
-                                                    <div className="text-[11px] text-n300 uppercase tracking-[0.08em]">AI Uyum</div>
+                                                    <div className="text-[10px] text-n300 uppercase tracking-[0.08em]">AI Uyum</div>
                                                     <div className="h-1 w-12 bg-n100 rounded-full overflow-hidden">
                                                         <div className={`h-full rounded-full ${app.aiScore >= 75 ? 'bg-ok' : app.aiScore >= 50 ? 'bg-warn' : 'bg-bad'}`} style={{ width: `${app.aiScore || 0}%` }} />
                                                     </div>
@@ -576,7 +576,7 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                                                     <button
                                                         key={st}
                                                         onClick={() => updateApplicationStatus(app.id, st)}
-                                                        className={`flex-1 py-1.5 rounded-md text-[11px] font-semibold uppercase tracking-wide border transition-all ${app.status === st ? cfg.pill : 'bg-n50 text-n300 border-n200 hover:border-n200'}`}
+                                                        className={`flex-1 py-1.5 rounded-md text-[10px] font-semibold uppercase tracking-wide border transition-all ${app.status === st ? cfg.pill : 'bg-n50 text-n300 border-n200 hover:border-n200'}`}
                                                     >
                                                         {cfg.label}
                                                     </button>
@@ -596,15 +596,15 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                 {activeTab === 'link' && (
                     <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
                         <div>
-                            <h3 className="text-[11px] font-semibold text-n400 tracking-[0.08em] uppercase mb-1">BAŞVURU LİNKİ</h3>
-                            <p className="text-[12px] text-n400 leading-relaxed">
+                            <h3 className="text-[10px] font-semibold text-n400 tracking-[0.08em] uppercase mb-1">BAŞVURU LİNKİ</h3>
+                            <p className="text-[11px] text-n400 leading-relaxed">
                                 Aşağıdaki linki LinkedIn, e-posta veya istediğiniz platformda paylaşın. Kaynağı seçin — sistem hangi kanaldan geldiğini otomatik kaydeder.
                             </p>
                         </div>
 
                         {/* Source selector */}
                         <div>
-                            <div className="text-[11px] font-semibold text-n400 tracking-[0.08em] uppercase mb-2">PAYLAŞIM KANALI</div>
+                            <div className="text-[10px] font-semibold text-n400 tracking-[0.08em] uppercase mb-2">PAYLAŞIM KANALI</div>
                             <div className="flex flex-wrap gap-2">
                                 {APPLY_SOURCES.map(s => (
                                     <button
@@ -619,8 +619,8 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                         </div>
 
                         {/* Link box */}
-                        <div className="bg-n50 border border-n200 rounded-[14px] p-4">
-                            <div className="text-[11px] font-semibold text-n400 uppercase tracking-[0.08em] mb-2">OLUŞTURULAN LİNK</div>
+                        <div className="bg-n50 border border-n200 rounded-[14px] p-3">
+                            <div className="text-[10px] font-semibold text-n400 uppercase tracking-[0.08em] mb-2">OLUŞTURULAN LİNK</div>
                             <div className="flex items-center gap-2">
                                 <div className="flex-1 bg-n0 border border-n200 rounded-md px-3 py-2.5 text-[12px] font-mono text-n600 break-all leading-relaxed">
                                     {applyUrl}
@@ -645,9 +645,9 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                         </a>
 
                         {/* Tip */}
-                        <div className="bg-brand-50 border border-brand-100 rounded-[14px] p-4">
-                            <div className="text-[11px] font-semibold text-brand uppercase tracking-[0.08em] mb-2">NASIL KULLANILIR?</div>
-                            <ul className="space-y-1.5 text-[12px] text-n500 leading-relaxed">
+                        <div className="bg-brand-50 border border-brand-100 rounded-[14px] p-3">
+                            <div className="text-[10px] font-semibold text-brand uppercase tracking-[0.08em] mb-2">NASIL KULLANILIR?</div>
+                            <ul className="space-y-1.5 text-[11px] text-n500 leading-relaxed">
                                 <li className="flex items-start gap-2"><ChevronRight size={10} className="text-brand mt-0.5 shrink-0" />LinkedIn iş ilanına "Başvur" butonu olarak ekleyin</li>
                                 <li className="flex items-start gap-2"><ChevronRight size={10} className="text-brand mt-0.5 shrink-0" />E-posta imzanıza veya kampanyaya hyperlink ekleyin</li>
                                 <li className="flex items-start gap-2"><ChevronRight size={10} className="text-brand mt-0.5 shrink-0" />Her platform için ayrı kaynak seçin — istatistikler ayrı tutulur</li>
@@ -658,9 +658,9 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                 )}
 
                 {/* Footer */}
-                <div className="px-6 py-4 border-t border-n200 shrink-0 bg-n50">
+                <div className="px-6 py-3 border-t border-n200 shrink-0 bg-n50">
                     {pos.status === 'open' && isRecruiterOrAdmin ? (
-                        <div className="flex gap-3">
+                        <div className="flex gap-2">
                             <button
                                 onClick={onRelease}
                                 className={`flex-1 py-3 rounded-md font-semibold text-xs flex items-center justify-center gap-2 transition-colors ${pos.releasedToDepartment ? 'bg-ok text-white' : 'bg-brand hover:bg-brand-600 text-white shadow-sm shadow-none'}`}
@@ -675,7 +675,7 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                             </button>
                         </div>
                     ) : pos.status === 'closed' && isRecruiterOrAdmin ? (
-                        <div className="flex gap-3">
+                        <div className="flex gap-2">
                             <button
                                 onClick={() => { onToggleStatus(); onClose(); }}
                                 className="flex-1 py-3 rounded-md bg-ok hover:opacity-90 text-white font-semibold text-xs flex items-center justify-center gap-2 transition-colors shadow-sm shadow-none"
@@ -773,14 +773,14 @@ function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser,
     return (
         <div className="fixed inset-0 z-50 bg-n0 flex flex-col overflow-hidden">
             {/* HEADER */}
-            <div className="px-8 py-4 border-b border-n200 flex items-center justify-between shrink-0 bg-n0 shadow-sm">
-                <div className="flex items-center gap-3">
+            <div className="px-8 py-3 border-b border-n200 flex items-center justify-between shrink-0 bg-n0 shadow-sm">
+                <div className="flex items-center gap-2">
                     <div className="w-9 h-9 rounded-md bg-brand-50 border border-brand-100 flex items-center justify-center">
                         <Briefcase size={18} className="text-brand-600" />
                     </div>
                     <div>
-                        <h2 className="text-[17px] font-semibold text-n900 leading-tight">Yeni Pozisyon Oluştur</h2>
-                        <p className="text-[12px] text-n400 font-medium">Stratejik işe alım planlaması</p>
+                        <h2 className="text-[15px] font-semibold text-n900 leading-tight">Yeni Pozisyon Oluştur</h2>
+                        <p className="text-[11px] text-n400 font-medium">Stratejik işe alım planlaması</p>
                     </div>
                 </div>
                 <button onClick={onClose} className="p-2.5 rounded-md hover:bg-n100 transition-colors text-n400 hover:text-n600">
@@ -795,18 +795,18 @@ function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser,
                 <div className="w-80 shrink-0 flex flex-col from-brand-50/60 to-white overflow-y-auto p-6">
                     <div className="flex items-center gap-2 mb-3">
                         <Sparkles size={14} className="text-brand" />
-                        <h3 className="text-[12px] font-semibold text-brand uppercase tracking-[0.08em]">AI ile Otomatik Doldur</h3>
+                        <h3 className="text-[11px] font-semibold text-brand uppercase tracking-[0.08em]">AI ile Otomatik Doldur</h3>
                     </div>
-                    <p className="text-[12px] text-n500 mb-3 leading-relaxed">İş ilanı metnini yapıştırın, AI tüm alanları otomatik dolduracak.</p>
+                    <p className="text-[11px] text-n500 mb-3 leading-relaxed">İş ilanı metnini yapıştırın, AI tüm alanları otomatik dolduracak.</p>
                     <textarea
-                        className="flex-1 min-h-[180px] bg-n0 border border-brand-100 rounded-[14px] p-4 text-sm text-n600 placeholder:text-n300 focus:outline-none focus:ring-2 focus:ring-brand-100 resize-none transition-all"
+                        className="flex-1 min-h-[180px] bg-n0 border border-brand-100 rounded-[14px] p-3 text-sm text-n600 placeholder:text-n300 focus:outline-none focus:ring-2 focus:ring-brand-100 resize-none transition-all"
                         placeholder="İş ilanı metnini buraya yapıştırın... (en az 50 karakter)"
                         value={jdText}
                         onChange={(e) => setJdText(e.target.value)}
                     />
                     <div className="flex items-center justify-between mt-1 mb-3">
-                        <p className="text-[11px] text-n400">{jdText.length} karakter</p>
-                        {jdText.length >= 50 && <p className="text-[11px] text-ok font-semibold">Hazır ✓</p>}
+                        <p className="text-[10px] text-n400">{jdText.length} karakter</p>
+                        {jdText.length >= 50 && <p className="text-[10px] text-ok font-semibold">Hazır ✓</p>}
                     </div>
                     <button
                         type="button"
@@ -820,7 +820,7 @@ function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser,
                         {['Pozisyon başlığı otomatik belirlenir', 'Gereksinimler listeye dönüştürülür', 'Departman tahmini yapılır', 'Kısa pozisyon özeti oluşturulur'].map(t => (
                             <div key={t} className="flex items-center gap-2">
                                 <CheckCircle2 size={12} className="text-ok shrink-0" />
-                                <span className="text-[12px] text-n500">{t}</span>
+                                <span className="text-[11px] text-n500">{t}</span>
                             </div>
                         ))}
                     </div>
@@ -828,7 +828,7 @@ function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser,
 
                 {/* COLUMN 2: Position Details */}
                 <form id="create-pos-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-8">
-                    <h3 className="text-[12px] font-semibold text-n400 uppercase tracking-[0.08em] mb-5">Pozisyon Bilgileri</h3>
+                    <h3 className="text-[11px] font-semibold text-n400 uppercase tracking-[0.08em] mb-5">Pozisyon Bilgileri</h3>
                     <div className="space-y-5">
                         <Field label="Pozisyon Adı *">
                             <input
@@ -839,7 +839,7 @@ function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser,
                                 className={INPUT_CLS}
                             />
                         </Field>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-2 gap-3">
                             <Field label="Departman *">
                                 {isDepartmentUser ? (
                                     <input type="text" disabled value={userDepartments?.[0] || ''} className={INPUT_CLS + ' opacity-60 cursor-not-allowed'} />
@@ -876,8 +876,8 @@ function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser,
                                 className={INPUT_CLS + ' h-28 resize-none'}
                             />
                             <div className="flex items-center justify-between mt-1">
-                                <p className="text-[11px] text-n400">Kısa genel özet — tam iş ilanı değil</p>
-                                <p className={`text-[11px] font-semibold ${descLen > 280 ? 'text-warn' : 'text-n400'}`}>{descLen}/320</p>
+                                <p className="text-[10px] text-n400">Kısa genel özet — tam iş ilanı değil</p>
+                                <p className={`text-[10px] font-semibold ${descLen > 280 ? 'text-warn' : 'text-n400'}`}>{descLen}/320</p>
                             </div>
                         </Field>
                     </div>
@@ -887,8 +887,8 @@ function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser,
                 <div className="w-[400px] shrink-0 flex flex-col overflow-y-auto p-6 bg-n50/40">
                     <div className="flex items-center justify-between mb-1">
                         <div>
-                            <h3 className="text-[12px] font-semibold text-n700 uppercase tracking-[0.08em]">Ön Eleme Soruları</h3>
-                            <p className="text-[11px] text-n400 mt-0.5">Adaylar yanıtlar — AI otomatik skorlar</p>
+                            <h3 className="text-[11px] font-semibold text-n700 uppercase tracking-[0.08em]">Ön Eleme Soruları</h3>
+                            <p className="text-[10px] text-n400 mt-0.5">Adaylar yanıtlar — AI otomatik skorlar</p>
                         </div>
                         <button
                             type="button"
@@ -900,20 +900,20 @@ function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser,
                     </div>
 
                     {!formData.screeningEnabled ? (
-                        <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center py-10">
+                        <div className="flex-1 flex flex-col items-center justify-center gap-2 text-center py-10">
                             <div className="w-14 h-14 rounded-[14px] bg-n100 flex items-center justify-center">
                                 <CheckCircle2 size={24} className="text-n300" />
                             </div>
-                            <p className="text-[13px] text-n400 font-medium">Ön eleme kapalı</p>
-                            <p className="text-[12px] text-n300 max-w-[180px]">Açmak için yukarıdaki anahtarı kullanın</p>
+                            <p className="text-[12px] text-n400 font-medium">Ön eleme kapalı</p>
+                            <p className="text-[11px] text-n300 max-w-[180px]">Açmak için yukarıdaki anahtarı kullanın</p>
                         </div>
                     ) : (
-                        <div className="flex flex-col gap-3 mt-4">
+                        <div className="flex flex-col gap-2 mt-4">
                             <button
                                 type="button"
                                 onClick={handleSuggestQuestions}
                                 disabled={suggestingQuestions}
-                                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-md bg-brand-50 border border-brand-100 text-[12px] font-semibold text-brand hover:bg-brand-100 transition-colors disabled:opacity-50"
+                                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-md bg-brand-50 border border-brand-100 text-[11px] font-semibold text-brand hover:bg-brand-100 transition-colors disabled:opacity-50"
                             >
                                 {suggestingQuestions ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
                                 {suggestingQuestions ? 'AI sorular oluşturuyor...' : 'AI ile 5 Soru Öner'}
@@ -922,7 +922,7 @@ function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser,
                                 {formData.screeningQuestions.map((q, i) => (
                                     <div key={i} className="bg-n0 rounded-md border border-n200 p-3 space-y-2">
                                         <div className="flex items-center justify-between">
-                                            <span className="text-[11px] font-semibold text-n400 uppercase tracking-[0.08em]">Soru {i + 1}</span>
+                                            <span className="text-[10px] font-semibold text-n400 uppercase tracking-[0.08em]">Soru {i + 1}</span>
                                             <div className="flex items-center gap-1.5">
                                                 <button
                                                     type="button"
@@ -963,14 +963,14 @@ function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser,
                                 <button
                                     type="button"
                                     onClick={() => setFormData(p => ({ ...p, screeningQuestions: [...p.screeningQuestions, ''] }))}
-                                    className="w-full py-2.5 rounded-md border-2 border-dashed border-n200 text-[12px] font-semibold text-n400 hover:border-brand-200 hover:text-brand transition-colors flex items-center justify-center gap-1.5"
+                                    className="w-full py-2.5 rounded-md border-2 border-dashed border-n200 text-[11px] font-semibold text-n400 hover:border-brand-200 hover:text-brand transition-colors flex items-center justify-center gap-1.5"
                                 >
                                     <Plus size={12} /> Soru Ekle
                                 </button>
                             )}
                             <div className="mt-2 bg-warn-bg border border-transparent rounded-md p-3">
-                                <p className="text-[11px] text-warn font-semibold mb-1">AI Skorlama Aktif</p>
-                                <p className="text-[11px] text-warn leading-relaxed">Adayların yanıtları Çok İyi / İyi / Fena Değil / Yetersiz olarak otomatik skorlanır.</p>
+                                <p className="text-[10px] text-warn font-semibold mb-1">AI Skorlama Aktif</p>
+                                <p className="text-[10px] text-warn leading-relaxed">Adayların yanıtları Çok İyi / İyi / Fena Değil / Yetersiz olarak otomatik skorlanır.</p>
                             </div>
                         </div>
                     )}
@@ -978,7 +978,7 @@ function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser,
             </div>
 
             {/* FOOTER */}
-            <div className="px-8 py-4 border-t border-n200 bg-n0 flex items-center justify-between shrink-0">
+            <div className="px-8 py-3 border-t border-n200 bg-n0 flex items-center justify-between shrink-0">
                 <button type="button" onClick={onClose} className="px-5 py-2.5 rounded-md bg-n100 hover:bg-n100 text-n600 font-semibold text-sm transition-colors">
                     İptal
                 </button>
@@ -1026,7 +1026,7 @@ function PositionEditModal({ pos, candidates, departments, isDepartmentUser, use
 
                 {/* Header */}
                 <div className="px-8 py-5 border-b border-n200 flex items-center justify-between shrink-0">
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3">
                         <div className="bg-warn-bg border border-warn text-warn p-2 rounded-md">
                             <Edit2 size={18} />
                         </div>
@@ -1045,9 +1045,9 @@ function PositionEditModal({ pos, candidates, departments, isDepartmentUser, use
 
                 {/* Warning banner */}
                 {candidateCount > 0 && (
-                    <div className="mx-8 mt-5 px-4 py-3 rounded-[14px] bg-warn-bg border border-warn flex items-center gap-3 shrink-0">
+                    <div className="mx-8 mt-5 px-4 py-3 rounded-[14px] bg-warn-bg border border-warn flex items-center gap-2 shrink-0">
                         <AlertCircle size={14} className="text-warn shrink-0" />
-                        <span className="text-[12px] text-warn font-medium">
+                        <span className="text-[11px] text-warn font-medium">
                             Bu pozisyona bağlı {candidateCount} aday etkilenebilir. Değişiklikleri kaydetmeden önce gözden geçirin.
                         </span>
                     </div>
@@ -1058,8 +1058,8 @@ function PositionEditModal({ pos, candidates, departments, isDepartmentUser, use
 
                     {/* Left: current info */}
                     <div className="p-6">
-                        <p className="text-[11px] font-semibold text-n400 tracking-[0.08em] uppercase mb-4">MEVCUT BİLGİLER</p>
-                        <div className="bg-n50 rounded-[14px] border border-n200 p-5 space-y-3">
+                        <p className="text-[10px] font-semibold text-n400 tracking-[0.08em] uppercase mb-4">MEVCUT BİLGİLER</p>
+                        <div className="bg-n50 rounded-[14px] border border-n200 p-3.5 space-y-3">
                             {[
                                 { label: 'Pozisyon', value: pos.title },
                                 { label: 'Departman', value: pos.department },
@@ -1067,12 +1067,12 @@ function PositionEditModal({ pos, candidates, departments, isDepartmentUser, use
                                 { label: 'Adaylar', value: `${candidateCount} eşleşme` },
                             ].map(({ label, value }) => (
                                 <div key={label} className="flex flex-col">
-                                    <span className="text-[11px] text-n400 uppercase tracking-[0.08em] font-semibold mb-0.5">{label}</span>
-                                    <span className="text-[13px] font-semibold text-n900">{value}</span>
+                                    <span className="text-[10px] text-n400 uppercase tracking-[0.08em] font-semibold mb-0.5">{label}</span>
+                                    <span className="text-[12px] font-semibold text-n900">{value}</span>
                                 </div>
                             ))}
                             <div className="flex flex-col">
-                                <span className="text-[11px] text-n400 uppercase tracking-[0.08em] font-semibold mb-1">Durum</span>
+                                <span className="text-[10px] text-n400 uppercase tracking-[0.08em] font-semibold mb-1">Durum</span>
                                 <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border w-fit ${sc.pill}`}>
                                     <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />{sc.label}
                                 </span>
@@ -1080,7 +1080,7 @@ function PositionEditModal({ pos, candidates, departments, isDepartmentUser, use
                         </div>
                         {pos.requirements?.length > 0 && (
                             <div className="mt-5">
-                                <p className="text-[11px] font-semibold text-n400 tracking-[0.08em] uppercase mb-2">MEVCUT GEREKSİNİMLER</p>
+                                <p className="text-[10px] font-semibold text-n400 tracking-[0.08em] uppercase mb-2">MEVCUT GEREKSİNİMLER</p>
                                 <div className="flex flex-wrap gap-1.5">
                                     {pos.requirements.map(tag => (
                                         <span key={tag} className="px-2.5 py-1 rounded-md bg-n100 text-n600 text-[12px] font-semibold border border-n200">{tag}</span>
@@ -1092,35 +1092,35 @@ function PositionEditModal({ pos, candidates, departments, isDepartmentUser, use
 
                     {/* Right: edit form */}
                     <form onSubmit={handleSubmit} className="p-6 flex flex-col">
-                        <p className="text-[11px] font-semibold text-n400 tracking-[0.08em] uppercase mb-4">DEĞİŞTİRİLECEK ALANLAR</p>
+                        <p className="text-[10px] font-semibold text-n400 tracking-[0.08em] uppercase mb-4">DEĞİŞTİRİLECEK ALANLAR</p>
 
                         {/* Mevcut bir ilanı yeni bir metne göre güncellemek, alanları
                             elle yeniden yazmayı gerektiriyordu — AI doldurma yalnızca
                             pozisyon OLUŞTURMA ekranında vardı. */}
                         <details className="mb-4 rounded-[14px] border border-brand-100 bg-brand-50/50 overflow-hidden">
-                            <summary className="cursor-pointer select-none px-4 py-2.5 flex items-center gap-2 text-[12px] font-semibold text-brand uppercase tracking-[0.08em]">
+                            <summary className="cursor-pointer select-none px-4 py-2.5 flex items-center gap-2 text-[11px] font-semibold text-brand uppercase tracking-[0.08em]">
                                 <Sparkles size={13} /> İlan metninden güncelle
                             </summary>
-                            <div className="p-4 pt-0">
+                            <div className="p-3 pt-0">
                                 <textarea
-                                    className="w-full min-h-[120px] bg-n0 border border-brand-100 rounded-md p-3 text-[12px] text-n600 placeholder:text-n300 focus:outline-none focus:ring-2 focus:ring-brand-100 resize-y"
+                                    className="w-full min-h-[120px] bg-n0 border border-brand-100 rounded-md p-3 text-[11px] text-n600 placeholder:text-n300 focus:outline-none focus:ring-2 focus:ring-brand-100 resize-y"
                                     placeholder="Güncel ilan / aranan profil metnini buraya yapıştırın... (en az 50 karakter)"
                                     value={jdText}
                                     onChange={(e) => setJdText(e.target.value)}
                                 />
                                 <div className="flex items-center justify-between mt-1 mb-2">
-                                    <p className="text-[11px] text-n400">{jdText.length} karakter</p>
-                                    {jdText.length >= 50 && <p className="text-[11px] text-ok font-semibold">Hazır ✓</p>}
+                                    <p className="text-[10px] text-n400">{jdText.length} karakter</p>
+                                    {jdText.length >= 50 && <p className="text-[10px] text-ok font-semibold">Hazır ✓</p>}
                                 </div>
                                 <button
                                     type="button"
                                     onClick={() => onExtract(formData, setFormData)}
                                     disabled={isExtracting || jdText.length < 50}
-                                    className="w-full bg-brand hover:bg-brand-600 text-white font-semibold text-[12px] py-2.5 rounded-md flex items-center justify-center gap-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                    className="w-full bg-brand hover:bg-brand-600 text-white font-semibold text-[11px] py-2.5 rounded-md flex items-center justify-center gap-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                     {isExtracting ? <><Loader2 size={13} className="animate-spin" />Analiz ediliyor...</> : <><Sparkles size={13} />Alanları Doldur</>}
                                 </button>
-                                <p className="text-[11px] text-n400 mt-2">
+                                <p className="text-[10px] text-n400 mt-2">
                                     Alanlar dolduruluyor, kayıt otomatik değil — gözden geçirip
                                     &quot;Değişiklikleri Kaydet&quot; demeniz gerekir.
                                 </p>
@@ -1154,7 +1154,7 @@ function PositionEditModal({ pos, candidates, departments, isDepartmentUser, use
                                 <textarea value={formData.description} onChange={e => setFormData(p => ({ ...p, description: e.target.value }))} className={INPUT_CLS + ' h-20 resize-none'} />
                             </Field>
                         </div>
-                        <div className="mt-6 flex gap-3 pt-4 border-t border-n200">
+                        <div className="mt-6 flex gap-2 pt-4 border-t border-n200">
                             <button type="button" onClick={onClose} className="flex-1 py-3 rounded-md bg-n100 hover:bg-n100 text-n600 font-semibold text-xs transition-colors">İptal</button>
                             <button type="submit" className="flex-1 py-3 rounded-md bg-brand hover:bg-brand-600 text-white font-semibold text-xs uppercase tracking-[0.08em] flex items-center justify-center gap-2 shadow-sm shadow-none transition-colors">
                                 <CheckCircle2 size={14} />Değişiklikleri Kaydet
@@ -1539,19 +1539,19 @@ export default function PositionsPage() {
             {/* Gereksinimler değişince etkilenen adaylar yeniden taranırken —
                 işlem sayfadan ayrılınca durur, bu yüzden görünür tutulur. */}
             {rescanProgress && (
-                <div className="mx-6 mt-4 px-5 py-3 rounded-[14px] border border-brand-200 bg-brand-50 flex items-center gap-3">
+                <div className="mx-6 mt-4 px-5 py-3 rounded-[14px] border border-brand-200 bg-brand-50 flex items-center gap-2">
                     <Loader2 className="w-4 h-4 text-brand animate-spin shrink-0" />
                     <p className="text-sm font-semibold text-brand-700">
                         Adaylar yeni gereksinimlere göre yeniden taranıyor — {rescanProgress.done} / {rescanProgress.total}
                     </p>
-                    <span className="text-[12px] text-brand">Bu sayfadan ayrılmayın</span>
+                    <span className="text-[11px] text-brand">Bu sayfadan ayrılmayın</span>
                 </div>
             )}
 
             {/* Pending banner */}
             {isRecruiterOrAdmin && pendingCount > 0 && (
                 <div className="mx-6 mt-4 px-5 py-3 rounded-[14px] border border-warn bg-warn-bg flex items-center justify-between">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                         <AlertCircle className="w-4 h-4 text-warn" />
                         <p className="text-sm font-semibold text-warn">{pendingCount} pozisyon talebi onayınızı bekliyor.</p>
                     </div>
@@ -1566,7 +1566,7 @@ export default function PositionsPage() {
 
                 {/* Sidebar */}
                 <aside className="w-[220px] shrink-0 bg-n0 rounded-[14px] border border-n200 shadow-sm flex flex-col py-5 px-4">
-                    <p className="text-[11px] font-semibold text-n400 tracking-[0.08em] uppercase mb-2 px-1">DURUM</p>
+                    <p className="text-[10px] font-semibold text-n400 tracking-[0.08em] uppercase mb-2 px-1">DURUM</p>
                     <div className="flex flex-col gap-0.5 mb-4">
                         {[
                             { key: 'all', label: 'Tümü', count: statusCounts.all },
@@ -1581,7 +1581,7 @@ export default function PositionsPage() {
                         ))}
                     </div>
                     <div className="border-t border-n200 my-2" />
-                    <p className="text-[11px] font-semibold text-n400 tracking-[0.08em] uppercase mb-2 px-1 mt-2">DEPARTMAN</p>
+                    <p className="text-[10px] font-semibold text-n400 tracking-[0.08em] uppercase mb-2 px-1 mt-2">DEPARTMAN</p>
                     <div className="flex flex-col gap-0.5 overflow-y-auto flex-1 pb-2">
                         {[{ key: 'all', label: 'Tüm Departmanlar' }, ...allDepts.map(d => ({ key: d, label: d, count: positions.filter(p => p.department === d).length }))].map(({ key, label, count }) => (
                             <button key={key} onClick={() => setDeptFilter(key)} className={`flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium transition-all border ${deptFilter === key ? 'bg-brand-50 border-brand-100 text-brand' : 'border-transparent text-n500 hover:bg-n50'}`}>
@@ -1600,12 +1600,12 @@ export default function PositionsPage() {
                 <div className="flex-1 min-w-0 flex flex-col bg-n0 rounded-[14px] border border-n200 shadow-sm overflow-hidden">
 
                     {/* Top bar */}
-                    <div className="px-7 py-4 border-b border-n200 flex items-center justify-between shrink-0">
-                        <div className="flex items-center gap-3">
+                    <div className="px-7 py-3 border-b border-n200 flex items-center justify-between shrink-0">
+                        <div className="flex items-center gap-2">
                             <h1 className="text-lg font-semibold text-n900 tracking-tight">{isDepartmentUser ? `${userDepartments?.join(', ')} Pozisyonları` : 'Pozisyon Portföyü'}</h1>
                             <span className="rounded-full bg-n100 text-n400 text-[12px] px-2 py-0.5 font-semibold">{visiblePositions.length}</span>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-n400" />
                                 <input type="text" placeholder="Pozisyon veya departman ara..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-56 bg-n50 border border-n200 rounded-md pl-9 pr-3 py-2 text-sm text-n700 placeholder-n400 outline-none focus:border-brand focus:ring-2 focus:ring-brand-100 transition-all" />
@@ -1618,7 +1618,7 @@ export default function PositionsPage() {
 
                     {/* Table header */}
                     <div className="px-7 pt-4 pb-2 shrink-0">
-                        <div className="grid grid-cols-[2fr_0.8fr_0.8fr_0.9fr_1.2fr_auto] gap-4 text-[11px] font-semibold text-n400 uppercase tracking-[0.08em] border-b border-n200 pb-2 px-4">
+                        <div className="grid grid-cols-[2fr_0.8fr_0.8fr_0.9fr_1.2fr_auto] gap-3 text-[10px] font-semibold text-n400 uppercase tracking-[0.08em] border-b border-n200 pb-2 px-4">
                             <div>POZİSYON / DEPARTMAN</div><div>ADAYLAR</div><div>TECRÜBE</div><div>DURUM</div><div>UYUM SKORU</div><div>İŞLEMLER</div>
                         </div>
                     </div>
@@ -1626,12 +1626,12 @@ export default function PositionsPage() {
                     {/* Rows */}
                     <div className="px-7 pb-6 space-y-2 overflow-y-auto flex-1">
                         {loading ? (
-                            <div className="flex flex-col items-center justify-center py-24 gap-3">
+                            <div className="flex flex-col items-center justify-center py-24 gap-2">
                                 <Loader2 className="w-8 h-8 animate-spin text-brand" />
                                 <p className="text-xs font-semibold text-n400 uppercase tracking-[0.08em]">Yükleniyor...</p>
                             </div>
                         ) : visiblePositions.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-24 gap-4">
+                            <div className="flex flex-col items-center justify-center py-24 gap-3">
                                 <div className="w-14 h-14 rounded-[14px] bg-n100 flex items-center justify-center"><Briefcase className="w-6 h-6 text-n300" /></div>
                                 <p className="text-sm font-semibold text-n400">{statusFilter === 'pending_approval' ? 'Bekleyen talep yok' : 'Pozisyon bulunamadı'}</p>
                                 <button onClick={() => setCreateOpen(true)} className="px-5 py-2.5 rounded-md bg-n100 hover:bg-n100 text-n600 text-xs font-semibold transition-all">
@@ -1659,7 +1659,7 @@ export default function PositionsPage() {
                                     )}
 
                                     <div
-                                        className="px-4 py-4 grid grid-cols-[2fr_0.8fr_0.8fr_0.9fr_1.2fr_auto] gap-4 items-center cursor-pointer"
+                                        className="px-4 py-3 grid grid-cols-[2fr_0.8fr_0.8fr_0.9fr_1.2fr_auto] gap-3 items-center cursor-pointer"
                                         onClick={() => setDetailPos(pos)}
                                     >
                                         {/* Col 1 */}
@@ -1670,12 +1670,12 @@ export default function PositionsPage() {
                                         {/* Col 2 */}
                                         <div>
                                             <div className="text-lg font-semibold text-n900 leading-none">{candidateCount}</div>
-                                            <div className="text-[11px] text-n400 mt-0.5">aday</div>
+                                            <div className="text-[10px] text-n400 mt-0.5">aday</div>
                                         </div>
                                         {/* Col 3 */}
                                         <div>
                                             <div className="font-semibold text-n900 leading-none">{pos.minExperience || 0} yıl+</div>
-                                            <div className="text-[11px] text-n400 mt-0.5">min.</div>
+                                            <div className="text-[10px] text-n400 mt-0.5">min.</div>
                                         </div>
                                         {/* Col 4 */}
                                         <div>
@@ -1726,7 +1726,7 @@ export default function PositionsPage() {
                                                             <button
                                                                 role="menuitem"
                                                                 onClick={() => { setOpenActionMenuId(null); handleToggleStatus(pos.id, pos.status); }}
-                                                                className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-n50 transition-colors text-left text-[12px] text-n700"
+                                                                className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-n50 transition-colors text-left text-[11px] text-n700"
                                                             >
                                                                 <XCircle className="w-3.5 h-3.5 text-n400 shrink-0" />
                                                                 <span>Pozisyonu Kapat</span>
@@ -1734,7 +1734,7 @@ export default function PositionsPage() {
                                                             <button
                                                                 role="menuitem"
                                                                 onClick={() => { setOpenActionMenuId(null); deletePosition(pos.id); }}
-                                                                className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-bad-bg transition-colors text-left text-[12px] text-bad"
+                                                                className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-bad-bg transition-colors text-left text-[11px] text-bad"
                                                             >
                                                                 <Trash2 className="w-3.5 h-3.5 shrink-0" />
                                                                 <span>Sil</span>
@@ -1766,7 +1766,7 @@ export default function PositionsPage() {
                     {/* Footer */}
                     <div className="px-7 py-3 border-t border-n200 bg-n50 flex items-center justify-between shrink-0">
                         <p className="text-xs text-n400 font-medium">{visiblePositions.length} pozisyon gösteriliyor</p>
-                        <div className="flex items-center gap-1"><Cpu className="w-3 h-3 text-brand" /><span className="text-[11px] text-n400">Eşleştirme aktif</span></div>
+                        <div className="flex items-center gap-1"><Cpu className="w-3 h-3 text-brand" /><span className="text-[10px] text-n400">Eşleştirme aktif</span></div>
                     </div>
                 </div>
             </div>
@@ -1873,7 +1873,7 @@ function SalaryBandFields({ formData, setFormData, inputCls }) {
     });
     return (
         <div>
-            <label className="text-[11px] font-semibold text-n400 uppercase tracking-[0.08em] block mb-1.5">
+            <label className="text-[10px] font-semibold text-n400 uppercase tracking-[0.08em] block mb-1.5">
                 Bütçe Bandı <span className="text-n300">(isteğe bağlı)</span>
             </label>
             {/* TEK TUTAR: bütçenin anlamlı ucu TAVAN. Alt sınır bir bütçe
@@ -1901,7 +1901,7 @@ function SalaryBandFields({ formData, setFormData, inputCls }) {
                     {BASES.map((x) => <option key={x} value={x}>{BASIS_LABEL[x]}</option>)}
                 </select>
             </div>
-            <p className="mt-1 text-[11px] text-n400">
+            <p className="mt-1 text-[10px] text-n400">
                 {preview
                     ? <>Kayıtlı band: <strong className="text-n500">{preview}</strong> — adayın beklentisi bununla karşılaştırılacak.</>
                     : 'Band girilmezse aday beklentileri bir şeyle kıyaslanamaz.'}

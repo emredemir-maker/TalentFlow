@@ -87,7 +87,7 @@ function ScoreCircle({ value, label, size = 'sm' }) {
                         style={{ transition: 'stroke-dashoffset 1.2s ease-out' }}
                     />
                 </svg>
-                <span className={`absolute inset-0 flex items-center justify-center font-bold ${colors.text} ${size === 'lg' ? 'text-xl' : 'text-[11px]'}`}>
+                <span className={`absolute inset-0 flex items-center justify-center font-bold ${colors.text} ${size === 'lg' ? 'text-xl' : 'text-[10px]'}`}>
                     {value}
                 </span>
             </div>
@@ -113,7 +113,7 @@ export default function AIAnalysisPanel({ result, loading, error, onRetry, title
     if (loading) {
         return (
             <div className="space-y-4 animate-fade-in">
-                <div className="flex items-center gap-3 p-4 rounded-xl bg-electric/5 border border-electric/10">
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-electric/5 border border-electric/10">
                     <div className="relative">
                         <Loader2 className="w-5 h-5 text-electric-light animate-spin" />
                         <div className="absolute inset-0 w-5 h-5 text-electric-light animate-ping opacity-20">
@@ -121,12 +121,12 @@ export default function AIAnalysisPanel({ result, loading, error, onRetry, title
                         </div>
                     </div>
                     <div>
-                        <div className="text-[13px] font-semibold text-electric-light">Gemini AI Analiz Ediyor...</div>
-                        <div className="text-[11px] text-text-muted mt-0.5">CV ve iş tanımı karşılaştırılıyor</div>
+                        <div className="text-[12px] font-semibold text-electric-light">Gemini AI Analiz Ediyor...</div>
+                        <div className="text-[10px] text-text-muted mt-0.5">CV ve iş tanımı karşılaştırılıyor</div>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-4 gap-2">
                     {Array.from({ length: 4 }).map((_, i) => (
                         <div key={i} className="p-3 rounded-xl bg-bg-primary border border-border-subtle">
                             <div className="skeleton w-10 h-10 rounded-full mx-auto mb-2 opacity-20" />
@@ -143,12 +143,12 @@ export default function AIAnalysisPanel({ result, loading, error, onRetry, title
     // ===== ERROR STATE =====
     if (error) {
         return (
-            <div className="p-4 rounded-xl bg-red-500/5 border border-red-500/10 space-y-3 animate-fade-in">
+            <div className="p-3 rounded-xl bg-red-500/5 border border-red-500/10 space-y-3 animate-fade-in">
                 <div className="flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4 text-red-400" />
-                    <span className="text-[13px] font-semibold text-red-400">Analiz Hatası</span>
+                    <span className="text-[12px] font-semibold text-red-400">Analiz Hatası</span>
                 </div>
-                <p className="text-[12px] text-text-muted leading-relaxed">{error}</p>
+                <p className="text-[11px] text-text-muted leading-relaxed">{error}</p>
                 <button
                     onClick={onRetry}
                     className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-bg-primary border border-border-subtle text-[12px] text-text-muted hover:text-text-primary transition-all cursor-pointer"
@@ -194,12 +194,12 @@ export default function AIAnalysisPanel({ result, loading, error, onRetry, title
     return (
         <div className="space-y-5 animate-fade-in-up">
             {/* ===== HEADER: Score + Recommendation ===== */}
-            <div className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-r from-electric/5 to-violet-500/5 border border-electric/10">
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-electric/5 to-violet-500/5 border border-electric/10">
                 <ScoreCircle value={targetScore || result.score} size="lg" />
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                         <Sparkles className="w-4 h-4 text-electric-light" />
-                        <span className="text-[12px] uppercase tracking-wider text-text-muted font-semibold">
+                        <span className="text-[11px] uppercase tracking-wider text-text-muted font-semibold">
                             {title ? `${title} Uyumluluğu` : 'AI Uyumluluk Skoru'}
                         </span>
                     </div>
@@ -239,7 +239,7 @@ export default function AIAnalysisPanel({ result, loading, error, onRetry, title
             {result.summary && (
                 <div>
                     <SectionHeader icon={Brain} title="Genel Değerlendirme" />
-                    <p className="text-[13px] text-text-secondary leading-relaxed p-4 rounded-xl bg-bg-primary border border-border-subtle shadow-inner italic">
+                    <p className="text-[12px] text-text-secondary leading-relaxed p-3 rounded-xl bg-bg-primary border border-border-subtle shadow-inner italic">
                         "{result.summary}"
                     </p>
                 </div>
@@ -251,13 +251,13 @@ export default function AIAnalysisPanel({ result, loading, error, onRetry, title
                     <SectionHeader icon={TrendingUp} title="Eşleşen Yetenekler" />
                     <div className="space-y-2">
                         {result.topSkills.map((item, i) => (
-                            <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10 shadow-sm">
+                            <div key={i} className="flex items-start gap-2 p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10 shadow-sm">
                                 <div className="w-6 h-6 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0 mt-0.5 border border-emerald-500/20">
                                     <CheckCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                                 </div>
                                 <div className="min-w-0">
-                                    <div className="text-[13px] font-black text-emerald-600 dark:text-emerald-400 lowercase tracking-wide first-letter:uppercase">{item.skill}</div>
-                                    <div className="text-[11px] text-text-muted mt-0.5 leading-tight">{item.relevance}</div>
+                                    <div className="text-[12px] font-black text-emerald-600 dark:text-emerald-400 lowercase tracking-wide first-letter:uppercase">{item.skill}</div>
+                                    <div className="text-[10px] text-text-muted mt-0.5 leading-tight">{item.relevance}</div>
                                 </div>
                             </div>
                         ))}
@@ -277,14 +277,14 @@ export default function AIAnalysisPanel({ result, loading, error, onRetry, title
                                 <div key={i} className={`p-3 rounded-xl ${sev.bg} border border-border-subtle`}>
                                     <div className="flex items-center gap-2 mb-1.5">
                                         <SevIcon className={`w-3.5 h-3.5 ${sev.color}`} />
-                                        <span className={`text-[13px] font-semibold ${sev.color}`}>{item.gap}</span>
+                                        <span className={`text-[12px] font-semibold ${sev.color}`}>{item.gap}</span>
                                         <span className={`ml-auto text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full ${sev.color} ${sev.bg} ring-1 ring-inset ${sev.ring}`}>
                                             {sev.label}
                                         </span>
                                     </div>
                                     <div className="flex items-start gap-2 mt-2">
                                         <ChevronRight className="w-3 h-3 text-text-muted shrink-0 mt-0.5 opacity-40" />
-                                        <span className="text-[11px] text-text-muted font-medium italic">"{item.suggestion}"</span>
+                                        <span className="text-[10px] text-text-muted font-medium italic">"{item.suggestion}"</span>
                                     </div>
                                 </div>
                             );
@@ -297,8 +297,8 @@ export default function AIAnalysisPanel({ result, loading, error, onRetry, title
             {result.personalizedMessage && (
                 <div>
                     <SectionHeader icon={MessageSquare} title="LinkedIn DM Taslağı" />
-                    <div className="relative p-5 rounded-xl bg-bg-primary border border-border-subtle shadow-inner">
-                        <p className="text-[13px] text-text-secondary leading-relaxed whitespace-pre-wrap pr-10 font-medium">
+                    <div className="relative p-3.5 rounded-xl bg-bg-primary border border-border-subtle shadow-inner">
+                        <p className="text-[12px] text-text-secondary leading-relaxed whitespace-pre-wrap pr-10 font-medium">
                             {result.personalizedMessage}
                         </p>
                         <button
@@ -327,7 +327,7 @@ function SectionHeader({ icon: Icon, title }) {
     return (
         <div className="flex items-center gap-2 mb-3">
             <Icon className="w-4 h-4 text-electric-light" />
-            <h4 className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">{title}</h4>
+            <h4 className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">{title}</h4>
         </div>
     );
 }
