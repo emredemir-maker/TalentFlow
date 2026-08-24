@@ -1306,7 +1306,11 @@ export default function CandidateProcessPage() {
     // ── TABS ──────────────────────────────────────────────────────────────────
     const TABS = [
         { id: 'ai_analysis',      label: 'STAR Analizi',        icon: <Brain className="w-3.5 h-3.5" /> },
-        { id: 'cv_file',          label: 'CV',                  icon: <FileQuestion className="w-3.5 h-3.5" /> },
+        // "CV" ve "CV & Uyum" TEK sekme. Ayrı dururken kullanıcı adayın
+        // belgesini görmek ile o belgeden çıkan uyum analizini görmek için
+        // iki ayrı sekme arasında gidip geliyordu — oysa ikincisi
+        // birincisinin okunmuş hâli. İçerik sırası: belge → uyum analizi →
+        // ön eleme → kronoloji.
         { id: 'cv_match',         label: 'CV & Uyum',           icon: <FileText className="w-3.5 h-3.5" /> },
         { id: 'pos_matches',      label: 'Pozisyon Eşleşmeleri', icon: <Layers className="w-3.5 h-3.5" /> },
         { id: 'verification',     label: 'Doğrulama',           icon: <ShieldCheck className="w-3.5 h-3.5" /> },
@@ -1784,9 +1788,6 @@ export default function CandidateProcessPage() {
                                     </div>
                                 )}
 
-                                {/* ── CV (orijinal dosya / form) ── */}
-                                {activeTab === 'cv_file' && <CandidateCvPanel candidate={candidate} />}
-
                                 {/* ── DOĞRULAMA (CV istihbaratı + sektör uyumu) ── */}
                                 {activeTab === 'verification' && (
                                     <VerificationPanel candidate={candidate} position={displayedPosition} />
@@ -1795,6 +1796,12 @@ export default function CandidateProcessPage() {
                                 {/* ── CV & UYUM ── */}
                                 {activeTab === 'cv_match' && (
                                     <div className="space-y-6 animate-in fade-in duration-300">
+                                        {/* ── CV (orijinal dosya / form) ──
+                                            Sekmenin başında: analiz, altındaki
+                                            belgeden çıkıyor. Panelin PDF/Form
+                                            kipleri ve kendi başlığı aynen. */}
+                                        <CandidateCvPanel candidate={candidate} />
+
                                         {/* Summary */}
                                         <div className="bg-n50 border border-n200 rounded-[14px] p-3.5 relative overflow-hidden">
                                             <Brain className="absolute -right-6 -top-6 w-24 h-24 text-n200" />

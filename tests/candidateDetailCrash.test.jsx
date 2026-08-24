@@ -150,7 +150,8 @@ const FIELDS = [
 
 const TABS = [
     'ai_analysis',
-    'cv_file',
+    // 'cv_file' EMIR 5'te kaldırıldı: CV görüntüleyici artık 'cv_match'
+    // sekmesinin başında duruyor.
     'cv_match',
     'pos_matches',
     'verification',
