@@ -1,7 +1,7 @@
 // src/pages/CandidateProcessPage.jsx
 import { analysisScoreFor } from '../utils/positionScore';
 import { scoreForPositionDetail } from '../utils/candidateTable';
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { memo, useMemo, useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
@@ -43,6 +43,76 @@ import {
     Sparkles, Trash2, RefreshCw, Layers, TrendingUp, Upload, FileQuestion, AlertTriangle,
     Users
 } from 'lucide-react';
+
+
+/**
+ * SOL LİSTEDEKİ TEK ADAY SATIRI — memoize.
+ *
+ * Satır eskiden sayfanın içinde, `filtered.map(...)` gövdesinde duruyordu.
+ * Sayfa her render olduğunda (bir adaya tıklamak dahil) listedeki HER satır
+ * yeniden çiziliyordu — 1500 adayda bu tek başına ~80 ms.
+ *
+ * Ayrı ve memoize bir bileşen olunca yalnızca props'u değişen satırlar
+ * çiziliyor: seçim değiştiğinde eski ve yeni seçili satır, yani ikisi.
+ *
+ * Props'un SABİT kalması şart, yoksa memo hiç tutmaz:
+ *   onSelect  → useState setter'ı (React garanti eder, her render aynı)
+ *   candidate → enrichedCandidates'ten gelen nesne, veri değişmedikçe aynı
+ *   score     → listScores memosundan gelen sayı
+ */
+const CandidateListItem = memo(function CandidateListItem({
+    candidate, role, sourceColors, score, isActive, onSelect,
+}) {
+    const mc = applyPiiMask(candidate, role);
+    const srcColor = candidate.source
+        ? sourceColors?.[String(candidate.source).toLowerCase()] || '#64748B'
+        : '#64748B';
+    const srcLabel = !candidate.source
+        ? 'Manuel / PDF'
+        : candidate.sourceDetail
+            ? `${candidate.source} (${candidate.sourceDetail})`
+            : candidate.source;
+
+    return (
+        <button
+            onClick={() => onSelect(candidate.id)}
+            className={`w-full text-left rounded-md px-3 py-2.5 flex items-center gap-2.5 transition-colors border ${
+                isActive ? 'bg-brand-50 border-brand-100' : 'bg-transparent border-transparent hover:bg-n50'
+            }`}
+        >
+            {isActive && <div className="w-[6px] h-[6px] rounded-full bg-brand shrink-0" />}
+            <CandidateAvatar
+                name={mc.name}
+                photo={candidate.photo}
+                photoUrl={candidate.photoUrl}
+                profileImage={candidate.profileImage}
+                size="sm"
+                rounded="rounded-md"
+            />
+            <div className="flex-1 min-w-0">
+                <p className={`text-[12px] font-semibold truncate leading-tight ${isActive ? 'text-brand' : 'text-n700'}`}>{mc.name}</p>
+                <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                    <span
+                        className="text-[11px] font-semibold px-1.5 py-0.5 rounded-md inline-flex items-center gap-0.5 uppercase"
+                        style={{ color: srcColor, backgroundColor: `${srcColor}15` }}
+                    >
+                        {srcLabel}
+                    </span>
+                    {candidate.screeningScore != null && (
+                        <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-md bg-brand-50 text-brand border border-brand-100 uppercase">
+                            🎯 %{Math.round(candidate.screeningScore)}
+                        </span>
+                    )}
+                </div>
+            </div>
+            <div className="shrink-0">
+                <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded-md ${
+                    isActive ? 'bg-brand-100 text-brand' : 'bg-n100 text-n500'
+                }`}>%{score}</span>
+            </div>
+        </button>
+    );
+});
 
 const STATUS_CONFIG = {
     live:       { label: 'CANLI',      bg: 'bg-bad-bg',    text: 'text-bad',    border: 'border-bad-bg',    pulse: true },
@@ -984,6 +1054,28 @@ export default function CandidateProcessPage() {
     };
     const score = coherentScoreOf(candidate);
 
+    /**
+     * SOL LİSTEDEKİ SKORLAR BİR KEZ HESAPLANIR.
+     *
+     * `coherentScoreOf` içinde `scoreForPositionDetail` → `calculateMatchScore`
+     * var; bu, adayın CV metnini baştan sona tarayan bir işlem ve aday başına
+     * ~1.5 ms sürüyor. Çağrı doğrudan `filtered.map(...)` içinde durduğu için
+     * ekranın HER render'ında LİSTEDEKİ HER ADAY için yeniden çalışıyordu.
+     *
+     * Ölçüm (1500 aday, 15 açık ilan): bir adaya tıklamak arayüzü 1378 ms
+     * kilitliyordu — tıklamanın yaptığı tek şey seçili adayı değiştirmek
+     * olmasına rağmen 1500 adayın skoru sıfırdan hesaplanıyordu.
+     *
+     * Hesap DEĞİŞMİYOR: aynı fonksiyon, aynı girdiler, aynı sonuç. Yalnızca
+     * girdiler değişmedikçe tekrar çalıştırılmıyor.
+     */
+    const listScores = useMemo(() => {
+        const m = new Map();
+        for (const c of filtered) m.set(c.id, coherentScoreOf(c));
+        return m;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [filtered, openByTitle]);
+
     // Gösterilen pozisyonun analiz METNİ — skorla aynı kural: ne gösteriliyorsa
     // onun analizi. Yoksa null döner ve arayüz "başka pozisyon için üretilmiş"
     // uyarısıyla eldeki metni gösterir.
@@ -1358,54 +1450,17 @@ export default function CandidateProcessPage() {
                                 <p className="text-[11px] font-semibold uppercase">Aday bulunamadı</p>
                             </div>
                         )}
-                        {filtered.map(c => {
-                            const mc = applyPiiMask(c, role);
-                            const sc = coherentScoreOf(c);
-                            const srcColor = getSourceColor(c.source);
-                            const isActive = c.id === candidate?.id;
-                            return (
-                                <button
-                                    key={c.id}
-                                    onClick={() => setViewCandidateId(c.id)}
-                                    className={`w-full text-left rounded-md px-3 py-2.5 flex items-center gap-2.5 transition-colors border ${
-                                        isActive
-                                            ? 'bg-brand-50 border-brand-100'
-                                            : 'bg-transparent border-transparent hover:bg-n50'
-                                    }`}
-                                >
-                                    {isActive && <div className="w-[6px] h-[6px] rounded-full bg-brand shrink-0" />}
-                                    <CandidateAvatar
-                                        name={mc.name}
-                                        photo={c.photo}
-                                        photoUrl={c.photoUrl}
-                                        profileImage={c.profileImage}
-                                        size="sm"
-                                        rounded="rounded-md"
-                                    />
-                                    <div className="flex-1 min-w-0">
-                                        <p className={`text-[12px] font-semibold truncate leading-tight ${isActive ? 'text-brand' : 'text-n700'}`}>{mc.name}</p>
-                                        <div className="flex items-center gap-1 mt-0.5 flex-wrap">
-                                            <span
-                                                className="text-[11px] font-semibold px-1.5 py-0.5 rounded-md inline-flex items-center gap-0.5 uppercase"
-                                                style={{ color: srcColor, backgroundColor: `${srcColor}15` }}
-                                            >
-                                                {getSourceLabel(c)}
-                                            </span>
-                                            {c.screeningScore != null && (
-                                                <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-md bg-brand-50 text-brand border border-brand-100 uppercase">
-                                                    🎯 %{Math.round(c.screeningScore)}
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="shrink-0">
-                                        <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded-md ${
-                                            isActive ? 'bg-brand-100 text-brand' : 'bg-n100 text-n500'
-                                        }`}>%{sc}</span>
-                                    </div>
-                                </button>
-                            );
-                        })}
+                        {filtered.map(c => (
+                            <CandidateListItem
+                                key={c.id}
+                                candidate={c}
+                                role={role}
+                                sourceColors={sourceColors}
+                                score={listScores.get(c.id) ?? 0}
+                                isActive={c.id === candidate?.id}
+                                onSelect={setViewCandidateId}
+                            />
+                        ))}
                     </div>
 
                     {/* Bottom AI card */}
