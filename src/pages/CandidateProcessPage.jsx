@@ -33,6 +33,7 @@ import MustHaveBadge from '../components/MustHaveBadge';
 import StarEvidenceCards from '../components/StarEvidenceCards';
 import VerificationPanel from '../components/VerificationPanel';
 import { starPercent } from '../utils/starDimensions';
+import { normalizeSkills } from '../utils/normalizeSkills';
 import {
     Plus, Search, Zap, Brain, X,
     Target, ShieldCheck, ArrowRight, FileText, Clock,
@@ -1845,11 +1846,26 @@ export default function CandidateProcessPage() {
                                                     <div className="flex items-center gap-2 pb-2 border-b border-n200 mb-3">
                                                         <h3 className="text-[11px] font-semibold text-n400 uppercase tracking-[0.08em]">Teknik Ekosistem</h3>
                                                     </div>
-                                                    <div className="flex flex-wrap gap-1.5">
-                                                        {(candidate.skills || ['React', 'Node.js', 'AWS', 'Redis']).map((s, i) => (
-                                                            <span key={i} className="px-2.5 py-1 bg-n0 border border-n200 rounded-md text-[11px] font-semibold text-n600 shadow-sm uppercase">{s}</span>
-                                                        ))}
-                                                    </div>
+                                                    {/* İKİ HATA BİRDEN VARDI.
+                                                        1) `.map` doğrudan `candidate.skills` üzerinde
+                                                           çağrılıyordu. Alan METİN olan bir adayda
+                                                           `.map` yok — sayfa çöküyor ve ekran BEYAZ
+                                                           kalıyordu. `|| []` yalnızca alanın
+                                                           yokluğuna karşı koruyor, yanlış tipe değil.
+                                                        2) Yedek değer UYDURMAYDI: yeteneği kayıtlı
+                                                           olmayan her aday ekranda "React, Node.js,
+                                                           AWS, Redis" biliyormuş gibi görünüyordu.
+                                                        Tip artık utils/normalizeSkills ile
+                                                        sabitleniyor; kayıt boşsa boş olduğu yazıyor. */}
+                                                    {normalizeSkills(candidate.skills).length > 0 ? (
+                                                        <div className="flex flex-wrap gap-1.5">
+                                                            {normalizeSkills(candidate.skills).map((s, i) => (
+                                                                <span key={i} className="px-2.5 py-1 bg-n0 border border-n200 rounded-md text-[11px] font-semibold text-n600 shadow-sm uppercase">{s}</span>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <p className="text-[12px] text-n400 m-0">CV&apos;den yetenek çıkarılamadı.</p>
+                                                    )}
                                                 </div>
                                                 <div className="pt-4 border-t border-n200">
                                                     <div className="flex items-center gap-2 pb-2 border-b border-n200 mb-3">

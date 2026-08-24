@@ -1,4 +1,5 @@
 // src/services/matchService.js
+import { normalizeSkills } from '../utils/normalizeSkills';
 import { analyzeCandidateMatch } from './geminiService';
 import { requirementsOf, hasPrioritizedRequirements } from '../utils/positionRequirements';
 import { skillAffinity, SKILL_VOCABULARY } from '../utils/skillGraph';
@@ -310,7 +311,7 @@ export function detectCandidateDomain(candidate) {
     const fullText = [
         candidate.about || '',
         candidate.description || '',
-        (candidate.skills || []).join(' '),
+        normalizeSkills(candidate.skills).join(' '),
         Array.isArray(candidate.experiences)
             ? candidate.experiences.map(e => `${e.title || ''} ${e.company || ''}`).join(' ')
             : '',
@@ -362,7 +363,7 @@ function candidateDomainText(candidate) {
         candidate.title || '',
         candidate.about || '',
         candidate.description || '',
-        (candidate.skills || []).join(' '),
+        normalizeSkills(candidate.skills).join(' '),
         Array.isArray(candidate.experiences)
             ? candidate.experiences.map(e => `${e.title || ''} ${e.company || ''}`).join(' ')
             : '',
@@ -432,7 +433,7 @@ export function calculateMatchScore(candidate, position, options = {}) {
 
     // --- 1. Enhanced Semantic Skills Match (70%) ---
     // Increased from 60% to emphasize technical fit
-    let cSkills = (candidate.skills || []).map(s => s.toLowerCase());
+    let cSkills = normalizeSkills(candidate.skills).map(s => s.toLowerCase());
 
     // A. Enrich skills from ALL text sources regardless of existing skills
     // This ensures candidates with empty skill lists but rich descriptions are caught.

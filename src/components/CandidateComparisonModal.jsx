@@ -1,4 +1,5 @@
 // src/components/CandidateComparisonModal.jsx
+import { normalizeSkills } from '../utils/normalizeSkills';
 import { useState } from 'react';
 import { useCandidates } from '../context/CandidatesContext';
 import { X, Zap, Brain, CheckCircle, TrendingUp, AlertCircle, Sparkles, MapPin, Briefcase, GraduationCap, Trophy, Loader2 } from 'lucide-react';
@@ -116,7 +117,7 @@ export default function CandidateComparisonModal({ isOpen, onClose }) {
                                         <h4 className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em]">Temel Yetkinlikler</h4>
                                     </div>
                                     <div className="flex flex-wrap gap-2">
-                                        {(candidate.skills || []).slice(0, 5).map((skill, sIdx) => (
+                                        {normalizeSkills(candidate.skills).slice(0, 5).map((skill, sIdx) => (
                                             <span key={sIdx} className="px-3 py-1.5 rounded-xl bg-bg-secondary border border-border-subtle text-[11px] font-black text-text-primary uppercase tracking-tighter">
                                                 {skill}
                                             </span>

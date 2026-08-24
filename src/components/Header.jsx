@@ -1,4 +1,5 @@
 // src/components/Header.jsx
+import { normalizeSkills } from '../utils/normalizeSkills';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
     Search, Bell, Settings, Home, X, Users, Briefcase,
@@ -48,7 +49,7 @@ function kwScoreCandidate(c, words) {
     for (const w of words) {
         if (c.name?.toLowerCase().includes(w)) s += 5;
         if (c.position?.toLowerCase().includes(w)) s += 3;
-        if ((c.skills || []).some(sk => sk.toLowerCase().includes(w))) s += 4;
+        if (normalizeSkills(c.skills).some(sk => sk.toLowerCase().includes(w))) s += 4;
         if ((c.summary || '').toLowerCase().includes(w)) s += 2;
         if (c.email?.toLowerCase().includes(w)) s += 2;
         if (c.department?.toLowerCase().includes(w)) s += 1;
@@ -189,7 +190,7 @@ export default function Header({ title }) {
             setAiLoading(true);
             try {
                 const summaries = enrichedCandidates.slice(0, 40).map(c =>
-                    `ID:${c.id}|${c.name}|${c.position || ''}|${(c.skills || []).slice(0, 6).join(',')}|${(c.summary || '').slice(0, 120)}`
+                    `ID:${c.id}|${c.name}|${c.position || ''}|${normalizeSkills(c.skills).slice(0, 6).join(',')}|${(c.summary || '').slice(0, 120)}`
                 ).join('\n');
 
                 const prompt = `Sen bir HR asistanısın. Kullanıcı arama kutusuna "${query}" yazdı.

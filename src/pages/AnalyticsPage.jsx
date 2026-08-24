@@ -1,6 +1,7 @@
 // src/pages/AnalyticsPage.jsx
 // Compact light-theme analytics dashboard — 3 tabs
 
+import { normalizeSkills } from '../utils/normalizeSkills';
 import { useState, useMemo } from 'react';
 import { useCandidates } from '../context/CandidatesContext';
 import { useMessageQueue } from '../context/MessageQueueContext';
@@ -538,7 +539,7 @@ export default function AnalyticsPage() {
 
     const topSkills = useMemo(() => {
         const skills = {};
-        timeFilteredCandidates.forEach(c => (c.skills || []).forEach(s => { skills[s] = (skills[s] || 0) + 1; }));
+        timeFilteredCandidates.forEach(c => normalizeSkills(c.skills).forEach(s => { skills[s] = (skills[s] || 0) + 1; }));
         return Object.entries(skills).sort((a, b) => b[1] - a[1]).slice(0, 8);
     }, [timeFilteredCandidates]);
 
