@@ -1022,7 +1022,16 @@ function PositionEditModal({ pos, candidates, departments, isDepartmentUser, use
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
             <div className="absolute inset-0 bg-n900/25 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-n0 rounded-[14px] shadow-2xl border border-n200 w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
+            {/* GENİŞLİK EKRANA GÖRE.
+                `max-w-3xl` (768px) bir OKUMA genişliği sınırı — uzun metni
+                65-75 karakterde tutmak için doğru. Ama burada okunan bir metin
+                değil, 16 alanlık bir FORM var. Kural forma uygulanınca 1600px
+                ekranda modal %48 yer kaplıyor, geri kalanı örtü oluyor ve form
+                dikey olarak 1.5 ekran uzuyordu.
+                Ölçüm sonrası: gereksinim satırı 160px, bütçe kutuları 76px.
+                Okuma genişliği kuralı yine çiğnenmiyor — genişlik kolonlara
+                dağıtılıyor, tek bir satır uzamıyor. */}
+            <div className="relative bg-n0 rounded-[14px] shadow-2xl border border-n200 w-full max-w-[min(1180px,92vw)] overflow-hidden flex flex-col max-h-[90vh]">
 
                 {/* Header */}
                 <div className="px-8 py-5 border-b border-n200 flex items-center justify-between shrink-0">
@@ -1054,7 +1063,14 @@ function PositionEditModal({ pos, candidates, departments, isDepartmentUser, use
                 )}
 
                 {/* Body */}
-                <div className="grid grid-cols-2 divide-x divide-n100 overflow-y-auto mt-2">
+                {/* KOLONLAR EŞİT DEĞİL.
+                    Sol kolon salt-okunur bir özet ("mevcut bilgiler") — üzerine
+                    yazılacak değerleri hatırlatıyor, üzerinde işlem yapılmıyor.
+                    Sağ kolon ise formun kendisi. Eşit bölünce, asıl iş yapılan
+                    yarı modalın yarısıyla yetiniyordu.
+                    Dar ekranda alt alta geçiyor; iki dar kolon hiç kimseye
+                    yaramaz. */}
+                <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.65fr)] lg:divide-x divide-n100 overflow-y-auto mt-2">
 
                     {/* Left: current info */}
                     <div className="p-6">
@@ -1127,22 +1143,34 @@ function PositionEditModal({ pos, candidates, departments, isDepartmentUser, use
                             </div>
                         </details>
                         <div className="space-y-4 flex-1">
-                            <Field label="Pozisyon Adı">
-                                <input type="text" value={formData.title} onChange={e => setFormData(p => ({ ...p, title: e.target.value }))} className={INPUT_CLS} />
-                            </Field>
-                            <Field label="Departman">
-                                {isDepartmentUser ? (
-                                    <input type="text" disabled value={userDepartments?.[0] || ''} className={INPUT_CLS + ' opacity-60 cursor-not-allowed'} />
-                                ) : (
-                                    <select value={formData.department} onChange={e => setFormData(p => ({ ...p, department: e.target.value }))} className={INPUT_CLS + ' appearance-none cursor-pointer'}>
-                                        {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
-                                    </select>
-                                )}
-                            </Field>
-                            <Field label="Min. Tecrübe (yıl)">
-                                <input type="number" min="0" value={formData.minExperience} onChange={e => setFormData(p => ({ ...p, minExperience: e.target.value }))} className={INPUT_CLS} />
-                            </Field>
-                            <SalaryBandFields formData={formData} setFormData={setFormData} inputCls={INPUT_CLS} />
+                            {/* KISA ALANLAR YAN YANA.
+                                Hepsi tek sütunda alt alta duruyordu; kolon
+                                genişleyince her biri 720px'e uzadı ve form
+                                gereksiz yere uzun kaldı. Pozisyon adı, departman
+                                ve tecrübe kısa değerler — yan yana durunca hem
+                                daha az kaydırma hem daha okunur bir satır ölçüsü.
+                                Bütçe bandı iki kolonu birden kaplıyor: kendi
+                                içinde dört alt alanı var. */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <Field label="Pozisyon Adı">
+                                    <input type="text" value={formData.title} onChange={e => setFormData(p => ({ ...p, title: e.target.value }))} className={INPUT_CLS} />
+                                </Field>
+                                <Field label="Departman">
+                                    {isDepartmentUser ? (
+                                        <input type="text" disabled value={userDepartments?.[0] || ''} className={INPUT_CLS + ' opacity-60 cursor-not-allowed'} />
+                                    ) : (
+                                        <select value={formData.department} onChange={e => setFormData(p => ({ ...p, department: e.target.value }))} className={INPUT_CLS + ' appearance-none cursor-pointer'}>
+                                            {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+                                        </select>
+                                    )}
+                                </Field>
+                                <Field label="Min. Tecrübe (yıl)">
+                                    <input type="number" min="0" value={formData.minExperience} onChange={e => setFormData(p => ({ ...p, minExperience: e.target.value }))} className={INPUT_CLS} />
+                                </Field>
+                                <div className="sm:col-span-2">
+                                    <SalaryBandFields formData={formData} setFormData={setFormData} inputCls={INPUT_CLS} />
+                                </div>
+                            </div>
                             <Field label="Gereksinimler">
                                 <RequirementListEditor
                                     items={formData.reqItems}
