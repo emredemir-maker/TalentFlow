@@ -12,7 +12,7 @@
 import { useMemo, useState } from 'react';
 import {
     AlertTriangle, CalendarClock, CheckCircle2, ClipboardCopy, Ear,
-    Loader2, Sparkles, Target,
+    ChevronDown, Loader2, Sparkles, Target,
 } from 'lucide-react';
 
 import {
@@ -104,7 +104,7 @@ export default function InterviewPlanPanel({ candidate, position, analysis, onSa
     // ── Plan çıkarılamayan durumlar: her biri FARKLI bir eylem gerektirir
     if (!plan.scanned) {
         return (
-            <Shell>
+            <Shell ozet="önce derin tarama gerekli">
                 <p className="text-[11px] text-n500 leading-relaxed">
                     Bu aday <strong>{position?.title || 'bu pozisyon'}</strong> için derin taramadan
                     geçmemiş. Plan, taramanın açık bıraktığı maddelerden çıkarılıyor —
@@ -116,7 +116,7 @@ export default function InterviewPlanPanel({ candidate, position, analysis, onSa
 
     if (plan.stale) {
         return (
-            <Shell>
+            <Shell ozet="ilan taramadan sonra değişti">
                 <div className="flex items-start gap-2 rounded-md border bg-warn-bg px-3 py-2">
                     <AlertTriangle className="w-3.5 h-3.5 text-warn shrink-0 mt-0.5" />
                     <p className="text-[10px] text-n700 leading-relaxed">
@@ -133,7 +133,7 @@ export default function InterviewPlanPanel({ candidate, position, analysis, onSa
     const criticalCount = plan.probes.filter((p) => p.priority === CRITICAL).length;
 
     return (
-        <Shell>
+        <Shell ozet={`${minutes} dk · ${planSummary(plan)}`}>
             {/* Süre seçimi — plan buna göre yeniden dağılır */}
             <div className="flex flex-wrap items-center gap-2">
                 <span className="text-[10px] font-semibold text-n400 uppercase tracking-[0.08em]">Süre</span>
@@ -285,16 +285,64 @@ export default function InterviewPlanPanel({ candidate, position, analysis, onSa
     );
 }
 
-function Shell({ children }) {
+/**
+ * PANEL VARSAYILAN OLARAK KAPALI.
+ *
+ * Ölçüm (1440×900, gerçekçi veriyle): STAR sekmesinin toplam yüksekliği
+ * 1952 px, görünür alan 632 px — üç ekrandan fazla kaydırma. Sekmenin
+ * ikinci satırı tek başına 998 px ve bunun tamamını BU panel belirliyordu:
+ * yanındaki iki madde kolonu 212 px'ti, yani satırın 786 px'i BOŞTU.
+ * Kullanıcı boşluğu kaydırıyordu.
+ *
+ * Panel silinmedi, katlandı: STAR sekmesi "bu skor neden bu?" sorusunu
+ * cevaplıyor; plan ise ayrı bir iş — "odada ne soracağım". Kapalıyken
+ * başlık satırı planın ÖZETİNİ taşıyor (süre, sonda sayısı, kritik madde),
+ * yani bilgi kaybolmuyor; yalnızca ayrıntı isteğe bağlı hâle geliyor.
+ *
+ * Tercih localStorage'da: her açılışta yeniden katlamak, paneli sürekli
+ * kullanan birine her seferinde aynı tıklamayı yaptırırdı.
+ */
+const ACIK_ANAHTAR = 'tf-mulakat-plani-acik';
+const acikOku = () => {
+    try {
+        return localStorage.getItem(ACIK_ANAHTAR) === '1';
+    } catch {
+        return false;
+    }
+};
+const acikYaz = (v) => {
+    try {
+        localStorage.setItem(ACIK_ANAHTAR, v ? '1' : '0');
+    } catch {
+        /* depolama yok — tercih yalnızca bu oturumda */
+    }
+};
+
+function Shell({ children, ozet }) {
+    const [acik, setAcik] = useState(acikOku);
+    const degistir = () => { setAcik((v) => { acikYaz(!v); return !v; }); };
+
     return (
-        <div className="rounded-md border border-n200 bg-n0 p-3 space-y-3">
-            <div className="flex items-center gap-2">
-                <Target className="w-3.5 h-3.5 text-brand" />
+        <div className="rounded-md border border-n200 bg-n0 p-3">
+            <button
+                type="button"
+                onClick={degistir}
+                aria-expanded={acik}
+                title={ozet || 'Mülakat Planı'}
+                className="w-full flex items-center gap-2 text-left py-1 -my-1"
+            >
+                <Target className="w-3.5 h-3.5 text-brand shrink-0" />
                 <span className="text-[10px] font-semibold text-n700 uppercase tracking-[0.08em]">
                     Mülakat Planı
                 </span>
-            </div>
-            {children}
+                {ozet && (
+                    <span className="text-[10px] text-n400 truncate">{ozet}</span>
+                )}
+                <ChevronDown
+                    className={`w-3.5 h-3.5 text-n400 shrink-0 ml-auto transition-transform duration-200 ${acik ? '' : '-rotate-90'}`}
+                />
+            </button>
+            {acik && <div className="space-y-3 mt-3">{children}</div>}
         </div>
     );
 }
