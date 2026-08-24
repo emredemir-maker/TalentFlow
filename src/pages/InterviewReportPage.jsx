@@ -315,10 +315,10 @@ export default function InterviewReportPage() {
 
     if (!candidate || !session) {
         return (
-            <div className="h-screen bg-slate-50 flex flex-col items-center justify-center">
-                <Brain className="w-12 h-12 text-slate-300 animate-pulse mb-4" />
-                <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px]">Raporu Yükleniyor...</p>
-                <button onClick={() => navigate('/')} className="mt-6 text-blue-600 font-black text-[10px] uppercase">Geri Dön</button>
+            <div className="h-screen bg-n50 flex flex-col items-center justify-center">
+                <Brain className="w-12 h-12 text-n300 animate-pulse mb-4" />
+                <p className="text-n500 font-semibold uppercase tracking-[0.08em] text-[10px]">Raporu Yükleniyor...</p>
+                <button onClick={() => navigate('/')} className="mt-6 text-brand font-semibold text-[10px] uppercase tracking-[0.08em]">Geri Dön</button>
             </div>
         );
     }
@@ -432,7 +432,7 @@ export default function InterviewReportPage() {
                     {/* TOAST */}
                     {toast && (
                         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100]">
-                            <div className="bg-n900 text-white px-4 py-2.5 rounded-md shadow-lg flex items-center gap-2">
+                            <div className="bg-n900 text-white px-4 py-2.5 rounded-md shadow-sm flex items-center gap-2">
                                 <Sparkles className="w-3.5 h-3.5" />
                                 <span className="text-[11px] font-medium">{toast.message}</span>
                             </div>
