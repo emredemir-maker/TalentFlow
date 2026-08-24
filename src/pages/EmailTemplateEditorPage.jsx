@@ -820,7 +820,7 @@ export default function EmailTemplateEditorPage() {
                         <textarea
                             value={currentHtml}
                             onChange={e => setHtmlCode(prev => ({ ...prev, [activeTemplate]: e.target.value }))}
-                            className="flex-1 p-3 font-mono text-xs text-n700 bg-n900 text-ok resize-none outline-none leading-relaxed"
+                            className="flex-1 p-3 font-mono text-xs text-n700 bg-n900 text-ok resize-none leading-relaxed"
                             placeholder="HTML kodunuzu buraya yazın..."
                             spellCheck={false}
                         />

@@ -291,7 +291,7 @@ export default function AIMatchPage() {
                                             value={selectedModel}
                                             onChange={(e) => setSelectedModel(e.target.value)}
                                             disabled={isProcessing}
-                                            className="bg-transparent text-sm text-navy-200 outline-none w-full cursor-pointer disabled:opacity-50 font-bold"
+                                            className="bg-transparent text-sm text-navy-200 w-full cursor-pointer disabled:opacity-50 font-bold"
                                         >
                                             {availableModels.map(m => (
                                                 <option key={m.id} value={m.id} className="bg-navy-900 text-navy-200">{m.displayName}</option>

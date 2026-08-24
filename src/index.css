@@ -251,3 +251,27 @@ h1, h2, h3, h4 {
     scroll-behavior: auto !important;
   }
 }
+
+/* ── KLAVYE ODAĞI ───────────────────────────────────────────────────────────
+ *
+ * Ölçüm: `outline-none` 114 yerde geçiyor ama 110'u yerine görünür bir
+ * karşılık koyuyor (`focus:ring-*`, `focus:border-*`). Yani sorun yaygın
+ * değil — yine de odak halkasını HİÇ tanımlamayan her denetim tarayıcının
+ * varsayılanına kalıyordu ve o halka zeminine göre zar zor seçiliyor.
+ *
+ * Bu kural ortak bir taban veriyor: marka renginde 2px, 2px boşlukla.
+ *
+ * `@layer base` İÇİNDE OLMASI KASITLI. Tailwind yardımcıları daha sonraki
+ * bir katmanda; katmansız yazılsaydı `focus:outline-none`u da EZERDİ ve
+ * kendi halkası zaten olan 110 denetimde çift gösterge çıkardı. Base
+ * katmanında yazılınca kendi çözümü olan bileşenler etkilenmiyor, yalnızca
+ * hiçbir şey söylemeyenler bu tabanı alıyor.
+ *
+ * `:focus-visible` — fare tıklamasında değil, yalnızca klavye/kalıcı odakta.
+ */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+  }
+}

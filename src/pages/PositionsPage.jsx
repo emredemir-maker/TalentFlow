@@ -463,7 +463,7 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                                                 <select
                                                     value={shortlistDept}
                                                     onChange={e => setShortlistDept(e.target.value)}
-                                                    className="text-[11px] font-semibold border border-brand-100 rounded-md px-2 py-1 bg-n0 text-n600 focus:outline-none"
+                                                    className="text-[11px] font-semibold border border-brand-100 rounded-md px-2 py-1 bg-n0 text-n600"
                                                 >
                                                     <option value="">Departman seç (opsiyonel)</option>
                                                     {departments.map(d => (

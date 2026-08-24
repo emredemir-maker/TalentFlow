@@ -41,7 +41,7 @@ export default function CandidateExitPage() {
                                         <button
                                             key={star}
                                             onClick={() => setRating(star)}
-                                            className="transition-all duration-200 hover:scale-110 focus:outline-none"
+                                            className="transition-all duration-200 hover:scale-110"
                                         >
                                             <Star
                                                 className={`w-9 h-9 transition-colors ${
