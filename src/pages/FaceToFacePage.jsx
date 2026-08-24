@@ -109,6 +109,19 @@ export default function FaceToFacePage() {
     useEffect(() => { phaseRef.current = phase; }, [phase]);
     useEffect(() => { isMicOnRef.current = isMicOn; }, [isMicOn]);
 
+    /**
+     * Mikrofon kapatınca ses parçası da kapansın.
+     *
+     * Bu ekranda uzak taraf yok (tek cihaz kaydı), o yüzden görüntülü
+     * ekrandaki gizlilik sorunu burada oluşmuyor. Yine de doğru davranış
+     * bu: parça kapalıyken tarayıcının mikrofon göstergesi de sönüyor ve
+     * kullanıcı sistemin gerçekten dinlemediğini görebiliyor.
+     */
+    useEffect(() => {
+        if (!stream) return;
+        stream.getAudioTracks().forEach((t) => { t.enabled = isMicOn; });
+    }, [stream, isMicOn]);
+
     // auto-scroll transcript
     useEffect(() => {
         if (transcriptRef.current) transcriptRef.current.scrollTop = transcriptRef.current.scrollHeight;
