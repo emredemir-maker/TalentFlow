@@ -162,9 +162,17 @@ const TABS = [
 const BASE = { id: 'c1', name: 'Test Aday', email: 'test@example.com', status: 'review' };
 
 let Page;
+// TARAMA HAZIRLIĞINA GENİŞ SÜRE.
+//
+// Bu hook, CandidateProcessPage'i (3200 satır) ve dolaylı olarak onlarca
+// bileşeni derleyip yüklüyor. vitest'in varsayılan 10 sn'lik hook süresi,
+// makine 92 test dosyasını paralel çevirirken zaman zaman yetmiyordu ve
+// takım TAM DA BU DOSYADA rastgele kırmızıya dönüyordu — kodda bir sorun
+// yokken. Sekiz koşuda iki kez görüldü; sebebi derleme süresi, testin
+// kendisi değil.
 beforeAll(async () => {
     Page = (await import('../src/pages/CandidateProcessPage.jsx')).default;
-});
+}, 120000);
 
 /** Ekranı bir adayla render eder; çökerse hata metnini döndürür. */
 function render(rawCandidate) {
