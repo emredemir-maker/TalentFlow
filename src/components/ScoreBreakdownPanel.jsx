@@ -323,7 +323,7 @@ function ScoreFormula({ cvScore, indexScore, hasInterview, delta }) {
                 {hasInterview ? (
                     <>
                         <span className="text-[14px] font-semibold text-n400">→</span>
-                        <Box
+                        <FormulaBox
                             label="Mülakat kanıtı"
                             value={delta > 0 ? `+${delta}` : String(delta)}
                             hint="odada kapanan maddeler"

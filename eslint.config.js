@@ -7,6 +7,7 @@
 // the warnings drain incrementally.
 import js from '@eslint/js'
 import globals from 'globals'
+import react from 'eslint-plugin-react'
 import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
@@ -40,9 +41,25 @@ export default defineConfig([
         sourceType: 'module',
       },
     },
+    plugins: { react },
+    settings: { react: { version: 'detect' } },
     rules: {
       // Real bugs — keep as errors.
       'no-undef': 'error',
+
+      // TANIMSIZ BİLEŞEN ADI — `no-undef` BUNU YAKALAMAZ.
+      //
+      // ESLint'in kapsam çözümleyicisi JSX etiket adlarını değişken
+      // referansı saymaz. Yani `<Box />` yazıp `Box`'ı hiç import etmemek
+      // hem lint'ten hem build'den SESSİZCE geçer; hata ancak o dal
+      // tarayıcıda çizilmeye çalışıldığında patlar ve React tüm ağacı
+      // söktüğü için ekran beyaz kalır.
+      //
+      // Canlıda iki kez yaşandı: `Users` (CandidateProcessPage) ve `Box`
+      // (ScoreBreakdownPanel — doğrusu `FormulaBox`). İkincisi yalnızca
+      // MÜLAKATI OLAN adaylarda çizilen bir dalda olduğu için haftalarca
+      // fark edilmedi. Bu kural o sınıfı derleme öncesinde yakalar.
+      'react/jsx-no-undef': 'error',
       'no-dupe-keys': 'error',
       'no-unreachable': 'error',
       // Pre-existing backlog — demote so CI can baseline-lock with --max-warnings
