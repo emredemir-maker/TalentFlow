@@ -920,7 +920,11 @@ export default function CandidateProcessPage() {
     );
 
     function parseCareerFromCvData(text) {
-        if (!text) return [];
+        // Tip kontrolü şart: `!text` yalnızca boş değeri eler, aşağıdaki
+        // `text.matchAll` ise metin olmayan her değerde hata fırlatır ve
+        // sekmeyi çökertirdi. Tip normalde utils/normalizeCandidate ile
+        // sabitleniyor; bu, çağrı noktasındaki ikinci savunma hattı.
+        if (!text || typeof text !== 'string') return [];
         const MONTHS = 'Ocak|Şubat|Mart|Nisan|Mayıs|Haziran|Temmuz|Ağustos|Eylül|Ekim|Kasım|Aralık|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec';
         const dateRx = new RegExp(
             `((?:${MONTHS})\\s+\\d{4})\\s*[–\\-]+\\s*((?:${MONTHS})\\s+\\d{4}|Günümüz|Present|Halen)`,

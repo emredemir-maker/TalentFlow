@@ -3,7 +3,7 @@
 // Rule 2 Compliance: Uses onSnapshot without complex queries, filters client-side
 
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
-import { normalizeSkills } from '../utils/normalizeSkills';
+import { normalizeCandidate } from '../utils/normalizeCandidate';
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, where, getDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from './AuthContext';
@@ -358,8 +358,18 @@ export function CandidatesProvider({ children }) {
     const enrichedCandidates = useMemo(() => {
         if (!Array.isArray(candidates)) return [];
 
-        const enriched = candidates.map(c => {
-            if (!c) return null;
+        const enriched = candidates.map(raw => {
+            if (!raw) return null;
+            // TİPLER TEK YERDE SABİTLENİYOR.
+            //
+            // Ekran kodu alanların tipini varsayıyor (dizi, metin). Firestore
+            // kayıtlarında bu varsayım tutmadığında render sırasında hata
+            // fırlıyor ve React tüm ağacı söküyor: ekran BEYAZ kalıyor.
+            // Sekiz ayrı çağrı noktasını tek tek korumak, dokuzuncusu
+            // eklendiğinde aynı hatayı geri getirir — bu yüzden veri
+            // uygulamaya girerken bir kez düzeltiliyor.
+            // Ayrıntı ve neden: utils/normalizeCandidate.js
+            const c = normalizeCandidate(raw);
 
             let bestAiScore = Number(c.aiScore || c.matchScore || c.initialAiScore || c.aiAnalysis?.score || 0);
             if (isNaN(bestAiScore)) bestAiScore = 0;
@@ -400,14 +410,6 @@ export function CandidatesProvider({ children }) {
 
             return {
                 ...c,
-                // YETENEK LİSTESİ TİPİ BURADA SABİTLENİR.
-                // Bir adayın `skills` alanı metin geldiğinde uygulama beyaz
-                // ekran veriyordu: sekiz ayrı yer dizi varsayıyor ve `|| []`
-                // yalnızca YOKLUĞA karşı koruyor, yanlış tipe değil. Header
-                // her sayfada render edildiği için hata tek ekranı değil
-                // uygulamanın tamamını düşürüyordu. Ayrıntı:
-                // utils/normalizeSkills.js
-                skills: normalizeSkills(c.skills),
                 bestScore: bestAiScore,
                 bestTitle,
                 interviewScore,
