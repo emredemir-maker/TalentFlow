@@ -294,14 +294,22 @@ export default function HrAssistantPanel() {
 
     if (!open) {
         return (
-            <div className="infoset fixed bottom-5 right-5 z-40" style={{ background: 'transparent' }}>
+            // METİNSİZ YUVARLAK TETİKLEYİCİ.
+            //
+            // Metinli hap 124×42 px yer kaplıyordu ve sayfaların sağ alt
+            // köşesindeki içeriğin üstüne biniyordu — aday detayında alt
+            // şeridin AŞAMA düğmesi görünüyor ama tıklanamıyordu. 46px
+            // yuvarlak buton hem daha az yer kaplıyor hem de tanıdık bir
+            // kalıp; ne olduğunu `title` ve erişilebilirlik etiketi söylüyor.
+            <div className="infoset fixed bottom-[18px] right-[18px] z-40" style={{ background: 'transparent' }}>
                 <button
                     onClick={() => setOpen(true)}
                     title="İK Asistanı"
-                    className="flex items-center gap-2 px-4 py-[11px] rounded-full bg-brand hover:bg-brand-600 text-white shadow-lg"
+                    aria-label="İK Asistanı"
+                    className="w-[46px] h-[46px] rounded-full bg-brand hover:bg-brand-600 text-white flex items-center justify-center transition-colors"
+                    style={{ boxShadow: '0 6px 18px rgba(80, 104, 255, 0.35)' }}
                 >
-                    <Sparkles className="w-[15px] h-[15px]" />
-                    <span className="text-[12px] font-semibold">İK Asistanı</span>
+                    <Sparkles className="w-5 h-5" />
                 </button>
             </div>
         );
