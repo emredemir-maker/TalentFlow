@@ -11,6 +11,7 @@ import { NotificationProvider } from './context/NotificationContext';
 import Sidebar from './components/Sidebar';
 import HrAssistantPanel from './components/HrAssistantPanel';
 import LoadingScreen from './components/LoadingScreen';
+import ErrorBoundary from './components/ErrorBoundary';
 // LoginPage stays eager — it's the first paint before auth resolves so
 // shipping a separate chunk just to wait for it on cold start hurts TTI.
 import LoginPage from './pages/LoginPage';
@@ -98,6 +99,7 @@ export default function App() {
               {/* Public routes use the full LoadingScreen because the URL maps
                   one-to-one to a single screen — there's no shell to fall back
                   to while the chunk loads. */}
+              <ErrorBoundary scope="Uygulama">
               <Suspense fallback={<LoadingScreen message="Yükleniyor..." />}>
                 <Routes>
                   <Route path="/live-interview/:sessionId" element={<LiveInterviewPage />} />
@@ -112,6 +114,7 @@ export default function App() {
                   <Route path="/*" element={<AuthenticatedApp />} />
                 </Routes>
               </Suspense>
+              </ErrorBoundary>
             </MessageQueueProvider>
           </NotificationProvider>
         </UserSettingsProvider>
@@ -211,9 +214,16 @@ function AuthenticatedApp() {
       >
         {/* In-app route changes — sidebar/header are already painted, so
             the inline spinner is enough until the page chunk arrives. */}
-        <Suspense fallback={<PageFallback />}>
-          {renderPage()}
-        </Suspense>
+        {/* HER EKRAN KENDİ HATA SINIRI İÇİNDE.
+            Bir sayfanın render'ı çökerse yalnızca o sayfanın yerine hata
+            kartı gelir; kenar menü, başlık ve diğer ekranlar ayakta kalır.
+            `resetKey` görünüm adı: kullanıcı başka bir ekrana geçtiğinde
+            sınır kendini sıfırlar. */}
+        <ErrorBoundary scope={`Ekran: ${activeView}`} resetKey={activeView}>
+          <Suspense fallback={<PageFallback />}>
+            {renderPage()}
+          </Suspense>
+        </ErrorBoundary>
       </main>
       {/* Her ekranda erişilebilir; yalnızca okur, hiçbir şeyi değiştirmez. */}
       <HrAssistantPanel />
