@@ -473,7 +473,7 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                                 <div className="flex items-center gap-2">
                                     <span className="text-sm font-semibold text-n900">Bildirimler</span>
                                     {unreadCount > 0 && (
-                                        <span className="text-[11px] bg-bad-bg text-bad font-semibold px-1.5 py-0.5 rounded-full">{unreadCount} yeni</span>
+                                        <span className="text-[11px] bg-bad-bg text-bad-text font-semibold px-1.5 py-0.5 rounded-full">{unreadCount} yeni</span>
                                     )}
                                 </div>
                                 <div className="flex items-center gap-2">

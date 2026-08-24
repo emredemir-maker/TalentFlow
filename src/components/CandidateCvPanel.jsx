@@ -186,7 +186,7 @@ function CvForm({ candidate, cvText }) {
                                         {exp.milestones.map((m, idx) => (
                                             <span
                                                 key={idx}
-                                                className="px-2 py-0.5 bg-ok-bg text-ok text-[11px] font-semibold rounded-md border border-transparent"
+                                                className="px-2 py-0.5 bg-ok-bg text-ok-text text-[11px] font-semibold rounded-md border border-transparent"
                                             >
                                                 {m}
                                             </span>

@@ -120,14 +120,14 @@ function ProvenanceBlock({ analysis, position, candidate }) {
                                         g.facts.verdict === 'celiski'
                                             ? 'bg-rose-50 text-rose-700 border-rose-200'
                                             : g.facts.verdict === 'dogrulandi'
-                                                ? 'bg-ok-bg text-ok border-transparent'
+                                                ? 'bg-ok-bg text-ok-text border-transparent'
                                                 : 'bg-n100 text-n600 border-n200'
                                     }`}>
                                         {VERDICT_TEXT[g.facts.verdict] || g.facts.verdict}
                                     </span>
                                 )}
                                 {g.facts.isFounder && (
-                                    <span className="text-[11px] font-semibold px-1.5 py-px rounded border bg-warn-bg text-warn border-warn">
+                                    <span className="text-[11px] font-semibold px-1.5 py-px rounded border bg-warn-bg text-warn-text border-warn">
                                         aday kurucu
                                     </span>
                                 )}

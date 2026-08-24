@@ -331,7 +331,7 @@ export default function SourceManagementPage() {
                                                         </div>
                                                         <button
                                                             onClick={() => handleRemoveSubSource(source, sub)}
-                                                            className="p-1 rounded-md text-n300 hover:text-bad hover:bg-bad-bg transition-all opacity-0 group-hover:opacity-100"
+                                                            className="p-1 rounded-md text-n300 hover:text-bad-text hover:bg-bad-bg transition-all opacity-0 group-hover:opacity-100"
                                                         >
                                                             <Trash2 className="w-3.5 h-3.5" />
                                                         </button>

@@ -859,7 +859,7 @@ export default function EmailTemplateEditorPage() {
                             <p className="text-xs text-n500 flex items-center gap-1">
                                 <Eye size={12} /> Önizleme — gerçek e-posta bu şekilde görünür
                             </p>
-                            <span className="text-[11px] bg-warn-bg text-warn px-2 py-0.5 rounded-full">
+                            <span className="text-[11px] bg-warn-bg text-warn-text px-2 py-0.5 rounded-full">
                                 Örnek verilerle gösteriliyor
                             </span>
                         </div>

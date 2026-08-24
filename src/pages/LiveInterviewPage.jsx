@@ -1928,7 +1928,7 @@ export default function LiveInterviewPage() {
         return (
             <div className="infoset min-h-screen bg-n25 flex flex-col items-center justify-center p-6">
                 <div className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-9 flex flex-col items-center gap-6 max-w-[440px] w-full text-center">
-                    <div className="w-14 h-14 rounded-full bg-ok-bg text-ok flex items-center justify-center">
+                    <div className="w-14 h-14 rounded-full bg-ok-bg text-ok-text flex items-center justify-center">
                         <CheckCircle2 className="w-7 h-7" />
                     </div>
                     <div>
@@ -1983,7 +1983,7 @@ export default function LiveInterviewPage() {
                 {/* ── Başlık ─────────────────────────────────────────────── */}
                 <header className="h-[52px] shrink-0 bg-n0 border-b border-n200 px-[18px] flex items-center gap-2 z-20">
                     <div className="flex items-center gap-2">
-                        <span className="w-7 h-7 rounded-md bg-bad-bg text-bad flex items-center justify-center">
+                        <span className="w-7 h-7 rounded-md bg-bad-bg text-bad-text flex items-center justify-center">
                             <Video className="w-[15px] h-[15px]" />
                         </span>
                         <div>
@@ -2009,7 +2009,7 @@ export default function LiveInterviewPage() {
                                     const cs = effectiveSession?.candidateStatus;
                                     if (cs === 'admitted') {
                                         return (
-                                            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-ok-bg text-ok text-[11px] font-semibold">
+                                            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-ok-bg text-ok-text text-[11px] font-semibold">
                                                 <span className="w-1.5 h-1.5 rounded-full bg-ok" /> Aday oturumda
                                             </span>
                                         );
@@ -2019,7 +2019,7 @@ export default function LiveInterviewPage() {
                                         <>
                                             <span
                                                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${
-                                                    inLobby ? 'bg-warn-bg text-warn' : 'bg-n100 text-n500'
+                                                    inLobby ? 'bg-warn-bg text-warn-text' : 'bg-n100 text-n500'
                                                 }`}
                                             >
                                                 <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${inLobby ? 'bg-warn' : 'bg-n400'}`} />
@@ -2110,7 +2110,7 @@ export default function LiveInterviewPage() {
                                                 navigate('/');
                                             }
                                         }}
-                                        className="w-full flex items-center gap-2 px-3 py-2 text-[11px] font-semibold text-bad hover:bg-bad-bg text-left"
+                                        className="w-full flex items-center gap-2 px-3 py-2 text-[11px] font-semibold text-bad-text hover:bg-bad-bg text-left"
                                     >
                                         <AlertCircle className="w-3.5 h-3.5" /> Mülakatı iptal et
                                     </button>
@@ -2193,7 +2193,7 @@ export default function LiveInterviewPage() {
                                                         </span>
                                                     )}
                                                     {activeQuestion?.visibleToCandidate && (
-                                                        <span className="text-[11px] font-semibold text-ok bg-ok-bg px-1.5 rounded-full flex items-center gap-1">
+                                                        <span className="text-[11px] font-semibold text-ok-text bg-ok-bg px-1.5 rounded-full flex items-center gap-1">
                                                             <CheckCircle2 className="w-2.5 h-2.5" /> Adayda
                                                         </span>
                                                     )}
@@ -2240,7 +2240,7 @@ export default function LiveInterviewPage() {
                                                     <Send className="w-3 h-3" /> Adaya gönder
                                                 </button>
                                             ) : activeQuestion?.visibleToCandidate ? (
-                                                <span className="flex items-center gap-1.5 text-[12px] font-semibold text-ok bg-ok-bg rounded-md px-2.5 py-[5px]">
+                                                <span className="flex items-center gap-1.5 text-[12px] font-semibold text-ok-text bg-ok-bg rounded-md px-2.5 py-[5px]">
                                                     <CheckCircle2 className="w-3 h-3" /> Adayda yayında
                                                 </span>
                                             ) : null}
@@ -2326,7 +2326,7 @@ export default function LiveInterviewPage() {
                                                     idx === currentQuestionIndex
                                                         ? 'bg-brand text-white'
                                                         : q.visibleToCandidate
-                                                            ? 'bg-ok-bg text-ok'
+                                                            ? 'bg-ok-bg text-ok-text'
                                                             : 'bg-n100 text-n500'
                                                 }`}>
                                                     {q.visibleToCandidate ? <Check className="w-2.5 h-2.5" /> : idx + 1}
@@ -2407,7 +2407,7 @@ export default function LiveInterviewPage() {
                             <div className="flex items-center gap-2 mb-2">
                                 <h2 className="text-[12px] font-semibold m-0">Canlı transkript</h2>
                                 <span className={`ml-auto flex items-center gap-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full ${
-                                    isRecording ? 'bg-ok-bg text-ok' : 'bg-n100 text-n500'
+                                    isRecording ? 'bg-ok-bg text-ok-text' : 'bg-n100 text-n500'
                                 }`}>
                                     <span className={`w-1.5 h-1.5 rounded-full ${isRecording ? 'bg-ok animate-pulse' : 'bg-n400'}`} />
                                     {isRecording ? 'Kaydediyor' : 'Beklemede'}

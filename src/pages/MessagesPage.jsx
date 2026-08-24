@@ -368,14 +368,14 @@ export default function MessagesPage() {
                                                 )}
                                                 {msg.status === 'failed' && (
                                                     <button onClick={() => handleRetry(msg)} disabled={isLoading}
-                                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-warn-bg border border-warn/20 text-warn text-[12px] font-semibold hover:bg-warn/20 transition-all cursor-pointer disabled:opacity-50">
+                                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-warn-bg border border-warn/20 text-warn-text text-[12px] font-semibold hover:bg-warn/20 transition-all cursor-pointer disabled:opacity-50">
                                                         <RefreshCw className="w-3 h-3" />
                                                         Tekrar Dene
                                                     </button>
                                                 )}
                                                 <div className="flex-1" />
                                                 <button onClick={() => handleDelete(msg)} disabled={isLoading}
-                                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-bad/70 hover:text-bad hover:bg-bad-bg text-[12px] font-medium transition-all cursor-pointer disabled:opacity-50">
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-bad-text/70 hover:text-bad-text hover:bg-bad-bg text-[12px] font-medium transition-all cursor-pointer disabled:opacity-50">
                                                     <Trash2 className="w-3 h-3" />
                                                     Sil
                                                 </button>
@@ -477,7 +477,7 @@ export default function MessagesPage() {
                                         <div className="flex items-center gap-2 flex-wrap">
                                             <span className="text-[13px] font-semibold text-n900 truncate">{thread.candidateName}</span>
                                             {thread.hasReply && (
-                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-ok-bg text-ok text-[11px] font-semibold ring-1 ring-ok-bg">
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-ok-bg text-ok-text text-[11px] font-semibold ring-1 ring-ok-bg">
                                                     <Reply className="w-2.5 h-2.5" />
                                                     Yanıt Var
                                                 </span>
@@ -568,7 +568,7 @@ export default function MessagesPage() {
                         </button>
                     </div>
                     {checkInfoResult && (
-                        <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-ok-bg/60 border border-ok/15 text-[12px] text-ok">
+                        <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-ok-bg/60 border border-ok/15 text-[12px] text-ok-text">
                             <CheckCircle className="w-3.5 h-3.5 shrink-0" />
                             {checkInfoResult.scanned} e-posta tarandı — {checkInfoResult.updated > 0 ? `${checkInfoResult.updated} yeni yanıt bulundu ve işaretlendi.` : 'yeni yanıt bulunamadı.'}
                         </div>
@@ -624,7 +624,7 @@ export default function MessagesPage() {
                                     </div>
                                     <div className="flex flex-col items-end gap-1.5 shrink-0">
                                         <span className="text-[10px] text-n300">{createdAt}</span>
-                                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${isPending ? 'bg-warn-bg text-warn ring-1 ring-warn-bg' : 'bg-ok-bg text-ok ring-1 ring-ok-bg'}`}>
+                                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${isPending ? 'bg-warn-bg text-warn-text ring-1 ring-warn-bg' : 'bg-ok-bg text-ok-text ring-1 ring-ok-bg'}`}>
                                             {isPending ? <Clock className="w-2.5 h-2.5" /> : <CheckCircle className="w-2.5 h-2.5" />}
                                             {isPending ? 'Bekleniyor' : 'Yanıtlandı'}
                                         </span>
@@ -677,7 +677,7 @@ export default function MessagesPage() {
                                                 <button
                                                     onClick={e => { e.stopPropagation(); handleMarkReplied(req.id); }}
                                                     disabled={markingReplied === req.id}
-                                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-ok-bg hover:bg-ok/20 text-ok text-[12px] font-semibold border border-ok/20 transition-all disabled:opacity-50"
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-ok-bg hover:bg-ok/20 text-ok-text text-[12px] font-semibold border border-ok/20 transition-all disabled:opacity-50"
                                                 >
                                                     {markingReplied === req.id
                                                         ? <Loader2 className="w-3 h-3 animate-spin" />

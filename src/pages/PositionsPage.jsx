@@ -244,7 +244,7 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                                 <button
                                     onClick={onRelease}
                                     disabled={releaseLoading && releasingPosId === pos.id}
-                                    className={`p-2 rounded-md border transition-colors ${pos.releasedToDepartment ? 'bg-ok-bg border-transparent text-ok' : 'bg-brand-50 border-brand-100 text-brand hover:bg-brand-100'}`}
+                                    className={`p-2 rounded-md border transition-colors ${pos.releasedToDepartment ? 'bg-ok-bg border-transparent text-ok-text' : 'bg-brand-50 border-brand-100 text-brand hover:bg-brand-100'}`}
                                     title="Departmana Aç"
                                 >
                                     {releaseLoading && releasingPosId === pos.id ? <Loader2 size={16} className="animate-spin" /> : <Unlock size={16} />}
@@ -540,7 +540,7 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                                                             </span>
                                                         )}
                                                         {syncedAppIds.has(app.id) && (
-                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[11px] font-semibold bg-ok-bg text-ok border-transparent">
+                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[11px] font-semibold bg-ok-bg text-ok-text border-transparent">
                                                                 <Check size={9} /> Kısa listede
                                                             </span>
                                                         )}
@@ -560,7 +560,7 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                                                     <button
                                                         onClick={() => handleDeleteApp(app.id)}
                                                         disabled={deletingAppId === app.id}
-                                                        className="mt-1 p-1.5 rounded-md text-n300 hover:text-bad hover:bg-bad-bg border border-transparent hover:border-transparent transition-all disabled:opacity-40"
+                                                        className="mt-1 p-1.5 rounded-md text-n300 hover:text-bad-text hover:bg-bad-bg border border-transparent hover:border-transparent transition-all disabled:opacity-40"
                                                         title="Başvuruyu sil"
                                                     >
                                                         {deletingAppId === app.id
@@ -627,7 +627,7 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                                 </div>
                                 <button
                                     onClick={copyLink}
-                                    className={`shrink-0 p-2.5 rounded-md border transition-all ${copied ? 'bg-ok-bg border-transparent text-ok' : 'bg-n0 border-n200 text-n400 hover:border-brand-200 hover:text-brand'}`}
+                                    className={`shrink-0 p-2.5 rounded-md border transition-all ${copied ? 'bg-ok-bg border-transparent text-ok-text' : 'bg-n0 border-n200 text-n400 hover:border-brand-200 hover:text-brand'}`}
                                 >
                                     {copied ? <Check size={16} /> : <Copy size={16} />}
                                 </button>
@@ -669,7 +669,7 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                             </button>
                             <button
                                 onClick={() => { onToggleStatus(); onClose(); }}
-                                className="flex-1 py-3 rounded-md bg-n0 border border-transparent hover:bg-bad-bg hover:border-bad transition-colors text-bad font-semibold text-xs flex items-center justify-center gap-2"
+                                className="flex-1 py-3 rounded-md bg-n0 border border-transparent hover:bg-bad-bg hover:border-bad transition-colors text-bad-text font-semibold text-xs flex items-center justify-center gap-2"
                             >
                                 <XCircle size={14} />Pozisyonu Kapat
                             </button>
@@ -929,7 +929,7 @@ function PositionCreateModal({ onClose, onSubmit, departments, isDepartmentUser,
                                                     onClick={() => handleImproveQuestion(i)}
                                                     disabled={!q.trim() || improvingIdx !== null}
                                                     title="AI ile soruyu düzelt ve geliştir"
-                                                    className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-ok-bg text-[11px] font-semibold text-ok hover:opacity-80 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                    className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-ok-bg text-[11px] font-semibold text-ok-text hover:opacity-80 disabled:opacity-40 disabled:cursor-not-allowed"
                                                 >
                                                     {improvingIdx === i ? <Loader2 size={9} className="animate-spin" /> : <Sparkles size={9} />}
                                                     AI Düzenle
@@ -1027,14 +1027,14 @@ function PositionEditModal({ pos, candidates, departments, isDepartmentUser, use
                 {/* Header */}
                 <div className="px-8 py-5 border-b border-n200 flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-3">
-                        <div className="bg-warn-bg border border-warn text-warn p-2 rounded-md">
+                        <div className="bg-warn-bg border border-warn text-warn-text p-2 rounded-md">
                             <Edit2 size={18} />
                         </div>
                         <div>
                             <h2 className="text-[16px] font-semibold text-n900 leading-tight">Pozisyon Düzenle</h2>
                             <div className="flex items-center gap-2 mt-0.5">
                                 <span className="text-sm font-medium text-n500 truncate max-w-[200px]">{pos.title}</span>
-                                <span className="text-[11px] font-semibold text-warn bg-warn-bg px-2 py-0.5 rounded-md shrink-0">Düzenleniyor</span>
+                                <span className="text-[11px] font-semibold text-warn-text bg-warn-bg px-2 py-0.5 rounded-md shrink-0">Düzenleniyor</span>
                             </div>
                         </div>
                     </div>
@@ -1555,7 +1555,7 @@ export default function PositionsPage() {
                         <AlertCircle className="w-4 h-4 text-warn" />
                         <p className="text-sm font-semibold text-warn">{pendingCount} pozisyon talebi onayınızı bekliyor.</p>
                     </div>
-                    <button onClick={() => setStatusFilter('pending_approval')} className="px-3 py-1.5 rounded-md bg-warn-bg text-warn text-xs font-semibold hover:opacity-80">
+                    <button onClick={() => setStatusFilter('pending_approval')} className="px-3 py-1.5 rounded-md bg-warn-bg text-warn-text text-xs font-semibold hover:opacity-80">
                         Talepleri Gör
                     </button>
                 </div>
@@ -1648,12 +1648,12 @@ export default function PositionsPage() {
                             return (
                                 <div key={pos.id} className="rounded-[14px] border border-n200 hover:border-brand-100 hover:shadow-sm transition-all bg-n0">
                                     {isPending && (
-                                        <div className="mx-4 mt-4 px-4 py-2 rounded-md bg-warn-bg border border-warn flex items-center gap-2 text-xs text-warn font-semibold">
+                                        <div className="mx-4 mt-4 px-4 py-2 rounded-md bg-warn-bg border border-warn flex items-center gap-2 text-xs text-warn-text font-semibold">
                                             <Clock className="w-3.5 h-3.5" />{pos.requestedBy?.displayName || 'Departman kullanıcısı'} tarafından talep edildi
                                         </div>
                                     )}
                                     {isRejected && pos.rejectionReason && (
-                                        <div className="mx-4 mt-4 px-4 py-2 rounded-md bg-bad-bg border border-transparent flex items-center gap-2 text-xs text-bad font-semibold">
+                                        <div className="mx-4 mt-4 px-4 py-2 rounded-md bg-bad-bg border border-transparent flex items-center gap-2 text-xs text-bad-text font-semibold">
                                             <XCircle className="w-3.5 h-3.5" />Red: {pos.rejectionReason}
                                         </div>
                                     )}
@@ -1704,11 +1704,11 @@ export default function PositionsPage() {
                                                     "..." overflow menu so the row doesn't surface
                                                     four icon buttons at once. */}
                                                 {isRecruiterOrAdmin && (
-                                                    <button onClick={() => handleRelease(pos)} disabled={releaseLoading && releasingPosId === pos.id} className={`p-1.5 rounded-md border transition-colors ${pos.releasedToDepartment ? 'bg-ok-bg border-transparent text-ok' : 'bg-brand-50 border-brand-100 text-brand hover:bg-brand-100'}`} title="Departmana Aç">
+                                                    <button onClick={() => handleRelease(pos)} disabled={releaseLoading && releasingPosId === pos.id} className={`p-1.5 rounded-md border transition-colors ${pos.releasedToDepartment ? 'bg-ok-bg border-transparent text-ok-text' : 'bg-brand-50 border-brand-100 text-brand hover:bg-brand-100'}`} title="Departmana Aç">
                                                         {releaseLoading && releasingPosId === pos.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Unlock className="w-4 h-4" />}
                                                     </button>
                                                 )}
-                                                <button onClick={() => setEditPos(pos)} className="p-1.5 rounded-md bg-n50 border border-n200 text-n400 hover:bg-warn-bg hover:border-warn hover:text-warn transition-colors" title="Düzenle"><Edit2 className="w-4 h-4" /></button>
+                                                <button onClick={() => setEditPos(pos)} className="p-1.5 rounded-md bg-n50 border border-n200 text-n400 hover:bg-warn-bg hover:border-warn hover:text-warn-text transition-colors" title="Düzenle"><Edit2 className="w-4 h-4" /></button>
 
                                                 {/* Overflow menu: Kapat + Sil */}
                                                 <div className="relative">
@@ -1734,7 +1734,7 @@ export default function PositionsPage() {
                                                             <button
                                                                 role="menuitem"
                                                                 onClick={() => { setOpenActionMenuId(null); deletePosition(pos.id); }}
-                                                                className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-bad-bg transition-colors text-left text-[11px] text-bad"
+                                                                className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-bad-bg transition-colors text-left text-[11px] text-bad-text"
                                                             >
                                                                 <Trash2 className="w-3.5 h-3.5 shrink-0" />
                                                                 <span>Sil</span>
@@ -1744,16 +1744,16 @@ export default function PositionsPage() {
                                                 </div>
                                             </>}
                                             {isPending && isRecruiterOrAdmin && <>
-                                                <button onClick={() => { if (window.confirm('Onaylamak istiyor musunuz?')) approvePosition(pos.id); }} className="p-1.5 rounded-md bg-ok-bg text-ok hover:opacity-80" title="Onayla"><CheckCircle2 className="w-4 h-4" /></button>
-                                                <button onClick={() => { const r = prompt('Red nedeni:'); if (r !== null) rejectPosition(pos.id, r); }} className="p-1.5 rounded-md bg-bad-bg border border-transparent text-bad hover:opacity-90 transition-colors" title="Reddet"><XCircle className="w-4 h-4" /></button>
+                                                <button onClick={() => { if (window.confirm('Onaylamak istiyor musunuz?')) approvePosition(pos.id); }} className="p-1.5 rounded-md bg-ok-bg text-ok-text hover:opacity-80" title="Onayla"><CheckCircle2 className="w-4 h-4" /></button>
+                                                <button onClick={() => { const r = prompt('Red nedeni:'); if (r !== null) rejectPosition(pos.id, r); }} className="p-1.5 rounded-md bg-bad-bg border border-transparent text-bad-text hover:opacity-90 transition-colors" title="Reddet"><XCircle className="w-4 h-4" /></button>
                                             </>}
                                             {isRejected && isRecruiterOrAdmin && (
-                                                <button onClick={() => deletePosition(pos.id)} className="p-1.5 rounded-md bg-bad-bg border border-transparent text-bad hover:opacity-90 transition-colors" title="Sil"><Trash2 className="w-4 h-4" /></button>
+                                                <button onClick={() => deletePosition(pos.id)} className="p-1.5 rounded-md bg-bad-bg border border-transparent text-bad-text hover:opacity-90 transition-colors" title="Sil"><Trash2 className="w-4 h-4" /></button>
                                             )}
                                             {pos.status === 'closed' && isRecruiterOrAdmin && (
                                                 <>
-                                                    <button onClick={() => handleToggleStatus(pos.id, pos.status)} className="p-1.5 rounded-md bg-ok-bg text-ok hover:opacity-80" title="Yeniden Aç"><RefreshCw className="w-4 h-4" /></button>
-                                                    <button onClick={() => deletePosition(pos.id)} className="p-1.5 rounded-md bg-n50 border border-n200 text-n400 hover:bg-bad-bg hover:border-transparent hover:text-bad transition-colors" title="Sil"><Trash2 className="w-4 h-4" /></button>
+                                                    <button onClick={() => handleToggleStatus(pos.id, pos.status)} className="p-1.5 rounded-md bg-ok-bg text-ok-text hover:opacity-80" title="Yeniden Aç"><RefreshCw className="w-4 h-4" /></button>
+                                                    <button onClick={() => deletePosition(pos.id)} className="p-1.5 rounded-md bg-n50 border border-n200 text-n400 hover:bg-bad-bg hover:border-transparent hover:text-bad-text transition-colors" title="Sil"><Trash2 className="w-4 h-4" /></button>
                                                 </>
                                             )}
                                         </div>

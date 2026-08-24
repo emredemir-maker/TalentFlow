@@ -67,6 +67,20 @@
   --color-ok: #16A26C;
   --color-ok-bg: #E6F7EF;
   --color-warn: #E8A13B;
+  /* METİN İÇİN KOYU TON KARŞILIKLARI.
+     Ölçüm: ton renginin kendi tonlu zemini üstündeki kontrastı gövde metni
+     için gereken 4.5:1'in çok altında — warn 2.01, ok 2.95, bad 3.37.
+     Canlı denetimde tek bir rozet ("Taranmadı") bu yüzden 23 kez 2.01:1
+     ile çiziliyordu. Ton rengi ZEMİN, KENARLIK ve İKON için kalıyor;
+     METİN bu koyu karşılıkları kullanıyor.
+     warn #96590A → tonlu zemin 5.16, beyaz 5.63
+     ok   #0E7A50 → 4.83 / 5.36
+     bad  #C0272C → 5.08 / 5.89
+     Hepsi hem tonlu zeminde hem beyazda AA geçen EN AÇIK tonlar; renk
+     kimliği korunsun diye daha koyusu seçilmedi. */
+  --color-warn-text: #96590A;
+  --color-ok-text: #0E7A50;
+  --color-bad-text: #C0272C;
   --color-warn-bg: #FDF4E4;
   --color-bad: #E5484D;
   --color-bad-bg: #FCEAEB;

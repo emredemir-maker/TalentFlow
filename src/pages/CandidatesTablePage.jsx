@@ -81,7 +81,7 @@ function MethodMark({ method }) {
             title={`${SCORE_METHOD_LABEL[method]} ile ölçüldü — bu ilana göre derin analiz yapılmamış, diğer adaylarla doğrudan karşılaştırılamaz`}
             className={`mt-0.5 px-1 py-px rounded text-[11px] font-semibold uppercase tracking-wide whitespace-nowrap border ${
                 keyword
-                    ? 'bg-warn-bg border-warn text-warn'
+                    ? 'bg-warn-bg border-warn text-warn-text'
                     : 'bg-n100 border-n200 text-n500'
             }`}
         >
@@ -116,7 +116,7 @@ function ScoreCell({ value, gate, interviewed, method }) {
             {label && label.tone === 'red' && (
                 <span
                     title={gate.missing.map((m) => m.text).join(' · ')}
-                    className="mt-0.5 px-1 py-px rounded bg-bad-bg border border-transparent text-[11px] font-semibold text-bad uppercase tracking-wide whitespace-nowrap"
+                    className="mt-0.5 px-1 py-px rounded bg-bad-bg border border-transparent text-[11px] font-semibold text-bad-text uppercase tracking-wide whitespace-nowrap"
                 >
                     {label.text}
                 </span>
@@ -125,7 +125,7 @@ function ScoreCell({ value, gate, interviewed, method }) {
             {label && label.tone === 'amber' && (
                 <span
                     title={gate.partial.map((m) => m.text).join(' · ')}
-                    className="mt-0.5 px-1 py-px rounded bg-warn-bg border border-warn text-[11px] font-semibold text-warn uppercase tracking-wide whitespace-nowrap"
+                    className="mt-0.5 px-1 py-px rounded bg-warn-bg border border-warn text-[11px] font-semibold text-warn-text uppercase tracking-wide whitespace-nowrap"
                 >
                     {label.text}
                 </span>
@@ -282,7 +282,7 @@ function BulkActionModal({ isOpen, type, count, applying, onApply, onClose }) {
                     )
                 )}
 
-                <div className="mt-4 flex items-start gap-2 text-[12px] text-warn bg-warn-bg border border-transparent rounded-md px-3 py-2">
+                <div className="mt-4 flex items-start gap-2 text-[12px] text-warn-text bg-warn-bg border border-transparent rounded-md px-3 py-2">
                     <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                     {cfg.warn(count)}
                 </div>
@@ -772,7 +772,7 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
                     {hasActiveFilters && (
                         <button
                             onClick={clearFilters}
-                            className="flex items-center gap-1 text-[12px] font-semibold text-bad hover:text-bad bg-bad-bg hover:opacity-90 px-2.5 py-1.5 rounded-md transition-colors"
+                            className="flex items-center gap-1 text-[12px] font-semibold text-bad-text hover:text-bad-text bg-bad-bg hover:opacity-90 px-2.5 py-1.5 rounded-md transition-colors"
                         >
                             <FilterX className="w-3.5 h-3.5" /> Temizle
                         </button>
@@ -899,7 +899,7 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
                             </div>
                         </div>
                     ) : (
-                        <div className={`flex items-center gap-2 text-[12px] font-semibold rounded-md px-4 py-2.5 border ${bulkResult.failed > 0 ? 'text-warn bg-warn-bg border-transparent' : 'text-ok bg-ok-bg border-transparent'}`}>
+                        <div className={`flex items-center gap-2 text-[12px] font-semibold rounded-md px-4 py-2.5 border ${bulkResult.failed > 0 ? 'text-warn-text bg-warn-bg border-transparent' : 'text-ok-text bg-ok-bg border-transparent'}`}>
                             <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                             {bulkResult.message}{bulkResult.failed > 0 ? `, ${bulkResult.failed} güncelleme başarısız` : ''}.
                             <button onClick={() => setBulkResult(null)} className="ml-auto text-n400 hover:text-n600"><X className="w-3.5 h-3.5" /></button>
@@ -1031,14 +1031,14 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
                                         <td className="px-3 py-2.5 text-center">
                                             {isDeepScanned(c) ? (
                                                 <span
-                                                    className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full text-ok bg-ok-bg border border-transparent whitespace-nowrap"
+                                                    className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full text-ok-text bg-ok-bg border border-transparent whitespace-nowrap"
                                                     title={c.lastScannedAt ? `Son tarama: ${new Date(c.lastScannedAt).toLocaleString('tr-TR')}` : 'Otonom tarama yapıldı'}
                                                 >
                                                     <Brain className="w-3 h-3" /> Tarandı
                                                 </span>
                                             ) : (
                                                 <span
-                                                    className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full text-warn bg-warn-bg border border-transparent whitespace-nowrap"
+                                                    className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full text-warn-text bg-warn-bg border border-transparent whitespace-nowrap"
                                                     title="Henüz otonom tarama yapılmadı — seçip 'Otonom Tarama' ile başlatabilirsiniz"
                                                 >
                                                     Taranmadı
@@ -1054,7 +1054,7 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
                                             {c.badges?.length > 0 ? (
                                                 <CandidateBadges badges={c.badges} />
                                             ) : c.verification?.at ? (
-                                                <span className="text-[11px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-md border bg-ok-bg text-ok border-transparent whitespace-nowrap" title="Doğrulama çalıştırıldı, bulgu çıkmadı">
+                                                <span className="text-[11px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-md border bg-ok-bg text-ok-text border-transparent whitespace-nowrap" title="Doğrulama çalıştırıldı, bulgu çıkmadı">
                                                     Temiz
                                                 </span>
                                             ) : (

@@ -1177,7 +1177,7 @@ export default function CandidateProcessPage() {
                                     <div className="flex items-center gap-2 flex-wrap">
                                         <h2 className="text-[15px] font-semibold tracking-[-0.02em] m-0">{candidate.name}</h2>
                                         {isTop2Percent && (
-                                            <span className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-ok-bg text-ok">
+                                            <span className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-ok-bg text-ok-text">
                                                 <Target className="w-[11px] h-[11px]" /> İlk %2
                                             </span>
                                         )}
@@ -1368,7 +1368,7 @@ export default function CandidateProcessPage() {
 
                                         {/* Error banner */}
                                         {analysisError && (
-                                            <div className="flex items-center gap-2 bg-bad-bg rounded-md px-3 py-2 text-[12px] text-bad">
+                                            <div className="flex items-center gap-2 bg-bad-bg rounded-md px-3 py-2 text-[12px] text-bad-text">
                                                 <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {analysisError}
                                             </div>
                                         )}
@@ -1587,7 +1587,7 @@ export default function CandidateProcessPage() {
                                                                 {exp.milestones?.length > 0 && (
                                                                     <div className="flex flex-wrap gap-1.5 mt-2">
                                                                         {exp.milestones.map((m, idx) => (
-                                                                            <span key={idx} className="flex items-center gap-1 px-2 py-0.5 bg-ok-bg text-ok text-[11px] font-semibold rounded-md border border-transparent">
+                                                                            <span key={idx} className="flex items-center gap-1 px-2 py-0.5 bg-ok-bg text-ok-text text-[11px] font-semibold rounded-md border border-transparent">
                                                                                 <Trophy className="w-2 h-2" /> {m}
                                                                             </span>
                                                                         ))}
@@ -1721,7 +1721,7 @@ export default function CandidateProcessPage() {
                                                                             </span>
                                                                         )}
                                                                         {match.score >= 70 && (
-                                                                            <span className="shrink-0 inline-flex items-center gap-1 text-[7px] font-semibold px-1.5 py-0.5 bg-ok-bg text-ok border border-transparent rounded-full">
+                                                                            <span className="shrink-0 inline-flex items-center gap-1 text-[7px] font-semibold px-1.5 py-0.5 bg-ok-bg text-ok-text border border-transparent rounded-full">
                                                                                 <TrendingUp className="w-2 h-2" /> Yüksek
                                                                             </span>
                                                                         )}
@@ -1730,7 +1730,7 @@ export default function CandidateProcessPage() {
                                                                         {stale && (
                                                                             <span
                                                                                 title="Bu analiz ilanın ESKİ madde listesine ait; skor bugünkü ölçüyle uyumsuz"
-                                                                                className="shrink-0 text-[7px] font-semibold px-1.5 py-0.5 bg-warn-bg text-warn border border-transparent rounded-full"
+                                                                                className="shrink-0 text-[7px] font-semibold px-1.5 py-0.5 bg-warn-bg text-warn-text border border-transparent rounded-full"
                                                                             >
                                                                                 BAYAT
                                                                             </span>
@@ -2199,7 +2199,7 @@ export default function CandidateProcessPage() {
                                                             <span className="text-[11px] font-semibold text-n700">Bilgi Talebi</span>
                                                         </div>
                                                         <div className="flex items-center gap-2">
-                                                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${isPending ? 'bg-warn-bg text-warn border border-warn' : 'bg-ok-bg text-ok border border-transparent'}`}>
+                                                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${isPending ? 'bg-warn-bg text-warn-text border border-warn' : 'bg-ok-bg text-ok-text border border-transparent'}`}>
                                                                 {isPending ? <Clock className="w-2.5 h-2.5" /> : <CheckCircle2 className="w-2.5 h-2.5" />}
                                                                 {isPending ? 'Bekliyor' : 'Yanıtlandı'}
                                                             </span>
@@ -2270,7 +2270,7 @@ export default function CandidateProcessPage() {
                                     )}
                                     <button
                                         onClick={() => setDeleteModal(true)}
-                                        className="h-7 w-7 flex items-center justify-center rounded-md text-n400 border border-n200 hover:text-bad hover:bg-bad-bg"
+                                        className="h-7 w-7 flex items-center justify-center rounded-md text-n400 border border-n200 hover:text-bad-text hover:bg-bad-bg"
                                         title="Adayı Sil"
                                     >
                                         <Trash2 className="w-3.5 h-3.5" />
@@ -2947,8 +2947,8 @@ export default function CandidateProcessPage() {
                                     {/* Status badge */}
                                     {bulkProgress.status && (
                                         <div className={`flex items-center gap-2 px-3 py-2 rounded-md text-[12px] font-semibold ${
-                                            bulkProgress.status === 'completed' ? 'bg-ok-bg text-ok border border-transparent' :
-                                            bulkProgress.status === 'error' ? 'bg-bad-bg text-bad border border-transparent' :
+                                            bulkProgress.status === 'completed' ? 'bg-ok-bg text-ok-text border border-transparent' :
+                                            bulkProgress.status === 'error' ? 'bg-bad-bg text-bad-text border border-transparent' :
                                             ['processing', 'uploading', 'unpacking'].includes(bulkProgress.status) ? 'bg-brand-50 text-brand-700 border border-brand-100' :
                                             'bg-n50 text-n500 border border-n200'
                                         }`}>

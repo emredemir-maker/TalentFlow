@@ -191,7 +191,7 @@ export function RequirementVerdicts({ report }) {
                                 <div className="flex items-center gap-[7px] flex-wrap">
                                     <span className="text-[10px] font-semibold text-n400">M{item.requirementIndex}</span>
                                     {item.must && (
-                                        <span className="text-[11px] font-semibold px-1.5 rounded bg-bad-bg text-bad">
+                                        <span className="text-[11px] font-semibold px-1.5 rounded bg-bad-bg text-bad-text">
                                             zorunlu
                                         </span>
                                     )}

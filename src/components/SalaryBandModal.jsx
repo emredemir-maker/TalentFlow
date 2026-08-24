@@ -172,10 +172,10 @@ export default function SalaryBandModal({ open, onClose }) {
                     </div>
 
                     {error && (
-                        <div className="bg-bad-bg text-bad text-[12px] rounded-md px-3 py-2">{error}</div>
+                        <div className="bg-bad-bg text-bad-text text-[12px] rounded-md px-3 py-2">{error}</div>
                     )}
                     {saved && (
-                        <div className="bg-ok-bg text-ok text-[12px] rounded-md px-3 py-2">
+                        <div className="bg-ok-bg text-ok-text text-[12px] rounded-md px-3 py-2">
                             {selected?.title} için band kaydedildi.
                         </div>
                     )}

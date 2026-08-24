@@ -295,7 +295,7 @@ export default function RequirementReviewPanel({
                                                 !toApply.has(it.index)
                                                     ? 'bg-n0 text-n400 border border-n200'
                                                     : actionOf(s) === REMOVE
-                                                        ? 'bg-bad-bg text-bad border border-transparent'
+                                                        ? 'bg-bad-bg text-bad-text border border-transparent'
                                                         : actionOf(s) === DEMOTE
                                                             ? 'bg-warn-bg text-n700 border border-transparent'
                                                             : 'bg-brand-50 text-brand-600 border border-brand-100'

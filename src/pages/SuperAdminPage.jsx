@@ -380,7 +380,7 @@ export default function SuperAdminPage() {
                                         </div>
                                         <button
                                             onClick={() => handleRemoveDomain(d)}
-                                            className="p-1 rounded-md text-n400 hover:text-bad hover:bg-bad-bg transition-colors"
+                                            className="p-1 rounded-md text-n400 hover:text-bad-text hover:bg-bad-bg transition-colors"
                                         >
                                             <X className="w-3.5 h-3.5" />
                                         </button>
@@ -427,7 +427,7 @@ export default function SuperAdminPage() {
                                     <div className="flex items-center gap-1.5 shrink-0">
                                         <RolePill role={u.role} />
                                         {u.status === 'disabled' && (
-                                            <span className="text-[11px] font-semibold text-bad bg-bad-bg border border-transparent px-1.5 py-0.5 rounded">Donduruldu</span>
+                                            <span className="text-[11px] font-semibold text-bad-text bg-bad-bg border border-transparent px-1.5 py-0.5 rounded">Donduruldu</span>
                                         )}
                                     </div>
                                     {u.id !== user.uid && (
@@ -441,7 +441,7 @@ export default function SuperAdminPage() {
                                             </button>
                                             <button
                                                 onClick={() => handleDeleteUser(u)}
-                                                className="p-1.5 rounded-md bg-n100 hover:bg-bad-bg hover:text-bad text-n400 transition-colors"
+                                                className="p-1.5 rounded-md bg-n100 hover:bg-bad-bg hover:text-bad-text text-n400 transition-colors"
                                                 title="Sil"
                                             >
                                                 <Trash2 className="w-3.5 h-3.5" />
@@ -458,7 +458,7 @@ export default function SuperAdminPage() {
                         <div className="px-4 py-3 border-b border-n200 flex items-center gap-2">
                             <Mail className="w-4 h-4 text-warn" />
                             <h2 className="text-[11px] font-semibold text-n900">Bekleyen Davetler</h2>
-                            <span className="ml-auto text-[11px] font-semibold bg-warn-bg text-warn border border-transparent px-2 py-0.5 rounded-full">{pendingInvites.length}</span>
+                            <span className="ml-auto text-[11px] font-semibold bg-warn-bg text-warn-text border border-transparent px-2 py-0.5 rounded-full">{pendingInvites.length}</span>
                         </div>
                         <div className="divide-y divide-n100">
                             {pendingInvites.length === 0 ? (
@@ -477,7 +477,7 @@ export default function SuperAdminPage() {
                                             onClick={() => handleCopyInviteLink(i.email, i.id)}
                                             className={`p-1.5 rounded-md text-xs font-semibold flex items-center gap-1 transition-all ${
                                                 copiedId === i.id
-                                                    ? 'bg-ok-bg text-ok border border-transparent'
+                                                    ? 'bg-ok-bg text-ok-text border border-transparent'
                                                     : 'bg-n100 text-n500 hover:bg-n100'
                                             }`}
                                         >
@@ -485,7 +485,7 @@ export default function SuperAdminPage() {
                                         </button>
                                         <button
                                             onClick={() => handleDeleteInvite(i.id)}
-                                            className="p-1.5 rounded-md bg-n100 hover:bg-bad-bg hover:text-bad text-n400 transition-colors"
+                                            className="p-1.5 rounded-md bg-n100 hover:bg-bad-bg hover:text-bad-text text-n400 transition-colors"
                                         >
                                             <Trash2 className="w-3.5 h-3.5" />
                                         </button>
@@ -607,7 +607,7 @@ export default function SuperAdminPage() {
                                     </div>
                                 </div>
                             )}
-                            {error && <p className="text-[12px] text-bad bg-bad-bg border border-transparent rounded-md px-3 py-2">{error}</p>}
+                            {error && <p className="text-[12px] text-bad-text bg-bad-bg border border-transparent rounded-md px-3 py-2">{error}</p>}
                             <div className="flex gap-2 pt-1">
                                 <button type="button" onClick={() => setShowInviteModal(false)} className="flex-1 h-9 rounded-md text-[11px] font-semibold text-n500 border border-n200 hover:bg-n50 transition-all">İptal</button>
                                 <button
@@ -676,15 +676,15 @@ export default function SuperAdminPage() {
                                     </div>
                                 </div>
                             )}
-                            {error && <p className="text-[12px] text-bad bg-bad-bg border border-transparent rounded-md px-3 py-2">{error}</p>}
+                            {error && <p className="text-[12px] text-bad-text bg-bad-bg border border-transparent rounded-md px-3 py-2">{error}</p>}
                             <div className="flex gap-2 pt-1">
                                 <button
                                     type="button"
                                     onClick={() => handleToggleUserStatus(editingUser.id, users.find(u => u.id === editingUser.id)?.status)}
                                     className={`flex-1 h-9 rounded-md text-[10px] font-semibold flex items-center justify-center gap-1.5 border transition-all ${
                                         users.find(u => u.id === editingUser.id)?.status === 'disabled'
-                                            ? 'bg-ok-bg border-transparent text-ok hover:bg-ok-bg'
-                                            : 'bg-warn-bg border-warn text-warn hover:bg-warn-bg'
+                                            ? 'bg-ok-bg border-transparent text-ok-text hover:bg-ok-bg'
+                                            : 'bg-warn-bg border-warn text-warn-text hover:bg-warn-bg'
                                     }`}
                                 >
                                     {users.find(u => u.id === editingUser.id)?.status === 'disabled' ? <UserCheck className="w-3.5 h-3.5" /> : <UserX className="w-3.5 h-3.5" />}

@@ -113,7 +113,7 @@ export default function RequirementListEditor({ items, onChange, title }) {
                                     type="button"
                                     onClick={() => remove(i)}
                                     title="Maddeyi kaldır"
-                                    className="p-1.5 rounded-lg text-n300 hover:text-bad hover:bg-bad-bg transition-colors shrink-0"
+                                    className="p-1.5 rounded-lg text-n300 hover:text-bad-text hover:bg-bad-bg transition-colors shrink-0"
                                 >
                                     <Trash2 className="w-3.5 h-3.5" />
                                 </button>

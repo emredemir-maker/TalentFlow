@@ -202,7 +202,7 @@ export default function BrandingSettingsPage() {
                                     {branding.logoUrl && (
                                         <button
                                             onClick={() => setBranding(p => ({ ...p, logoUrl: '' }))}
-                                            className="flex items-center gap-1.5 px-3 py-2 text-sm text-bad border border-transparent rounded-md hover:bg-bad-bg transition-colors"
+                                            className="flex items-center gap-1.5 px-3 py-2 text-sm text-bad-text border border-transparent rounded-md hover:bg-bad-bg transition-colors"
                                         >
                                             <X className="w-3.5 h-3.5" /> Kaldır
                                         </button>

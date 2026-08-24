@@ -72,7 +72,7 @@ export default function PositionDraftCard({ draft, positions = [], onUpdateDraft
                 {draft.items.map((item, i) => (
                     <div key={i} className="flex items-start gap-2 px-2.5 py-1.5">
                         <span className={`shrink-0 mt-0.5 px-1.5 rounded text-[11px] font-semibold ${
-                            item.must ? 'bg-bad-bg text-bad' : 'bg-n100 text-n500'
+                            item.must ? 'bg-bad-bg text-bad-text' : 'bg-n100 text-n500'
                         }`}>
                             {item.must ? 'zorunlu' : 'tercihen'}
                         </span>

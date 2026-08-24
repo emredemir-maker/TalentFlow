@@ -319,8 +319,8 @@ function ResponsesTab({ sentMessages, pendingApprovals, onProcess, onCheckMail }
     const getStatusBadge = (msg) => {
         const s = msg.status;
         if (s === 'email_opened') return <span className="bg-brand-50 text-brand-600 border-brand-200 text-[11px] font-semibold px-2.5 py-1 rounded-full border inline-flex items-center gap-1"><MailOpen size={11} />Açıldı</span>;
-        if (s === 'replied')       return <span className="bg-ok-bg text-ok border-transparent text-[11px] font-semibold px-2.5 py-1 rounded-full border inline-flex items-center gap-1"><Reply size={11} />Yanıtladı</span>;
-        if (s === 'draft' || s === 'ready_to_send') return <span className="bg-warn-bg text-warn border-warn text-[11px] font-semibold px-2.5 py-1 rounded-full border inline-flex items-center gap-1"><Clock size={11} />Beklemede</span>;
+        if (s === 'replied')       return <span className="bg-ok-bg text-ok-text border-transparent text-[11px] font-semibold px-2.5 py-1 rounded-full border inline-flex items-center gap-1"><Reply size={11} />Yanıtladı</span>;
+        if (s === 'draft' || s === 'ready_to_send') return <span className="bg-warn-bg text-warn-text border-warn text-[11px] font-semibold px-2.5 py-1 rounded-full border inline-flex items-center gap-1"><Clock size={11} />Beklemede</span>;
         return <span className="bg-n100 text-n500 border-n200 text-[11px] font-semibold px-2.5 py-1 rounded-full border inline-flex items-center gap-1"><Mail size={11} />Gönderildi</span>;
     };
 

@@ -1640,8 +1640,8 @@ export default function InterviewManagementPage() {
                                                     </div>
                                                     {manualDate && manualTime && (
                                                         <div className={`px-2 py-1 rounded-md text-[11px] font-semibold uppercase tracking-[0.08em] flex-shrink-0 ${
-                                                            availability === 'available' ? 'bg-ok-bg text-ok' :
-                                                            availability === 'busy' ? 'bg-bad-bg text-bad' :
+                                                            availability === 'available' ? 'bg-ok-bg text-ok-text' :
+                                                            availability === 'busy' ? 'bg-bad-bg text-bad-text' :
                                                             'bg-n100 text-n500'
                                                         }`}>
                                                             {availability === 'available' ? 'MÜSAİT' : availability === 'busy' ? 'MEŞGUL' : 'BİLGİSİZ'}
@@ -1715,7 +1715,7 @@ export default function InterviewManagementPage() {
                                             {selectedParticipants.map(p => (
                                                 <span key={p.id} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold border ${
                                                     p.isExternal
-                                                        ? 'bg-warn-bg border-warn text-warn'
+                                                        ? 'bg-warn-bg border-warn text-warn-text'
                                                         : 'bg-n0 border-brand-200 text-brand'
                                                 }`}>
                                                     {p.isExternal && <AtSign className="w-2.5 h-2.5" />}
@@ -1860,7 +1860,7 @@ export default function InterviewManagementPage() {
                                                                     <CheckCircle2 className="w-2.5 h-2.5" /> SEÇİLİ
                                                                 </span>
                                                             ) : isBusy ? (
-                                                                <span className="text-[11px] font-semibold px-1.5 py-0.5 bg-bad-bg text-bad rounded-md flex items-center gap-0.5">
+                                                                <span className="text-[11px] font-semibold px-1.5 py-0.5 bg-bad-bg text-bad-text rounded-md flex items-center gap-0.5">
                                                                     <AlertCircle className="w-2.5 h-2.5" /> DOLU
                                                                 </span>
                                                             ) : (
@@ -1876,7 +1876,7 @@ export default function InterviewManagementPage() {
                                             <button
                                                 onClick={handleAutoPlan}
                                                 disabled={isAnalyzingSlots}
-                                                className="mt-4 w-full py-2 rounded-md border border-transparent bg-ok-bg/60 text-[10px] font-semibold uppercase tracking-[0.08em] text-ok flex items-center justify-center gap-1.5 hover:bg-ok-bg transition-all"
+                                                className="mt-4 w-full py-2 rounded-md border border-transparent bg-ok-bg/60 text-[10px] font-semibold uppercase tracking-[0.08em] text-ok-text flex items-center justify-center gap-1.5 hover:bg-ok-bg transition-all"
                                             >
                                                 {isAnalyzingSlots ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
                                                 AI Slot Öner
@@ -1890,7 +1890,7 @@ export default function InterviewManagementPage() {
                                                         <button
                                                             key={i}
                                                             onClick={() => { setManualDate(slot.date); setManualTime(slot.time); }}
-                                                            className="px-3 py-1.5 bg-n0 border border-transparent rounded-md text-[11px] font-semibold text-ok hover:bg-ok-bg transition-all"
+                                                            className="px-3 py-1.5 bg-n0 border border-transparent rounded-md text-[11px] font-semibold text-ok-text hover:bg-ok-bg transition-all"
                                                         >
                                                             {new Date(slot.date + 'T12:00:00').toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })} {slot.time}
                                                         </button>
@@ -1915,17 +1915,17 @@ export default function InterviewManagementPage() {
                                                             return (
                                                                 <div key={p.id} className={`flex items-center justify-between border rounded-md px-3 py-2 ${p.isExternal ? 'bg-warn-bg border-transparent' : 'bg-n0 border-n100'}`}>
                                                                     <div className="flex items-center gap-2">
-                                                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold ${p.isExternal ? 'bg-warn-bg text-warn' : 'bg-brand/10 text-brand'}`}>
+                                                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold ${p.isExternal ? 'bg-warn-bg text-warn-text' : 'bg-brand/10 text-brand'}`}>
                                                                             {p.isExternal ? '@' : (p.name || p.displayName || p.email || '?').charAt(0).toUpperCase()}
                                                                         </div>
                                                                         <span className="text-[11px] font-semibold text-n900">{p.name || p.displayName || p.email}</span>
                                                                     </div>
                                                                     {p.isExternal ? (
-                                                                        <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold uppercase tracking-[0.08em] bg-warn-bg text-warn">HARİCİ</span>
+                                                                        <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold uppercase tracking-[0.08em] bg-warn-bg text-warn-text">HARİCİ</span>
                                                                     ) : (
                                                                         <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold uppercase tracking-[0.08em] ${
-                                                                            avail === 'available' ? 'bg-ok-bg text-ok' :
-                                                                            avail === 'busy' ? 'bg-bad-bg text-bad' :
+                                                                            avail === 'available' ? 'bg-ok-bg text-ok-text' :
+                                                                            avail === 'busy' ? 'bg-bad-bg text-bad-text' :
                                                                             'bg-n100 text-n500'
                                                                         }`}>
                                                                             {avail === 'available' ? 'MÜSAİT' : avail === 'busy' ? 'MEŞGUL' : 'BİLGİSİZ'}
@@ -1999,7 +1999,7 @@ export default function InterviewManagementPage() {
                                         )}
                                         <div className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-[11px] font-semibold uppercase tracking-[0.08em] ${
                                             interviewType === 'technical' ? 'bg-brand-50 text-brand-600' :
-                                            interviewType === 'hr' ? 'bg-warn-bg text-warn' :
+                                            interviewType === 'hr' ? 'bg-warn-bg text-warn-text' :
                                             'bg-brand-50 text-brand-600'
                                         }`}>
                                             {interviewType === 'technical' ? 'TEKNİK MÜLAKAT' : interviewType === 'hr' ? 'İK FİLTRE' : 'PRODUCT MÜLAKATI'}
@@ -2019,7 +2019,7 @@ export default function InterviewManagementPage() {
                                                         : 'bg-n0 border-n200'
                                                 }`}>
                                                     <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold ${
-                                                        p.isExternal ? 'bg-warn-bg text-warn' : 'bg-brand/10 text-brand'
+                                                        p.isExternal ? 'bg-warn-bg text-warn-text' : 'bg-brand/10 text-brand'
                                                     }`}>
                                                         {p.isExternal ? '@' : (p.name || p.displayName || p.email || '?').charAt(0).toUpperCase()}
                                                     </div>
@@ -2250,7 +2250,7 @@ export default function InterviewManagementPage() {
                                             }}
                                             className="w-full flex items-start gap-2.5 px-2.5 py-[9px] rounded-md hover:bg-n50 text-left"
                                         >
-                                            <div className="w-7 h-7 rounded-md bg-ok-bg text-ok flex items-center justify-center shrink-0">
+                                            <div className="w-7 h-7 rounded-md bg-ok-bg text-ok-text flex items-center justify-center shrink-0">
                                                 <Play className="w-3.5 h-3.5 fill-current" />
                                             </div>
                                             <div className="flex-1 min-w-0">
@@ -2316,7 +2316,7 @@ export default function InterviewManagementPage() {
                                                     className="w-full flex items-start gap-2.5 px-2.5 py-[9px] rounded-md hover:bg-n50 text-left"
                                                     title="Geçmiş görüşmelerin transkriptinde geçen maaş beklentisini bul ve onayınla kaydet"
                                                 >
-                                                    <div className="w-7 h-7 rounded-md bg-warn-bg text-warn flex items-center justify-center shrink-0">
+                                                    <div className="w-7 h-7 rounded-md bg-warn-bg text-warn-text flex items-center justify-center shrink-0">
                                                         <Wallet className="w-3.5 h-3.5" />
                                                     </div>
                                                     <div className="flex-1 min-w-0">
@@ -2576,7 +2576,7 @@ export default function InterviewManagementPage() {
                                                                             setOpenMenuId(null);
                                                                             setPostponeModal({ candidateId: resolvedCandidateId, sessionId: sessionKey, date: s.date || '', time: s.time || '09:00' });
                                                                         }}
-                                                                        className="w-full flex items-center gap-2 px-3 py-2 text-[11px] font-semibold text-warn hover:bg-warn-bg text-left"
+                                                                        className="w-full flex items-center gap-2 px-3 py-2 text-[11px] font-semibold text-warn-text hover:bg-warn-bg text-left"
                                                                     >
                                                                         <AlertCircle className="w-3.5 h-3.5" /> Ertele
                                                                     </button>
@@ -2589,7 +2589,7 @@ export default function InterviewManagementPage() {
                                                                                 await handleUpdateSessionStatus(resolvedCandidateId, sessionKey, 'cancelled');
                                                                             }
                                                                         }}
-                                                                        className="w-full flex items-center gap-2 px-3 py-2 text-[11px] font-semibold text-bad hover:bg-bad-bg text-left"
+                                                                        className="w-full flex items-center gap-2 px-3 py-2 text-[11px] font-semibold text-bad-text hover:bg-bad-bg text-left"
                                                                     >
                                                                         <AlertTriangle className="w-3.5 h-3.5" /> İptal Et
                                                                     </button>
@@ -2905,7 +2905,7 @@ export default function InterviewManagementPage() {
                                                     onClick={() => { setQuickCandidate(c); setQuickSearch(c.name); }}
                                                     className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-ok-bg transition-colors text-left border-b border-n200 last:border-0"
                                                 >
-                                                    <div className="w-7 h-7 rounded-full bg-ok-bg flex items-center justify-center text-[10px] font-semibold text-ok shrink-0">
+                                                    <div className="w-7 h-7 rounded-full bg-ok-bg flex items-center justify-center text-[10px] font-semibold text-ok-text shrink-0">
                                                         {c.name?.[0]?.toUpperCase() || '?'}
                                                     </div>
                                                     <div>

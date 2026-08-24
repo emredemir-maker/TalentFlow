@@ -272,7 +272,7 @@ export default function DepartmentManagementPage() {
                         <p className="text-sm font-semibold text-bad">{unassignedUsers.length} departman kullanıcısı henüz atanmamış</p>
                         <div className="flex flex-wrap gap-1.5 mt-2">
                             {unassignedUsers.map(u => (
-                                <span key={u.id} className="text-xs bg-bad-bg text-bad px-2 py-0.5 rounded-md font-medium">
+                                <span key={u.id} className="text-xs bg-bad-bg text-bad-text px-2 py-0.5 rounded-md font-medium">
                                     {u.displayName || u.email}
                                 </span>
                             ))}
@@ -397,7 +397,7 @@ export default function DepartmentManagementPage() {
                                                         </span>
                                                         <button
                                                             onClick={() => handleRemoveUser(u.id)}
-                                                            className="p-1.5 rounded-md text-n300 hover:text-bad hover:bg-bad-bg transition-all opacity-0 group-hover:opacity-100"
+                                                            className="p-1.5 rounded-md text-n300 hover:text-bad-text hover:bg-bad-bg transition-all opacity-0 group-hover:opacity-100"
                                                         >
                                                             <UserMinus className="w-3.5 h-3.5" />
                                                         </button>
@@ -415,7 +415,7 @@ export default function DepartmentManagementPage() {
                                                 </div>
                                                 <div className="flex flex-wrap gap-2">
                                                     {positions.filter(p => p.department === dept.name).map(p => (
-                                                        <span key={p.id} className={`px-2.5 py-1 rounded-md text-xs font-medium border ${p.status === 'open' ? 'bg-ok-bg text-ok border-transparent' : 'bg-n50 text-n500 border-n200'}`}>
+                                                        <span key={p.id} className={`px-2.5 py-1 rounded-md text-xs font-medium border ${p.status === 'open' ? 'bg-ok-bg text-ok-text border-transparent' : 'bg-n50 text-n500 border-n200'}`}>
                                                             {p.title} · {p.status === 'open' ? 'Aktif' : 'Kapalı'}
                                                         </span>
                                                     ))}

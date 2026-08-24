@@ -124,7 +124,7 @@ const FEATURES = [
                             <div className="text-xs font-semibold text-n700">{p.title}</div>
                             <div className="text-[10px] text-n400">{p.dept} · {p.count} aday</div>
                         </div>
-                        <div className={`text-[11px] px-1.5 py-0.5 rounded-full font-medium ${p.status === 'Aktif' ? 'bg-ok-bg text-ok' : 'bg-n100 text-n400'}`}>{p.status}</div>
+                        <div className={`text-[11px] px-1.5 py-0.5 rounded-full font-medium ${p.status === 'Aktif' ? 'bg-ok-bg text-ok-text' : 'bg-n100 text-n400'}`}>{p.status}</div>
                     </div>
                 ))}
             </div>
@@ -156,14 +156,14 @@ const FEATURES = [
                 <div className="bg-warn-bg border border-transparent rounded-md p-3">
                     <div className="flex items-center justify-between mb-2">
                         <span className="text-xs font-semibold text-warn">Bugün — 14:00</span>
-                        <span className="text-[11px] bg-warn-bg text-warn px-1.5 py-0.5 rounded-full">Bekliyor</span>
+                        <span className="text-[11px] bg-warn-bg text-warn-text px-1.5 py-0.5 rounded-full">Bekliyor</span>
                     </div>
                     <div className="text-[11px] text-n700 font-medium">Ahmet Yılmaz — Teknik Mülakat</div>
                     <div className="text-[10px] text-n400 mt-0.5">Yazılım Müh. • meet.google.com/···</div>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                     {[{ l: 'Ahmet B.', ext: false }, { l: 'dış@partner.com', ext: true }].map((p, i) => (
-                        <span key={i} className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border ${p.ext ? 'bg-warn-bg border-warn text-warn' : 'bg-brand-50 border-brand-200 text-brand-700'}`}>
+                        <span key={i} className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border ${p.ext ? 'bg-warn-bg border-warn text-warn-text' : 'bg-brand-50 border-brand-200 text-brand-700'}`}>
                             {p.ext ? '@' : '✓'} {p.l}
                         </span>
                     ))}
@@ -306,7 +306,7 @@ const FEATURES = [
                 <div className="bg-n50 border border-n200 rounded-md p-3">
                     <div className="text-[10px] text-n400 mb-2 font-medium uppercase tracking-[0.08em]">Hazırlık Ekranı</div>
                     <div className="space-y-1.5">
-                        <div className="w-full flex items-center justify-center gap-1.5 bg-bad-bg border border-transparent text-bad rounded-md py-1.5 text-[10px] font-semibold">
+                        <div className="w-full flex items-center justify-center gap-1.5 bg-bad-bg border border-transparent text-bad-text rounded-md py-1.5 text-[10px] font-semibold">
                             <AlertCircle className="w-3 h-3" /> Mülakatı İptal Et
                         </div>
                         <div className="w-full flex items-center justify-center gap-1.5 bg-n100 border border-n200 text-n500 rounded-md py-1.5 text-[10px] font-semibold">
@@ -523,12 +523,12 @@ const FEATURES = [
                     { name: 'Mert A.', sub: 'İK Mülakat Daveti', replied: false },
                 ].map((t, i) => (
                     <div key={i} className="flex items-center gap-2 bg-n0 border border-n200 rounded-md p-2">
-                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-semibold ${t.replied ? 'bg-ok-bg text-ok' : 'bg-n100 text-n500'}`}>{t.name[0]}</div>
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-semibold ${t.replied ? 'bg-ok-bg text-ok-text' : 'bg-n100 text-n500'}`}>{t.name[0]}</div>
                         <div className="flex-1 min-w-0">
                             <div className="text-[10px] font-semibold text-n700">{t.name}</div>
                             <div className="text-[10px] text-n400 truncate">{t.sub}</div>
                         </div>
-                        {t.replied && <span className="text-[7px] bg-ok-bg text-ok border border-transparent px-1.5 py-0.5 rounded-full font-semibold">Yanıt Var</span>}
+                        {t.replied && <span className="text-[7px] bg-ok-bg text-ok-text border border-transparent px-1.5 py-0.5 rounded-full font-semibold">Yanıt Var</span>}
                     </div>
                 ))}
             </div>
@@ -603,7 +603,7 @@ const FEATURES = [
                         </div>
                     </div>
                 </div>
-                <div className="bg-ok-bg border border-transparent rounded-md p-2 text-center text-[10px] text-ok font-medium">
+                <div className="bg-ok-bg border border-transparent rounded-md p-2 text-center text-[10px] text-ok-text font-medium">
                     meet.google.com/abc-def-ghi — Hazır
                 </div>
             </div>
@@ -676,7 +676,7 @@ const FEATURES = [
                         <div className="flex-1 text-xs font-medium text-n700">{d.name}</div>
                         <div className="flex items-center gap-2">
                             <span className="text-[10px] text-n400">{d.users} kullanıcı</span>
-                            <span className="text-[11px] bg-ok-bg text-ok px-1 rounded">{d.open} açık</span>
+                            <span className="text-[11px] bg-ok-bg text-ok-text px-1 rounded">{d.open} açık</span>
                         </div>
                     </div>
                 ))}
@@ -716,7 +716,7 @@ const FEATURES = [
                         ))}
                     </div>
                 </div>
-                <div className="bg-ok-bg border border-transparent rounded-md px-2 py-1.5 text-center text-[11px] text-ok font-medium">Canlı Önizleme Aktif</div>
+                <div className="bg-ok-bg border border-transparent rounded-md px-2 py-1.5 text-center text-[11px] text-ok-text font-medium">Canlı Önizleme Aktif</div>
             </div>
         )
     },
@@ -745,7 +745,7 @@ const FEATURES = [
                             <Globe className="w-3.5 h-3.5 text-brand" />
                         </div>
                         <div className="flex-1 text-xs font-medium text-n700">@{item.d}</div>
-                        <span className="text-[11px] bg-ok-bg text-ok px-1.5 py-0.5 rounded-full">{item.users} kullanıcı</span>
+                        <span className="text-[11px] bg-ok-bg text-ok-text px-1.5 py-0.5 rounded-full">{item.users} kullanıcı</span>
                     </div>
                 ))}
                 <div className="border border-dashed border-n200 rounded-md px-3 py-2 flex items-center gap-2">
@@ -779,7 +779,7 @@ const FEATURES = [
                         <Shield className="w-4 h-4 text-bad" />
                         <span className="text-xs font-medium text-n700">Süper Admin</span>
                     </div>
-                    <span className="text-[11px] bg-bad-bg text-bad px-1.5 py-0.5 rounded-full">Tam Yetki</span>
+                    <span className="text-[11px] bg-bad-bg text-bad-text px-1.5 py-0.5 rounded-full">Tam Yetki</span>
                 </div>
                 {[{ role: 'Recruiter', color: '#3b82f6' }, { role: 'Dept. Kullanıcısı', color: '#f59e0b' }].map((r, i) => (
                     <div key={i} className="flex items-center justify-between bg-n0 border border-n200 rounded-md p-2.5">

@@ -98,7 +98,7 @@ export default function InterviewOutcomePanel({ candidate, position, analysis })
                             >
                                 <div className="flex flex-wrap items-center gap-1.5 mb-1">
                                     {c.must && (
-                                        <span className="px-1.5 py-0.5 rounded border border-transparent bg-bad-bg text-bad text-[11px] font-semibold">
+                                        <span className="px-1.5 py-0.5 rounded border border-transparent bg-bad-bg text-bad-text text-[11px] font-semibold">
                                             zorunlu
                                         </span>
                                     )}

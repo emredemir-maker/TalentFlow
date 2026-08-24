@@ -370,7 +370,7 @@ function ProbeCard({ probe, order }) {
                 </span>
                 <span className="text-[10px] font-semibold text-n500">{probe.minutes} dk</span>
                 {probe.must && (
-                    <span className="px-1.5 py-0.5 rounded border border-transparent bg-bad-bg text-bad text-[11px] font-semibold">
+                    <span className="px-1.5 py-0.5 rounded border border-transparent bg-bad-bg text-bad-text text-[11px] font-semibold">
                         zorunlu
                     </span>
                 )}

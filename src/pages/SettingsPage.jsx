@@ -366,7 +366,7 @@ export default function SettingsPage({ initialTab }) {
                                     </div>
                                     {isGoogleConnected ? (
                                         <button onClick={handleGoogleDisconnect} disabled={isConnectingGoogle}
-                                            className="px-4 py-2 rounded-md text-xs font-semibold text-bad bg-bad-bg hover:opacity-90 transition-all border border-transparent disabled:opacity-50">
+                                            className="px-4 py-2 rounded-md text-xs font-semibold text-bad-text bg-bad-bg hover:opacity-90 transition-all border border-transparent disabled:opacity-50">
                                             {isConnectingGoogle ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Bağlantıyı Kes'}
                                         </button>
                                     ) : (
@@ -402,7 +402,7 @@ export default function SettingsPage({ initialTab }) {
                                     </div>
                                     {isMicrosoftConnected ? (
                                         <button onClick={handleMicrosoftDisconnect} disabled={isConnectingMicrosoft}
-                                            className="px-4 py-2 rounded-md text-xs font-semibold text-bad bg-bad-bg hover:opacity-90 transition-all border border-transparent disabled:opacity-50">
+                                            className="px-4 py-2 rounded-md text-xs font-semibold text-bad-text bg-bad-bg hover:opacity-90 transition-all border border-transparent disabled:opacity-50">
                                             {isConnectingMicrosoft ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Bağlantıyı Kes'}
                                         </button>
                                     ) : (
@@ -431,7 +431,7 @@ export default function SettingsPage({ initialTab }) {
                                         <div className="flex items-center gap-2">
                                             <h2 className="text-sm font-semibold text-n900">Gemini API Anahtarı</h2>
                                             {hasSavedGeminiKey && (
-                                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.08em] px-2 py-0.5 rounded-full bg-ok-bg text-ok border border-transparent">
+                                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.08em] px-2 py-0.5 rounded-full bg-ok-bg text-ok-text border border-transparent">
                                                     <CheckCircle className="w-3 h-3" /> Aktif{savedKeyLast4 ? ` ••••${savedKeyLast4}` : ''}
                                                 </span>
                                             )}
@@ -483,8 +483,8 @@ export default function SettingsPage({ initialTab }) {
                                     <div className="flex items-center gap-3">
                                         <button onClick={toggleSttTest}
                                             className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 transition-all duration-300 ${
-                                                sttStatus === 'listening' ? 'bg-bad-bg border-2 border-bad text-bad scale-110'
-                                                : sttStatus === 'success' ? 'bg-ok-bg border-2 border-ok text-ok'
+                                                sttStatus === 'listening' ? 'bg-bad-bg border-2 border-bad text-bad-text scale-110'
+                                                : sttStatus === 'success' ? 'bg-ok-bg border-2 border-ok text-ok-text'
                                                 : 'bg-n0 border border-n200 text-n400 hover:border-brand hover:text-brand'
                                             }`}>
                                             {sttStatus === 'listening' ? <MicOff size={17} className="animate-pulse" /> : <Mic size={17} />}
@@ -494,9 +494,9 @@ export default function SettingsPage({ initialTab }) {
                                                 <Zap size={11} className={sttStatus === 'listening' ? 'text-brand' : 'text-n400'} />
                                                 <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-n500">STT Nöral Motor</span>
                                                 <span className={`ml-auto text-[11px] font-semibold uppercase tracking-[0.08em] px-2 py-0.5 rounded-full ${
-                                                    sttStatus === 'listening' ? 'bg-bad-bg text-bad border border-transparent'
-                                                    : sttStatus === 'success' ? 'bg-ok-bg text-ok border border-transparent'
-                                                    : sttStatus === 'error' ? 'bg-bad-bg text-bad border border-transparent'
+                                                    sttStatus === 'listening' ? 'bg-bad-bg text-bad-text border border-transparent'
+                                                    : sttStatus === 'success' ? 'bg-ok-bg text-ok-text border border-transparent'
+                                                    : sttStatus === 'error' ? 'bg-bad-bg text-bad-text border border-transparent'
                                                     : 'bg-n100 text-n400'
                                                 }`}>
                                                     {sttStatus === 'idle' && 'Hazır'}
@@ -522,7 +522,7 @@ export default function SettingsPage({ initialTab }) {
                                         <button onClick={toggleSttTest}
                                             className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all shrink-0 border ${
                                                 sttStatus === 'listening'
-                                                    ? 'bg-bad-bg text-bad border-transparent hover:opacity-90'
+                                                    ? 'bg-bad-bg text-bad-text border-transparent hover:opacity-90'
                                                     : 'bg-brand-50 text-brand border-brand-100 hover:bg-brand-100'
                                             }`}>
                                             {sttStatus === 'listening' ? 'Durdur' : sttStatus === 'success' ? 'Tekrar Test Et' : 'Testi Başlat'}
