@@ -3,6 +3,7 @@
 
 import { createContext, useContext, useState, useEffect , useMemo } from 'react';
 import { useAuth } from './AuthContext';
+import { normalizePosition } from '../utils/normalizePosition';
 import { db } from '../config/firebase';
 import {
     collection,
@@ -56,7 +57,16 @@ export function PositionsProvider({ children }) {
                 return bTime - aTime;
             });
 
-            setPositions(positionsList);
+            // TİPLER TEK YERDE SABİTLENİYOR.
+            //
+            // `requirements` metin dizisi olmalı: `matchService` içinde
+            // `.toLowerCase()` çağrılıyor ve metin olmayan bir öğe skor
+            // hesabını çökertiyor — ekran beyaz kalıyor. Ayrıca `title`,
+            // `department`, `minExperience` nesne geldiğinde React ağacı
+            // düşüyor. Her çağrı noktasını ayrı korumak, bir sonraki çağrı
+            // eklendiğinde aynı hatayı geri getirirdi.
+            // Ayrıntı ve neden: utils/normalizePosition.js
+            setPositions(positionsList.map(normalizePosition));
             setLoading(false);
             setError(null);
         }, (err) => {
