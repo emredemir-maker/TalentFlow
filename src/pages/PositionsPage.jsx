@@ -216,7 +216,15 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
             <div className="fixed inset-0 bg-n900/20 backdrop-blur-[2px] z-40" onClick={onClose} />
 
             {/* Drawer */}
-            <div className="fixed right-0 top-0 h-full w-[520px] bg-n0 shadow-2xl shadow-none/10 border-l border-n200 flex flex-col z-50">
+            {/* GENİŞLİK EKRANA GÖRE — ama hiçbir ekranda bugünkünden dar değil.
+                Sabit 520px, 1440px ekranda çekmeceyi %36'ya sıkıştırıyordu ve
+                içerik 3.4 ekran boyunca kaydırılıyordu. Yüksekliğin %81'i iki
+                bloktan geliyor: gereksinim gözden geçirme (840px) ve eşleşen
+                adaylar (955px) — ikisi de satır satır sarmalanan listeler,
+                genişlik doğrudan yüksekliğe dönüşüyor.
+                `max(520px, ...)`: dar ekranda formül 520'nin altına düşse bile
+                bugünkü genişlik korunuyor. `92vw` küçük ekranda taşmayı önler. */}
+            <div className="fixed right-0 top-0 h-full w-[min(92vw,max(520px,52vw))] bg-n0 shadow-2xl shadow-none/10 border-l border-n200 flex flex-col z-50">
 
                 {/* Header */}
                 <div className="px-6 py-5 border-b border-n200 shrink-0">
