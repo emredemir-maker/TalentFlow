@@ -5,7 +5,7 @@ import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import {
     Users, Calendar, Clock, Star, Search,
-    List, ArrowUpRight, ChevronRight, MousePointerClick, Upload, X,
+    List, LayoutGrid, ArrowUpRight, ChevronRight, MousePointerClick, Upload, X,
 } from 'lucide-react';
 import { STAGES as STAGE_DEFS } from '../utils/pipelineStages';
 import { withCoherentScores } from '../utils/candidateTable';
@@ -147,6 +147,129 @@ function StatusBadge({ status }) {
 
 const TYPE_MAP = { technical: 'Teknik', hr: 'İK', product: 'Ürün', cultural: 'Kültür', behavioral: 'Davranışsal' };
 
+
+// ── Liste görünümü ────────────────────────────────────────────────────────────
+/**
+ * Kanban'ın düz tablo karşılığı.
+ *
+ * Pano, adayın hangi aşamada olduğunu bir bakışta gösteriyor ama çok adayda
+ * karşılaştırma zorlaşıyor: skorlar altı ayrı sütuna dağılıyor ve kaynak hiç
+ * görünmüyor. Liste aynı veriyi tek eksende sıralıyor.
+ *
+ * SATIR TIKLAMASI panodakiyle AYNI davranıyor: adayı seçer, sağ ray dolar.
+ * Aday detayına gitmek ayrı bir eylem ("Aç") — yoksa sağ raydaki aşama
+ * ilerletme, mülakat planlama gibi işlere hiç ulaşılamazdı.
+ */
+function CandidateListView({ rows, selectedId, onSelect, onOpen }) {
+    if (rows.length === 0) {
+        return (
+            <div className="border border-dashed border-n300 rounded-[10px] px-[18px] py-7 text-center">
+                <div className="text-[12px] font-semibold mb-1">Aday bulunamadı</div>
+                <p className="text-[11px] text-n500 m-0">Arama kutusunu temizleyerek tüm adayları görebilirsiniz.</p>
+            </div>
+        );
+    }
+    const KOLON = 'grid grid-cols-[1.5fr_110px_60px] md:grid-cols-[1.6fr_1.3fr_128px_136px_120px_64px] items-center gap-2';
+    return (
+        <div className="bg-n0 border border-n200 rounded-[10px] overflow-hidden">
+            <div className={`${KOLON} px-3 py-2 bg-n25 border-b border-n200 text-[10px] font-semibold text-n400 uppercase tracking-[0.08em]`}>
+                <span>Aday</span>
+                <span className="hidden md:block">Pozisyon</span>
+                <span className="hidden md:block">CV uyumu</span>
+                <span>Aşama</span>
+                <span className="hidden md:block">Kaynak</span>
+                <span className="text-right">İşlem</span>
+            </div>
+            {rows.map((c) => {
+                const stage = STAGE_DEFS.find((x) => x.key === resolveStage(c.status)) || STAGE_DEFS[0];
+                const score = cardScore(c);
+                const tone = scoreTone(score);
+                const secili = selectedId === c.id;
+                return (
+                    <div
+                        key={c.id}
+                        onClick={() => onSelect(c.id)}
+                        className={`${KOLON} px-3 py-[7px] border-b border-n100 last:border-b-0 cursor-pointer text-[11px] ${
+                            secili ? 'bg-brand-50' : 'hover:bg-n50'
+                        }`}
+                    >
+                        <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-[22px] h-[22px] flex-none rounded-full bg-n50 border border-n200 flex items-center justify-center text-[9px] font-semibold text-n600">
+                                {initials(c.name)}
+                            </div>
+                            <span className={`truncate font-medium ${secili ? 'text-brand' : 'text-n900'}`}>
+                                {c.name || 'İsimsiz'}
+                            </span>
+                        </div>
+
+                        <span className="hidden md:block truncate text-n600">
+                            {c.matchedPositionTitle || c.position || '—'}
+                        </span>
+
+                        <div className="hidden md:flex items-center gap-2">
+                            <div className="flex-1 h-[4px] bg-n100 rounded-full overflow-hidden">
+                                <div className="h-full rounded-full" style={{ width: `${Math.min(score, 100)}%`, background: tone.fg }} />
+                            </div>
+                            <span className="font-semibold shrink-0" style={{ color: tone.fg }}>
+                                {score ? `%${score}` : '—'}
+                            </span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="w-[7px] h-[7px] rounded-full shrink-0" style={{ background: stage.color }} />
+                            <span
+                                style={{ background: stage.bg, color: stage.color }}
+                                className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full truncate"
+                            >
+                                {stage.label}
+                            </span>
+                        </div>
+
+                        <span className="hidden md:block truncate text-n500">
+                            {c.source ? (c.sourceDetail ? `${c.source} (${c.sourceDetail})` : c.source) : 'Manuel'}
+                        </span>
+
+                        <div className="flex justify-end">
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onOpen(c.id); }}
+                                title="Aday detayını aç"
+                                className="flex items-center gap-0.5 text-[11px] font-semibold text-brand hover:text-brand-600"
+                            >
+                                Aç <ChevronRight className="w-3 h-3" />
+                            </button>
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+
+/**
+ * Görünüm tercihi SUNUCUYA YAZILMAZ.
+ *
+ * Kanban mı liste mi — bu bir kullanıcı tercihi değil, o andaki bakış açısı.
+ * Firestore'a yazmak her geçişte bir yazma işlemi demek olurdu ve tercih
+ * cihazlar arasında taşınsın diye bir gerekçe yok. localStorage yeterli;
+ * erişilemediği ortamlarda (gizli sekme, kısıtlı depolama) sessizce
+ * varsayılana düşer.
+ */
+const GORUNUM_ANAHTARI = 'tf-pipeline-gorunum';
+const gorunumOku = () => {
+    try {
+        return localStorage.getItem(GORUNUM_ANAHTARI) === 'list' ? 'list' : 'kanban';
+    } catch {
+        return 'kanban';
+    }
+};
+const gorunumYaz = (v) => {
+    try {
+        localStorage.setItem(GORUNUM_ANAHTARI, v);
+    } catch {
+        /* depolama yok — tercih yalnızca bu oturumda geçerli */
+    }
+};
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function PipelinePage() {
     const { enrichedCandidates, updateCandidate, setViewCandidateId } = useCandidates();
@@ -168,6 +291,11 @@ export default function PipelinePage() {
         [enrichedCandidates, openPositions]
     );
     const [tab, setTab] = useState('kanban'); // 'kanban' | 'interviews'
+    // Kanban sekmesi içindeki görünüm: pano mu düz liste mi.
+    // `tab`'dan AYRI bir eksen — "Mülakatlar" sekmesi bu tercihi etkilemez ve
+    // mülakatlardan dönünce kullanıcı bıraktığı görünümde bulur kendini.
+    const [viewMode, setViewMode] = useState(gorunumOku);
+    const setGorunum = (v) => { setViewMode(v); gorunumYaz(v); };
     const [search, setSearch] = useState('');
     const [ivFilter, setIvFilter] = useState('all');
     // Seçili aday sağ rayı besliyor. Kart tıklaması artık sayfadan ayrılmıyor;
@@ -189,20 +317,39 @@ export default function PipelinePage() {
         return () => unsub();
     }, []);
 
+    /**
+     * ARAMA SÜZGECİ İKİ GÖRÜNÜM İÇİN ORTAK.
+     *
+     * Süzgeç eskiden kanban gruplamasının içinde duruyordu. Liste görünümü
+     * kendi süzgecini kursaydı, aynı arama iki görünümde farklı sonuç
+     * verebilirdi — ve görünüm değiştiren kullanıcı aramasını kaybederdi.
+     */
+    const filtered = useMemo(() => {
+        const q = search.toLowerCase().trim();
+        if (!q) return candidates;
+        return candidates.filter(c =>
+            c.name?.toLowerCase().includes(q) ||
+            c.position?.toLowerCase().includes(q) ||
+            c.email?.toLowerCase().includes(q));
+    }, [candidates, search]);
+
     // ── Kanban: group candidates by stage ─────────────────────────────────────
     const kanbanData = useMemo(() => {
-        const q = search.toLowerCase();
-        const filtered = q
-            ? candidates.filter(c =>
-                c.name?.toLowerCase().includes(q) ||
-                c.position?.toLowerCase().includes(q) ||
-                c.email?.toLowerCase().includes(q))
-            : candidates;
-
         const groups = Object.fromEntries(STAGE_DEFS.map(s => [s.key, []]));
         for (const c of filtered) groups[resolveStage(c.status)].push(c);
         return groups;
-    }, [candidates, search]);
+    }, [filtered]);
+
+    /** Liste görünümü — kanbanla aynı süzgeç, aşamaya göre sıralı. */
+    const listRows = useMemo(() => {
+        const sira = Object.fromEntries(STAGE_DEFS.map((s, i) => [s.key, i]));
+        return [...filtered].sort((a, b) => {
+            const fa = sira[resolveStage(a.status)] ?? 99;
+            const fb = sira[resolveStage(b.status)] ?? 99;
+            if (fa !== fb) return fa - fb;
+            return cardScore(b) - cardScore(a);
+        });
+    }, [filtered]);
 
     // ── Interviews: flatten all sessions from candidates ──────────────────────
     const allInterviews = useMemo(() => {
@@ -271,6 +418,31 @@ export default function PipelinePage() {
                             />
                         </div>
                     )}
+                    {/* İKİ KONUMLU ANAHTAR — Kanban | Liste.
+                        Yalnızca kanban sekmesinde anlamlı; "Mülakatlar"
+                        açıkken gizleniyor ki hangi görünümü değiştirdiği
+                        belirsiz kalmasın. */}
+                    {tab === 'kanban' && (
+                        <div className="flex items-center bg-n50 border border-n200 rounded-md p-0.5">
+                            {[
+                                { id: 'kanban', label: 'Kanban', Icon: LayoutGrid },
+                                { id: 'list', label: 'Liste', Icon: List },
+                            ].map(({ id, label, Icon }) => (
+                                <button
+                                    key={id}
+                                    onClick={() => setGorunum(id)}
+                                    aria-pressed={viewMode === id}
+                                    className={`flex items-center gap-1.5 text-[12px] font-medium rounded-[5px] px-2.5 py-1 transition-colors ${
+                                        viewMode === id
+                                            ? 'bg-n0 text-brand shadow-sm'
+                                            : 'text-n500 hover:text-n700'
+                                    }`}
+                                >
+                                    <Icon className="w-[13px] h-[13px]" /> {label}
+                                </button>
+                            ))}
+                        </div>
+                    )}
                     <button
                         onClick={() => setTab(tab === 'interviews' ? 'kanban' : 'interviews')}
                         className={`flex items-center gap-1.5 text-[12px] font-medium border rounded-md px-[11px] py-1.5 ${
@@ -306,17 +478,26 @@ export default function PipelinePage() {
             {tab === 'kanban' && (
                 <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] items-start">
                     <div className="px-[18px] py-2.5 xl:border-r border-n200 overflow-x-auto">
-                        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2.5 items-start">
-                            {STAGE_DEFS.map(stage => (
-                                <KanbanColumn
-                                    key={stage.key}
-                                    stage={stage}
-                                    candidates={kanbanData[stage.key] || []}
-                                    selectedId={selectedId}
-                                    onSelectCandidate={setSelectedId}
-                                />
-                            ))}
-                        </div>
+                        {viewMode === 'kanban' ? (
+                            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2.5 items-start">
+                                {STAGE_DEFS.map(stage => (
+                                    <KanbanColumn
+                                        key={stage.key}
+                                        stage={stage}
+                                        candidates={kanbanData[stage.key] || []}
+                                        selectedId={selectedId}
+                                        onSelectCandidate={setSelectedId}
+                                    />
+                                ))}
+                            </div>
+                        ) : (
+                            <CandidateListView
+                                rows={listRows}
+                                selectedId={selectedId}
+                                onSelect={setSelectedId}
+                                onOpen={openCandidateDetail}
+                            />
+                        )}
                     </div>
 
                     <div className="p-3.5">

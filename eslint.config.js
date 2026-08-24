@@ -60,6 +60,14 @@ export default defineConfig([
       // MÜLAKATI OLAN adaylarda çizilen bir dalda olduğu için haftalarca
       // fark edilmedi. Bu kural o sınıfı derleme öncesinde yakalar.
       'react/jsx-no-undef': 'error',
+
+      // JSX'TE KULLANILAN DEĞİŞKEN "KULLANILMIYOR" SAYILMASIN.
+      // `no-unused-vars` JSX etiketlerini referans olarak görmüyor; bir
+      // bileşen bir değişkene alınıp `<Icon />` diye çizildiğinde yanlış
+      // uyarı üretiyordu. Bu kural o bağı kurar. (Dosya genelindeki büyük
+      // harfli bileşenler `varsIgnorePattern` sayesinde zaten muaftı;
+      // sorun yalnızca fonksiyon ARGÜMANI olarak gelen bileşenlerdeydi.)
+      'react/jsx-uses-vars': 'error',
       'no-dupe-keys': 'error',
       'no-unreachable': 'error',
       // Pre-existing backlog — demote so CI can baseline-lock with --max-warnings
