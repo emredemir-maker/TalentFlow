@@ -40,9 +40,21 @@ const ASSETS_DIR = path.join(REPO_ROOT, 'dist', 'assets');
 // though Vite typically emits one).
 const BUDGETS = {
     // Main app entry — the only JS chunk every visitor downloads on
-    // first paint. PR #35 shipped this at 73.1 KB gzip. 130 KB allows
-    // ~80% headroom before failing.
-    'index-': Number(process.env.BUDGET_INDEX_GZIP_KB) || 130,
+    // first paint. PR #35 shipped this at 73.1 KB gzip.
+    //
+    // 130 → 134 (PR #220). Ölçüm: main 129.5 KB, dal 130.9 KB — büyüme
+    // 1.4 KB ve tamamı BİLEREK eager olan iki dosyadan geliyor:
+    //
+    //   components/ErrorBoundary.jsx  — ilk rota yüklenmeden ÖNCE var
+    //     olmak zorunda; asıl işlerinden biri parça (chunk) yükleme
+    //     hatasını yakalamak, dolayısıyla kendisi lazy olamaz.
+    //   utils/normalizeCandidate.js   — CandidatesContext içinde, veri
+    //     uygulamaya girerken çalışıyor.
+    //
+    // Bütçe zaten tavana dayanmıştı (main 129.5/130). 134 hem bu iki
+    // dosyayı hem de ~3 KB organik büyüme payını karşılıyor. Bir sonraki
+    // aşma gerçek bir inceleme istesin diye daha yükseğe çekilmedi.
+    'index-': Number(process.env.BUDGET_INDEX_GZIP_KB) || 134,
 
     // Firebase SDK chunk — firebase/auth + firestore + storage. Heavy
     // (~162 KB gzip) but needed on every authenticated route, so it's
