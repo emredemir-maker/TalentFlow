@@ -3,6 +3,7 @@
 // Rule 2 Compliance: Uses onSnapshot without complex queries, filters client-side
 
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import { normalizeSkills } from '../utils/normalizeSkills';
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, where, getDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from './AuthContext';
@@ -399,6 +400,14 @@ export function CandidatesProvider({ children }) {
 
             return {
                 ...c,
+                // YETENEK LİSTESİ TİPİ BURADA SABİTLENİR.
+                // Bir adayın `skills` alanı metin geldiğinde uygulama beyaz
+                // ekran veriyordu: sekiz ayrı yer dizi varsayıyor ve `|| []`
+                // yalnızca YOKLUĞA karşı koruyor, yanlış tipe değil. Header
+                // her sayfada render edildiği için hata tek ekranı değil
+                // uygulamanın tamamını düşürüyordu. Ayrıntı:
+                // utils/normalizeSkills.js
+                skills: normalizeSkills(c.skills),
                 bestScore: bestAiScore,
                 bestTitle,
                 interviewScore,

@@ -1,6 +1,7 @@
 // src/components/CandidateDrawer.jsx
 // Context-aware Candidate Management + Assessment + Reporting
 
+import { normalizeSkills } from '../utils/normalizeSkills';
 import { analysisScoreFor, analysisScoreForTitle } from '../utils/positionScore';
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
@@ -119,7 +120,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
         if (!candidate) return 'general';
         const text = [
             candidate.position || '', candidate.title || '',
-            (candidate.skills || []).join(' '), candidate.about || '',
+            normalizeSkills(candidate.skills).join(' '), candidate.about || '',
             candidate.description || '', candidate.cvData || '',
         ].join(' ');
         return detectJobDomain(text);
