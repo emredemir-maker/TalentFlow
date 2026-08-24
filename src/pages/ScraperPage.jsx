@@ -194,7 +194,7 @@ export default function ScraperPage() {
 
             <div className="max-w-5xl mx-auto px-6 lg:px-8 py-8">
                 {/* Intro Card */}
-                <div className="bg-gradient-to-br from-violet-900/20 to-electric/10 rounded-2xl p-6 border border-white/[0.06] mb-8 flex items-start gap-4">
+                <div className="bg-gradient-to-br from-violet-900/20 to-electric/10 rounded-2xl p-6 border border-white/[0.06] mb-8 flex items-start gap-3">
                     <div className="p-3 rounded-xl bg-violet-500/20 text-violet-300">
                         <DownloadCloud className="w-6 h-6" />
                     </div>
@@ -213,7 +213,7 @@ export default function ScraperPage() {
 
                         {/* 1. AUTO SCRAPER CARD */}
                         <div className="glass rounded-2xl p-6 border border-electric/20 relative overflow-hidden group">
-                            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                            <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
                                 <Search className="w-24 h-24 text-electric" />
                             </div>
 
@@ -222,8 +222,8 @@ export default function ScraperPage() {
                                 URL ile Çek veya Otomatik Arama
                             </h3>
 
-                            <div className="flex flex-col gap-4">
-                                <div className="flex gap-3">
+                            <div className="flex flex-col gap-3">
+                                <div className="flex gap-2">
                                     <input
                                         type="text"
                                         value={searchQuery}
@@ -241,7 +241,7 @@ export default function ScraperPage() {
                                         {autoScraping ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Çek / Ara'}
                                     </button>
                                 </div>
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2">
                                     <button
                                         onClick={() => handleAutoScrape(true)}
                                         disabled={autoScraping || !searchQuery.trim() || !kvkkChecked}
@@ -259,14 +259,14 @@ export default function ScraperPage() {
                                         onChange={() => setKvkkChecked(!kvkkChecked)}
                                         className="w-4 h-4 rounded border-white/10 bg-navy-900 text-electric focus:ring-electric"
                                     />
-                                    <label htmlFor="kvkk-auto" className="text-[11px] text-navy-400 cursor-pointer">
+                                    <label htmlFor="kvkk-auto" className="text-[10px] text-navy-400 cursor-pointer">
                                         Adayın verilerinin <b>KVKK/GDPR</b> kapsamında işlenmesini ve istihdam amacıyla saklanmasını onaylıyorum.
                                     </label>
                                 </div>
                                 <div className="flex justify-center">
                                     <button
                                         onClick={handleSetupBrowser}
-                                        className="text-[11px] text-navy-400 hover:text-text-primary underline decoration-navy-600 transition-colors"
+                                        className="text-[10px] text-navy-400 hover:text-text-primary underline decoration-navy-600 transition-colors"
                                     >
                                         ⚙️ Tarayıcıda Oturumu Hazırla (İlk Sefer İçin Giriş Yap)
                                     </button>
@@ -277,20 +277,20 @@ export default function ScraperPage() {
                             </p>
 
                             {/* MAGIC BUTTON SECTION */}
-                            <div className="mt-8 p-5 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 relative overflow-hidden">
+                            <div className="mt-8 p-3.5 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 relative overflow-hidden">
                                 <div className="absolute -top-10 -right-10 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl" />
 
                                 <h4 className="text-sm font-bold text-emerald-400 mb-2 flex items-center gap-2">
                                     <Layers className="w-4 h-4" />
                                     🚀 Sales Navigator PRO & LinkedIn Sihirli Buton
                                 </h4>
-                                <p className="text-[11px] text-navy-400 mb-4 leading-relaxed">
+                                <p className="text-[10px] text-navy-400 mb-4 leading-relaxed">
                                     Sizin Sales Navigator üyeliğinizi kullanarak <b>toplu aday</b> çeken profesyonel yöntem.
                                     Arama sonuçları sayfasında veya tekli profildeyken aşağıdaki kodu kopyalayıp konsola (F12) yapıştırın.
                                 </p>
 
                                 <div className="relative group">
-                                    <pre className="text-[10px] bg-black/60 p-4 rounded-xl text-emerald-300/90 font-mono overflow-x-auto max-h-[150px] border border-white/5 backdrop-blur-sm">
+                                    <pre className="text-[10px] bg-black/60 p-3 rounded-xl text-emerald-300/90 font-mono overflow-x-auto max-h-[150px] border border-white/5 backdrop-blur-sm">
                                         {`/* SALESNAV PRO SCRIPT */
 (async () => {
   const isSearch = window.location.href.includes('/search/');
@@ -367,10 +367,10 @@ export default function ScraperPage() {
                                 value={textInput}
                                 onChange={(e) => setTextInput(e.target.value)}
                                 placeholder="LinkedIn profil sayfasını açıp Ctrl+A (Tümünü Seç) ve Ctrl+C (Kopyala) yaptıktan sonra buraya (Ctrl+V) yapıştırın. AI sizin için ayrıştıracaktır..."
-                                className="w-full h-48 p-4 rounded-xl bg-navy-950/50 border border-white/[0.06] text-sm text-navy-200 placeholder:text-navy-500 focus:border-emerald-500/40 focus:ring-1 focus:ring-emerald-500/40 outline-none resize-none font-mono"
+                                className="w-full h-48 p-3 rounded-xl bg-navy-950/50 border border-white/[0.06] text-sm text-navy-200 placeholder:text-navy-500 focus:border-emerald-500/40 focus:ring-1 focus:ring-emerald-500/40 outline-none resize-none font-mono"
                             />
 
-                            <div className="mt-4 flex flex-wrap justify-end gap-3">
+                            <div className="mt-4 flex flex-wrap justify-end gap-2">
 
                                 {/* Hidden File Input */}
                                 <input
@@ -414,7 +414,7 @@ export default function ScraperPage() {
                                     onChange={() => setKvkkChecked(!kvkkChecked)}
                                     className="w-4 h-4 rounded border-white/10 bg-navy-900 text-emerald-500 focus:ring-emerald-500"
                                 />
-                                <label htmlFor="kvkk-manual" className="text-[11px] text-navy-400 cursor-pointer">
+                                <label htmlFor="kvkk-manual" className="text-[10px] text-navy-400 cursor-pointer">
                                     Adayın verilerinin <b>KVKK/GDPR</b> kapsamında işlenmesini ve sistemde saklanmasını onaylıyorum.
                                 </label>
                             </div>
@@ -422,7 +422,7 @@ export default function ScraperPage() {
 
                         {/* Error State */}
                         {error && (
-                            <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-3 text-red-400 animate-fade-in">
+                            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-2 text-red-400 animate-fade-in">
                                 <AlertTriangle className="w-5 h-5 shrink-0" />
                                 <p className="text-sm">{error}</p>
                             </div>
@@ -437,7 +437,7 @@ export default function ScraperPage() {
                                     <div key={idx} className="glass rounded-2xl p-6 border border-emerald-500/20 animate-fade-in-up relative overflow-hidden">
                                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 to-teal-400" />
 
-                                        <div className="flex items-center gap-3 mb-6">
+                                        <div className="flex items-center gap-2 mb-6">
                                             <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400">
                                                 <CheckCircle2 className="w-6 h-6" />
                                             </div>

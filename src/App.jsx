@@ -1,7 +1,8 @@
 // src/App.jsx
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { Routes, Route, useLocation, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
+import { useCandidates } from './context/CandidatesContext';
 import { CandidatesProvider } from './context/CandidatesContext';
 import { PositionsProvider } from './context/PositionsContext';
 import { UserSettingsProvider } from './context/UserSettingsContext';
@@ -123,18 +124,108 @@ export default function App() {
   );
 }
 
+/**
+ * GÖRÜNÜM ARTIK ADRESTEN TÜRETİLİYOR.
+ *
+ * Ekran adı React state'inde tutuluyordu ve adres çubuğuna hiç yazılmıyordu.
+ * Üç sonucu vardı, üçü de her gün yaşanıyordu:
+ *   - tarayıcının geri tuşu uygulama İÇİNDE çalışmıyordu (geri basmak
+ *     uygulamadan çıkarıyordu),
+ *   - hiçbir ekranın paylaşılabilir adresi yoktu — "şu adaya bak" diye link
+ *     atmanın yolu yoktu,
+ *   - yenilemek her seferinde Kontrol Paneli'ne döndürüyordu.
+ *
+ * İhtiyaç zaten kabul edilmişti: değerlendirme e-postalarındaki linkler için
+ * `?aday=<id>` parametresi vardı. Burada o istisna kurala dönüştürülüyor.
+ *
+ * TEK YÖNLÜ: state ile adres arasında senkron kurmak yerine state KALDIRILDI.
+ * `activeView` artık `location.pathname`'den okunuyor, `setActiveView` de
+ * `navigate` çağırıyor. İki yönlü senkronun klasik sonsuz döngü riski
+ * böylece hiç doğmuyor.
+ *
+ * `changeView` olayı AYNEN duruyor: 12 dosya bu olayı gönderiyor ve hiçbiri
+ * değişmedi — yalnızca olayın vardığı yer artık adres çubuğu.
+ */
+const GORUNUM_YOLU = {
+    dashboard: '/panel',
+    'candidates-table': '/adaylar',
+    'candidate-process': '/aday-detayi',
+    positions: '/ilanlar',
+    interviews: '/mulakatlar',
+    pipeline: '/surec',
+    messages: '/mesajlar',
+    analytics: '/analitik',
+    settings: '/ayarlar',
+    sources: '/ayarlar/kaynaklar',
+    departments: '/ayarlar/departmanlar',
+    guide: '/ayarlar/kilavuz',
+    'super-admin': '/ayarlar/sistem',
+    'tech-docs': '/teknik-dokumantasyon',
+    integrations: '/entegrasyonlar',
+    'live-interview': '/canli-mulakat',
+    'interview-report': '/mulakat-raporu',
+};
+const YOL_GORUNUMU = Object.fromEntries(
+    Object.entries(GORUNUM_YOLU).map(([gorunum, yol]) => [yol, gorunum])
+);
+
+/**
+ * Adresten görünüm adı. Tanınmayan yol Kontrol Paneli'ne düşer.
+ *
+ * `?aday=` ile gelen e-posta linki kök adrese düşse bile aday detayını açar —
+ * eski davranış korunuyor.
+ */
+function gorunumCoz(pathname, search) {
+    const yol = pathname.replace(/\/+$/, '') || '/';
+    if (YOL_GORUNUMU[yol]) return YOL_GORUNUMU[yol];
+    if (new URLSearchParams(search).get('aday')) return 'candidate-process';
+    return 'dashboard';
+}
+
 function AuthenticatedApp() {
   const { loading, error, isAuthenticated, user, userProfile } = useAuth();
-  // Derin-link: ?aday=<id> ile gelindiyse girişten sonra aday detayında
-  // başla (CandidatesContext aynı parametreden viewCandidateId'yi kurar).
-  const [activeView, setActiveView] = useState(
-    () => (new URLSearchParams(window.location.search).get('aday') ? 'candidate-process' : 'dashboard')
-  );
+  const { viewCandidateId } = useCandidates();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   // Mobile drawer (<lg). Desktop layout (≥lg) uses sidebarCollapsed instead.
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+
+  // Görünüm state DEĞİL, adresin okunuşu. Geri/ileri tuşları ve yenileme
+  // bu sayede ekstra kod olmadan çalışıyor.
+  const activeView = useMemo(
+    () => gorunumCoz(location.pathname, location.search),
+    [location.pathname, location.search]
+  );
+
+  const setActiveView = useCallback((gorunum) => {
+    const yol = GORUNUM_YOLU[gorunum] || GORUNUM_YOLU.dashboard;
+    if (yol === location.pathname) return;
+    navigate(yol);
+  }, [navigate, location.pathname]);
+
+  /**
+   * AÇIK ADAY ADRESTE YAZILI.
+   *
+   * "Şu adaya bak" diye link atmak bu ekranın en sık istenen işi. Aday
+   * detayı açıkken seçili adayın kimliği `?aday=` olarak adrese yazılıyor;
+   * karşı taraf linke tıkladığında CandidatesContext aynı parametreyi zaten
+   * okuyor ve o adayı açıyor.
+   *
+   * `replace` kullanılıyor: aday değiştirmek yeni bir geçmiş adımı olmamalı,
+   * yoksa geri tuşu kullanıcıyı gezdiği adaylar arasında tek tek geri
+   * yürütürdü.
+   */
+  useEffect(() => {
+    if (activeView !== 'candidate-process') return;
+    const mevcut = new URLSearchParams(location.search).get('aday') || '';
+    const hedef = viewCandidateId || '';
+    if (mevcut === hedef) return;
+    navigate(
+      { pathname: location.pathname, search: hedef ? `?aday=${encodeURIComponent(hedef)}` : '' },
+      { replace: true }
+    );
+  }, [activeView, viewCandidateId, location.pathname, location.search, navigate]);
 
   useEffect(() => {
     const handleNav = (e) => {
@@ -153,7 +244,12 @@ function AuthenticatedApp() {
       window.removeEventListener('changeView', handleNav);
       window.removeEventListener('openMobileSidebar', handleOpenMobile);
     };
-  }, []);
+    // `setActiveView` bağımlılıkta OLMAK ZORUNDA: artık adres çubuğuna
+    // yazan bir fonksiyon ve içinde o anki `location.pathname`'i tutuyor.
+    // Boş bağımlılıkla dinleyici ilk render'ın kapanışında donar, "aynı
+    // yoldaysan gitme" denetimi eski yolu okur ve bazı geçişler sessizce
+    // yutulurdu.
+  }, [setActiveView]);
 
   // Auth loading
   if (loading) {
@@ -210,7 +306,7 @@ function AuthenticatedApp() {
       />
       <main
         className={`flex-1 min-h-screen transition-all duration-300 min-w-0
-          ${sidebarCollapsed ? 'lg:ml-[80px]' : 'lg:ml-[240px]'}`}
+          ${sidebarCollapsed ? 'lg:ml-[80px]' : 'lg:ml-[196px]'}`}
       >
         {/* In-app route changes — sidebar/header are already painted, so
             the inline spinner is enough until the page chunk arrives. */}

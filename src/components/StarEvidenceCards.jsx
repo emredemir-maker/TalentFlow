@@ -46,7 +46,7 @@ export default function StarEvidenceCards({ starAnalysis, position, narrativeErr
             {noText && (
                 <div className="flex items-start gap-2 bg-warn-bg rounded-md px-3 py-2">
                     <AlertTriangle className="w-3.5 h-3.5 text-warn shrink-0 mt-0.5" />
-                    <p className="text-[12px] text-n700 leading-relaxed">
+                    <p className="text-[11px] text-n700 leading-relaxed">
                         <strong>Bu analizde gerekçe metinleri yok.</strong> Puanlar geçerli — onlar
                         ayrı bir çağrıdan geliyor — ama &quot;CV&apos;de ne yazıyor&quot; kısmı
                         kaydedilmemiş.{' '}
@@ -60,7 +60,7 @@ export default function StarEvidenceCards({ starAnalysis, position, narrativeErr
             {isLegacy && (
                 <div className="flex items-start gap-2 bg-n50 border border-n200 rounded-md px-3 py-2">
                     <Info className="w-3.5 h-3.5 text-n400 shrink-0 mt-0.5" />
-                    <p className="text-[12px] text-n500 leading-relaxed">
+                    <p className="text-[11px] text-n500 leading-relaxed">
                         Bu analiz eski değerlendirme biçiminde üretilmiş. Eski &quot;negatif&quot; notları
                         çoğunlukla bir kusur değil, CV&apos;de bulunmayan bilgiydi; burada
                         <strong> Mülakatta Sorulacaklar </strong> olarak gösteriliyor.
@@ -75,11 +75,11 @@ export default function StarEvidenceCards({ starAnalysis, position, narrativeErr
                 return (
                     <div key={d.key} className={`rounded-md border ${step.border} ${step.bg} p-3`}>
                         <div className="flex items-center gap-2 mb-2 flex-wrap">
-                            <div className={`w-6 h-6 rounded-md bg-n0 border ${step.border} flex items-center justify-center text-[12px] font-semibold ${step.tc} shadow-sm shrink-0`}>
+                            <div className={`w-6 h-6 rounded-md bg-n0 border ${step.border} flex items-center justify-center text-[11px] font-semibold ${step.tc} shadow-sm shrink-0`}>
                                 {step.k}
                             </div>
-                            <h4 className={`text-[12px] font-semibold uppercase tracking-[0.08em] ${step.tc}`}>{step.l}</h4>
-                            <span className={`text-[11px] font-medium opacity-60 ${step.tc}`}>({d.key})</span>
+                            <h4 className={`text-[11px] font-semibold uppercase tracking-[0.08em] ${step.tc}`}>{step.l}</h4>
+                            <span className={`text-[10px] font-medium opacity-60 ${step.tc}`}>({d.key})</span>
                             <span className="ml-auto flex items-center gap-1.5">
                                 {d.confidentiality && (
                                     <span
@@ -94,7 +94,7 @@ export default function StarEvidenceCards({ starAnalysis, position, narrativeErr
                                         {label}
                                     </span>
                                 )}
-                                <span className={`text-[12px] font-semibold ${step.tc}`}>{d.score}/{d.max}</span>
+                                <span className={`text-[11px] font-semibold ${step.tc}`}>{d.score}/{d.max}</span>
                             </span>
                         </div>
 
@@ -126,7 +126,7 @@ export default function StarEvidenceCards({ starAnalysis, position, narrativeErr
                                 />
                             )}
                             {!d.evidence && !d.missing && !d.conflict && (
-                                <p className="text-[12px] text-n400 italic">
+                                <p className="text-[11px] text-n400 italic">
                                     CV&apos;de bu boyuta dair bilgi bulunamadı.
                                 </p>
                             )}
@@ -135,7 +135,7 @@ export default function StarEvidenceCards({ starAnalysis, position, narrativeErr
                 );
             })}
 
-            <p className="text-[11px] text-n400 leading-relaxed pt-1">
+            <p className="text-[10px] text-n400 leading-relaxed pt-1">
                 Bu bölüm adayın niteliğini değil, CV&apos;de ne kadar kanıt bulunduğunu ölçer.
                 Bilginin CV&apos;de olmaması bir kusur değildir — gizlilik yükümlülüğü, yer kısıtı
                 ya da yazım alışkanlığı olabilir. Kesin rakam şart değildir: aralık, oran ve
@@ -148,7 +148,7 @@ export default function StarEvidenceCards({ starAnalysis, position, narrativeErr
 function Bucket({ icon, title, tone, text, position }) {
     return (
         <div className={`bg-n0 border px-3 py-2 rounded-md ${tone.split(' ')[0]}`}>
-            <div className={`flex items-center gap-1 text-[11px] font-semibold uppercase mb-1 ${tone.split(' ')[1]}`}>
+            <div className={`flex items-center gap-1 text-[10px] font-semibold uppercase mb-1 ${tone.split(' ')[1]}`}>
                 {icon} {title}
             </div>
             {/* Metindeki terimler tıklanabilir: okuyan kişi "PLG neymiş"

@@ -86,16 +86,16 @@ export default function EvaluationEmailModal({ isOpen, onClose, candidates, open
     };
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-3">
             <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={sending ? undefined : onClose} />
-            <div className="relative w-full max-w-lg bg-white rounded-2xl border border-slate-100 shadow-2xl p-5 max-h-[90vh] overflow-y-auto">
+            <div className="relative w-full max-w-lg bg-white rounded-2xl border border-slate-100 shadow-2xl p-3.5 max-h-[90vh] overflow-y-auto">
                 <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                         <div className="w-9 h-9 rounded-xl bg-[#13294E] flex items-center justify-center">
                             <Mail className="w-4.5 h-4.5 text-white" />
                         </div>
                         <div>
-                            <h3 className="text-[14px] font-black text-slate-900">Değerlendirmeye Gönder</h3>
+                            <h3 className="text-[13px] font-black text-slate-900">Değerlendirmeye Gönder</h3>
                             <p className="text-[10px] text-slate-400 font-bold">{candidates.length} aday · e-posta sizin hesabınızdan çıkar</p>
                         </div>
                     </div>
@@ -124,12 +124,12 @@ export default function EvaluationEmailModal({ isOpen, onClose, candidates, open
                             className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[12px] text-slate-700 outline-none focus:border-blue-300 transition-all resize-none"
                         />
                     </div>
-                    <div className="flex items-center gap-4">
-                        <label className="flex items-center gap-1.5 text-[12px] font-bold text-slate-600 cursor-pointer">
+                    <div className="flex items-center gap-3">
+                        <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600 cursor-pointer">
                             <input type="checkbox" checked={includeTable} onChange={(e) => setIncludeTable(e.target.checked)} className="w-3.5 h-3.5 accent-[#13294E]" />
                             Uyum analizi ve kariyer özeti
                         </label>
-                        <label className="flex items-center gap-1.5 text-[12px] font-bold text-slate-600 cursor-pointer">
+                        <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600 cursor-pointer">
                             <input type="checkbox" checked={includeLinks} onChange={(e) => setIncludeLinks(e.target.checked)} className="w-3.5 h-3.5 accent-[#13294E]" />
                             Detay kart linkleri
                         </label>
@@ -160,7 +160,7 @@ export default function EvaluationEmailModal({ isOpen, onClose, candidates, open
                     <button
                         onClick={handleCopy}
                         disabled={sending || (!includeTable && !includeLinks)}
-                        className="flex-1 py-2.5 rounded-xl border border-slate-200 text-[12px] font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 flex items-center justify-center gap-1.5 transition-colors"
+                        className="flex-1 py-2.5 rounded-xl border border-slate-200 text-[11px] font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 flex items-center justify-center gap-1.5 transition-colors"
                     >
                         {copied ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
                         {copied ? 'Kopyalandı' : 'Panoya Kopyala'}
@@ -168,7 +168,7 @@ export default function EvaluationEmailModal({ isOpen, onClose, candidates, open
                     <button
                         onClick={handleSend}
                         disabled={!canSend}
-                        className="flex-[2] py-2.5 rounded-xl bg-[#13294E] hover:bg-[#1E3A6E] text-white text-[12px] font-black disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
+                        className="flex-[2] py-2.5 rounded-xl bg-[#13294E] hover:bg-[#1E3A6E] text-white text-[11px] font-black disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
                     >
                         {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
                         {sending ? 'Gönderiliyor…' : 'Gönder'}

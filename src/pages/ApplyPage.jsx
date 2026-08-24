@@ -32,7 +32,7 @@ const APPLICATIONS_COLLECTION = 'artifacts/talent-flow/public/data/applications'
 function InputField({ label, icon: Icon, required, autoFilled, ...props }) {
     return (
         <div>
-            <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
                 {label} {required && <span className="text-indigo-500">*</span>}
                 {autoFilled && (
                     <span className="ml-1 inline-flex items-center gap-0.5 text-[9px] font-black uppercase tracking-wide text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-full px-1.5 py-0.5">
@@ -464,7 +464,7 @@ export default function ApplyPage() {
 
                     <p className="text-slate-400 text-sm mb-6">Profiliniz değerlendirmeye alındı. Ekibimiz inceleyerek size dönüş yapacak.</p>
 
-                    <div className="bg-slate-50 rounded-xl p-4 text-left border border-slate-100 text-[11px]">
+                    <div className="bg-slate-50 rounded-xl p-3 text-left border border-slate-100 text-[10px]">
                         <div className="font-black uppercase tracking-widest text-slate-400 mb-2">Başvuru Özeti</div>
                         <div className="space-y-1">
                             <div className="flex gap-2"><span className="text-slate-300 w-16 shrink-0">Ad</span><span className="font-bold text-slate-700 truncate">{form.name}</span></div>
@@ -491,7 +491,7 @@ export default function ApplyPage() {
                     <p className="text-slate-400 text-sm mb-6">
                         Bu e-posta veya telefon numarası sistemimizde kayıtlı. Başvurunuz mevcut profilinize bağlandı ve yeni pozisyon eklendi.
                     </p>
-                    <div className="bg-amber-50 rounded-xl p-4 text-left border border-amber-100 text-[11px] mb-4">
+                    <div className="bg-amber-50 rounded-xl p-3 text-left border border-amber-100 text-[10px] mb-4">
                         <div className="font-black uppercase tracking-widest text-amber-600 mb-2">Başvuru Bilgileri</div>
                         <div className="space-y-1">
                             <div className="flex gap-2"><span className="text-amber-400 w-20 shrink-0">Ad</span><span className="font-bold text-slate-700 truncate">{form.name}</span></div>
@@ -528,10 +528,10 @@ export default function ApplyPage() {
     return (
         <div className="min-h-screen bg-slate-50">
             {/* Top bar */}
-            <div className="bg-white border-b border-slate-100 px-6 py-3.5">
-                <div className="max-w-lg mx-auto flex items-center gap-3">
+            <div className="bg-white border-b border-slate-100 px-6 py-2.5">
+                <div className="max-w-lg mx-auto flex items-center gap-2">
                     <div className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center shrink-0">
-                        <span className="text-white text-[11px] font-black tracking-tight">TI</span>
+                        <span className="text-white text-[10px] font-black tracking-tight">TI</span>
                     </div>
                     <span className="text-slate-800 font-black text-sm">Talent-Inn</span>
                     {effectiveSource !== 'Direkt' && (
@@ -553,7 +553,7 @@ export default function ApplyPage() {
                         <h1 className="text-[24px] font-black leading-tight mb-1" style={{ color: '#ffffff' }}>{position?.title}</h1>
                         <div className="flex items-center gap-1.5 mb-4">
                             <Building2 size={12} style={{ color: '#a5b4fc' }} />
-                            <span className="text-[12px] font-semibold" style={{ color: '#a5b4fc' }}>{position?.department}</span>
+                            <span className="text-[11px] font-semibold" style={{ color: '#a5b4fc' }}>{position?.department}</span>
                         </div>
                         {position?.requirements?.length > 0 && (
                             <div className="flex flex-wrap gap-1.5">
@@ -586,21 +586,21 @@ export default function ApplyPage() {
                                 <div className="flex flex-col items-center gap-2">
                                     <Loader2 className="w-8 h-8 text-indigo-400 animate-spin" />
                                     <div className="font-bold text-slate-500 text-sm">CV okunuyor ve analiz ediliyor...</div>
-                                    <div className="text-[11px] text-slate-400">Bilgileriniz otomatik doldurulacak</div>
+                                    <div className="text-[10px] text-slate-400">Bilgileriniz otomatik doldurulacak</div>
                                 </div>
                             ) : cvFile ? (
                                 <div className="flex flex-col items-center gap-2">
                                     <FileText className="w-8 h-8 text-indigo-500" />
                                     <div className="font-bold text-slate-700 text-sm">{cvFile.name}</div>
-                                    <div className="text-[11px] text-slate-400">{(cvFile.size / 1024).toFixed(0)} KB</div>
+                                    <div className="text-[10px] text-slate-400">{(cvFile.size / 1024).toFixed(0)} KB</div>
                                     {cvParseError && (
-                                        <div className="text-[11px] text-amber-500 font-semibold mt-1">⚠ Belge okunamadı — lütfen bilgilerinizi manuel doldurun</div>
+                                        <div className="text-[10px] text-amber-500 font-semibold mt-1">⚠ Belge okunamadı — lütfen bilgilerinizi manuel doldurun</div>
                                     )}
                                     {cvParseNoData && !cvParseError && (
-                                        <div className="text-[11px] text-amber-500 font-semibold mt-1">Bu belgede kişisel bilgi bulunamadı — lütfen bilgilerinizi manuel doldurun</div>
+                                        <div className="text-[10px] text-amber-500 font-semibold mt-1">Bu belgede kişisel bilgi bulunamadı — lütfen bilgilerinizi manuel doldurun</div>
                                     )}
                                     <button type="button" onClick={e => { e.stopPropagation(); setCvFile(null); setAutoFilled({ name: false, email: false, phone: false, linkedin: false }); setCvParseNoData(false); setCvParseError(false); }}
-                                        className="flex items-center gap-1 text-red-400 text-[11px] font-bold hover:text-red-500 mt-1">
+                                        className="flex items-center gap-1 text-red-400 text-[10px] font-bold hover:text-red-500 mt-1">
                                         <X size={12} /> Kaldır
                                     </button>
                                 </div>
@@ -608,8 +608,8 @@ export default function ApplyPage() {
                                 <div className="flex flex-col items-center gap-2">
                                     <Upload className="w-8 h-8 text-slate-300" />
                                     <div className="font-bold text-slate-500 text-sm">CV'nizi sürükleyin veya tıklayın</div>
-                                    <div className="text-[11px] text-slate-400">PDF veya DOCX • Maks. 10 MB</div>
-                                    <div className="text-[11px] text-indigo-400 font-semibold mt-1">Bilgiler otomatik doldurulacak</div>
+                                    <div className="text-[10px] text-slate-400">PDF veya DOCX • Maks. 10 MB</div>
+                                    <div className="text-[10px] text-indigo-400 font-semibold mt-1">Bilgiler otomatik doldurulacak</div>
                                 </div>
                             )}
                         </div>
@@ -739,7 +739,7 @@ export default function ApplyPage() {
                         <div className="bg-white rounded-2xl border border-indigo-100 shadow-sm p-6 space-y-4">
                             <div className="flex items-center gap-2 mb-2">
                                 <div className="w-6 h-6 rounded-lg bg-indigo-100 flex items-center justify-center shrink-0">
-                                    <span className="text-[11px]">🎯</span>
+                                    <span className="text-[10px]">🎯</span>
                                 </div>
                                 <div>
                                     <div className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Ön Eleme Soruları</div>
@@ -748,7 +748,7 @@ export default function ApplyPage() {
                             </div>
                             {(position.screeningQuestions || []).map((q, i) => (
                                 <div key={i} className="space-y-1.5">
-                                    <label className="text-[12px] font-semibold text-slate-700 block">
+                                    <label className="text-[11px] font-semibold text-slate-700 block">
                                         <span className="text-indigo-400 font-black mr-1.5">{i + 1}.</span>{q}
                                     </label>
                                     <textarea
@@ -760,7 +760,7 @@ export default function ApplyPage() {
                                         }}
                                         placeholder="Yanıtınızı buraya yazın..."
                                         rows={3}
-                                        className="w-full border border-slate-200 rounded-xl p-3 text-[12px] text-slate-700 placeholder-slate-300 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-50 resize-none transition-all"
+                                        className="w-full border border-slate-200 rounded-xl p-3 text-[11px] text-slate-700 placeholder-slate-300 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-50 resize-none transition-all"
                                     />
                                 </div>
                             ))}
@@ -769,7 +769,7 @@ export default function ApplyPage() {
 
                     {/* KVKK */}
                     <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-                        <label className="flex gap-3 cursor-pointer select-none">
+                        <label className="flex gap-2 cursor-pointer select-none">
                             <div className="relative mt-0.5 shrink-0">
                                 <input type="checkbox" className="sr-only" checked={kvkk} onChange={e => setKvkk(e.target.checked)} />
                                 <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${kvkk ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300 bg-white'}`}>
@@ -777,7 +777,7 @@ export default function ApplyPage() {
                                 </div>
                             </div>
                             <div>
-                                <div className="text-[12px] font-semibold text-slate-700 leading-relaxed">
+                                <div className="text-[11px] font-semibold text-slate-700 leading-relaxed">
                                     <span className="text-indigo-600 font-bold">KVKK Aydınlatma Metni</span>'ni okudum ve kişisel verilerimin Talent-Inn tarafından işlenmesine onay veriyorum.
                                 </div>
                                 <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
@@ -792,7 +792,7 @@ export default function ApplyPage() {
                     <button
                         type="submit"
                         disabled={!form.name || !form.email || !form.phone || !cvFile || !kvkk}
-                        className="w-full py-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-[15px] flex items-center justify-center gap-2 transition-colors shadow-sm mt-1"
+                        className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-[15px] flex items-center justify-center gap-2 transition-colors shadow-sm mt-1"
                     >
                         Başvuruyu Gönder <ChevronRight className="w-5 h-5" />
                     </button>

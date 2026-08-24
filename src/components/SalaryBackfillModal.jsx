@@ -204,18 +204,18 @@ export default function SalaryBackfillModal({ open, onClose, candidates = [], ui
     const eta = humanDuration(estimateMs(scanTargets.length));
 
     return (
-        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[130] flex items-center justify-center p-3">
             <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={saving ? undefined : close} />
             <div className="relative w-full max-w-3xl max-h-[90vh] flex flex-col bg-white rounded-2xl border border-slate-100 shadow-2xl">
                 {/* Başlık */}
-                <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-3 border-b border-slate-100">
-                    <div className="flex items-center gap-3">
+                <div className="flex items-start justify-between gap-2 px-5 pt-5 pb-3 border-b border-slate-100">
+                    <div className="flex items-center gap-2">
                         <div className="w-9 h-9 rounded-xl bg-[#13294E] flex items-center justify-center shrink-0">
                             <Wallet className="w-4 h-4 text-white" />
                         </div>
                         <div>
-                            <h3 className="text-[14px] font-black text-slate-900">Geçmiş Görüşmelerde Maaş Beklentisi</h3>
-                            <p className="text-[11px] text-slate-500">
+                            <h3 className="text-[13px] font-black text-slate-900">Geçmiş Görüşmelerde Maaş Beklentisi</h3>
+                            <p className="text-[10px] text-slate-500">
                                 Beklentisi kayıtlı olmayan görüşmeler — en yeni önce
                             </p>
                         </div>
@@ -241,7 +241,7 @@ export default function SalaryBackfillModal({ open, onClose, candidates = [], ui
                                 <span className="text-[10px] text-slate-400">{eta}</span>
                             )}
                             {scanning && progress && (
-                                <span className="text-[11px] font-semibold text-blue-700 tabular-nums">
+                                <span className="text-[10px] font-semibold text-blue-700 tabular-nums">
                                     {progress.done} / {progress.total}
                                 </span>
                             )}
@@ -282,19 +282,19 @@ export default function SalaryBackfillModal({ open, onClose, candidates = [], ui
                     {phase === 'loading' && (
                         <div className="flex items-center gap-2 py-8 justify-center text-slate-500">
                             <Loader2 className="w-4 h-4 animate-spin" />
-                            <span className="text-[12px] font-semibold">Görüşme kayıtları okunuyor…</span>
+                            <span className="text-[11px] font-semibold">Görüşme kayıtları okunuyor…</span>
                         </div>
                     )}
 
                     {phase === 'error' && (
                         <div className="flex gap-2 px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-200">
                             <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
-                            <p className="text-[11px] text-amber-700">{loadError}</p>
+                            <p className="text-[10px] text-amber-700">{loadError}</p>
                         </div>
                     )}
 
                     {phase === 'ready' && rows.length === 0 && (
-                        <p className="py-8 text-center text-[12px] text-slate-500">
+                        <p className="py-8 text-center text-[11px] text-slate-500">
                             Beklentisi eksik görüşme bulunamadı.
                         </p>
                     )}
@@ -332,12 +332,12 @@ export default function SalaryBackfillModal({ open, onClose, candidates = [], ui
                 {phase === 'ready' && rows.length > 0 && (
                     <div className="px-5 py-3 border-t border-slate-100 space-y-2">
                         {savedCount > 0 && (
-                            <p className="text-[11px] font-semibold text-emerald-700">
+                            <p className="text-[10px] font-semibold text-emerald-700">
                                 {savedCount} görüşmeye beklenti yazıldı.
                             </p>
                         )}
                         {saveError && (
-                            <p className="text-[11px] text-amber-700">{saveError}</p>
+                            <p className="text-[10px] text-amber-700">{saveError}</p>
                         )}
                         {/* Bazsız kaydedilenler AYRI sayılır: rakam kayda geçer
                             ama fark raporunda "bilinmiyor" kefesinde kalır. */}
@@ -347,8 +347,8 @@ export default function SalaryBackfillModal({ open, onClose, candidates = [], ui
                                 karşılaştırmasına girmez.
                             </p>
                         )}
-                        <div className="flex items-center gap-3">
-                            <p className="flex-1 text-[11px] text-slate-500">
+                        <div className="flex items-center gap-2">
+                            <p className="flex-1 text-[10px] text-slate-500">
                                 <strong className="tabular-nums">{tally.filled}</strong> satır kaydedilmeye hazır,{' '}
                                 <span className="tabular-nums">{tally.empty}</span> satır boş.
                                 {' '}Boş bırakılan satır <strong>sıfır değil, &ldquo;sorulmadı&rdquo;</strong> sayılır.

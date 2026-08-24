@@ -87,29 +87,29 @@ export default class ErrorBoundary extends React.Component {
         return (
             <div className="infoset min-h-[60vh] flex items-start justify-center p-6">
                 <div className="w-full max-w-2xl bg-n0 border border-n200 rounded-[14px] shadow-sm overflow-hidden">
-                    <div className="px-5 py-4 border-b border-n200 bg-bad-bg">
+                    <div className="px-5 py-3 border-b border-n200 bg-bad-bg">
                         <h2 className="text-[15px] font-semibold text-bad m-0">Bu ekran açılamadı</h2>
-                        <p className="text-[12px] text-n600 mt-1 mb-0">
+                        <p className="text-[11px] text-n600 mt-1 mb-0">
                             Uygulamanın geri kalanı çalışmaya devam ediyor — sol menüden başka bir
                             ekrana geçebilirsiniz. Kaydedilmemiş bir işlem kaybolmadı.
                         </p>
                     </div>
 
-                    <div className="px-5 py-4 space-y-3">
+                    <div className="px-5 py-3 space-y-3">
                         {scope && (
-                            <div className="text-[11px] font-semibold text-n400 uppercase tracking-[0.08em]">
+                            <div className="text-[10px] font-semibold text-n400 uppercase tracking-[0.08em]">
                                 {scope}
                             </div>
                         )}
-                        <p className="text-[13px] font-medium text-n900 m-0 break-words">
+                        <p className="text-[12px] font-medium text-n900 m-0 break-words">
                             {error?.name || 'Error'}: {error?.message || String(error)}
                         </p>
 
                         <details className="rounded-md border border-n200 bg-n50">
-                            <summary className="cursor-pointer select-none px-3 py-2 text-[12px] font-semibold text-n600">
+                            <summary className="cursor-pointer select-none px-3 py-2 text-[11px] font-semibold text-n600">
                                 Teknik ayrıntı
                             </summary>
-                            <pre className="px-3 pb-3 pt-0 m-0 text-[11px] leading-relaxed text-n600 whitespace-pre-wrap break-words max-h-64 overflow-auto">
+                            <pre className="px-3 pb-3 pt-0 m-0 text-[10px] leading-relaxed text-n600 whitespace-pre-wrap break-words max-h-64 overflow-auto">
                                 {String(error?.stack || '')}
                                 {info?.componentStack ? `\n\nBileşen zinciri:${info.componentStack}` : ''}
                             </pre>

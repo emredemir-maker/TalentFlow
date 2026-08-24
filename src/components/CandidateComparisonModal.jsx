@@ -31,7 +31,7 @@ export default function CandidateComparisonModal({ isOpen, onClose }) {
     if (selectedCandidates.length === 0) return null;
 
     return (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 md:p-8 animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-3 md:p-8 animate-in fade-in duration-300">
             <div className="absolute inset-0 bg-navy-950/80 backdrop-blur-md" onClick={onClose} />
 
             <div className="relative w-full max-w-7xl h-full max-h-[90vh] bg-bg-primary stitch-glass border border-border-subtle rounded-[2.5rem] shadow-[0_50px_100px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col animate-in zoom-in-95 duration-500">
@@ -41,7 +41,7 @@ export default function CandidateComparisonModal({ isOpen, onClose }) {
 
                 {/* Header */}
                 <div className="relative z-10 p-6 border-b border-border-subtle flex items-center justify-between bg-bg-secondary/40 backdrop-blur-sm">
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3">
                         <div className="w-12 h-12 rounded-2xl bg-violet-500/20 flex items-center justify-center border border-violet-500/30">
                             <Sparkles className="w-6 h-6 text-violet-400" />
                         </div>
@@ -50,10 +50,10 @@ export default function CandidateComparisonModal({ isOpen, onClose }) {
                             <p className="text-[10px] font-black text-text-muted uppercase tracking-widest opacity-60">Seçilen {selectedCandidates.length} aday için yan yana değerlendirme</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                         <button
                             onClick={clearCompareSelection}
-                            className="px-4 py-2 text-[11px] font-black text-text-muted hover:text-red-400 transition-colors uppercase tracking-widest"
+                            className="px-4 py-2 text-[10px] font-black text-text-muted hover:text-red-400 transition-colors uppercase tracking-widest"
                         >
                             Seçimi Temizle
                         </button>
@@ -73,7 +73,7 @@ export default function CandidateComparisonModal({ isOpen, onClose }) {
                             <div key={candidate.id} className={`flex flex-col gap-8 px-6 pb-12 ${idx !== selectedCandidates.length - 1 ? 'border-r border-border-subtle/30' : ''}`}>
 
                                 {/* 1. Profil Info */}
-                                <div className="flex flex-col items-center text-center gap-4">
+                                <div className="flex flex-col items-center text-center gap-3">
                                     <div className="relative">
                                         <div className="w-24 h-24 rounded-[2.5rem] bg-gradient-to-br from-violet-600 to-indigo-600 p-0.5 shadow-2xl">
                                             <div className="w-full h-full rounded-[2.4rem] bg-bg-primary flex items-center justify-center">
@@ -101,7 +101,7 @@ export default function CandidateComparisonModal({ isOpen, onClose }) {
                                         </div>
                                         <h4 className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em]">Yönetici Özeti</h4>
                                     </div>
-                                    <div className="p-5 rounded-3xl bg-violet-500/[0.03] border border-violet-500/10 group-hover:border-violet-500/30 transition-all min-h-[140px]">
+                                    <div className="p-3.5 rounded-3xl bg-violet-500/[0.03] border border-violet-500/10 group-hover:border-violet-500/30 transition-all min-h-[140px]">
                                         <p className="text-sm text-text-secondary leading-relaxed font-medium italic">
                                             {candidate.aiAnalysis?.summary || candidate.summary || "AI analizi henüz gerçekleştirilmemiş."}
                                         </p>
@@ -131,15 +131,15 @@ export default function CandidateComparisonModal({ isOpen, onClose }) {
                                 </div>
 
                                 {/* 4. Experience & Education Stats */}
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/10 flex flex-col gap-1">
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div className="p-3 rounded-2xl bg-indigo-500/5 border border-indigo-500/10 flex flex-col gap-1">
                                         <div className="flex items-center gap-1.5 text-text-muted opacity-60">
                                             <Briefcase className="w-3.5 h-3.5" />
                                             <span className="text-[9px] font-black uppercase tracking-widest">Tecrübe</span>
                                         </div>
                                         <p className="text-sm font-black text-text-primary uppercase">{candidate.experience || '0'} YIL</p>
                                     </div>
-                                    <div className="p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 flex flex-col gap-1">
+                                    <div className="p-3 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 flex flex-col gap-1">
                                         <div className="flex items-center gap-1.5 text-text-muted opacity-60">
                                             <GraduationCap className="w-3.5 h-3.5" />
                                             <span className="text-[9px] font-black uppercase tracking-widest">Eğitim</span>
@@ -201,7 +201,7 @@ export default function CandidateComparisonModal({ isOpen, onClose }) {
                                 <div className="flex flex-col md:flex-row gap-12">
                                     {/* Left: Global Summary */}
                                     <div className="md:w-1/3 space-y-6">
-                                        <div className="flex items-center gap-3">
+                                        <div className="flex items-center gap-2">
                                             <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 flex items-center justify-center">
                                                 <Sparkles className="w-6 h-6 text-emerald-400" />
                                             </div>
@@ -221,32 +221,32 @@ export default function CandidateComparisonModal({ isOpen, onClose }) {
                                     {/* Right: Insights Grid */}
                                     <div className="md:w-2/3 space-y-6">
                                         <h4 className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] px-2">Aday Bazlı İçgörüler</h4>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                             {analysisResult.candidatesInsights.map((insight, iIdx) => (
-                                                <div key={iIdx} className="p-5 rounded-[2rem] bg-bg-primary border border-border-subtle hover:border-violet-500/30 transition-all shadow-sm group">
+                                                <div key={iIdx} className="p-3.5 rounded-[2rem] bg-bg-primary border border-border-subtle hover:border-violet-500/30 transition-all shadow-sm group">
                                                     <div className="flex items-center justify-between mb-4">
                                                         <span className="text-sm font-black text-text-primary uppercase tracking-tight">{insight.name}</span>
                                                         <span className="text-[10px] font-black px-2 py-0.5 rounded-lg bg-violet-500/10 text-violet-400 border border-violet-500/20">%{insight.fitScore} Uyum</span>
                                                     </div>
                                                     <div className="space-y-4">
-                                                        <div className="flex gap-3">
+                                                        <div className="flex gap-2">
                                                             <div className="pt-1"><CheckCircle className="w-3.5 h-3.5 text-emerald-500" /></div>
-                                                            <p className="text-[11px] font-bold text-text-secondary leading-snug">{insight.strength}</p>
+                                                            <p className="text-[10px] font-bold text-text-secondary leading-snug">{insight.strength}</p>
                                                         </div>
-                                                        <div className="flex gap-3">
+                                                        <div className="flex gap-2">
                                                             <div className="pt-1"><AlertCircle className="w-3.5 h-3.5 text-amber-500" /></div>
-                                                            <p className="text-[11px] font-bold text-text-muted leading-snug">{insight.weakness}</p>
+                                                            <p className="text-[10px] font-bold text-text-muted leading-snug">{insight.weakness}</p>
                                                         </div>
                                                     </div>
                                                 </div>
                                             ))}
                                         </div>
                                         <div className="p-6 rounded-[2rem] bg-violet-600/10 border border-violet-500/20">
-                                            <div className="flex items-center gap-3 mb-2">
+                                            <div className="flex items-center gap-2 mb-2">
                                                 <TrendingUp className="w-4 h-4 text-violet-400" />
                                                 <p className="text-[10px] font-black text-violet-400 uppercase tracking-widest">Stratejik Tavsiye</p>
                                             </div>
-                                            <p className="text-[13px] font-bold text-text-primary leading-relaxed opacity-90">{analysisResult.recruitingAdvice}</p>
+                                            <p className="text-[12px] font-bold text-text-primary leading-relaxed opacity-90">{analysisResult.recruitingAdvice}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -258,7 +258,7 @@ export default function CandidateComparisonModal({ isOpen, onClose }) {
                 {/* Footer Actions */}
                 <div className="relative z-10 p-6 border-t border-border-subtle bg-bg-secondary/40 backdrop-blur-sm flex items-center justify-center gap-6">
                     <button
-                        className="px-8 py-4 rounded-2xl bg-bg-primary border border-border-subtle text-text-muted text-[13px] font-black uppercase tracking-widest hover:border-violet-500 hover:text-violet-500 transition-all shadow-sm"
+                        className="px-8 py-3 rounded-2xl bg-bg-primary border border-border-subtle text-text-muted text-[13px] font-black uppercase tracking-widest hover:border-violet-500 hover:text-violet-500 transition-all shadow-sm"
                         onClick={clearCompareSelection}
                     >
                         Tümünü Temizle
@@ -266,7 +266,7 @@ export default function CandidateComparisonModal({ isOpen, onClose }) {
                     <button
                         disabled={isAnalyzing}
                         onClick={handleAIAnalysis}
-                        className={`px-12 py-4 rounded-2xl bg-violet-600 text-white text-[13px] font-black uppercase tracking-[0.2em] shadow-xl shadow-violet-500/20 hover:scale-105 transition-all flex items-center gap-3 ${isAnalyzing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        className={`px-12 py-3 rounded-2xl bg-violet-600 text-white text-[13px] font-black uppercase tracking-[0.2em] shadow-xl shadow-violet-500/20 hover:scale-105 transition-all flex items-center gap-2 ${isAnalyzing ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                         {isAnalyzing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Brain className="w-5 h-5" />}
                         {analysisResult ? 'ANALİZİ YENİLE' : 'AI DERİN ANALİZ RAPORU OLUŞTUR'}

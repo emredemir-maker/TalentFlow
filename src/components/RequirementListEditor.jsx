@@ -62,13 +62,13 @@ export default function RequirementListEditor({ items, onChange, title }) {
                     value={raw}
                     onChange={(e) => setRaw(e.target.value)}
                     placeholder={'İlandaki gereksinimleri buraya yapıştırın; "Maddelere ayır" tek tek puanlanabilir hâle getirir.'}
-                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[12px] text-slate-700 outline-none focus:border-cyan-400 transition-colors h-20 resize-y font-mono leading-relaxed"
+                    className="flex-1 bg-n50 border border-n200 rounded-md px-3 py-2 text-[12px] text-n700 outline-none focus:border-brand transition-colors h-20 resize-y font-mono leading-relaxed"
                 />
                 <button
                     type="button"
                     onClick={runSplit}
                     disabled={!canSplit || loading}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-white text-[10px] font-black uppercase tracking-wider transition-colors disabled:opacity-40 shrink-0"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-md bg-brand hover:bg-brand-600 text-white text-[10px] font-semibold uppercase tracking-wider transition-colors disabled:opacity-40 shrink-0"
                 >
                     {loading
                         ? <><Loader2 className="w-3 h-3 animate-spin" /> Ayrıştırılıyor…</>
@@ -77,12 +77,12 @@ export default function RequirementListEditor({ items, onChange, title }) {
             </div>
 
             {list.length === 0 ? (
-                <p className="text-[10px] text-slate-400 leading-relaxed">
+                <p className="text-[10px] text-n400 leading-relaxed">
                     Henüz madde yok. Metni yapıştırıp ayırın ya da elle ekleyin.
                 </p>
             ) : (
                 <>
-                    <p className="text-[10px] text-slate-400">
+                    <p className="text-[10px] text-n400">
                         <strong>{list.length}</strong> madde · {mustCount} zorunlu, {list.length - mustCount} tercihen.
                         Zorunlu maddeler karşılanmazsa <strong>skoru düşürür</strong>; tercihen olanlar ceza üretmez.
                     </p>
@@ -93,16 +93,16 @@ export default function RequirementListEditor({ items, onChange, title }) {
                                     value={r.text}
                                     onChange={(e) => update(i, { text: e.target.value })}
                                     placeholder="Gereksinim"
-                                    className="flex-1 min-w-0 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-[11px] text-slate-700 outline-none focus:border-cyan-400 transition-colors"
+                                    className="flex-1 min-w-0 bg-n0 border border-n200 rounded-lg px-2.5 py-1.5 text-[11px] text-n700 outline-none focus:border-brand transition-colors"
                                 />
-                                <span className="flex rounded-lg border border-slate-200 overflow-hidden shrink-0">
+                                <span className="flex rounded-lg border border-n200 overflow-hidden shrink-0">
                                     {[[true, 'Zorunlu'], [false, 'Tercihen']].map(([value, label]) => (
                                         <button
                                             key={label}
                                             type="button"
                                             onClick={() => update(i, { must: value })}
-                                            className={`px-2 py-1 text-[9px] font-black uppercase tracking-wider transition-colors ${
-                                                r.must === value ? 'bg-cyan-500 text-white' : 'bg-white text-slate-400 hover:bg-slate-50'
+                                            className={`px-2 py-1 text-[9px] font-semibold uppercase tracking-wider transition-colors ${
+                                                r.must === value ? 'bg-brand text-white' : 'bg-n0 text-n400 hover:bg-n50'
                                             }`}
                                         >
                                             {label}
@@ -113,7 +113,7 @@ export default function RequirementListEditor({ items, onChange, title }) {
                                     type="button"
                                     onClick={() => remove(i)}
                                     title="Maddeyi kaldır"
-                                    className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
+                                    className="p-1.5 rounded-lg text-n300 hover:text-bad-text hover:bg-bad-bg transition-colors shrink-0"
                                 >
                                     <Trash2 className="w-3.5 h-3.5" />
                                 </button>
@@ -126,7 +126,7 @@ export default function RequirementListEditor({ items, onChange, title }) {
             <button
                 type="button"
                 onClick={add}
-                className="flex items-center gap-1 px-2 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-[9px] font-black text-slate-500 uppercase tracking-wider transition-colors"
+                className="flex items-center gap-1 px-2 py-1 rounded-lg border border-n200 bg-n0 hover:bg-n50 text-[9px] font-semibold text-n500 uppercase tracking-wider transition-colors"
             >
                 <Plus className="w-2.5 h-2.5" /> Madde ekle
             </button>

@@ -67,6 +67,20 @@
   --color-ok: #16A26C;
   --color-ok-bg: #E6F7EF;
   --color-warn: #E8A13B;
+  /* METİN İÇİN KOYU TON KARŞILIKLARI.
+     Ölçüm: ton renginin kendi tonlu zemini üstündeki kontrastı gövde metni
+     için gereken 4.5:1'in çok altında — warn 2.01, ok 2.95, bad 3.37.
+     Canlı denetimde tek bir rozet ("Taranmadı") bu yüzden 23 kez 2.01:1
+     ile çiziliyordu. Ton rengi ZEMİN, KENARLIK ve İKON için kalıyor;
+     METİN bu koyu karşılıkları kullanıyor.
+     warn #96590A → tonlu zemin 5.16, beyaz 5.63
+     ok   #0E7A50 → 4.83 / 5.36
+     bad  #C0272C → 5.08 / 5.89
+     Hepsi hem tonlu zeminde hem beyazda AA geçen EN AÇIK tonlar; renk
+     kimliği korunsun diye daha koyusu seçilmedi. */
+  --color-warn-text: #96590A;
+  --color-ok-text: #0E7A50;
+  --color-bad-text: #C0272C;
   --color-warn-bg: #FDF4E4;
   --color-bad: #E5484D;
   --color-bad-bg: #FCEAEB;
@@ -225,4 +239,83 @@ h1, h2, h3, h4 {
   transition: background-color 120ms cubic-bezier(.2,.7,.2,1),
               border-color 120ms cubic-bezier(.2,.7,.2,1),
               color 120ms cubic-bezier(.2,.7,.2,1);
+}
+
+/* ── HAREKET AZALTMA TERCİHİ ────────────────────────────────────────────────
+ *
+ * İşletim sisteminde "hareketi azalt" seçili olan kullanıcı için animasyonlar
+ * durur. Bu bir tercih değil, erişilebilirlik gereği: vestibüler duyarlılığı
+ * olan kişilerde kayan/ölçeklenen hareket baş dönmesi ve mide bulantısı
+ * yapabiliyor.
+ *
+ * NEDEN GLOBAL: uygulamada 65 dosya geçiş/animasyon kullanıyor ve hiçbirinde
+ * bu denetim yoktu. Tek tek eklemek, 66'ncısı yazıldığında yine unutulur.
+ *
+ * Sıfır yerine 0.01ms: bazı tarayıcılarda süre tam sıfır olduğunda
+ * `transitionend` olayı hiç ateşlemiyor ve o olayı bekleyen kod askıda
+ * kalıyor. 0.01ms göze anında görünür ama olay yine tetiklenir.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── KLAVYE ODAĞI ───────────────────────────────────────────────────────────
+ *
+ * Ölçüm: `outline-none` 114 yerde geçiyor ama 110'u yerine görünür bir
+ * karşılık koyuyor (`focus:ring-*`, `focus:border-*`). Yani sorun yaygın
+ * değil — yine de odak halkasını HİÇ tanımlamayan her denetim tarayıcının
+ * varsayılanına kalıyordu ve o halka zeminine göre zar zor seçiliyor.
+ *
+ * Bu kural ortak bir taban veriyor: marka renginde 2px, 2px boşlukla.
+ *
+ * `@layer base` İÇİNDE OLMASI KASITLI. Tailwind yardımcıları daha sonraki
+ * bir katmanda; katmansız yazılsaydı `focus:outline-none`u da EZERDİ ve
+ * kendi halkası zaten olan 110 denetimde çift gösterge çıkardı. Base
+ * katmanında yazılınca kendi çözümü olan bileşenler etkilenmiyor, yalnızca
+ * hiçbir şey söylemeyenler bu tabanı alıyor.
+ *
+ * `:focus-visible` — fare tıklamasında değil, yalnızca klavye/kalıcı odakta.
+ */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+  }
+}
+
+/* ── İSKELET (yükleme yer tutucusu) ─────────────────────────────────────────
+ *
+ * `.skeleton` sınıfı üç dosyada KULLANILIYORDU ama hiçbir yerde TANIMLI
+ * DEĞİLDİ — o yer tutucular görünmez div olarak çiziliyordu. Sınıf burada
+ * tanımlanınca üçü de kendiliğinden çalışır hâle geliyor.
+ *
+ * Neden iskelet: uzun beklemede dönen çark "bir şey oluyor" der ama NE
+ * geleceğini söylemez ve yer ayırmadığı için içerik gelince sayfa zıplar.
+ * İskelet ikisini birden çözer.
+ *
+ * Hareket azaltma tercihi ayrıca ele alınmıyor: index.css'teki global kural
+ * animasyon süresini zaten kısıyor, parıltı duruyor ve yer tutucu sabit
+ * kalıyor — yine yer ayırıyor, yalnızca hareket etmiyor.
+ */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-n100) 25%,
+    var(--color-n50) 37%,
+    var(--color-n100) 63%
+  );
+  background-size: 400% 100%;
+  animation: iskelet-parla 1.4s ease-in-out infinite;
+}
+
+@keyframes iskelet-parla {
+  from { background-position: 100% 50%; }
+  to   { background-position: 0 50%; }
 }

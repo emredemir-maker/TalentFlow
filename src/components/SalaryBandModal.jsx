@@ -84,15 +84,15 @@ export default function SalaryBandModal({ open, onClose }) {
     };
 
     return (
-        <div className="infoset fixed inset-0 z-[120] bg-ink/40 flex items-center justify-center p-4">
+        <div className="infoset fixed inset-0 z-[120] bg-ink/40 flex items-center justify-center p-3">
             <div className="bg-n0 w-full max-w-[520px] rounded-[14px] border border-n200 shadow-xl overflow-hidden">
                 <div className="h-[52px] px-[18px] flex items-center gap-2.5 border-b border-n200">
                     <div className="w-7 h-7 rounded-md bg-brand-50 text-brand flex items-center justify-center">
                         <Wallet className="w-[15px] h-[15px]" />
                     </div>
                     <div>
-                        <h2 className="text-[14px] font-semibold m-0 tracking-[-0.01em]">Maaş aralığı tanımla</h2>
-                        <span className="text-[11px] text-n400">Pozisyonun bütçe tavanı — aday beklentisi bununla kıyaslanır</span>
+                        <h2 className="text-[13px] font-semibold m-0 tracking-[-0.01em]">Maaş aralığı tanımla</h2>
+                        <span className="text-[10px] text-n400">Pozisyonun bütçe tavanı — aday beklentisi bununla kıyaslanır</span>
                     </div>
                     <button
                         onClick={onClose}
@@ -105,7 +105,7 @@ export default function SalaryBandModal({ open, onClose }) {
 
                 <div className="p-[18px] flex flex-col gap-3.5">
                     <div>
-                        <label className="text-[11px] font-semibold text-n500 tracking-[0.08em] uppercase block mb-1.5">
+                        <label className="text-[10px] font-semibold text-n500 tracking-[0.08em] uppercase block mb-1.5">
                             Pozisyon
                         </label>
                         <select
@@ -121,12 +121,12 @@ export default function SalaryBandModal({ open, onClose }) {
                             ))}
                         </select>
                         {openPositions.length === 0 && (
-                            <p className="mt-1.5 text-[11px] text-n400 m-0">
+                            <p className="mt-1.5 text-[10px] text-n400 m-0">
                                 Açık pozisyon yok — band tanımlanacak bir ilan bulunmuyor.
                             </p>
                         )}
                         {selected && (
-                            <p className="mt-1.5 text-[11px] text-n400 m-0">
+                            <p className="mt-1.5 text-[10px] text-n400 m-0">
                                 {currentBand
                                     ? <>Kayıtlı band: <strong className="text-n600 font-semibold">{currentBand}</strong></>
                                     : 'Bu pozisyonda tanımlı band yok.'}
@@ -135,7 +135,7 @@ export default function SalaryBandModal({ open, onClose }) {
                     </div>
 
                     <div>
-                        <label className="text-[11px] font-semibold text-n500 tracking-[0.08em] uppercase block mb-1.5">
+                        <label className="text-[10px] font-semibold text-n500 tracking-[0.08em] uppercase block mb-1.5">
                             Bütçe üst sınırı
                         </label>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -164,7 +164,7 @@ export default function SalaryBandModal({ open, onClose }) {
                                 {BASES.map(x => <option key={x} value={x}>{BASIS_LABEL[x]}</option>)}
                             </select>
                         </div>
-                        <p className="mt-1.5 text-[11px] text-n400 m-0">
+                        <p className="mt-1.5 text-[10px] text-n400 m-0">
                             {preview
                                 ? <>Kaydedilecek: <strong className="text-n600 font-semibold">{preview}</strong></>
                                 : 'Band girilmezse aday beklentileri bir şeyle kıyaslanamaz.'}
@@ -172,10 +172,10 @@ export default function SalaryBandModal({ open, onClose }) {
                     </div>
 
                     {error && (
-                        <div className="bg-bad-bg text-bad text-[12px] rounded-md px-3 py-2">{error}</div>
+                        <div className="bg-bad-bg text-bad-text text-[12px] rounded-md px-3 py-2">{error}</div>
                     )}
                     {saved && (
-                        <div className="bg-ok-bg text-ok text-[12px] rounded-md px-3 py-2">
+                        <div className="bg-ok-bg text-ok-text text-[12px] rounded-md px-3 py-2">
                             {selected?.title} için band kaydedildi.
                         </div>
                     )}

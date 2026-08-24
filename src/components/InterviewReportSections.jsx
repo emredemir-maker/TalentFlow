@@ -44,7 +44,7 @@ export function InterviewResultCard({ report, onReevaluate, regrading, regradeNo
         <section className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-[18px] flex flex-col gap-3.5">
             <div className="flex items-center gap-2.5">
                 <Target className="w-[15px] h-[15px] text-brand" />
-                <h3 className="text-[11px] font-semibold text-n500 tracking-[0.1em] uppercase m-0">Görüşme sonucu</h3>
+                <h3 className="text-[10px] font-semibold text-n500 tracking-[0.1em] uppercase m-0">Görüşme sonucu</h3>
                 {report.outcome && (
                     <span
                         className="ml-auto text-[11px] font-semibold px-2.5 py-[3px] rounded-full"
@@ -71,7 +71,7 @@ export function InterviewResultCard({ report, onReevaluate, regrading, regradeNo
             </div>
 
             {regradeNote && (
-                <p className="text-[12px] text-n500 leading-relaxed m-0">{regradeNote}</p>
+                <p className="text-[11px] text-n500 leading-relaxed m-0">{regradeNote}</p>
             )}
 
             {/* SAYI ÜRETİLEMEDİYSE SEBEBİ YAZILIR — 0 basılmaz. Ölçemediğini 0
@@ -80,16 +80,16 @@ export function InterviewResultCard({ report, onReevaluate, regrading, regradeNo
                 <div className="flex items-start gap-2 rounded-md bg-warn-bg px-3.5 py-3">
                     <AlertCircle className="w-4 h-4 text-warn shrink-0 mt-0.5" />
                     <div>
-                        <p className="text-[11px] font-semibold text-warn tracking-[0.08em] uppercase mb-1 m-0">
+                        <p className="text-[10px] font-semibold text-warn tracking-[0.08em] uppercase mb-1 m-0">
                             Sayısal sonuç üretilmedi
                         </p>
-                        <p className="text-[12px] text-n700 leading-relaxed m-0">
+                        <p className="text-[11px] text-n700 leading-relaxed m-0">
                             {NO_SCORE_TEXT[report.noScoreReason]}
                         </p>
                         {/* Teknik sebep gizlenmiyor: aynı hata tekrarlıyorsa
                             kullanıcı bunu bize aktarabilmeli. */}
                         {report.gradingError && (
-                            <p className="mt-1 text-[11px] text-n500 font-mono break-words m-0">
+                            <p className="mt-1 text-[10px] text-n500 font-mono break-words m-0">
                                 {report.gradingError}
                             </p>
                         )}
@@ -99,7 +99,7 @@ export function InterviewResultCard({ report, onReevaluate, regrading, regradeNo
                 <div className="flex flex-wrap items-end gap-5">
                     <div>
                         <p className="text-[44px] font-semibold text-n900 leading-none tracking-[-0.03em] m-0">%{e.score}</p>
-                        <p className="text-[11px] text-n500 mt-1 m-0">
+                        <p className="text-[10px] text-n500 mt-1 m-0">
                             Kanıt oranı · {e.asked} madde soruldu
                         </p>
                     </div>
@@ -127,7 +127,7 @@ export function InterviewResultCard({ report, onReevaluate, regrading, regradeNo
             {gate && (
                 <div className="flex items-start gap-2 rounded-md bg-bad-bg px-3.5 py-3">
                     <ShieldCheck className="w-4 h-4 text-bad shrink-0 mt-0.5" />
-                    <p className="text-[12px] text-n700 leading-relaxed m-0">
+                    <p className="text-[11px] text-n700 leading-relaxed m-0">
                         <strong className="font-semibold">{e.mustMissing} zorunlu madde</strong> odada da kapanmadı.
                         Öneri bu yüzden olumlu olamaz — nihai karar sizin.
                     </p>
@@ -137,7 +137,7 @@ export function InterviewResultCard({ report, onReevaluate, regrading, regradeNo
             {/* Karar verilemeyen madde skoru düşürmez, paydaya da girmez. */}
             {!report.noScoreReason && Number(e?.inconclusive) > 0 && (
                 <div className="bg-n50 rounded-md px-3.5 py-2.5">
-                    <p className="text-[12px] text-n700 leading-relaxed m-0">
+                    <p className="text-[11px] text-n700 leading-relaxed m-0">
                         <strong className="font-semibold">{e.inconclusive} madde</strong> için karar verilemedi (soru
                         atlandı ya da cevap konuya girmedi). Bunlar orana <strong className="font-semibold">girmiyor</strong> —
                         cevaplanmamış soruyu yanlış cevap saymıyoruz.
@@ -146,7 +146,7 @@ export function InterviewResultCard({ report, onReevaluate, regrading, regradeNo
             )}
 
             {report.legacySchema && (
-                <p className="text-[12px] text-n500 leading-relaxed border-t border-n100 pt-3 m-0">
+                <p className="text-[11px] text-n500 leading-relaxed border-t border-n100 pt-3 m-0">
                     Bu kayıt <strong className="font-semibold">eski ölçüyle</strong> üretildi: sayıyı model veriyordu
                     ve neye göre verdiği tanımlı değildi. Yeni kayıtlarla aynı listede kıyaslamayın.
                 </p>
@@ -161,14 +161,14 @@ export function RequirementVerdicts({ report }) {
 
     return (
         <section className="flex flex-col gap-2.5">
-            <h3 className="text-[11px] font-semibold text-n500 tracking-[0.1em] uppercase px-0.5 m-0">
+            <h3 className="text-[10px] font-semibold text-n500 tracking-[0.1em] uppercase px-0.5 m-0">
                 Madde bazlı değerlendirme
             </h3>
 
             {report.requirementsStale && (
                 <div className="flex items-start gap-2 rounded-md bg-warn-bg px-3.5 py-3">
                     <AlertCircle className="w-4 h-4 text-warn shrink-0 mt-0.5" />
-                    <p className="text-[12px] text-n700 leading-relaxed m-0">
+                    <p className="text-[11px] text-n700 leading-relaxed m-0">
                         İlan bu görüşmeden sonra değişti; madde metinleri gösterilmiyor. Damgalar eski listeye ait
                         ve yeni numaralara dizilirse cevaplar <strong className="font-semibold">yanlış maddelere</strong> yazılır.
                     </p>
@@ -189,9 +189,9 @@ export function RequirementVerdicts({ report }) {
                             </div>
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-[7px] flex-wrap">
-                                    <span className="text-[11px] font-semibold text-n400">M{item.requirementIndex}</span>
+                                    <span className="text-[10px] font-semibold text-n400">M{item.requirementIndex}</span>
                                     {item.must && (
-                                        <span className="text-[11px] font-semibold px-1.5 rounded bg-bad-bg text-bad">
+                                        <span className="text-[11px] font-semibold px-1.5 rounded bg-bad-bg text-bad-text">
                                             zorunlu
                                         </span>
                                     )}
@@ -202,7 +202,7 @@ export function RequirementVerdicts({ report }) {
                                         {VERDICT_LABEL[item.verdict] || item.verdict}
                                     </span>
                                 </div>
-                                <p className="text-[13px] font-semibold text-n900 mt-1 leading-snug m-0">
+                                <p className="text-[12px] font-semibold text-n900 mt-1 leading-snug m-0">
                                     {item.text || (
                                         <span className="text-n400 font-normal">
                                             madde metni gösterilemiyor — ilan değişmiş
@@ -215,19 +215,19 @@ export function RequirementVerdicts({ report }) {
                         {/* Damganın hesabını veren alıntı — adayın kendi sözü. */}
                         {item.quote && (
                             <div className="ml-[38px] mt-2.5 pl-2.5 border-l-2 border-brand-100">
-                                <p className="text-[12px] text-n700 leading-relaxed m-0">{item.quote}</p>
+                                <p className="text-[11px] text-n700 leading-relaxed m-0">{item.quote}</p>
                             </div>
                         )}
                         {item.question && (
                             <div className="ml-[38px] mt-2.5">
-                                <p className="text-[11px] font-semibold text-n400 m-0">S: {item.question}</p>
+                                <p className="text-[10px] font-semibold text-n400 m-0">S: {item.question}</p>
                                 {item.answer
-                                    ? <p className="text-[12px] text-n700 leading-relaxed mt-0.5 m-0">{item.answer}</p>
-                                    : <p className="text-[11px] text-n300 mt-0.5 m-0">cevap girilmedi</p>}
+                                    ? <p className="text-[11px] text-n700 leading-relaxed mt-0.5 m-0">{item.answer}</p>
+                                    : <p className="text-[10px] text-n300 mt-0.5 m-0">cevap girilmedi</p>}
                             </div>
                         )}
                         {item.observation && (
-                            <p className="ml-[38px] mt-2.5 pl-2.5 text-[12px] text-n600 leading-relaxed border-l-2 border-n200 m-0">
+                            <p className="ml-[38px] mt-2.5 pl-2.5 text-[11px] text-n600 leading-relaxed border-l-2 border-n200 m-0">
                                 {item.observation}
                             </p>
                         )}
@@ -249,32 +249,32 @@ export function InterviewNarrative({ report }) {
                 <div className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-[18px]">
                     <div className="flex items-center gap-2.5 mb-2.5">
                         <Brain className="w-[15px] h-[15px] text-brand" />
-                        <h3 className="text-[11px] font-semibold text-n500 tracking-[0.1em] uppercase m-0">Görüşme özeti</h3>
+                        <h3 className="text-[10px] font-semibold text-n500 tracking-[0.1em] uppercase m-0">Görüşme özeti</h3>
                     </div>
                     {report.summary && (
-                        <p className="text-[14px] text-n700 leading-[1.65] m-0">{report.summary}</p>
+                        <p className="text-[13px] text-n700 leading-[1.65] m-0">{report.summary}</p>
                     )}
 
                     {(report.strengths.length > 0 || report.concerns.length > 0) && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3.5">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3.5">
                             {report.strengths.length > 0 && (
                                 <div className="bg-ok-bg rounded-[10px] p-3.5">
-                                    <div className="text-[11px] font-semibold text-ok tracking-[0.08em] uppercase mb-2">Öne çıkanlar</div>
+                                    <div className="text-[10px] font-semibold text-ok tracking-[0.08em] uppercase mb-2">Öne çıkanlar</div>
                                     {report.strengths.map((s, i) => (
                                         <div key={i} className="flex gap-[7px] mb-1.5">
                                             <span className="text-ok">•</span>
-                                            <span className="text-[12px] text-n700 leading-[1.5]">{s}</span>
+                                            <span className="text-[11px] text-n700 leading-[1.5]">{s}</span>
                                         </div>
                                     ))}
                                 </div>
                             )}
                             {report.concerns.length > 0 && (
                                 <div className="bg-warn-bg rounded-[10px] p-3.5">
-                                    <div className="text-[11px] font-semibold text-warn tracking-[0.08em] uppercase mb-2">Açık kalanlar</div>
+                                    <div className="text-[10px] font-semibold text-warn tracking-[0.08em] uppercase mb-2">Açık kalanlar</div>
                                     {report.concerns.map((c, i) => (
                                         <div key={i} className="flex gap-[7px] mb-1.5">
                                             <span className="text-warn">•</span>
-                                            <span className="text-[12px] text-n700 leading-[1.5]">{c}</span>
+                                            <span className="text-[11px] text-n700 leading-[1.5]">{c}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -287,15 +287,15 @@ export function InterviewNarrative({ report }) {
             {/* Maddeye bağlı olmayan sorular skora girmiyor ama konuşuldular;
                 yok saymak mülakatçının emeğini silmek olurdu. */}
             {report.unlinked.length > 0 && (
-                <div className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-[18px] flex flex-col gap-3">
-                    <h4 className="text-[11px] font-semibold text-n500 tracking-[0.08em] uppercase m-0">
+                <div className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-[18px] flex flex-col gap-2">
+                    <h4 className="text-[10px] font-semibold text-n500 tracking-[0.08em] uppercase m-0">
                         Diğer sorular <span className="text-n400 normal-case tracking-normal font-normal">· ilanın maddelerine bağlı değil, skora girmiyor</span>
                     </h4>
                     {report.unlinked.map((q, i) => (
                         <div key={i} className="border-l-2 border-n200 pl-2.5">
-                            <p className="text-[11px] font-semibold text-n400 m-0">S: {q.question}</p>
-                            {q.answer && <p className="text-[12px] text-n700 leading-relaxed mt-0.5 m-0">{q.answer}</p>}
-                            {q.observation && <p className="text-[12px] text-n600 leading-relaxed mt-0.5 m-0">{q.observation}</p>}
+                            <p className="text-[10px] font-semibold text-n400 m-0">S: {q.question}</p>
+                            {q.answer && <p className="text-[11px] text-n700 leading-relaxed mt-0.5 m-0">{q.answer}</p>}
+                            {q.observation && <p className="text-[11px] text-n600 leading-relaxed mt-0.5 m-0">{q.observation}</p>}
                         </div>
                     ))}
                 </div>

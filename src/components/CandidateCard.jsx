@@ -76,7 +76,7 @@ export default function CandidateCard({ candidate: rawCandidate, index = 0, onCl
                     onClick?.(rawCandidate);
                 }
             }}
-            className={`stitch-card group p-4 cursor-pointer transition-all duration-500 relative flex flex-col h-full
+            className={`stitch-card group p-3 cursor-pointer transition-all duration-500 relative flex flex-col h-full
             ${isSelected ? 'border-electric shadow-[0_0_20px_rgba(59,130,246,0.3)] scale-[1.01]' : 'hover:-translate-y-1'}`}
             style={{
                 borderLeft: !isSelected ? `3px solid ${scColor}` : undefined,
@@ -106,7 +106,7 @@ export default function CandidateCard({ candidate: rawCandidate, index = 0, onCl
 
             {/* Top Section */}
             <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3 min-w-0">
+                <div className="flex items-center gap-2 min-w-0">
                     <CandidateAvatar
                         name={candidate.name}
                         photo={candidate.photo}
@@ -117,7 +117,7 @@ export default function CandidateCard({ candidate: rawCandidate, index = 0, onCl
                         className="shadow-md"
                     />
                     <div className="min-w-0 flex-1">
-                        <h3 className="text-[13px] font-black text-text-primary uppercase tracking-tight group-hover:text-cyan-400 transition-colors leading-tight break-words line-clamp-2">
+                        <h3 className="text-[12px] font-black text-text-primary uppercase tracking-tight group-hover:text-cyan-400 transition-colors leading-tight break-words line-clamp-2">
                             {candidate.name}
                         </h3>
                         <p className="text-[9px] font-black text-text-muted opacity-60 uppercase tracking-widest mt-0.5 truncate">{candidate.position}</p>
@@ -217,12 +217,12 @@ export default function CandidateCard({ candidate: rawCandidate, index = 0, onCl
 
             {/* AI Insight Highlight */}
             {(candidate.aiAnalysis?.summary || candidate.summary) && (
-                <div className="mb-6 p-4 rounded-2xl bg-electric/5 border border-border-subtle relative overflow-hidden group/insight hover:bg-electric/10 transition-colors">
+                <div className="mb-6 p-3 rounded-2xl bg-electric/5 border border-border-subtle relative overflow-hidden group/insight hover:bg-electric/10 transition-colors">
                     <div className="flex items-center gap-2 mb-2">
                         <Brain className="w-4 h-4 text-electric" />
                         <span className="text-[10px] font-black text-electric-light uppercase tracking-widest">Nöral Görü</span>
                     </div>
-                    <p className="text-[12px] text-text-primary leading-relaxed line-clamp-2 italic font-medium">
+                    <p className="text-[11px] text-text-primary leading-relaxed line-clamp-2 italic font-medium">
                         "{candidate.aiAnalysis?.summary || candidate.summary}"
                     </p>
                     <div className="absolute bottom-0 right-0 p-1 opacity-20">

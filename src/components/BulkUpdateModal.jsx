@@ -83,7 +83,7 @@ export default function BulkUpdateModal({ isOpen, onClose, selectedIds, type, on
     const currentMainSource = availableSources.find(s => s.name === selectedMainSource);
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-3">
             <div className="absolute inset-0 bg-navy-950/80 backdrop-blur-xl animate-fade-in" onClick={onClose} />
 
             <div className="relative w-full max-w-lg glass rounded-[2.5rem] border border-white/10 p-8 shadow-2xl animate-scale-in overflow-hidden">
@@ -91,7 +91,7 @@ export default function BulkUpdateModal({ isOpen, onClose, selectedIds, type, on
                 <div className="absolute -top-24 -right-24 w-64 h-64 bg-indigo-600/10 rounded-full blur-[100px] -z-10" />
 
                 <div className="flex items-center justify-between mb-8">
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3">
                         <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
                             {type === 'stage' ? <Layers className="w-6 h-6 text-indigo-400" /> : <Share2 className="w-6 h-6 text-indigo-400" />}
                         </div>
@@ -111,13 +111,13 @@ export default function BulkUpdateModal({ isOpen, onClose, selectedIds, type, on
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {type === 'stage' ? (
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-2 gap-2">
                             {STAGE_OPTIONS.map(opt => (
                                 <button
                                     key={opt.value}
                                     type="button"
                                     onClick={() => setSelectedStage(opt.value)}
-                                    className={`flex items-center gap-3 p-4 rounded-2xl border transition-all text-left ${selectedStage === opt.value
+                                    className={`flex items-center gap-2 p-3 rounded-2xl border transition-all text-left ${selectedStage === opt.value
                                             ? 'bg-indigo-500/20 border-indigo-500/50 shadow-lg shadow-indigo-500/10'
                                             : 'bg-white/[0.02] border-white/5 hover:border-white/10'
                                         }`}
@@ -134,7 +134,7 @@ export default function BulkUpdateModal({ isOpen, onClose, selectedIds, type, on
                             <div className="space-y-3">
                                 <label className="text-[10px] text-navy-500 uppercase font-black tracking-widest ml-1">Ana Kaynak Seçin</label>
                                 {fetchLoading ? (
-                                    <div className="flex items-center gap-2 text-navy-500 text-xs italic p-4">
+                                    <div className="flex items-center gap-2 text-navy-500 text-xs italic p-3">
                                         <Loader2 className="w-4 h-4 animate-spin" />
                                         Kaynaklar yükleniyor...
                                     </div>
@@ -150,12 +150,12 @@ export default function BulkUpdateModal({ isOpen, onClose, selectedIds, type, on
                                                         setSelectedMainSource(s.name);
                                                         setSelectedSubSource('');
                                                     }}
-                                                    className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${selectedMainSource === s.name
+                                                    className={`flex items-center justify-between p-3 rounded-2xl border transition-all ${selectedMainSource === s.name
                                                             ? 'bg-indigo-500/10 border-indigo-500/30'
                                                             : 'bg-white/[0.02] border-white/5 hover:border-white/10'
                                                         }`}
                                                 >
-                                                    <div className="flex items-center gap-3">
+                                                    <div className="flex items-center gap-2">
                                                         <div className="w-8 h-8 rounded-xl flex items-center justify-center border border-white/5" style={{ backgroundColor: s.color + '20' }}>
                                                             <IconComp className="w-4 h-4" style={{ color: s.color }} />
                                                         </div>
@@ -192,18 +192,18 @@ export default function BulkUpdateModal({ isOpen, onClose, selectedIds, type, on
                         </div>
                     )}
 
-                    <div className="pt-4 border-t border-white/5 flex gap-3">
+                    <div className="pt-4 border-t border-white/5 flex gap-2">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="flex-1 py-4 px-6 rounded-2xl bg-white/5 border border-white/10 text-navy-300 font-bold text-xs uppercase tracking-widest hover:bg-white/10 transition-all"
+                            className="flex-1 py-3 px-6 rounded-2xl bg-white/5 border border-white/10 text-navy-300 font-bold text-xs uppercase tracking-widest hover:bg-white/10 transition-all"
                         >
                             İptal
                         </button>
                         <button
                             type="submit"
                             disabled={loading || (type === 'stage' ? !selectedStage : !selectedMainSource)}
-                            className="flex-[2] py-4 px-6 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-text-primary font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-indigo-600/20 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                            className="flex-[2] py-3 px-6 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-text-primary font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-indigo-600/20 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                         >
                             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                             Değişiklikleri Uygula
@@ -211,9 +211,9 @@ export default function BulkUpdateModal({ isOpen, onClose, selectedIds, type, on
                     </div>
                 </form>
 
-                <div className="mt-6 p-4 rounded-2xl bg-amber-500/5 border border-amber-500/10 flex items-start gap-3">
+                <div className="mt-6 p-3 rounded-2xl bg-amber-500/5 border border-amber-500/10 flex items-start gap-2">
                     <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                    <p className="text-[11px] text-amber-500/80 leading-relaxed">
+                    <p className="text-[10px] text-amber-500/80 leading-relaxed">
                         Bu işlem seçili <strong>{selectedIds.size}</strong> adayın verilerini toplu olarak güncelleyecektir. Bu işlem geri alınamaz.
                     </p>
                 </div>

@@ -11,10 +11,9 @@ import { STAGES, getStage } from '../utils/pipelineStages';
 import {
     resolveStageKey,
     cleanRoleText,
-    isDeepScanned,
     withCoherentScores,
 } from '../utils/candidateTable';
-import { calculateMatchScore } from '../services/matchService';
+import { calculateMatchScore, filterCandidatesByDomain } from '../services/matchService';
 import {
     Users,
     Target,
@@ -22,8 +21,8 @@ import {
     Star,
     Upload,
     Plus,
-    ListChecks,
-    X,
+    Calendar,
+    ArrowRight,
     SlidersHorizontal,
     ArrowUpRight,
     ArrowDownRight,
@@ -55,7 +54,7 @@ function Trend({ val, goodness }) {
     const Icon = isDown ? ArrowDownRight : ArrowUpRight;
     const isGood = typeof goodness === 'boolean' ? goodness : !isDown;
     return (
-        <span className={`inline-flex items-center gap-0.5 text-[11px] font-semibold ${isGood ? 'text-ok' : 'text-bad'}`}>
+        <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold ${isGood ? 'text-ok' : 'text-bad'}`}>
             <Icon className="w-3 h-3" />
             {val}
         </span>
@@ -109,10 +108,6 @@ function relativeTime(ms) {
     return wk === 1 ? '1 hafta önce' : `${wk} hafta önce`;
 }
 
-function daysSince(ms) {
-    if (!ms) return null;
-    return Math.floor((Date.now() - ms) / 86400000);
-}
 
 /** Bir oturum fiilen bitmiş mi? — Dashboard genelinde tek ölçüt. */
 function isSessionDone(session, effectiveStatus) {
@@ -121,26 +116,28 @@ function isSessionDone(session, effectiveStatus) {
             && (session.aiOverallScore > 0 || Boolean(session.aiSummary) || session.finalScore > 0));
 }
 
-const QUEUE_TONES = {
-    danger: { accent: '#E5484D', avatarBg: '#FCEAEB' },
-    warn: { accent: '#E8A13B', avatarBg: '#FDF4E4' },
-    brand: { accent: '#5068FF', avatarBg: '#EEF1FF' },
-    success: { accent: '#16A26C', avatarBg: '#E6F7EF' },
-};
+/**
+ * "Öne çıkan CV'ler" hangi aşamaları kapsar.
+ *
+ * Yalnızca CV'si okunmuş ama henüz görüşmeye geçmemiş adaylar: Ön Eleme ve
+ * İnceleme. Mülakat/Teklif/İşe Alındı/Reddedildi aşamasındaki bir adayı
+ * "öne çıkan CV" diye göstermek yanlış olurdu — o adayın CV'si zaten
+ * değerlendirilmiş ve bir karara bağlanmış.
+ */
+const ONE_CIKAN_ASAMALAR = ['ai_analysis', 'review'];
 
 export default function Dashboard() {
     const {
         enrichedCandidates,
         setViewCandidateId,
+        setPreselectedInterviewData,
         error,
         loading: candidatesLoading,
     } = useCandidates();
 
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-    // Havuzun aşama süzgeci ve kuyruktan elle çıkarılanlar — ikisi de yalnızca
-    // görünüm durumu, hiçbir yere yazılmıyor.
+    // Havuzun aşama süzgeci — yalnızca görünüm durumu, hiçbir yere yazılmıyor.
     const [poolFilter, setPoolFilter] = useState(null);
-    const [dismissed, setDismissed] = useState(() => new Set());
 
     const [sessionStatuses, setSessionStatuses] = useState({});
     useEffect(() => {
@@ -199,8 +196,6 @@ export default function Dashboard() {
         () => withCoherentScores(enrichedCandidates || [], openPositions, (c, p) => calculateMatchScore(c, p).score),
         [enrichedCandidates, openPositions]
     );
-
-    const candidateById = useMemo(() => new Map(candidates.map(c => [c.id, c])), [candidates]);
 
     const weeklyPlan = useMemo(() => {
         const now = new Date();
@@ -270,112 +265,59 @@ export default function Dashboard() {
     ], [candidates.length, allOpenCount, dynamicMetrics]);
 
     /**
-     * BUGÜN ÖNCE BUNLAR — kuyruğa giren her satır, o adayı oraya sokan KOŞULUN
-     * kendisidir.
+     * ÖNE ÇIKAN CV'LER — "hangi CV'ye bugün bakmalıyım?"
      *
-     * Prototip bu bloğun başlığında "AI önceliklendirdi" diyor; öyle bir
-     * mekanizma yok. Olmayan bir ölçümü varmış gibi sunmak bu projede tekrar
-     * tekrar düzelttiğimiz hata olduğu için kuyruk deterministik kurallarla
-     * kuruluyor; gerekçe metni tahmin değil, kuralın okunabilir hâli.
+     * Kuyruğun yerine geçti. Kuyruk aciliyet kuralları işletiyordu (canlı
+     * görüşme, bekleyen teklif…); bu blok ise tek bir soruya cevap veriyor:
+     * elde okunmayı hak eden en iyi CV'ler hangileri.
      *
-     * Kurallar aciliyet sırasına göre denenir ve bir aday yalnızca İLK eşleştiği
-     * kuralla kuyruğa girer — aynı kişi iki kart açmaz.
+     * İKİ SÜZGEÇ BİRLİKTE:
+     *  1) Aşama — yalnızca Ön Eleme ve İnceleme. Mülakata geçmiş, teklif
+     *     almış, işe alınmış ya da reddedilmiş bir aday burada görünmez;
+     *     onun CV'si zaten değerlendirilip karara bağlanmış.
+     *  2) Meslek alanı — aday, AÇIK ilanlardan en az biriyle alan uyumlu
+     *     olmalı. Uyum ölçüsü YENİDEN YAZILMADI: Açık İlanlar ekranının
+     *     kullandığı `filterCandidatesByDomain` her açık ilan için
+     *     çalıştırılıp sonuçlar birleştiriliyor. İkinci bir cetvel üretmek,
+     *     aynı adayın iki ekranda farklı "uyumlu" sayılmasına yol açardı.
+     *
+     * SKOR KAYNAĞI havuz tablosuyla aynı: yukarıdaki `candidates`
+     * (withCoherentScores'tan geçmiş bestScore). Burada yeniden hesaplansaydı
+     * aynı aday için Kontrol Paneli ile Adaylar tablosu farklı sayı gösterirdi.
+     *
+     * GEREKÇE UYDURULMUYOR: satır, adayı buraya sokan iki olgunun okunabilir
+     * hâli — aşaması ve eşleştiği ilan.
      */
-    const queue = useMemo(() => {
-        const out = [];
-        const seen = new Set();
-        const push = (candidate, rule) => {
-            if (!candidate || seen.has(candidate.id)) return;
-            seen.add(candidate.id);
-            out.push({
-                id: candidate.id,
-                candidate,
-                name: candidate.name || 'Aday',
-                role: cleanRoleText(candidate.position || candidate.bestTitle, 'Pozisyon atanmadı'),
-                // CV uyumu (bestScore) — combinedScore görüşme skorunu ortalamaya
-                // katıyor ve o zaman havuzdaki sayı Aday Detayı'ndaki CV Analizi ile
-                // tutmuyor. Kolon başlığı 'CV uyumu' olduğu sürece kaynak bestScore.
-                score: Math.round(Number(candidate.bestScore) || 0),
-                ...rule,
-            });
-        };
-
-        // Aynı kurala giren çok aday varsa skoru yüksek olan öne geçsin.
-        const byScore = [...candidates].sort(
-            (a, b) => (Number(b.bestScore) || 0) - (Number(a.bestScore) || 0)
+    const featuredCvs = useMemo(() => {
+        if (openPositions.length === 0) return [];
+        const incelemedekiler = candidates.filter(
+            (c) => ONE_CIKAN_ASAMALAR.includes(resolveStageKey(c.status))
         );
-        const todayStr = new Date().toISOString().split('T')[0];
+        const alanUyumlu = new Map();
+        for (const pos of openPositions) {
+            for (const c of filterCandidatesByDomain(pos, incelemedekiler)) alanUyumlu.set(c.id, c);
+        }
+        return Array.from(alanUyumlu.values())
+            .sort((a, b) => (Number(b.bestScore) || 0) - (Number(a.bestScore) || 0))
+            .slice(0, 5)
+            .map((c) => ({
+                id: c.id,
+                name: c.name || 'Aday',
+                role: cleanRoleText(c.position || c.bestTitle, 'Pozisyon atanmadı'),
+                score: Math.round(Number(c.bestScore) || 0),
+                why: `${getStage(resolveStageKey(c.status)).label} aşamasında · ${
+                    c.matchedPositionTitle
+                        ? `${c.matchedPositionTitle} ilanıyla eşleşti`
+                        : 'ilan atanmadı'
+                }`,
+            }));
+    }, [candidates, openPositions]);
 
-        // 1 — Görüşme şu anda canlı.
-        weeklyPlan.filter(s => s.status === 'live').forEach(s => {
-            push(candidateById.get(s.candidateId), {
-                why: 'Görüşme şu anda canlı.',
-                cta: 'Katıl',
-                tone: 'danger',
-                onCta: () => navigate(`/live-interview/${s.id}`),
-            });
-        });
-
-        // 2 — Görüşme bugün planlı, henüz başlamamış.
-        weeklyPlan.filter(s => s.status !== 'live' && s.date === todayStr).forEach(s => {
-            push(candidateById.get(s.candidateId), {
-                why: `Görüşme bugün ${s.time}'da.`,
-                cta: 'Görüntüle',
-                tone: 'warn',
-                onCta: () => navigate(`/live-interview/${s.id}`),
-            });
-        });
-
-        // 3 — Görüşme bitmiş ama aday hâlâ Mülakat aşamasında: rapor hazır,
-        //     aşama ilerletilmemiş.
-        byScore.forEach(c => {
-            if (resolveStageKey(c.status) !== 'interview') return;
-            const done = (c.interviewSessions || []).find(
-                s => isSessionDone(s, sessionStatuses[s.id] || s.status)
-            );
-            if (!done) return;
-            push(c, {
-                why: 'Görüşme tamamlandı, aşama ilerletilmedi.',
-                cta: 'Rapor',
-                tone: 'success',
-                onCta: () => navigate(`/interview-report/${done.id}`),
-            });
-        });
-
-        // 4 — Derin tarama bitmiş ama aday hâlâ Ön Eleme'de.
-        byScore.forEach(c => {
-            if (resolveStageKey(c.status) !== 'ai_analysis' || !isDeepScanned(c)) return;
-            push(c, {
-                why: 'Derin tarama bitti, inceleme bekliyor.',
-                cta: 'İncele',
-                tone: 'brand',
-                onCta: () => openCandidate(c.id),
-            });
-        });
-
-        // 5 — Teklif aşamasında bekleyen.
-        byScore.forEach(c => {
-            if (resolveStageKey(c.status) !== 'offer') return;
-            const d = daysSince(lastTouchMs(c));
-            push(c, {
-                why: d && d > 0
-                    ? `Teklif aşamasında, ${d} gündür güncellenmedi.`
-                    : 'Teklif aşamasında, onay bekliyor.',
-                cta: 'Onayla',
-                tone: 'warn',
-                onCta: () => openCandidate(c.id),
-            });
-        });
-
-        return out;
-    }, [candidates, weeklyPlan, candidateById, sessionStatuses, navigate, openCandidate]);
-
-    const visibleQueue = useMemo(
-        () => queue.filter(q => !dismissed.has(q.id)).slice(0, 5),
-        [queue, dismissed]
-    );
-    const queueHiddenByUser = queue.length > 0 && visibleQueue.length === 0;
-    const queuedIds = useMemo(() => new Set(visibleQueue.map(q => q.id)), [visibleQueue]);
+    /** Mülakat planlama akışı — Aday Detayı'ndaki "Mülakat planla" ile aynı zincir. */
+    const planInterview = useCallback((id) => {
+        setPreselectedInterviewData({ candidateId: id });
+        window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }));
+    }, [setPreselectedInterviewData]);
 
     /** Aşama süzgeci sayıları — havuzun kendisinden türetiliyor. */
     const stageCounts = useMemo(() => {
@@ -429,7 +371,7 @@ export default function Dashboard() {
 
     const shownRows = poolRows.slice(0, 9);
 
-    if (error) return <div className="p-10 text-[11px] font-black text-red-500 uppercase tracking-widest text-center">Sistem Hatası: Veri Senkronizasyonu Başarısız.</div>;
+    if (error) return <div className="p-10 text-[10px] font-black text-red-500 uppercase tracking-widest text-center">Sistem Hatası: Veri Senkronizasyonu Başarısız.</div>;
 
     return (
         <div className="infoset min-h-screen bg-n25">
@@ -440,7 +382,7 @@ export default function Dashboard() {
                 Paneli</h2> basıyor ve ikisi birlikte başlığı ekranda iki kez
                 gösteriyordu. */}
             <header className="h-[52px] flex items-center gap-3.5 px-[18px] border-b border-n200 bg-n0">
-                <span className="text-[13px] font-medium text-n700">
+                <span className="text-[12px] font-medium text-n700">
                     {new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'long' })}
                 </span>
                 <div className="ml-auto flex items-center gap-3.5">
@@ -456,7 +398,7 @@ export default function Dashboard() {
                                 title={`${k.label} — ${k.desc}`}
                                 className="hidden md:flex items-baseline gap-1.5 pl-3.5 border-l border-n200"
                             >
-                                <span className="text-[11px] text-n500">{k.short}</span>
+                                <span className="text-[10px] text-n500">{k.short}</span>
                                 <span className="text-[16px] font-semibold tracking-[-0.02em]">{k.value}</span>
                                 {k.change && <Trend val={k.change} goodness={k.goodness} />}
                             </div>
@@ -477,73 +419,72 @@ export default function Dashboard() {
                 </div>
             </header>
 
-            {/* BUGÜN ÖNCE BUNLAR — kural bazlı iş kuyruğu */}
-            <div className="px-[18px] py-3.5 bg-n25 border-b border-n200">
+            {/* ÖNE ÇIKAN CV'LER — aşama + meslek alanı süzgecinden geçen en iyi 5 CV */}
+            <div className="px-[18px] py-2.5 bg-n25 border-b border-n200">
                 <div className="flex items-center gap-2.5 mb-2.5 flex-wrap">
-                    <ListChecks className="w-4 h-4 text-brand" />
-                    <h2 className="m-0 text-[14px] font-semibold tracking-[-0.01em]">Bugün önce bunlar</h2>
+                    <Star className="w-4 h-4 text-brand" />
+                    <h2 className="m-0 text-[13px] font-semibold tracking-[-0.01em]">Öne çıkan CV&apos;ler</h2>
                     <span className="text-[11px] font-semibold px-2 py-0.5 bg-brand-50 text-brand rounded-full">
-                        {visibleQueue.length} iş
+                        İlk {featuredCvs.length}
                     </span>
-                    <span className="text-[12px] text-n500">aciliyet kuralına göre sıralandı</span>
-                    {dismissed.size > 0 && (
-                        <button
-                            onClick={() => setDismissed(new Set())}
-                            className="ml-auto text-[12px] font-medium text-brand hover:text-brand-600"
-                        >
-                            Kuyruğu geri al
-                        </button>
-                    )}
+                    <span className="text-[11px] text-n500">
+                        İnceleme / Ön Eleme aşamasındaki, açık ilanların alanıyla uyumlu en iyi CV&apos;ler
+                    </span>
+                    <button
+                        onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'candidates-table' }))}
+                        className="ml-auto flex items-center gap-1 text-[11px] font-semibold text-brand hover:text-brand-600"
+                    >
+                        Tümünü gör <ArrowRight className="w-3 h-3" />
+                    </button>
                 </div>
 
-                {visibleQueue.length === 0 ? (
+                {featuredCvs.length === 0 ? (
                     <div className="border border-dashed border-n300 rounded-[10px] p-[26px] text-center">
-                        <div className="text-[13px] font-semibold mb-[3px]">Kuyruk boş</div>
-                        <div className="text-[12px] text-n500">
-                            {queueHiddenByUser
-                                ? 'Bugünün işlerini kenara aldınız. "Kuyruğu geri al" ile geri getirebilirsiniz.'
-                                : 'Bekleyen bir iş yok. Yeni iş çıktığında burada belirir.'}
+                        <div className="text-[12px] font-semibold mb-[3px]">Öne çıkan CV yok</div>
+                        <div className="text-[11px] text-n500">
+                            {openPositions.length === 0
+                                ? 'Açık ilan yok — alan uyumu hesaplanamıyor.'
+                                : 'Ön Eleme / İnceleme aşamasında, açık ilanların alanıyla uyumlu aday bulunmuyor.'}
                         </div>
                     </div>
                 ) : (
                     <div className="grid gap-2.5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-                        {visibleQueue.map((q) => {
-                            const tone = QUEUE_TONES[q.tone] || QUEUE_TONES.brand;
+                        {featuredCvs.map((f) => {
+                            const tone = scoreTone(f.score);
                             return (
                                 <div
-                                    key={q.id}
-                                    style={{ borderTop: `2px solid ${tone.accent}` }}
+                                    key={f.id}
+                                    style={{ borderTop: `2px solid ${tone}` }}
                                     className="bg-n0 border border-n200 rounded-[10px] shadow-sm px-3 py-[11px] flex flex-col gap-[7px]"
                                 >
                                     <div className="flex items-center gap-2">
-                                        <div
-                                            style={{ background: tone.avatarBg, color: tone.accent }}
-                                            className="w-[26px] h-[26px] flex-none rounded-full flex items-center justify-center text-[11px] font-semibold"
-                                        >
-                                            {initialOf(q.name)}
+                                        <div className="w-[26px] h-[26px] flex-none rounded-full bg-brand-50 text-brand flex items-center justify-center text-[10px] font-semibold">
+                                            {initialOf(f.name)}
                                         </div>
                                         <div className="min-w-0 flex-1">
-                                            <div className="text-[13px] font-semibold truncate">{q.name}</div>
-                                            <div className="text-[11px] text-n400 truncate">{q.role}</div>
+                                            <div className="text-[12px] font-semibold truncate">{f.name}</div>
+                                            <div className="text-[10px] text-n400 truncate">{f.role}</div>
                                         </div>
-                                        {q.score > 0 && (
-                                            <span className="text-[13px] font-semibold" style={{ color: tone.accent }}>%{q.score}</span>
-                                        )}
+                                        {/* Skor VURGU: EMIR 1 kompaktlaştırmasında skorlar küçülmüyor. */}
+                                        <span className="text-[15px] font-semibold" style={{ color: tone }}>%{f.score}</span>
                                     </div>
-                                    <div className="text-[12px] leading-[1.4] text-n600 min-h-[34px]">{q.why}</div>
+                                    <div className="h-[3px] bg-n100 rounded-full overflow-hidden">
+                                        <div className="h-full rounded-full" style={{ width: `${Math.min(f.score, 100)}%`, background: tone }} />
+                                    </div>
+                                    <div className="text-[11px] leading-[1.4] text-n600 min-h-[31px]">{f.why}</div>
                                     <div className="flex items-center gap-1.5">
                                         <button
-                                            onClick={q.onCta}
-                                            className="flex-1 text-center text-[12px] font-semibold text-white bg-brand hover:bg-brand-600 py-1.5 rounded-md"
+                                            onClick={() => openCandidate(f.id)}
+                                            className="flex-1 text-center text-[11px] font-semibold text-white bg-brand hover:bg-brand-600 py-1.5 rounded-md"
                                         >
-                                            {q.cta}
+                                            Profili aç
                                         </button>
                                         <button
-                                            onClick={() => setDismissed(prev => new Set(prev).add(q.id))}
-                                            title="Bugünlük kenara al"
-                                            className="w-7 h-7 border border-n200 rounded-md flex items-center justify-center text-n400 hover:bg-n50"
+                                            onClick={() => planInterview(f.id)}
+                                            title="Mülakat planla"
+                                            className="w-7 h-7 border border-n200 rounded-md flex items-center justify-center text-n400 hover:bg-n50 hover:text-brand"
                                         >
-                                            <X className="w-3.5 h-3.5" />
+                                            <Calendar className="w-3.5 h-3.5" />
                                         </button>
                                     </div>
                                 </div>
@@ -559,8 +500,8 @@ export default function Dashboard() {
                 {/* SOL — ADAY HAVUZU */}
                 <div className="xl:border-r border-n200 bg-n0">
                     <div className="flex items-center gap-2.5 px-[18px] pt-2.5 flex-wrap">
-                        <h2 className="m-0 text-[13px] font-semibold">Aday havuzu</h2>
-                        <span className="text-[12px] text-n400">
+                        <h2 className="m-0 text-[12px] font-semibold">Aday havuzu</h2>
+                        <span className="text-[11px] text-n400">
                             {candidates.length} aday{poolFilter ? ` · ${poolRows.length} süzüldü` : ''}
                         </span>
                         <div className="ml-auto flex items-center gap-2">
@@ -600,7 +541,7 @@ export default function Dashboard() {
                             </button>
                         ))}
                         {poolFilter && (
-                            <button onClick={() => setPoolFilter(null)} className="flex-none text-[12px] font-medium text-brand">Temizle</button>
+                            <button onClick={() => setPoolFilter(null)} className="flex-none text-[11px] font-medium text-brand">Temizle</button>
                         )}
                         <button
                             onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'candidates-table' }))}
@@ -610,7 +551,7 @@ export default function Dashboard() {
                         </button>
                     </div>
 
-                    <div className="hidden md:grid grid-cols-[1.6fr_1.3fr_96px_88px_96px_84px] px-[18px] py-2 border-b border-n200 bg-n50 text-[11px] font-semibold text-n500">
+                    <div className="hidden md:grid grid-cols-[1.6fr_1.3fr_96px_88px_96px_84px] px-[18px] py-2 border-b border-n200 bg-n50 text-[10px] font-semibold text-n500">
                         <span>Aday</span>
                         <span>Pozisyon</span>
                         <span className="text-right pr-3.5">CV uyumu</span>
@@ -628,7 +569,7 @@ export default function Dashboard() {
                             </div>
                         ))
                     ) : shownRows.length === 0 ? (
-                        <div className="px-[18px] py-12 text-center text-[12px] text-n400">
+                        <div className="px-[18px] py-12 text-center text-[11px] text-n400">
                             {poolFilter ? 'Bu aşamada aday yok.' : 'Havuzda aday yok.'}
                         </div>
                     ) : shownRows.map((r) => {
@@ -638,20 +579,17 @@ export default function Dashboard() {
                             <div
                                 key={r.id}
                                 onClick={() => openCandidate(r.id)}
-                                className={`grid grid-cols-[1fr_84px] md:grid-cols-[1.6fr_1.3fr_96px_88px_96px_84px] items-center px-[18px] py-[9px] border-b border-n100 text-[13px] cursor-pointer hover:bg-n50 ${queuedIds.has(r.id) ? 'bg-brand-50/40' : ''}`}
+                                className={`grid grid-cols-[1fr_84px] md:grid-cols-[1.6fr_1.3fr_96px_88px_96px_84px] items-center px-[18px] py-[9px] border-b border-n100 text-[12px] cursor-pointer hover:bg-n50`}
                             >
                                 <div className="flex items-center gap-2.5 min-w-0">
-                                    <div className="w-[26px] h-[26px] flex-none rounded-full bg-brand-50 text-brand flex items-center justify-center text-[11px] font-semibold">
+                                    <div className="w-[26px] h-[26px] flex-none rounded-full bg-brand-50 text-brand flex items-center justify-center text-[10px] font-semibold">
                                         {initialOf(r.name)}
                                     </div>
                                     <div className="min-w-0">
-                                        <div className="font-medium flex items-center gap-1.5">
+                                        <div className="font-medium">
                                             <span className="truncate">{r.name}</span>
-                                            {queuedIds.has(r.id) && (
-                                                <span className="flex-none text-[11px] font-semibold text-brand bg-brand-50 px-1.5 rounded-full">kuyrukta</span>
-                                            )}
                                         </div>
-                                        <div className="text-[11px] text-n400 truncate">{r.city}</div>
+                                        <div className="text-[10px] text-n400 truncate">{r.city}</div>
                                     </div>
                                 </div>
                                 <div className="hidden md:block min-w-0 text-n600 truncate">{r.role}</div>
@@ -669,10 +607,10 @@ export default function Dashboard() {
                                         {r.stage.label}
                                     </span>
                                 </div>
-                                <div className="hidden md:block text-[11px] text-n500">{r.last}</div>
+                                <div className="hidden md:block text-[10px] text-n500">{r.last}</div>
                                 <button
                                     onClick={(e) => { e.stopPropagation(); action.onClick(); }}
-                                    className="text-right text-[12px] font-medium text-brand hover:text-brand-600"
+                                    className="text-right text-[11px] font-medium text-brand hover:text-brand-600"
                                 >
                                     {action.label}
                                 </button>
@@ -680,7 +618,7 @@ export default function Dashboard() {
                         );
                     })}
 
-                    <div className="px-[18px] py-2.5 flex items-center gap-2.5 text-[12px] text-n500">
+                    <div className="px-[18px] py-2.5 flex items-center gap-2.5 text-[11px] text-n500">
                         <span>{poolRows.length} adaydan {shownRows.length} tanesi gösteriliyor</span>
                         <button
                             onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'candidates-table' }))}
@@ -692,19 +630,19 @@ export default function Dashboard() {
                 </div>
 
                 {/* SAĞ RAY — yaklaşan mülakatlar · açık pozisyonlar · sistem durumu */}
-                <div className="p-3.5 flex flex-col gap-3 bg-n25">
+                <div className="p-3.5 flex flex-col gap-2 bg-n25">
                     <div>
                         <div className="flex items-center justify-between mb-2.5">
-                            <span className="text-[11px] font-semibold text-n500 tracking-[0.08em] uppercase">Yaklaşan mülakatlar</span>
+                            <span className="text-[10px] font-semibold text-n500 tracking-[0.08em] uppercase">Yaklaşan mülakatlar</span>
                             <button
                                 onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }))}
-                                className="text-[11px] text-brand font-medium"
+                                className="text-[10px] text-brand font-medium"
                             >
                                 Tümü
                             </button>
                         </div>
                         {weeklyPlan.length === 0 ? (
-                            <div className="text-[12px] text-n400 py-3">Planlı mülakat bulunmuyor.</div>
+                            <div className="text-[11px] text-n400 py-3">Planlı mülakat bulunmuyor.</div>
                         ) : weeklyPlan.map((s) => {
                             const todayStr = new Date().toISOString().split('T')[0];
                             const isToday = s.date === todayStr;
@@ -728,10 +666,10 @@ export default function Dashboard() {
                                     }}
                                     className="w-full flex items-center gap-2.5 py-2 border-t border-n100 text-left hover:bg-n50"
                                 >
-                                    <span className="w-[38px] flex-none text-[12px] font-semibold">{s.time}</span>
+                                    <span className="w-[38px] flex-none text-[11px] font-semibold">{s.time}</span>
                                     <div className="flex-1 min-w-0">
-                                        <div className="text-[12px] font-medium truncate">{s.name}</div>
-                                        <div className="text-[11px] text-n400 truncate">
+                                        <div className="text-[11px] font-medium truncate">{s.name}</div>
+                                        <div className="text-[10px] text-n400 truncate">
                                             {s.role}
                                             {!isToday && s.date ? ` · ${new Date(s.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}` : ''}
                                         </div>
@@ -746,8 +684,8 @@ export default function Dashboard() {
 
                     <div>
                         <div className="flex items-center justify-between mb-2.5">
-                            <span className="text-[11px] font-semibold text-n500 tracking-[0.08em] uppercase">Açık pozisyonlar</span>
-                            <span className="text-[11px] text-n400">{allOpenCount} aktif</span>
+                            <span className="text-[10px] font-semibold text-n500 tracking-[0.08em] uppercase">Açık pozisyonlar</span>
+                            <span className="text-[10px] text-n400">{allOpenCount} aktif</span>
                         </div>
                         {activePositions.map((pos) => {
                             const posCount = candidates.filter(c => c.position === pos.title || c.bestTitle === pos.title).length;
@@ -763,15 +701,15 @@ export default function Dashboard() {
                                     className="w-full flex items-center gap-2.5 py-2 border-t border-n100 text-left hover:bg-n50"
                                 >
                                     <div className="flex-1 min-w-0">
-                                        <div className="text-[12px] font-medium truncate">{pos.title}</div>
-                                        <div className="text-[11px] text-n400">{posCount} aday</div>
+                                        <div className="text-[11px] font-medium truncate">{pos.title}</div>
+                                        <div className="text-[10px] text-n400">{posCount} aday</div>
                                     </div>
                                 </button>
                             );
                         })}
                         <button
                             onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'positions' }))}
-                            className="mt-2 text-[12px] font-medium text-brand hover:text-brand-600"
+                            className="mt-2 text-[11px] font-medium text-brand hover:text-brand-600"
                         >
                             Tüm pozisyonlar →
                         </button>
@@ -780,7 +718,7 @@ export default function Dashboard() {
                     <div className="h-px bg-n200" />
 
                     <div>
-                        <div className="text-[11px] font-semibold text-n500 tracking-[0.08em] uppercase mb-2.5">Sistem durumu</div>
+                        <div className="text-[10px] font-semibold text-n500 tracking-[0.08em] uppercase mb-2.5">Sistem durumu</div>
                         {[
                             { label: 'Skorlama motoru', val: 98 },
                             { label: 'Önyargı denetimi', val: 100 },
@@ -797,8 +735,8 @@ export default function Dashboard() {
                                         <Icon className="w-[11px] h-[11px]" />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <div className="text-[12px] font-semibold">{e.label}</div>
-                                        <div className="text-[11px] leading-[1.4] text-n400">%{e.val} kullanılabilirlik</div>
+                                        <div className="text-[11px] font-semibold">{e.label}</div>
+                                        <div className="text-[10px] leading-[1.4] text-n400">%{e.val} kullanılabilirlik</div>
                                     </div>
                                 </div>
                             );

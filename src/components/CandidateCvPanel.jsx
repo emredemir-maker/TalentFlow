@@ -28,13 +28,13 @@ export default function CandidateCvPanel({ candidate }) {
 
     if (hasNoCv(candidate)) {
         return (
-            <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+            <div className="flex flex-col items-center justify-center py-16 gap-2 text-center">
                 <div className="w-14 h-14 rounded-[14px] bg-n50 border border-n200 flex items-center justify-center">
                     <FileText className="w-7 h-7 text-n300" />
                 </div>
                 <div>
-                    <p className="text-[12px] font-semibold text-n700 mb-1">CV Bulunamadı</p>
-                    <p className="text-[12px] text-n400 max-w-xs leading-relaxed">
+                    <p className="text-[11px] font-semibold text-n700 mb-1">CV Bulunamadı</p>
+                    <p className="text-[11px] text-n400 max-w-xs leading-relaxed">
                         Bu aday için ne orijinal dosya ne de çıkarılmış CV metni kayıtlı.
                     </p>
                 </div>
@@ -47,7 +47,7 @@ export default function CandidateCvPanel({ candidate }) {
             <div className="flex items-center justify-between flex-wrap gap-2 pb-2 border-b border-n200">
                 <div className="flex items-center gap-2">
                     <div className="w-1 h-3.5 rounded-full bg-brand" />
-                    <h3 className="text-[11px] font-semibold text-n700 uppercase tracking-[0.08em]">Aday CV'si</h3>
+                    <h3 className="text-[10px] font-semibold text-n700 uppercase tracking-[0.08em]">Aday CV'si</h3>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -57,7 +57,7 @@ export default function CandidateCvPanel({ candidate }) {
                         <div className="flex items-center rounded-md border border-n200 overflow-hidden">
                             <button
                                 onClick={() => setMode('pdf')}
-                                className={`px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] transition-colors ${
+                                className={`px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] transition-colors ${
                                     mode === 'pdf' ? 'bg-brand text-white' : 'bg-n0 text-n500 hover:bg-n50'
                                 }`}
                             >
@@ -65,7 +65,7 @@ export default function CandidateCvPanel({ candidate }) {
                             </button>
                             <button
                                 onClick={() => setMode('form')}
-                                className={`px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] transition-colors ${
+                                className={`px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] transition-colors ${
                                     mode === 'form' ? 'bg-brand text-white' : 'bg-n0 text-n500 hover:bg-n50'
                                 }`}
                             >
@@ -101,7 +101,7 @@ export default function CandidateCvPanel({ candidate }) {
             {hasFile && !embeddable && (
                 <div className="flex items-start gap-2 bg-warn-bg rounded-md px-3 py-2">
                     <AlertCircle className="w-3.5 h-3.5 text-warn shrink-0 mt-0.5" />
-                    <p className="text-[12px] text-warn leading-relaxed">
+                    <p className="text-[11px] text-warn leading-relaxed">
                         Orijinal dosya PDF olmadığı için tarayıcıda gösterilemiyor. Yukarıdaki
                         <strong> İndir </strong> bağlantısını kullanabilirsiniz; aşağıda CV'nin metin hâli var.
                     </p>
@@ -136,8 +136,8 @@ function CvForm({ candidate, cvText }) {
                     <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5">
                         {fields.map((f) => (
                             <div key={f.label} className="flex flex-col gap-0.5">
-                                <dt className="text-[11px] font-semibold text-n400 uppercase tracking-[0.08em]">{f.label}</dt>
-                                <dd className="text-[12px] font-medium text-n700 break-words">{f.value}</dd>
+                                <dt className="text-[10px] font-semibold text-n400 uppercase tracking-[0.08em]">{f.label}</dt>
+                                <dd className="text-[11px] font-medium text-n700 break-words">{f.value}</dd>
                             </div>
                         ))}
                     </dl>
@@ -167,8 +167,8 @@ function CvForm({ candidate, cvText }) {
                                 <div className="absolute -left-[5px] top-1 w-2.5 h-2.5 rounded-full bg-n0 border-2 border-brand shadow-sm" />
                                 <div className="flex justify-between items-start mb-1 flex-wrap gap-1">
                                     <div>
-                                        {exp.role && <h4 className="text-[13px] font-semibold text-n900">{exp.role}</h4>}
-                                        {exp.company && <p className="text-[12px] font-semibold text-n500 uppercase">{exp.company}</p>}
+                                        {exp.role && <h4 className="text-[12px] font-semibold text-n900">{exp.role}</h4>}
+                                        {exp.company && <p className="text-[11px] font-semibold text-n500 uppercase">{exp.company}</p>}
                                     </div>
                                     {exp.duration && (
                                         <span className="text-[11px] font-semibold text-n400 bg-n100 px-2 py-0.5 rounded-md border border-n200 shrink-0">
@@ -177,7 +177,7 @@ function CvForm({ candidate, cvText }) {
                                     )}
                                 </div>
                                 {exp.desc && (
-                                    <p className="text-[12px] text-n500 leading-relaxed bg-n50 p-2 rounded-md border border-n200">
+                                    <p className="text-[11px] text-n500 leading-relaxed bg-n50 p-2 rounded-md border border-n200">
                                         {exp.desc}
                                     </p>
                                 )}
@@ -186,7 +186,7 @@ function CvForm({ candidate, cvText }) {
                                         {exp.milestones.map((m, idx) => (
                                             <span
                                                 key={idx}
-                                                className="px-2 py-0.5 bg-ok-bg text-ok text-[11px] font-semibold rounded-md border border-transparent"
+                                                className="px-2 py-0.5 bg-ok-bg text-ok-text text-[11px] font-semibold rounded-md border border-transparent"
                                             >
                                                 {m}
                                             </span>
@@ -203,8 +203,8 @@ function CvForm({ candidate, cvText }) {
                 <Section icon={<AlignLeft className="w-3.5 h-3.5 text-brand" />} title="CV Metninin Tamamı">
                     {/* whitespace-pre-wrap: CV metni satır sonlarıyla anlam taşıyor;
                         tek paragrafa çökerse okunmaz hâle geliyor. */}
-                    <div className="max-h-[60vh] overflow-y-auto rounded-md border border-n200 bg-n50 p-4">
-                        <p className="text-[12px] text-n600 leading-relaxed whitespace-pre-wrap break-words">
+                    <div className="max-h-[60vh] overflow-y-auto rounded-md border border-n200 bg-n50 p-3">
+                        <p className="text-[11px] text-n600 leading-relaxed whitespace-pre-wrap break-words">
                             {cvText}
                         </p>
                     </div>
@@ -221,7 +221,7 @@ function Section({ icon, title, children }) {
         <div className="space-y-3">
             <div className="flex items-center gap-2 pb-2 border-b border-n200">
                 {icon}
-                <h4 className="text-[11px] font-semibold text-n700 uppercase tracking-[0.08em]">{title}</h4>
+                <h4 className="text-[10px] font-semibold text-n700 uppercase tracking-[0.08em]">{title}</h4>
             </div>
             {children}
         </div>

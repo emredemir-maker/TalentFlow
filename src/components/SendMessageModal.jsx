@@ -223,7 +223,7 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
     return (
         <>
             <div className="fixed inset-0 bg-bg-primary/80 backdrop-blur-md z-[80] animate-fade-in" onClick={onClose} />
-            <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 pointer-events-none">
+            <div className="fixed inset-0 z-[90] flex items-center justify-center p-3 pointer-events-none">
                 <div className="bg-bg-secondary border border-border-subtle rounded-[32px] shadow-[0_32px_128px_rgba(0,0,0,0.4)] w-full max-w-2xl max-h-[90vh] flex flex-col pointer-events-auto animate-fade-in-up overflow-hidden relative">
 
                     {/* Decorative Blobs */}
@@ -233,7 +233,7 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
                     {/* HEADER */}
                     <div className="p-8 pb-4">
                         <div className="flex items-center justify-between mb-6">
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-3">
                                 <div className="w-12 h-12 rounded-2xl bg-electric/10 border border-electric/20 flex items-center justify-center">
                                     <Mail className="w-6 h-6 text-electric" />
                                 </div>
@@ -248,7 +248,7 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
                         </div>
 
                         {/* CANDIDATE STRIP */}
-                        <div className="flex items-center gap-4 p-4 rounded-3xl bg-bg-primary border border-border-subtle backdrop-blur-xl shadow-inner">
+                        <div className="flex items-center gap-3 p-3 rounded-3xl bg-bg-primary border border-border-subtle backdrop-blur-xl shadow-inner">
                             <div className="w-12 h-12 rounded-full bg-gradient-to-br from-electric to-blue-600 flex items-center justify-center text-lg font-bold text-text-primary shadow-xl shadow-electric/10 shrink-0">
                                 {candidate.name?.[0].toUpperCase()}
                             </div>
@@ -281,7 +281,7 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
                                     key={t.id}
                                     onClick={() => generateDM(t.id)}
                                     disabled={generating}
-                                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-tight transition-all duration-300 ${purpose === t.id ? 'bg-bg-secondary text-text-primary shadow-lg border border-border-subtle' : 'text-text-muted hover:text-text-primary hover:bg-bg-secondary/40'}`}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-tight transition-all duration-300 ${purpose === t.id ? 'bg-bg-secondary text-text-primary shadow-lg border border-border-subtle' : 'text-text-muted hover:text-text-primary hover:bg-bg-secondary/40'}`}
                                 >
                                     <t.icon className="w-3.5 h-3.5" /> {t.label}
                                 </button>
@@ -314,7 +314,7 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
                                                 <h5 className="text-[10px] font-black text-cyan-500 uppercase tracking-[0.2em]">Flow Config</h5>
                                                 <p className="text-[9px] text-text-muted font-black italic opacity-60">Automation Preferences</p>
                                             </div>
-                                            <div className="flex items-center gap-4">
+                                            <div className="flex items-center gap-3">
                                                 <div className="flex flex-col items-end gap-1.5">
                                                     <span className="text-[9px] text-text-primary font-black uppercase tracking-tighter">Sync Calendar</span>
                                                     <button onClick={() => setSyncToCalendar(!syncToCalendar)} className={`w-8 h-4 rounded-full transition-colors relative shadow-inner ${syncToCalendar ? 'bg-emerald-500' : 'bg-bg-secondary border border-border-subtle'}`}>
@@ -330,7 +330,7 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
                                             </div>
                                         </div>
 
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                             <div className="space-y-2 group/date">
                                                 <label className="text-[9px] text-text-muted font-black uppercase tracking-[0.1em] ml-1 flex items-center gap-1.5 opacity-70">
                                                     <Calendar className="w-3 h-3" /> Date
@@ -400,7 +400,7 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
                                         {generating ? <RefreshCcw className="w-3.5 h-3.5 text-cyan-500 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 text-cyan-500" />}
                                         <span className="text-[10px] font-black text-text-primary uppercase tracking-widest">{generating ? 'AI Generating...' : 'Message Script'}</span>
                                     </div>
-                                    <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-2">
                                         {purpose === 'interview' && (
                                             <button
                                                 onClick={() => {
@@ -432,22 +432,22 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
                                                 value={messageContent}
                                                 onChange={(e) => setMessageContent(e.target.value)}
                                                 rows={8}
-                                                className="w-full bg-bg-primary border border-border-subtle rounded-3xl py-4 px-5 text-sm text-text-secondary outline-none focus:border-cyan-500/40 leading-relaxed custom-scrollbar shadow-inner font-bold"
+                                                className="w-full bg-bg-primary border border-border-subtle rounded-3xl py-3 px-5 text-sm text-text-secondary outline-none focus:border-cyan-500/40 leading-relaxed custom-scrollbar shadow-inner font-bold"
                                                 placeholder="Message content..."
                                             />
                                         </div>
                                     ) : (
                                         <div className="p-6 rounded-[32px] bg-bg-primary border border-border-subtle hover:border-cyan-500/20 transition-all cursor-text shadow-inner group" onClick={() => setIsEditing(true)}>
                                             <div className="text-[10px] text-text-muted font-black uppercase mb-3 opacity-60">Subject: <span className="text-text-primary opacity-100">{messageSubject}</span></div>
-                                            <p className="text-[13px] text-text-secondary leading-relaxed whitespace-pre-wrap font-bold">{messageContent}</p>
+                                            <p className="text-[12px] text-text-secondary leading-relaxed whitespace-pre-wrap font-bold">{messageContent}</p>
                                         </div>
                                     )}
                                 </div>
                             </div>
 
                             {error && (
-                                <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 flex flex-col gap-3 animate-shake">
-                                    <div className="flex items-start gap-3">
+                                <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 flex flex-col gap-2 animate-shake">
+                                    <div className="flex items-start gap-2">
                                         <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
                                         <p className="text-xs text-red-400 font-medium">{error}</p>
                                     </div>
@@ -472,7 +472,7 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
                             <button
                                 onClick={handleDirectSend}
                                 disabled={sending || generating || (!sendCandidateEmail && purpose !== 'interview') || (purpose === 'interview' && !syncToCalendar && !sendCandidateEmail) || (purpose === 'interview' && (syncToCalendar || sendCandidateEmail) && (!interviewDate || !interviewTime))}
-                                className={`w-full py-4 rounded-[20px] bg-gradient-to-r ${sendCandidateEmail ? 'from-cyan-500 to-blue-600 shadow-cyan-500/20' : 'from-emerald-500 to-teal-600 shadow-emerald-500/20'} font-black text-sm text-text-primary shadow-2xl hover:translate-y-[-2px] active:translate-y-0 transition-all duration-300 flex items-center justify-center gap-3 disabled:opacity-50 disabled:translate-y-0 group relative overflow-hidden`}
+                                className={`w-full py-3 rounded-[20px] bg-gradient-to-r ${sendCandidateEmail ? 'from-cyan-500 to-blue-600 shadow-cyan-500/20' : 'from-emerald-500 to-teal-600 shadow-emerald-500/20'} font-black text-sm text-text-primary shadow-2xl hover:translate-y-[-2px] active:translate-y-0 transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:translate-y-0 group relative overflow-hidden`}
                             >
                                 <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
                                 {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : sendCandidateEmail ? <Send className="w-5 h-5" /> : <Calendar className="w-5 h-5" />}
@@ -482,16 +482,16 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
                                 }
                             </button>
                         ) : (
-                            <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/10 flex items-center justify-between">
-                                <div className="flex items-center gap-3">
+                            <div className="p-3 rounded-2xl bg-amber-500/5 border border-amber-500/10 flex items-center justify-between">
+                                <div className="flex items-center gap-2">
                                     <Globe className="w-5 h-5 text-amber-500/60" />
-                                    <div className="text-[11px] text-amber-500/80 font-bold uppercase">Google Hesabı Bağlı Değil</div>
+                                    <div className="text-[10px] text-amber-500/80 font-bold uppercase">Google Hesabı Bağlı Değil</div>
                                 </div>
                                 <span className="text-[10px] text-navy-500 italic">Dışarıdan gönderim seçeneklerini kullanın</span>
                             </div>
                         )}
 
-                        <div className="grid grid-cols-3 gap-3">
+                        <div className="grid grid-cols-3 gap-2">
                             <button onClick={handleCopy} className="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl bg-bg-primary border border-border-subtle hover:bg-bg-secondary transition-all group shadow-inner">
                                 {copied ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4 text-text-muted group-hover:text-text-primary" />}
                                 <span className="text-[9px] font-black text-text-muted group-hover:text-text-primary uppercase tracking-tight">Kopyala</span>

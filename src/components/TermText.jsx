@@ -46,7 +46,7 @@ export default function TermText({ text, position }) {
 
     return (
         <>
-            <p className="text-[12px] text-slate-600 leading-relaxed">
+            <p className="text-[11px] text-slate-600 leading-relaxed">
                 {parts.map((p, i) => (p.term ? (
                     <button
                         key={i}
@@ -88,21 +88,21 @@ export default function TermText({ text, position }) {
                     </div>
 
                     {loading && !shown && (
-                        <p className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                        <p className="flex items-center gap-1.5 text-[10px] text-slate-400">
                             <Loader2 className="w-3 h-3 animate-spin" /> Bakıyorum…
                         </p>
                     )}
-                    {error && <p className="text-[11px] text-red-600">{error}</p>}
+                    {error && <p className="text-[10px] text-red-600">{error}</p>}
 
                     {shown && (
                         <>
                             {shown.meaning && (
-                                <p className="text-[11px] text-slate-700 leading-relaxed">
+                                <p className="text-[10px] text-slate-700 leading-relaxed">
                                     <strong>{open}</strong> — {shown.meaning}
                                 </p>
                             )}
                             {shown.why && (
-                                <p className="text-[11px] text-slate-600 leading-relaxed">
+                                <p className="text-[10px] text-slate-600 leading-relaxed">
                                     <span className="font-black uppercase text-[9px] text-slate-400">Bu işte: </span>
                                     {shown.why}
                                 </p>
@@ -114,7 +114,7 @@ export default function TermText({ text, position }) {
                                 </p>
                             )}
                             {!shown.meaning && !shown.why && (
-                                <p className="text-[11px] text-slate-500 italic">
+                                <p className="text-[10px] text-slate-500 italic">
                                     Bu terim için güvenilir bir açıklama üretilemedi.
                                 </p>
                             )}

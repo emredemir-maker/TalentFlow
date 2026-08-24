@@ -80,7 +80,8 @@ test.describe('Authenticated shell', () => {
     test('sidebar Mülakatlar nav switches the in-app view', async ({ page }) => {
         // Pins the in-app SPA navigation contract (changeView event +
         // renderPage switch in App.jsx). Tapping a sidebar item should
-        // swap the page chunk in without a hard reload.
+        // swap the page chunk in without a hard reload — AND write the
+        // new view to the address bar.
         await page.goto('/');
 
         // Wait for the dashboard body first so we don't race the lazy
@@ -100,9 +101,24 @@ test.describe('Authenticated shell', () => {
             { timeout: 10_000 }
         );
 
-        // URL did not change (App.jsx uses event-based view switching,
-        // not router navigation, for in-app pages).
+        // ADRES DEĞİŞMELİ.
+        //
+        // Bu satır eskiden `toBe('/')` idi: uygulama içi gezinme adres
+        // çubuğuna hiçbir şey yazmıyordu ve test bunu SÖZLEŞME olarak
+        // sabitliyordu. Sonuçları her gün yaşanıyordu — tarayıcının geri
+        // tuşu uygulama içinde çalışmıyor, hiçbir ekranın paylaşılabilir
+        // adresi yok, yenilemek Kontrol Paneli'ne döndürüyordu.
+        //
+        // Görünüm artık `location.pathname`'den türetiliyor, dolayısıyla
+        // testin sabitlediği şey de tersine döndü: adres DEĞİŞMELİ.
         const path = await page.evaluate(() => window.location.pathname);
-        expect(path).toBe('/');
+        expect(path).toBe('/mulakatlar');
+
+        // Geri tuşu uygulama içinde çalışmalı — asıl kazanç bu.
+        await page.goBack();
+        await expect(page.getByRole('heading', { name: 'Aday havuzu' })).toBeVisible({
+            timeout: 10_000,
+        });
+        expect(await page.evaluate(() => window.location.pathname)).toBe('/');
     });
 });

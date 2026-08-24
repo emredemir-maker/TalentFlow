@@ -27,7 +27,7 @@ export default function CandidateExitPage() {
                     <h1 className="text-[22px] font-black text-slate-900 tracking-tight mb-2">
                         Mülakat Tamamlandı
                     </h1>
-                    <p className="text-[13px] text-slate-500 leading-relaxed mb-8">
+                    <p className="text-[12px] text-slate-500 leading-relaxed mb-8">
                         Katılımınız için teşekkür ederiz. Görüşmeniz başarıyla sonlandırıldı. Deneyiminizi değerlendirmeniz bizim için çok değerli.
                     </p>
 
@@ -41,7 +41,7 @@ export default function CandidateExitPage() {
                                         <button
                                             key={star}
                                             onClick={() => setRating(star)}
-                                            className="transition-all duration-200 hover:scale-110 focus:outline-none"
+                                            className="transition-all duration-200 hover:scale-110"
                                         >
                                             <Star
                                                 className={`w-9 h-9 transition-colors ${
@@ -65,7 +65,7 @@ export default function CandidateExitPage() {
                                 value={feedback}
                                 onChange={e => setFeedback(e.target.value)}
                                 placeholder="Deneyiminizi kısaca paylaşın... (isteğe bağlı)"
-                                className="w-full h-24 bg-slate-50 border border-slate-200 rounded-xl p-4 text-[12px] text-slate-700 placeholder-slate-400 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-50 transition-all resize-none"
+                                className="w-full h-24 bg-slate-50 border border-slate-200 rounded-xl p-3 text-[11px] text-slate-700 placeholder-slate-400 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-50 transition-all resize-none"
                             />
 
                             {/* Submit button */}
@@ -86,8 +86,8 @@ export default function CandidateExitPage() {
                             <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center mx-auto mb-4">
                                 <CheckCircle2 className="w-6 h-6 text-emerald-500" />
                             </div>
-                            <p className="text-[13px] font-black text-slate-700 mb-1">Teşekkürler!</p>
-                            <p className="text-[11px] text-slate-400">Geri bildiriminiz başarıyla alındı.</p>
+                            <p className="text-[12px] font-black text-slate-700 mb-1">Teşekkürler!</p>
+                            <p className="text-[10px] text-slate-400">Geri bildiriminiz başarıyla alındı.</p>
                         </div>
                     )}
                 </div>

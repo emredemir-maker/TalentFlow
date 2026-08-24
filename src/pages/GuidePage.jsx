@@ -38,7 +38,7 @@ const FEATURES = [
                     {[{ l: 'Açık İlan', v: '12', c: '#3b82f6' }, { l: 'Aday', v: '48', c: '#10b981' }, { l: 'Bu Hafta', v: '5', c: '#f59e0b' }].map(k => (
                         <div key={k.l} className="bg-n0 border border-n200 rounded-md p-2.5 text-center">
                             <div className="text-lg font-semibold" style={{ color: k.c }}>{k.v}</div>
-                            <div className="text-[11px] text-n400 font-medium">{k.l}</div>
+                            <div className="text-[10px] text-n400 font-medium">{k.l}</div>
                         </div>
                     ))}
                 </div>
@@ -46,7 +46,7 @@ const FEATURES = [
                     {['Ahmet Yılmaz eklenid • 2dk', 'Yazılım Müh. mülakatı planlandı • 1s'].map((t, i) => (
                         <div key={i} className="flex items-center gap-2 bg-n50 border border-n200 rounded-md p-2">
                             <div className="w-1.5 h-1.5 rounded-full bg-brand" />
-                            <span className="text-[11px] text-n500">{t}</span>
+                            <span className="text-[10px] text-n500">{t}</span>
                         </div>
                     ))}
                 </div>
@@ -77,13 +77,13 @@ const FEATURES = [
                     { name: 'Mert A.', pos: 'Backend Dev', score: 78, status: 'Değerlendirme', sc: '#f59e0b' },
                     { name: 'Selin Y.', pos: 'UX Designer', score: 85, status: 'Yeni', sc: '#3b82f6' },
                 ].map((c, i) => (
-                    <div key={i} className="flex items-center gap-3 bg-n0 border border-n200 rounded-md p-2.5">
+                    <div key={i} className="flex items-center gap-2 bg-n0 border border-n200 rounded-md p-2.5">
                         <div className="w-8 h-8 rounded-full bg-n100 flex items-center justify-center text-xs font-semibold text-n600">
                             {c.name[0]}
                         </div>
                         <div className="flex-1 min-w-0">
                             <div className="text-xs font-semibold text-n700">{c.name}</div>
-                            <div className="text-[11px] text-n400">{c.pos}</div>
+                            <div className="text-[10px] text-n400">{c.pos}</div>
                         </div>
                         <div className="text-xs font-semibold" style={{ color: c.sc }}>{c.score}%</div>
                         <div className="text-[11px] px-1.5 py-0.5 rounded-full" style={{ background: c.sc + '20', color: c.sc }}>{c.status}</div>
@@ -116,15 +116,15 @@ const FEATURES = [
                     { title: 'UX Designer', dept: 'Ürün', count: 5, status: 'Aktif' },
                     { title: 'Data Analyst', dept: 'Analitik', count: 3, status: 'Pasif' },
                 ].map((p, i) => (
-                    <div key={i} className="flex items-center gap-3 bg-n0 border border-n200 rounded-md p-2.5">
+                    <div key={i} className="flex items-center gap-2 bg-n0 border border-n200 rounded-md p-2.5">
                         <div className="w-8 h-8 rounded-md bg-brand-50 border border-brand-100 flex items-center justify-center">
                             <Briefcase className="w-4 h-4 text-brand" />
                         </div>
                         <div className="flex-1 min-w-0">
                             <div className="text-xs font-semibold text-n700">{p.title}</div>
-                            <div className="text-[11px] text-n400">{p.dept} · {p.count} aday</div>
+                            <div className="text-[10px] text-n400">{p.dept} · {p.count} aday</div>
                         </div>
-                        <div className={`text-[11px] px-1.5 py-0.5 rounded-full font-medium ${p.status === 'Aktif' ? 'bg-ok-bg text-ok' : 'bg-n100 text-n400'}`}>{p.status}</div>
+                        <div className={`text-[11px] px-1.5 py-0.5 rounded-full font-medium ${p.status === 'Aktif' ? 'bg-ok-bg text-ok-text' : 'bg-n100 text-n400'}`}>{p.status}</div>
                     </div>
                 ))}
             </div>
@@ -156,24 +156,24 @@ const FEATURES = [
                 <div className="bg-warn-bg border border-transparent rounded-md p-3">
                     <div className="flex items-center justify-between mb-2">
                         <span className="text-xs font-semibold text-warn">Bugün — 14:00</span>
-                        <span className="text-[11px] bg-warn-bg text-warn px-1.5 py-0.5 rounded-full">Bekliyor</span>
+                        <span className="text-[11px] bg-warn-bg text-warn-text px-1.5 py-0.5 rounded-full">Bekliyor</span>
                     </div>
-                    <div className="text-[12px] text-n700 font-medium">Ahmet Yılmaz — Teknik Mülakat</div>
-                    <div className="text-[11px] text-n400 mt-0.5">Yazılım Müh. • meet.google.com/···</div>
+                    <div className="text-[11px] text-n700 font-medium">Ahmet Yılmaz — Teknik Mülakat</div>
+                    <div className="text-[10px] text-n400 mt-0.5">Yazılım Müh. • meet.google.com/···</div>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                     {[{ l: 'Ahmet B.', ext: false }, { l: 'dış@partner.com', ext: true }].map((p, i) => (
-                        <span key={i} className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border ${p.ext ? 'bg-warn-bg border-warn text-warn' : 'bg-brand-50 border-brand-200 text-brand-700'}`}>
+                        <span key={i} className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border ${p.ext ? 'bg-warn-bg border-warn text-warn-text' : 'bg-brand-50 border-brand-200 text-brand-700'}`}>
                             {p.ext ? '@' : '✓'} {p.l}
                         </span>
                     ))}
                 </div>
                 <div className="flex gap-2">
                     <div className="flex-1 bg-ok-bg border border-transparent rounded-md px-2 py-1.5 text-center">
-                        <div className="text-[11px] text-ok font-semibold">Başlat →</div>
+                        <div className="text-[10px] text-ok font-semibold">Başlat →</div>
                     </div>
                     <div className="flex-1 bg-n50 border border-n200 rounded-md px-2 py-1.5 text-center">
-                        <div className="text-[11px] text-n500 font-semibold">E-posta Gönder</div>
+                        <div className="text-[10px] text-n500 font-semibold">E-posta Gönder</div>
                     </div>
                 </div>
             </div>
@@ -199,28 +199,28 @@ const FEATURES = [
         tags: ['canlı mülakat', 'webrtc', 'video', 'ses', 'gemini', 'stt', 'ai soru', 'star', 'gerçek zamanlı', 'sesli analiz'],
         mockup: (
             <div className="space-y-2.5">
-                <div className="bg-n900 rounded-md p-3 flex items-center gap-3">
+                <div className="bg-n900 rounded-md p-3 flex items-center gap-2">
                     <div className="w-10 h-10 rounded-md bg-n700 flex items-center justify-center">
                         <Video className="w-5 h-5 text-white/60" />
                     </div>
                     <div>
-                        <div className="text-[11px] text-white font-semibold">Aday Bağlı</div>
+                        <div className="text-[10px] text-white font-semibold">Aday Bağlı</div>
                         <div className="flex items-center gap-1 mt-0.5">
                             <div className="w-1.5 h-1.5 rounded-full bg-ok animate-pulse" />
-                            <span className="text-[11px] text-ok">Canlı · 00:14:32</span>
+                            <span className="text-[10px] text-ok">Canlı · 00:14:32</span>
                         </div>
                     </div>
                 </div>
                 <div className="bg-brand-50 border border-brand-100 rounded-md p-2.5">
-                    <div className="text-[11px] text-brand font-semibold mb-1 flex items-center gap-1">
+                    <div className="text-[10px] text-brand font-semibold mb-1 flex items-center gap-1">
                         <Brain className="w-3 h-3" /> AI Soru Önerisi
                     </div>
-                    <div className="text-[11px] text-n700">"Bu projede karşılaştığınız en büyük teknik engel neydi?"</div>
+                    <div className="text-[10px] text-n700">"Bu projede karşılaştığınız en büyük teknik engel neydi?"</div>
                 </div>
                 <div className="grid grid-cols-4 gap-1">
                     {['S', 'T', 'A', 'R'].map((s, i) => (
                         <div key={s} className="bg-n0 border border-n200 rounded-md p-1.5 text-center">
-                            <div className="text-[11px] font-semibold text-n500">{s}</div>
+                            <div className="text-[10px] font-semibold text-n500">{s}</div>
                             <div className="mt-1 h-1 bg-n100 rounded-full overflow-hidden">
                                 <div className="h-full rounded-full bg-brand" style={{ width: `${[80, 60, 90, 70][i]}%` }} />
                             </div>
@@ -255,11 +255,11 @@ const FEATURES = [
                     <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-1.5">
                             <Mic className="w-3.5 h-3.5 text-warn" />
-                            <span className="text-[11px] font-semibold text-warn">Yüz Yüze Mülakat</span>
+                            <span className="text-[10px] font-semibold text-warn">Yüz Yüze Mülakat</span>
                         </div>
                         <div className="flex items-center gap-1">
                             <div className="w-1.5 h-1.5 rounded-full bg-bad animate-pulse" />
-                            <span className="text-[11px] text-bad">Canlı</span>
+                            <span className="text-[10px] text-bad">Canlı</span>
                         </div>
                     </div>
                     <div className="flex gap-1 mb-2">
@@ -267,14 +267,14 @@ const FEATURES = [
                             <div key={s} className={`text-[11px] px-2 py-0.5 rounded-full border font-medium ${i === 0 ? 'bg-warn text-white border-warn' : 'bg-n0 text-warn border-warn'}`}>{s}</div>
                         ))}
                     </div>
-                    <div className="text-[11px] text-n600 bg-n0 rounded-md p-1.5 border border-n200">
+                    <div className="text-[10px] text-n600 bg-n0 rounded-md p-1.5 border border-n200">
                         "Karmaşık bir teknik problemi ekiple nasıl çözdüğünüzü anlatın."
                     </div>
                 </div>
                 <div className="grid grid-cols-4 gap-1">
                     {['S', 'T', 'A', 'R'].map((s, i) => (
                         <div key={s} className="bg-n0 border border-n200 rounded-md p-1.5 text-center">
-                            <div className="text-[11px] font-semibold text-n500">{s}</div>
+                            <div className="text-[10px] font-semibold text-n500">{s}</div>
                             <div className="mt-1 h-1 bg-n100 rounded-full overflow-hidden">
                                 <div className="h-full rounded-full bg-warn" style={{ width: `${[75, 65, 88, 72][i]}%` }} />
                             </div>
@@ -304,24 +304,24 @@ const FEATURES = [
         mockup: (
             <div className="space-y-2">
                 <div className="bg-n50 border border-n200 rounded-md p-3">
-                    <div className="text-[11px] text-n400 mb-2 font-medium uppercase tracking-[0.08em]">Hazırlık Ekranı</div>
+                    <div className="text-[10px] text-n400 mb-2 font-medium uppercase tracking-[0.08em]">Hazırlık Ekranı</div>
                     <div className="space-y-1.5">
-                        <div className="w-full flex items-center justify-center gap-1.5 bg-bad-bg border border-transparent text-bad rounded-md py-1.5 text-[11px] font-semibold">
+                        <div className="w-full flex items-center justify-center gap-1.5 bg-bad-bg border border-transparent text-bad-text rounded-md py-1.5 text-[10px] font-semibold">
                             <AlertCircle className="w-3 h-3" /> Mülakatı İptal Et
                         </div>
-                        <div className="w-full flex items-center justify-center gap-1.5 bg-n100 border border-n200 text-n500 rounded-md py-1.5 text-[11px] font-semibold">
+                        <div className="w-full flex items-center justify-center gap-1.5 bg-n100 border border-n200 text-n500 rounded-md py-1.5 text-[10px] font-semibold">
                             <Clock className="w-3 h-3" /> Askıya Al
                         </div>
                     </div>
                 </div>
                 <div className="grid grid-cols-2 gap-1.5">
                     <div className="bg-bad-bg border border-transparent rounded-md p-2 text-center">
-                        <div className="text-[11px] font-semibold text-bad mb-0.5">İptal</div>
-                        <div className="text-[11px] text-bad">Kalıcı · Geri alınamaz</div>
+                        <div className="text-[10px] font-semibold text-bad mb-0.5">İptal</div>
+                        <div className="text-[10px] text-bad">Kalıcı · Geri alınamaz</div>
                     </div>
                     <div className="bg-n50 border border-n200 rounded-md p-2 text-center">
-                        <div className="text-[11px] font-semibold text-n600 mb-0.5">Askıya Al</div>
-                        <div className="text-[11px] text-n400">Geçici · Devam edilebilir</div>
+                        <div className="text-[10px] font-semibold text-n600 mb-0.5">Askıya Al</div>
+                        <div className="text-[10px] text-n400">Geçici · Devam edilebilir</div>
                     </div>
                 </div>
             </div>
@@ -346,14 +346,14 @@ const FEATURES = [
         mockup: (
             <div className="space-y-2">
                 <div className="bg-brand-50 border border-brand-100 rounded-md p-3">
-                    <div className="text-[11px] font-semibold text-brand-700 mb-2">STAR Skoru — Zeynep K.</div>
+                    <div className="text-[10px] font-semibold text-brand-700 mb-2">STAR Skoru — Zeynep K.</div>
                     {[['Durum Analizi', 85], ['Görev Yönetimi', 72], ['Aksiyon Gücü', 91], ['Sonuç Odaklılık', 88]].map(([l, v]) => (
                         <div key={l} className="flex items-center gap-2 mb-1">
-                            <span className="text-[11px] text-n500 w-28">{l}</span>
+                            <span className="text-[10px] text-n500 w-28">{l}</span>
                             <div className="flex-1 h-1.5 bg-n100 rounded-full overflow-hidden">
                                 <div className="h-full bg-brand rounded-full" style={{ width: v + '%' }} />
                             </div>
-                            <span className="text-[11px] font-semibold text-brand">{v}</span>
+                            <span className="text-[10px] font-semibold text-brand">{v}</span>
                         </div>
                     ))}
                 </div>
@@ -382,7 +382,7 @@ const FEATURES = [
             <div className="space-y-2">
                 <div className="bg-brand-50 border border-brand-100 rounded-md p-3">
                     <div className="flex items-center justify-between mb-2">
-                        <span className="text-[11px] font-semibold text-brand-700">Yükleme Kuyruğu</span>
+                        <span className="text-[10px] font-semibold text-brand-700">Yükleme Kuyruğu</span>
                         <span className="text-[11px] bg-brand-100 text-brand-600 px-1.5 py-0.5 rounded-full">3/5</span>
                     </div>
                     {[
@@ -392,19 +392,19 @@ const FEATURES = [
                     ].map((f, i) => (
                         <div key={i} className="flex items-center gap-2 mb-1">
                             <FileText className="w-3 h-3 text-brand shrink-0" />
-                            <span className="text-[11px] text-n600 flex-1 truncate">{f.name}</span>
-                            <span className="text-[11px] font-medium" style={{ color: f.color }}>{f.status}</span>
+                            <span className="text-[10px] text-n600 flex-1 truncate">{f.name}</span>
+                            <span className="text-[10px] font-medium" style={{ color: f.color }}>{f.status}</span>
                         </div>
                     ))}
                 </div>
                 <div className="flex gap-2 text-center">
                     <div className="flex-1 bg-ok-bg border border-transparent rounded-md p-1.5">
                         <div className="text-xs font-semibold text-ok">3</div>
-                        <div className="text-[11px] text-ok">Eklendi</div>
+                        <div className="text-[10px] text-ok">Eklendi</div>
                     </div>
                     <div className="flex-1 bg-warn-bg border border-transparent rounded-md p-1.5">
                         <div className="text-xs font-semibold text-warn">%78</div>
-                        <div className="text-[11px] text-warn">Ort. Skor</div>
+                        <div className="text-[10px] text-warn">Ort. Skor</div>
                     </div>
                 </div>
             </div>
@@ -438,7 +438,7 @@ const FEATURES = [
                     ].map((q, i) => (
                         <div key={i} className="flex items-start gap-2 bg-brand-50 border border-brand-100 rounded-md p-2">
                             <FileQuestion className="w-3 h-3 text-brand mt-0.5 shrink-0" />
-                            <span className="text-[11px] text-n600 flex-1 leading-relaxed">{q.q}</span>
+                            <span className="text-[10px] text-n600 flex-1 leading-relaxed">{q.q}</span>
                             <span className="text-[7px] bg-brand-200 text-brand-700 px-1.5 rounded-full shrink-0">{q.badge}</span>
                         </div>
                     ))}
@@ -482,7 +482,7 @@ const FEATURES = [
                     {[{ l: 'Toplam Aday', v: '124', c: '#3b82f6' }, { l: 'Ort. Skor', v: '%82', c: '#10b981' }, { l: 'Mülakatlar', v: '31', c: '#8b5cf6' }, { l: 'İşe Alım', v: '8', c: '#f59e0b' }].map(k => (
                         <div key={k.l} className="bg-n0 border border-n200 rounded-md p-2 text-center">
                             <div className="text-sm font-semibold" style={{ color: k.c }}>{k.v}</div>
-                            <div className="text-[11px] text-n400">{k.l}</div>
+                            <div className="text-[10px] text-n400">{k.l}</div>
                         </div>
                     ))}
                 </div>
@@ -516,19 +516,19 @@ const FEATURES = [
             <div className="space-y-2">
                 <div className="flex gap-1 p-0.5 bg-n100 rounded-md">
                     <div className="flex-1 bg-n0 rounded-md px-2 py-1 text-center text-[11px] font-semibold text-pink-600 shadow-sm">Mesaj Kuyruğu</div>
-                    <div className="flex-1 px-2 py-1 text-center text-[11px] text-n400">E-posta Yazışmaları</div>
+                    <div className="flex-1 px-2 py-1 text-center text-[10px] text-n400">E-posta Yazışmaları</div>
                 </div>
                 {[
                     { name: 'Zeynep K.', sub: 'Teknik Mülakat Daveti', replied: true },
                     { name: 'Mert A.', sub: 'İK Mülakat Daveti', replied: false },
                 ].map((t, i) => (
                     <div key={i} className="flex items-center gap-2 bg-n0 border border-n200 rounded-md p-2">
-                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold ${t.replied ? 'bg-ok-bg text-ok' : 'bg-n100 text-n500'}`}>{t.name[0]}</div>
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-semibold ${t.replied ? 'bg-ok-bg text-ok-text' : 'bg-n100 text-n500'}`}>{t.name[0]}</div>
                         <div className="flex-1 min-w-0">
-                            <div className="text-[11px] font-semibold text-n700">{t.name}</div>
-                            <div className="text-[11px] text-n400 truncate">{t.sub}</div>
+                            <div className="text-[10px] font-semibold text-n700">{t.name}</div>
+                            <div className="text-[10px] text-n400 truncate">{t.sub}</div>
                         </div>
-                        {t.replied && <span className="text-[7px] bg-ok-bg text-ok border border-transparent px-1.5 py-0.5 rounded-full font-semibold">Yanıt Var</span>}
+                        {t.replied && <span className="text-[7px] bg-ok-bg text-ok-text border border-transparent px-1.5 py-0.5 rounded-full font-semibold">Yanıt Var</span>}
                     </div>
                 ))}
             </div>
@@ -552,13 +552,13 @@ const FEATURES = [
         tags: ['email', 'e-posta', 'şablon', 'html', 'marka', 'logo', 'tasarım', 'davet', 'kurumsal', 'bildirim'],
         mockup: (
             <div className="space-y-2">
-                <div className="border border-n200 rounded-md overflow-hidden text-[11px]">
+                <div className="border border-n200 rounded-md overflow-hidden text-[10px]">
                     <div className="bg-brand px-3 py-2 text-center">
                         <div className="inline-block bg-n0/20 rounded-md px-2 py-0.5 text-white font-semibold">Şirket Adı</div>
                         <div className="text-white/70 text-[7px] mt-0.5">Akıllı İK Platformu</div>
                     </div>
                     <div className="bg-n0 px-3 py-2 space-y-1.5">
-                        <div className="font-semibold text-n900 text-[11px]">Mülakat Davetiniz</div>
+                        <div className="font-semibold text-n900 text-[10px]">Mülakat Davetiniz</div>
                         <div className="text-n500 leading-relaxed">Merhaba <strong>Zeynep K.</strong>, sizinle tanışmak isteriz.</div>
                         <div className="bg-brand-50 border-l-2 border-brand pl-2 py-1 space-y-0.5">
                             <div className="text-n600">📋 Frontend Developer</div>
@@ -592,18 +592,18 @@ const FEATURES = [
         tags: ['google', 'gmail', 'takvim', 'calendar', 'entegrasyon', 'meet', 'email', 'bağlantı'],
         mockup: (
             <div className="space-y-2.5">
-                <div className="flex items-center gap-3 bg-n0 border border-n200 rounded-md p-3">
+                <div className="flex items-center gap-2 bg-n0 border border-n200 rounded-md p-3">
                     <div className="w-10 h-10 rounded-full bg-n0 border border-n200 shadow-sm flex items-center justify-center p-2">
                         <svg viewBox="0 0 24 24" className="w-full h-full"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" /><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" /><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" /><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" /></svg>
                     </div>
                     <div className="flex-1">
                         <div className="text-xs font-semibold text-n700">Google Workspace</div>
-                        <div className="text-[11px] text-ok flex items-center gap-1">
+                        <div className="text-[10px] text-ok flex items-center gap-1">
                             <CheckCircle className="w-2.5 h-2.5" /> Bağlı
                         </div>
                     </div>
                 </div>
-                <div className="bg-ok-bg border border-transparent rounded-md p-2 text-center text-[11px] text-ok font-medium">
+                <div className="bg-ok-bg border border-transparent rounded-md p-2 text-center text-[10px] text-ok-text font-medium">
                     meet.google.com/abc-def-ghi — Hazır
                 </div>
             </div>
@@ -634,12 +634,12 @@ const FEATURES = [
                     { name: 'Kariyer Portalları', subs: 3, color: '#ec4899' },
                     { name: 'Referral / Öneri', subs: 3, color: '#10b981' },
                 ].map((s, i) => (
-                    <div key={i} className="flex items-center gap-3 bg-n0 border border-n200 rounded-md p-2.5">
+                    <div key={i} className="flex items-center gap-2 bg-n0 border border-n200 rounded-md p-2.5">
                         <div className="w-7 h-7 rounded-md flex items-center justify-center" style={{ background: s.color + '20' }}>
                             <Share2 className="w-3.5 h-3.5" style={{ color: s.color }} />
                         </div>
                         <div className="flex-1 text-xs font-medium text-n700">{s.name}</div>
-                        <div className="text-[11px] text-n400">{s.subs} alt detay</div>
+                        <div className="text-[10px] text-n400">{s.subs} alt detay</div>
                     </div>
                 ))}
             </div>
@@ -669,14 +669,14 @@ const FEATURES = [
                     { name: 'Ürün', users: 2, open: 1, color: '#8b5cf6' },
                     { name: 'Satış', users: 3, open: 2, color: '#f59e0b' },
                 ].map((d, i) => (
-                    <div key={i} className="flex items-center gap-3 bg-n0 border border-n200 rounded-md p-2.5">
+                    <div key={i} className="flex items-center gap-2 bg-n0 border border-n200 rounded-md p-2.5">
                         <div className="w-8 h-8 rounded-md flex items-center justify-center" style={{ background: d.color + '18', border: `1px solid ${d.color}30` }}>
                             <Building2 className="w-4 h-4" style={{ color: d.color }} />
                         </div>
                         <div className="flex-1 text-xs font-medium text-n700">{d.name}</div>
                         <div className="flex items-center gap-2">
-                            <span className="text-[11px] text-n400">{d.users} kullanıcı</span>
-                            <span className="text-[11px] bg-ok-bg text-ok px-1 rounded">{d.open} açık</span>
+                            <span className="text-[10px] text-n400">{d.users} kullanıcı</span>
+                            <span className="text-[11px] bg-ok-bg text-ok-text px-1 rounded">{d.open} açık</span>
                         </div>
                     </div>
                 ))}
@@ -710,13 +710,13 @@ const FEATURES = [
                     <div className="p-2 space-y-1.5 bg-n0">
                         {[['Şirket Adı', 'BTC Türk A.Ş.'], ['Slogan', 'Kripto & Blockchain'], ['Ana Renk', '#13294E']].map(([l, v]) => (
                             <div key={l} className="flex items-center gap-2">
-                                <span className="text-[11px] text-n400 w-16">{l}</span>
-                                <span className="text-[11px] font-medium text-n700">{v}</span>
+                                <span className="text-[10px] text-n400 w-16">{l}</span>
+                                <span className="text-[10px] font-medium text-n700">{v}</span>
                             </div>
                         ))}
                     </div>
                 </div>
-                <div className="bg-ok-bg border border-transparent rounded-md px-2 py-1.5 text-center text-[11px] text-ok font-medium">Canlı Önizleme Aktif</div>
+                <div className="bg-ok-bg border border-transparent rounded-md px-2 py-1.5 text-center text-[11px] text-ok-text font-medium">Canlı Önizleme Aktif</div>
             </div>
         )
     },
@@ -745,11 +745,11 @@ const FEATURES = [
                             <Globe className="w-3.5 h-3.5 text-brand" />
                         </div>
                         <div className="flex-1 text-xs font-medium text-n700">@{item.d}</div>
-                        <span className="text-[11px] bg-ok-bg text-ok px-1.5 py-0.5 rounded-full">{item.users} kullanıcı</span>
+                        <span className="text-[11px] bg-ok-bg text-ok-text px-1.5 py-0.5 rounded-full">{item.users} kullanıcı</span>
                     </div>
                 ))}
                 <div className="border border-dashed border-n200 rounded-md px-3 py-2 flex items-center gap-2">
-                    <span className="text-[11px] text-n400 flex-1">yenidomain.com ekle…</span>
+                    <span className="text-[10px] text-n400 flex-1">yenidomain.com ekle…</span>
                     <span className="text-[11px] bg-brand-50 text-brand px-2 py-0.5 rounded font-medium">Ekle</span>
                 </div>
             </div>
@@ -779,7 +779,7 @@ const FEATURES = [
                         <Shield className="w-4 h-4 text-bad" />
                         <span className="text-xs font-medium text-n700">Süper Admin</span>
                     </div>
-                    <span className="text-[11px] bg-bad-bg text-bad px-1.5 py-0.5 rounded-full">Tam Yetki</span>
+                    <span className="text-[11px] bg-bad-bg text-bad-text px-1.5 py-0.5 rounded-full">Tam Yetki</span>
                 </div>
                 {[{ role: 'Recruiter', color: '#3b82f6' }, { role: 'Dept. Kullanıcısı', color: '#f59e0b' }].map((r, i) => (
                     <div key={i} className="flex items-center justify-between bg-n0 border border-n200 rounded-md p-2.5">
@@ -811,12 +811,12 @@ const FEATURES = [
                 {[['Tema', '🌙 Koyu'], ['Dil', '🇹🇷 Türkçe'], ['Bildirimler', '✅ Açık']].map(([l, v]) => (
                     <div key={l} className="flex items-center justify-between bg-n0 border border-n200 rounded-md px-3 py-2">
                         <span className="text-xs text-n600">{l}</span>
-                        <span className="text-[11px] font-medium text-n700">{v}</span>
+                        <span className="text-[10px] font-medium text-n700">{v}</span>
                     </div>
                 ))}
                 <div className="bg-brand-50 border border-brand-100 rounded-md px-3 py-2 flex items-center gap-2">
                     <Mic className="w-3.5 h-3.5 text-brand" />
-                    <span className="text-[11px] text-brand font-medium">STT Motoru — Hazır</span>
+                    <span className="text-[10px] text-brand font-medium">STT Motoru — Hazır</span>
                 </div>
             </div>
         )
@@ -915,7 +915,7 @@ export default function GuidePage() {
                         {[['13', 'Özellik'], ['6', 'Kategori'], ['75+', 'Adım']].map(([v, l]) => (
                             <div key={l} className="text-center">
                                 <div className="text-xl font-semibold text-n900">{v}</div>
-                                <div className="text-[11px] text-n400 font-medium uppercase tracking-wide">{l}</div>
+                                <div className="text-[10px] text-n400 font-medium uppercase tracking-wide">{l}</div>
                             </div>
                         ))}
                     </div>
@@ -929,9 +929,9 @@ export default function GuidePage() {
                     <div className="bg-n0 rounded-[14px] border border-n200 overflow-hidden">
                         <button
                             onClick={() => setShowQuickStart(p => !p)}
-                            className="w-full flex items-center justify-between px-6 py-4 hover:bg-n50 transition-all"
+                            className="w-full flex items-center justify-between px-6 py-3 hover:bg-n50 transition-all"
                         >
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2">
                                 <div className="w-8 h-8 rounded-md bg-brand-50 border border-brand-100 flex items-center justify-center">
                                     <Play className="w-4 h-4 text-brand" />
                                 </div>
@@ -951,13 +951,13 @@ export default function GuidePage() {
                                         {QUICK_STEPS.map((step, i) => {
                                             const Icon = step.icon;
                                             return (
-                                                <div key={i} className="flex gap-4 relative">
+                                                <div key={i} className="flex gap-3 relative">
                                                     <div className="w-10 h-10 rounded-md flex items-center justify-center shrink-0 relative z-10 border" style={{ background: step.color + '15', borderColor: step.color + '30' }}>
                                                         <Icon className="w-4.5 h-4.5" style={{ color: step.color }} />
                                                     </div>
                                                     <div className="flex-1 pt-1.5">
                                                         <div className="flex items-center gap-2">
-                                                            <span className="text-[11px] font-semibold text-n300">ADIM {step.num}</span>
+                                                            <span className="text-[10px] font-semibold text-n300">ADIM {step.num}</span>
                                                             <h3 className="text-sm font-semibold text-n900">{step.title}</h3>
                                                         </div>
                                                         <p className="text-xs text-n500 mt-1 leading-relaxed">{step.desc}</p>
@@ -997,7 +997,7 @@ export default function GuidePage() {
 
                 {/* ── SEARCH STATUS ── */}
                 {query && (
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                         <div className="flex items-center gap-2 text-sm text-n500">
                             <Search className="w-4 h-4 text-n400" />
                             <span>"{query}" için <span className="font-semibold text-n700">{filtered.length}</span> sonuç</span>
@@ -1024,7 +1024,7 @@ export default function GuidePage() {
                                     {/* Card Header */}
                                     <button
                                         onClick={() => toggle(feature.id)}
-                                        className="w-full flex items-center gap-4 px-5 py-4 text-left"
+                                        className="w-full flex items-center gap-3 px-5 py-3 text-left"
                                     >
                                         <div className="w-10 h-10 rounded-md flex items-center justify-center shrink-0 border" style={{ background: feature.color + '15', borderColor: feature.color + '25' }}>
                                             <Icon className="w-5 h-5" style={{ color: feature.color }} />
@@ -1032,7 +1032,7 @@ export default function GuidePage() {
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2">
                                                 <h3 className="text-sm font-semibold text-n900">{feature.title}</h3>
-                                                <span className="hidden sm:block text-[11px] text-n400 font-medium">{feature.subtitle}</span>
+                                                <span className="hidden sm:block text-[10px] text-n400 font-medium">{feature.subtitle}</span>
                                             </div>
                                             <p className="text-xs text-n500 mt-0.5 line-clamp-1">{feature.description}</p>
                                         </div>
@@ -1057,8 +1057,8 @@ export default function GuidePage() {
                                                         </div>
                                                         <div className="space-y-2.5">
                                                             {feature.steps.map((step, i) => (
-                                                                <div key={i} className="flex gap-3">
-                                                                    <div className="w-5 h-5 rounded-md text-[11px] font-semibold flex items-center justify-center shrink-0 mt-0.5 border" style={{ background: feature.color + '15', borderColor: feature.color + '25', color: feature.color }}>
+                                                                <div key={i} className="flex gap-2">
+                                                                    <div className="w-5 h-5 rounded-md text-[10px] font-semibold flex items-center justify-center shrink-0 mt-0.5 border" style={{ background: feature.color + '15', borderColor: feature.color + '25', color: feature.color }}>
                                                                         {i + 1}
                                                                     </div>
                                                                     <p className="text-sm text-n600 leading-relaxed flex-1">{step}</p>
@@ -1068,10 +1068,10 @@ export default function GuidePage() {
                                                     </div>
 
                                                     {/* Tip */}
-                                                    <div className="flex gap-3 p-3 bg-warn-bg border border-transparent rounded-md">
+                                                    <div className="flex gap-2 p-3 bg-warn-bg border border-transparent rounded-md">
                                                         <Lightbulb className="w-4 h-4 text-warn shrink-0 mt-0.5" />
                                                         <div>
-                                                            <div className="text-[11px] font-semibold text-warn uppercase tracking-wide mb-1">Profesyonel İpucu</div>
+                                                            <div className="text-[10px] font-semibold text-warn uppercase tracking-wide mb-1">Profesyonel İpucu</div>
                                                             <p className="text-xs text-warn leading-relaxed">{feature.tip}</p>
                                                         </div>
                                                     </div>
@@ -1083,7 +1083,7 @@ export default function GuidePage() {
                                                         <Eye className="w-3.5 h-3.5 text-n400" />
                                                         <span className="text-xs font-semibold text-n500 uppercase tracking-wide">Arayüz Önizlemesi</span>
                                                     </div>
-                                                    <div className="bg-n50 border border-n200 rounded-md p-4">
+                                                    <div className="bg-n50 border border-n200 rounded-md p-3">
                                                         {/* Window chrome */}
                                                         <div className="flex items-center gap-1.5 mb-3">
                                                             <div className="w-2 h-2 rounded-full bg-bad" />

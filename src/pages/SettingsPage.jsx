@@ -269,7 +269,7 @@ export default function SettingsPage({ initialTab }) {
     return (
         <div className="infoset flex flex-col min-h-screen">
             {/* Top header */}
-            <header className="sticky top-0 z-40 bg-n0 border-b border-n200 px-6 lg:px-8 h-14 flex items-center gap-3">
+            <header className="sticky top-0 z-40 bg-n0 border-b border-n200 px-6 lg:px-8 h-14 flex items-center gap-2">
                 <div className="w-8 h-8 rounded-md bg-brand-50 border border-brand-100 flex items-center justify-center">
                     <Settings className="w-4 h-4 text-brand" />
                 </div>
@@ -285,14 +285,14 @@ export default function SettingsPage({ initialTab }) {
             <div className="flex flex-1 min-h-0">
                 {/* Sidebar */}
                 <aside className="w-56 shrink-0 bg-n0 border-r border-n200 overflow-y-auto hidden md:block">
-                    <nav className="py-4 px-3 space-y-6">
+                    <nav className="py-3 px-3 space-y-6">
                         {NAV_GROUPS.map(group => {
                             const visibleItems = group.items.filter(i => !i.adminOnly || isSuperAdmin);
                             if (group.adminOnly && !isSuperAdmin) return null;
                             if (visibleItems.length === 0) return null;
                             return (
                                 <div key={group.group}>
-                                    <p className="px-3 mb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-n400">
+                                    <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-n400">
                                         {group.group}
                                     </p>
                                     <ul className="space-y-0.5">
@@ -332,7 +332,7 @@ export default function SettingsPage({ initialTab }) {
 
                             {/* Tercihler */}
                             <div className="bg-n0 rounded-[14px] border border-n200 p-6 space-y-0">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-n400 mb-1">Tercihler</p>
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-n400 mb-1">Tercihler</p>
                                 <SettingRow icon={Bell} label="Uygulama Bildirimleri" description="Bildirim rozeti ve paneli göster / gizle" noBorder>
                                     <Toggle checked={settings.notifications !== false} onChange={(v) => updateSettings({ notifications: v })} />
                                 </SettingRow>
@@ -340,9 +340,9 @@ export default function SettingsPage({ initialTab }) {
 
                             {/* Entegrasyonlar */}
                             <div className="bg-n0 rounded-[14px] border border-n200 p-6">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-n400 mb-4">Entegrasyonlar</p>
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-n400 mb-4">Entegrasyonlar</p>
                                 <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-4">
+                                    <div className="flex items-center gap-3">
                                         <div className="w-11 h-11 rounded-full bg-n0 flex items-center justify-center shadow-sm shrink-0 overflow-hidden p-2 border border-n200">
                                             <svg viewBox="0 0 24 24" className="w-full h-full">
                                                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
@@ -366,7 +366,7 @@ export default function SettingsPage({ initialTab }) {
                                     </div>
                                     {isGoogleConnected ? (
                                         <button onClick={handleGoogleDisconnect} disabled={isConnectingGoogle}
-                                            className="px-4 py-2 rounded-md text-xs font-semibold text-bad bg-bad-bg hover:opacity-90 transition-all border border-transparent disabled:opacity-50">
+                                            className="px-4 py-2 rounded-md text-xs font-semibold text-bad-text bg-bad-bg hover:opacity-90 transition-all border border-transparent disabled:opacity-50">
                                             {isConnectingGoogle ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Bağlantıyı Kes'}
                                         </button>
                                     ) : (
@@ -379,7 +379,7 @@ export default function SettingsPage({ initialTab }) {
 
                                 {/* Microsoft 365 */}
                                 <div className="flex items-center justify-between mt-4 pt-4 border-t border-n200">
-                                    <div className="flex items-center gap-4">
+                                    <div className="flex items-center gap-3">
                                         <div className="w-11 h-11 rounded-full bg-n0 flex items-center justify-center shadow-sm shrink-0 overflow-hidden p-2 border border-n200">
                                             <svg viewBox="0 0 23 23" className="w-full h-full">
                                                 <path fill="#f25022" d="M0 0h11v11H0z" />
@@ -402,7 +402,7 @@ export default function SettingsPage({ initialTab }) {
                                     </div>
                                     {isMicrosoftConnected ? (
                                         <button onClick={handleMicrosoftDisconnect} disabled={isConnectingMicrosoft}
-                                            className="px-4 py-2 rounded-md text-xs font-semibold text-bad bg-bad-bg hover:opacity-90 transition-all border border-transparent disabled:opacity-50">
+                                            className="px-4 py-2 rounded-md text-xs font-semibold text-bad-text bg-bad-bg hover:opacity-90 transition-all border border-transparent disabled:opacity-50">
                                             {isConnectingMicrosoft ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Bağlantıyı Kes'}
                                         </button>
                                     ) : (
@@ -423,7 +423,7 @@ export default function SettingsPage({ initialTab }) {
 
                             {/* Gemini API Key */}
                             <div className="bg-n0 rounded-[14px] border border-n200 p-6">
-                                <div className="flex items-center gap-3 mb-5 pb-4 border-b border-n200">
+                                <div className="flex items-center gap-2 mb-5 pb-4 border-b border-n200">
                                     <div className="w-9 h-9 rounded-md bg-brand-50 border border-brand-100 flex items-center justify-center">
                                         <Key className="w-4 h-4 text-brand" />
                                     </div>
@@ -431,7 +431,7 @@ export default function SettingsPage({ initialTab }) {
                                         <div className="flex items-center gap-2">
                                             <h2 className="text-sm font-semibold text-n900">Gemini API Anahtarı</h2>
                                             {hasSavedGeminiKey && (
-                                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.08em] px-2 py-0.5 rounded-full bg-ok-bg text-ok border border-transparent">
+                                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.08em] px-2 py-0.5 rounded-full bg-ok-bg text-ok-text border border-transparent">
                                                     <CheckCircle className="w-3 h-3" /> Aktif{savedKeyLast4 ? ` ••••${savedKeyLast4}` : ''}
                                                 </span>
                                             )}
@@ -470,7 +470,7 @@ export default function SettingsPage({ initialTab }) {
 
                             {/* STT Test */}
                             <div className="bg-n0 rounded-[14px] border border-n200 p-6">
-                                <div className="flex items-center gap-3 mb-5 pb-4 border-b border-n200">
+                                <div className="flex items-center gap-2 mb-5 pb-4 border-b border-n200">
                                     <div className="w-9 h-9 rounded-md bg-brand-50 border border-brand-100 flex items-center justify-center">
                                         <Activity className="w-4.5 h-4.5 text-brand" />
                                     </div>
@@ -479,12 +479,12 @@ export default function SettingsPage({ initialTab }) {
                                         <p className="text-xs text-n400">STT motorunun çalışırlığını doğrulayın</p>
                                     </div>
                                 </div>
-                                <div className="rounded-md border border-n200 p-4 bg-n50">
-                                    <div className="flex items-center gap-4">
+                                <div className="rounded-md border border-n200 p-3 bg-n50">
+                                    <div className="flex items-center gap-3">
                                         <button onClick={toggleSttTest}
                                             className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 transition-all duration-300 ${
-                                                sttStatus === 'listening' ? 'bg-bad-bg border-2 border-bad text-bad scale-110'
-                                                : sttStatus === 'success' ? 'bg-ok-bg border-2 border-ok text-ok'
+                                                sttStatus === 'listening' ? 'bg-bad-bg border-2 border-bad text-bad-text scale-110'
+                                                : sttStatus === 'success' ? 'bg-ok-bg border-2 border-ok text-ok-text'
                                                 : 'bg-n0 border border-n200 text-n400 hover:border-brand hover:text-brand'
                                             }`}>
                                             {sttStatus === 'listening' ? <MicOff size={17} className="animate-pulse" /> : <Mic size={17} />}
@@ -492,11 +492,11 @@ export default function SettingsPage({ initialTab }) {
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 mb-1">
                                                 <Zap size={11} className={sttStatus === 'listening' ? 'text-brand' : 'text-n400'} />
-                                                <span className="text-[12px] font-semibold uppercase tracking-[0.08em] text-n500">STT Nöral Motor</span>
+                                                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-n500">STT Nöral Motor</span>
                                                 <span className={`ml-auto text-[11px] font-semibold uppercase tracking-[0.08em] px-2 py-0.5 rounded-full ${
-                                                    sttStatus === 'listening' ? 'bg-bad-bg text-bad border border-transparent'
-                                                    : sttStatus === 'success' ? 'bg-ok-bg text-ok border border-transparent'
-                                                    : sttStatus === 'error' ? 'bg-bad-bg text-bad border border-transparent'
+                                                    sttStatus === 'listening' ? 'bg-bad-bg text-bad-text border border-transparent'
+                                                    : sttStatus === 'success' ? 'bg-ok-bg text-ok-text border border-transparent'
+                                                    : sttStatus === 'error' ? 'bg-bad-bg text-bad-text border border-transparent'
                                                     : 'bg-n100 text-n400'
                                                 }`}>
                                                     {sttStatus === 'idle' && 'Hazır'}
@@ -505,7 +505,7 @@ export default function SettingsPage({ initialTab }) {
                                                     {sttStatus === 'error' && 'Hata'}
                                                 </span>
                                             </div>
-                                            <div className="text-[12px] text-n500 min-h-[18px]">
+                                            <div className="text-[11px] text-n500 min-h-[18px]">
                                                 {sttStatus === 'idle' && 'Mikrofon butonuna basarak testi başlatın.'}
                                                 {sttStatus === 'listening' && (
                                                     <span className="flex items-center gap-1 text-brand">
@@ -522,7 +522,7 @@ export default function SettingsPage({ initialTab }) {
                                         <button onClick={toggleSttTest}
                                             className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all shrink-0 border ${
                                                 sttStatus === 'listening'
-                                                    ? 'bg-bad-bg text-bad border-transparent hover:opacity-90'
+                                                    ? 'bg-bad-bg text-bad-text border-transparent hover:opacity-90'
                                                     : 'bg-brand-50 text-brand border-brand-100 hover:bg-brand-100'
                                             }`}>
                                             {sttStatus === 'listening' ? 'Durdur' : sttStatus === 'success' ? 'Tekrar Test Et' : 'Testi Başlat'}
@@ -541,7 +541,7 @@ export default function SettingsPage({ initialTab }) {
                                     </div>
                                     {sttStatus === 'success' && sttEmotion && (
                                         <div className="mt-4 border-t border-n200 pt-4">
-                                            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-n400 mb-3 flex items-center gap-1.5">
+                                            <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-n400 mb-3 flex items-center gap-1.5">
                                                 <Activity size={10} className="text-brand" /> Ses Duygu Analizi
                                             </p>
                                             <div className="grid grid-cols-2 gap-x-6 gap-y-2.5">
@@ -553,8 +553,8 @@ export default function SettingsPage({ initialTab }) {
                                                 ].map(({ label, value, color }) => (
                                                     <div key={label}>
                                                         <div className="flex justify-between mb-1">
-                                                            <span className="text-[11px] text-n500">{label}</span>
-                                                            <span className="text-[11px] font-semibold" style={{ color }}>{value}%</span>
+                                                            <span className="text-[10px] text-n500">{label}</span>
+                                                            <span className="text-[10px] font-semibold" style={{ color }}>{value}%</span>
                                                         </div>
                                                         <div className="h-1.5 bg-n100 rounded-full overflow-hidden">
                                                             <div className="h-full rounded-full transition-all duration-700" style={{ width: `${value}%`, backgroundColor: color }} />
@@ -565,7 +565,7 @@ export default function SettingsPage({ initialTab }) {
                                         </div>
                                     )}
                                 </div>
-                                <p className="text-[12px] text-n400 mt-3">
+                                <p className="text-[11px] text-n400 mt-3">
                                     Bu test, mülakatlarda kullanılan Gemini tabanlı ses tanıma motorunun cihazınızda düzgün çalışıp çalışmadığını doğrular.
                                 </p>
                             </div>
@@ -621,7 +621,7 @@ export default function SettingsPage({ initialTab }) {
 
 function SectionHeader({ icon: Icon, title, desc }) {
     return (
-        <div className="flex items-center gap-3 mb-2">
+        <div className="flex items-center gap-2 mb-2">
             <div className="w-9 h-9 rounded-md bg-brand-50 border border-brand-100 flex items-center justify-center shrink-0">
                 <Icon className="w-4.5 h-4.5 text-brand" />
             </div>
@@ -635,8 +635,8 @@ function SectionHeader({ icon: Icon, title, desc }) {
 
 function SettingRow({ icon: Icon, label, description, children, noBorder }) {
     return (
-        <div className={`flex items-center justify-between py-4 ${!noBorder ? 'border-b border-n200' : ''}`}>
-            <div className="flex items-center gap-3">
+        <div className={`flex items-center justify-between py-3 ${!noBorder ? 'border-b border-n200' : ''}`}>
+            <div className="flex items-center gap-2">
                 <Icon className="w-4 h-4 text-n400 shrink-0" />
                 <div>
                     <p className="text-sm font-medium text-n700">{label}</p>

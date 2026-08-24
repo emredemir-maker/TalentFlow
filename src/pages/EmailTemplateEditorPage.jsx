@@ -630,8 +630,8 @@ export default function EmailTemplateEditorPage() {
     return (
         <div className="flex flex-col h-full min-h-0">
             {/* ── Top Bar ── */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-n200 bg-n0 sticky top-0 z-10">
-                <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between px-6 py-3 border-b border-n200 bg-n0 sticky top-0 z-10">
+                <div className="flex items-center gap-2">
                     <div className="w-9 h-9 rounded-md bg-brand-50 flex items-center justify-center">
                         <LayoutTemplate className="w-5 h-5 text-brand-600" />
                     </div>
@@ -736,7 +736,7 @@ export default function EmailTemplateEditorPage() {
                 {mode === 'blocks' && (
                     <>
                         {/* Left: Block list */}
-                        <div className="flex-1 overflow-y-auto p-4 space-y-2 min-h-0">
+                        <div className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0">
                             {currentBlocks.length === 0 && (
                                 <div className="flex flex-col items-center justify-center py-16 text-n400">
                                     <LayoutTemplate size={32} className="mb-3 opacity-30" />
@@ -793,7 +793,7 @@ export default function EmailTemplateEditorPage() {
                                 <p className="text-xs font-semibold text-n400 uppercase tracking-wide mb-2 flex items-center gap-1">
                                     <Variable size={11} /> Değişkenler
                                 </p>
-                                <p className="text-[11px] text-n400 mb-2 leading-4">Alan kutularına yapıştırın veya kopyalayın</p>
+                                <p className="text-[10px] text-n400 mb-2 leading-4">Alan kutularına yapıştırın veya kopyalayın</p>
                                 <div className="space-y-1">
                                     {(TEMPLATE_VARIABLES[activeTemplate] || []).map(v => (
                                         <button
@@ -805,7 +805,7 @@ export default function EmailTemplateEditorPage() {
                                             className="w-full flex items-center justify-between px-2.5 py-1.5 text-[12px] bg-n0 border border-n200 rounded-md hover:border-brand-200 hover:bg-brand-50 transition-colors group"
                                         >
                                             <span className="text-n500">{v.label}</span>
-                                            <span className="text-brand font-mono text-[11px] truncate ml-1">{v.key}</span>
+                                            <span className="text-brand font-mono text-[10px] truncate ml-1">{v.key}</span>
                                         </button>
                                     ))}
                                 </div>
@@ -820,7 +820,7 @@ export default function EmailTemplateEditorPage() {
                         <textarea
                             value={currentHtml}
                             onChange={e => setHtmlCode(prev => ({ ...prev, [activeTemplate]: e.target.value }))}
-                            className="flex-1 p-4 font-mono text-xs text-n700 bg-n900 text-ok resize-none outline-none leading-relaxed"
+                            className="flex-1 p-3 font-mono text-xs text-n700 bg-n900 text-ok resize-none leading-relaxed"
                             placeholder="HTML kodunuzu buraya yazın..."
                             spellCheck={false}
                         />
@@ -829,7 +829,7 @@ export default function EmailTemplateEditorPage() {
                             <p className="text-xs font-semibold text-n400 uppercase tracking-wide mb-2 flex items-center gap-1">
                                 <Variable size={11} /> Değişkenler
                             </p>
-                            <p className="text-[11px] text-n400 mb-2 leading-4">Kopyala & yapıştır</p>
+                            <p className="text-[10px] text-n400 mb-2 leading-4">Kopyala & yapıştır</p>
                             <div className="space-y-1">
                                 {(TEMPLATE_VARIABLES[activeTemplate] || []).map(v => (
                                     <button
@@ -859,7 +859,7 @@ export default function EmailTemplateEditorPage() {
                             <p className="text-xs text-n500 flex items-center gap-1">
                                 <Eye size={12} /> Önizleme — gerçek e-posta bu şekilde görünür
                             </p>
-                            <span className="text-[11px] bg-warn-bg text-warn px-2 py-0.5 rounded-full">
+                            <span className="text-[11px] bg-warn-bg text-warn-text px-2 py-0.5 rounded-full">
                                 Örnek verilerle gösteriliyor
                             </span>
                         </div>

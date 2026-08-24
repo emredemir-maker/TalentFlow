@@ -41,9 +41,9 @@ export default function SalaryBackfillRow({ row, draft, hint, status = 'idle', e
     return (
         <div className={`rounded-xl border px-3 py-2.5 space-y-2 ${saved ? 'border-emerald-200 bg-emerald-50/40' : 'border-slate-200 bg-white'}`}>
             {/* Kimlik */}
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                    <p className="text-[12px] font-black text-slate-800 truncate">{row.candidateName}</p>
+                    <p className="text-[11px] font-black text-slate-800 truncate">{row.candidateName}</p>
                     <p className="text-[10px] text-slate-400 truncate">
                         {row.positionTitle || 'pozisyon bağlı değil'}
                         {row.date ? ` · ${row.date}` : ''}
@@ -51,7 +51,7 @@ export default function SalaryBackfillRow({ row, draft, hint, status = 'idle', e
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                     {band && (
-                        <span className="text-[11px] font-bold text-slate-600 tabular-nums">{formatBand(band)}</span>
+                        <span className="text-[10px] font-bold text-slate-600 tabular-nums">{formatBand(band)}</span>
                     )}
                     {saved ? (
                         <span className="px-1.5 py-px rounded border text-[9px] font-black bg-emerald-50 text-emerald-700 border-emerald-200">
@@ -73,7 +73,7 @@ export default function SalaryBackfillRow({ row, draft, hint, status = 'idle', e
                     <div className="flex items-start gap-2">
                         <Quote className="w-3 h-3 text-violet-400 shrink-0 mt-0.5" />
                         <div className="min-w-0 flex-1">
-                            <p className="text-[11px] text-violet-900">
+                            <p className="text-[10px] text-violet-900">
                                 Transkriptte: <strong>{formatBand(hint)}</strong>
                             </p>
                             <p className="text-[10px] text-violet-700 italic">&ldquo;{hint.quote}&rdquo;</p>
@@ -141,7 +141,7 @@ export default function SalaryBackfillRow({ row, draft, hint, status = 'idle', e
                         Transkript
                     </button>
                     {openTranscript && (
-                        <pre className="mt-1 max-h-44 overflow-y-auto whitespace-pre-wrap rounded-lg bg-slate-50 border border-slate-100 p-2 text-[11px] leading-relaxed text-slate-600">
+                        <pre className="mt-1 max-h-44 overflow-y-auto whitespace-pre-wrap rounded-lg bg-slate-50 border border-slate-100 p-2 text-[10px] leading-relaxed text-slate-600">
                             {row.transcript}
                         </pre>
                     )}

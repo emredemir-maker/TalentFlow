@@ -315,10 +315,10 @@ export default function InterviewReportPage() {
 
     if (!candidate || !session) {
         return (
-            <div className="h-screen bg-slate-50 flex flex-col items-center justify-center">
-                <Brain className="w-12 h-12 text-slate-300 animate-pulse mb-4" />
-                <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px]">Raporu Yükleniyor...</p>
-                <button onClick={() => navigate('/')} className="mt-6 text-blue-600 font-black text-[10px] uppercase">Geri Dön</button>
+            <div className="h-screen bg-n50 flex flex-col items-center justify-center">
+                <Brain className="w-12 h-12 text-n300 animate-pulse mb-4" />
+                <p className="text-n500 font-semibold uppercase tracking-[0.08em] text-[10px]">Raporu Yükleniyor...</p>
+                <button onClick={() => navigate('/')} className="mt-6 text-brand font-semibold text-[10px] uppercase tracking-[0.08em]">Geri Dön</button>
             </div>
         );
     }
@@ -333,7 +333,7 @@ export default function InterviewReportPage() {
     return (
         <div className="infoset flex flex-col h-screen bg-n25 overflow-hidden">
             {/* ── Başlık (56px) ──────────────────────────────────────────── */}
-            <header className="h-14 shrink-0 bg-n0 border-b border-n200 px-5 flex items-center gap-3 sticky top-0 z-40">
+            <header className="h-14 shrink-0 bg-n0 border-b border-n200 px-5 flex items-center gap-2 sticky top-0 z-40">
                 <button
                     onClick={() => navigate('/')}
                     className="w-7 h-7 rounded-md text-n500 hover:bg-n50 hover:text-n900 flex items-center justify-center"
@@ -343,7 +343,7 @@ export default function InterviewReportPage() {
                 </button>
                 <div>
                     <h1 className="text-[15px] font-semibold tracking-[-0.02em] m-0">Mülakat Raporu</h1>
-                    <span className="text-[11px] text-n400">
+                    <span className="text-[10px] text-n400">
                         {candidate.name}
                         {candidate.position || candidate.bestTitle ? ` · ${candidate.position || candidate.bestTitle}` : ''}
                         {` · ${formattedDate}`}
@@ -393,7 +393,7 @@ export default function InterviewReportPage() {
                         </div>
                         <div className="min-w-0">
                             <h2 className="text-[15px] font-semibold tracking-[-0.01em] m-0">{candidate.name}</h2>
-                            <span className="text-[11px] text-n400">{candidate.position || candidate.bestTitle || 'Pozisyon atanmadı'}</span>
+                            <span className="text-[10px] text-n400">{candidate.position || candidate.bestTitle || 'Pozisyon atanmadı'}</span>
                         </div>
 
                         {/* SKOR ROZETLERİ — kayıtta ne varsa o.
@@ -432,9 +432,9 @@ export default function InterviewReportPage() {
                     {/* TOAST */}
                     {toast && (
                         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100]">
-                            <div className="bg-n900 text-white px-4 py-2.5 rounded-md shadow-lg flex items-center gap-2">
+                            <div className="bg-n900 text-white px-4 py-2.5 rounded-md shadow-sm flex items-center gap-2">
                                 <Sparkles className="w-3.5 h-3.5" />
-                                <span className="text-[12px] font-medium">{toast.message}</span>
+                                <span className="text-[11px] font-medium">{toast.message}</span>
                             </div>
                         </div>
                     )}
@@ -481,22 +481,22 @@ export default function InterviewReportPage() {
                                     yanlış: tarama YAPILMADI, sonuç boş çıkmadı. */}
                                 {(session.criticalMoments || []).length > 0 && (
                                     <section className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-[18px] flex flex-col gap-3.5">
-                                        <h3 className="text-[11px] font-semibold text-n500 tracking-[0.1em] uppercase m-0">Kritik anlar</h3>
+                                        <h3 className="text-[10px] font-semibold text-n500 tracking-[0.1em] uppercase m-0">Kritik anlar</h3>
                                         <div className="flex flex-col gap-3.5">
                                             {session.criticalMoments.map((moment, idx) => (
                                                 <div key={idx} className="relative pl-4 border-l border-n200">
                                                     <div className={`absolute -left-[3.5px] top-1.5 w-1.5 h-1.5 rounded-full ${moment.color}`} />
                                                     <div className="flex items-center gap-2">
-                                                        <span className="text-[11px] text-n400 tabular-nums">{moment.time}</span>
+                                                        <span className="text-[10px] text-n400 tabular-nums">{moment.time}</span>
                                                         <span className={`text-[11px] font-semibold px-1.5 rounded text-white ${moment.color}`}>{moment.type}</span>
                                                     </div>
-                                                    <p className="text-[12px] text-n700 leading-relaxed mt-1 m-0">{moment.text}</p>
+                                                    <p className="text-[11px] text-n700 leading-relaxed mt-1 m-0">{moment.text}</p>
                                                 </div>
                                             ))}
                                         </div>
                                         <button
                                             onClick={() => setActiveTab('transcript')}
-                                            className="text-[12px] font-medium text-brand text-left"
+                                            className="text-[11px] font-medium text-brand text-left"
                                         >
                                             Tüm transkripti görüntüle →
                                         </button>
@@ -519,20 +519,20 @@ export default function InterviewReportPage() {
                                     alanına ait — başka bir ölçüm. İkisini aynı
                                     cetvelle göstermek 83'ü "83/3" yapardı. */}
                                 {hasStarScores(session) && (
-                                    <section className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-4">
+                                    <section className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-3">
                                         <div className="flex items-center gap-2.5 mb-0.5">
                                             <Star className="w-[15px] h-[15px] text-brand" />
-                                            <h3 className="text-[13px] font-semibold m-0">STAR kanıt analizi</h3>
+                                            <h3 className="text-[12px] font-semibold m-0">STAR kanıt analizi</h3>
                                         </div>
-                                        <p className="text-[11px] text-n400 mb-3 m-0">Görüşmede bulunan kanıtın yoğunluğu</p>
+                                        <p className="text-[10px] text-n400 mb-3 m-0">Görüşmede bulunan kanıtın yoğunluğu</p>
                                         {STAR_ROWS.map(row => {
                                             const score = session.starScores?.[row.key];
                                             if (!Number.isFinite(Number(score))) return null;
                                             return (
                                                 <div key={row.key} className="py-1.5">
                                                     <div className="flex items-center justify-between mb-1">
-                                                        <span className="text-[12px] text-n700">{row.label}</span>
-                                                        <span className="text-[12px] font-semibold">
+                                                        <span className="text-[11px] text-n700">{row.label}</span>
+                                                        <span className="text-[11px] font-semibold">
                                                             {score}<span className="text-n400 font-normal">/100</span>
                                                         </span>
                                                     </div>
@@ -558,13 +558,13 @@ export default function InterviewReportPage() {
                                     denk geliyordu — `cultureFit` "Liderlik" diye
                                     etiketlenmişti. Çubukta etiket sayının yanında. */}
                                 {hasCompetencyScores(session) && (
-                                    <section className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-4">
-                                        <h3 className="text-[13px] font-semibold mb-3 m-0">Yetkinlik analizi</h3>
+                                    <section className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-3">
+                                        <h3 className="text-[12px] font-semibold mb-3 m-0">Yetkinlik analizi</h3>
                                         {COMPETENCY_ROWS.map(row => (
                                             <div key={row.key} className="py-1.5">
                                                 <div className="flex items-center justify-between mb-1">
-                                                    <span className="text-[12px] text-n700">{row.label}</span>
-                                                    <span className="text-[12px] font-semibold">
+                                                    <span className="text-[11px] text-n700">{row.label}</span>
+                                                    <span className="text-[11px] font-semibold">
                                                         {starScores[row.key]}<span className="text-n400 font-normal">/100</span>
                                                     </span>
                                                 </div>
@@ -577,8 +577,8 @@ export default function InterviewReportPage() {
                                             </div>
                                         ))}
                                         <div className="flex items-center gap-2 mt-3 pt-3 border-t border-n100">
-                                            <span className="text-[12px] text-n500 flex-1">Ortalama</span>
-                                            <span className="text-[13px] font-semibold text-brand tabular-nums">
+                                            <span className="text-[11px] text-n500 flex-1">Ortalama</span>
+                                            <span className="text-[12px] font-semibold text-brand tabular-nums">
                                                 %{Math.round(COMPETENCY_ROWS.reduce((sum, r) => sum + (Number(starScores[r.key]) || 0), 0) / COMPETENCY_ROWS.length)}
                                             </span>
                                         </div>
@@ -586,15 +586,15 @@ export default function InterviewReportPage() {
                                 )}
 
                                 {/* KARAR */}
-                                <section className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-4 flex flex-col gap-3">
-                                    <h3 className="text-[11px] font-semibold text-n500 tracking-[0.08em] uppercase m-0">Karar</h3>
+                                <section className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-3 flex flex-col gap-2">
+                                    <h3 className="text-[10px] font-semibold text-n500 tracking-[0.08em] uppercase m-0">Karar</h3>
 
                                     <div>
                                         <textarea
                                             value={recruiterNotes}
                                             onChange={(e) => setRecruiterNotes(e.target.value)}
                                             rows={4}
-                                            className="w-full bg-n50 border border-n200 rounded-md p-2.5 text-[12px] text-n800 leading-relaxed focus:outline-none focus:border-brand resize-none placeholder:text-n400"
+                                            className="w-full bg-n50 border border-n200 rounded-md p-2.5 text-[11px] text-n800 leading-relaxed focus:outline-none focus:border-brand resize-none placeholder:text-n400"
                                             placeholder="Kararınızı ve gerekçesini yazın…"
                                         />
                                         <button
@@ -618,7 +618,7 @@ export default function InterviewReportPage() {
                                                     key={opt.value}
                                                     onClick={() => handleSaveDecision(opt.value)}
                                                     disabled={isSavingDecision}
-                                                    className={`text-[12px] font-semibold rounded-md py-2 border disabled:opacity-50 ${
+                                                    className={`text-[11px] font-semibold rounded-md py-2 border disabled:opacity-50 ${
                                                         on ? 'text-white border-transparent' : 'bg-n0 text-n600 border-n200 hover:bg-n50'
                                                     }`}
                                                     style={on ? { background: opt.bg } : undefined}
@@ -629,17 +629,17 @@ export default function InterviewReportPage() {
                                         })}
                                     </div>
                                     {finalDecision && (
-                                        <p className="text-[11px] text-n400 text-center m-0">
+                                        <p className="text-[10px] text-n400 text-center m-0">
                                             Mevcut karar: <span className="text-n700 font-semibold">{finalDecision}</span>
                                         </p>
                                     )}
                                 </section>
 
                                 {/* MÜLAKATÇI DEĞERLENDİRMESİ */}
-                                <section className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-4 flex flex-col gap-3">
+                                <section className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-3 flex flex-col gap-2">
                                     <div className="flex items-center gap-2">
                                         <Award className="w-[15px] h-[15px] text-brand" />
-                                        <h3 className="text-[13px] font-semibold m-0">Mülakatçı değerlendirmesi</h3>
+                                        <h3 className="text-[12px] font-semibold m-0">Mülakatçı değerlendirmesi</h3>
                                         <button
                                             onClick={runEvaluateInterviewer}
                                             disabled={evalLoading}
@@ -650,44 +650,44 @@ export default function InterviewReportPage() {
                                         </button>
                                     </div>
                                     {evalLoading && (
-                                        <p className="text-[12px] text-n500 m-0">Mülakatçı performansı analiz ediliyor…</p>
+                                        <p className="text-[11px] text-n500 m-0">Mülakatçı performansı analiz ediliyor…</p>
                                     )}
                                     {!evalLoading && !recruiterEval && (
-                                        <p className="text-[12px] text-n400 leading-relaxed m-0">
+                                        <p className="text-[11px] text-n400 leading-relaxed m-0">
                                             "Analiz et" ile bu görüşmenin mülakatçı performans değerlendirmesini üretin.
                                         </p>
                                     )}
                                     {!evalLoading && recruiterEval && (
-                                        <div className="flex flex-col gap-3">
+                                        <div className="flex flex-col gap-2">
                                             <div className="flex items-start gap-2.5 bg-n50 rounded-md p-2.5">
                                                 <span className="text-[15px] font-semibold text-brand shrink-0">
-                                                    {recruiterEval.overallScore}<span className="text-n400 text-[12px] font-normal">/5</span>
+                                                    {recruiterEval.overallScore}<span className="text-n400 text-[11px] font-normal">/5</span>
                                                 </span>
-                                                <p className="text-[12px] text-n700 leading-relaxed flex-1 m-0">{recruiterEval.summary}</p>
+                                                <p className="text-[11px] text-n700 leading-relaxed flex-1 m-0">{recruiterEval.summary}</p>
                                             </div>
                                             <button
                                                 onClick={() => setEvalOpen(v => !v)}
-                                                className="flex items-center justify-between text-[11px] font-semibold text-n500 tracking-[0.08em] uppercase hover:text-n700"
+                                                className="flex items-center justify-between text-[10px] font-semibold text-n500 tracking-[0.08em] uppercase hover:text-n700"
                                             >
                                                 Boyut puanları
                                                 <ChevronDown className={`w-3.5 h-3.5 transition-transform ${evalOpen ? 'rotate-180' : ''}`} />
                                             </button>
                                             {evalOpen && (
-                                                <div className="flex flex-col gap-3">
+                                                <div className="flex flex-col gap-2">
                                                     {(recruiterEval.dimensions || []).map(dim => (
                                                         <div key={dim.key}>
                                                             <div className="flex items-center justify-between mb-1">
-                                                                <span className="text-[12px] font-semibold text-n700">{dim.label}</span>
+                                                                <span className="text-[11px] font-semibold text-n700">{dim.label}</span>
                                                                 <span className="flex items-center gap-1">
                                                                     {[1, 2, 3, 4, 5].map(n => (
                                                                         <span key={n} className={`w-2 h-2 rounded-full ${n <= dim.score ? 'bg-brand' : 'bg-n200'}`} />
                                                                     ))}
-                                                                    <span className="text-[11px] font-semibold text-n500 ml-1">{dim.score}/5</span>
+                                                                    <span className="text-[10px] font-semibold text-n500 ml-1">{dim.score}/5</span>
                                                                 </span>
                                                             </div>
-                                                            <p className="text-[12px] text-n600 leading-relaxed m-0">{dim.explanation}</p>
+                                                            <p className="text-[11px] text-n600 leading-relaxed m-0">{dim.explanation}</p>
                                                             {dim.tip && (
-                                                                <p className="text-[12px] text-brand leading-relaxed border-l-2 border-brand-100 pl-2 mt-1 m-0">{dim.tip}</p>
+                                                                <p className="text-[11px] text-brand leading-relaxed border-l-2 border-brand-100 pl-2 mt-1 m-0">{dim.tip}</p>
                                                             )}
                                                         </div>
                                                     ))}
@@ -703,8 +703,8 @@ export default function InterviewReportPage() {
                         <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-3.5 items-start">
 
                             <div className="flex flex-col gap-3.5 min-w-0">
-                                <section className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-4">
-                                    <h3 className="text-[11px] font-semibold text-n500 tracking-[0.08em] uppercase mb-2.5 m-0">Oturum bilgileri</h3>
+                                <section className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-3">
+                                    <h3 className="text-[10px] font-semibold text-n500 tracking-[0.08em] uppercase mb-2.5 m-0">Oturum bilgileri</h3>
                                     {/* YALNIZCA KAYITTA OLAN ALANLAR.
                                         Eskiden dil alanı boşsa "Türkçe" yazıyordu ve
                                         süre boşsa "N/A" basılıyordu — biri hiç
@@ -717,8 +717,8 @@ export default function InterviewReportPage() {
                                         { label: 'Dil', value: session.language || null },
                                     ].filter(item => item.value).map(item => (
                                         <div key={item.label} className="flex items-center justify-between py-1">
-                                            <span className="text-[12px] text-n500">{item.label}</span>
-                                            <span className="text-[12px] font-semibold text-n800">{item.value}</span>
+                                            <span className="text-[11px] text-n500">{item.label}</span>
+                                            <span className="text-[11px] font-semibold text-n800">{item.value}</span>
                                         </div>
                                     ))}
                                 </section>
@@ -730,8 +730,8 @@ export default function InterviewReportPage() {
                                     'Yorumlanıyor...' diye hiç bitmeyen bir etiket
                                     basılıyordu. */}
                                 {(session.keywords || []).length > 0 && (
-                                    <section className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-4">
-                                        <h3 className="text-[11px] font-semibold text-n500 tracking-[0.08em] uppercase mb-2.5 m-0">Anahtar kelimeler</h3>
+                                    <section className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-3">
+                                        <h3 className="text-[10px] font-semibold text-n500 tracking-[0.08em] uppercase mb-2.5 m-0">Anahtar kelimeler</h3>
                                         <div className="flex flex-wrap gap-1.5">
                                             {session.keywords.map(tag => (
                                                 <span key={tag} className="text-[11px] font-medium text-n600 bg-n50 border border-n200 rounded-full px-2 py-0.5">{tag}</span>
@@ -748,7 +748,7 @@ export default function InterviewReportPage() {
                             <div className="flex flex-col gap-3.5 min-w-0">
                                 <section className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-[18px] flex flex-col h-[640px]">
                                     <div className="flex items-center gap-2 mb-3">
-                                        <h3 className="text-[13px] font-semibold m-0">Tam transkript</h3>
+                                        <h3 className="text-[12px] font-semibold m-0">Tam transkript</h3>
                                         <button
                                             onClick={handleDownload}
                                             className="ml-auto flex items-center gap-1.5 text-[12px] font-medium text-n600 bg-n50 border border-n200 hover:bg-n100 rounded-md px-2.5 py-[5px]"
@@ -766,7 +766,7 @@ export default function InterviewReportPage() {
                                             value={transcriptSearch}
                                             onChange={(e) => setTranscriptSearch(e.target.value)}
                                             placeholder="Transkript içinde ara…"
-                                            className="w-full bg-n50 border border-n200 rounded-md pl-8 pr-3 py-2 text-[12px] focus:outline-none focus:border-brand"
+                                            className="w-full bg-n50 border border-n200 rounded-md pl-8 pr-3 py-2 text-[11px] focus:outline-none focus:border-brand"
                                         />
                                     </div>
 
@@ -775,7 +775,7 @@ export default function InterviewReportPage() {
                                             /* Manuel görüşme: rol etiketi yok, kullanıcının
                                                yapıştırdığı metin olduğu gibi gösteriliyor.
                                                Uydurma bir rol ataması yapmıyoruz. */
-                                            <div className="bg-n50 border border-n200 rounded-md p-3.5 text-[13px] leading-relaxed text-n800 whitespace-pre-wrap">
+                                            <div className="bg-n50 border border-n200 rounded-md p-3.5 text-[12px] leading-relaxed text-n800 whitespace-pre-wrap">
                                                 {transcriptText}
                                             </div>
                                         ) : visibleTranscript.length > 0 ? (
@@ -789,19 +789,19 @@ export default function InterviewReportPage() {
                                                         }`}
                                                     >
                                                         <div className="flex items-center justify-between mb-0.5">
-                                                            <span className={`text-[11px] font-semibold tracking-[0.08em] uppercase ${isCandidate ? 'text-brand' : 'text-n400'}`}>
+                                                            <span className={`text-[10px] font-semibold tracking-[0.08em] uppercase ${isCandidate ? 'text-brand' : 'text-n400'}`}>
                                                                 {msg.role}
                                                             </span>
-                                                            {msg.time && <span className="text-[11px] text-n400 tabular-nums">{msg.time}</span>}
+                                                            {msg.time && <span className="text-[10px] text-n400 tabular-nums">{msg.time}</span>}
                                                         </div>
-                                                        <p className="text-[13px] leading-relaxed text-n700 m-0">{msg.text}</p>
+                                                        <p className="text-[12px] leading-relaxed text-n700 m-0">{msg.text}</p>
                                                     </div>
                                                 );
                                             })
                                         ) : (
                                             <div className="flex-1 flex flex-col items-center justify-center text-center">
                                                 <MessageSquare className="w-6 h-6 text-n300 mb-2" />
-                                                <p className="text-[12px] text-n400 m-0">
+                                                <p className="text-[11px] text-n400 m-0">
                                                     {transcriptSearch && transcriptMessages.length > 0
                                                         ? 'Aramaya uyan satır yok.'
                                                         : 'Diyalog verisi bulunamadı.'}
@@ -816,12 +816,12 @@ export default function InterviewReportPage() {
                                     analiz edildi." yazıyordu — yapılmamış bir analizi
                                     yapılmış gibi gösteren sabit bir cümle. */}
                                 {session.aiSummary && (
-                                    <section className="bg-brand-50 border border-brand-100 rounded-[14px] p-4">
+                                    <section className="bg-brand-50 border border-brand-100 rounded-[14px] p-3">
                                         <div className="flex items-center gap-2 mb-1.5">
                                             <Sparkles className="w-3.5 h-3.5 text-brand" />
-                                            <h3 className="text-[11px] font-semibold text-brand tracking-[0.08em] uppercase m-0">Özet</h3>
+                                            <h3 className="text-[10px] font-semibold text-brand tracking-[0.08em] uppercase m-0">Özet</h3>
                                         </div>
-                                        <p className="text-[13px] text-n700 leading-relaxed m-0">{session.aiSummary}</p>
+                                        <p className="text-[12px] text-n700 leading-relaxed m-0">{session.aiSummary}</p>
                                     </section>
                                 )}
                             </div>

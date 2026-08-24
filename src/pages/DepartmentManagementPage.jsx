@@ -226,8 +226,8 @@ export default function DepartmentManagementPage() {
         <div className="pb-10 space-y-6">
 
             {/* Sub-header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
                     <div className="w-9 h-9 rounded-md bg-brand-50 border border-brand-100 flex items-center justify-center">
                         <Building2 className="w-4.5 h-4.5 text-brand" />
                     </div>
@@ -245,7 +245,7 @@ export default function DepartmentManagementPage() {
             </div>
 
             {/* Stats Row */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 {[
                     { label: 'Toplam Departman', value: departments.length, color: 'text-brand', bg: 'bg-brand-50', border: 'border-brand-100' },
                     { label: 'Toplam Kullanıcı', value: allUsers.length, color: 'text-brand-600', bg: 'bg-brand-50', border: 'border-brand-100' },
@@ -257,8 +257,8 @@ export default function DepartmentManagementPage() {
                         border: unassignedUsers.length > 0 ? 'border-transparent' : 'border-transparent'
                     },
                 ].map((s, i) => (
-                    <div key={i} className={`${s.bg} border ${s.border} rounded-md p-4`}>
-                        <p className="text-[11px] font-semibold text-n500 uppercase tracking-wide mb-1">{s.label}</p>
+                    <div key={i} className={`${s.bg} border ${s.border} rounded-md p-3`}>
+                        <p className="text-[10px] font-semibold text-n500 uppercase tracking-wide mb-1">{s.label}</p>
                         <p className={`text-2xl font-semibold ${s.color}`}>{s.value}</p>
                     </div>
                 ))}
@@ -266,13 +266,13 @@ export default function DepartmentManagementPage() {
 
             {/* Unassigned Warning */}
             {unassignedUsers.length > 0 && (
-                <div className="flex items-start gap-3 p-4 rounded-md bg-bad-bg border border-transparent">
+                <div className="flex items-start gap-2 p-3 rounded-md bg-bad-bg border border-transparent">
                     <AlertCircle className="w-4.5 h-4.5 text-bad shrink-0 mt-0.5" />
                     <div>
                         <p className="text-sm font-semibold text-bad">{unassignedUsers.length} departman kullanıcısı henüz atanmamış</p>
                         <div className="flex flex-wrap gap-1.5 mt-2">
                             {unassignedUsers.map(u => (
-                                <span key={u.id} className="text-xs bg-bad-bg text-bad px-2 py-0.5 rounded-md font-medium">
+                                <span key={u.id} className="text-xs bg-bad-bg text-bad-text px-2 py-0.5 rounded-md font-medium">
                                     {u.displayName || u.email}
                                 </span>
                             ))}
@@ -313,7 +313,7 @@ export default function DepartmentManagementPage() {
                             <div key={dept.id} className={`bg-n0 rounded-[14px] border overflow-hidden transition-all duration-300 ${isExpanded ? 'border-brand-100 shadow-sm shadow-none' : 'border-n200 hover:border-n300'}`}>
                                 {/* Dept Header Row */}
                                 <div
-                                    className="px-5 py-4 flex items-center gap-4 cursor-pointer"
+                                    className="px-5 py-3 flex items-center gap-3 cursor-pointer"
                                     onClick={() => setExpandedDept(isExpanded ? null : dept.id)}
                                 >
                                     <div className="w-11 h-11 rounded-md flex items-center justify-center shrink-0" style={{ background: `${deptColor}18`, border: `1px solid ${deptColor}30` }}>
@@ -325,18 +325,18 @@ export default function DepartmentManagementPage() {
                                     </div>
 
                                     {/* Stat Pills */}
-                                    <div className="hidden sm:flex items-center gap-3">
+                                    <div className="hidden sm:flex items-center gap-2">
                                         <div className="text-center px-3 py-1.5 rounded-md bg-n50 border border-n200">
                                             <p className="text-sm font-semibold text-n700">{stats.userCount}</p>
-                                            <p className="text-[11px] font-semibold text-n400 uppercase tracking-wide">Kullanıcı</p>
+                                            <p className="text-[10px] font-semibold text-n400 uppercase tracking-wide">Kullanıcı</p>
                                         </div>
                                         <div className="text-center px-3 py-1.5 rounded-md bg-n50 border border-n200">
                                             <p className="text-sm font-semibold text-n700">{stats.positionCount}</p>
-                                            <p className="text-[11px] font-semibold text-n400 uppercase tracking-wide">Pozisyon</p>
+                                            <p className="text-[10px] font-semibold text-n400 uppercase tracking-wide">Pozisyon</p>
                                         </div>
                                         <div className="text-center px-3 py-1.5 rounded-md bg-ok-bg border border-transparent">
                                             <p className="text-sm font-semibold text-ok">{stats.openPositions}</p>
-                                            <p className="text-[11px] font-semibold text-ok uppercase tracking-wide">Açık</p>
+                                            <p className="text-[10px] font-semibold text-ok uppercase tracking-wide">Açık</p>
                                         </div>
                                     </div>
 
@@ -362,7 +362,7 @@ export default function DepartmentManagementPage() {
 
                                 {/* Expanded Content */}
                                 {isExpanded && (
-                                    <div className="border-t border-n200 bg-n50/50 px-5 py-4 space-y-4">
+                                    <div className="border-t border-n200 bg-n50/50 px-5 py-3 space-y-4">
                                         {/* Users Section */}
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-2">
@@ -384,20 +384,20 @@ export default function DepartmentManagementPage() {
                                         ) : (
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                                                 {stats.users.map(u => (
-                                                    <div key={u.id} className="group flex items-center gap-3 p-3 rounded-md bg-n0 border border-n200 hover:border-n200 transition-all">
-                                                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-semibold text-white shrink-0" style={{ background: `linear-gradient(135deg, ${deptColor}, ${deptColor}aa)` }}>
+                                                    <div key={u.id} className="group flex items-center gap-2 p-3 rounded-md bg-n0 border border-n200 hover:border-n200 transition-all">
+                                                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-semibold text-white shrink-0" style={{ background: `linear-gradient(135deg, ${deptColor}, ${deptColor}aa)` }}>
                                                             {u.displayName?.substring(0, 2).toUpperCase() || 'U'}
                                                         </div>
                                                         <div className="flex-1 min-w-0">
                                                             <p className="text-sm font-semibold text-n700 truncate">{u.displayName}</p>
-                                                            <p className="text-[11px] text-n400 truncate">{u.email}</p>
+                                                            <p className="text-[10px] text-n400 truncate">{u.email}</p>
                                                         </div>
                                                         <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-n100 text-n500">
                                                             {u.role === 'super_admin' ? 'Admin' : u.role === 'department_user' ? 'Dept' : 'Recruiter'}
                                                         </span>
                                                         <button
                                                             onClick={() => handleRemoveUser(u.id)}
-                                                            className="p-1.5 rounded-md text-n300 hover:text-bad hover:bg-bad-bg transition-all opacity-0 group-hover:opacity-100"
+                                                            className="p-1.5 rounded-md text-n300 hover:text-bad-text hover:bg-bad-bg transition-all opacity-0 group-hover:opacity-100"
                                                         >
                                                             <UserMinus className="w-3.5 h-3.5" />
                                                         </button>
@@ -415,7 +415,7 @@ export default function DepartmentManagementPage() {
                                                 </div>
                                                 <div className="flex flex-wrap gap-2">
                                                     {positions.filter(p => p.department === dept.name).map(p => (
-                                                        <span key={p.id} className={`px-2.5 py-1 rounded-md text-xs font-medium border ${p.status === 'open' ? 'bg-ok-bg text-ok border-transparent' : 'bg-n50 text-n500 border-n200'}`}>
+                                                        <span key={p.id} className={`px-2.5 py-1 rounded-md text-xs font-medium border ${p.status === 'open' ? 'bg-ok-bg text-ok-text border-transparent' : 'bg-n50 text-n500 border-n200'}`}>
                                                             {p.title} · {p.status === 'open' ? 'Aktif' : 'Kapalı'}
                                                         </span>
                                                     ))}
@@ -432,11 +432,11 @@ export default function DepartmentManagementPage() {
 
             {/* Add/Edit Department Modal */}
             {showForm && (
-                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-3">
                     <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={resetForm} />
                     <div className="relative w-full max-w-md bg-n0 rounded-[14px] border border-n200 shadow-2xl">
                         <div className="flex items-center justify-between px-6 py-5 border-b border-n200">
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2">
                                 <div className="w-9 h-9 rounded-md bg-brand-50 border border-brand-100 flex items-center justify-center">
                                     <Building2 className="w-4.5 h-4.5 text-brand" />
                                 </div>
@@ -486,7 +486,7 @@ export default function DepartmentManagementPage() {
                                     ))}
                                 </div>
                                 {/* Preview */}
-                                <div className="flex items-center gap-3 p-3 bg-n50 border border-n200 rounded-md">
+                                <div className="flex items-center gap-2 p-3 bg-n50 border border-n200 rounded-md">
                                     <div className="w-9 h-9 rounded-md flex items-center justify-center" style={{ background: `${formData.color}18`, border: `1px solid ${formData.color}30` }}>
                                         <Building2 className="w-4.5 h-4.5" style={{ color: formData.color }} />
                                     </div>
@@ -494,7 +494,7 @@ export default function DepartmentManagementPage() {
                                 </div>
                             </div>
 
-                            <div className="flex gap-3 pt-1">
+                            <div className="flex gap-2 pt-1">
                                 <button type="button" onClick={resetForm}
                                     className="flex-1 py-2.5 text-sm font-semibold text-n600 bg-n100 rounded-md hover:bg-n100 transition-all"
                                 >
@@ -520,11 +520,11 @@ export default function DepartmentManagementPage() {
                 const assignable = getAssignableUsers(deptName);
 
                 return (
-                    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+                    <div className="fixed inset-0 z-[200] flex items-center justify-center p-3">
                         <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setAssignModal(null)} />
                         <div className="relative w-full max-w-md bg-n0 rounded-[14px] border border-n200 shadow-2xl">
                             <div className="flex items-center justify-between px-6 py-5 border-b border-n200">
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2">
                                     <div className="w-9 h-9 rounded-md bg-brand-50 border border-brand-100 flex items-center justify-center">
                                         <UserPlus className="w-4.5 h-4.5 text-brand" />
                                     </div>
@@ -556,7 +556,7 @@ export default function DepartmentManagementPage() {
                                         </div>
                                     ) : (
                                         assignable.map(u => (
-                                            <div key={u.id} className="group flex items-center gap-3 p-3 rounded-md border border-n200 hover:border-brand-100 hover:bg-brand-50/30 transition-all cursor-pointer"
+                                            <div key={u.id} className="group flex items-center gap-2 p-3 rounded-md border border-n200 hover:border-brand-100 hover:bg-brand-50/30 transition-all cursor-pointer"
                                                 onClick={() => { handleAssignUser(u.id, deptName); setAssignModal(null); }}
                                             >
                                                 <div className="w-8 h-8 rounded-full bg-n100 border border-n200 flex items-center justify-center text-xs font-semibold text-n600 shrink-0">
@@ -564,7 +564,7 @@ export default function DepartmentManagementPage() {
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <p className="text-sm font-semibold text-n700 truncate">{u.displayName}</p>
-                                                    <p className="text-[11px] text-n400 truncate">{u.email} · {u.role === 'super_admin' ? 'Admin' : u.role === 'department_user' ? 'Dept Kullanıcısı' : 'Recruiter'}</p>
+                                                    <p className="text-[10px] text-n400 truncate">{u.email} · {u.role === 'super_admin' ? 'Admin' : u.role === 'department_user' ? 'Dept Kullanıcısı' : 'Recruiter'}</p>
                                                 </div>
                                                 <span className="text-xs font-semibold text-brand opacity-0 group-hover:opacity-100 transition-all">Ata →</span>
                                             </div>

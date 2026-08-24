@@ -54,7 +54,7 @@ export default function StarScoreCard({ analysis, candidate, onRefresh }) {
                             bulunduğunu söylüyor. Yöneticiler %100 görüp "çok iyi
                             aday" diye okuyor, sonra CV'ye bakıp haklı olarak
                             "bize uymaz" diyorlardı. */}
-                        <h3 className="text-[13px] font-bold text-on-surface tracking-tight">STAR Kanıt Analizi</h3>
+                        <h3 className="text-[12px] font-bold text-on-surface tracking-tight">STAR Kanıt Analizi</h3>
                         <p className="text-[8px] text-text-muted font-black uppercase mt-0.5 tracking-[0.2em] opacity-60">CV'de bulunan kanıtın yoğunluğu</p>
                     </div>
                 </div>
@@ -92,7 +92,7 @@ export default function StarScoreCard({ analysis, candidate, onRefresh }) {
                                     <Info className="w-3 h-3" />
                                 </button>
                             </span>
-                            <span className={`text-[12px] font-black ${config.color}`}>{getScoreValue(scores[key])}<span className="text-text-muted/30 ml-0.5 font-medium">/10</span></span>
+                            <span className={`text-[11px] font-black ${config.color}`}>{getScoreValue(scores[key])}<span className="text-text-muted/30 ml-0.5 font-medium">/10</span></span>
                         </div>
                         <div className="h-1.5 bg-surface-container-lowest rounded-full overflow-hidden border border-outline-variant/5 shadow-inner">
                             <div
@@ -109,7 +109,7 @@ export default function StarScoreCard({ analysis, candidate, onRefresh }) {
                     <div className="w-full max-w-sm bg-white border border-outline-variant/10 rounded-3xl p-6 shadow-2xl relative animate-in zoom-in-95 duration-300">
                         <button onClick={() => setSelectedDetail(null)} className="absolute top-5 right-5 text-text-muted hover:text-on-surface transition-colors"><X className="w-4 h-4" /></button>
 
-                        <div className="flex items-center gap-4 mb-6">
+                        <div className="flex items-center gap-3 mb-6">
                             <div className={`w-12 h-12 rounded-xl ${selectedDetail.bg} ${selectedDetail.color} flex items-center justify-center font-black text-xl border border-current/10`}>{selectedDetail.key[0]}</div>
                             <div>
                                 <h4 className="text-base font-bold text-on-surface tracking-tight">{selectedDetail.label.split(' ')[0]}</h4>
@@ -123,7 +123,7 @@ export default function StarScoreCard({ analysis, candidate, onRefresh }) {
 
                         <button
                             onClick={() => setSelectedDetail(null)}
-                            className="w-full mt-10 py-5 rounded-2xl bg-primary text-white text-[11px] font-black uppercase tracking-[0.2em] shadow-lg shadow-primary/20 hover:opacity-90 transition-all transition-all leading-none"
+                            className="w-full mt-10 py-5 rounded-2xl bg-primary text-white text-[10px] font-black uppercase tracking-[0.2em] shadow-lg shadow-primary/20 hover:opacity-90 transition-all transition-all leading-none"
                         >
                             İNCELENDİ
                         </button>

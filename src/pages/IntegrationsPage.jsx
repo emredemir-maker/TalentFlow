@@ -127,7 +127,7 @@ function InfoBox({ type = 'info', children }) {
     }[type];
     const Icon = s.icon;
     return (
-        <div className={`flex gap-3 p-3.5 rounded-xl border my-3 ${s.bg}`}>
+        <div className={`flex gap-2 p-3.5 rounded-xl border my-3 ${s.bg}`}>
             <Icon className={`w-4 h-4 shrink-0 mt-0.5 ${s.ic}`} />
             <p className={`text-xs leading-relaxed ${s.tc}`}>{children}</p>
         </div>
@@ -142,7 +142,7 @@ function IntegrationCard({ icon, name, subtitle, status, features, configContent
     return (
         <div className={`bg-white rounded-2xl border transition-all duration-200 ${expanded ? 'border-slate-300 shadow-md' : 'border-slate-200 hover:border-slate-300 hover:shadow-sm'}`}>
             <div
-                className={`flex items-center gap-4 p-5 ${!isComingSoon ? 'cursor-pointer' : ''}`}
+                className={`flex items-center gap-3 p-3.5 ${!isComingSoon ? 'cursor-pointer' : ''}`}
                 onClick={() => !isComingSoon && setExpanded(v => !v)}
             >
                 <div className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0 shadow-sm">
@@ -212,7 +212,7 @@ function SetupSteps({ steps, accent = 'bg-slate-200 text-slate-600' }) {
             {steps.map((step, i) => (
                 <li key={i} className="flex items-start gap-2">
                     <span className={`w-4 h-4 rounded-full ${accent} flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5`}>{i + 1}</span>
-                    <span className="text-[11px] text-slate-600 leading-relaxed">{step}</span>
+                    <span className="text-[10px] text-slate-600 leading-relaxed">{step}</span>
                 </li>
             ))}
         </ol>
@@ -394,7 +394,7 @@ export default function IntegrationsPage() {
     if (loading) {
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-                <div className="flex items-center gap-3 text-slate-500">
+                <div className="flex items-center gap-2 text-slate-500">
                     <Loader2 className="w-5 h-5 animate-spin" />
                     <span className="text-sm">Entegrasyonlar yükleniyor...</span>
                 </div>
@@ -406,13 +406,13 @@ export default function IntegrationsPage() {
         <div className="min-h-screen bg-slate-50">
             {/* Header */}
             <div className="bg-white border-b border-slate-200 sticky top-0 z-10">
-                <div className="max-w-3xl mx-auto px-6 py-4 flex items-center gap-3">
+                <div className="max-w-3xl mx-auto px-6 py-3 flex items-center gap-2">
                     <div className="w-8 h-8 rounded-xl bg-slate-900 flex items-center justify-center shrink-0">
                         <Plug className="w-4 h-4 text-white" />
                     </div>
                     <div>
                         <h1 className="text-sm font-bold text-slate-900 leading-none">Entegrasyon Merkezi</h1>
-                        <p className="text-[11px] text-slate-400 mt-0.5">Dış servis bağlantılarını yönetin</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">Dış servis bağlantılarını yönetin</p>
                     </div>
                     <span className="ml-auto text-[10px] bg-red-50 text-red-600 border border-red-200 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
                         <Shield className="w-3 h-3" /> Süper Admin
@@ -423,7 +423,7 @@ export default function IntegrationsPage() {
             <div className="max-w-3xl mx-auto px-6 py-8 space-y-6">
 
                 {/* Taşınabilirlik Notu */}
-                <div className="flex gap-3 p-4 bg-blue-50 border border-blue-200 rounded-2xl">
+                <div className="flex gap-2 p-3 bg-blue-50 border border-blue-200 rounded-2xl">
                     <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
                     <div>
                         <p className="text-xs font-bold text-blue-800 mb-0.5">Platform Bağımsız Yapılandırma</p>
@@ -434,7 +434,7 @@ export default function IntegrationsPage() {
                 </div>
 
                 {/* Güvenlik Uyarısı */}
-                <div className="flex gap-3 p-4 bg-amber-50 border border-amber-200 rounded-2xl">
+                <div className="flex gap-2 p-3 bg-amber-50 border border-amber-200 rounded-2xl">
                     <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
                     <p className="text-xs text-amber-700 leading-relaxed">
                         <strong>Güvenlik:</strong> Client Secret değerleri Firestore'da saklanır. Yalnızca Süper Admin erişebilir. Üretim ortamında ek şifreleme katmanı önerilir.
@@ -467,14 +467,14 @@ export default function IntegrationsPage() {
                                         Google Workspace entegrasyonu <strong>şu an aktif ve çalışıyor</strong> — Firebase OAuth 2.0 ile yerleşik olarak entegre edilmiştir. Herhangi bir yapılandırma gerekmez. Kullanıcılar <strong>Ayarlar → Hesabım</strong> bölümünden Gmail ve Google Takvim hesaplarını bağlayabilir.
                                     </InfoBox>
 
-                                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2.5">
+                                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2.5">
                                         <p className="text-xs font-semibold text-slate-600 mb-2">Etkin Özellikler</p>
                                         {[
                                             { icon: <Mail className="w-3.5 h-3.5 text-blue-500" />, label: 'Gmail API', desc: 'Mülakat davetleri ve e-posta takibi' },
                                             { icon: <Calendar className="w-3.5 h-3.5 text-emerald-500" />, label: 'Google Calendar', desc: 'Otomatik etkinlik oluşturma ve müsaitlik kontrolü' },
                                             { icon: <Video className="w-3.5 h-3.5 text-red-500" />, label: 'Google Meet', desc: 'Mülakat davetlerinde otomatik Meet linki üretimi' },
                                         ].map((f, i) => (
-                                            <div key={i} className="flex items-center gap-3">
+                                            <div key={i} className="flex items-center gap-2">
                                                 <div className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center shrink-0">{f.icon}</div>
                                                 <div>
                                                     <p className="text-xs font-medium text-slate-700">{f.label}</p>
@@ -522,7 +522,7 @@ export default function IntegrationsPage() {
                                             />
                                             <div className="flex items-center gap-2">
                                                 <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer"
-                                                    className="inline-flex items-center gap-1 text-[11px] text-blue-600 font-semibold hover:underline">
+                                                    className="inline-flex items-center gap-1 text-[10px] text-blue-600 font-semibold hover:underline">
                                                     Google Cloud Console <ExternalLink className="w-3 h-3" />
                                                 </a>
                                             </div>
@@ -558,7 +558,7 @@ export default function IntegrationsPage() {
                                         Microsoft Azure AD'de bir uygulama kaydı oluşturun ve aşağıdaki Redirect URI'yi "Yetkilendirme redirect URI'leri" listesine ekleyin.
                                     </InfoBox>
 
-                                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
                                         <p className="text-xs font-bold text-slate-600 mb-3 flex items-center gap-1.5">
                                             <Zap className="w-3.5 h-3.5 text-amber-500" /> Azure AD Kurulum Adımları
                                         </p>
@@ -584,7 +584,7 @@ export default function IntegrationsPage() {
                                         copyable={true}
                                     />
 
-                                    <div className="grid grid-cols-1 gap-3">
+                                    <div className="grid grid-cols-1 gap-2">
                                         <ConfigField
                                             label="Application (Client) ID"
                                             hint="Azure AD → Uygulamanız → Genel Bakış → Uygulama (istemci) kimliği"
@@ -612,7 +612,7 @@ export default function IntegrationsPage() {
                                         />
                                     </div>
 
-                                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
                                         <p className="text-xs font-bold text-slate-600 mb-3">Gerekli API İzinleri (Delegated)</p>
                                         <ScopeTable scopes={[
                                             { scope: 'User.Read',                desc: 'Kullanıcı profili' },
@@ -644,7 +644,7 @@ export default function IntegrationsPage() {
                 {/* Yakında */}
                 <div>
                     <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4">Yakında</h2>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                         {[
                             {
                                 icon: <SlackIcon size={22} />,
@@ -665,15 +665,15 @@ export default function IntegrationsPage() {
                                 chips: ['ATS Sync', 'Webhook'],
                             },
                         ].map((item, i) => (
-                            <div key={i} className="bg-white border border-slate-200 rounded-2xl p-4 opacity-70">
-                                <div className="flex items-center gap-3 mb-3">
+                            <div key={i} className="bg-white border border-slate-200 rounded-2xl p-3 opacity-70">
+                                <div className="flex items-center gap-2 mb-3">
                                     <div className="w-9 h-9 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center">{item.icon}</div>
                                     <div>
                                         <p className="text-xs font-bold text-slate-700">{item.name}</p>
                                         <StatusBadge status="soon" />
                                     </div>
                                 </div>
-                                <p className="text-[11px] text-slate-400 leading-relaxed mb-3">{item.desc}</p>
+                                <p className="text-[10px] text-slate-400 leading-relaxed mb-3">{item.desc}</p>
                                 <div className="flex flex-wrap gap-1">
                                     {item.chips.map(c => (
                                         <span key={c} className="text-[9px] bg-slate-50 border border-slate-200 text-slate-500 px-1.5 py-0.5 rounded-md">{c}</span>
