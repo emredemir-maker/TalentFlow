@@ -1,7 +1,6 @@
 // src/pages/CandidateProcessPage.jsx
-import { analysisScoreFor } from '../utils/positionScore';
 import { scoreForPositionDetail } from '../utils/candidateTable';
-import { memo, useMemo, useState, useEffect, useCallback } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCandidates } from '../context/CandidatesContext';
 import { usePositions } from '../context/PositionsContext';
@@ -14,7 +13,7 @@ import { extractTextFromFile } from '../services/cvParser';
 import { calculateMatchScore, domainLabel, detectCandidateDomain, detectPositionDomain } from '../services/matchService';
 import { applyPiiMask, stripPiiForAI } from '../utils/pii';
 import { cleanRoleText, analysisForPosition, fullAnalysisForPosition } from '../utils/candidateTable';
-import { mustHaveGate, gateLabel, gateRank } from '../utils/mustHaveGate';
+import { mustHaveGate, gateLabel } from '../utils/mustHaveGate';
 import { formatBytes, totalBytes, oversizedFiles, MAX_SOURCE_BYTES, MAX_SOURCES } from '../utils/bulkUpload';
 import { uploadBulkSources } from '../services/bulkStorageUpload';
 import { getFeedbackEmail } from '../utils/templateService';
@@ -44,75 +43,6 @@ import {
     Users
 } from 'lucide-react';
 
-
-/**
- * SOL LİSTEDEKİ TEK ADAY SATIRI — memoize.
- *
- * Satır eskiden sayfanın içinde, `filtered.map(...)` gövdesinde duruyordu.
- * Sayfa her render olduğunda (bir adaya tıklamak dahil) listedeki HER satır
- * yeniden çiziliyordu — 1500 adayda bu tek başına ~80 ms.
- *
- * Ayrı ve memoize bir bileşen olunca yalnızca props'u değişen satırlar
- * çiziliyor: seçim değiştiğinde eski ve yeni seçili satır, yani ikisi.
- *
- * Props'un SABİT kalması şart, yoksa memo hiç tutmaz:
- *   onSelect  → useState setter'ı (React garanti eder, her render aynı)
- *   candidate → enrichedCandidates'ten gelen nesne, veri değişmedikçe aynı
- *   score     → listScores memosundan gelen sayı
- */
-const CandidateListItem = memo(function CandidateListItem({
-    candidate, role, sourceColors, score, isActive, onSelect,
-}) {
-    const mc = applyPiiMask(candidate, role);
-    const srcColor = candidate.source
-        ? sourceColors?.[String(candidate.source).toLowerCase()] || '#64748B'
-        : '#64748B';
-    const srcLabel = !candidate.source
-        ? 'Manuel / PDF'
-        : candidate.sourceDetail
-            ? `${candidate.source} (${candidate.sourceDetail})`
-            : candidate.source;
-
-    return (
-        <button
-            onClick={() => onSelect(candidate.id)}
-            className={`w-full text-left rounded-md px-3 py-2.5 flex items-center gap-2.5 transition-colors border ${
-                isActive ? 'bg-brand-50 border-brand-100' : 'bg-transparent border-transparent hover:bg-n50'
-            }`}
-        >
-            {isActive && <div className="w-[6px] h-[6px] rounded-full bg-brand shrink-0" />}
-            <CandidateAvatar
-                name={mc.name}
-                photo={candidate.photo}
-                photoUrl={candidate.photoUrl}
-                profileImage={candidate.profileImage}
-                size="sm"
-                rounded="rounded-md"
-            />
-            <div className="flex-1 min-w-0">
-                <p className={`text-[11px] font-semibold truncate leading-tight ${isActive ? 'text-brand' : 'text-n700'}`}>{mc.name}</p>
-                <div className="flex items-center gap-1 mt-0.5 flex-wrap">
-                    <span
-                        className="text-[11px] font-semibold px-1.5 py-0.5 rounded-md inline-flex items-center gap-0.5 uppercase"
-                        style={{ color: srcColor, backgroundColor: `${srcColor}15` }}
-                    >
-                        {srcLabel}
-                    </span>
-                    {candidate.screeningScore != null && (
-                        <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-md bg-brand-50 text-brand border border-brand-100 uppercase">
-                            🎯 %{Math.round(candidate.screeningScore)}
-                        </span>
-                    )}
-                </div>
-            </div>
-            <div className="shrink-0">
-                <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded-md ${
-                    isActive ? 'bg-brand-100 text-brand' : 'bg-n100 text-n500'
-                }`}>%{score}</span>
-            </div>
-        </button>
-    );
-});
 
 const STATUS_CONFIG = {
     live:       { label: 'CANLI',      bg: 'bg-bad-bg',    text: 'text-bad',    border: 'border-bad-bg',    pulse: true },
@@ -153,14 +83,8 @@ export default function CandidateProcessPage() {
     const { positions } = usePositions();
     const { user, userProfile, isSuperAdmin, role } = useAuth();
     const candidates = enrichedCandidates || [];
-    const [searchQuery, setSearchQuery]   = useState('');
     const [activeTab, setActiveTab]       = useState('ai_analysis');
     const [migrateStatus, setMigrateStatus] = useState(null); // null | 'running' | 'done'
-    const [showFilters, setShowFilters]   = useState(false);
-    const [filterSource, setFilterSource] = useState('');
-    const [filterStatus, setFilterStatus] = useState('');
-    const [filterPosition, setFilterPosition] = useState('');
-    const [filterMinScore, setFilterMinScore] = useState(0);
 
     // ── Modal states ──────────────────────────────────────────────────────────
     const [commentModal, setCommentModal] = useState(false);
@@ -889,95 +813,6 @@ export default function CandidateProcessPage() {
     // active openings — a candidate matched to a now-closed position falls
     // out of any open-position filter as expected.
     //
-    // Fallback to candidate-derived list if no open positions are loaded
-    // yet, so the page doesn't appear broken during initial render.
-    const filterOptions = useMemo(() => {
-        const sources = [...new Set(candidates.map(c => c.source).filter(Boolean))];
-        const openPosTitles = (positions || [])
-            .filter(p => p.status === 'open')
-            .map(p => p.title)
-            .filter(Boolean);
-        const positionsList = openPosTitles.length > 0
-            ? [...new Set(openPosTitles)]
-            : [...new Set(candidates.map(c => c.matchedPositionTitle || c.position || c.bestTitle).filter(Boolean))];
-        const statuses = [...new Set(candidates.map(c => normalizePipelineStatus(c.status)).filter(Boolean))];
-        return { sources, positions: positionsList, statuses };
-    }, [candidates, positions]);
-
-    const activeFilterCount = [filterSource, filterStatus, filterPosition, filterMinScore > 0].filter(Boolean).length;
-
-    const filtered = useMemo(() => {
-        const q = searchQuery.toLowerCase();
-        // Pozisyon filtresi "uygunluk modu": seçilen AÇIK pozisyon için her
-        // adayın skoru (kayıtlı AI analizi ↔ anahtar-kelime, büyük olan)
-        // hesaplanır; min skor eşiği ve sıralama BU skora uygulanır. Eski
-        // davranış adayın en-iyi-eşleşme skoruna bakıyordu — yanlış adayları
-        // geçirip doğru adayları eliyordu.
-        const selectedPos = filterPosition
-            ? (positions || []).find(p => p.status === 'open' && p.title === filterPosition) || null
-            : null;
-        const positionScores = selectedPos
-            ? new Map(candidates.map(c => [c.id, Math.max(
-                analysisScoreFor(c, selectedPos),
-                Number(calculateMatchScore(c, selectedPos)?.score || 0),
-            )]))
-            : null;
-        const results = candidates.filter(c => {
-            // Position-related fields the candidate might be searched/filtered
-            // by. matchedPositionTitle is the system's pick (highest-scoring
-            // open position for this candidate); position/bestTitle come from
-            // CV text. Search hits any of them; filter prefers the system pick.
-            const candidatePosForSearch = [
-                c.matchedPositionTitle,
-                c.position,
-                c.bestTitle,
-            ].filter(Boolean).join(' ').toLowerCase();
-            const candidatePosForFilter = c.matchedPositionTitle || c.position || c.bestTitle || '';
-
-            if (q && !c.name?.toLowerCase().includes(q) && !candidatePosForSearch.includes(q)) return false;
-            if (filterSource && c.source !== filterSource) return false;
-            if (filterStatus && normalizePipelineStatus(c.status) !== filterStatus) return false;
-            if (filterPosition) {
-                if (positionScores) {
-                    if (filterMinScore > 0 && (positionScores.get(c.id) || 0) < filterMinScore) return false;
-                } else {
-                    // Seçilen başlık artık açık pozisyon değil — eski etiket eşleşmesi
-                    if (candidatePosForFilter !== filterPosition) return false;
-                    if (filterMinScore > 0 && (c.bestScore || 0) < filterMinScore) return false;
-                }
-            } else if (filterMinScore > 0 && (c.bestScore || 0) < filterMinScore) return false;
-            return true;
-        });
-        if (positionScores) {
-            // Önce ZORUNLU gereksinim kapısı, sonra skor.
-            //
-            // Zorunlu bir maddeyi karşılamayan aday, puanı ne olursa olsun
-            // karşılayanların altında kalır. Cezayı skorun içinde eritmek
-            // yerine ayrı bir kademe kullanmak, "85 puanlık aday neden altta?"
-            // sorusunu ortadan kaldırıyor: sebep aday kartındaki rozette yazıyor.
-            const rankOf = new Map(results.map((c) => [
-                c.id,
-                gateRank(mustHaveGate(fullAnalysisForPosition(c, selectedPos.title), selectedPos, c).status),
-            ]));
-            results.sort((a, b) => {
-                const ra = rankOf.get(a.id) ?? 2;
-                const rb = rankOf.get(b.id) ?? 2;
-                if (ra !== rb) return rb - ra;
-                return (positionScores.get(b.id) || 0) - (positionScores.get(a.id) || 0);
-            });
-            return results;
-        }
-        const hasScreening = results.some(c => c.screeningScore != null);
-        if (hasScreening) {
-            results.sort((a, b) => {
-                const sa = a.screeningScore ?? -1;
-                const sb = b.screeningScore ?? -1;
-                return sb - sa;
-            });
-        }
-        return results;
-    }, [candidates, searchQuery, filterSource, filterStatus, filterPosition, filterMinScore, positions]);
-
     // parseFeedback kaldırıldı: "Pozitif (+)/Negatif (-)" ayrıştırması artık
     // starDimensions.normalizeStarDimension içinde, eski ve yeni biçimi
     // birlikte ele alacak şekilde yapılıyor.
@@ -1053,70 +888,6 @@ export default function CandidateProcessPage() {
         return scoreForPositionDetail(c, pos, (cand, p) => calculateMatchScore(cand, p)?.score).score;
     };
     const score = coherentScoreOf(candidate);
-
-    /**
-     * SOL LİSTEDEKİ SKORLAR BİR KEZ HESAPLANIR.
-     *
-     * `coherentScoreOf` içinde `scoreForPositionDetail` → `calculateMatchScore`
-     * var; bu, adayın CV metnini baştan sona tarayan bir işlem ve aday başına
-     * ~1.5 ms sürüyor. Çağrı doğrudan `filtered.map(...)` içinde durduğu için
-     * ekranın HER render'ında LİSTEDEKİ HER ADAY için yeniden çalışıyordu.
-     *
-     * Ölçüm (1500 aday, 15 açık ilan): bir adaya tıklamak arayüzü 1378 ms
-     * kilitliyordu — tıklamanın yaptığı tek şey seçili adayı değiştirmek
-     * olmasına rağmen 1500 adayın skoru sıfırdan hesaplanıyordu.
-     *
-     * Hesap DEĞİŞMİYOR: aynı fonksiyon, aynı girdiler, aynı sonuç. Yalnızca
-     * girdiler değişmedikçe tekrar çalıştırılmıyor.
-     */
-    const listScores = useMemo(() => {
-        const m = new Map();
-        for (const c of filtered) m.set(c.id, coherentScoreOf(c));
-        return m;
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [filtered, openByTitle]);
-
-    /**
-     * SOL LİSTE PARÇA PARÇA ÇİZİLİR.
-     *
-     * Liste, filtreden geçen HER adayı tek seferde çiziyordu. Canlıda 662
-     * aday var; ölçümde 662 kart 6521 DOM düğümü üretti ve listenin toplam
-     * yüksekliği 57.500 piksele çıktı. Kullanıcı bunun ikisini birden
-     * hissediyor: açılış gecikmesi ve kaydırırken takılma.
-     *
-     * Ekranda aynı anda en fazla ~8 kart görünüyor. Geri kalanı önden
-     * çizmenin bir karşılığı yok. İlk parça hemen geliyor, kullanıcı listenin
-     * sonuna yaklaştıkça bir sonraki parça ekleniyor.
-     *
-     * Sabit yükseklik VARSAYILMIYOR: kartlar bir ile üç satır arasında
-     * değişiyor (uzun ad + uzun kaynak etiketi). Bu yüzden klasik sanal liste
-     * yerine artımlı çizim; aynı kazancı verirken hizalama bozulmuyor.
-     */
-    const LISTE_PARCA = 60;
-    const [gorunenAdet, setGorunenAdet] = useState(LISTE_PARCA);
-    /**
-     * Sonraki parçayı KAYDIRMA OLAYI tetikler, IntersectionObserver değil.
-     *
-     * Önce bir gözlemci elemanı denendi. Gözlemci, sayfanın gerçekten
-     * çizilmesine bağlı: çizimin durduğu ortamlarda (arka plan sekmesi,
-     * başsız tarayıcı, bazı gömülü görünümler) geri çağırma HİÇ çalışmıyor
-     * ve liste ilk 60 adayda kilitli kalıyor — kullanıcı geri kalanına asla
-     * ulaşamazdı. Bunu ölçüm sırasında yaşadım.
-     *
-     * Kaydırma olayı böyle bir varsayım taşımıyor. Maliyeti de yok: yalnızca
-     * eşiğe gelindiğinde ve gösterilecek aday kaldıysa state'e dokunuyor.
-     */
-    const handleListeKaydir = useCallback((e) => {
-        const el = e.currentTarget;
-        if (el.scrollTop + el.clientHeight >= el.scrollHeight - 400) {
-            setGorunenAdet((n) => n + LISTE_PARCA);
-        }
-    }, []);
-    // Filtre ya da arama değişince baştan başla; yoksa kullanıcı daraltılmış
-    // bir listede de eski parça sayısıyla karşılaşırdı.
-    useEffect(() => { setGorunenAdet(LISTE_PARCA); }, [searchQuery, filterSource, filterStatus, filterPosition, filterMinScore]);
-
-    const gorunenAdaylar = useMemo(() => filtered.slice(0, gorunenAdet), [filtered, gorunenAdet]);
 
     // Gösterilen pozisyonun analiz METNİ — skorla aynı kural: ne gösteriliyorsa
     // onun analizi. Yoksa null döner ve arayüz "başka pozisyon için üretilmiş"
@@ -1378,157 +1149,10 @@ export default function CandidateProcessPage() {
             )}
 
             <div className="flex-1 flex overflow-hidden">
-                {/* ── LEFT: CANDIDATE LIST ─────────────────────────────────── */}
-                <aside className="w-[260px] shrink-0 flex flex-col bg-n0 border-r border-n200">
-
-                    {/* Logo + Branding */}
-                    <div className="flex items-center gap-2 px-4 pt-5 pb-4 border-b border-n200">
-                        <div className="w-9 h-9 rounded-md flex items-center justify-center bg-brand shrink-0">
-                            <span className="font-semibold text-white text-sm tracking-tighter">TI</span>
-                        </div>
-                        <div className="flex flex-col min-w-0">
-                            <span className="text-sm font-semibold text-n900 leading-tight">Talent-Inn</span>
-                            <span className="text-[10px] text-n400 font-medium">HR Platform</span>
-                        </div>
-                    </div>
-
-                    {/* Search */}
-                    <div className="px-4 pt-4 pb-2">
-                        <div className="flex items-center justify-between mb-3">
-                            <div className="text-[10px] font-semibold text-n400 tracking-[0.08em] uppercase">
-                                ADAYLAR <span className="text-n300">({filtered.length})</span>
-                                {filtered.some(c => c.screeningScore != null) && (
-                                    <span className="ml-1 text-brand normal-case font-medium">· Ön Eleme Puanına Göre Sıralı</span>
-                                )}
-                            </div>
-                            <button
-                                onClick={() => setShowFilters(f => !f)}
-                                className={`flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.08em] px-2 py-1 rounded-md transition-all ${showFilters || activeFilterCount > 0 ? 'bg-brand-50 text-brand border border-brand-100' : 'text-n400 hover:text-n600'}`}
-                            >
-                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" /></svg>
-                                FİLTRE{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
-                            </button>
-                        </div>
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-n400" />
-                            <input
-                                type="text"
-                                placeholder="Ad veya pozisyon ara..."
-                                value={searchQuery}
-                                onChange={e => setSearchQuery(e.target.value)}
-                                className="w-full bg-n50 border border-n200 rounded-md py-2 pl-9 pr-3 text-[11px] text-n700 placeholder-n400 outline-none focus:border-brand focus:ring-0 transition-all"
-                            />
-                        </div>
-                    </div>
-
-                    {/* Filter Panel */}
-                    {showFilters && (
-                        <div className="px-4 pb-3 space-y-2 border-b border-n200">
-                            {/* Source */}
-                            <div>
-                                <label className="text-[10px] font-semibold text-n400 uppercase tracking-[0.08em] block mb-1">Kaynak</label>
-                                <select
-                                    value={filterSource}
-                                    onChange={e => setFilterSource(e.target.value)}
-                                    className="w-full bg-n50 border border-n200 rounded-md py-1.5 px-2 text-[11px] text-n700 outline-none focus:border-brand transition-all"
-                                >
-                                    <option value="">Tümü</option>
-                                    {filterOptions.sources.map(s => <option key={s} value={s}>{s}</option>)}
-                                </select>
-                            </div>
-                            {/* Stage */}
-                            <div>
-                                <label className="text-[10px] font-semibold text-n400 uppercase tracking-[0.08em] block mb-1">Aşama</label>
-                                <select
-                                    value={filterStatus}
-                                    onChange={e => setFilterStatus(e.target.value)}
-                                    className="w-full bg-n50 border border-n200 rounded-md py-1.5 px-2 text-[11px] text-n700 outline-none focus:border-brand transition-all"
-                                >
-                                    <option value="">Tümü</option>
-                                    {filterOptions.statuses.map(s => <option key={s} value={s}>{PIPELINE_STATUS_LABELS[s] || s}</option>)}
-                                </select>
-                            </div>
-                            {/* Position */}
-                            <div>
-                                <label className="text-[10px] font-semibold text-n400 uppercase tracking-[0.08em] block mb-1">Pozisyon</label>
-                                <select
-                                    value={filterPosition}
-                                    onChange={e => setFilterPosition(e.target.value)}
-                                    className="w-full bg-n50 border border-n200 rounded-md py-1.5 px-2 text-[11px] text-n700 outline-none focus:border-brand transition-all"
-                                >
-                                    <option value="">Tümü</option>
-                                    {filterOptions.positions.map(p => <option key={p} value={p}>{p}</option>)}
-                                </select>
-                            </div>
-                            {/* Min Score */}
-                            <div>
-                                <label className="text-[10px] font-semibold text-n400 uppercase tracking-[0.08em] block mb-1">Min. Uyum Skoru: <span className="text-brand">%{filterMinScore}</span></label>
-                                <input
-                                    type="range"
-                                    min={0}
-                                    max={100}
-                                    step={5}
-                                    value={filterMinScore}
-                                    onChange={e => setFilterMinScore(Number(e.target.value))}
-                                    className="w-full accent-[var(--color-brand)]"
-                                />
-                                <div className="flex justify-between text-[7px] text-n300 font-semibold mt-0.5">
-                                    <span>0%</span><span>50%</span><span>100%</span>
-                                </div>
-                            </div>
-                            {/* Clear */}
-                            {activeFilterCount > 0 && (
-                                <button
-                                    onClick={() => { setFilterSource(''); setFilterStatus(''); setFilterPosition(''); setFilterMinScore(0); }}
-                                    className="w-full text-[10px] font-semibold uppercase tracking-[0.08em] text-bad hover:text-bad py-1 transition-all"
-                                >
-                                    Filtreleri Temizle
-                                </button>
-                            )}
-                        </div>
-                    )}
-
-                    {/* List */}
-                    <div onScroll={handleListeKaydir} className="flex-1 overflow-y-auto px-3 pb-3 space-y-0.5 custom-scrollbar">
-                        {filtered.length === 0 && (
-                            <div className="py-10 flex flex-col items-center text-n400">
-                                <Search className="w-8 h-8 mb-2 opacity-30" />
-                                <p className="text-[10px] font-semibold uppercase">Aday bulunamadı</p>
-                            </div>
-                        )}
-                        {gorunenAdaylar.map(c => (
-                            <CandidateListItem
-                                key={c.id}
-                                candidate={c}
-                                role={role}
-                                sourceColors={sourceColors}
-                                score={listScores.get(c.id) ?? 0}
-                                isActive={c.id === candidate?.id}
-                                onSelect={setViewCandidateId}
-                            />
-                        ))}
-                        {/* Sona yaklaşınca bir sonraki parça yüklenir. */}
-                        {gorunenAdet < filtered.length && (
-                            <button
-                                onClick={() => setGorunenAdet(n => n + LISTE_PARCA)}
-                                className="w-full py-3 text-center text-[10px] font-semibold text-n400 hover:text-brand"
-                            >
-                                {filtered.length - gorunenAdet} aday daha · göstermek için kaydırın
-                            </button>
-                        )}
-                    </div>
-
-                    {/* Bottom AI card */}
-                    <div className="px-4 py-3 border-t border-n200">
-                        <div className="rounded-md bg-brand-50 border border-brand-100 p-3 flex items-start gap-2">
-                            <Sparkles className="w-3.5 h-3.5 text-brand shrink-0 mt-0.5" />
-                            <span className="text-[11px] text-n500 leading-snug">
-                                {candidates.length} aday AI analiz sürecinde
-                            </span>
-                        </div>
-                    </div>
-                </aside>
-
+                {/* SOL ADAY LİSTESİ KALDIRILDI.
+                    Detay ekranı tek sütun; listeye dönüş üstteki "Listeye dön"
+                    düğmesiyle. Liste 662 kart taşıyordu ve ekranın 260px'ini
+                    sürekli işgal ediyordu. */}
                 {/* ── RIGHT: DETAIL PANEL ───────────────────────────────────── */}
                 <main className="flex-1 overflow-hidden flex flex-col bg-n50">
                     {candidate ? (
@@ -2604,15 +2228,14 @@ export default function CandidateProcessPage() {
 
                             {/* Footer actions */}
                             {/* SAĞDA İK ASİSTANI İÇİN YER AYRILIYOR.
-                                İK asistanı düğmesi `fixed bottom-5 right-5` ile
-                                ekranın sağ alt köşesinde duruyor (124×42 px) ve
-                                tam olarak bu şeridin sağ ucundaki AŞAMA
-                                düğmesinin üstüne biniyordu: düğme görünüyor ama
-                                tıklanamıyordu — kullanıcı bunu bildirdi.
-                                Asistanı taşımak yerine şeride onun kapladığı
-                                alan kadar sağ boşluk veriliyor; asistan her
-                                ekranda aynı yerde kalsın. */}
-                            <div className="border-t border-n200 pl-5 pr-5 sm:pr-[156px] py-2.5 flex items-center justify-between bg-n0 shrink-0">
+                                Asistan düğmesi sağ alt köşede sabit duruyor ve
+                                bu şeridin sağ ucundaki AŞAMA düğmesinin üstüne
+                                biniyordu: düğme görünüyor ama tıklanamıyordu.
+                                Ayrılan boşluk düğmenin ölçüsüne bağlı — EMIR 7
+                                ile metinli hap (124px) 46px yuvarlağa indi,
+                                boşluk da 156 → 76px'e çekildi (46 + 18 kenar
+                                boşluğu + 12 nefes payı). */}
+                            <div className="border-t border-n200 pl-5 pr-5 sm:pr-[76px] py-2.5 flex items-center justify-between bg-n0 shrink-0">
                                 {/* Success toast */}
                                 {actionSuccess && (
                                     <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 bg-n900 text-white text-[11px] font-semibold rounded-md shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-300">
