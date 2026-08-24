@@ -93,6 +93,11 @@ export default function LiveInterviewPage() {
     const remoteVideoRef = useRef(null); // NOT muted — plays remote audio+video
     const [copied, setCopied] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
+    // Bağlantı durumu ve aktarma sunucusunun varlığı — ikisi de ekranda
+    // gösteriliyor. Eskiden `pc.connectionState` hiç okunmuyordu ve kullanıcı
+    // "bağlanıyor" ile "bağlanamadı"yı ayırt edemiyordu.
+    const [connectionState, setConnectionState] = useState('new');
+    const [relayConfigured, setRelayConfigured] = useState(false);
 
     // KVKK / Consent (Candidate only)
     const [hasConsent, setHasConsent] = useState(false);
@@ -519,80 +524,182 @@ export default function LiveInterviewPage() {
     }, [stream, isVideoOn]);
 
     // WebRTC peer connection — established when interview goes active
+    //
+    // ── EFEKT ARTIK ASENKRON KURULUYOR ────────────────────────────────────
+    // Aktarma sunucusu (TURN) bilgisi sunucudan çekildiği için kurulum bir
+    // `await` içeriyor. React efekti doğrudan `async` olamaz (temizleme
+    // fonksiyonu döndüremez), o yüzden kurulum içeride bir IIFE'de yapılıyor
+    // ve temizleme bir değişken üzerinden yönetiliyor.
     useEffect(() => {
-        if (phase !== 'active' || !stream || !sessionId) return;
+        if (phase !== 'active' || !stream || !sessionId) return undefined;
 
-        const STUN = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] };
-        const pc = new RTCPeerConnection(STUN);
-        peerConnectionRef.current = pc;
-        appliedRecruiterIceRef.current = 0;
-        appliedCandidateIceRef.current = 0;
+        let cancelled = false;
+        let cleanup = () => {};
 
-        stream.getTracks().forEach(track => pc.addTrack(track, stream));
+        (async () => {
+            // AKTARMA SUNUCUSU (TURN) — bağlanamayan ağlar için.
+            //
+            // Yalnızca STUN varken şirket ağı / VPN arkasındaki katılımcılar
+            // görüşmeye HİÇ bağlanamıyordu ve ekranda bunu söyleyen bir şey
+            // de yoktu. Kimlik bilgisi sunucudan geliyor
+            // (functions/routes/turn.js): uzun ömürlü anahtar tarayıcıya
+            // inmiyor.
+            //
+            // Yapılandırılmamışsa akış DURMUYOR — STUN'la devam ediyor, yani
+            // bugünkü davranış. Fark şu: artık sebebini biliyoruz ve
+            // bağlantı kurulamazsa kullanıcıya söyleyebiliyoruz.
+            let iceServers = [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' },
+            ];
+            let relayAvailable = false;
+            try {
+                const res = await fetch('/api/turn-credentials');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (Array.isArray(data.iceServers) && data.iceServers.length > 0) {
+                        iceServers = data.iceServers;
+                        relayAvailable = true;
+                    }
+                } else if (res.status === 501) {
+                    console.warn('[WebRTC] Aktarma sunucusu yapılandırılmamış — yalnızca doğrudan bağlantı denenecek.');
+                }
+            } catch (err) {
+                console.warn('[WebRTC] Aktarma sunucusu bilgisi alınamadı:', err.message);
+            }
+            if (cancelled) return;
+            setRelayConfigured(relayAvailable);
 
-        pc.ontrack = (event) => {
-            const [remote] = event.streams;
-            if (remote) setRemoteStream(remote);
-        };
+            const pc = new RTCPeerConnection({ iceServers });
+            peerConnectionRef.current = pc;
+            appliedRecruiterIceRef.current = 0;
+            appliedCandidateIceRef.current = 0;
 
-        const sessionRef = doc(db, 'interviews', sessionId);
-
-        if (isRecruiter) {
-            pc.onicecandidate = async ({ candidate }) => {
-                if (candidate) {
-                    try { await updateDoc(sessionRef, { recruiterIce: arrayUnion(JSON.stringify(candidate.toJSON())) }); } catch(e) {}
+            /**
+             * ERKEN GELEN ICE ADAYLARI KUYRUĞA ALINIR.
+             *
+             * `addIceCandidate`, `remoteDescription` atanmadan çağrılırsa hata
+             * fırlatıyor. Eskiden bu hata boş bir `catch` ile yutuluyordu ve o
+             * aday BİR DAHA denenmiyordu — bağlantı kurulma süresini uzatan
+             * ya da tamamen engelleyen klasik hata. Artık bekletiliyor ve uzak
+             * taraf tanımlandığı anda sırayla uygulanıyor.
+             */
+            const pendingIce = [];
+            const addIce = async (raw) => {
+                let candidate;
+                try { candidate = new RTCIceCandidate(JSON.parse(raw)); }
+                catch (err) { console.warn('[WebRTC] ICE adayı okunamadı:', err.message); return; }
+                if (!pc.remoteDescription) { pendingIce.push(candidate); return; }
+                try { await pc.addIceCandidate(candidate); }
+                catch (err) { console.warn('[WebRTC] ICE adayı eklenemedi:', err.message); }
+            };
+            const flushPendingIce = async () => {
+                while (pendingIce.length > 0) {
+                    const c = pendingIce.shift();
+                    try { await pc.addIceCandidate(c); }
+                    catch (err) { console.warn('[WebRTC] Bekleyen ICE adayı eklenemedi:', err.message); }
                 }
             };
 
-            (async () => {
+            // BAĞLANTI DURUMU EKRANDA. Eskiden hiç okunmuyordu; kullanıcı
+            // "bağlanıyor" ile "bağlanamadı"yı ayırt edemiyordu.
+            pc.onconnectionstatechange = () => {
+                if (!cancelled) setConnectionState(pc.connectionState);
+            };
+
+            stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+
+            pc.ontrack = (event) => {
+                const [remote] = event.streams;
+                if (remote && !cancelled) setRemoteStream(remote);
+            };
+
+            const sessionRef = doc(db, 'interviews', sessionId);
+
+            if (isRecruiter) {
+                pc.onicecandidate = async ({ candidate }) => {
+                    if (!candidate) return;
+                    try {
+                        await updateDoc(sessionRef, { recruiterIce: arrayUnion(JSON.stringify(candidate.toJSON())) });
+                    } catch (err) {
+                        console.warn('[WebRTC] ICE adayı yazılamadı:', err.message);
+                    }
+                };
+
                 try {
                     const offer = await pc.createOffer();
                     await pc.setLocalDescription(offer);
-                    await setDoc(sessionRef, { webrtcOffer: { sdp: offer.sdp, type: offer.type }, webrtcAnswer: null, recruiterIce: [], candidateIce: [] }, { merge: true });
-                } catch(e) { console.error('[WebRTC recruiter offer]', e); }
-            })();
-
-            const unsub = onSnapshot(sessionRef, async (snap) => {
-                if (!snap.exists()) return;
-                const data = snap.data();
-                if (data.webrtcAnswer && !pc.remoteDescription) {
-                    try { await pc.setRemoteDescription(new RTCSessionDescription(data.webrtcAnswer)); } catch(e) {}
+                    // ICE LİSTELERİ SİLİNMİYOR.
+                    //
+                    // Eskiden burada `recruiterIce: [], candidateIce: []` de
+                    // yazılıyordu. Aday sayfayı ÖNCE açtıysa o ana kadar
+                    // gönderdiği bütün adaylar siliniyordu ve yeniden
+                    // denenmiyordu — bağlantı hiç kurulmuyordu.
+                    await setDoc(sessionRef, {
+                        webrtcOffer: { sdp: offer.sdp, type: offer.type },
+                        webrtcAnswer: null,
+                    }, { merge: true });
+                } catch (err) {
+                    console.error('[WebRTC] Teklif oluşturulamadı:', err.message);
+                    if (!cancelled) setConnectionState('failed');
                 }
-                const ice = data.candidateIce || [];
-                for (let i = appliedCandidateIceRef.current; i < ice.length; i++) {
-                    try { await pc.addIceCandidate(new RTCIceCandidate(JSON.parse(ice[i]))); } catch(e) {}
-                }
-                appliedCandidateIceRef.current = ice.length;
-            });
 
-            return () => { unsub(); pc.close(); peerConnectionRef.current = null; };
-        } else {
-            pc.onicecandidate = async ({ candidate }) => {
-                if (candidate) {
-                    try { await updateDoc(sessionRef, { candidateIce: arrayUnion(JSON.stringify(candidate.toJSON())) }); } catch(e) {}
-                }
-            };
+                const unsub = onSnapshot(sessionRef, async (snap) => {
+                    if (!snap.exists() || cancelled) return;
+                    const data = snap.data();
+                    if (data.webrtcAnswer && !pc.remoteDescription) {
+                        try {
+                            await pc.setRemoteDescription(new RTCSessionDescription(data.webrtcAnswer));
+                            await flushPendingIce();
+                        } catch (err) {
+                            console.error('[WebRTC] Cevap uygulanamadı:', err.message);
+                        }
+                    }
+                    const ice = data.candidateIce || [];
+                    for (let i = appliedCandidateIceRef.current; i < ice.length; i++) {
+                        await addIce(ice[i]);
+                    }
+                    appliedCandidateIceRef.current = ice.length;
+                });
 
-            const unsub = onSnapshot(sessionRef, async (snap) => {
-                if (!snap.exists()) return;
-                const data = snap.data();
-                if (data.webrtcOffer && !pc.remoteDescription) {
+                cleanup = () => { unsub(); pc.close(); peerConnectionRef.current = null; };
+            } else {
+                pc.onicecandidate = async ({ candidate }) => {
+                    if (!candidate) return;
                     try {
-                        await pc.setRemoteDescription(new RTCSessionDescription(data.webrtcOffer));
-                        const answer = await pc.createAnswer();
-                        await pc.setLocalDescription(answer);
-                        await updateDoc(sessionRef, { webrtcAnswer: { sdp: answer.sdp, type: answer.type } });
-                    } catch(e) { console.error('[WebRTC candidate answer]', e); }
-                }
-                const ice = data.recruiterIce || [];
-                for (let i = appliedRecruiterIceRef.current; i < ice.length; i++) {
-                    try { await pc.addIceCandidate(new RTCIceCandidate(JSON.parse(ice[i]))); } catch(e) {}
-                }
-                appliedRecruiterIceRef.current = ice.length;
-            });
+                        await updateDoc(sessionRef, { candidateIce: arrayUnion(JSON.stringify(candidate.toJSON())) });
+                    } catch (err) {
+                        console.warn('[WebRTC] ICE adayı yazılamadı:', err.message);
+                    }
+                };
 
-            return () => { unsub(); pc.close(); peerConnectionRef.current = null; };
-        }
+                const unsub = onSnapshot(sessionRef, async (snap) => {
+                    if (!snap.exists() || cancelled) return;
+                    const data = snap.data();
+                    if (data.webrtcOffer && !pc.remoteDescription) {
+                        try {
+                            await pc.setRemoteDescription(new RTCSessionDescription(data.webrtcOffer));
+                            const answer = await pc.createAnswer();
+                            await pc.setLocalDescription(answer);
+                            await updateDoc(sessionRef, { webrtcAnswer: { sdp: answer.sdp, type: answer.type } });
+                            await flushPendingIce();
+                        } catch (err) {
+                            console.error('[WebRTC] Cevap oluşturulamadı:', err.message);
+                            if (!cancelled) setConnectionState('failed');
+                        }
+                    }
+                    const ice = data.recruiterIce || [];
+                    for (let i = appliedRecruiterIceRef.current; i < ice.length; i++) {
+                        await addIce(ice[i]);
+                    }
+                    appliedRecruiterIceRef.current = ice.length;
+                });
+
+                cleanup = () => { unsub(); pc.close(); peerConnectionRef.current = null; };
+            }
+        })();
+
+        return () => { cancelled = true; cleanup(); };
     }, [phase, sessionId, isRecruiter]); // stream intentionally omitted to avoid reconnects on track toggle
 
     const handleGenerateAIQuestion = async (mode, category = null) => {
@@ -2477,9 +2584,28 @@ export default function LiveInterviewPage() {
                                     <video ref={pipVideoRef} autoPlay muted playsInline className="w-full h-full object-cover scale-x-[-1]" />
                                 </div>
                             )}
-                            <span className="absolute top-2 left-2 flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-bad text-white text-[11px] font-semibold">
-                                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> Canlı
-                            </span>
+                            {/* BAĞLANTI DURUMU — "canlı" rozeti tek başına yanıltıcıydı:
+                                oturum canlı olsa bile karşı tarafla bağlantı
+                                kurulamamış olabiliyor ve ekranda bunu söyleyen
+                                hiçbir şey yoktu. */}
+                            {connectionState === 'connected' ? (
+                                <span className="absolute top-2 left-2 flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-bad text-white text-[11px] font-semibold">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> Canlı
+                                </span>
+                            ) : connectionState === 'failed' || connectionState === 'disconnected' ? (
+                                <span
+                                    className="absolute top-2 left-2 flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-warn text-white text-[11px] font-semibold"
+                                    title={relayConfigured
+                                        ? 'Bağlantı kurulamadı. Karşı taraf sayfayı yenilemeyi deneyebilir.'
+                                        : 'Bağlantı kurulamadı. Aktarma sunucusu tanımlı olmadığı için bazı ağlarda (şirket ağı, VPN) doğrudan bağlantı mümkün olmuyor.'}
+                                >
+                                    Bağlantı kurulamadı
+                                </span>
+                            ) : (
+                                <span className="absolute top-2 left-2 flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-n900/70 text-white text-[11px] font-semibold">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> Bağlanıyor…
+                                </span>
+                            )}
                             <span className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-black/50 text-white/80 text-[11px] font-semibold tabular-nums">
                                 {elapsedLabel}
                             </span>
