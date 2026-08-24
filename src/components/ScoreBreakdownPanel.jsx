@@ -243,8 +243,8 @@ function StarDensity({ dims, starPct, buckets }) {
     if (!dims || dims.length === 0) return null;
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_1fr] gap-3">
-            <div className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-[18px]">
+        <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_1fr] gap-2.5">
+            <div className="bg-n0 border border-n200 rounded-[14px] shadow-sm px-4 py-3">
                 <div className="flex items-baseline gap-2 mb-2.5">
                     <span className="text-[11px] font-semibold text-n500 tracking-[0.1em] uppercase">
                         STAR kanıt yoğunluğu
@@ -283,7 +283,7 @@ function StarDensity({ dims, starPct, buckets }) {
             </div>
 
             {buckets && (
-                <div className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-[18px]">
+                <div className="bg-n0 border border-n200 rounded-[14px] shadow-sm px-4 py-3">
                     <div className="text-[11px] font-semibold text-n500 tracking-[0.1em] uppercase mb-2.5">
                         Kanıt kovaları
                     </div>
@@ -312,7 +312,7 @@ function StarDensity({ dims, starPct, buckets }) {
 
 function ScoreFormula({ cvScore, indexScore, hasInterview, delta }) {
     return (
-        <div className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-[18px]">
+        <div className="bg-n0 border border-n200 rounded-[14px] shadow-sm px-4 py-3">
             <div className="text-[11px] font-semibold text-n500 tracking-[0.1em] uppercase mb-3">
                 Skor nasıl oluştu
             </div>
@@ -383,7 +383,7 @@ export default function ScoreBreakdownPanel({ analysis, position, candidate = nu
     const pct = (n) => Math.round(n * 100);
 
     return (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2.5">
         {/* Prototipin üst kartı: skorun nasıl oluştuğu HER ZAMAN görünür.
             Eskiden bu bilgi katlanmış bir akordeonun içindeydi ve kullanıcı
             açmadıkça skorun dayanağını hiç görmüyordu. */}

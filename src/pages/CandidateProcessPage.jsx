@@ -1076,6 +1076,48 @@ export default function CandidateProcessPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [filtered, openByTitle]);
 
+    /**
+     * SOL LİSTE PARÇA PARÇA ÇİZİLİR.
+     *
+     * Liste, filtreden geçen HER adayı tek seferde çiziyordu. Canlıda 662
+     * aday var; ölçümde 662 kart 6521 DOM düğümü üretti ve listenin toplam
+     * yüksekliği 57.500 piksele çıktı. Kullanıcı bunun ikisini birden
+     * hissediyor: açılış gecikmesi ve kaydırırken takılma.
+     *
+     * Ekranda aynı anda en fazla ~8 kart görünüyor. Geri kalanı önden
+     * çizmenin bir karşılığı yok. İlk parça hemen geliyor, kullanıcı listenin
+     * sonuna yaklaştıkça bir sonraki parça ekleniyor.
+     *
+     * Sabit yükseklik VARSAYILMIYOR: kartlar bir ile üç satır arasında
+     * değişiyor (uzun ad + uzun kaynak etiketi). Bu yüzden klasik sanal liste
+     * yerine artımlı çizim; aynı kazancı verirken hizalama bozulmuyor.
+     */
+    const LISTE_PARCA = 60;
+    const [gorunenAdet, setGorunenAdet] = useState(LISTE_PARCA);
+    /**
+     * Sonraki parçayı KAYDIRMA OLAYI tetikler, IntersectionObserver değil.
+     *
+     * Önce bir gözlemci elemanı denendi. Gözlemci, sayfanın gerçekten
+     * çizilmesine bağlı: çizimin durduğu ortamlarda (arka plan sekmesi,
+     * başsız tarayıcı, bazı gömülü görünümler) geri çağırma HİÇ çalışmıyor
+     * ve liste ilk 60 adayda kilitli kalıyor — kullanıcı geri kalanına asla
+     * ulaşamazdı. Bunu ölçüm sırasında yaşadım.
+     *
+     * Kaydırma olayı böyle bir varsayım taşımıyor. Maliyeti de yok: yalnızca
+     * eşiğe gelindiğinde ve gösterilecek aday kaldıysa state'e dokunuyor.
+     */
+    const handleListeKaydir = useCallback((e) => {
+        const el = e.currentTarget;
+        if (el.scrollTop + el.clientHeight >= el.scrollHeight - 400) {
+            setGorunenAdet((n) => n + LISTE_PARCA);
+        }
+    }, []);
+    // Filtre ya da arama değişince baştan başla; yoksa kullanıcı daraltılmış
+    // bir listede de eski parça sayısıyla karşılaşırdı.
+    useEffect(() => { setGorunenAdet(LISTE_PARCA); }, [searchQuery, filterSource, filterStatus, filterPosition, filterMinScore]);
+
+    const gorunenAdaylar = useMemo(() => filtered.slice(0, gorunenAdet), [filtered, gorunenAdet]);
+
     // Gösterilen pozisyonun analiz METNİ — skorla aynı kural: ne gösteriliyorsa
     // onun analizi. Yoksa null döner ve arayüz "başka pozisyon için üretilmiş"
     // uyarısıyla eldeki metni gösterir.
@@ -1443,14 +1485,14 @@ export default function CandidateProcessPage() {
                     )}
 
                     {/* List */}
-                    <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-0.5 custom-scrollbar">
+                    <div onScroll={handleListeKaydir} className="flex-1 overflow-y-auto px-3 pb-3 space-y-0.5 custom-scrollbar">
                         {filtered.length === 0 && (
                             <div className="py-10 flex flex-col items-center text-n400">
                                 <Search className="w-8 h-8 mb-2 opacity-30" />
                                 <p className="text-[11px] font-semibold uppercase">Aday bulunamadı</p>
                             </div>
                         )}
-                        {filtered.map(c => (
+                        {gorunenAdaylar.map(c => (
                             <CandidateListItem
                                 key={c.id}
                                 candidate={c}
@@ -1461,6 +1503,15 @@ export default function CandidateProcessPage() {
                                 onSelect={setViewCandidateId}
                             />
                         ))}
+                        {/* Sona yaklaşınca bir sonraki parça yüklenir. */}
+                        {gorunenAdet < filtered.length && (
+                            <button
+                                onClick={() => setGorunenAdet(n => n + LISTE_PARCA)}
+                                className="w-full py-3 text-center text-[11px] font-semibold text-n400 hover:text-brand"
+                            >
+                                {filtered.length - gorunenAdet} aday daha · göstermek için kaydırın
+                            </button>
+                        )}
                     </div>
 
                     {/* Bottom AI card */}
@@ -1575,7 +1626,7 @@ export default function CandidateProcessPage() {
                                     <button
                                         key={tab.id}
                                         onClick={() => setActiveTab(tab.id)}
-                                        className={`flex items-center gap-[7px] text-[12px] font-semibold px-3.5 py-[11px] whitespace-nowrap border-b-2 ${
+                                        className={`flex items-center gap-[7px] text-[12px] font-semibold px-3.5 py-2.5 whitespace-nowrap border-b-2 ${
                                             activeTab === tab.id
                                                 ? 'text-brand border-brand'
                                                 : 'text-n500 border-transparent hover:text-n700'
@@ -1587,7 +1638,7 @@ export default function CandidateProcessPage() {
                             </div>
 
                             {/* Tab content */}
-                            <div className="flex-1 overflow-y-auto custom-scrollbar p-4">
+                            <div className="flex-1 overflow-y-auto custom-scrollbar px-4 py-3">
 
                                 {/* ── STAR ANALİZİ ── */}
                                 {activeTab === 'ai_analysis' && (
@@ -2527,7 +2578,16 @@ export default function CandidateProcessPage() {
                             </div>
 
                             {/* Footer actions */}
-                            <div className="border-t border-n200 px-5 py-2.5 flex items-center justify-between bg-n0 shrink-0">
+                            {/* SAĞDA İK ASİSTANI İÇİN YER AYRILIYOR.
+                                İK asistanı düğmesi `fixed bottom-5 right-5` ile
+                                ekranın sağ alt köşesinde duruyor (124×42 px) ve
+                                tam olarak bu şeridin sağ ucundaki AŞAMA
+                                düğmesinin üstüne biniyordu: düğme görünüyor ama
+                                tıklanamıyordu — kullanıcı bunu bildirdi.
+                                Asistanı taşımak yerine şeride onun kapladığı
+                                alan kadar sağ boşluk veriliyor; asistan her
+                                ekranda aynı yerde kalsın. */}
+                            <div className="border-t border-n200 pl-5 pr-5 sm:pr-[156px] py-2.5 flex items-center justify-between bg-n0 shrink-0">
                                 {/* Success toast */}
                                 {actionSuccess && (
                                     <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 bg-n900 text-white text-[11px] font-semibold rounded-md shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-300">
