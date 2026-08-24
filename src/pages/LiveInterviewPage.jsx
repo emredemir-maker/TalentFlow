@@ -493,6 +493,31 @@ export default function LiveInterviewPage() {
         }
     }, [stream, remoteStream, phase, isVideoOn]);
 
+    /**
+     * MİKROFON VE KAMERA GERÇEKTEN KAPANSIN.
+     *
+     * `isMicOn`/`isVideoOn` bugüne kadar YALNIZCA React state'ini çeviriyordu.
+     * Hiçbir yerde medya parçası kapatılmıyordu, dolayısıyla:
+     *   - yerel ses parçası yakalamaya devam ediyor,
+     *   - WebRTC karşı tarafa ses/görüntü GÖNDERMEYE devam ediyordu.
+     * Arayüz "kapalı" gösterirken karşı taraf duymaya devam ediyordu.
+     *
+     * Bu bir gizlilik sorunu: aday mikrofonu kapattığını sanıp konuşuyor.
+     *
+     * Parçanın `enabled` alanını kapatmak bağlantıyı YENİDEN KURMAZ —
+     * `addTrack` ile eklenmiş parça yerinde kalır, yalnızca sessiz/siyah
+     * veri gider. Yeniden açmak da aynı şekilde anında.
+     */
+    useEffect(() => {
+        if (!stream) return;
+        stream.getAudioTracks().forEach((t) => { t.enabled = isMicOn; });
+    }, [stream, isMicOn]);
+
+    useEffect(() => {
+        if (!stream) return;
+        stream.getVideoTracks().forEach((t) => { t.enabled = isVideoOn; });
+    }, [stream, isVideoOn]);
+
     // WebRTC peer connection — established when interview goes active
     useEffect(() => {
         if (phase !== 'active' || !stream || !sessionId) return;
