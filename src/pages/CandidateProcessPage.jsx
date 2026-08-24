@@ -25,7 +25,7 @@ import SystemScanner from '../components/SystemScanner';
 import AddCandidateModal from '../components/AddCandidateModal';
 import CandidateAvatar from '../components/CandidateAvatar';
 import CandidateCvPanel from '../components/CandidateCvPanel';
-import ScoreBreakdownPanel from '../components/ScoreBreakdownPanel';
+import ScoreBreakdownPanel, { RequirementTiers } from '../components/ScoreBreakdownPanel';
 import InterviewPlanPanel from '../components/InterviewPlanPanel';
 import InterviewOutcomePanel from '../components/InterviewOutcomePanel';
 import { aiErrorHint } from '../utils/aiErrorHint';
@@ -1700,28 +1700,46 @@ export default function CandidateProcessPage() {
                                             />
                                         )}
 
-                                        {/* Mülakat planı — skorun bıraktığı soruyu odaya taşır.
-                                            Kırılımın hemen altında duruyor çünkü aynı veriyi
-                                            okuyor: hangi madde açık kaldıysa mülakatın işi o. */}
-                                        {!analyzingIds.has(candidate.id) && displayedPosition && (
-                                            <InterviewPlanPanel
-                                                candidate={candidate}
-                                                position={displayedPosition}
-                                                analysis={displayedFullAnalysis}
-                                                onSave={handleSaveInterviewPlan}
-                                            />
-                                        )}
+                                        {/* 2. SATIR — solda ZORUNLU, ortada TERCİHEN madde
+                                            kartları, sağda mülakat panelleri alt alta.
+                                            Kolon oranları prototipteki gibi 1.3 / 1.2 / 0.85.
 
-                                        {/* Mülakat sonucu — planın ÜSTÜNDE değil altında
-                                            duruyor ama okuma sırası tersine işliyor: mülakat
-                                            yapılmışsa panel görünür ve "odada ne değişti"yi
-                                            söyler; yapılmamışsa hiç çıkmaz. */}
-                                        {!analyzingIds.has(candidate.id) && displayedPosition && (
-                                            <InterviewOutcomePanel
-                                                candidate={candidate}
-                                                position={displayedPosition}
-                                                analysis={displayedFullAnalysis}
-                                            />
+                                            Mülakat sütunu `xl:col-start-3` ile SABİT sağda:
+                                            kefe sayısı veriden geliyor ve "tercihen" maddesi
+                                            olmayan bir ilanda tek kefe çıkıyor. Sabitlenmeseydi
+                                            o durumda mülakat panelleri ortaya kayardı.
+
+                                            Paneller ve kart içerikleri aynen; değişen yalnızca
+                                            nereye yerleştikleri. */}
+                                        {!analyzingIds.has(candidate.id) && (
+                                            <div className="grid grid-cols-1 xl:grid-cols-[1.3fr_1.2fr_0.85fr] gap-2.5 items-start">
+                                                <RequirementTiers
+                                                    analysis={displayedFullAnalysis}
+                                                    position={displayedPosition}
+                                                />
+
+                                                {displayedPosition && (
+                                                    <div className="xl:col-start-3 flex flex-col gap-2.5">
+                                                        {/* Mülakat planı — skorun bıraktığı soruyu
+                                                            odaya taşır: hangi madde açık kaldıysa
+                                                            mülakatın işi o. */}
+                                                        <InterviewPlanPanel
+                                                            candidate={candidate}
+                                                            position={displayedPosition}
+                                                            analysis={displayedFullAnalysis}
+                                                            onSave={handleSaveInterviewPlan}
+                                                        />
+                                                        {/* Mülakat sonucu — yapılmışsa "odada ne
+                                                            değişti"yi söyler; yapılmamışsa hiç
+                                                            çıkmaz. */}
+                                                        <InterviewOutcomePanel
+                                                            candidate={candidate}
+                                                            position={displayedPosition}
+                                                            analysis={displayedFullAnalysis}
+                                                        />
+                                                    </div>
+                                                )}
+                                            </div>
                                         )}
 
                                         {/* Error banner */}

@@ -239,12 +239,21 @@ function evidenceBuckets(analysis) {
  * KOVA SAYILARI UYDURULMUYOR: maddelerin damgalarından (met/partial/missing)
  * geliyor. Damgası olmayan madde hiçbir kovaya girmez.
  */
-function StarDensity({ dims, starPct, buckets }) {
+/**
+ * ÜÇ KART AYRI BİLEŞEN.
+ *
+ * "STAR kanıt yoğunluğu" ile "Kanıt kovaları" tek bileşenin içinde, kendi
+ * iki kolonlu ızgarasındaydı; "Skor nasıl oluştu" ise onların üstünde tam
+ * genişlikte duruyordu. Üçü tek satırda yan yana gelsin diye ızgara dışarı
+ * alındı — bir bileşen kendi ızgarasını taşırken dışarıdaki satırın kolonu
+ * olamaz.
+ *
+ * Kart içerikleri aynen; değişen yalnızca kimin kime sarıldığı.
+ */
+function StarDensityCard({ dims, starPct }) {
     if (!dims || dims.length === 0) return null;
-
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_1fr] gap-2.5">
-            <div className="bg-n0 border border-n200 rounded-[14px] shadow-sm px-4 py-3">
+            <div className="h-full bg-n0 border border-n200 rounded-[14px] shadow-sm px-4 py-3">
                 <div className="flex items-baseline gap-2 mb-2.5">
                     <span className="text-[10px] font-semibold text-n500 tracking-[0.1em] uppercase">
                         STAR kanıt yoğunluğu
@@ -255,7 +264,8 @@ function StarDensity({ dims, starPct, buckets }) {
                         </span>
                     )}
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {/* Dört boyut 2×2 — kart artık üç kolonlu satırın biri, tek sırada dört kutu sığmıyor. */}
+                <div className="grid grid-cols-2 gap-2">
                     {dims.map((d) => (
                         <div key={d.key} className="bg-n50 border border-n200 rounded-md px-[11px] py-2.5">
                             <div className="text-[10px] font-semibold text-n500 uppercase tracking-[0.06em]">
@@ -281,9 +291,13 @@ function StarDensity({ dims, starPct, buckets }) {
                     Kanıtın ne kadar iyi belgelendiğini ölçer, adayın ne kadar iyi olduğunu değil.
                 </p>
             </div>
+    );
+}
 
-            {buckets && (
-                <div className="bg-n0 border border-n200 rounded-[14px] shadow-sm px-4 py-3">
+function EvidenceBucketsCard({ buckets }) {
+    if (!buckets) return null;
+    return (
+                <div className="h-full bg-n0 border border-n200 rounded-[14px] shadow-sm px-4 py-3">
                     <div className="text-[10px] font-semibold text-n500 tracking-[0.1em] uppercase mb-2.5">
                         Kanıt kovaları
                     </div>
@@ -305,14 +319,12 @@ function StarDensity({ dims, starPct, buckets }) {
                         </div>
                     ))}
                 </div>
-            )}
-        </div>
     );
 }
 
 function ScoreFormula({ cvScore, indexScore, hasInterview, delta }) {
     return (
-        <div className="bg-n0 border border-n200 rounded-[14px] shadow-sm px-4 py-3">
+        <div className="h-full bg-n0 border border-n200 rounded-[14px] shadow-sm px-4 py-3">
             <div className="text-[10px] font-semibold text-n500 tracking-[0.1em] uppercase mb-3">
                 Skor nasıl oluştu
             </div>
@@ -348,6 +360,64 @@ function ScoreFormula({ cvScore, indexScore, hasInterview, delta }) {
     );
 }
 
+
+/** Oran → yüzde. Bileşenin içindeki `pct` ile aynı; modül düzeyine alındı. */
+const yuzde = (n) => Math.round(n * 100);
+
+/**
+ * ZORUNLU VE TERCİHEN MADDE KARTLARI — kendi kolonlarında.
+ *
+ * Bu kartlar "Skor Nasıl Hesaplandı" akordeonunun içindeydi ve kullanıcı
+ * açmadıkça hiç görünmüyorlardı. Oysa skorun asıl dayanağı bunlar: hangi
+ * madde karşılandı, hangisi açık kaldı. Artık STAR sekmesinin ikinci
+ * satırında, iki ayrı kolon olarak duruyorlar.
+ *
+ * Her kefe (tier) BİR ızgara hücresi üretir; bileşen kendi ızgarasını
+ * kurmaz, dışarıdaki satırın kolonları olur. Kefe sayısı veriden gelir —
+ * "tercihen" maddesi olmayan bir ilanda ikinci kolon çıkmaz. Boş bir kolonu
+ * doldurmak için sahte içerik üretmek yanlış olurdu.
+ *
+ * Hesap YOK: `explainHybridScore` skorun kendi hesabından geliyor, panelin
+ * kullandığı çağrının aynısı.
+ */
+export function RequirementTiers({ analysis, position }) {
+    if (!analysis || isStaleFor(analysis, position)) return null;
+    const exp = explainHybridScore(analysis, requirementsOf(position));
+    const tiers = exp?.coverage?.tiers || [];
+    if (tiers.length === 0) return null;
+
+    return (
+        <>
+            {tiers.map((tier) => (
+                <div key={tier.key} className="bg-n0 border border-n200 rounded-[14px] shadow-sm px-4 py-3">
+                    <div className="flex items-baseline gap-2 mb-2 pb-2 border-b border-n100">
+                        <h5 className="text-[10px] font-semibold text-n500 uppercase tracking-[0.08em] m-0">
+                            {tier.label} — kapsamanın %{tier.weight}&apos;i
+                        </h5>
+                        <span className="ml-auto text-[10px] font-semibold text-n400">
+                            karşılanma %{yuzde(tier.ratio)}
+                        </span>
+                    </div>
+                    <div className="space-y-1.5">
+                        {tier.groups.map((group) => (
+                            <div key={group.kind} className="space-y-1">
+                                {tier.groups.length > 1 && (
+                                    <p className="text-[10px] text-n400 pl-0.5 m-0">
+                                        {group.label} · bu kefenin %{yuzde(group.share)}&apos;i
+                                    </p>
+                                )}
+                                {group.items.map((item) => (
+                                    <RequirementRow key={item.index} item={item} />
+                                ))}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            ))}
+        </>
+    );
+}
+
 export default function ScoreBreakdownPanel({ analysis, position, candidate = null }) {
     const [open, setOpen] = useState(false);
 
@@ -380,25 +450,31 @@ export default function ScoreBreakdownPanel({ analysis, position, candidate = nu
         ? Math.round(preVerification * effect.multiplier)
         : preVerification;
 
-    const pct = (n) => Math.round(n * 100);
+
+    const starDims = normalizeStarAnalysis(analysis?.starAnalysis);
 
     return (
         <div className="flex flex-col gap-2.5">
         {/* Prototipin üst kartı: skorun nasıl oluştuğu HER ZAMAN görünür.
             Eskiden bu bilgi katlanmış bir akordeonun içindeydi ve kullanıcı
             açmadıkça skorun dayanağını hiç görmüyordu. */}
-        <ScoreFormula
-            cvScore={scoreDetail.cvScore}
-            indexScore={headlineScore}
-            hasInterview={scoreDetail.interviewed}
-            delta={headlineScore - scoreDetail.cvScore}
-        />
+        {/* 1. SATIR — üç kart yan yana, eşit yükseklik.
+            `items-stretch` ızgaranın varsayılanı; kartlardaki `h-full` da
+            içeriği kısa olanın kısa kalmasını engelliyor.
 
-        <StarDensity
-            dims={normalizeStarAnalysis(analysis?.starAnalysis)}
-            starPct={starPercent(analysis?.starAnalysis)}
-            buckets={evidenceBuckets(analysis)}
-        />
+            KOLON SAYISI KARTA GÖRE: STAR analizi çalıştırılmamış bir adayda
+            yoğunluk kartı hiç çizilmiyor. Kolon sayısı sabit 3 kalsaydı sağda
+            boş bir sütun kalır, kanıt kovaları ortaya kayardı. */}
+        <div className={`grid grid-cols-1 gap-2.5 items-stretch ${starDims.length > 0 ? 'lg:grid-cols-3' : 'lg:grid-cols-2'}`}>
+            <ScoreFormula
+                cvScore={scoreDetail.cvScore}
+                indexScore={headlineScore}
+                hasInterview={scoreDetail.interviewed}
+                delta={headlineScore - scoreDetail.cvScore}
+            />
+            <StarDensityCard dims={starDims} starPct={starPercent(analysis?.starAnalysis)} />
+            <EvidenceBucketsCard buckets={evidenceBuckets(analysis)} />
+        </div>
 
         <div className="rounded-md border border-n200 bg-n0 overflow-hidden">
             <button
@@ -561,34 +637,10 @@ export default function ScoreBreakdownPanel({ analysis, position, candidate = nu
                         </div>
                     )}
 
-                    {!staleRequirements && exp.coverage?.tiers?.length > 0 && (
-                        <div className="space-y-3">
-                            {exp.coverage.tiers.map((tier) => (
-                                <div key={tier.key} className="space-y-1.5">
-                                    <div className="flex items-baseline gap-2">
-                                        <h5 className="text-[10px] font-semibold text-n500 uppercase tracking-[0.08em]">
-                                            {tier.label}
-                                        </h5>
-                                        <span className="text-[10px] text-n400">
-                                            kapsamanın %{tier.weight}'i · karşılanma %{pct(tier.ratio)}
-                                        </span>
-                                    </div>
-                                    {tier.groups.map((group) => (
-                                        <div key={group.kind} className="space-y-1">
-                                            {tier.groups.length > 1 && (
-                                                <p className="text-[10px] text-n400 pl-0.5">
-                                                    {group.label} · bu kefenin %{pct(group.share)}'i
-                                                </p>
-                                            )}
-                                            {group.items.map((item) => (
-                                                <RequirementRow key={item.index} item={item} />
-                                            ))}
-                                        </div>
-                                    ))}
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                    {/* Madde kartları buradan ÇIKTI — artık sekmenin 2. satırında
+                        kendi kolonlarında duruyorlar (RequirementTiers). Katlanmış
+                        bir akordeonun içinde durdukları sürece kullanıcı açmadıkça
+                        hiç görünmüyorlardı; skorun asıl dayanağı onlar. */}
 
                     {/* Madde bazlı değerlendirmesi olmayan eski kayıtlar */}
                     {exp.coverage && exp.coverage.tiers.length === 0 && (
