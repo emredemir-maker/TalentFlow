@@ -210,7 +210,7 @@ function AuthenticatedApp() {
       />
       <main
         className={`flex-1 min-h-screen transition-all duration-300 min-w-0
-          ${sidebarCollapsed ? 'lg:ml-[80px]' : 'lg:ml-[240px]'}`}
+          ${sidebarCollapsed ? 'lg:ml-[80px]' : 'lg:ml-[196px]'}`}
       >
         {/* In-app route changes — sidebar/header are already painted, so
             the inline spinner is enough until the page chunk arrives. */}

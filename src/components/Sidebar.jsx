@@ -66,13 +66,13 @@ export default function Sidebar({
         return (
             <button
                 onClick={() => onNavigate(item.id)}
-                className={`w-full flex items-center gap-3 px-6 py-2.5 transition-all duration-200 group relative
+                className={`w-full flex items-center gap-3 px-3.5 py-1.5 transition-all duration-200 group relative
                     ${isActive
                         ? 'bg-brand-50 text-brand'
                         : 'text-n600 hover:text-n900 hover:bg-n100'
                     }`}
             >
-                <item.icon className={`w-4.5 h-4.5 shrink-0 ${isActive ? 'text-brand' : 'text-n400 group-hover:text-n700'}`} />
+                <item.icon className={`w-[15px] h-[15px] shrink-0 ${isActive ? 'text-brand' : 'text-n400 group-hover:text-n700'}`} />
                 <span className={`text-[12px] font-medium tracking-tight truncate ${labelClass}`}>{item.label}</span>
 
                 {isActive && (
@@ -85,7 +85,7 @@ export default function Sidebar({
     // Mobile drawer (<lg): translate off-screen when not open. Desktop (≥lg)
     // ignores the transform and uses width-based collapse instead.
     const mobileTransform = mobileOpen ? 'translate-x-0' : '-translate-x-full';
-    const desktopWidth = collapsed ? 'lg:w-[80px]' : 'lg:w-[240px]';
+    const desktopWidth = collapsed ? 'lg:w-[80px]' : 'lg:w-[196px]';
 
     return (
         <>
@@ -100,7 +100,7 @@ export default function Sidebar({
 
             <aside
                 className={`infoset fixed left-0 top-0 h-screen transition-transform duration-300 lg:transition-all z-50 border-r border-n200
-                w-[240px] ${desktopWidth} ${mobileTransform} lg:translate-x-0
+                w-[196px] ${desktopWidth} ${mobileTransform} lg:translate-x-0
                 flex flex-col`}
                 style={{ background: 'var(--color-n50)' }}
             >
@@ -116,7 +116,7 @@ export default function Sidebar({
                 )}
 
                 {/* Logo Section */}
-                <div className={`h-14 flex items-center px-6 ${collapsed ? 'lg:justify-center lg:px-0' : ''}`}>
+                <div className={`h-[52px] shrink-0 flex items-center px-3.5 border-b border-n200 ${collapsed ? 'lg:justify-center lg:px-0' : ''}`}>
                     {/* Collapsed desktop → icon only. Mobile + expanded desktop → full logo */}
                     {collapsed ? (
                         <>
@@ -135,14 +135,14 @@ export default function Sidebar({
                 {/* Navigation Items */}
                 <nav className="flex-1 mt-2 space-y-0.5 overflow-y-auto custom-scrollbar">
                     <div className="mb-4">
-                        <h5 className={`text-[10px] text-n400 font-semibold px-8 mb-2 uppercase tracking-[0.08em] ${sectionHeaderClass}`}>
+                        <h5 className={`text-[9px] text-n400 font-semibold px-3.5 mb-1.5 uppercase tracking-[0.08em] ${sectionHeaderClass}`}>
                             Ana Menü
                         </h5>
                         {menuItems.map(item => <MenuItem key={item.id} item={item} />)}
                     </div>
 
                     <div className="pt-4">
-                        <h5 className={`text-[10px] text-n400 font-semibold px-8 mb-2 uppercase tracking-[0.08em] ${sectionHeaderClass}`}>
+                        <h5 className={`text-[9px] text-n400 font-semibold px-3.5 mb-1.5 uppercase tracking-[0.08em] ${sectionHeaderClass}`}>
                             Yönetim
                         </h5>
                         {adminItems.map(item => <MenuItem key={item.id} item={item} />)}
@@ -150,7 +150,7 @@ export default function Sidebar({
 
                     {userProfile?.role === 'super_admin' && (
                         <div className="pt-4">
-                            <h5 className={`text-[10px] text-n400 font-semibold px-8 mb-2 uppercase tracking-[0.08em] ${sectionHeaderClass}`}>
+                            <h5 className={`text-[9px] text-n400 font-semibold px-3.5 mb-1.5 uppercase tracking-[0.08em] ${sectionHeaderClass}`}>
                                 Geliştirici
                             </h5>
                             {docsItems.map(item => <MenuItem key={item.id} item={item} />)}
