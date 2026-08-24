@@ -912,7 +912,7 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
             <div className="flex-1 px-6 py-3">
                 <div className="bg-n0 rounded-md border border-n200 shadow-sm overflow-hidden">
                     <div className="overflow-x-auto">
-                        <table className="w-full text-[11px]">
+                        <table className="w-full text-[11px]" aria-busy={loading}>
                             <thead className="bg-n50 border-b border-n200">
                                 <tr>
                                     <th className="px-3 py-2.5 w-9">
@@ -944,12 +944,36 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
                                 </tr>
                             </thead>
                             <tbody>
+                                {/* YÜKLEME: TEK SATIRLIK YAZI DEĞİL, İSKELET SATIRLAR.
+                                    Önceki hâl ortalanmış bir "Adaylar yükleniyor…"
+                                    yazısıydı: tablo tek satıra iniyor, veri gelince
+                                    birden 50 satıra çıkıyordu — sayfa zıplıyordu.
+                                    İskelet satırlar gerçek satırla aynı yüksekliği
+                                    kapladığı için yer önceden ayrılıyor.
+
+                                    Ekran okuyucu için ayrıca `aria-busy` ve gizli
+                                    bir durum metni var: iskelet görsel bir ipucu,
+                                    okuyucuya hiçbir şey söylemez. */}
                                 {loading && (
-                                    <tr>
-                                        <td colSpan={selectedPosition ? 16 : 15} className="px-4 py-12 text-center text-n400 text-[11px]">
-                                            Adaylar yükleniyor…
-                                        </td>
-                                    </tr>
+                                    <>
+                                        <tr className="sr-only">
+                                            <td colSpan={selectedPosition ? 16 : 15} role="status">
+                                                Adaylar yükleniyor…
+                                            </td>
+                                        </tr>
+                                        {Array.from({ length: 8 }).map((_, satir) => (
+                                            <tr key={`iskelet-${satir}`} className="border-b border-n100" aria-hidden="true">
+                                                {Array.from({ length: selectedPosition ? 16 : 15 }).map((_, sutun) => (
+                                                    <td key={sutun} className="px-3 py-2.5">
+                                                        <div
+                                                            className="skeleton h-3 rounded"
+                                                            style={{ width: sutun === 1 ? '75%' : sutun === 2 ? '60%' : '42%' }}
+                                                        />
+                                                    </td>
+                                                ))}
+                                            </tr>
+                                        ))}
+                                    </>
                                 )}
                                 {!loading && pageRows.length === 0 && (
                                     <tr>

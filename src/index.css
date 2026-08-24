@@ -275,3 +275,33 @@ h1, h2, h3, h4 {
     outline-offset: 2px;
   }
 }
+
+/* ── İSKELET (yükleme yer tutucusu) ─────────────────────────────────────────
+ *
+ * `.skeleton` sınıfı üç dosyada KULLANILIYORDU ama hiçbir yerde TANIMLI
+ * DEĞİLDİ — o yer tutucular görünmez div olarak çiziliyordu. Sınıf burada
+ * tanımlanınca üçü de kendiliğinden çalışır hâle geliyor.
+ *
+ * Neden iskelet: uzun beklemede dönen çark "bir şey oluyor" der ama NE
+ * geleceğini söylemez ve yer ayırmadığı için içerik gelince sayfa zıplar.
+ * İskelet ikisini birden çözer.
+ *
+ * Hareket azaltma tercihi ayrıca ele alınmıyor: index.css'teki global kural
+ * animasyon süresini zaten kısıyor, parıltı duruyor ve yer tutucu sabit
+ * kalıyor — yine yer ayırıyor, yalnızca hareket etmiyor.
+ */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-n100) 25%,
+    var(--color-n50) 37%,
+    var(--color-n100) 63%
+  );
+  background-size: 400% 100%;
+  animation: iskelet-parla 1.4s ease-in-out infinite;
+}
+
+@keyframes iskelet-parla {
+  from { background-position: 100% 50%; }
+  to   { background-position: 0 50%; }
+}
