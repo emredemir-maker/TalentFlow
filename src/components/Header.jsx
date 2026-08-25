@@ -1,5 +1,9 @@
 // src/components/Header.jsx
 import { normalizeSkills } from '../utils/normalizeSkills';
+// Arama puanlaması ayrı dosyada: Header beş context'e bağlı olduğu için
+// buradayken test edilemiyordu ve sayı olan `experience` alanı canlıda
+// aramayı çökertti. Neden ve gerileme testi: utils/globalSearchScore.js
+import { kwScoreCandidate, kwScorePosition, kwScorePage } from '../utils/globalSearchScore';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
     Search, Bell, Settings, Home, X, Users, Briefcase,
@@ -42,39 +46,6 @@ const NOTIF_CONFIG = {
 
 function dispatchView(view) {
     window.dispatchEvent(new CustomEvent('changeView', { detail: view }));
-}
-
-function kwScoreCandidate(c, words) {
-    let s = 0;
-    for (const w of words) {
-        if (c.name?.toLowerCase().includes(w)) s += 5;
-        if (c.position?.toLowerCase().includes(w)) s += 3;
-        if (normalizeSkills(c.skills).some(sk => sk.toLowerCase().includes(w))) s += 4;
-        if ((c.summary || '').toLowerCase().includes(w)) s += 2;
-        if (c.email?.toLowerCase().includes(w)) s += 2;
-        if (c.department?.toLowerCase().includes(w)) s += 1;
-        if ((c.experience || '').toLowerCase().includes(w)) s += 1;
-    }
-    return s;
-}
-
-function kwScorePosition(p, words) {
-    let s = 0;
-    for (const w of words) {
-        if (p.title?.toLowerCase().includes(w)) s += 5;
-        if (p.department?.toLowerCase().includes(w)) s += 3;
-        if ((p.description || '').toLowerCase().includes(w)) s += 1;
-    }
-    return s;
-}
-
-function kwScorePage(pg, words) {
-    let s = 0;
-    for (const w of words) {
-        if (pg.label.toLowerCase().includes(w)) s += 5;
-        if (pg.desc.toLowerCase().includes(w)) s += 2;
-    }
-    return s;
 }
 
 function formatTime(ts) {
