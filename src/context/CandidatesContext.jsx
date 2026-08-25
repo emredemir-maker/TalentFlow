@@ -4,6 +4,7 @@
 
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { normalizeCandidate } from '../utils/normalizeCandidate';
+import { resolveCandidateStage } from '../utils/candidateTable';
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, where, getDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from './AuthContext';
@@ -454,8 +455,15 @@ export function CandidatesProvider({ children }) {
         }
 
         // Status filter
+        //
+        // HAM EŞİTLİK YETMİYOR: kayıtların çoğu eski anahtarları taşıyor
+        // (`interview`, `new`, `final`). Ham karşılaştırma bu adayları hiçbir
+        // aşama süzgecinde göstermiyordu. `resolveCandidateStage` eski
+        // anahtarları kanonik aşamaya eşliyor ve mülakatı biten adayı
+        // "Mülakat Tamamlandı" sayıyor — ekranda görünen aşama neyse süzgeç
+        // de onu süzüyor.
         if (statusFilter !== 'all') {
-            result = result.filter((c) => c.status === statusFilter);
+            result = result.filter((c) => resolveCandidateStage(c) === statusFilter);
         }
 
         // Experience filter

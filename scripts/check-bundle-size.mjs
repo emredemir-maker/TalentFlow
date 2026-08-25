@@ -54,7 +54,14 @@ const BUDGETS = {
     // Bütçe zaten tavana dayanmıştı (main 129.5/130). 134 hem bu iki
     // dosyayı hem de ~3 KB organik büyüme payını karşılıyor. Bir sonraki
     // aşma gerçek bir inceleme istesin diye daha yükseğe çekilmedi.
-    'index-': Number(process.env.BUDGET_INDEX_GZIP_KB) || 134,
+    //
+    // 134 → 138 (aday statüleri). Ölçüm: main 132.7 KB, dal 133.8 KB —
+    // büyüme 1.1 KB ve kaynağı, `CandidatesContext` içinden eager olarak
+    // çekilen üç küçük dosya: utils/pipelineStages (aşama tanımları),
+    // utils/candidateTable (aşama çözümlemesi) ve utils/interviewSession.
+    // Aşama süzgeci veri uygulamaya girerken çalıştığı için lazy olamıyor.
+    // 138, aşma anında gerçek bir inceleme yapılmasını sağlayacak kadar dar.
+    'index-': Number(process.env.BUDGET_INDEX_GZIP_KB) || 138,
 
     // Firebase SDK chunk — firebase/auth + firestore + storage. Heavy
     // (~162 KB gzip) but needed on every authenticated route, so it's

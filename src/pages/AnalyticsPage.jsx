@@ -2,6 +2,9 @@
 // Compact light-theme analytics dashboard — 3 tabs
 
 import { normalizeSkills } from '../utils/normalizeSkills';
+import { resolveCandidateStage } from '../utils/candidateTable';
+import { getStage, reachedStage } from '../utils/pipelineStages';
+import { rejectionBreakdown, REJECTION_CATEGORY_BY_ID } from '../utils/rejectionReasons';
 import { useState, useMemo } from 'react';
 import { useCandidates } from '../context/CandidatesContext';
 import { useMessageQueue } from '../context/MessageQueueContext';
@@ -11,7 +14,7 @@ import {
     Users, MessageSquare, Clock, FileText, Loader2, Sparkles, Send, X,
     TrendingUp, Zap, Briefcase, BrainCircuit, Globe, Activity, Target,
     CheckCircle, Search, RefreshCw, Layers, MailOpen, Reply, Mail,
-    Filter, AlertCircle,
+    Filter, AlertCircle, XCircle,
 } from 'lucide-react';
 import { analyzeResponseEmail } from '../services/geminiService';
 import { useAuth } from '../context/AuthContext';
@@ -30,8 +33,8 @@ function TabPill({ id, label, active, onClick }) {
 }
 
 // ─── Overview tab ────────────────────────────────────────────
-function OverviewTab({ candidates, funnelData, trendsData, positionStatusData, avgMatchScore, pendingCount, timeRange }) {
-    const hiredCount   = candidates.filter(c => c.status === 'hired').length;
+function OverviewTab({ candidates, funnelData, rejectionData, trendsData, positionStatusData, avgMatchScore, pendingCount, timeRange }) {
+    const hiredCount   = candidates.filter(c => resolveCandidateStage(c) === 'hired').length;
     const hiringRate   = Math.round((hiredCount / (candidates.length || 1)) * 100);
     const pendingReply = pendingCount;
 
@@ -153,6 +156,64 @@ function OverviewTab({ candidates, funnelData, trendsData, positionStatusData, a
                 </div>
             </div>
 
+
+            {/* Red nedenleri — "neden kaybediyoruz" */}
+            <div className="bg-n0 border border-n200 rounded-[14px] shadow-sm overflow-hidden">
+                <div className="px-5 py-3 border-b border-n200 flex items-center justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-2">
+                        <XCircle className="text-bad" size={15} />
+                        <span className="text-[13px] font-semibold text-n900">Red Nedenleri</span>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {rejectionData.byCategory.map((cat) => (
+                            <span
+                                key={cat.id}
+                                style={{ color: cat.color, background: cat.bg }}
+                                className="text-[11px] font-semibold px-2.5 py-1 rounded-md"
+                            >
+                                {cat.label} · {cat.count}
+                            </span>
+                        ))}
+                        <span className="bg-n100 text-n500 text-[11px] font-semibold px-2.5 py-1 rounded-md">
+                            {rejectionData.total} Red
+                        </span>
+                    </div>
+                </div>
+                {rejectionData.byReason.length === 0 ? (
+                    <div className="px-5 py-8 text-center text-sm text-n400">
+                        {rejectionData.total === 0
+                            ? 'Bu dönemde reddedilen aday yok.'
+                            : 'Reddedilen adaylara henüz neden girilmemiş.'}
+                    </div>
+                ) : (
+                    <div className="px-5 py-4 space-y-3">
+                        {rejectionData.byReason.map((r) => {
+                            const cat = REJECTION_CATEGORY_BY_ID[r.category];
+                            const oran = Math.round((r.count / (rejectionData.total || 1)) * 100);
+                            return (
+                                <div key={r.id}>
+                                    <div className="flex justify-between items-center mb-1.5 gap-3">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: cat?.color || '#64748B' }} />
+                                            <span className="text-[11px] font-semibold text-n700 truncate">{r.label}</span>
+                                        </div>
+                                        <span className="text-[12px] font-semibold text-n900 shrink-0">{r.count} <span className="text-n400 font-medium">%{oran}</span></span>
+                                    </div>
+                                    <div className="h-2 bg-n100 rounded-full overflow-hidden">
+                                        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${Math.max(4, oran)}%`, backgroundColor: cat?.color || '#64748B' }} />
+                                    </div>
+                                </div>
+                            );
+                        })}
+                        {rejectionData.missing > 0 && (
+                            <p className="text-[11px] text-n400 pt-1">
+                                {rejectionData.missing} adayın red nedeni girilmemiş — bu kayıtlar kırılıma dahil değil.
+                            </p>
+                        )}
+                    </div>
+                )}
+            </div>
+
             {/* Position matrix table */}
             <div className="bg-n0 border border-n200 rounded-[14px] shadow-sm overflow-hidden">
                 <div className="px-5 py-3 border-b border-n200 flex items-center justify-between">
@@ -195,7 +256,7 @@ function OverviewTab({ candidates, funnelData, trendsData, positionStatusData, a
 // ─── Acquisition tab ─────────────────────────────────────────
 function AcquisitionTab({ sourceList, subSourceList, topSkills, avgMatchScore, candidates }) {
     const [sourceTab, setSourceTab] = useState('source');
-    const hiredCount = candidates.filter(c => c.status === 'hired').length;
+    const hiredCount = candidates.filter(c => resolveCandidateStage(c) === 'hired').length;
     const hiringRate = Math.round((hiredCount / (candidates.length || 1)) * 100);
     const activeList  = sourceTab === 'source' ? sourceList : subSourceList;
     const maxSkill    = topSkills.length > 0 ? topSkills[0][1] : 1;
@@ -292,7 +353,7 @@ function AcquisitionTab({ sourceList, subSourceList, topSkills, avgMatchScore, c
                         <div className="text-[10px] text-n400 font-medium uppercase mt-0.5">Toplam</div>
                     </div>
                     <div className="bg-n50 border border-ok-bg rounded-md p-2.5 text-center">
-                        <div className="text-[15px] font-semibold text-ok">{candidates.filter(c => c.status === 'hired').length}</div>
+                        <div className="text-[15px] font-semibold text-ok">{candidates.filter(c => resolveCandidateStage(c) === 'hired').length}</div>
                         <div className="text-[10px] text-n400 font-medium uppercase mt-0.5">İşe Alım</div>
                     </div>
                     <div className="bg-n50 border border-brand-50 rounded-md p-2.5 text-center">
@@ -507,20 +568,53 @@ export default function AnalyticsPage() {
             if (!matrix[pos]) matrix[pos] = { name: pos, total: 0, review: 0, interview: 0, hired: 0, rejected: 0, avgScore: 0, scoredCandidates: 0 };
             matrix[pos].total += 1;
             if (c.matchScore) { matrix[pos].avgScore += c.matchScore; matrix[pos].scoredCandidates += 1; }
-            if (['review', 'ai_analysis'].includes(c.status)) matrix[pos].review += 1;
-            if (['interview', 'deep_review'].includes(c.status)) matrix[pos].interview += 1;
-            if (['hired', 'offer'].includes(c.status)) matrix[pos].hired += 1;
-            if (c.status === 'rejected') matrix[pos].rejected += 1;
+            // HAM `c.status` YETMİYORDU: kayıtların çoğu eski anahtarları
+            // taşıyor (`new`, `Interview`, `final`) ve bu diziler onları hiç
+            // saymıyordu — matris olduğundan düşük görünüyordu. Aşama artık
+            // ekranda görünenle aynı yerden çözülüyor.
+            const asama = resolveCandidateStage(c);
+            if (asama === 'review' || asama === 'ai_analysis') matrix[pos].review += 1;
+            if (asama === 'interview_scheduled' || asama === 'interview_done') matrix[pos].interview += 1;
+            if (asama === 'hired' || asama === 'offer') matrix[pos].hired += 1;
+            if (asama === 'rejected') matrix[pos].rejected += 1;
         });
         return Object.values(matrix).map(p => ({ ...p, avgScore: p.scoredCandidates > 0 ? Math.round(p.avgScore / p.scoredCandidates) : 0 })).sort((a, b) => b.total - a.total);
     }, [timeFilteredCandidates, positions]);
 
-    const funnelData = useMemo(() => ([
-        { name: 'Başvuru',  color: '#6366f1', count: timeFilteredCandidates.length },
-        { name: 'İnceleme', color: '#f59e0b', count: timeFilteredCandidates.filter(c => ['review', 'interview', 'offer', 'hired'].includes(c.status)).length },
-        { name: 'Mülakat',  color: '#3b82f6', count: timeFilteredCandidates.filter(c => ['interview', 'offer', 'hired'].includes(c.status)).length },
-        { name: 'İşe Alım', color: '#10b981', count: timeFilteredCandidates.filter(c => c.status === 'hired').length },
-    ]), [timeFilteredCandidates]);
+    /**
+     * Red nedenleri kırılımı — "neden kaybediyoruz".
+     *
+     * Bu soru daha önce cevaplanamıyordu: red nedeni iki ekranda iki farklı
+     * biçimde (kimlik ve serbest metin) aynı alana yazılıyordu. Liste tek
+     * tanıma indirildi; eski serbest metinler "Diğer" altında metni korunarak
+     * görünüyor (bkz. utils/rejectionReasons).
+     */
+    const rejectionData = useMemo(
+        () => rejectionBreakdown(timeFilteredCandidates.filter((c) => resolveCandidateStage(c) === 'rejected')),
+        [timeFilteredCandidates]
+    );
+
+    /**
+     * Huni — "bu aşamaya kadar kaç aday geldi".
+     *
+     * Eskiden her basamak elle yazılmış bir durum dizisiydi ve yeni bir aşama
+     * eklendiğinde sessizce eksik kalıyordu. Artık kanonik sıradan türüyor:
+     * aday hedef aşamaya ULAŞMIŞSA sayılıyor. Reddedilen aday sıranın dışında
+     * (bkz. stageOrder) — ilerlemiş sayılmıyor.
+     *
+     * Mülakat basamağı iki aşamayı da kapsıyor: planlı mülakatı olan aday da
+     * mülakat basamağına ulaşmış sayılır.
+     */
+    const funnelData = useMemo(() => {
+        const asamalar = timeFilteredCandidates.map(resolveCandidateStage);
+        const kacTane = (hedef) => asamalar.filter((k) => reachedStage(k, hedef)).length;
+        return [
+            { name: 'Başvuru',  color: '#6366f1', count: timeFilteredCandidates.length },
+            { name: 'İnceleme', color: getStage('review').color,              count: kacTane('review') },
+            { name: 'Mülakat',  color: getStage('interview_scheduled').color, count: kacTane('interview_scheduled') },
+            { name: 'İşe Alım', color: getStage('hired').color,               count: kacTane('hired') },
+        ];
+    }, [timeFilteredCandidates]);
 
     const { sourceList, subSourceList } = useMemo(() => {
         const sources = {}, subSources = {};
@@ -531,7 +625,7 @@ export default function AnalyticsPage() {
             const sub = c.sourceDetail || c.subSource || 'Belirtilmedi';
             if (!subSources[sub]) subSources[sub] = { count: 0, totalScore: 0, successCount: 0 };
             subSources[sub].count += 1; subSources[sub].totalScore += (c.matchScore || 0);
-            if (['hired', 'offer'].includes(c.status)) { sources[s].successCount += 1; subSources[sub].successCount += 1; }
+            if (['hired', 'offer'].includes(resolveCandidateStage(c))) { sources[s].successCount += 1; subSources[sub].successCount += 1; }
         });
         const fmt = obj => Object.entries(obj).map(([name, d]) => ({ name, value: d.count, percentage: d.count > 0 ? Math.round(d.totalScore / d.count) : 0, successRate: d.count > 0 ? Math.round((d.successCount / d.count) * 100) : 0 })).sort((a, b) => b.value - a.value);
         return { sourceList: fmt(sources), subSourceList: fmt(subSources) };
@@ -606,7 +700,7 @@ export default function AnalyticsPage() {
                 <div className="max-w-[1600px] mx-auto">
                     {activeTab === 'overview' && (
                         <OverviewTab
-                            candidates={timeFilteredCandidates} funnelData={funnelData} trendsData={trendsData}
+                            candidates={timeFilteredCandidates} funnelData={funnelData} rejectionData={rejectionData} trendsData={trendsData}
                             positionStatusData={positionStatusData} avgMatchScore={avgMatchScore} pendingCount={pendingCount}
                             timeRange={timeRange}
                         />

@@ -5,28 +5,13 @@ import { MapPin, Briefcase, Clock, ArrowUpRight, Sparkles, Brain, Zap, Graduatio
 import { useCandidates } from '../context/CandidatesContext';
 import { useAuth } from '../context/AuthContext';
 import { applyPiiMask } from '../utils/pii';
+import { STAGES, getStage } from '../utils/pipelineStages';
+import { resolveCandidateStage } from '../utils/candidateTable';
 
-// Stage badge colours follow the canonical pipeline palette (see utils/pipelineStages):
-// Ön Eleme=cyan · İnceleme=teal · Mülakat=violet · Teklif=amber · İşe Alındı=emerald · Reddedildi=red
-const STATUS_CONFIG = {
-    ai_analysis: { label: 'AI ANALİZİ',       classes: 'bg-cyan-500/20 text-cyan-800 border-cyan-500/30' },
-    review:      { label: 'MANUEL İNCELEME', classes: 'bg-teal-500/20 text-teal-800 border-teal-500/30' },
-    interview:   { label: 'MÜLAKAT',         classes: 'bg-violet-500/20 text-violet-800 border-violet-500/30' },
-    offer:       { label: 'TEKLİF',          classes: 'bg-amber-500/20 text-amber-800 border-amber-500/30' },
-    hired:       { label: 'İŞE ALINDI',      classes: 'bg-emerald-500/20 text-emerald-800 border-emerald-500/30' },
-    rejected:    { label: 'BAĞLANTI KESİLDİ',classes: 'bg-red-500/20 text-red-800 border-red-500/30' },
-};
-
-const PIPELINE_STAGES = [
-    { value: 'ai_analysis', label: 'AI Analiz',  color: 'text-cyan-700',   bg: 'bg-cyan-50',   hover: 'hover:bg-cyan-50' },
-    { value: 'review',      label: 'İnceleme',   color: 'text-teal-700',   bg: 'bg-teal-50',   hover: 'hover:bg-teal-50' },
-    { value: 'interview',   label: 'Mülakat',    color: 'text-violet-700', bg: 'bg-violet-50', hover: 'hover:bg-violet-50' },
-    { value: 'offer',       label: 'Teklif',     color: 'text-amber-700',  bg: 'bg-amber-50',  hover: 'hover:bg-amber-50' },
-    { value: 'hired',       label: 'İşe Alındı', color: 'text-emerald-700',bg: 'bg-emerald-50',hover: 'hover:bg-emerald-50' },
-    { value: 'rejected',    label: 'Reddedildi', color: 'text-red-700',    bg: 'bg-red-50',    hover: 'hover:bg-red-50' },
-];
-
-const normalizePipelineStatus = (s) => (s === 'new' ? 'ai_analysis' : s);
+// Aşama tanımları ARTIK KOPYALANMIYOR — tek kaynak utils/pipelineStages.
+// İki kopya (rozet + seçici) burada duruyordu; ikisi de altı aşamayı elle
+// sayıyordu ve etiketleri kanonik listeden farklıydı ("AI ANALİZİ",
+// "BAĞLANTI KESİLDİ"). Yeni bir aşama eklendiğinde sessizce eksik kalırlardı.
 
 function getInitials(name) {
     if (!name) return '?';
@@ -44,8 +29,8 @@ export default function CandidateCard({ candidate: rawCandidate, index = 0, onCl
     const candidate = applyPiiMask(rawCandidate, role);
 
     const isComparing = compareIds.includes(rawCandidate.id);
-    const currentStatus = normalizePipelineStatus(rawCandidate.status);
-    const status = STATUS_CONFIG[currentStatus] || STATUS_CONFIG.ai_analysis;
+    const currentStatus = resolveCandidateStage(rawCandidate);
+    const status = getStage(currentStatus);
 
     const sourceName = (candidate.source || '').toLowerCase();
     const scColor = sourceColors[sourceName] || '#3b82f6';
@@ -139,7 +124,8 @@ export default function CandidateCard({ candidate: rawCandidate, index = 0, onCl
                     onClick={(e) => { e.stopPropagation(); setStatusOpen(v => !v); }}
                     disabled={statusLoading}
                     title="Aşama değiştir"
-                    className={`inline-flex items-center gap-1 px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-[0.1em] border transition-all ${status.classes} ${statusLoading ? 'opacity-50' : 'hover:opacity-80'}`}
+                    style={{ color: status.color, background: status.bg, borderColor: status.border }}
+                    className={`inline-flex items-center gap-1 px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-[0.1em] border transition-all ${statusLoading ? 'opacity-50' : 'hover:opacity-80'}`}
                 >
                     <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
                     {status.label}
@@ -152,18 +138,18 @@ export default function CandidateCard({ candidate: rawCandidate, index = 0, onCl
                             className="fixed inset-0 z-40"
                             onClick={(e) => { e.stopPropagation(); setStatusOpen(false); }}
                         />
-                        <div className="absolute top-8 left-0 z-50 bg-white border border-slate-200 rounded-xl shadow-xl py-1 min-w-[140px] animate-in fade-in zoom-in-95 duration-150">
-                            {PIPELINE_STAGES.map(stage => {
-                                const isCurrent = stage.value === currentStatus;
+                        <div className="absolute top-8 left-0 z-50 bg-white border border-slate-200 rounded-xl shadow-xl py-1 min-w-[190px] animate-in fade-in zoom-in-95 duration-150">
+                            {STAGES.map(stage => {
+                                const isCurrent = stage.key === currentStatus;
                                 return (
                                     <button
-                                        key={stage.value}
+                                        key={stage.key}
                                         disabled={isCurrent}
-                                        onClick={(e) => handleCardStatusChange(e, stage.value)}
-                                        className={`w-full text-left px-3 py-1.5 text-[10px] font-bold flex items-center gap-2 transition-colors ${
-                                            isCurrent
-                                                ? `${stage.bg} ${stage.color} cursor-default`
-                                                : `text-slate-700 ${stage.hover}`
+                                        onClick={(e) => handleCardStatusChange(e, stage.key)}
+                                        title={stage.desc}
+                                        style={isCurrent ? { color: stage.color, background: stage.bg } : undefined}
+                                        className={`w-full text-left px-3 py-1.5 text-[10px] font-bold flex items-center gap-2 whitespace-nowrap transition-colors ${
+                                            isCurrent ? 'cursor-default' : 'text-slate-700 hover:bg-n50'
                                         }`}
                                     >
                                         {isCurrent

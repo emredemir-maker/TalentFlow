@@ -1,5 +1,6 @@
 // src/components/InterviewHistory.jsx
 import { useState } from 'react';
+import { isSessionDone } from '../utils/interviewSession';
 import {
     Clock, Zap, Users, Box, ChevronDown, TrendingUp, TrendingDown,
     Printer, FileText, CalendarDays, ShieldCheck, Brain, Video, Trash2, MessageSquare,
@@ -127,8 +128,7 @@ export default function InterviewHistory({ sessions = [], onStartSession, onDele
             <div className="space-y-4">
                 {sorted.map(session => {
                     const isExpanded = expandedId === session.id;
-                    const isCompleted = session.status === 'completed' ||
-                        (session.status !== 'live' && (session.aiOverallScore > 0 || Boolean(session.aiSummary) || session.finalScore > 0));
+                    const isCompleted = isSessionDone(session);
                     const isPlanned = !isCompleted && session.status !== 'cancelled';
                     const TypeIcon = TYPE_ICONS[session.type] || MessageSquare;
 
