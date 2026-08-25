@@ -7,6 +7,7 @@ import { analysisFor, analysisScoreDetail } from './positionScore';
 import { sectorBucket, verificationBucket } from './candidateBadges';
 import { mustHaveGate } from './mustHaveGate';
 import { STAGES, getStage } from './pipelineStages';
+import { hasCompletedInterview } from './interviewSession';
 import { normalizeStarAnalysis, starPercent } from './starDimensions';
 
 /** Map any raw/legacy candidate status onto a canonical stage key. */
@@ -16,6 +17,28 @@ export function resolveStageKey(status) {
         if (s.key === status || s.legacy.includes(status)) return s.key;
     }
     return 'ai_analysis';
+}
+
+/**
+ * Adayın GÖRÜNEN aşaması — kayıtlı durum + fiilen olan bitenin birleşimi.
+ *
+ * "Mülakat Tamamlandı" aşaması İK'nın elle işaretlemesini beklemiyor:
+ * mülakat bittiğinde aday kendiliğinden bu aşamada görünüyor. Sebebi pratik —
+ * görüşmeyi yapan kişi çoğu zaman panoyu güncelleyen kişi değil ve pano
+ * "kimin kararını vereceğim" sorusunu ancak güncelse cevaplayabiliyor.
+ *
+ * TÜRETME YALNIZCA PLANLI MÜLAKAT AŞAMASINDA ÇALIŞIR. Aday elle Teklif'e,
+ * İnceleme'ye ya da Red'e taşınmışsa kayıtlı durum aynen geçerlidir —
+ * otomatik hareket İK'nın kararının önüne geçmez.
+ *
+ * Firestore'a hiçbir şey yazılmaz; bu bir okuma kuralı. Bu sayede arka uçta
+ * tamamlanan mülakatlar (canlı mülakat, rapor üretimi) için ayrıca bir
+ * yazma akışı gerekmiyor ve veri ile ekran arasında sapma oluşmuyor.
+ */
+export function resolveCandidateStage(candidate) {
+    const key = resolveStageKey(candidate?.status);
+    if (key === 'interview_scheduled' && hasCompletedInterview(candidate)) return 'interview_done';
+    return key;
 }
 
 /** Applied date as 'YYYY-MM-DD' — prefers the explicit field, falls back to createdAt. */
@@ -322,7 +345,7 @@ export function applyTableFilters(rows, filters, opts = {}) {
         );
     }
     if (f.stage !== 'all') {
-        result = result.filter((c) => resolveStageKey(c.status) === f.stage);
+        result = result.filter((c) => resolveCandidateStage(c) === f.stage);
     }
     if (f.position !== 'all') {
         if (positionMode) {
@@ -414,7 +437,7 @@ const SORT_ACCESSORS = {
     department: (c) => c.department || '',
     location: (c) => c.location || '',
     source: (c) => c.source || '',
-    stage: (c) => getStage(resolveStageKey(c.status)).label,
+    stage: (c) => getStage(resolveCandidateStage(c)).label,
     scanStatus: (c) => (isDeepScanned(c) ? 1 : 0),
     bestScore: (c) => (c.bestScore ?? null),
     positionScore: (c) => (c.positionScore ?? null),
@@ -574,7 +597,7 @@ export function buildExportRows(rows) {
         'Pozisyon': c.bestTitle || c.position || '',
         "CV'ye Göre İdeal Rol": cleanRoleText(c.suggestedRole, c.position || '') || '',
         'Departman': c.department || '',
-        'Aşama': getStage(resolveStageKey(c.status)).label,
+        'Aşama': getStage(resolveCandidateStage(c)).label,
         'Kaynak': c.source || '',
         'Kaynak Detayı': c.sourceDetail || '',
         'Otonom Tarama': isDeepScanned(c) ? 'Yapıldı' : 'Yapılmadı',

@@ -17,7 +17,7 @@ import { mustHaveGate } from './mustHaveGate';
 import { starPercent } from './starDimensions';
 import { skillAffinity } from './skillGraph';
 import { cvTextOf } from './candidateCv';
-import { resolveStageKey } from './candidateTable';
+import { resolveCandidateStage } from './candidateTable';
 import { getStage } from './pipelineStages';
 import { foldTr, foldedIncludes } from './turkishText';
 
@@ -136,7 +136,7 @@ function viewOf(candidate, position, fingerprint) {
             : Number(candidate?.bestScore ?? 0),
         gate: scanned ? mustHaveGate(analysis, position, candidate).status : 'unknown',
         star: scanned ? starPercent(analysis?.starAnalysis) : null,
-        stageKey: resolveStageKey(candidate?.status),
+        stageKey: resolveCandidateStage(candidate),
     };
 }
 

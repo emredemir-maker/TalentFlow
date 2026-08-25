@@ -1,5 +1,8 @@
 // src/pages/CandidateProcessPage.jsx
-import { scoreForPositionDetail } from '../utils/candidateTable';
+import { scoreForPositionDetail, resolveCandidateStage } from '../utils/candidateTable';
+import { STAGES, getStage } from '../utils/pipelineStages';
+import RejectReasonPicker from '../components/RejectReasonPicker';
+import { REJECTION_REASON_BY_ID } from '../utils/rejectionReasons';
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCandidates } from '../context/CandidatesContext';
@@ -52,30 +55,10 @@ const STATUS_CONFIG = {
 };
 const getStatusCfg = (s) => STATUS_CONFIG[s] || STATUS_CONFIG.scheduled;
 
-const PIPELINE_STATUS_LABELS = {
-    new:         'AI Analiz',
-    ai_analysis: 'AI Analiz',
-    review:      'İnceleme',
-    interview:   'Mülakat',
-    offer:       'Teklif',
-    hired:       'İşe Alındı',
-    rejected:    'Red',
-    final:       'Final',
-};
-
-// Ordered pipeline stages for the full status selector
-// Canonical pipeline palette (see utils/pipelineStages):
-// Ön Eleme=cyan · İnceleme=teal · Mülakat=violet · Teklif=amber · İşe Alındı=emerald · Reddedildi=red
-const PIPELINE_STAGES = [
-    { value: 'ai_analysis', label: 'AI Analiz',   color: 'text-brand',   bg: 'bg-brand-50' },
-    { value: 'review',      label: 'İnceleme',     color: 'text-brand',     bg: 'bg-brand-50' },
-    { value: 'interview',   label: 'Mülakat',      color: 'text-brand', bg: 'bg-brand-50' },
-    { value: 'offer',       label: 'Teklif',       color: 'text-warn',  bg: 'bg-warn-bg' },
-    { value: 'hired',       label: 'İşe Alındı',   color: 'text-ok',bg: 'bg-ok-bg' },
-    { value: 'rejected',    label: 'Reddedildi',   color: 'text-bad',    bg: 'bg-bad-bg' },
-];
-
-const normalizePipelineStatus = (s) => (s === 'new' ? 'ai_analysis' : s);
+// Aşama tanımları ARTIK KOPYALANMIYOR — tek kaynak utils/pipelineStages.
+// Burada iki kopya vardı (etiket sözlüğü + seçici listesi) ve ikisi de altı
+// aşamayı elle sayıyordu; "Ön İnceleme" burada "AI Analiz" diye geçiyordu.
+const PIPELINE_STATUS_LABELS = Object.fromEntries(STAGES.map((s) => [s.key, s.label]));
 
 export default function CandidateProcessPage() {
     const navigate = useNavigate();
@@ -390,7 +373,10 @@ export default function CandidateProcessPage() {
         try {
             await updateCandidate(candidate.id, {
                 status: 'rejected',
-                rejectionReason: rejectReason.trim() || null,
+                rejectionReason: rejectReason || null,
+                // Kategori de yazılıyor: "biz mi eledik, aday mı çekildi"
+                // sorusu analitikte nedenden bağımsız sorulabiliyor.
+                rejectionCategory: REJECTION_REASON_BY_ID[rejectReason]?.category || null,
                 rejectedAt: new Date().toISOString(),
                 rejectedBy: user?.displayName || user?.email || 'HR',
             });
@@ -407,7 +393,11 @@ export default function CandidateProcessPage() {
         setActionLoading(true);
         try {
             await updateCandidate(candidate.id, {
-                status: 'final',
+                // Eskiden 'final' yazılıyordu; bu anahtar kanonik listede yok ve
+                // yalnızca legacy eşlemesiyle okunabiliyordu. Final turu da
+                // planlanmış bir görüşme olduğu için artık kanonik anahtar
+                // yazılıyor; `finalizedAt` final turu bilgisini taşımaya devam ediyor.
+                status: 'interview_scheduled',
                 finalizedAt: new Date().toISOString(),
                 finalizedBy: user?.displayName || user?.email || 'HR',
             });
@@ -646,8 +636,16 @@ export default function CandidateProcessPage() {
     };
 
     const handleStatusChange = async (newStatus) => {
-        if (!candidate || newStatus === normalizePipelineStatus(candidate.status)) return;
+        if (!candidate || newStatus === resolveCandidateStage(candidate)) return;
         setStatusDropdownOpen(false);
+        // RED, NEDEN SORULMADAN KAYDEDİLMİYOR. Aşama seçicisi tek tıkla
+        // "Reddedildi" yazabiliyordu ve o kayıtlar analitikte nedensiz
+        // görünüyordu. Seçim artık red modalını açıyor; yazma orada oluyor.
+        if (newStatus === 'rejected') {
+            setRejectReason('');
+            setRejectModal(true);
+            return;
+        }
         setActionLoading(true);
         try {
             const update = {
@@ -2268,6 +2266,23 @@ export default function CandidateProcessPage() {
                                             <Mail className="w-3 h-3" /> Mesaj Gönder
                                         </button>
                                     )}
+                                    {/* RED DÜĞMESİ GERİ GELDİ.
+                                        Red modalı koddaydı ama onu açan hiçbir
+                                        düğme yoktu — süreçten çıkarmanın tek yolu
+                                        aşama seçicisinden "Reddedildi" seçmekti ve
+                                        o yol NEDEN SORMUYORDU. Süreç panosundaki
+                                        "Süreçten çıkar" da kullanıcıyı buraya
+                                        gönderiyor; geldiğinde bir eylem bulması
+                                        gerekiyor. */}
+                                    {!getStage(resolveCandidateStage(candidate)).terminal && (
+                                        <button
+                                            onClick={() => { setRejectReason(''); setRejectModal(true); }}
+                                            className="h-7 px-[11px] bg-n0 text-bad-text rounded-md text-[12px] font-medium border border-n200 hover:bg-bad-bg flex items-center gap-1.5"
+                                            title="Adayı süreçten çıkar"
+                                        >
+                                            <XCircle className="w-3 h-3" /> Reddet
+                                        </button>
+                                    )}
                                     <button
                                         onClick={() => setDeleteModal(true)}
                                         className="h-7 w-7 flex items-center justify-center rounded-md text-n400 border border-n200 hover:text-bad-text hover:bg-bad-bg"
@@ -2287,25 +2302,24 @@ export default function CandidateProcessPage() {
                                         {actionLoading
                                             ? <Loader2 className="w-3 h-3 animate-spin" />
                                             : (() => {
-                                                const cur = PIPELINE_STAGES.find(s => s.value === normalizePipelineStatus(candidate?.status));
-                                                return cur ? cur.label : 'Aşama';
+                                                return getStage(resolveCandidateStage(candidate)).label;
                                             })()
                                         }
                                         <ChevronDown className="w-3 h-3" />
                                     </button>
                                     {statusDropdownOpen && (
-                                        <div className="absolute bottom-9 right-0 z-50 bg-n0 border border-n200 rounded-[10px] shadow-lg py-1 min-w-[150px]">
-                                            {PIPELINE_STAGES.map(stage => {
-                                                const isCurrent = stage.value === normalizePipelineStatus(candidate?.status);
+                                        <div className="absolute bottom-9 right-0 z-50 bg-n0 border border-n200 rounded-[10px] shadow-lg py-1 min-w-[200px]">
+                                            {STAGES.map(stage => {
+                                                const isCurrent = stage.key === resolveCandidateStage(candidate);
                                                 return (
                                                     <button
-                                                        key={stage.value}
+                                                        key={stage.key}
                                                         disabled={isCurrent}
-                                                        onClick={() => handleStatusChange(stage.value)}
-                                                        className={`w-full text-left px-3 py-1.5 text-[10px] font-semibold flex items-center gap-2 transition-colors ${
-                                                            isCurrent
-                                                                ? `${stage.bg} ${stage.color} cursor-default`
-                                                                : 'hover:bg-n50 text-n700'
+                                                        onClick={() => handleStatusChange(stage.key)}
+                                                        title={stage.desc}
+                                                        style={isCurrent ? { color: stage.color, background: stage.bg } : undefined}
+                                                        className={`w-full text-left px-3 py-1.5 text-[10px] font-semibold flex items-center gap-2 whitespace-nowrap transition-colors ${
+                                                            isCurrent ? 'cursor-default' : 'hover:bg-n50 text-n700'
                                                         }`}
                                                     >
                                                         {isCurrent && <CheckCircle2 className="w-3 h-3 shrink-0" />}
@@ -2466,26 +2480,18 @@ export default function CandidateProcessPage() {
                                 </p>
                             </div>
                             <div>
-                                <label className="text-[10px] font-semibold text-n400 uppercase tracking-[0.08em] block mb-1.5">Red Nedeni (İsteğe Bağlı)</label>
-                                <select
-                                    value={rejectReason}
-                                    onChange={e => setRejectReason(e.target.value)}
-                                    className="w-full bg-n50 border border-n200 rounded-md px-3 py-2 text-[12px] text-n700 outline-none focus:border-bad focus:ring-0 transition-all"
-                                >
-                                    <option value="">Neden seçin...</option>
-                                    <option value="Teknik Yetersizlik">Teknik Yetersizlik</option>
-                                    <option value="Deneyim Eksikliği">Deneyim Eksikliği</option>
-                                    <option value="Kültürel Uyumsuzluk">Kültürel Uyumsuzluk</option>
-                                    <option value="Maaş Beklentisi">Maaş Beklentisi Uyumsuz</option>
-                                    <option value="Pozisyon Dolu">Pozisyon Dolu</option>
-                                    <option value="Diğer">Diğer</option>
-                                </select>
+                                {/* NEDEN ZORUNLU OLDU: bu kutu eskiden serbest metin yazıyordu
+                                    ("Teknik Yetersizlik" gibi) ve aynı alana çekmecedeki seçici
+                                    kimlik yazıyordu. İki biçim karıştığı için red nedenleri
+                                    sayılamıyordu. Artık tek liste — analitikte kırılım çıkıyor. */}
+                                <label className="text-[10px] font-semibold text-n400 uppercase tracking-[0.08em] block mb-2">Red Nedeni</label>
+                                <RejectReasonPicker selectedId={rejectReason || null} onSelect={setRejectReason} />
                             </div>
                             <div className="flex gap-2 justify-end pt-1">
                                 <button onClick={() => setRejectModal(false)} className="h-9 px-4 rounded-md text-[11px] font-semibold text-n500 border border-n200 hover:bg-n50 transition-all">İptal</button>
                                 <button
                                     onClick={handleReject}
-                                    disabled={actionLoading}
+                                    disabled={actionLoading || !rejectReason}
                                     className="h-9 px-5 rounded-md text-[11px] font-semibold uppercase tracking-[0.08em] flex items-center gap-2 bg-bad hover:opacity-90 text-white shadow-sm transition-all disabled:opacity-60"
                                 >
                                     {actionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}

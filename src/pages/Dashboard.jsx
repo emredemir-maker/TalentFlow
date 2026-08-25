@@ -8,8 +8,9 @@ import AddCandidateModal from '../components/AddCandidateModal';
 import { doc, getDoc, collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { STAGES, getStage } from '../utils/pipelineStages';
+import { isSessionDone } from '../utils/interviewSession';
 import {
-    resolveStageKey,
+    resolveCandidateStage,
     cleanRoleText,
     withCoherentScores,
 } from '../utils/candidateTable';
@@ -108,13 +109,6 @@ function relativeTime(ms) {
     return wk === 1 ? '1 hafta önce' : `${wk} hafta önce`;
 }
 
-
-/** Bir oturum fiilen bitmiş mi? — Dashboard genelinde tek ölçüt. */
-function isSessionDone(session, effectiveStatus) {
-    return effectiveStatus === 'completed'
-        || (effectiveStatus !== 'live'
-            && (session.aiOverallScore > 0 || Boolean(session.aiSummary) || session.finalScore > 0));
-}
 
 /**
  * "Öne çıkan CV'ler" hangi aşamaları kapsar.
@@ -291,7 +285,7 @@ export default function Dashboard() {
     const featuredCvs = useMemo(() => {
         if (openPositions.length === 0) return [];
         const incelemedekiler = candidates.filter(
-            (c) => ONE_CIKAN_ASAMALAR.includes(resolveStageKey(c.status))
+            (c) => ONE_CIKAN_ASAMALAR.includes(resolveCandidateStage(c))
         );
         const alanUyumlu = new Map();
         for (const pos of openPositions) {
@@ -305,7 +299,7 @@ export default function Dashboard() {
                 name: c.name || 'Aday',
                 role: cleanRoleText(c.position || c.bestTitle, 'Pozisyon atanmadı'),
                 score: Math.round(Number(c.bestScore) || 0),
-                why: `${getStage(resolveStageKey(c.status)).label} aşamasında · ${
+                why: `${getStage(resolveCandidateStage(c)).label} aşamasında · ${
                     c.matchedPositionTitle
                         ? `${c.matchedPositionTitle} ilanıyla eşleşti`
                         : 'ilan atanmadı'
@@ -323,7 +317,7 @@ export default function Dashboard() {
     const stageCounts = useMemo(() => {
         const map = {};
         candidates.forEach(c => {
-            const key = resolveStageKey(c.status);
+            const key = resolveCandidateStage(c);
             map[key] = (map[key] || 0) + 1;
         });
         return map;
@@ -355,7 +349,7 @@ export default function Dashboard() {
 
     const poolRows = useMemo(() => {
         return candidates
-            .filter(c => !poolFilter || resolveStageKey(c.status) === poolFilter)
+            .filter(c => !poolFilter || resolveCandidateStage(c) === poolFilter)
             .map(c => ({
                 id: c.id,
                 candidate: c,
@@ -363,7 +357,7 @@ export default function Dashboard() {
                 city: c.location || '—',
                 role: cleanRoleText(c.position || c.bestTitle, 'Pozisyon atanmadı'),
                 score: Math.round(Number(c.bestScore) || 0),
-                stage: getStage(resolveStageKey(c.status)),
+                stage: getStage(resolveCandidateStage(c)),
                 last: relativeTime(lastTouchMs(c)),
             }))
             .sort((a, b) => b.score - a.score);

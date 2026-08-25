@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
     cleanRoleText,
     resolveStageKey,
+    resolveCandidateStage,
     getAppliedDate,
     applyTableFilters,
     scoreForPosition,
@@ -50,13 +51,19 @@ const CANDIDATES = [
 
 describe('resolveStageKey', () => {
     it('maps canonical keys to themselves', () => {
-        expect(resolveStageKey('interview')).toBe('interview');
+        expect(resolveStageKey('interview_scheduled')).toBe('interview_scheduled');
+        expect(resolveStageKey('interview_done')).toBe('interview_done');
         expect(resolveStageKey('hired')).toBe('hired');
     });
     it('maps legacy statuses onto canonical stages', () => {
         expect(resolveStageKey('new')).toBe('ai_analysis');
         expect(resolveStageKey('Review')).toBe('review');
-        expect(resolveStageKey('Mülakat')).toBe('interview');
+        expect(resolveStageKey('Mülakat')).toBe('interview_scheduled');
+        // ESKİ KANONİK ANAHTAR: canlıdaki kayıtların çoğu bunu taşıyor.
+        // "Planlı Mülakat"a düşmesi, mülakat aşamasının ikiye ayrılmasının
+        // geçmiş veriyi bozmadığının kanıtı.
+        expect(resolveStageKey('interview')).toBe('interview_scheduled');
+        expect(resolveStageKey('final')).toBe('interview_scheduled');
     });
     it('falls back to ai_analysis for unknown/empty', () => {
         expect(resolveStageKey('')).toBe('ai_analysis');
@@ -308,7 +315,7 @@ describe('buildExportRows', () => {
             'Pozisyon': 'Frontend Developer',
             "CV'ye Göre İdeal Rol": 'Frontend Developer',
             'Departman': 'Yazılım',
-            'Aşama': 'Mülakat',
+            'Aşama': 'Planlı Mülakat',
             'Kaynak': 'LinkedIn',
             'Kaynak Detayı': 'Sponsorlu',
             'Otonom Tarama': 'Yapılmadı',
@@ -331,7 +338,7 @@ describe('buildExportRows', () => {
     it('renders empty strings for missing fields and blank for null scores', () => {
         const [row] = buildExportRows([{ id: 'x', status: 'new' }]);
         expect(row['Ad Soyad']).toBe('');
-        expect(row['Aşama']).toBe('Ön Eleme');
+        expect(row['Aşama']).toBe('Ön İnceleme');
         expect(row['Mülakat Skoru']).toBe('');
         expect(row['Yetenekler']).toBe('');
     });
@@ -901,5 +908,43 @@ describe('pozisyon filtresinin kapsamı', () => {
         expect(describeActiveFilters({ position: 'Customer Success' }).map((x) => x.key)).toEqual(['position']);
         expect(describeActiveFilters({ position: 'Customer Success', positionScope: 'pool' }).map((x) => x.key))
             .toEqual(['position', 'positionScope']);
+    });
+});
+
+describe('resolveCandidateStage', () => {
+    it('MÜLAKAT BİTİNCE AŞAMA KENDİLİĞİNDEN İLERLİYOR', () => {
+        // Görüşmeyi yapan kişi çoğu zaman panoyu güncelleyen kişi değil.
+        expect(resolveCandidateStage({
+            status: 'interview_scheduled',
+            interviewSessions: [{ status: 'completed' }],
+        })).toBe('interview_done');
+    });
+
+    it('eski `interview` kaydı da otomatik ilerliyor', () => {
+        expect(resolveCandidateStage({
+            status: 'interview',
+            interviewSessions: [{ status: 'scheduled', finalScore: 78 }],
+        })).toBe('interview_done');
+    });
+
+    it('planlı mülakat bitmemişse olduğu yerde kalıyor', () => {
+        expect(resolveCandidateStage({
+            status: 'interview_scheduled',
+            interviewSessions: [{ status: 'scheduled' }],
+        })).toBe('interview_scheduled');
+        expect(resolveCandidateStage({ status: 'interview_scheduled' })).toBe('interview_scheduled');
+    });
+
+    it('OTOMATİK HAREKET İK KARARININ ÖNÜNE GEÇMİYOR', () => {
+        // Aday elle taşınmışsa kayıtlı durum aynen geçerli.
+        const oturumlar = [{ status: 'completed' }];
+        expect(resolveCandidateStage({ status: 'offer', interviewSessions: oturumlar })).toBe('offer');
+        expect(resolveCandidateStage({ status: 'rejected', interviewSessions: oturumlar })).toBe('rejected');
+        expect(resolveCandidateStage({ status: 'review', interviewSessions: oturumlar })).toBe('review');
+    });
+
+    it('bozuk girdi çökertmiyor', () => {
+        expect(resolveCandidateStage(null)).toBe('ai_analysis');
+        expect(resolveCandidateStage({ interviewSessions: 'metin' })).toBe('ai_analysis');
     });
 });

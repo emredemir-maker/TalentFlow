@@ -5,17 +5,12 @@ import { useState, useEffect } from 'react';
 import { X, Save, Layers, Share2, Loader2, CheckCircle, AlertCircle, ChevronRight, Globe, Users, Zap, Link2 } from 'lucide-react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { STAGES } from '../utils/pipelineStages';
 
-// Canonical pipeline palette (see utils/pipelineStages):
-// Ön Eleme=cyan · İnceleme=teal · Mülakat=violet · Teklif=amber · İşe Alındı=emerald · Reddedildi=red
-const STAGE_OPTIONS = [
-    { value: 'ai_analysis', label: 'AI Analiz', color: 'text-cyan-400', bg: 'bg-cyan-500/10' },
-    { value: 'review', label: 'İnceleme', color: 'text-teal-400', bg: 'bg-teal-500/10' },
-    { value: 'interview', label: 'Mülakat', color: 'text-violet-400', bg: 'bg-violet-500/10' },
-    { value: 'offer', label: 'Teklif', color: 'text-amber-400', bg: 'bg-amber-500/10' },
-    { value: 'hired', label: 'İşe Alındı', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
-    { value: 'rejected', label: 'Red', color: 'text-red-400', bg: 'bg-red-500/10' },
-];
+// Aşama listesi ARTIK KOPYALANMIYOR — tek kaynak utils/pipelineStages.
+// Kopya olduğu sürece yeni bir aşama eklendiğinde burası sessizce eksik
+// kalıyordu; renkler de kanonik paletten sapmıştı.
+const STAGE_OPTIONS = STAGES.map((s) => ({ value: s.key, label: s.label, color: s.color, bg: s.bg }));
 
 const ICONS = {
     Globe: Globe,
@@ -122,7 +117,7 @@ export default function BulkUpdateModal({ isOpen, onClose, selectedIds, type, on
                                             : 'bg-white/[0.02] border-white/5 hover:border-white/10'
                                         }`}
                                 >
-                                    <div className={`w-3 h-3 rounded-full ${opt.bg.replace('10', '40')} ${opt.color}`} />
+                                    <div className="w-3 h-3 rounded-full" style={{ background: opt.color }} />
                                     <span className={`text-sm font-bold ${selectedStage === opt.value ? 'text-text-primary' : 'text-navy-300'}`}>
                                         {opt.label}
                                     </span>

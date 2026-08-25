@@ -24,22 +24,16 @@ import { db } from '../config/firebase';
 
 import { useNavigate } from 'react-router-dom';
 import InterviewHistory from './InterviewHistory';
+import RejectReasonPicker from './RejectReasonPicker';
+import { STAGES, getStage, nextStageKey } from '../utils/pipelineStages';
+import { resolveCandidateStage } from '../utils/candidateTable';
+import { resolveRejection } from '../utils/rejectionReasons';
+import { isSessionDone } from '../utils/interviewSession';
 
-const STATUS_CONFIG = {
-    ai_analysis: { label: 'AI Analiz', dot: 'bg-violet-500', color: 'text-violet-600 dark:text-violet-400', next: 'review' },
-    review: { label: 'İnceleme', dot: 'bg-amber-500', color: 'text-amber-600 dark:text-amber-400', next: 'interview' },
-    interview: { label: 'Mülakat', dot: 'bg-blue-500', color: 'text-blue-600 dark:text-blue-400', next: 'offer' },
-    offer: { label: 'Teklif', dot: 'bg-cyan-500', color: 'text-cyan-600 dark:text-cyan-400', next: 'hired' },
-    hired: { label: 'İşe Alındı', dot: 'bg-emerald-500', color: 'text-emerald-600 dark:text-emerald-400', next: null },
-    rejected: { label: 'Red', dot: 'bg-red-500', color: 'text-red-600 dark:text-red-400', next: null },
-};
-
-const REJECTION_REASONS = [
-    { id: 'not_suitable', label: 'Uygun Değil' },
-    { id: 'declined', label: 'Kabul Etmedi' },
-    { id: 'wrong_entry', label: 'Hatalı Kayıt' }
-];
-
+// Aşama ve red nedeni tanımları ARTIK KOPYALANMIYOR.
+// Aşamalar: utils/pipelineStages · Red nedenleri: utils/rejectionReasons
+// Buradaki kopya hem eksikti (yeni aşamaları bilmiyordu) hem de renkleri
+// kanonik paletten farklıydı: "İnceleme" panoda teal iken burada amberdi.
 
 export default function CandidateDrawer({ candidate: initialCandidate, onClose, positionContext = null }) {
     const { updateCandidate, candidates: allCandidates, setViewCandidateId } = useCandidates();
@@ -303,7 +297,12 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
 
     if (!candidate) return null;
 
-    const status = STATUS_CONFIG[candidate.status] || STATUS_CONFIG.ai_analysis;
+    // Görünen aşama kayıtlı durumdan değil, adayın tamamından türüyor:
+    // mülakatı biten aday elle işaretlenmeden "Mülakat Tamamlandı" görünüyor.
+    const stageKey = resolveCandidateStage(candidate);
+    const status = getStage(stageKey);
+    const sonrakiAsama = nextStageKey(stageKey);
+    const redNedeni = resolveRejection(candidate.rejectionReason);
 
 
     return (
@@ -326,32 +325,35 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                     {/* STATUS BADGE & SWITCHER */}
                                     <div className="relative group/status">
                                         <div className={`flex items-center gap-2 px-3 py-1 rounded-xl bg-bg-primary border border-border-subtle cursor-pointer hover:bg-bg-secondary transition-all shadow-inner`}>
-                                            <span className={`w-2 h-2 rounded-full ${status.dot} shadow-sm`} />
+                                            <span className="w-2 h-2 rounded-full shadow-sm" style={{ background: status.color }} />
                                             <span className="text-[10px] text-text-secondary font-black uppercase tracking-[0.05em]">{status.label}</span>
-                                            {candidate.rejectionReason && (
-                                                <span className="text-[10px] text-red-500/80 font-black lowercase italic opacity-80">({REJECTION_REASONS.find(r => r.id === candidate.rejectionReason)?.label})</span>
+                                            {redNedeni && (
+                                                <span className="text-[10px] text-bad font-black lowercase italic opacity-80" title={redNedeni.note || undefined}>
+                                                    ({redNedeni.note || redNedeni.label})
+                                                </span>
                                             )}
                                         </div>
 
                                         {/* Status Dropdown */}
                                         <div className="absolute top-full left-0 mt-3 w-64 bg-bg-secondary border border-border-subtle rounded-3xl shadow-2xl opacity-0 invisible group-hover/status:opacity-100 group-hover/status:visible transition-all z-[80] p-2 backdrop-blur-2xl animate-in slide-in-from-top-2">
-                                            {Object.entries(STATUS_CONFIG).map(([key, config]) => (
+                                            {STAGES.map((stage) => (
                                                 <button
-                                                    key={key}
-                                                    onClick={() => updateCandidate(candidate.id, { status: key, rejectionReason: null })}
-                                                    className={`w-full flex items-center gap-2 px-4 py-3 rounded-2xl text-left text-[11px] font-black uppercase tracking-tight transition-all ${candidate.status === key ? 'bg-cyan-500 text-white shadow-lg shadow-cyan-500/20' : 'text-text-muted hover:bg-bg-primary hover:text-text-primary'}`}
+                                                    key={stage.key}
+                                                    onClick={() => updateCandidate(candidate.id, { status: stage.key, rejectionReason: null })}
+                                                    title={stage.desc}
+                                                    className={`w-full flex items-center gap-2 px-4 py-3 rounded-2xl text-left text-[11px] font-black uppercase tracking-tight transition-all ${stageKey === stage.key ? 'bg-cyan-500 text-white shadow-lg shadow-cyan-500/20' : 'text-text-muted hover:bg-bg-primary hover:text-text-primary'}`}
                                                 >
-                                                    <span className={`w-2 h-2 rounded-full ${config.dot} ${candidate.status === key ? 'shadow-[0_0_8px_white]' : ''}`} />
-                                                    {config.label}
+                                                    <span className="w-2 h-2 rounded-full" style={{ background: stageKey === stage.key ? '#FFFFFF' : stage.color }} />
+                                                    {stage.label}
                                                 </button>
                                             ))}
                                         </div>
                                     </div>
 
                                     {/* Next Step Shortcut */}
-                                    {status.next && (
+                                    {sonrakiAsama && (
                                         <button
-                                            onClick={() => updateCandidate(candidate.id, { status: status.next, rejectionReason: null })}
+                                            onClick={() => updateCandidate(candidate.id, { status: sonrakiAsama, rejectionReason: null })}
                                             className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-600 dark:text-cyan-400 text-[10px] font-black uppercase tracking-tight hover:bg-cyan-500/20 transition-all shadow-sm"
                                         >
                                             Sonraki Aşama
@@ -360,22 +362,22 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                     )}
 
                                     {/* Reject Button & Sub-reasons */}
-                                    {candidate.status !== 'rejected' && candidate.status !== 'hired' && (
+                                    {!status.terminal && (
                                         <div className="relative group/reject">
                                             <button className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-red-500/5 border border-red-500/10 text-red-500/60 text-[10px] font-black uppercase tracking-tight hover:bg-red-500/10 hover:text-red-500 transition-all shadow-sm">
                                                 Reddet
                                             </button>
-                                            <div className="absolute top-full left-0 mt-3 w-48 bg-bg-secondary border border-border-subtle rounded-3xl shadow-2xl opacity-0 invisible group-hover/reject:opacity-100 group-hover/reject:visible transition-all z-[80] p-2 backdrop-blur-2xl animate-in slide-in-from-top-2">
-                                                <div className="px-4 py-2 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] border-b border-border-subtle/50 mb-2 opacity-60 italic">Neden?</div>
-                                                {REJECTION_REASONS.map(reason => (
-                                                    <button
-                                                        key={reason.id}
-                                                        onClick={() => updateCandidate(candidate.id, { status: 'rejected', rejectionReason: reason.id })}
-                                                        className="w-full text-left px-4 py-2.5 rounded-2xl text-[11px] font-black text-text-muted hover:bg-red-500/10 hover:text-red-500 transition-all uppercase tracking-tight"
-                                                    >
-                                                        {reason.label}
-                                                    </button>
-                                                ))}
+                                            <div className="absolute top-full left-0 mt-3 w-72 bg-bg-secondary border border-border-subtle rounded-3xl shadow-2xl opacity-0 invisible group-hover/reject:opacity-100 group-hover/reject:visible transition-all z-[80] p-3 backdrop-blur-2xl animate-in slide-in-from-top-2">
+                                                <div className="px-1 pb-2 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] border-b border-border-subtle/50 mb-2 opacity-60 italic">Neden?</div>
+                                                <RejectReasonPicker
+                                                    compact
+                                                    selectedId={redNedeni?.id || null}
+                                                    onSelect={(reasonId) => updateCandidate(candidate.id, {
+                                                        status: 'rejected',
+                                                        rejectionReason: reasonId,
+                                                        rejectedAt: new Date().toISOString(),
+                                                    })}
+                                                />
                                             </div>
                                         </div>
                                     )}
@@ -410,7 +412,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                     try {
                                         await updateCandidate(candidate.id, {
                                             interviewSessions: [...(candidate.interviewSessions || []), newSession],
-                                            status: 'interview'
+                                            status: 'interview_scheduled'
                                         });
                                         navigate(`/live-interview/${sessId}`);
                                     } catch (err) {
@@ -805,7 +807,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                     try {
                                         await updateCandidate(candidate.id, {
                                             interviewSessions: [...(candidate.interviewSessions || []), newSession],
-                                            status: 'interview'
+                                            status: 'interview_scheduled'
                                         });
                                         navigate(`/live-interview/${sessId}`);
                                     } catch (err) {
@@ -822,7 +824,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                             <InterviewHistory
                                 sessions={candidate.interviewSessions}
                                 onStartSession={async (session) => {
-                                    const effComp = session.status === 'completed' || (session.status !== 'live' && (session.aiOverallScore > 0 || Boolean(session.aiSummary) || session.finalScore > 0));
+                                    const effComp = isSessionDone(session);
                                     if (effComp) {
                                         navigate(`/interview-report/${session.id}`);
                                         return;

@@ -7,32 +7,10 @@ import {
     Users, Calendar, Clock, Star, Search,
     List, LayoutGrid, ArrowUpRight, ChevronRight, MousePointerClick, Upload, X,
 } from 'lucide-react';
-import { STAGES as STAGE_DEFS } from '../utils/pipelineStages';
+import { STAGES as STAGE_DEFS, nextStageKey } from '../utils/pipelineStages';
+import { resolveCandidateStage } from '../utils/candidateTable';
 import { withCoherentScores } from '../utils/candidateTable';
 import { calculateMatchScore } from '../services/matchService';
-
-function resolveStage(status) {
-    if (!status) return 'ai_analysis';
-    for (const s of STAGE_DEFS) {
-        if (s.key === status || s.legacy.includes(status)) return s.key;
-    }
-    return 'ai_analysis';
-}
-
-/**
- * Bir sonraki aşama — CandidateDrawer'daki STATUS_CONFIG.next zincirinin
- * aynısı (ai_analysis → review → interview → offer → hired).
- *
- * STAGES sırasından türetiliyor ama SON İKİ girdi hariç tutuluyor: listedeki
- * son eleman "Reddedildi" ve onu "sonraki aşama" saymak, ilerlet düğmesine
- * basan kullanıcıyı adayı reddetmeye götürürdü.
- */
-function nextStageKey(stageKey) {
-    const advanceable = STAGE_DEFS.filter(s => s.key !== 'rejected');
-    const i = advanceable.findIndex(s => s.key === stageKey);
-    if (i < 0 || i >= advanceable.length - 1) return null;
-    return advanceable[i + 1].key;
-}
 
 function initials(name = '') {
     const parts = name.trim().split(/\s+/);
@@ -181,7 +159,7 @@ function CandidateListView({ rows, selectedId, onSelect, onOpen }) {
                 <span className="text-right">İşlem</span>
             </div>
             {rows.map((c) => {
-                const stage = STAGE_DEFS.find((x) => x.key === resolveStage(c.status)) || STAGE_DEFS[0];
+                const stage = STAGE_DEFS.find((x) => x.key === resolveCandidateStage(c)) || STAGE_DEFS[0];
                 const score = cardScore(c);
                 const tone = scoreTone(score);
                 const secili = selectedId === c.id;
@@ -336,7 +314,7 @@ export default function PipelinePage() {
     // ── Kanban: group candidates by stage ─────────────────────────────────────
     const kanbanData = useMemo(() => {
         const groups = Object.fromEntries(STAGE_DEFS.map(s => [s.key, []]));
-        for (const c of filtered) groups[resolveStage(c.status)].push(c);
+        for (const c of filtered) groups[resolveCandidateStage(c)].push(c);
         return groups;
     }, [filtered]);
 
@@ -344,8 +322,8 @@ export default function PipelinePage() {
     const listRows = useMemo(() => {
         const sira = Object.fromEntries(STAGE_DEFS.map((s, i) => [s.key, i]));
         return [...filtered].sort((a, b) => {
-            const fa = sira[resolveStage(a.status)] ?? 99;
-            const fb = sira[resolveStage(b.status)] ?? 99;
+            const fa = sira[resolveCandidateStage(a)] ?? 99;
+            const fb = sira[resolveCandidateStage(b)] ?? 99;
             if (fa !== fb) return fa - fb;
             return cardScore(b) - cardScore(a);
         });
@@ -386,7 +364,7 @@ export default function PipelinePage() {
         () => candidates.find(c => c.id === selectedId) || null,
         [candidates, selectedId]
     );
-    const selectedStage = selected ? STAGE_DEFS.find(s => s.key === resolveStage(selected.status)) : null;
+    const selectedStage = selected ? STAGE_DEFS.find(s => s.key === resolveCandidateStage(selected)) : null;
     const nextKey = selectedStage ? nextStageKey(selectedStage.key) : null;
     const nextStage = nextKey ? STAGE_DEFS.find(s => s.key === nextKey) : null;
 

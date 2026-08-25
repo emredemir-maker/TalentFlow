@@ -27,7 +27,7 @@ import { deepScanCandidate, rescanCandidateForPosition } from '../services/scanS
 import { STAGES, getStage } from '../utils/pipelineStages';
 import {
     DEFAULT_FILTERS, applyTableFilters, withCoherentScores, sortRows, buildExportRows,
-    resolveStageKey, getAppliedDate, isDeepScanned, cleanRoleText, isIstanbulLocation,
+    resolveCandidateStage, getAppliedDate, isDeepScanned, cleanRoleText, isIstanbulLocation,
     VERIFICATION_RANK, describeActiveFilters, FILTER_RESET_FIELDS,
     SCORE_METHOD, SCORE_METHOD_LABEL,
 } from '../utils/candidateTable';
@@ -51,8 +51,10 @@ const loadTableState = () => {
     try { return JSON.parse(sessionStorage.getItem(TABLE_STATE_KEY)) || {}; } catch { return {}; }
 };
 
-function StageChip({ status }) {
-    const stage = getStage(resolveStageKey(status));
+// Aşama rozeti adayın TAMAMINI alıyor: "Mülakat Tamamlandı" kayıtlı durumdan
+// değil, tamamlanmış mülakat oturumundan türüyor (bkz. resolveCandidateStage).
+function StageChip({ candidate }) {
+    const stage = getStage(resolveCandidateStage(candidate));
     return (
         <span
             style={{ color: stage.color, background: stage.bg, border: `1px solid ${stage.border}` }}
@@ -1026,7 +1028,7 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
                                                 ? <p className={`truncate max-w-[130px] ${isIstanbulLocation(c.location) ? '' : 'text-warn'}`} title={c.location}>{c.location}</p>
                                                 : <span className="text-n300">—</span>}
                                         </td>
-                                        <td className="px-3 py-2.5"><StageChip status={c.status} /></td>
+                                        <td className="px-3 py-2.5"><StageChip candidate={c} /></td>
                                         <td className="px-3 py-2.5 text-n500 whitespace-nowrap">{c.source || '—'}</td>
                                         <td className="px-3 py-2.5 text-center">
                                             {isDeepScanned(c) ? (
