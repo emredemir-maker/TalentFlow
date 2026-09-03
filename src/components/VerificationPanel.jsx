@@ -15,9 +15,14 @@ import { useState, useEffect, useCallback } from 'react';
 import {
     ShieldCheck, ShieldAlert, AlertTriangle, Info, CheckCircle2, Search,
     Building2, ExternalLink, Loader2, HelpCircle, Target, RefreshCw, Settings2, TrendingDown, TrendingUp,
+    UserCheck, PencilLine,
 } from 'lucide-react';
 
 import { verifyCandidate, buildVerificationSummary, buildStoredReport } from '../services/cvVerification';
+import { saveManualCompanyIntel, clearManualCompanyIntel, companyKey } from '../services/companyIntelStore';
+import { buildManualCompanyRecord, formFromRecord, isManualRecord } from '../utils/manualCompanyIntel';
+import ManualCompanyForm from './ManualCompanyForm';
+import { useAuth } from '../context/AuthContext';
 import { readOrgProfile } from '../services/orgProfile';
 import { useCandidates } from '../context/CandidatesContext';
 import { describeSectorFit, VERDICT } from '../utils/sectorFit';
@@ -56,6 +61,9 @@ const CLAIM_STYLE = {
     [CLAIM_VERDICT.VERIFIED]: { label: 'Doğrulandı', cls: 'bg-ok-bg text-ok border-transparent', icon: CheckCircle2 },
     [CLAIM_VERDICT.UNVERIFIED]: { label: 'Doğrulanamadı', cls: 'bg-n100 text-n600 border-n200', icon: HelpCircle },
     [CLAIM_VERDICT.CONTRADICTED]: { label: 'Çelişki', cls: 'bg-rose-100 text-rose-700 border-rose-200', icon: ShieldAlert },
+    // ELLE DOĞRULANAN AYRI GÖRÜNÜR. Aynı yeşil rozeti kullanmak, raporu
+    // okuyan üçüncü kişiye bağımsız bir kaynak bulunmuş gibi gelirdi.
+    [CLAIM_VERDICT.MANUAL]: { label: 'Elle doğrulandı', cls: 'bg-brand-50 text-brand border-brand-100', icon: UserCheck },
 };
 
 const SECTOR_STYLE = {
@@ -121,10 +129,12 @@ function SourceList({ sources }) {
     );
 }
 
-function CompanyRow({ item }) {
+function CompanyRow({ item, onSaveManual, onRemoveManual }) {
+    const [formOpen, setFormOpen] = useState(false);
     const style = CLAIM_STYLE[item.verdict] || CLAIM_STYLE[CLAIM_VERDICT.UNVERIFIED];
     const Icon = style.icon;
     const ev = item.evidence;
+    const elle = isManualRecord(ev);
     const facts = [
         ev?.sectorRaw && `Sektör: ${ev.sectorRaw}`,
         ev?.sizeBand && `Ölçek: ${ev.sizeBand}`,
@@ -161,7 +171,48 @@ function CompanyRow({ item }) {
                 </p>
             )}
 
+            {/* KAYNAĞIN İNSAN OLDUĞU HER ZAMAN YAZILI. Kim, ne zaman ve nasıl
+                doğruladığı raporda kalmalı: bu bilgi bir karar dayanağı ve
+                sonradan okuyan kişi kime soracağını bilmeli. */}
+            {elle && (
+                <div className="mt-2 bg-brand-50 rounded-md px-2.5 py-2">
+                    <p className="text-[11px] text-n700 leading-relaxed">
+                        <strong>{ev.manual?.by || 'Bilinmiyor'}</strong> tarafından elle doğrulandı
+                        {ev.manual?.at && ` · ${new Date(ev.manual.at).toLocaleDateString('tr-TR')}`}
+                    </p>
+                    {ev.manual?.note && (
+                        <p className="text-[11px] text-n600 leading-relaxed mt-1">{ev.manual.note}</p>
+                    )}
+                </div>
+            )}
+
             <SourceList sources={ev?.sources} />
+
+            {/* Elle doğrulama YALNIZCA otomatik kaynağın bulunamadığı ya da
+                zaten elle girilmiş olduğu şirketlerde açılıyor. Bağımsız
+                kaynakla doğrulanmış bir şirketin üzerine elle veri yazmak,
+                daha güçlü kanıtı daha zayıfıyla değiştirmek olurdu. */}
+            {onSaveManual && (elle || item.verdict === CLAIM_VERDICT.UNVERIFIED) && (
+                formOpen ? (
+                    <ManualCompanyForm
+                        company={item.company}
+                        initial={elle ? formFromRecord(ev) : null}
+                        onSave={async (form) => { await onSaveManual(item.company, form); setFormOpen(false); }}
+                        onRemove={elle ? async () => { await onRemoveManual(item.company); setFormOpen(false); } : null}
+                        onCancel={() => setFormOpen(false)}
+                    />
+                ) : (
+                    <button
+                        type="button"
+                        onClick={() => setFormOpen(true)}
+                        className="mt-2.5 inline-flex items-center gap-1.5 text-[11px] font-semibold text-brand hover:underline"
+                    >
+                        {elle
+                            ? <><PencilLine className="w-3.5 h-3.5" /> Elle girilen bilgiyi düzenle</>
+                            : <><UserCheck className="w-3.5 h-3.5" /> Bu şirketi elle doğrula</>}
+                    </button>
+                )
+            )}
         </div>
     );
 }
@@ -169,6 +220,13 @@ function CompanyRow({ item }) {
 function SectorFitBlock({ fit, onOpenSettings }) {
     const style = SECTOR_STYLE[fit?.verdict] || SECTOR_STYLE[VERDICT.UNMEASURED];
     const noTarget = fit?.verdict === VERDICT.NO_TARGET;
+    // ÖLÇÜM KUTUSU YALNIZCA ÖLÇÜM VARSA. `fit` boş gelebiliyor: kayıtlı
+    // raporlar `sectorFit: report.sectorFit || null` ile yazılıyor ve sektör
+    // ölçümü eklenmeden önce kaydedilmiş raporlarda bu alan null. Aşağıdaki
+    // ay tablosu `fit.exactMonths` okuyor — null'da tüm sekme beyaz kalıyordu
+    // ("Cannot read properties of null"). Taze raporda bu dal hiç çalışmaz;
+    // measureSectorFit her zaman bir nesne döndürüyor.
+    const olculdu = Boolean(fit) && !noTarget;
 
     return (
         <div className="bg-n50 border border-n200 rounded-[14px] p-3.5">
@@ -184,13 +242,15 @@ function SectorFitBlock({ fit, onOpenSettings }) {
 
             <p className="text-[11px] text-n600 leading-relaxed">{describeSectorFit(fit)}</p>
 
-            {noTarget ? (
-                <button
-                    onClick={onOpenSettings}
-                    className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-semibold text-brand hover:text-brand"
-                >
-                    <Settings2 className="w-3.5 h-3.5" /> Kurumsal Kimlik ayarlarından hedef sektörü tanımla
-                </button>
+            {noTarget || !olculdu ? (
+                noTarget ? (
+                    <button
+                        onClick={onOpenSettings}
+                        className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-semibold text-brand hover:text-brand"
+                    >
+                        <Settings2 className="w-3.5 h-3.5" /> Kurumsal Kimlik ayarlarından hedef sektörü tanımla
+                    </button>
+                ) : null
             ) : (
                 <>
                     <div className="grid grid-cols-3 gap-2 mt-4">
@@ -337,6 +397,7 @@ export default function VerificationPanel({ candidate, position = null }) {
     const [target, setTarget] = useState(null);
     const [targetLoaded, setTargetLoaded] = useState(false);
     const { updateCandidate } = useCandidates();
+    const { user, userProfile } = useAuth();
 
     useEffect(() => {
         let alive = true;
@@ -408,6 +469,32 @@ export default function VerificationPanel({ candidate, position = null }) {
             setRunning(false);
         }
     }, [candidate, position, target, updateCandidate]);
+
+    /**
+     * Elle doğrulamayı kaydeder ve raporu YENİDEN ÜRETİR.
+     *
+     * Yeniden üretmek şart: hüküm, skor çarpanı, sektör uyumu ve bayrakların
+     * hepsi bu kanıttan türüyor. Yalnızca kaydedip ekranı olduğu gibi
+     * bırakmak, kullanıcıya "kaydettim ama hiçbir şey değişmedi" hissi
+     * verirdi — oysa değişen çok şey var.
+     *
+     * `force` KULLANILMIYOR: elle kayıt zaten önbelleğin önüne geçiyor ve
+     * force diğer şirketleri de yeniden aratıp boşuna ücret yakardı.
+     */
+    const saveManual = useCallback(async (company, form) => {
+        const record = buildManualCompanyRecord(company, form, {
+            by: userProfile?.displayName || userProfile?.email || user?.email || 'Bilinmiyor',
+        });
+        await saveManualCompanyIntel(companyKey(company), record);
+        await run(false);
+    }, [run, user, userProfile]);
+
+    const removeManual = useCallback(async (company) => {
+        await clearManualCompanyIntel(companyKey(company));
+        // Kayıt silindi; şirket artık önbellekte yok. Yeniden değerlendirme
+        // onu sıfırdan çözümleyecek — elle girilen bilgi geri gelmez.
+        await run(false);
+    }, [run]);
 
     const openSettings = () => window.dispatchEvent(new CustomEvent('changeView', { detail: 'settings' }));
 
@@ -539,7 +626,14 @@ export default function VerificationPanel({ candidate, position = null }) {
                                 }
                             />
                             <div className="space-y-2">
-                                {report.companies.map((c, i) => <CompanyRow key={`${c.company}-${i}`} item={c} />)}
+                                {report.companies.map((c, i) => (
+                                    <CompanyRow
+                                        key={`${c.company}-${i}`}
+                                        item={c}
+                                        onSaveManual={saveManual}
+                                        onRemoveManual={removeManual}
+                                    />
+                                ))}
                             </div>
                         </div>
                     )}

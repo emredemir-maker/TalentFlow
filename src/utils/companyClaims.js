@@ -22,11 +22,19 @@
 // belirti farklı kaynaktan geldiğinde farklı AĞIRLIK üretir.
 
 import { seniorityBand, SEVERITY } from './cvConsistency.js';
+import { MANUAL_SOURCE } from './manualCompanyIntel.js';
 
 export const CLAIM_VERDICT = {
     VERIFIED: 'dogrulandi',
     UNVERIFIED: 'dogrulanamadi',
     CONTRADICTED: 'celiski',
+    // ── DÖRDÜNCÜ HÜKÜM: ELLE DOĞRULANDI ────────────────────────────────────
+    // Bağımsız kaynak bulunamadığında İK'nın kendi araştırmasıyla girdiği
+    // kayıt. AYRI TUTULUYOR çünkü kanıt cinsi farklı: biri makinenin
+    // bulduğu bağımsız kayıt, diğeri bir insanın beyanı. İkisini aynı
+    // kutuya koymak, raporu okuyan üçüncü kişiye "bağımsız kaynak var"
+    // dedirtirdi — bu araç tam olarak bunu yapmamak üzere yazıldı.
+    MANUAL: 'elle_dogrulandi',
 };
 
 /** Şirket ölçek bantları — küçükten büyüğe. */
@@ -87,7 +95,16 @@ function hasEvidence(evidence) {
         || evidence?.website
         || evidence?.foundedYear
         || (Array.isArray(evidence?.sources) && evidence.sources.length > 0)
+        // Elle girilen kayıt yalnızca notdan ibaret olabilir ("eski
+        // çalışanıyla görüştüm"). Somut alan yoksa da bu bir kanıttır ve
+        // "hiçbir şey bulunamadı" demek artık doğru değildir.
+        || isManualEvidence(evidence)
     );
+}
+
+/** Kanıt, otomatik arama yerine bir insan tarafından mı girildi? */
+export function isManualEvidence(evidence) {
+    return evidence?.source === MANUAL_SOURCE;
 }
 
 /**
@@ -196,6 +213,13 @@ export function verifyCompanyClaim({ claim, evidence, candidateName } = {}) {
     const contradicted = flags.some((f) => f.severity === SEVERITY.CONTRADICTION);
     if (contradicted) return { company, verdict: CLAIM_VERDICT.CONTRADICTED, flags };
 
+    // ÇELİŞKİ ELLE GİRİLEN KAYITTA DA ÇELİŞKİDİR. İK'nın girdiği kuruluş yılı
+    // CV'yle çelişiyorsa hüküm "doğrulandı" olamaz — kaynağın insan olması
+    // bulgunun kendisini geçersiz kılmaz, yalnızca AĞIRLIĞINI belirler
+    // (elle girilen yıl sicil değil arama seviyesinde değerlendirilir;
+    //  bkz. utils/manualCompanyIntel.js).
+    if (isManualEvidence(evidence)) return { company, verdict: CLAIM_VERDICT.MANUAL, flags };
+
     // Kanıt var ve çelişki yok — doğrulandı. Dikkat bayrakları bunu bozmaz:
     // adayın kendi şirketi olması, şirketin varlığını yalanlamaz.
     return { company, verdict: CLAIM_VERDICT.VERIFIED, flags };
@@ -210,7 +234,7 @@ export function verifyCompanyClaim({ claim, evidence, candidateName } = {}) {
  */
 export function summarizeCompanyVerification(results) {
     const list = Array.isArray(results) ? results : [];
-    const counts = { dogrulandi: 0, dogrulanamadi: 0, celiski: 0 };
+    const counts = { dogrulandi: 0, dogrulanamadi: 0, celiski: 0, elle_dogrulandi: 0 };
     for (const r of list) {
         if (counts[r?.verdict] !== undefined) counts[r.verdict] += 1;
     }
