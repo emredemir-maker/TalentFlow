@@ -14,10 +14,11 @@
 // bir haberde geçmiş olabilir. Bulunan kayıt 180 gün, bulunamayan 30 gün
 // tazedir.
 
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 
 import { db } from '../config/firebase';
 import { resolveCompany, companyKey } from './ai/companyIntel';
+import { isManualRecord } from '../utils/manualCompanyIntel';
 import { getLogger } from './logger';
 
 const log = getLogger('companyIntel');
@@ -53,6 +54,12 @@ export function docIdFor(key) {
 
 /** Kayıt hâlâ taze mi? */
 export function isFresh(record, now = Date.now()) {
+    // ELLE GİRİLEN KAYIT BAYATLAMAZ. Tazelik süresi "bu bilgiyi yeniden
+    // aratmanın maliyeti, eskimiş olma riskine değer mi" sorusunun cevabı.
+    // Elle girilen kayıtta yeniden arama bir şey kazandırmaz: zaten arama
+    // bulamadığı için insan girmişti. Süre dolunca sessizce aramaya düşmek,
+    // İK'nın yazdığı bilgiyi bir gün fark ettirmeden silmek olurdu.
+    if (isManualRecord(record)) return true;
     if (!record?.resolvedAt) return false;
     const at = Date.parse(record.resolvedAt);
     if (!Number.isFinite(at)) return false;
@@ -118,14 +125,16 @@ export async function resolveCompanies(companies, {
         const { key, name } = list[i];
         onProgress?.(i, list.length);
 
-        if (!force) {
-            const cached = await readCompanyIntel(key);
-            if (isFresh(cached)) {
-                intel.set(key, cached);
-                intel.set(name, cached);
-                fromCache += 1;
-                continue;
-            }
+        // ELLE GİRİLEN KAYIT `force` İLE DE EZİLMEZ. "Yeniden tara" düğmesi
+        // önbelleği tazelemek için var; bir insanın araştırıp yazdığı bilgiyi
+        // sessizce silmek için değil. Otomatik aramaya dönmek isteyen
+        // kullanıcı elle doğrulamayı açıkça kaldırır (clearManualCompanyIntel).
+        const cached = await readCompanyIntel(key);
+        if (isManualRecord(cached) || (!force && isFresh(cached))) {
+            intel.set(key, cached);
+            intel.set(name, cached);
+            fromCache += 1;
+            continue;
         }
 
         if (looked >= maxLookups) {
@@ -148,6 +157,36 @@ export async function resolveCompanies(companies, {
 
     onProgress?.(list.length, list.length);
     return { intel, fromCache, looked, skipped, failed };
+}
+
+/**
+ * Elle doğrulama kaydını yazar.
+ *
+ * `merge` KULLANILMIYOR: birleştirme, eski otomatik kaydın alanlarını elle
+ * girilen kaydın altında bırakırdı ve ortaya "kaynağı insan" diyen ama
+ * verisi makineden gelen melez bir kayıt çıkardı. Elle doğrulama, o şirket
+ * için kaydın TAMAMINI değiştirir.
+ *
+ * @throws yazma başarısız olursa — okuma aksine burada hata YUTULMAZ:
+ *   kullanıcı bir form doldurdu, kaydedilmediyse bunu bilmek zorunda.
+ */
+export async function saveManualCompanyIntel(key, record) {
+    const id = docIdFor(key);
+    if (!id) throw new Error('Şirket adı kayıt için uygun değil.');
+    await setDoc(doc(db, INTEL_PATH, id), { ...record, key });
+}
+
+/**
+ * Elle doğrulamayı kaldırır — kayıt tamamen silinir.
+ *
+ * Yalnızca elle girilen alanları temizlemek, altta kalan eski otomatik
+ * kaydı "taze" gibi gösterirdi. Dokümanı silmek bir sonraki taramanın
+ * şirketi sıfırdan çözümlemesini garanti ediyor; maliyeti tek bir arama.
+ */
+export async function clearManualCompanyIntel(key) {
+    const id = docIdFor(key);
+    if (!id) throw new Error('Şirket adı kayıt için uygun değil.');
+    await deleteDoc(doc(db, INTEL_PATH, id));
 }
 
 export { companyKey };

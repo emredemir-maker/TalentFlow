@@ -202,13 +202,16 @@ describe('verifyCompanyClaim — evidence strength is ranked', () => {
 });
 
 describe('summarizeCompanyVerification', () => {
-    it('keeps the three verdicts apart instead of collapsing them to a percentage', () => {
+    it('keeps the verdicts apart instead of collapsing them to a percentage', () => {
+        // Dördüncü hüküm eklendi: elle doğrulanan, otomatik doğrulanandan
+        // AYRI sayılıyor — kanıt cinsi farklı (bkz. CLAIM_VERDICT.MANUAL).
         const s = summarizeCompanyVerification([
             { verdict: CLAIM_VERDICT.VERIFIED, flags: [] },
             { verdict: CLAIM_VERDICT.UNVERIFIED, flags: [{ id: 'a' }] },
             { verdict: CLAIM_VERDICT.CONTRADICTED, flags: [{ id: 'b' }] },
+            { verdict: CLAIM_VERDICT.MANUAL, flags: [] },
         ]);
-        expect(s.counts).toEqual({ dogrulandi: 1, dogrulanamadi: 1, celiski: 1 });
+        expect(s.counts).toEqual({ dogrulandi: 1, dogrulanamadi: 1, celiski: 1, elle_dogrulandi: 1 });
         expect(s.hasContradiction).toBe(true);
         expect(s.flags).toHaveLength(2);
     });

@@ -64,6 +64,11 @@ export function buildVerificationSummary(report) {
             dogrulandi: c.dogrulandi || 0,
             dogrulanamadi: c.dogrulanamadi || 0,
             celiski: c.celiski || 0,
+            // Elle doğrulananlar AYRI sayılıyor. `dogrulanamadi` dışında
+            // kaldıkları için skor cezası ve "şirket teyitsiz" rozeti
+            // kendiliğinden düşüyor; ama kaç tanesinin insan eliyle
+            // doğrulandığı da görünür kalmalı.
+            elle_dogrulandi: c.elle_dogrulandi || 0,
         },
         // TARAMA EKSİK KALDIYSA SKOR CEZASI UYGULANMAZ. Atlanan şirket bizim
         // tavanımızın sonucu; adayın skorundan düşmek kendi kısıtımızın
@@ -128,6 +133,13 @@ export function buildStoredReport(report) {
             caution: ev.caution || '',
             withheld: Boolean(ev.withheld),
             withheldReason: ev.withheldReason || '',
+            // KANITIN KİMDEN GELDİĞİ SAKLANIR. Rapor kaydedildikten sonra
+            // ekrana kayıttan basılıyor; kaynağı atarsak elle girilmiş bir
+            // bilgi, bağımsız kaynaktan gelmiş gibi görünürdü.
+            source: ev.source || '',
+            manual: ev.manual
+                ? { by: ev.manual.by || '', at: ev.manual.at || '', note: ev.manual.note || '' }
+                : null,
             sources: (Array.isArray(ev.sources) ? ev.sources : [])
                 .slice(0, MAX_STORED_SOURCES)
                 .map((s) => ({ title: s?.title || '', uri: s?.uri || '' })),

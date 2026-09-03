@@ -215,7 +215,14 @@ describe('describeSectorFit', () => {
 
     it('points at the missing configuration instead of reporting zero', () => {
         expect(describeSectorFit({ verdict: VERDICT.NO_TARGET })).toContain('Hedef sektör tanımlı değil');
-        expect(describeSectorFit(null)).toContain('Hedef sektör tanımlı değil');
+    });
+
+    it('ÖLÇÜM YOK ile HEDEF YOK ayrı cümleler', () => {
+        // Sektör ölçümü eklenmeden önce kaydedilmiş raporlarda alan boş.
+        // O raporlara "hedef sektör tanımlı değil" demek yanlış yönlendirme:
+        // hedef tanımlı olabilir, ölçüm o gün yapılmamıştı.
+        expect(describeSectorFit(null)).toContain('sektör ölçümü içermiyor');
+        expect(describeSectorFit(null)).not.toContain('Hedef sektör tanımlı değil');
     });
 
     it('admits when the measurement is partial', () => {

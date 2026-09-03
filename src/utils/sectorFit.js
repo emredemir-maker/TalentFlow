@@ -214,7 +214,15 @@ function decideVerdict({ knownMonths, exactMonths, nearMonths, recentExactMonths
  * yılın 1 yıl 6 ayı" diyoruz. Okuyan kendi kararını verir.
  */
 export function describeSectorFit(fit) {
-    if (!fit || fit.verdict === VERDICT.NO_TARGET) {
+    // ÖLÇÜM YOK ile HEDEF YOK farklı şeyler. Kayıtlı eski raporlarda
+    // `sectorFit` hiç bulunmuyor (alan sonradan eklendi) ve o raporlara
+    // "hedef sektör tanımlı değil" demek yanlış: hedef tanımlı olabilir,
+    // ölçüm o gün yapılmamıştı. Kullanıcıyı ayarlara göndermek yerine
+    // yapması gerekeni söylüyoruz.
+    if (!fit) {
+        return 'Bu rapor sektör ölçümü içermiyor — yeniden tarayın.';
+    }
+    if (fit.verdict === VERDICT.NO_TARGET) {
         return 'Hedef sektör tanımlı değil — ayarlardan kurum sektörünü girin.';
     }
     if (fit.verdict === VERDICT.UNMEASURED) {
