@@ -127,18 +127,94 @@ describe('mülakat raporu PDF belgesi', () => {
         expect(t).not.toContain('Kanıt oranı');
     });
 
-    it('mülakatçı değerlendirmesi AÇIK basılıyor — kâğıtta katlanan kutu açılamaz', () => {
+    it('MÜLAKATÇI DEĞERLENDİRMESİ BELGEYE GİRMİYOR', () => {
+        // O bölüm adayı değil, görüşmeyi yapan kişiyi değerlendiriyor. Belge
+        // adayla ilgili ve elden ele dolaşıyor.
         const t = tumMetin(belge({
             recruiterEval: {
-                overallScore: 4,
-                summary: 'Sorular iyi kurgulanmış.',
-                dimensions: [{ key: 'depth', label: 'Derinlik', score: 3, explanation: 'Takip soruları az.', tip: 'Örnek isteyin.' }],
+                overallScore: 2,
+                summary: 'Mülakatçı hiç soru sormamış.',
+                dimensions: [{ key: 'depth', label: 'Derinlik', score: 1, explanation: 'x', tip: 'y' }],
             },
         }).content);
-        expect(t).toContain('Sorular iyi kurgulanmış.');
-        expect(t).toContain('Derinlik');
-        expect(t).toContain('Takip soruları az.');
-        expect(t).toContain('Örnek isteyin.');
+        expect(t).not.toContain('Mülakatçı hiç soru sormamış.');
+        expect(t).not.toContain('Derinlik');
+    });
+
+    it('CEVAP KISALTILIYOR, ALINTI TAM KALIYOR', () => {
+        // Aynı paragraf dört maddede tekrar ediyordu; kanıt alıntıdır,
+        // cevabın tamamı transkriptte duruyor.
+        const uzunCevap = 'Birinci cümle burada. ' + 'Tekrar eden uzun bir anlatı. '.repeat(60);
+        const t = tumMetin(belge({
+            report: { ...REPORT, items: [{ ...REPORT.items[0], answer: uzunCevap, quote: 'Kısa ama kritik alıntı' }] },
+        }).content);
+        expect(t).toContain('Kısa ama kritik alıntı');
+        expect(t).toContain('Birinci cümle burada.');
+        expect(t).not.toContain(uzunCevap);
+        expect(t).toContain('transkriptte');
+    });
+
+    it('SORU MADDE METNİNİ TEKRAR EDİYORSA BASILMIYOR', () => {
+        const t = tumMetin(belge({
+            report: {
+                ...REPORT,
+                items: [{
+                    ...REPORT.items[0],
+                    text: 'React ile 3 yıl deneyim',
+                    question: 'React ile 3 yıl deneyim konusunda yaptığınız işi anlatır mısınız?',
+                }],
+            },
+        }).content);
+        expect(t).toContain('React ile 3 yıl deneyim');
+        expect(t).not.toContain('konusunda yaptığınız işi anlatır mısınız?');
+    });
+
+    it('farklı bir soru metni basılıyor', () => {
+        const t = tumMetin(belge({
+            report: { ...REPORT, items: [{ ...REPORT.items[0], question: 'Ekipte kaç kişiydiniz?' }] },
+        }).content);
+        expect(t).toContain('Ekipte kaç kişiydiniz?');
+    });
+
+    it('HİÇ SORULMAYAN MADDELER EKSİKLİK GİBİ GÖSTERİLMİYOR', () => {
+        const t = tumMetin(belge({
+            requirements: [
+                { text: 'React ile 3 yıl deneyim' },
+                { text: 'Ölçekli sistem deneyimi' },
+                { text: 'Takım yönetimi' },
+            ],
+        }).content);
+        expect(t).toContain('hiç sorulmayan maddeler');
+        expect(t).toContain('Madde 2: Ölçekli sistem deneyimi');
+        expect(t).toContain('karşılamadığı maddeler değil');
+    });
+
+    it('KARAR VERİLEMEYEN MADDE PAYDAYA GİRMİYOR — bu yazılı', () => {
+        const t = tumMetin(belge({
+            report: { ...REPORT, evidence: { score: 100, asked: 6, inconclusive: 1 } },
+        }).content);
+        expect(t).toContain('6 maddede ölçüldü');
+        expect(t).toContain('karar verilemedi');
+        expect(t).toContain('paydasına girmiyor');
+    });
+
+    it('ÜÇ HÜKMÜN KAYNAĞI YAZILI', () => {
+        const t = tumMetin(belge({
+            report: { ...REPORT, outcome: 'positive', recruiterOutcome: 'pending' },
+            finalDecision: 'Beklemede',
+        }).content);
+        expect(t).toContain('Nihai karar (İK)');
+        expect(t).toContain('izlenim (mülakatçı)');
+        expect(t).toContain('Sistem önerisi');
+    });
+
+    it('DEĞERLENDİRME ÜRETİLEMEDİYSE SÖYLENİYOR', () => {
+        const t = tumMetin(belge({
+            session: { ...SESSION, aiSummary: '' },
+            report: { ...REPORT, summary: '', strengths: [], concerns: [] },
+        }).content);
+        expect(t).toContain('üretilemedi');
+        expect(t).toContain('damgalar aşağıda duruyor ve geçerli');
     });
 
     it('notlar ve karar belgeye giriyor', () => {

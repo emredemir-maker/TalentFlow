@@ -84,6 +84,30 @@ export function dosyaAdi(candidate, session) {
     return `mulakat-raporu-${sade}${gun}.pdf`;
 }
 
+/**
+ * CEVAP KISALTILIYOR — KANIT DEĞİL.
+ *
+ * Canlı bir raporda aynı paragraf dört ayrı maddenin altında tekrar ediyordu:
+ * transkript ayırıcısı örtüşen parçaları birden çok gereksinime atıyor ve
+ * alıntı da cevabın içinden alındığı için metin dördüncü kez okunuyordu.
+ * 23 sayfalık raporun beş sayfası bu tekrardı.
+ *
+ * Rapor kanıtı gösterir: ALINTI tam, cevap ilk cümleleriyle. Hiçbir bilgi
+ * kaybolmuyor — transkriptin tamamı zaten aynı belgenin sonunda.
+ */
+const CEVAP_SINIRI = 340;
+
+export function cevapOzeti(text, limit = CEVAP_SINIRI) {
+    const t = metin(text);
+    if (t.length <= limit) return { text: t, kirpildi: false };
+    // Cümle sınırında kes: kelimenin ortasında biten bir alıntı, okuyanı
+    // eksik bir cümleyle baş başa bırakıyor.
+    const pencere = t.slice(0, limit);
+    const nokta = Math.max(pencere.lastIndexOf('. '), pencere.lastIndexOf('! '), pencere.lastIndexOf('? '));
+    const kes = nokta > limit * 0.5 ? nokta + 1 : pencere.lastIndexOf(' ');
+    return { text: `${t.slice(0, kes > 0 ? kes : limit).trim()}…`, kirpildi: true };
+}
+
 const baslik = (text) => ({ text, style: 'h2', margin: [0, 14, 0, 6] });
 const altBaslik = (text) => ({ text, style: 'h3', margin: [0, 8, 0, 3] });
 const paragraf = (text) => ({ text, style: 'p', margin: [0, 0, 0, 4] });
@@ -139,19 +163,43 @@ function maddeBlogu(items) {
                 it.must ? { text: '  · Zorunlu', style: 'label' } : '',
                 { text: `  · ${label}`, style: 'label' },
             ],
-            margin: [0, 6, 0, 2],
+            margin: [0, 8, 0, 2],
         });
         // METİN YOKSA SEBEBİ YAZILIYOR. Ekranda da böyle: ilan görüşmeden
         // sonra değiştiyse madde metni gösterilmiyor, çünkü bugünkü listeden
         // okumak cevabı yanlış maddeye yazmak olurdu.
         satirlar.push(paragraf(metin(it.text) || 'Madde metni bu rapora bağlı listede yok.'));
-        if (metin(it.question)) satirlar.push({ text: `Soru: ${it.question}`, style: 'pMuted' });
-        if (metin(it.answer)) satirlar.push({ text: `Cevap: ${it.answer}`, style: 'p' });
-        if (metin(it.quote)) satirlar.push({ text: `Alıntı: “${it.quote}”`, style: 'quote' });
+
+        // ALINTI ÖNCE: hükmün dayanağı bu. Cevabın tamamı değil, adayın o
+        // maddeye dair söylediği cümle.
+        if (metin(it.quote)) satirlar.push({ text: `“${it.quote}”`, style: 'quote', margin: [0, 2, 0, 2] });
         if (metin(it.observation)) satirlar.push({ text: `Gözlem: ${it.observation}`, style: 'pMuted' });
+
+        // SORU MADDE METNİNİ TEKRAR EDİYORSA BASILMIYOR. Üretilen sorular
+        // "<madde metni> konusunda yaptığınız işi anlatır mısınız?" kalıbında;
+        // madde zaten iki satır yukarıda duruyor.
+        const soru = metin(it.question);
+        if (soru && !soruMaddeyiTekrarliyor(soru, it.text)) {
+            satirlar.push({ text: `Soru: ${soru}`, style: 'pMuted' });
+        }
+
+        const cevap = cevapOzeti(it.answer);
+        if (cevap.text) {
+            satirlar.push({ text: `Cevap: ${cevap.text}`, style: 'p' });
+            if (cevap.kirpildi) {
+                satirlar.push({ text: 'Cevabın tamamı bu belgenin sonundaki transkriptte.', style: 'label' });
+            }
+        }
         out.push({ stack: satirlar, unbreakable: true });
     }
     return out;
+}
+
+/** Soru, madde metnini olduğu gibi içine almış mı? */
+function soruMaddeyiTekrarliyor(soru, maddeMetni) {
+    const madde = metin(maddeMetni).replace(/^['"]|['"]$/g, '');
+    if (madde.length < 15) return false;
+    return metin(soru).includes(madde);
 }
 
 /**
@@ -200,8 +248,8 @@ function transkriptBlogu(session) {
  *   candidate      — aday kaydı
  *   session        — mülakat oturumu (kanonik kayıtla birleştirilmiş hâli)
  *   report         — buildInterviewReport() çıktısı
- *   recruiterEval  — mülakatçı değerlendirmesi (varsa)
  *   recruiterNotes — değerlendirme notları (varsa)
+ *   requirements   — ilanın madde listesi; sorulmayanları söyleyebilmek için
  *   finalDecision  — karar (varsa)
  *   now            — üretim zamanı; testler sabitleyebilsin diye dışarıdan
  * @returns {object} pdfmake docDefinition
@@ -210,9 +258,14 @@ export function buildInterviewReportDoc({
     candidate,
     session,
     report,
-    recruiterEval = null,
+    // MÜLAKATÇI DEĞERLENDİRMESİ BELGEYE GİRMİYOR.
+    // O bölüm adayı değil, GÖRÜŞMEYİ YAPAN kişiyi değerlendiriyor. Belge
+    // adayla ilgili ve elden ele dolaşıyor; içinde başka bir çalışanın
+    // performans notunun bulunması yanlış. Ekranda duruyor.
     recruiterNotes = '',
     finalDecision = '',
+    // İlanın madde metinleri — hiç sorulmamış maddeleri söyleyebilmek için.
+    requirements = [],
     now = new Date(),
 } = {}) {
     const adayAdi = metin(candidate?.name) || 'İsimsiz aday';
@@ -233,20 +286,31 @@ export function buildInterviewReportDoc({
     if (sayiMi(session?.finalScore)) skorlar.push({ label: 'Genel skor', value: `%${session.finalScore}` });
     if (sayiMi(session?.interviewScore)) skorlar.push({ label: 'Mülakat skoru', value: `%${session.interviewScore}` });
     if (sayiMi(report?.evidence?.score)) {
-        skorlar.push({ label: 'Kanıt oranı', value: `%${report.evidence.score} (${report.evidence.asked} madde)` });
+        skorlar.push({ label: 'Kanıt oranı', value: `%${report.evidence.score} (${report.evidence.asked} maddede ölçüldü)` });
     }
     const skorTablo = bilgiTablosu(skorlar);
     if (skorTablo) content.push(skorTablo);
 
     // ── Sonuç ───────────────────────────────────────────────────────────────
+    // ÜÇ AYRI HÜKÜM YAN YANA DURUYORDU VE KİMİN OLDUĞU BELLİ DEĞİLDİ:
+    // "Mülakatçı kararı: Kararsız / Önerilen sonuç: Olumlu / Karar: Beklemede".
+    // Etiketler artık kaynağı söylüyor.
     const sonuclar = [];
+    if (metin(finalDecision)) {
+        sonuclar.push({ label: 'Nihai karar (İK)', value: finalDecision });
+    }
     if (report?.recruiterOutcome) {
-        sonuclar.push({ label: 'Mülakatçı kararı', value: OUTCOME_LABEL[report.recruiterOutcome] || report.recruiterOutcome });
+        sonuclar.push({
+            label: 'Görüşme sonrası izlenim (mülakatçı)',
+            value: OUTCOME_LABEL[report.recruiterOutcome] || report.recruiterOutcome,
+        });
     }
     if (report?.outcome) {
-        sonuclar.push({ label: 'Önerilen sonuç', value: OUTCOME_LABEL[report.outcome] || report.outcome });
+        sonuclar.push({
+            label: 'Sistem önerisi (kanıt oranından)',
+            value: OUTCOME_LABEL[report.outcome] || report.outcome,
+        });
     }
-    if (metin(finalDecision)) sonuclar.push({ label: 'Karar', value: finalDecision });
     const sonucTablo = bilgiTablosu(sonuclar);
     if (sonucTablo) {
         content.push(baslik('Sonuç'));
@@ -273,6 +337,27 @@ export function buildInterviewReportDoc({
         content.push(paragraf(ikinciOzet));
     }
 
+    // DEĞERLENDİRME ÜRETİLEMEDİYSE SESSİZ KALINMIYOR.
+    //
+    // Canlı bir raporda özet, güçlü yönler, endişeler ve madde gözlemlerinin
+    // hiçbiri yoktu: madde damgalaması başarılı olmuş, anlatım üreten çağrı
+    // düşmüştü (ikisi ayrı çağrı — bkz. functions/routes/interview.js).
+    // Rapor bunu söylemiyor, yalnızca o bölümleri basmıyordu; okuyan kişi
+    // "yorum yapılmamış" ile "yorum üretilemedi" arasındaki farkı göremiyordu.
+    const yorumVar = Boolean(ozet)
+        || (Array.isArray(report?.strengths) && report.strengths.length > 0)
+        || (Array.isArray(report?.concerns) && report.concerns.length > 0);
+    if (!yorumVar && Array.isArray(report?.items) && report.items.length > 0) {
+        content.push(baslik('Özet'));
+        content.push({
+            text: 'Bu görüşme için yazılı değerlendirme (özet, güçlü yönler, dikkat edilecekler) '
+                + 'üretilemedi. Madde madde damgalar aşağıda duruyor ve geçerli; eksik olan yalnızca '
+                + 'anlatım. Aday sayfasındaki "Yeniden değerlendir" ile üretilebilir.',
+            style: 'pMuted',
+            margin: [0, 0, 0, 4],
+        });
+    }
+
     const guclu = Array.isArray(report?.strengths) ? report.strengths.filter(Boolean) : [];
     const endise = Array.isArray(report?.concerns) ? report.concerns.filter(Boolean) : [];
     if (guclu.length > 0) {
@@ -288,6 +373,17 @@ export function buildInterviewReportDoc({
     const items = Array.isArray(report?.items) ? report.items : [];
     if (items.length > 0) {
         content.push(baslik('Gereksinim değerlendirmesi'));
+        // "%100" ile "bir madde karar verilemedi" aynı sayfada duruyordu ve
+        // ikisinin nasıl bir arada olabildiği yazmıyordu: karar verilemeyen
+        // madde paydaya girmiyor.
+        const kararsiz = Number(report?.evidence?.inconclusive) || 0;
+        if (kararsiz > 0) {
+            content.push({
+                text: `${kararsiz} madde için karar verilemedi; bu maddeler kanıt oranının paydasına girmiyor.`,
+                style: 'pMuted',
+                margin: [0, 0, 0, 4],
+            });
+        }
         if (report?.requirementsStale) {
             content.push({
                 text: 'Bu damgalar, ilanın görüşme anındaki gereksinim listesine ait. Liste sonradan değiştiği için madde metinleri gösterilmiyor.',
@@ -296,6 +392,31 @@ export function buildInterviewReportDoc({
             });
         }
         content.push(...maddeBlogu(items));
+    }
+
+    // HİÇ SORULMAMIŞ MADDE BİR EKSİKLİK DEĞİLDİR.
+    //
+    // Raporda madde numaraları atlıyordu (1, 2, 3, 5, 6, 7, 9) ve okuyan kişi
+    // 4 ile 8'e ne olduğunu bilemiyordu. Sorulmamış madde adayın karşılamadığı
+    // madde DEĞİL, hakkında bilgimiz olmayan maddedir; söylenmezse okuyan onu
+    // eksik sanar. Aynı ilke aday havuzu yorumlayıcısının yönergesinde de var.
+    const sorulanIndeks = new Set(items.map((it) => Number(it.requirementIndex)));
+    const sorulmayan = (Array.isArray(requirements) ? requirements : [])
+        .map((r, i) => ({ index: i + 1, text: metin(r?.text ?? r) }))
+        .filter((r) => r.text && !sorulanIndeks.has(r.index));
+    if (sorulmayan.length > 0 && items.length > 0) {
+        content.push(altBaslik('Bu görüşmede hiç sorulmayan maddeler'));
+        content.push({
+            text: 'Aşağıdaki maddeler görüşmede konuşulmadı. Adayın karşılamadığı maddeler değil, '
+                + 'haklarında bilgimiz olmayan maddeler — kanıt oranına da girmiyorlar.',
+            style: 'pMuted',
+            margin: [0, 0, 0, 3],
+        });
+        content.push({
+            ul: sorulmayan.map((r) => `Madde ${r.index}: ${r.text}`),
+            style: 'p',
+            margin: [0, 0, 0, 4],
+        });
     }
 
     const unlinked = Array.isArray(report?.unlinked) ? report.unlinked : [];
@@ -328,26 +449,6 @@ export function buildInterviewReportDoc({
         content.push({ text: `Ortalama: %${ort}`, style: 'pBold', margin: [0, 0, 0, 4] });
     }
 
-    // ── Mülakatçı değerlendirmesi — BOYUTLAR AÇIK ───────────────────────────
-    // Ekranda katlanır bir bölümdü; kâğıtta katlanmış bölüm açılamaz.
-    if (recruiterEval) {
-        content.push(baslik('Mülakatçı değerlendirmesi'));
-        if (sayiMi(recruiterEval.overallScore)) {
-            content.push({ text: `Genel: ${recruiterEval.overallScore}/5`, style: 'pBold', margin: [0, 0, 0, 3] });
-        }
-        if (metin(recruiterEval.summary)) content.push(paragraf(recruiterEval.summary));
-        for (const dim of (Array.isArray(recruiterEval.dimensions) ? recruiterEval.dimensions : [])) {
-            const satir = [{
-                text: `${metin(dim.label) || metin(dim.key)}${sayiMi(dim.score) ? ` — ${dim.score}/5` : ''}`,
-                style: 'pBold',
-                margin: [0, 5, 0, 2],
-            }];
-            if (metin(dim.explanation)) satir.push(paragraf(dim.explanation));
-            if (metin(dim.tip)) satir.push({ text: `Öneri: ${dim.tip}`, style: 'quote' });
-            content.push({ stack: satir, unbreakable: true });
-        }
-    }
-
     if (metin(recruiterNotes)) {
         content.push(baslik('Değerlendirme notları'));
         content.push(paragraf(recruiterNotes));
@@ -373,7 +474,9 @@ export function buildInterviewReportDoc({
     }
 
     // ── Transkript — EN SONA, KESİNTİSİZ ────────────────────────────────────
-    content.push({ text: 'Tam transkript', style: 'h2', pageBreak: 'before', margin: [0, 0, 0, 6] });
+    // TRANSKRİPT EK OLARAK İŞARETLİ. Belgenin en büyük parçası bu; "ek"
+    // demek okuyana raporun asıl gövdesinin bittiğini söylüyor.
+    content.push({ text: 'Ek: Tam transkript', style: 'h2', pageBreak: 'before', margin: [0, 0, 0, 6] });
     content.push(...transkriptBlogu(session));
 
     return {
