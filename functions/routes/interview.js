@@ -362,6 +362,11 @@ router.post(
             transcript,
             notes,
             recruiterOutcome,
+            // PLANLI GÖRÜŞMENİN SONUCU GİRİLİYORSA o kaydın kimliği.
+            // Görüşme sistem dışında (Zoom, Teams, yüz yüze) yapıldığında
+            // planlanan oturum sonsuza kadar "Bekliyor" olarak kalıyordu ve
+            // sonuç ayrı bir kayıt olarak ekleniyordu: tek görüşme, iki satır.
+            replacesSessionId,
         } = req.body || {};
 
         // ── Validation
@@ -380,6 +385,10 @@ router.post(
             return res.status(400).json({
                 error: `recruiterOutcome şunlardan biri olmalı: ${[...VALID_OUTCOMES].join(', ')}`,
             });
+        }
+        if (replacesSessionId !== undefined && replacesSessionId !== null
+            && (typeof replacesSessionId !== 'string' || replacesSessionId.length > 200)) {
+            return res.status(400).json({ error: 'replacesSessionId geçersiz.' });
         }
         const safeQuestions = sanitizeQuestions(questions);
         const hasContent =
@@ -464,7 +473,7 @@ router.post(
             record: {
                 candidateId, candidateName, positionId, positionTitle, interviewerName,
                 date, time, durationMinutes, interviewType, transcript, notes,
-                recruiterOutcome,
+                recruiterOutcome, replacesSessionId,
             },
             safeQuestions,
             aiAnalysis,
@@ -585,6 +594,29 @@ async function runManualEvaluation(input) {
 }
 
 /** Kaydı /interviews/{sessionId} altına yazar ve aday belgesine yansıtır. */
+/**
+ * Planli kaydin yerine sonucu koyar.
+ *
+ * `arrayRemove` bu isi yapamaz: kaldirilacak ogenin TAMAMEN ayni olmasi
+ * gerekiyor ve elimizde yalnizca kimlik var. Bu yuzden liste okunup yeniden
+ * yaziliyor ve degistirme kurali burada, tek yerde ve test edilebilir duruyor.
+ *
+ * KIMLIK BULUNAMAZSA YENI KAYIT YINE EKLENIR: kullanicinin girdigi sonucu
+ * atmak, en pahali kayip olurdu. Planli kayit baskasi tarafindan silinmis
+ * olabilir.
+ *
+ * @param {Array} list mevcut interviewSessions
+ * @param {string|null} replacesSessionId
+ * @param {object} newSession
+ * @returns {Array} yeni liste
+ */
+export function replaceSessionInList(list, replacesSessionId, newSession) {
+    const mevcut = Array.isArray(list) ? list : [];
+    if (!replacesSessionId) return [...mevcut, newSession];
+    const kalan = mevcut.filter((x) => String(x?.id) !== String(replacesSessionId));
+    return [...kalan, newSession];
+}
+
 async function persistManualInterview({
     req,
     res,
@@ -601,7 +633,7 @@ async function persistManualInterview({
     const {
         candidateId, candidateName, positionId, positionTitle, interviewerName,
         date, time, durationMinutes, interviewType, transcript, notes, recruiterOutcome,
-        candidateSalary,
+        candidateSalary, replacesSessionId,
     } = record;
 
     const sessionId = `mi-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -664,29 +696,32 @@ async function persistManualInterview({
             const candidateRef = db.doc(
                 `artifacts/talent-flow/public/data/candidates/${candidateId}`
             );
-            const update = {
-                interviewSessions: admin.firestore.FieldValue.arrayUnion({
-                    id: sessionId,
-                    mode: 'manual',
-                    date,
-                    time: time || null,
-                    interviewType,
-                    status: 'completed',
-                    recruiterOutcome: recruiterOutcome || 'pending',
+            const yeniOturum = {
+                id: sessionId,
+                mode: 'manual',
+                date,
+                time: time || null,
+                interviewType,
+                status: 'completed',
+                recruiterOutcome: recruiterOutcome || 'pending',
                 // Adayın odada söylediği beklenti. YOKSA null: boş beklentiyi
                 // sıfır saymak, sorulmamış bir soruyu cevaplanmış göstermek
                 // olurdu ve bütçe raporunu sessizce aşağı çekerdi.
                 candidateSalary: sanitizeSalary(candidateSalary),
-                    // Liste ekranları bu alanı okuyor. Artık modelin sayısı
-                    // değil, damgalardan hesaplanan kanıt oranı yazılıyor;
-                    // ölçülecek bir şey yoksa null kalıyor.
-                    aggregateScore: evidence?.score ?? null,
-                    evalSchema: EVAL_SCHEMA,
-                    createdAt: new Date().toISOString(),
-                }),
+                // Liste ekranları bu alanı okuyor. Artık modelin sayısı
+                // değil, damgalardan hesaplanan kanıt oranı yazılıyor;
+                // ölçülecek bir şey yoksa null kalıyor.
+                aggregateScore: evidence?.score ?? null,
+                evalSchema: EVAL_SCHEMA,
+                createdAt: new Date().toISOString(),
+                // Hangi planlı kaydın yerine geçtiği kayıtta duruyor: bir
+                // hafta sonra "bu görüşme planlanmış mıydı" sorusunun cevabı.
+                ...(replacesSessionId ? { replacedSessionId: replacesSessionId } : {}),
             };
+
+            const ek = {};
             if (positionTitle && requirementVerdicts.length > 0 && fingerprint) {
-                update.interviewCoverage = {
+                ek.interviewCoverage = {
                     [positionTitle]: {
                         sessionId,
                         date,
@@ -696,7 +731,41 @@ async function persistManualInterview({
                     },
                 };
             }
-            await candidateRef.set(update, { merge: true });
+
+            if (replacesSessionId) {
+                // PLANLI KAYIT SİLİNİP YERİNE SONUÇ YAZILIYOR.
+                //
+                // `arrayRemove` işe yaramaz: kaldırılacak öğenin TAMAMEN aynı
+                // olması gerekiyor, elimizde yalnızca kimlik var. Bu yüzden
+                // liste okunup yeniden yazılıyor — ve İŞLEM (transaction)
+                // içinde: okuma ile yazma arasında başka biri aynı adaya
+                // oturum eklerse o kayıt sessizce silinirdi.
+                await db.runTransaction(async (tx) => {
+                    const snap = await tx.get(candidateRef);
+                    const liste = replaceSessionInList(
+                        snap.data()?.interviewSessions, replacesSessionId, yeniOturum
+                    );
+                    tx.set(candidateRef, { ...ek, interviewSessions: liste }, { merge: true });
+                });
+
+                // Planlı oturumun kendi belgesi de kapanıyor. Kapatılmazsa
+                // aday linki hâlâ açık kalır ve `/interviews` üzerinden okuyan
+                // ekranlar oturumu "bekliyor" görmeye devam eder.
+                try {
+                    await db.doc(`interviews/${replacesSessionId}`).set({
+                        status: 'superseded',
+                        supersededBy: sessionId,
+                        supersededAt: admin.firestore.FieldValue.serverTimestamp(),
+                    }, { merge: true });
+                } catch (supErr) {
+                    log.warn({ err: supErr.message }, '[create-manual-interview] superseded flag failed');
+                }
+            } else {
+                await candidateRef.set(
+                    { ...ek, interviewSessions: admin.firestore.FieldValue.arrayUnion(yeniOturum) },
+                    { merge: true }
+                );
+            }
         } catch (mirrorErr) {
             // Yansıtma en iyi çaba — asıl kayıt /interviews/ altında.
             log.warn(

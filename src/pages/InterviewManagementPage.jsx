@@ -12,6 +12,8 @@ import { getCalendarEvents, connectGoogleWorkspace, sendDirectEmail, createDirec
 import { getInviteEmail, getParticipantEmail, getRescheduleEmail } from '../utils/templateService';
 import { buildICS } from '../utils/emailTemplates';
 import AddManualInterviewModal from '../components/AddManualInterviewModal';
+import { downloadInterviewIcs } from '../utils/interviewIcs';
+import { isSessionPast } from '../utils/interviewSession';
 import SalaryBackfillModal from '../components/SalaryBackfillModal';
 import SalaryBandModal from '../components/SalaryBandModal';
 import { 
@@ -53,7 +55,9 @@ import {
     UserPlus,
     AtSign,
     Briefcase,
-    Wallet
+    Wallet,
+    ClipboardCheck,
+    CalendarPlus,
 } from 'lucide-react';
 
 const PARTICIPANT_INVITES_PATH = 'artifacts/talent-flow/public/data/participantInvites';
@@ -141,6 +145,12 @@ export default function InterviewManagementPage() {
 
     // "My Interviews" filter for department users in calendar view
     const [showMyInterviews, setShowMyInterviews] = useState(false);
+
+    // Planlı bir görüşmenin sonucu giriliyorsa hangi oturum olduğu burada.
+    // Görüşme sistem dışında yapıldığında (Zoom, Teams, yüz yüze) planlanan
+    // kayıt sonsuza kadar "Bekliyor" kalıyordu; sonucu girmenin tek yolu
+    // sıfırdan yeni bir kayıt açmaktı ve tek görüşme listede iki satır oluyordu.
+    const [manualPrefill, setManualPrefill] = useState(null);
 
     // Manual interview entry modal — see components/AddManualInterviewModal.jsx
     const [manualInterviewOpen, setManualInterviewOpen] = useState(false);
@@ -2458,6 +2468,32 @@ export default function InterviewManagementPage() {
                                         if (s.mode === 'face_to_face') { navigate(`/face-interview/${sessionKey}`); return; }
                                         navigate(`/live-interview/${sessionKey}`);
                                     };
+                                    // Sonuc girisi YALNIZCA planli kayitlarda: tamamlanmisin
+                                    // zaten raporu var, iptal edilenin sonucu yok.
+                                    const sonucGirilebilir = !isDone && !isCancelled && !isLive && Boolean(resolvedCandidateId);
+                                    const gecti = isSessionPast(s);
+                                    const sonucGir = () => {
+                                        setOpenMenuId(null);
+                                        setManualPrefill({
+                                            sessionId: sessionKey,
+                                            candidateId: resolvedCandidateId,
+                                            positionId: s.positionId || null,
+                                            date: s.date || '',
+                                            time: s.time || '',
+                                            interviewerName: s.interviewerName || s.interviewer || '',
+                                            title: s.title || '',
+                                        });
+                                        setManualInterviewOpen(true);
+                                    };
+                                    const takvimeEkle = () => {
+                                        setOpenMenuId(null);
+                                        const ok = downloadInterviewIcs(s, {
+                                            candidateName: s.candidateName,
+                                            positionTitle: s.positionTitle,
+                                            organizer: { name: userProfile?.displayName || '', email: userProfile?.email || '' },
+                                        });
+                                        if (!ok) window.alert('Bu gorusmede tarih ya da saat yok; takvim dosyasi uretilemedi.');
+                                    };
                                     return (
                                         <div
                                             key={sessionKey}
@@ -2538,7 +2574,10 @@ export default function InterviewManagementPage() {
                                                     </button>
                                                 ) : (
                                                     <button
-                                                        onClick={openSession}
+                                                        onClick={sonucGirilebilir && gecti ? sonucGir : openSession}
+                                                        title={sonucGirilebilir && gecti
+                                                            ? 'Görüşme yapıldıysa sonucunu buradan girin — başka bir uygulamada yapılmış olabilir'
+                                                            : undefined}
                                                         className={`text-[12px] font-semibold px-2.5 py-[5px] rounded-md border ${
                                                             isLive
                                                                 ? 'bg-ok text-white border-transparent hover:opacity-90'
@@ -2547,7 +2586,10 @@ export default function InterviewManagementPage() {
                                                                     : 'bg-brand text-white border-transparent hover:bg-brand-600'
                                                         }`}
                                                     >
-                                                        {isLive ? 'Katıl' : isDone ? 'Rapor' : 'Görüntüle'}
+                                                        {/* SAATI GECMIS GORUSMEDE YAPILACAK IS "KATILMAK" DEGIL.
+                                                            Gorusme baska bir uygulamada yapilmis olabilir; bu
+                                                            ekrandan yapilabilecek tek anlamli sey sonucu girmek. */}
+                                                        {isLive ? 'Katıl' : isDone ? 'Rapor' : gecti && sonucGirilebilir ? 'Sonucu gir' : 'Görüntüle'}
                                                     </button>
                                                 )}
 
@@ -2570,6 +2612,27 @@ export default function InterviewManagementPage() {
                                                                 className="absolute right-0 top-7 w-44 bg-n0 rounded-[10px] shadow-lg border border-n200 py-1 z-40"
                                                                 onClick={(e) => e.stopPropagation()}
                                                             >
+                                                                {sonucGirilebilir && (
+                                                                    <button
+                                                                        onClick={sonucGir}
+                                                                        className="w-full flex items-center gap-2 px-3 py-2 text-[11px] font-semibold text-n700 hover:bg-n50 text-left"
+                                                                    >
+                                                                        <ClipboardCheck className="w-3.5 h-3.5" /> Sonucu gir
+                                                                    </button>
+                                                                )}
+                                                                {/* TAKVIM BLOKE ETME - entegrasyon gerektirmeyen yol.
+                                                                    Takvim etkinligi yalnizca Google Workspace bagliysa
+                                                                    olusuyor; bagli degilse kullanicinin kendi takviminde
+                                                                    hicbir iz kalmiyordu. .ics dosyasini Outlook, Apple
+                                                                    Takvim ve Google Takvim aciyor. */}
+                                                                {!isCancelled && s.date && s.time && (
+                                                                    <button
+                                                                        onClick={takvimeEkle}
+                                                                        className="w-full flex items-center gap-2 px-3 py-2 text-[11px] font-semibold text-n700 hover:bg-n50 text-left"
+                                                                    >
+                                                                        <CalendarPlus className="w-3.5 h-3.5" /> Takvimime ekle
+                                                                    </button>
+                                                                )}
                                                                 {canModify && !isCancelled && (
                                                                     <button
                                                                         onClick={() => {
@@ -3024,10 +3087,11 @@ export default function InterviewManagementPage() {
 
         <AddManualInterviewModal
             open={manualInterviewOpen}
-            onClose={() => setManualInterviewOpen(false)}
+            onClose={() => { setManualInterviewOpen(false); setManualPrefill(null); }}
             candidates={enrichedCandidates}
             positions={positions}
             currentUser={userProfile || currentUser}
+            prefill={manualPrefill}
             onCreated={() => {
                 // Listener on /interviews picks up the new doc automatically
                 // — no manual refresh needed. Just close the modal.
