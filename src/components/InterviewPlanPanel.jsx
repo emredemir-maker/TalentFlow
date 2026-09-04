@@ -19,6 +19,7 @@ import {
     buildInterviewPlan, planToText, priorityLabel, planSummary, CRITICAL, VERIFY,
 } from '../utils/interviewPlan';
 import { generateProbeQuestions } from '../services/ai/interviewPlanner';
+import { aiErrorHint } from '../utils/aiErrorHint';
 
 const DURATIONS = [30, 45, 60, 90];
 
@@ -46,6 +47,8 @@ export default function InterviewPlanPanel({ candidate, position, analysis, onSa
     const [written, setWritten] = useState(null); // soru metni eklenmiş sondalar
     const [copied, setCopied] = useState(false);
     const [error, setError] = useState('');
+    // Soru üretimi neden başarısız oldu — uyarı kutusunda gösteriliyor.
+    const [writeError, setWriteError] = useState('');
 
     // İskelet saf hesap — süre değişince anında yeniden çıkar, AI çağrısı yok.
     const plan = useMemo(
@@ -65,9 +68,11 @@ export default function InterviewPlanPanel({ candidate, position, analysis, onSa
     const handleWrite = async () => {
         setWriting(true);
         setError('');
+        setWriteError('');
         try {
-            const result = await generateProbeQuestions(plan, candidate, position);
+            const { probes: result, error: sebep } = await generateProbeQuestions(plan, candidate, position);
             setWritten(result);
+            setWriteError(sebep || '');
             // Kalıcı: manuel görüşme girişi bu planı yükleyip soruları madde
             // numarasıyla birlikte önceden doldurabilsin.
             if (onSave && position?.title) {
@@ -219,6 +224,17 @@ export default function InterviewPlanPanel({ candidate, position, analysis, onSa
                                 <strong>Sorular AI ile yazılamadı</strong> — aşağıdakiler hazır yedek
                                 sorular. Plan yine geçerli: hangi maddeyi neden soracağınız doğru.
                                 Yalnızca cümleler adaya özel değil, kendi sözlerinizle sorabilirsiniz.
+                                {/* SEBEP YAZILI. Eskiden yalnızca konsola düşüyordu; kullanıcı
+                                    kotanın mı dolduğunu yoksa cevabın mı kesildiğini
+                                    ayırt edemiyordu ve aynı düğmeye tekrar tekrar basıyordu. */}
+                                {writeError && (
+                                    <>
+                                        {' '}<span className="text-n600">Sebep: {writeError}</span>
+                                        {aiErrorHint(writeError).hint && (
+                                            <> {aiErrorHint(writeError).hint}</>
+                                        )}
+                                    </>
+                                )}
                             </p>
                         </div>
                     )}

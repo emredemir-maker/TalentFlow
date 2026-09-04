@@ -116,15 +116,15 @@ describe('generateProbeQuestions — çağrı yapılmayan durumlar', () => {
         const { getModel } = await import('./config.js');
         getModel.mockClear();
         const out = await generateProbeQuestions({ stale: true, probes: PROBES }, {}, {});
-        expect(out).toEqual([]);
+        expect(out.probes).toEqual([]);
         expect(getModel).not.toHaveBeenCalled();
     });
 
     it('does not call the model when there is nothing to probe', async () => {
         const { getModel } = await import('./config.js');
         getModel.mockClear();
-        expect(await generateProbeQuestions({ probes: [] }, {}, {})).toEqual([]);
-        expect(await generateProbeQuestions(null, {}, {})).toEqual([]);
+        expect((await generateProbeQuestions({ probes: [] }, {}, {})).probes).toEqual([]);
+        expect((await generateProbeQuestions(null, {}, {})).probes).toEqual([]);
         expect(getModel).not.toHaveBeenCalled();
     });
 
@@ -132,9 +132,11 @@ describe('generateProbeQuestions — çağrı yapılmayan durumlar', () => {
         const { getModel } = await import('./config.js');
         getModel.mockRejectedValueOnce(new Error('502 Bad Gateway'));
         const out = await generateProbeQuestions({ probes: PROBES }, {}, { title: 'GPM' });
-        expect(out).toHaveLength(3);
-        expect(out.every((p) => p.question.length > 10)).toBe(true);
-        expect(out.every((p) => p.generated === false)).toBe(true);
+        expect(out.probes).toHaveLength(3);
+        expect(out.probes.every((p) => p.question.length > 10)).toBe(true);
+        expect(out.probes.every((p) => p.generated === false)).toBe(true);
+        // SEBEP DE DÖNÜYOR: ekran "neden" diye soranı konsola göndermesin.
+        expect(out.error).toContain('502');
     });
 });
 
