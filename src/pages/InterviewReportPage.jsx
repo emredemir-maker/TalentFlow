@@ -202,6 +202,7 @@ export default function InterviewReportPage() {
     const [recruiterNotes, setRecruiterNotes] = useState('');
     const [finalDecision, setFinalDecision] = useState('');
     const [isSavingNotes, setIsSavingNotes] = useState(false);
+    const [pdfLoading, setPdfLoading] = useState(false);
     const [isSavingDecision, setIsSavingDecision] = useState(false);
     const [recruiterEval, setRecruiterEval] = useState(null);
     const [evalLoading, setEvalLoading] = useState(false);
@@ -275,8 +276,44 @@ export default function InterviewReportPage() {
         showToast("Rapor bağlantısı panoya kopyalandı!");
     };
 
-    const handleDownload = () => {
-        window.print();
+    /**
+     * PDF'İ KENDİMİZ ÜRETİYORUZ.
+     *
+     * Eskiden `window.print()` çağrılıyordu ve bu üç yerden içerik
+     * kaybettiriyordu: sayfa `h-screen overflow-hidden`, transkript kutusu
+     * `h-[640px]` sabit ve kendi içinde kayıyor, üstelik rapor iki sekme —
+     * hangisi açıksa yalnızca o basılıyordu. Kullanıcının seçtiği
+     * "Microsoft Print to PDF" sürücüsü de sayfayı resme çeviriyordu:
+     * gelen dosyada tek bir metin karakteri yoktu.
+     *
+     * Artık belge VERİDEN kuruluyor (utils/interviewReportDoc) ve doğrudan
+     * iniyor — yazdırma penceresi açılmıyor, hedef seçilmiyor.
+     */
+    const handleDownload = async () => {
+        if (!candidate || !session || pdfLoading) return;
+        setPdfLoading(true);
+        try {
+            const [{ buildInterviewReportDoc, dosyaAdi }, { downloadPdf }] = await Promise.all([
+                import('../utils/interviewReportDoc'),
+                import('../services/pdfExport'),
+            ]);
+            const doc = buildInterviewReportDoc({
+                candidate,
+                session,
+                report,
+                recruiterEval,
+                recruiterNotes,
+                finalDecision,
+            });
+            await downloadPdf(doc, dosyaAdi(candidate, session));
+        } catch (err) {
+            // SESSİZ KALINMAZ: kullanıcı düğmeye bastı, dosya inmediyse
+            // sebebini bilmeli. Eskiden yazdırma penceresi açılmadığında
+            // hiçbir geri bildirim yoktu.
+            showToast(`PDF üretilemedi: ${err?.message || 'bilinmeyen hata'}`, 'error');
+        } finally {
+            setPdfLoading(false);
+        }
     };
 
     const handleSaveNotes = async () => {
@@ -366,9 +403,14 @@ export default function InterviewReportPage() {
                     </button>
                     <button
                         onClick={handleDownload}
-                        className="flex items-center gap-1.5 text-[12px] font-medium text-n600 bg-n0 border border-n200 hover:bg-n50 rounded-md px-[11px] py-[5px]"
+                        disabled={pdfLoading}
+                        title="Raporun tamamını PDF olarak indirir — yazdırma penceresi açılmaz"
+                        className="flex items-center gap-1.5 text-[12px] font-medium text-n600 bg-n0 border border-n200 hover:bg-n50 rounded-md px-[11px] py-[5px] disabled:opacity-60"
                     >
-                        <Download className="w-[13px] h-[13px]" /> PDF
+                        {pdfLoading
+                            ? <Loader2 className="w-[13px] h-[13px] animate-spin" />
+                            : <Download className="w-[13px] h-[13px]" />}
+                        {pdfLoading ? 'Hazırlanıyor…' : 'PDF olarak indir'}
                     </button>
                     {finalDecision && (
                         <span className="text-[12px] font-semibold px-[11px] py-[5px] rounded-full bg-brand-50 text-brand">
@@ -751,9 +793,14 @@ export default function InterviewReportPage() {
                                         <h3 className="text-[12px] font-semibold m-0">Tam transkript</h3>
                                         <button
                                             onClick={handleDownload}
-                                            className="ml-auto flex items-center gap-1.5 text-[12px] font-medium text-n600 bg-n50 border border-n200 hover:bg-n100 rounded-md px-2.5 py-[5px]"
+                                            disabled={pdfLoading}
+                                            title="Transkriptin tamamı dahil, raporun tümünü indirir"
+                                            className="ml-auto flex items-center gap-1.5 text-[12px] font-medium text-n600 bg-n50 border border-n200 hover:bg-n100 rounded-md px-2.5 py-[5px] disabled:opacity-60"
                                         >
-                                            <Download className="w-3 h-3" /> PDF
+                                            {pdfLoading
+                                                ? <Loader2 className="w-3 h-3 animate-spin" />
+                                                : <Download className="w-3 h-3" />}
+                                            PDF olarak indir
                                         </button>
                                     </div>
 
