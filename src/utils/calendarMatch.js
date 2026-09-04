@@ -156,3 +156,89 @@ export function sessionForEvent(event, candidate) {
     const oturumlar = Array.isArray(candidate?.interviewSessions) ? candidate.interviewSessions : [];
     return oturumlar.find((s) => trim(s?.calendarEventId) === trim(event?.id)) || null;
 }
+
+/**
+ * MÜLAKAT OLMA İHTİMALİ OLAN ETKİNLİKLER.
+ *
+ * Takvimde her şey var: sprint toplantısı, diş hekimi, İK görüşmesi. Hepsini
+ * aynı gri kutuda göstermek, işe alım görüşmelerini gürültünün içinde
+ * kaybediyor — oysa kullanıcının bu ekranda aradığı tek şey onlar.
+ *
+ * ── NEDEN "GÖRÜŞME" TEK BAŞINA YETMİYOR ─────────────────────────────────────
+ * Türkçede "görüşme" her toplantı için kullanılıyor: "müşteri görüşmesi",
+ * "tedarikçi görüşmesi". Tek başına eşleştirmek takvimin yarısını mülakat
+ * gibi işaretlerdi. Bu yüzden ÖBEK aranıyor: "İK görüşmesi", "aday
+ * görüşmesi", "teknik görüşme" gibi.
+ *
+ * ── BU BİR İDDİA DEĞİL, BİR İŞARET ──────────────────────────────────────────
+ * Eşleşen etkinlik "mülakat" diye kaydedilmiyor; yalnızca farklı renkte
+ * gösteriliyor ve "Mülakat olarak işaretle" düğmesi öne çıkıyor. Kararı
+ * kullanıcı veriyor.
+ */
+export const INTERVIEW_HINTS = [
+    'mulakat',
+    'interview',
+    'ik gorusme',
+    'ik gorusmesi',
+    'aday gorusme',
+    'aday gorusmesi',
+    'teknik gorusme',
+    'on gorusme',
+    'ise alim',
+    'screening',
+    'candidate',
+    'hr interview',
+];
+
+/** Etkinlik başlığı ya da açıklaması mülakata işaret ediyor mu? */
+export function looksLikeInterview(event) {
+    const metin = fold(`${event?.title || ''} ${event?.description || ''}`);
+    if (!metin) return false;
+    return INTERVIEW_HINTS.some((k) => metin.includes(k));
+}
+
+/**
+ * Takvim kaydından PLANLI BİR MÜLAKAT OTURUMU kurar.
+ *
+ * ── NEDEN SADECE "BAĞLAMAK" YETMEDİ ─────────────────────────────────────────
+ * Etkinliği bir adaya bağlamak yalnızca eşleşmeyi kuruyordu: takvimde
+ * "elle bağlandı" yazıyor ama mülakat listesinde, süreçte ve raporlarda
+ * hiçbir şey yok. Kullanıcının istediği, o toplantıyı SİSTEMDEKİ bir adayın
+ * mülakatı olarak işaretlemek — yani gerçek bir kayıt oluşturmak.
+ *
+ * Oturum PLANLI olarak açılıyor: geçmişte bile olsa sonucu henüz girilmedi.
+ * Saati geçmiş planlı kayıtta arayüz zaten "Sonucu gir" gösteriyor.
+ *
+ * @param {object} event — normalizeCalendarEvent çıktısı
+ * @param {object} candidate
+ * @param {{interviewerName?: string, interviewerId?: string}} meta
+ * @returns {object|null} aday belgesine eklenecek oturum; etkinlik geçersizse null
+ */
+export function buildSessionFromEvent(event, candidate, meta = {}) {
+    if (!event?.id || !event?.start || !candidate?.id) return null;
+    const d = event.start;
+    const iki = (n) => String(n).padStart(2, '0');
+
+    return {
+        // Kimlik etkinlikten türüyor: aynı etkinlik iki kez işaretlenirse
+        // ikinci kayıt oluşmuyor, aynı kimliğe denk geliyor.
+        id: `cal-${event.id}`,
+        mode: 'calendar',
+        calendarEventId: event.id,
+        title: event.title || 'Mülakat',
+        // Kanal bilinmiyor: takvimde Meet yazsa bile görüşme Teams'ten
+        // olabilir. Sonuç girilirken kullanıcı seçiyor.
+        type: 'other',
+        date: `${d.getFullYear()}-${iki(d.getMonth() + 1)}-${iki(d.getDate())}`,
+        time: event.allDay ? '' : `${iki(d.getHours())}:${iki(d.getMinutes())}`,
+        status: 'scheduled',
+        meetLink: event.location || event.htmlLink || '',
+        candidateId: candidate.id,
+        candidateName: trim(candidate.name),
+        positionId: candidate.positionId || null,
+        positionTitle: trim(candidate.position) || trim(candidate.bestTitle) || null,
+        interviewer: trim(meta.interviewerName),
+        interviewerId: meta.interviewerId || null,
+        createdAt: new Date().toISOString(),
+    };
+}
