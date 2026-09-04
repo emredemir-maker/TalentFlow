@@ -5,7 +5,7 @@
 // Gemini); covered by manual smoke for now.
 import { describe, expect, it } from 'vitest';
 
-import { buildManualInterviewPrompt, filterSessionMerge, sanitizeQuestions, PROTECTED_SESSION_FIELDS } from './interview.js';
+import { buildManualInterviewPrompt, filterSessionMerge, sanitizeQuestions, replaceSessionInList, PROTECTED_SESSION_FIELDS } from './interview.js';
 
 // Minimum-viable input shape — every other test reuses this with overrides
 const baseInput = {
@@ -277,5 +277,33 @@ describe('sanitizeQuestions', () => {
         for (const bad of [null, undefined, 'metin', {}, 5]) {
             expect(sanitizeQuestions(bad)).toEqual([]);
         }
+    });
+});
+
+describe('replaceSessionInList', () => {
+    const planli = { id: 'iv-1', status: 'scheduled' };
+    const baska = { id: 'iv-2', status: 'scheduled' };
+    const sonuc = { id: 'mi-9', status: 'completed' };
+
+    it('TEK GÖRÜŞME, TEK SATIR — planlı kayıt sonuçla değişiyor', () => {
+        const out = replaceSessionInList([planli, baska], 'iv-1', sonuc);
+        expect(out.map((x) => x.id)).toEqual(['iv-2', 'mi-9']);
+    });
+
+    it('kimlik verilmezse eski davranış — yalnızca ekleme', () => {
+        const out = replaceSessionInList([planli], null, sonuc);
+        expect(out.map((x) => x.id)).toEqual(['iv-1', 'mi-9']);
+    });
+
+    it('KİMLİK BULUNAMAZSA SONUÇ YİNE KAYDEDİLİYOR', () => {
+        // Planlı kayıt bu arada silinmiş olabilir; kullanıcının girdiği
+        // sonucu atmak en pahalı kayıp olurdu.
+        const out = replaceSessionInList([baska], 'iv-yok', sonuc);
+        expect(out.map((x) => x.id)).toEqual(['iv-2', 'mi-9']);
+    });
+
+    it('bozuk listede çökmüyor', () => {
+        expect(replaceSessionInList(null, 'iv-1', sonuc)).toEqual([sonuc]);
+        expect(replaceSessionInList([null, {}], 'iv-1', sonuc).length).toBe(3);
     });
 });

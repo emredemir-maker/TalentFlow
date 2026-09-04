@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isSessionDone, hasCompletedInterview } from './interviewSession';
+import { isSessionDone, hasCompletedInterview, isSessionPast } from './interviewSession';
 
 describe('mülakat oturumu bitti mi', () => {
     it("durum 'completed' ise bitmiştir", () => {
@@ -38,5 +38,32 @@ describe('mülakat oturumu bitti mi', () => {
         expect(hasCompletedInterview({})).toBe(false);
         expect(hasCompletedInterview({ interviewSessions: 'metin' })).toBe(false);
         expect(hasCompletedInterview(null)).toBe(false);
+    });
+});
+
+describe('görüşmenin saati geçti mi', () => {
+    const now = new Date('2026-09-12T15:00:00');
+
+    it('geçmiş saatteki görüşme geçmiş sayılıyor', () => {
+        expect(isSessionPast({ date: '2026-09-12', time: '14:30' }, now)).toBe(true);
+        expect(isSessionPast({ date: '2026-09-11', time: '23:00' }, now)).toBe(true);
+    });
+
+    it('gelecekteki görüşme geçmiş sayılmıyor', () => {
+        expect(isSessionPast({ date: '2026-09-12', time: '16:00' }, now)).toBe(false);
+        expect(isSessionPast({ date: '2026-09-13', time: '09:00' }, now)).toBe(false);
+    });
+
+    it('SAAT YOKSA GÜN SONUNA KADAR BEKLENİYOR', () => {
+        // Saatsiz kaydı öğlen "geçti" saymak, yapılmamış görüşmeyi yapılmış
+        // gibi gösterip listedeki birincil düğmeyi yanlış işe çevirirdi.
+        expect(isSessionPast({ date: '2026-09-12' }, now)).toBe(false);
+        expect(isSessionPast({ date: '2026-09-11' }, now)).toBe(true);
+    });
+
+    it('bozuk ya da eksik tarihte çökmüyor', () => {
+        expect(isSessionPast({}, now)).toBe(false);
+        expect(isSessionPast({ date: 'bozuk' }, now)).toBe(false);
+        expect(isSessionPast(null, now)).toBe(false);
     });
 });

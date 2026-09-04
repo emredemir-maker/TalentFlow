@@ -72,6 +72,12 @@ export default function AddManualInterviewModal({
     candidates = [],
     positions = [],
     currentUser,
+    // PLANLI GÖRÜŞMENİN SONUCU GİRİLİYORSA burası dolu gelir.
+    // Görüşme sistem dışında (Zoom, Teams, yüz yüze) yapıldığında planlanan
+    // oturum sonsuza kadar "Bekliyor" kalıyordu ve sonucu girmenin tek yolu
+    // sıfırdan yeni bir kayıt açmaktı: tek görüşme, listede iki satır.
+    // {sessionId, candidateId, positionId, date, time, interviewerName, title}
+    prefill = null,
 }) {
     // ── Form state
     const [step, setStep] = useState('form'); // form | submitting | result | error
@@ -115,12 +121,24 @@ export default function AddManualInterviewModal({
 
     // Reset state every time the modal is opened — prevents stale data on re-open
     useEffect(() => {
-        if (open) {
-            setStep('form');
-            setSubmitError('');
-            setCreatedResult(null);
-        }
-    }, [open]);
+        if (!open) return;
+        setStep('form');
+        setSubmitError('');
+        setCreatedResult(null);
+        if (!prefill) return;
+
+        // GÖRÜŞME KANALI TAŞINMIYOR, SORULUYOR.
+        // Planlama sihirbazındaki "tip" görüşmenin TÜRÜ (teknik / İK / ürün);
+        // buradaki tip görüşmenin KANALI (telefon / Zoom / Teams). İkisi
+        // farklı eksen; birini diğerine eşlemek kayda yanlış bilgi yazardı.
+        // Kanalı kullanıcı seçiyor — zaten nerede yaptığını bilen o.
+        if (prefill.candidateId) setCandidateId(prefill.candidateId);
+        if (prefill.positionId) setPositionId(prefill.positionId);
+        if (prefill.date) setDate(String(prefill.date).slice(0, 10));
+        if (prefill.time) setTime(prefill.time);
+        if (prefill.interviewerName) setInterviewerName(prefill.interviewerName);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open, prefill?.sessionId]);
 
     // Auto-fill position when candidate is picked
     const selectedCandidate = useMemo(
@@ -414,6 +432,9 @@ export default function AddManualInterviewModal({
                         min: salaryMin, max: salaryMax,
                         currency: salaryCurrency, period: salaryPeriod, basis: salaryBasis,
                     }),
+                    // Sunucu bu kimliği görürse planlı kaydı silip yerine
+                    // sonucu yazıyor — aynı görüşme iki satır olmuyor.
+                    ...(prefill?.sessionId ? { replacesSessionId: prefill.sessionId } : {}),
                 }),
             });
             const data = await res.json();
@@ -437,11 +458,12 @@ export default function AddManualInterviewModal({
                 <div className="px-8 py-5 border-b border-slate-200 flex items-center justify-between bg-gradient-to-r from-indigo-50 to-blue-50">
                     <div>
                         <h2 className="text-xl font-black text-slate-900 tracking-tight">
-                            Manuel Görüşme Ekle
+                            {prefill?.sessionId ? 'Görüşme Sonucunu Gir' : 'Manuel Görüşme Ekle'}
                         </h2>
                         <p className="text-xs text-slate-500 mt-0.5">
-                            Sistem dışında yapılmış görüşmeyi kaydet — AI değerlendirmesi
-                            otomatik çalışır.
+                            {prefill?.sessionId
+                                ? `${prefill.title || 'Planlanan görüşme'} — sonucu kaydedince planlı kayıt bu sonuçla değişir, listede ikinci satır oluşmaz.`
+                                : 'Sistem dışında yapılmış görüşmeyi kaydet — AI değerlendirmesi otomatik çalışır.'}
                         </p>
                     </div>
                     <button
