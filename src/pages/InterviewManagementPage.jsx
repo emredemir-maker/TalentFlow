@@ -15,7 +15,7 @@ import AddManualInterviewModal from '../components/AddManualInterviewModal';
 import { downloadInterviewIcs } from '../utils/interviewIcs';
 import { isSessionPast } from '../utils/interviewSession';
 import InterviewCalendarView from '../components/InterviewCalendarView';
-import { eventMinutes } from '../utils/calendarMatch';
+import { eventMinutes, buildSessionFromEvent } from '../utils/calendarMatch';
 import SalaryBackfillModal from '../components/SalaryBackfillModal';
 import SalaryBandModal from '../components/SalaryBandModal';
 import { 
@@ -795,17 +795,33 @@ export default function InterviewManagementPage() {
     };
 
     /**
-     * Takvim kaydını bir adaya bağlar.
+     * Takvim kaydını SİSTEMDEKİ BİR ADAYIN MÜLAKATI olarak işaretler.
      *
-     * Bağlantı ADAY BELGESİNDE duruyor: aday listesi zaten canlı dinleniyor,
-     * yani ayrı bir koleksiyon, ayrı kural ve her satır için ek okuma
-     * gerekmiyor. Elle kurulan bağ her tahminin üstünde tutuluyor
-     * (bkz. utils/calendarMatch).
+     * Sadece bağlamak yetmiyordu: bağ yalnızca eşleşmeyi kuruyor, mülakat
+     * listesinde ve süreçte hiçbir şey görünmüyordu. Burada adayın altında
+     * gerçek bir PLANLI mülakat kaydı açılıyor — saati geçmişse arayüz zaten
+     * "Sonucu gir" gösteriyor.
+     *
+     * Aynı etkinlik ikinci kez işaretlenirse yeni kayıt oluşmuyor: oturum
+     * kimliği etkinlikten türüyor ve varlığı önce denetleniyor.
      */
-    const takvimAdayaBagla = async (candidate, eventId) => {
-        const mevcut = Array.isArray(candidate.calendarEventIds) ? candidate.calendarEventIds : [];
-        if (mevcut.includes(eventId)) return;
-        await updateCandidate(candidate.id, { calendarEventIds: [...mevcut, eventId] });
+    const takvimMulakatIsaretle = async (event, candidate) => {
+        const oturumlar = Array.isArray(candidate.interviewSessions) ? candidate.interviewSessions : [];
+        if (oturumlar.some((s) => String(s?.calendarEventId) === String(event.id))) return;
+
+        const yeni = buildSessionFromEvent(event, candidate, {
+            interviewerName: userProfile?.displayName || currentUser?.displayName || '',
+            interviewerId: userId,
+        });
+        if (!yeni) return;
+
+        const mevcutBaglar = Array.isArray(candidate.calendarEventIds) ? candidate.calendarEventIds : [];
+        await updateCandidate(candidate.id, {
+            interviewSessions: [...oturumlar, yeni],
+            // Bağ da yazılıyor: kayıt sonradan silinse bile eşleşme kalır ve
+            // aynı etkinlik yeniden "bağlı değil" görünmez.
+            calendarEventIds: mevcutBaglar.includes(event.id) ? mevcutBaglar : [...mevcutBaglar, event.id],
+        });
     };
 
     const openEmailPreview = () => {
@@ -2546,7 +2562,7 @@ export default function InterviewManagementPage() {
                                     onSessionResult={takvimOturumSonucu}
                                     onPrepare={takvimHazirlik}
                                     onEventResult={takvimSonucGir}
-                                    onLink={takvimAdayaBagla}
+                                    onMarkInterview={takvimMulakatIsaretle}
                                     onConnect={takvimGoogleBagla}
                                 />
                             )}

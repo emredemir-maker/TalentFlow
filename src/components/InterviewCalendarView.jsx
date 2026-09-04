@@ -19,12 +19,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-    ChevronLeft, ChevronRight, Loader2, RefreshCw, CalendarDays, Link2,
-    ClipboardCheck, ExternalLink, AlertCircle, X, Search,
+    ChevronLeft, ChevronRight, Loader2, RefreshCw, CalendarDays,
+    ClipboardCheck, ExternalLink, AlertCircle, X, Search, UserPlus,
 } from 'lucide-react';
 
 import { fetchCalendarWindow } from '../services/calendarFeed';
-import { matchCandidate, sessionForEvent, MATCH_LABEL } from '../utils/calendarMatch';
+import { matchCandidate, sessionForEvent, looksLikeInterview, MATCH_LABEL } from '../utils/calendarMatch';
 import { monthGrid, monthLabel, bucketByDay, dayKey, WEEKDAYS } from '../utils/calendarGrid';
 import { isSessionPast } from '../utils/interviewSession';
 
@@ -37,6 +37,25 @@ function sessionTone(session) {
     if (st === 'cancelled') return { fg: '#C0272C', bg: '#FEF2F2' };
     if (session?._effectiveCompleted || st === 'completed') return { fg: '#4F46E5', bg: '#EEF2FF' };
     return { fg: '#5068FF', bg: '#EEF1FF' };
+}
+
+/**
+ * Takvim etkinliğinin ızgaradaki rengi.
+ *
+ * Takvimde her şey var: sprint toplantısı, diş hekimi, İK görüşmesi. Hepsini
+ * aynı gri kutuda göstermek, işe alım görüşmelerini gürültünün içinde
+ * kaybediyordu — oysa kullanıcının bu ekranda aradığı tek şey onlar.
+ *
+ * Üç durum, üç renk:
+ *   adaya bağlı        → marka rengi; sistemde karşılığı var
+ *   mülakat olabilir   → amber; başlığında "mülakat/İK görüşmesi" geçiyor,
+ *                        işaretlenmeyi bekliyor
+ *   diğer              → gri; kullanıcının kendi toplantısı
+ */
+function eventTone(candidate, muhtemel) {
+    if (candidate) return { fg: '#5068FF', bg: '#EEF1FF' };
+    if (muhtemel) return { fg: '#96590A', bg: '#FFFBEB' };
+    return { fg: '#6B7384', bg: '#F1F3F7' };
 }
 
 function AdaySecici({ candidates, onSelect, onCancel }) {
@@ -91,7 +110,7 @@ function AdaySecici({ candidates, onSelect, onCancel }) {
  * @param {(session: object) => void} props.onSessionResult
  * @param {(candidateId: string) => void} props.onPrepare
  * @param {(event: object, candidate: object) => void} props.onEventResult
- * @param {(candidate: object, eventId: string) => Promise<void>} props.onLink
+ * @param {(event: object, candidate: object) => Promise<void>} props.onMarkInterview
  * @param {() => void} props.onConnect
  */
 export default function InterviewCalendarView({
@@ -104,7 +123,7 @@ export default function InterviewCalendarView({
     onSessionResult,
     onPrepare,
     onEventResult,
-    onLink,
+    onMarkInterview,
     onConnect,
 }) {
     const bugun = useMemo(() => new Date(), []);
@@ -253,9 +272,12 @@ export default function InterviewCalendarView({
                                                     </span>
                                                 );
                                             }
+                                            const eslesen = eslesme(it.event).candidate;
+                                            const tone = eventTone(eslesen, looksLikeInterview(it.event));
                                             return (
                                                 <span key={`e-${i}`}
-                                                    className="text-[10px] font-medium px-1 py-0.5 rounded truncate bg-n100 text-n600">
+                                                    style={{ background: tone.bg, color: tone.fg }}
+                                                    className="text-[10px] font-medium px-1 py-0.5 rounded truncate">
                                                     {it.time && `${it.time} `}{it.event.title}
                                                 </span>
                                             );
@@ -273,7 +295,8 @@ export default function InterviewCalendarView({
                     <div className="flex items-center gap-3 flex-wrap py-2 text-[10px] text-n500">
                         <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded" style={{ background: '#EEF1FF', border: '1px solid #5068FF' }} /> Planlı mülakat</span>
                         <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded" style={{ background: '#EEF2FF', border: '1px solid #4F46E5' }} /> Tamamlanmış</span>
-                        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded bg-n100 border border-n300" /> Takvim etkinliği (sistemde kaydı yok)</span>
+                        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded" style={{ background: '#FFFBEB', border: '1px solid #96590A' }} /> Mülakat olabilir (işaretlenmemiş)</span>
+                        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded bg-n100 border border-n300" /> Diğer takvim etkinliği</span>
                     </div>
                 </div>
 
@@ -327,6 +350,7 @@ export default function InterviewCalendarView({
                         const e = it.event;
                         const { candidate, source } = eslesme(e);
                         const kayit = candidate ? sessionForEvent(e, candidate) : null;
+                        const muhtemel = looksLikeInterview(e);
                         return (
                             <div key={`ed-${i}`} className="py-2.5 border-b border-n100">
                                 <div className="flex items-start gap-3 flex-wrap">
@@ -337,8 +361,14 @@ export default function InterviewCalendarView({
                                         <div className="text-[12px] text-n900 truncate">{e.title}</div>
                                         <div className="text-[11px] text-n400 mt-0.5">
                                             {candidate
-                                                ? <><span className="text-brand font-semibold">{candidate.name}</span>{' · '}{MATCH_LABEL[source] || ''}{kayit && ' · sonucu girilmiş'}</>
-                                                : 'Adaya bağlı değil'}
+                                                ? <>
+                                                    <span className="text-brand font-semibold">{candidate.name}</span>
+                                                    {' · '}{MATCH_LABEL[source] || ''}
+                                                    {kayit ? ' · mülakat kaydı var' : ' · henüz mülakat olarak işaretlenmedi'}
+                                                </>
+                                                : muhtemel
+                                                    ? <span className="text-warn-text font-semibold">Mülakat olabilir — bir adaya işaretleyin</span>
+                                                    : 'Adaya bağlı değil'}
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-1.5 flex-wrap justify-end">
@@ -357,27 +387,65 @@ export default function InterviewCalendarView({
                                         )}
                                         {candidate && !kayit && (
                                             <button onClick={() => onEventResult(e, candidate)}
-                                                className="h-7 px-[11px] rounded-md text-[12px] font-semibold bg-brand hover:bg-brand-600 text-white flex items-center gap-1.5">
+                                                className="h-7 px-[11px] rounded-md text-[12px] font-semibold bg-n0 text-n600 border border-n200 hover:bg-n50 flex items-center gap-1.5">
                                                 <ClipboardCheck className="w-3 h-3" /> Sonucu gir
                                             </button>
                                         )}
-                                        {!candidate && (
+                                        {/* MÜLAKAT OLARAK İŞARETLE — sadece bağlamak yetmiyordu.
+                                            Bağlamak yalnızca eşleşmeyi kuruyor; mülakat listesinde,
+                                            süreçte ve raporlarda hiçbir şey görünmüyordu. Bu düğme
+                                            adayın altında GERÇEK bir planlı mülakat kaydı açıyor. */}
+                                        {!kayit && (
                                             <button onClick={() => setLinkingId(linkingId === e.id ? null : e.id)}
-                                                className="h-7 px-[11px] rounded-md text-[12px] font-semibold bg-n0 text-n600 border border-n200 hover:bg-n50 flex items-center gap-1.5">
-                                                <Link2 className="w-3 h-3" /> Adaya bağla
+                                                title={candidate
+                                                    ? `${candidate.name} adına planlı bir mülakat kaydı oluşturur`
+                                                    : 'Bu görüşmeyi sistemdeki bir adayın mülakatı olarak kaydeder'}
+                                                className={`h-7 px-[11px] rounded-md text-[12px] font-semibold flex items-center gap-1.5 ${
+                                                    muhtemel && !candidate
+                                                        ? 'bg-warn-bg text-warn-text border border-warn'
+                                                        : 'bg-brand hover:bg-brand-600 text-white'
+                                                }`}>
+                                                <UserPlus className="w-3 h-3" /> Mülakat olarak işaretle
                                             </button>
                                         )}
                                     </div>
                                 </div>
                                 {linkingId === e.id && (
-                                    <AdaySecici
-                                        candidates={candidates}
-                                        onCancel={() => setLinkingId(null)}
-                                        onSelect={async (c) => {
-                                            setLinkingId(null);
-                                            try { await onLink(c, e.id); } catch (err) { setError(err?.message || 'Bağlantı kaydedilemedi.'); }
-                                        }}
-                                    />
+                                    candidate ? (
+                                        // Eşleşen aday zaten belli; ikinci kez sormak gereksiz
+                                        // bir adım olurdu. Yine de KİMİN adına kaydedileceği
+                                        // yazıyor — sessizce kaydetmiyoruz.
+                                        <div className="mt-2 border border-n200 rounded-md p-2.5 bg-n25 flex items-center gap-2 flex-wrap">
+                                            <span className="text-[11px] text-n700">
+                                                <strong>{candidate.name}</strong> adına planlı mülakat kaydı oluşturulacak.
+                                            </span>
+                                            <div className="ml-auto flex items-center gap-1.5">
+                                                <button onClick={() => setLinkingId(null)}
+                                                    className="h-7 px-3 rounded-md text-[11px] font-semibold text-n500 border border-n200 hover:bg-n50">
+                                                    Vazgeç
+                                                </button>
+                                                <button
+                                                    onClick={async () => {
+                                                        setLinkingId(null);
+                                                        try { await onMarkInterview(e, candidate); }
+                                                        catch (err) { setError(err?.message || 'Kaydedilemedi.'); }
+                                                    }}
+                                                    className="h-7 px-3 rounded-md text-[11px] font-semibold bg-brand hover:bg-brand-600 text-white">
+                                                    Oluştur
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <AdaySecici
+                                            candidates={candidates}
+                                            onCancel={() => setLinkingId(null)}
+                                            onSelect={async (c) => {
+                                                setLinkingId(null);
+                                                try { await onMarkInterview(e, c); }
+                                                catch (err) { setError(err?.message || 'Kaydedilemedi.'); }
+                                            }}
+                                        />
+                                    )
                                 )}
                             </div>
                         );

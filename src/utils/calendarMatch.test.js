@@ -4,6 +4,8 @@ import {
     matchCandidate,
     eventMinutes,
     sessionForEvent,
+    looksLikeInterview,
+    buildSessionFromEvent,
     MATCH_SOURCE,
 } from './calendarMatch';
 
@@ -117,5 +119,96 @@ describe('etkinliğe bağlı görüşme kaydı', () => {
     it('bağlı kayıt yoksa null', () => {
         expect(sessionForEvent({ id: 'evt-1' }, { interviewSessions: [{ id: 'mi-1' }] })).toBeNull();
         expect(sessionForEvent({ id: 'evt-1' }, null)).toBeNull();
+    });
+});
+
+describe('mülakat ihtimali olan etkinlikler', () => {
+    const ev = (title, description = '') => normalizeCalendarEvent({
+        id: 'e', summary: title, description, start: { dateTime: '2026-09-05T10:00:00Z' },
+    });
+
+    it('İK ve mülakat ifadeleri yakalanıyor', () => {
+        for (const t of [
+            'Kerem ile mülakat',
+            'İK Görüşmesi — Ayşe',
+            'Teknik görüşme',
+            'Ön görüşme',
+            'Aday görüşmesi',
+            'Interview with Kerem',
+            'HR interview',
+            'İşe alım toplantısı',
+        ]) {
+            expect(looksLikeInterview(ev(t))).toBe(true);
+        }
+    });
+
+    it('açıklamadaki ifade de sayılıyor', () => {
+        expect(looksLikeInterview(ev('Toplantı', 'Aday: Kerem — mülakat'))).toBe(true);
+    });
+
+    it('"GÖRÜŞME" TEK BAŞINA MÜLAKAT SAYILMIYOR', () => {
+        // Türkçede her toplantı "görüşme"; tek başına eşleştirmek takvimin
+        // yarısını mülakat gibi işaretlerdi.
+        expect(looksLikeInterview(ev('Müşteri görüşmesi'))).toBe(false);
+        expect(looksLikeInterview(ev('Tedarikçi görüşmesi'))).toBe(false);
+        expect(looksLikeInterview(ev('Sprint planlama'))).toBe(false);
+        expect(looksLikeInterview(ev('Diş hekimi'))).toBe(false);
+    });
+
+    it('boş etkinlikte çökmüyor', () => {
+        expect(looksLikeInterview(null)).toBe(false);
+        expect(looksLikeInterview({})).toBe(false);
+    });
+});
+
+describe('takvim kaydından mülakat oturumu', () => {
+    const event = normalizeCalendarEvent({
+        id: 'evt-9',
+        summary: 'İK Görüşmesi — Kerem',
+        location: 'https://teams.microsoft.com/l/x',
+        start: { dateTime: '2026-09-05T14:30:00+03:00' },
+        end: { dateTime: '2026-09-05T15:30:00+03:00' },
+    });
+    const aday = { id: 'c1', name: 'Kerem Can Demirtaş', position: 'Growth PM', positionId: 'p1' };
+
+    it('etkinlikten planlı bir oturum kuruyor', () => {
+        const s = buildSessionFromEvent(event, aday, { interviewerName: 'Emre', interviewerId: 'u1' });
+        expect(s.status).toBe('scheduled');
+        expect(s.calendarEventId).toBe('evt-9');
+        expect(s.candidateId).toBe('c1');
+        expect(s.candidateName).toBe('Kerem Can Demirtaş');
+        expect(s.positionTitle).toBe('Growth PM');
+        expect(s.title).toBe('İK Görüşmesi — Kerem');
+        expect(s.meetLink).toContain('teams.microsoft.com');
+        expect(s.interviewer).toBe('Emre');
+    });
+
+    it('AYNI ETKİNLİK İKİ KEZ İŞARETLENİRSE İKİNCİ KAYIT OLUŞMUYOR', () => {
+        // Kimlik etkinlikten türüyor; `sessionForEvent` de bunu buluyor.
+        const a = buildSessionFromEvent(event, aday);
+        const b = buildSessionFromEvent(event, aday);
+        expect(a.id).toBe(b.id);
+        expect(sessionForEvent(event, { interviewSessions: [a] })).not.toBeNull();
+    });
+
+    it('tarih ve saat yerel güne göre', () => {
+        const s = buildSessionFromEvent(event, aday);
+        expect(s.date).toBe('2026-09-05');
+        expect(s.time).toMatch(/^\d{2}:\d{2}$/);
+    });
+
+    it('TÜM GÜN ETKİNLİĞİNE SAAT UYDURULMUYOR', () => {
+        const tumGun = normalizeCalendarEvent({ id: 'e2', summary: 'İzin', start: { date: '2026-09-05' } });
+        expect(buildSessionFromEvent(tumGun, aday).time).toBe('');
+    });
+
+    it('KANAL VARSAYILMIYOR — takvimde Meet yazsa bile Teams olabilir', () => {
+        expect(buildSessionFromEvent(event, aday).type).toBe('other');
+    });
+
+    it('eksik girdide null', () => {
+        expect(buildSessionFromEvent(null, aday)).toBeNull();
+        expect(buildSessionFromEvent(event, null)).toBeNull();
+        expect(buildSessionFromEvent({ id: 'x' }, aday)).toBeNull();
     });
 });
