@@ -86,6 +86,34 @@ export function matchFounder(candidateName, founders) {
     return founders.find((f) => namesMatch(candidateName, f)) || null;
 }
 
+/**
+ * Değeri yıl olarak kullanır; yıl değilse null.
+ *
+ * ── NEDEN AYRI BİR SÜZGEÇ ───────────────────────────────────────────────────
+ * `Number(null)` SIFIRDIR ve `Number.isInteger(0)` DOĞRUDUR. Doğrudan
+ * `Number.isInteger(Number(x))` yazan kod, "tarih okunamadı" anlamına gelen
+ * null'ı "başlangıç yılı: 0" diye kabul ediyordu. Sonucu canlıda görüldü:
+ * tarihi okunamayan beş görev için beş ayrı KIRMIZI çelişki basıldı —
+ * "CV'de başlangıç 0; ticaret sicilinde kuruluş 1986". Aynı raporun altında
+ * "hiçbir görevin tarihi okunamadı" yazıyordu; iki cümle birbirini yalanlıyor
+ * ve ağır olanı adayı suçluyordu.
+ *
+ * Aynı tuzak kanıt tarafında da kuruluydu: `registry.foundedYear` null ise
+ * sicil yılı 0 sayılıyor, "sicil bu soruyu cevapladı" dalına girip web
+ * kaynağındaki gerçek kuruluş yılını hiç sormuyordu.
+ *
+ * Bilinmeyen bir yıl SIFIR DEĞİLDİR. Sıfır, tüm kuruluş tarihlerinden küçük
+ * olduğu için sessiz kalmıyor: en ağır bayrağı üretiyor.
+ */
+const MIN_YEAR = 1800;
+const MAX_YEAR = 2200;
+
+export function yearOrNull(value) {
+    if (value === null || value === undefined || value === '') return null;
+    const n = Number(value);
+    return Number.isInteger(n) && n >= MIN_YEAR && n <= MAX_YEAR ? n : null;
+}
+
 const flag = (id, severity, title, detail, question) => ({ id, severity, title, detail, question });
 
 /** Kanıtta gerçekten bir şey bulunmuş mu? */
@@ -154,16 +182,16 @@ export function verifyCompanyClaim({ claim, evidence, candidateName } = {}) {
     // "şirket 2021'de kuruldu" diyorsa, alan adının 2026'da alınmış olması
     // artık hiçbir şey anlatmaz — sadece gürültü üretir ve raporu
     // kalabalıklaştırıp asıl bulguyu gölgeler.
-    const startYear = Number(claim?.startYear);
-    if (Number.isInteger(startYear)) {
-        const registryYear = Number(evidence.registry?.foundedYear);
-        const searchYear = Number(evidence.foundedYear);
-        const domainYear = Number(evidence.domainCreatedYear);
+    const startYear = yearOrNull(claim?.startYear);
+    if (startYear !== null) {
+        const registryYear = yearOrNull(evidence.registry?.foundedYear);
+        const searchYear = yearOrNull(evidence.foundedYear);
+        const domainYear = yearOrNull(evidence.domainCreatedYear);
 
         // 1 yıl tolerans — kuruluş ile fiilî faaliyet arasında fark olabilir.
-        const foundingConflict = (year) => Number.isInteger(year) && startYear < year - 1;
+        const foundingConflict = (year) => year !== null && startYear < year - 1;
 
-        if (Number.isInteger(registryYear)) {
+        if (registryYear !== null) {
             // Ticaret sicili hukuki belge: şirket kurulmadan orada çalışılamaz.
             if (foundingConflict(registryYear)) {
                 flags.push(flag(
@@ -174,7 +202,7 @@ export function verifyCompanyClaim({ claim, evidence, candidateName } = {}) {
                     `${company} sicilde ${registryYear} kuruluşlu görünüyor ama CV'nizde ${startYear} yazıyor. Şirket önce başka bir unvanla mı faaliyet gösteriyordu?`
                 ));
             }
-        } else if (Number.isInteger(searchYear)) {
+        } else if (searchYear !== null) {
             // Arama sonucundan gelen kuruluş yılı sicil değil — bir web
             // sayfasının iddiası. Aynı belirti, bir basamak düşük ağırlıkla.
             if (foundingConflict(searchYear)) {
@@ -186,7 +214,7 @@ export function verifyCompanyClaim({ claim, evidence, candidateName } = {}) {
                     `${company} kaynaklarda ${searchYear} kuruluşlu görünüyor ama CV'nizde ${startYear} yazıyor. Şirket önce başka bir unvanla mı faaliyet gösteriyordu?`
                 ));
             }
-        } else if (Number.isInteger(domainYear) && startYear < domainYear - 2) {
+        } else if (domainYear !== null && startYear < domainYear - 2) {
             // Domain yaşı EN DOLAYLI kanıt: şirket kurumsal siteye geç geçmiş
             // olabilir. Yalnızca kuruluş yılı hiç bulunamadığında anlamlı.
             flags.push(flag(

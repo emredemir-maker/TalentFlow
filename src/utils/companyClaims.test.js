@@ -15,6 +15,7 @@ import {
     matchFounder,
     verifyCompanyClaim,
     summarizeCompanyVerification,
+    yearOrNull,
     CLAIM_VERDICT,
 } from './companyClaims';
 import { SEVERITY } from './cvConsistency';
@@ -220,5 +221,49 @@ describe('summarizeCompanyVerification', () => {
         expect(summarizeCompanyVerification([]).total).toBe(0);
         expect(summarizeCompanyVerification(null).hasContradiction).toBe(false);
         expect(summarizeCompanyVerification([null, {}]).total).toBe(2);
+    });
+});
+
+// ── BİLİNMEYEN YIL SIFIR DEĞİLDİR ───────────────────────────────────────────
+// `Number(null)` sıfırdır ve `Number.isInteger(0)` doğrudur. Tarihi
+// okunamayan görevler için canlıda beş ayrı KIRMIZI çelişki basıldı:
+// "CV'de başlangıç 0; ticaret sicilinde kuruluş 1986". Sıfır tüm kuruluş
+// yıllarından küçük olduğu için sessiz kalmıyor — en ağır bayrağı üretiyor.
+describe('yıl okuma', () => {
+    it('yıl olmayan değerler yıl sayılmıyor', () => {
+        expect(yearOrNull(null)).toBeNull();
+        expect(yearOrNull(undefined)).toBeNull();
+        expect(yearOrNull('')).toBeNull();
+        expect(yearOrNull(0)).toBeNull();
+        expect(yearOrNull('bilinmiyor')).toBeNull();
+        expect(yearOrNull(2020.5)).toBeNull();
+    });
+
+    it('gerçek yıllar okunuyor', () => {
+        expect(yearOrNull(1986)).toBe(1986);
+        expect(yearOrNull('2021')).toBe(2021);
+    });
+});
+
+describe('tarihi okunamayan görev', () => {
+    it('BAŞLANGIÇ YOKSA KURULUŞ ÇELİŞKİSİ ÜRETİLMİYOR', () => {
+        const r = verifyCompanyClaim({
+            claim: claim({ startYear: null, duration: '2025-06 - 2026-07' }),
+            evidence: evidence({ registry: { foundedYear: 1986, founders: [] } }),
+        });
+        expect(idsOf(r)).not.toContain('kurulus-sonrasi');
+        expect(r.verdict).toBe(CLAIM_VERDICT.VERIFIED);
+    });
+
+    it('sicilde kuruluş yılı yoksa web kaynağı sorulmaya devam ediyor', () => {
+        // Eski davranışta `registry.foundedYear: null` sicil yılını 0 yapıyor,
+        // "sicil bu soruyu cevapladı" dalına giriliyor ve gerçek kuruluş yılı
+        // hiç sorulmuyordu.
+        const r = verifyCompanyClaim({
+            claim: claim({ startYear: 2018 }),
+            evidence: evidence({ registry: { founders: [] }, foundedYear: 2021 }),
+        });
+        expect(idsOf(r)).toContain('kurulus-sonrasi');
+        expect(r.flags.find((f) => f.id === 'kurulus-sonrasi').severity).toBe(SEVERITY.ATTENTION);
     });
 });

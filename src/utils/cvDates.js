@@ -73,6 +73,37 @@ const fold = (s) => String(s ?? '')
     .replace(/Ç/g, 'c').replace(/ç/g, 'c')
     .toLowerCase();
 
+/**
+ * TARİHİN İÇİNDEKİ TİRE, AYRAÇ DEĞİLDİR.
+ *
+ * CV çıkarımının ürettiği en yaygın biçimlerden biri ISO: "2025-06 - 2026-07".
+ * Aralık ayracı da tire olduğu için metin dört parçaya bölünüyordu
+ * ("2025", "06", "2026", "07"); ilk parça yıl gibi okunuyor, son parça ("07")
+ * yıl olmadığı için ayrıştırma başarısız oluyordu.
+ *
+ * Sonucu canlıda görüldü: beş görevin hiçbirinin tarihi okunamadı, kapsama
+ * "ölçüm yapılamadı" oldu ve doğrulama tarafı bu boşluğu SIFIR yıl gibi
+ * kullanıp "şirket kuruluşundan önce başlamış" çelişkisi üretti. Yani bir
+ * ayrıştırma boşluğu, ekranda beş kırmızı suçlama olarak göründü.
+ *
+ * Çözüm biçimi tanımak değil, AYRACI TEKİLLEŞTİRMEK: tarihin kendi içindeki
+ * tire noktaya çevriliyor. Nokta ayraç listesinde yok ve `parseDatePart`
+ * "2025.06" biçimini zaten okuyor — yani yeni bir tarih dili eklenmiyor,
+ * yalnızca bölme adımının tarihi parçalaması engelleniyor.
+ *
+ * Ay 01-12 aralığıyla sınırlı ve ardından rakam gelmemeli; bu olmadan
+ * "2020-2023" yıl aralığı "2020.20" + "23" diye bölünürdü.
+ */
+function separateDates(text) {
+    return text
+        // Gün de varsa gün düşürülür: ölçüm ay hassasiyetinde yapılıyor.
+        .replace(/\b(\d{4})-(0?[1-9]|1[0-2])-\d{1,2}(?!\d)/g, '$1.$2')
+        .replace(/\b(\d{4})-(0?[1-9]|1[0-2])(?!\d)/g, '$1.$2')
+        // "06-2019" — aynı tuzağın ters yazımı. Kelime sınırı yıl aralığını
+        // koruyor: "1998-2005" içinde ay adayı bulunamaz.
+        .replace(/\b(0?[1-9]|1[0-2])-(\d{4})(?!\d)/g, '$1.$2');
+}
+
 /** Makul yıl aralığı. Dışındaki sayı yıl değildir — muhtemelen bir metriktir. */
 const MIN_YEAR = 1950;
 const MAX_YEAR = 2100;
@@ -129,7 +160,7 @@ const isCurrentWord = (s) => CURRENT_WORDS.some((w) => s === w || s.startsWith(`
  *   precision='year': en az bir uçta ay yok; hesap yıl hassasiyetinde.
  */
 export function parseDuration(raw) {
-    const s = fold(raw).trim();
+    const s = separateDates(fold(raw).trim());
     if (!s) return null;
 
     // Ayraç: '-', '–', '—', ' to ', '→', 'arası'. Eğik çizgi AYRAÇ DEĞİL —
