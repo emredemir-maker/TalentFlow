@@ -14,6 +14,8 @@ import { buildICS } from '../utils/emailTemplates';
 import AddManualInterviewModal from '../components/AddManualInterviewModal';
 import { downloadInterviewIcs } from '../utils/interviewIcs';
 import { isSessionPast } from '../utils/interviewSession';
+import CalendarInterviewPanel from '../components/CalendarInterviewPanel';
+import { eventMinutes } from '../utils/calendarMatch';
 import SalaryBackfillModal from '../components/SalaryBackfillModal';
 import SalaryBandModal from '../components/SalaryBandModal';
 import { 
@@ -105,7 +107,7 @@ function ivDateLabel(raw) {
 export default function InterviewManagementPage() {
     const navigate = useNavigate();
     const { user: currentUser, userProfile, userId, isDepartmentUser, role } = useAuth();
-    const { enrichedCandidates, updateCandidate, preselectedInterviewData, setPreselectedInterviewData } = useCandidates();
+    const { enrichedCandidates, updateCandidate, setViewCandidateId, preselectedInterviewData, setPreselectedInterviewData } = useCandidates();
     const { positions } = usePositions();
     const openPositions = useMemo(() => (positions || []).filter(p => p.status === 'open'), [positions]);
     const { addNotification } = useNotifications();
@@ -721,6 +723,63 @@ export default function InterviewManagementPage() {
                 setSuggestedSlots(freeSlots);
             }
         } finally { setIsAnalyzingSlots(false); }
+    };
+
+    // ── TAKVİMDEN GELEN AKIŞ ────────────────────────────────────────────────
+    //
+    // Takvim bugüne kadar yalnızca boş slot bulmak için okunuyordu. İşin
+    // gerçek başlangıcı ise takvim: kullanıcı gününe bakıyor, hazırlanıyor,
+    // görüşme bitince sonucu giriyor. Görüşmenin nerede yapıldığı (Meet,
+    // Teams, yüz yüze) bu akışı ilgilendirmiyor.
+
+    /** Google bağlantısı — takvim salt okunur, yazma yetkisi istenmiyor. */
+    const takvimGoogleBagla = async () => {
+        try {
+            const res = await connectGoogleWorkspace(userId);
+            if (res && res.success === false && res.error) window.alert(res.error);
+        } catch (err) {
+            window.alert(err?.message || 'Google bağlantısı kurulamadı.');
+        }
+    };
+
+    /** Hazırlık: adayın mülakat planına ve üretilmiş sorularına git. */
+    const takvimHazirlik = (candidateId) => {
+        // Plan mantığı aday sayfasında yaşıyor; burada ikinci bir kopyası
+        // olsaydı ikisi zamanla ayrışırdı.
+        setViewCandidateId(candidateId);
+        window.dispatchEvent(new CustomEvent('changeView', { detail: 'candidate-process' }));
+    };
+
+    /** Takvim kaydından sonuç girişi — form kayıttan dolu açılıyor. */
+    const takvimSonucGir = (event, candidate) => {
+        setManualPrefill({
+            // Oturum kimliği YOK: bu takvim kaydına bağlı bir görüşme kaydı
+            // henüz yok, dolayısıyla değiştirilecek bir şey de yok.
+            sessionId: null,
+            calendarEventId: event.id,
+            candidateId: candidate.id,
+            positionId: candidate.positionId || null,
+            date: event.start.toISOString().slice(0, 10),
+            time: event.allDay ? '' : event.start.toTimeString().slice(0, 5),
+            durationMinutes: eventMinutes(event),
+            interviewerName: userProfile?.displayName || currentUser?.displayName || '',
+            title: event.title,
+        });
+        setManualInterviewOpen(true);
+    };
+
+    /**
+     * Takvim kaydını bir adaya bağlar.
+     *
+     * Bağlantı ADAY BELGESİNDE duruyor: aday listesi zaten canlı dinleniyor,
+     * yani ayrı bir koleksiyon, ayrı kural ve her satır için ek okuma
+     * gerekmiyor. Elle kurulan bağ her tahminin üstünde tutuluyor
+     * (bkz. utils/calendarMatch).
+     */
+    const takvimAdayaBagla = async (candidate, eventId) => {
+        const mevcut = Array.isArray(candidate.calendarEventIds) ? candidate.calendarEventIds : [];
+        if (mevcut.includes(eventId)) return;
+        await updateCandidate(candidate.id, { calendarEventIds: [...mevcut, eventId] });
     };
 
     const openEmailPreview = () => {
@@ -2381,6 +2440,11 @@ export default function InterviewManagementPage() {
                                         { key: 'upcoming', label: 'Yaklaşan', count: activeInterviews.length },
                                         { key: 'done', label: 'Tamamlanan', count: pastInterviews.length },
                                         { key: 'cancelled', label: 'İptal', count: cancelledInterviews.length },
+                                        // TAKVİM SEKMESİ sayı göstermiyor: sayıyı bilmek için
+                                        // takvimi okumak gerekir ve o okuma sekmeye basılınca
+                                        // yapılıyor. Yükleme öncesi "0" yazmak, boş takvim
+                                        // izlenimi verirdi.
+                                        { key: 'calendar', label: 'Takvimim', count: null },
                                     ].map(t => {
                                         const on = ivTab === t.key;
                                         return (
@@ -2392,11 +2456,13 @@ export default function InterviewManagementPage() {
                                                 }`}
                                             >
                                                 {t.label}
-                                                <span className={`text-[12px] font-semibold px-1.5 rounded-full ${
-                                                    on ? 'bg-brand-50 text-brand' : 'bg-n100 text-n400'
-                                                }`}>
-                                                    {t.count}
-                                                </span>
+                                                {t.count !== null && (
+                                                    <span className={`text-[12px] font-semibold px-1.5 rounded-full ${
+                                                        on ? 'bg-brand-50 text-brand' : 'bg-n100 text-n400'
+                                                    }`}>
+                                                        {t.count}
+                                                    </span>
+                                                )}
                                             </button>
                                         );
                                     })}
@@ -2419,7 +2485,24 @@ export default function InterviewManagementPage() {
                                 )}
                             </div>
 
+                            {/* TAKVİM SEKMESİ liste yerine geçiyor: aynı kolonlar
+                                anlamlı değil — takvim kaydının değerlendiricisi,
+                                durumu ya da skoru yok. */}
+                            {ivTab === 'calendar' && (
+                                <CalendarInterviewPanel
+                                    candidates={enrichedCandidates}
+                                    isGoogleConnected={isGoogleConnected}
+                                    userId={userId}
+                                    userProfile={userProfile}
+                                    onPrepare={takvimHazirlik}
+                                    onEnterResult={takvimSonucGir}
+                                    onLink={takvimAdayaBagla}
+                                    onConnect={takvimGoogleBagla}
+                                />
+                            )}
+
                             {/* Kolon başlıkları */}
+                            {ivTab !== 'calendar' && (
                             <div className="hidden lg:grid grid-cols-[1.5fr_1.25fr_92px_116px_1fr_104px_128px] items-center px-[18px] py-2 border-b border-n200 bg-n50 text-[11px] font-semibold text-n500 flex-shrink-0">
                                 <span>Aday</span>
                                 <span>Pozisyon</span>
@@ -2429,8 +2512,10 @@ export default function InterviewManagementPage() {
                                 <span>Durum</span>
                                 <span className="text-right">Aksiyon</span>
                             </div>
+                            )}
 
                             {/* Satırlar */}
+                            {ivTab !== 'calendar' && (
                             <div className="flex-1 overflow-y-auto custom-scrollbar">
                                 {ivRows.length === 0 ? (
                                     <div className="px-[18px] py-14 flex flex-col items-center text-center">
@@ -2687,8 +2772,10 @@ export default function InterviewManagementPage() {
                                     );
                                 })}
                             </div>
+                            )}
 
                             {/* Sayfalama — gerçek sayfalar, dekoratif değil. */}
+                            {ivTab !== 'calendar' && (
                             <div className="px-[18px] py-2.5 border-t border-n200 flex items-center text-[11px] text-n500 flex-shrink-0">
                                 <span>
                                     {ivRowsAll.length === 0
@@ -2712,6 +2799,7 @@ export default function InterviewManagementPage() {
                                     </button>
                                 </div>
                             </div>
+                            )}
                         </div>
 
                         {/* SAĞ RAY: bugün + değerlendirici yükü ───────────────── */}

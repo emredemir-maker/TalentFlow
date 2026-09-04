@@ -367,6 +367,10 @@ router.post(
             // planlanan oturum sonsuza kadar "Bekliyor" olarak kalıyordu ve
             // sonuç ayrı bir kayıt olarak ekleniyordu: tek görüşme, iki satır.
             replacesSessionId,
+            // TAKVİM KAYDIYLA BAĞ. Sonuç bir takvim etkinliğinden girildiyse
+            // etkinliğin kimliği kayda yazılıyor: aynı etkinliğe ikinci kez
+            // sonuç girilmesin ve takvim listesi "sonucu girilmiş" diyebilsin.
+            calendarEventId,
         } = req.body || {};
 
         // ── Validation
@@ -389,6 +393,10 @@ router.post(
         if (replacesSessionId !== undefined && replacesSessionId !== null
             && (typeof replacesSessionId !== 'string' || replacesSessionId.length > 200)) {
             return res.status(400).json({ error: 'replacesSessionId geçersiz.' });
+        }
+        if (calendarEventId !== undefined && calendarEventId !== null
+            && (typeof calendarEventId !== 'string' || calendarEventId.length > 512)) {
+            return res.status(400).json({ error: 'calendarEventId geçersiz.' });
         }
         const safeQuestions = sanitizeQuestions(questions);
         const hasContent =
@@ -473,7 +481,7 @@ router.post(
             record: {
                 candidateId, candidateName, positionId, positionTitle, interviewerName,
                 date, time, durationMinutes, interviewType, transcript, notes,
-                recruiterOutcome, replacesSessionId,
+                recruiterOutcome, replacesSessionId, calendarEventId,
             },
             safeQuestions,
             aiAnalysis,
@@ -633,7 +641,7 @@ async function persistManualInterview({
     const {
         candidateId, candidateName, positionId, positionTitle, interviewerName,
         date, time, durationMinutes, interviewType, transcript, notes, recruiterOutcome,
-        candidateSalary, replacesSessionId,
+        candidateSalary, replacesSessionId, calendarEventId,
     } = record;
 
     const sessionId = `mi-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -678,6 +686,7 @@ async function persistManualInterview({
             // onları yeni madde numaralarına dizer — bugün dört kez düzelttiğimiz
             // hatanın ta kendisi.
             requirementsFingerprint: fingerprint || null,
+            calendarEventId: calendarEventId || null,
             status: 'completed',
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
             createdBy: req.user?.uid || null,
@@ -717,6 +726,7 @@ async function persistManualInterview({
                 // Hangi planlı kaydın yerine geçtiği kayıtta duruyor: bir
                 // hafta sonra "bu görüşme planlanmış mıydı" sorusunun cevabı.
                 ...(replacesSessionId ? { replacedSessionId: replacesSessionId } : {}),
+                ...(calendarEventId ? { calendarEventId } : {}),
             };
 
             const ek = {};
