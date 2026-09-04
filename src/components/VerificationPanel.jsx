@@ -176,8 +176,13 @@ function CompanyRow({ item, onSaveManual, onRemoveManual }) {
                 sonradan okuyan kişi kime soracağını bilmeli. */}
             {elle && (
                 <div className="mt-2 bg-brand-50 rounded-md px-2.5 py-2">
+                    {/* YÖNTEM YAZILI. "Kullanıcı elle yazdı" ile "kullanıcının
+                        verdiği siteden araştırıldı" aynı güvende değil. */}
                     <p className="text-[11px] text-n700 leading-relaxed">
-                        <strong>{ev.manual?.by || 'Bilinmiyor'}</strong> tarafından elle doğrulandı
+                        <strong>{ev.manual?.by || 'Bilinmiyor'}</strong>
+                        {ev.manual?.method === 'site'
+                            ? <> tarafından verilen <strong>{ev.manual.site || 'web sitesi'}</strong> adresinden araştırıldı</>
+                            : ' tarafından elle girildi'}
                         {ev.manual?.at && ` · ${new Date(ev.manual.at).toLocaleDateString('tr-TR')}`}
                     </p>
                     {ev.manual?.note && (
@@ -197,7 +202,7 @@ function CompanyRow({ item, onSaveManual, onRemoveManual }) {
                     <ManualCompanyForm
                         company={item.company}
                         initial={elle ? formFromRecord(ev) : null}
-                        onSave={async (form) => { await onSaveManual(item.company, form); setFormOpen(false); }}
+                        onSave={async (form, research) => { await onSaveManual(item.company, form, research); setFormOpen(false); }}
                         onRemove={elle ? async () => { await onRemoveManual(item.company); setFormOpen(false); } : null}
                         onCancel={() => setFormOpen(false)}
                     />
@@ -481,9 +486,13 @@ export default function VerificationPanel({ candidate, position = null }) {
      * `force` KULLANILMIYOR: elle kayıt zaten önbelleğin önüne geçiyor ve
      * force diğer şirketleri de yeniden aratıp boşuna ücret yakardı.
      */
-    const saveManual = useCallback(async (company, form) => {
+    const saveManual = useCallback(async (company, form, research = null) => {
         const record = buildManualCompanyRecord(company, form, {
             by: userProfile?.displayName || userProfile?.email || user?.email || 'Bilinmiyor',
+            // Araştırma yapıldıysa modelin gösterdiği kaynaklar kayda giriyor:
+            // "kullanıcı yazdı" ile "kullanıcının verdiği siteden araştırıldı"
+            // aynı güvende değil ve raporu okuyan bunu görmeli.
+            research,
         });
         await saveManualCompanyIntel(companyKey(company), record);
         await run(false);

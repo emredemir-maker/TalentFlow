@@ -89,6 +89,67 @@ export function hasManualEvidence(form) {
     );
 }
 
+/** Formdaki alanların ekranda görünen adları — hangisi doldu, hangisi boş. */
+export const FIELD_LABELS = {
+    website: 'Web sitesi',
+    foundedYear: 'Kuruluş yılı',
+    sizeBand: 'Ölçek',
+    sector: 'Sektör',
+    model: 'İş modeli',
+    type: 'Şirket tipi',
+    headquarters: 'Merkez',
+};
+
+/** Araştırma sonucundaki kanıtı form alanlarına eşler. */
+export function formFromResearch(evidence) {
+    return {
+        website: evidence?.website || '',
+        foundedYear: evidence?.foundedYear ?? '',
+        sizeBand: evidence?.sizeBand || '',
+        sector: evidence?.sector || '',
+        model: evidence?.model || '',
+        type: evidence?.type || '',
+        sectorRaw: evidence?.sectorRaw || '',
+        headquarters: evidence?.headquarters || '',
+    };
+}
+
+/**
+ * Araştırma sonucunu forma işler.
+ *
+ * KULLANICININ YAZDIĞININ ÜSTÜNE YAZILMAZ. Yalnızca BOŞ alanlar doluyor.
+ * Kullanıcı ölçeği kendi bildiğinden "11-50" seçtiyse ve model "51-200"
+ * diyorsa, insanın bildiği kazanır: o kişi şirketi tanıyor olabilir ve
+ * girdiğinin sessizce değişmesi, kaydettiğini sandığı şeyin kaybolması
+ * demektir.
+ *
+ * @returns {{form: object, filled: string[], missing: string[]}}
+ *   `filled` — araştırmanın doldurduğu alan adları
+ *   `missing` — hâlâ boş olan alanlar; kullanıcı bunları elle tamamlıyor
+ */
+export function mergeResearchIntoForm(form = {}, evidence = null) {
+    const bulunan = formFromResearch(evidence);
+    const out = { ...form };
+    const filled = [];
+    const missing = [];
+
+    for (const key of Object.keys(FIELD_LABELS)) {
+        const mevcut = String(out[key] ?? '').trim();
+        const yeniDeger = String(bulunan[key] ?? '').trim();
+        if (mevcut) continue;
+        if (yeniDeger) {
+            out[key] = bulunan[key];
+            filled.push(FIELD_LABELS[key]);
+        } else {
+            missing.push(FIELD_LABELS[key]);
+        }
+    }
+    // Sektörün serbest metni yalnızca kutulu sektör boşsa anlamlı.
+    if (!String(out.sectorRaw || '').trim() && bulunan.sectorRaw) out.sectorRaw = bulunan.sectorRaw;
+
+    return { form: out, filled, missing };
+}
+
 /**
  * Form girdisini, otomatik kayıtla AYNI ŞEKİLLİ bir kanıt kaydına çevirir.
  *
@@ -109,11 +170,24 @@ export function buildManualCompanyRecord(name, form = {}, meta = {}) {
     const headquarters = String(form.headquarters || '').trim();
     const sectorRaw = String(form.sectorRaw || '').trim();
 
-    // Web sitesi aynı zamanda bir KAYNAK. Kaynak listesi ekranda tıklanabilir
-    // duruyor; elle doğrulamanın da denetlenebilir olması gerekiyor.
-    const sources = website
+    // KAYNAK LİSTESİ: araştırma yapıldıysa modelin gösterdiği sayfalar,
+    // yapılmadıysa yalnızca girilen adres. Elle doğrulamanın da
+    // denetlenebilir olması gerekiyor — kaynağı görünmeyen bir hüküm bu
+    // ekranda üretilmiyor.
+    const arastirma = meta.research || null;
+    const arastirmaKaynaklari = Array.isArray(arastirma?.sources) ? arastirma.sources : [];
+    const siteKaynagi = website
         ? [{ title: 'Şirket web sitesi (elle girildi)', uri: website }]
         : [];
+    const gorulen = new Set();
+    const sources = [...arastirmaKaynaklari, ...siteKaynagi]
+        .filter((s) => {
+            const uri = String(s?.uri || '').trim();
+            if (!uri || gorulen.has(uri)) return false;
+            gorulen.add(uri);
+            return true;
+        })
+        .slice(0, 8);
 
     return {
         name: String(name || '').trim(),
@@ -133,15 +207,22 @@ export function buildManualCompanyRecord(name, form = {}, meta = {}) {
         caution: '',
         withheld: false,
         withheldReason: '',
-        grounded: false,
-        searchQueries: [],
         sources,
-        searchSuggestionHtml: '',
+        // Araştırma yapıldıysa arama sorguları ve Google'ın gösterim şartı olan
+        // öneri bloğu da taşınıyor — otomatik kayıtla aynı kurallar.
+        grounded: Boolean(arastirma?.grounded),
+        searchQueries: Array.isArray(arastirma?.searchQueries) ? arastirma.searchQueries : [],
+        searchSuggestionHtml: arastirma?.searchSuggestionHtml || '',
         source: MANUAL_SOURCE,
         manual: {
             by: String(meta.by || '').trim() || 'Bilinmiyor',
             at: meta.at || new Date().toISOString(),
             note,
+            // NASIL DOLDURULDU: kullanıcının verdiği siteden araştırılarak mı,
+            // yoksa tamamen elle mi. İkisi aynı güvende değil ve raporu okuyan
+            // kişinin bunu bilmesi gerekiyor.
+            method: arastirma ? 'site' : 'form',
+            site: arastirma ? String(arastirma.site || website || '') : '',
         },
         resolvedAt: meta.at || new Date().toISOString(),
     };
