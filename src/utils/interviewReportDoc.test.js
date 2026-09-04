@@ -77,7 +77,7 @@ describe('mülakat raporu PDF belgesi', () => {
             'Dikkat edilecekler',
             'Gereksinim değerlendirmesi',
             'React ile 3 yıl deneyim',
-            'Maddeye bağlanmayan sorular',
+            'Değerlendirmeye girmeyen sorular',
             'STAR kanıt analizi',
             'Yetkinlik analizi',
             'Oturum bilgileri',

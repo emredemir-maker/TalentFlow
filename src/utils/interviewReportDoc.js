@@ -421,7 +421,7 @@ export function buildInterviewReportDoc({
 
     const unlinked = Array.isArray(report?.unlinked) ? report.unlinked : [];
     if (unlinked.length > 0) {
-        content.push(baslik('Maddeye bağlanmayan sorular'));
+        content.push(baslik('Değerlendirmeye girmeyen sorular'));
         for (const q of unlinked) {
             const satir = [{ text: metin(q.question), style: 'pBold', margin: [0, 6, 0, 2] }];
             if (metin(q.answer)) satir.push({ text: `Cevap: ${q.answer}`, style: 'p' });

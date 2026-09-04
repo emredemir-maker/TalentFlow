@@ -185,6 +185,81 @@ describe('maddeye bağlı olmayan sorular', () => {
     });
 });
 
+// ── SORULMUŞ HİÇBİR SORU RAPORDAN DÜŞMEZ ────────────────────────────────────
+// Eski ölçüt "numarası var mı" idi; doğrusu "yukarıdaki madde satırlarından
+// birine girdi mi". Aradaki fark bir kayıp: numarası olan ama damgası çıkmayan
+// soru iki listeye de girmiyor, rapordan tamamen siliniyordu.
+describe('damgası çıkmayan sorular', () => {
+    const uc = { question: 'CX ürünü?', answer: 'Employee engagement ürünü yönettim', requirementIndex: 3 };
+
+    it('MADDEYE BAĞLI AMA DAMGASI YOKSA YİNE DE GÖRÜNÜYOR', () => {
+        // Ulaşılabilir: damgalama boş cevaplı soruları eliyor, model bir
+        // maddeyi atlayabiliyor. Soru sorulmuş ve cevaplanmış olmasına rağmen
+        // ne madde listesinde ne diğer sorularda yer alıyordu.
+        const session = manualSession({ questions: [...manualSession().questions, uc] });
+        const r = buildInterviewReport(session, POSITION);
+        expect(r.items).toHaveLength(2);
+        expect(r.unlinked.map((q) => q.question)).toContain('CX ürünü?');
+        expect(r.unlinked[0].answer).toBe('Employee engagement ürünü yönettim');
+    });
+
+    it('numarası artık bir maddeye karşılık gelmiyorsa da görünüyor', () => {
+        const session = manualSession({
+            questions: [{ ...uc, requirementIndex: 99 }],
+            requirementVerdicts: [],
+        });
+        const r = buildInterviewReport(session, POSITION);
+        expect(r.items).toEqual([]);
+        expect(r.unlinked).toHaveLength(1);
+    });
+
+    it('damgası olan soru İKİ KEZ görünmüyor', () => {
+        const r = buildInterviewReport(manualSession(), POSITION);
+        expect(r.items).toHaveLength(2);
+        expect(r.unlinked).toEqual([]);
+    });
+
+    it('aynı maddeye iki soru sorulduysa ikincisi kaybolmuyor', () => {
+        const session = manualSession({
+            questions: [
+                ...manualSession().questions,
+                { question: 'Funnel ölçümünü nasıl kurdunuz?', answer: 'GA4', requirementIndex: 1 },
+            ],
+        });
+        const r = buildInterviewReport(session, POSITION);
+        const hepsi = [...r.items.map((i) => i.question), ...r.unlinked.map((q) => q.question)];
+        expect(hepsi).toContain('Funnel ölçümünü nasıl kurdunuz?');
+        expect(hepsi.filter(Boolean)).toHaveLength(3);
+    });
+});
+
+describe('sıfır bir madde numarası değildir', () => {
+    // Number(null) sıfırdır ve Number.isInteger(0) doğrudur. Boş bağ, geçerli
+    // bir numara gibi kabul ediliyordu. Sunucu tarafı bunu zaten "bağ yok"
+    // sayıyor (routes/interview.js: idx > 0) — istemci artık aynı fikirde.
+    it('numarası boş olan soru "diğer sorular" listesinde', () => {
+        const session = manualSession({
+            questions: [{ question: 'Neden ayrıldınız?', answer: 'Yeniden yapılanma', requirementIndex: null }],
+            requirementVerdicts: [],
+        });
+        const r = buildInterviewReport(session, POSITION);
+        expect(r.items).toEqual([]);
+        expect(r.unlinked).toHaveLength(1);
+    });
+
+    it('SIFIR NUMARALI DAMGA METİNSİZ BİR MADDE SATIRI ÜRETMİYOR', () => {
+        const session = manualSession({
+            requirementVerdicts: [
+                { requirementIndex: 0, verdict: 'met', quote: 'x' },
+                { requirementIndex: 1, verdict: 'met', quote: 'uçtan uca sahiptim' },
+            ],
+        });
+        const r = buildInterviewReport(session, POSITION);
+        expect(r.items).toHaveLength(1);
+        expect(r.items[0].requirementIndex).toBe(1);
+    });
+});
+
 describe('eski şema', () => {
     it('marks records whose number came from the model, not from verdicts', () => {
         // Şema 1'de sayıyı model üretiyordu ve çıpasızdı: canlıda kötü geçen

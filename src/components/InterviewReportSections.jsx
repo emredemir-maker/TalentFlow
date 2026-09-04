@@ -284,12 +284,14 @@ export function InterviewNarrative({ report }) {
                 </div>
             )}
 
-            {/* Maddeye bağlı olmayan sorular skora girmiyor ama konuşuldular;
-                yok saymak mülakatçının emeğini silmek olurdu. */}
+            {/* Yukarıdaki madde değerlendirmesine girmeyen sorular. Skora
+                girmiyorlar ama konuşuldular; yok saymak mülakatçının emeğini
+                silmek olurdu. Bir kısmının numarası VAR ama damgası yok —
+                başlık bu yüzden "bağlı değil" demiyor. */}
             {report.unlinked.length > 0 && (
                 <div className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-[18px] flex flex-col gap-2">
                     <h4 className="text-[10px] font-semibold text-n500 tracking-[0.08em] uppercase m-0">
-                        Diğer sorular <span className="text-n400 normal-case tracking-normal font-normal">· ilanın maddelerine bağlı değil, skora girmiyor</span>
+                        Diğer sorular <span className="text-n400 normal-case tracking-normal font-normal">· madde değerlendirmesine girmedi, skora etkisi yok</span>
                     </h4>
                     {report.unlinked.map((q, i) => (
                         <div key={i} className="border-l-2 border-n200 pl-2.5">
