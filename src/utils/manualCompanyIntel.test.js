@@ -6,6 +6,7 @@ import {
     buildManualCompanyRecord,
     isManualRecord,
     formFromRecord,
+    mergeResearchIntoForm,
     MANUAL_SOURCE,
 } from './manualCompanyIntel';
 import { verifyCompanyClaim, CLAIM_VERDICT, summarizeCompanyVerification } from './companyClaims';
@@ -82,6 +83,9 @@ describe('buildManualCompanyRecord', () => {
             by: 'Ayşe Yılmaz',
             at: '2026-09-03T10:00:00.000Z',
             note: 'Ticaret sicilinden baktım',
+            // NASIL DOLDURULDU: araştırma yapılmadıysa 'form'.
+            method: 'form',
+            site: '',
         });
     });
 
@@ -163,5 +167,84 @@ describe('elle kayıt doğrulama hükmüne nasıl giriyor', () => {
         expect(ozet.counts.dogrulanamadi).toBe(1);
         expect(ozet.counts.elle_dogrulandi).toBe(1);
         expect(ozet.total).toBe(2);
+    });
+});
+
+describe('siteden araştırma sonucunun forma işlenmesi', () => {
+    const bulgu = {
+        website: 'https://delta.com.tr/',
+        foundedYear: 2015,
+        sizeBand: '11-50',
+        sector: 'kurumsal yazilim',
+        model: 'b2b',
+        type: 'saas',
+        sectorRaw: 'Kurumsal yazılım',
+        headquarters: 'İzmir',
+    };
+
+    it('boş alanları dolduruyor ve neyin dolduğunu söylüyor', () => {
+        const { form, filled, missing } = mergeResearchIntoForm({ website: 'delta.com.tr' }, bulgu);
+        expect(form.foundedYear).toBe(2015);
+        expect(form.sizeBand).toBe('11-50');
+        expect(filled).toContain('Kuruluş yılı');
+        expect(filled).not.toContain('Web sitesi'); // kullanıcı zaten yazmıştı
+        expect(missing).toEqual([]);
+    });
+
+    it('KULLANICININ YAZDIĞININ ÜSTÜNE YAZMIYOR', () => {
+        // İnsan şirketi tanıyor olabilir; girdiğinin sessizce değişmesi,
+        // kaydettiğini sandığı şeyin kaybolması demektir.
+        const { form, filled } = mergeResearchIntoForm({ sizeBand: '1-10', headquarters: 'Ankara' }, bulgu);
+        expect(form.sizeBand).toBe('1-10');
+        expect(form.headquarters).toBe('Ankara');
+        expect(filled).not.toContain('Ölçek');
+        expect(filled).not.toContain('Merkez');
+    });
+
+    it('AÇIKTA KALANLAR SÖYLENİYOR — kullanıcı elle tamamlasın diye', () => {
+        const { missing, filled } = mergeResearchIntoForm({}, { website: 'delta.com.tr' });
+        expect(filled).toEqual(['Web sitesi']);
+        expect(missing).toEqual(expect.arrayContaining(['Kuruluş yılı', 'Ölçek', 'Sektör', 'Merkez']));
+    });
+
+    it('bulgu yoksa form olduğu gibi kalıyor', () => {
+        const { form, filled } = mergeResearchIntoForm({ website: 'x.com' }, null);
+        expect(form.website).toBe('x.com');
+        expect(filled).toEqual([]);
+    });
+
+    it('ARAŞTIRMA KAYNAKLARI KAYDA GİRİYOR ve yöntem yazılı', () => {
+        const r = buildManualCompanyRecord('Delta', { website: 'delta.com.tr' }, {
+            by: 'Ayşe',
+            research: {
+                sources: [{ title: 'Hakkımızda', uri: 'https://delta.com.tr/hakkimizda' }],
+                searchQueries: ['delta.com.tr hakkında'],
+                grounded: true,
+                site: 'https://delta.com.tr/',
+            },
+        });
+        expect(r.manual.method).toBe('site');
+        expect(r.manual.site).toBe('https://delta.com.tr/');
+        expect(r.grounded).toBe(true);
+        expect(r.sources.map((s) => s.uri)).toContain('https://delta.com.tr/hakkimizda');
+    });
+
+    it('aynı kaynak iki kez listelenmiyor', () => {
+        const r = buildManualCompanyRecord('Delta', { website: 'delta.com.tr' }, {
+            research: { sources: [{ title: 'Ana sayfa', uri: 'https://delta.com.tr/' }], site: 'https://delta.com.tr/' },
+        });
+        expect(r.sources).toHaveLength(1);
+    });
+
+    it('araştırma yapılmadıysa hüküm yine ELLE DOĞRULANDI', () => {
+        // Kaynağın insan olması durumu değiştirmiyor; yöntem alanı ayırıyor.
+        const elle = buildManualCompanyRecord('Delta', { note: 'aradım' });
+        const site = buildManualCompanyRecord('Delta', { website: 'delta.com.tr' }, {
+            research: { sources: [{ title: 'x', uri: 'https://delta.com.tr/x' }] },
+        });
+        expect(verifyCompanyClaim({ claim: { company: 'Delta' }, evidence: elle }).verdict)
+            .toBe(CLAIM_VERDICT.MANUAL);
+        expect(verifyCompanyClaim({ claim: { company: 'Delta' }, evidence: site }).verdict)
+            .toBe(CLAIM_VERDICT.MANUAL);
     });
 });

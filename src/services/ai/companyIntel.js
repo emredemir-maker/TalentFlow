@@ -237,6 +237,105 @@ export async function resolveCompany(company, { hint = '' } = {}) {
 }
 
 /**
+ * KULLANICININ VERDİĞİ SİTEDEN ARAŞTIRMA.
+ *
+ * ── NEDEN AYRI BİR SORGU ────────────────────────────────────────────────────
+ * Otomatik çözümleme yalnızca ADI biliyor ve Türkiye'de aynı adı taşıyan
+ * onlarca şirket var — "Delta Yazılım" araması bağlamsız yapıldığında hangi
+ * Delta olduğu belli olmuyor ve şirket "bulunamadı" kalıyordu. Kullanıcı
+ * doğru alan adını biliyorsa belirsizlik ortadan kalkıyor: araştırma o
+ * alan adına ÇAPALANIYOR.
+ *
+ * ── YİNE DE OTOMATİK DEĞİL ──────────────────────────────────────────────────
+ * Bu çağrının sonucu doğrudan kaydedilmiyor; FORMU DOLDURUYOR. Kullanıcı
+ * gördüğü alanları düzeltip kaydediyor. Alan adı yanlış girilmiş ya da park
+ * edilmiş bir siteyse modelin anlattığı şirket bambaşka olabilir; araya bir
+ * insan onayı koymadan bu veriyi yazmak, yanlış şirketi adayın CV'sine
+ * yapıştırmak olurdu.
+ */
+const SITE_PROMPT = `
+ALAN ADI KULLANICI TARAFINDAN VERİLDİ ve şirketin doğru sitesi olduğu
+söyleniyor. Araştırmanı BU ALAN ADINA ÇAPALA:
+- Önce bu sitenin kendi sayfalarına bak (hakkımızda, kurumsal, iletişim).
+- Sonra bu alan adına ya da bu şirkete atıf yapan dış kaynaklara bak.
+
+BENZER ADLI BAŞKA BİR ŞİRKETİ ANLATMA. Bulduğun kaynak bu alan adıyla
+ilişkili değilse KULLANMA ve ilgili satıra "bilinmiyor" yaz. Aynı adı
+taşıyan farklı bir şirketin verisini buraya yazmak, bir adayın geçmişine
+başka bir şirketin bilgisini yapıştırmak olur.
+
+SİTE ULAŞILAMIYORSA ya da içeriği şirketi tanıtmıyorsa (park edilmiş alan
+adı, boş sayfa) bunu NOT satırında söyle ve alanları "bilinmiyor" bırak.
+`;
+
+/** Alan adına çapalanmış sorgu metni. */
+export function buildSiteQuery(company, website, { hint = '' } = {}) {
+    return [
+        INTEL_PROMPT,
+        SITE_PROMPT,
+        `ŞİRKET ADI: ${sanitizeForPrompt(String(company || '').trim())}`,
+        `ŞİRKETİN ALAN ADI: ${sanitizeForPrompt(String(website || '').trim())}`,
+        hint ? `EK BAĞLAM: ${sanitizeForPrompt(String(hint).trim())}` : '',
+    ].filter(Boolean).join('\n\n');
+}
+
+/**
+ * Verilen siteden şirketi araştırır.
+ *
+ * @param {string} company — şirketin CV'deki adı
+ * @param {string} website — kullanıcının girdiği alan adı ya da adres
+ * @param {{hint?: string}} options
+ * @returns {Promise<object>} `resolveCompany` ile AYNI şekilli kanıt kaydı;
+ *   kaynak gösterilemediyse `withheld: true`
+ */
+export async function researchCompanySite(company, website, { hint = '' } = {}) {
+    const name = String(company || '').trim();
+    const site = String(website || '').trim();
+    if (!name) throw new Error('Şirket adı gerekli.');
+    if (!site) throw new Error('Şirketin web adresi gerekli.');
+
+    const answer = await askGrounded(buildSiteQuery(name, site, { hint }), { maxOutputTokens: 4096 });
+    const parsed = parseCompanyAnswer(answer.text);
+    const sources = Array.isArray(answer.sources) ? answer.sources : [];
+    const searchQueries = Array.isArray(answer.searchQueries) ? answer.searchQueries : [];
+
+    // KAYNAKSIZ KANIT GÖSTERİLMEZ — `resolveCompany` ile aynı kısıt. Modele
+    // "kaynaksız yazma" demek bir dilek; bu bir kural.
+    if (sources.length === 0) {
+        return {
+            name,
+            exists: 'bilinmiyor',
+            website: site, foundedYear: null, sizeBand: null,
+            sector: null, sectorRaw: '', model: null, type: null,
+            headquarters: '', founders: [], registry: null, caution: '',
+            withheld: true,
+            withheldReason: searchQueries.length > 0 ? 'searched-uncited' : 'not-searched',
+            grounded: Boolean(answer.grounded),
+            searchQueries,
+            sources: [],
+            searchSuggestionHtml: answer.searchSuggestionHtml || '',
+            resolvedAt: new Date().toISOString(),
+        };
+    }
+
+    return {
+        name,
+        ...parsed,
+        // KULLANICININ VERDİĞİ ADRES KORUNUR. Model siteyi başka bir alan adı
+        // olarak okuyabiliyor (yönlendirme, alt alan adı); kullanıcının
+        // yazdığını onun tahminiyle değiştirmek, girdiğinin kaybolması demek.
+        website: parsed.website || site,
+        withheld: false,
+        withheldReason: '',
+        grounded: Boolean(answer.grounded),
+        searchQueries,
+        sources,
+        searchSuggestionHtml: answer.searchSuggestionHtml || '',
+        resolvedAt: new Date().toISOString(),
+    };
+}
+
+/**
  * CV'deki BENZERSİZ şirketleri çıkarır.
  *
  * Aynı şirket birden çok görevde geçebilir (terfi, departman değişikliği) ve
