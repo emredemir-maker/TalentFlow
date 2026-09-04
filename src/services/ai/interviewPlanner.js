@@ -148,9 +148,17 @@ function candidateBrief(candidate) {
  * @param {object} position
  * @returns {Promise<Array>} soru metni eklenmiş sondalar
  */
+/**
+ * Sondalar için soru metinleri üretir.
+ *
+ * @returns {Promise<{probes: Array, error: string}>}
+ *   HER ZAMAN AYNI ŞEKİL. Eskiden düz dizi dönüyordu ve başarısızlık sessizdi:
+ *   ekran yalnızca "sorular yazılamadı" diyor, sebebi tarayıcı konsolunda
+ *   kalıyordu. Sebep artık çağırana da veriliyor.
+ */
 export async function generateProbeQuestions(plan, candidate, position) {
     const probes = plan?.probes || [];
-    if (plan?.stale || probes.length === 0) return [];
+    if (plan?.stale || probes.length === 0) return { probes: [], error: '' };
 
     // Modele giden sonda listesi: madde metni, durum ve NEDEN sorulduğu.
     // Kademe ve dakika bilinçli olarak GÖNDERİLMİYOR — modelin uzunluğu ya da
@@ -173,13 +181,33 @@ export async function generateProbeQuestions(plan, candidate, position) {
 
     try {
         const model = await getModel();
-        const result = await model.generateContent(prompt, { maxOutputTokens: 4096, label: 'interview-plan' });
+        // 4096 → 16384. Canlıda cevap bir dizenin ortasında kesildi
+        // ("Unterminated string in JSON at position 979") ve TÜM sorular
+        // yedek kalıba düştü. Sebep bütçenin küçüklüğü değil, Gemini 2.5'te
+        // DÜŞÜNME TOKEN'LARININ da bu bütçeden yemesi: 4096'nın çoğu düşünmeye
+        // gidince cevaba birkaç yüz token kalıyor. Aynı ders companyIntel ve
+        // marketResearch'te de yaşandı.
+        //
+        // 10 madde için soru + takip sorusu + dinlenecek nokta yazılıyor;
+        // anlatım üreten çağrı (extraction) da 16384 kullanıyor.
+        const result = await model.generateContent(prompt, { maxOutputTokens: 16384, label: 'interview-plan' });
         const parsed = parseAIJson(result.response.text(), { questions: [] });
-        return mergeProbeQuestions(probes, parsed?.questions);
+        const yazilan = Array.isArray(parsed?.questions) ? parsed.questions : [];
+        return {
+            probes: mergeProbeQuestions(probes, yazilan),
+            // SEBEP EKRANA ÇIKIYOR. Cevap okunamadığında hata FIRLAMIYOR —
+            // ayrıştırıcı sessizce varsayılana düşüyor ve kullanıcı yalnızca
+            // "sorular yazılamadı" görüyordu. Canlıda sebep, cevabın çıktı
+            // bütçesi bitince bir dizenin ortasında kesilmesiydi; bunu
+            // ancak tarayıcı konsolundan görmek mümkündü.
+            error: yazilan.length === 0
+                ? 'Modelin cevabı okunamadı — yanıt yarıda kesilmiş olabilir.'
+                : '',
+        };
     } catch (e) {
         // Model çökerse plan boş dönMEZ: yedek sorularla çalışır bir plan
         // çıkar. Mülakatçının eli boş kalmasındansa jenerik soru iyidir.
         console.error('[interviewPlanner]', e.message);
-        return mergeProbeQuestions(probes, []);
+        return { probes: mergeProbeQuestions(probes, []), error: e?.message || 'Sorular yazılamadı.' };
     }
 }

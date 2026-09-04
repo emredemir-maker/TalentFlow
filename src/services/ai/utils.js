@@ -139,6 +139,64 @@ export function jsonFailureContext(text) {
  * Handles markdown code blocks, control characters, and various
  * formatting inconsistencies.
  */
+/**
+ * Yarıda kesilmiş bir JSON metninden TAMAMLANMIŞ dizi öğelerini toplar.
+ *
+ * Yalnızca `"<alan>": [ {...}, {...}, {...` biçimindeki kesilmeleri hedefler:
+ * model bir dizi yazarken bütçesi bitmiştir ve son öğe yarım kalmıştır.
+ *
+ * Ayrıştırıcı değil, TARAYICI: süslü parantezleri sayarak öğe sınırlarını
+ * buluyor ve dize içindeki parantezleri saymamak için tırnak durumunu
+ * izliyor. Kaçış karakteri de takip ediliyor, yoksa `"a\""` gibi bir değer
+ * tırnağı kapatmış sanılır ve sayım kayar.
+ *
+ * @param {string} text
+ * @returns {object|null} `{<alan>: [...]}`; kurtarılacak öğe yoksa null
+ */
+export function salvageTruncatedArray(text) {
+    const raw = String(text || '');
+    const m = raw.match(/"([A-Za-z_][A-Za-z0-9_]*)"\s*:\s*\[/);
+    if (!m) return null;
+
+    const key = m[1];
+    let i = m.index + m[0].length;
+    const items = [];
+
+    let depth = 0;
+    let start = -1;
+    let inString = false;
+    let escaped = false;
+
+    for (; i < raw.length; i += 1) {
+        const ch = raw[i];
+
+        if (inString) {
+            if (escaped) escaped = false;
+            else if (ch === '\\') escaped = true;
+            else if (ch === '"') inString = false;
+            continue;
+        }
+        if (ch === '"') { inString = true; continue; }
+        if (ch === '{') { if (depth === 0) start = i; depth += 1; continue; }
+        if (ch === '}') {
+            depth -= 1;
+            if (depth === 0 && start >= 0) {
+                try {
+                    items.push(JSON.parse(raw.slice(start, i + 1)));
+                } catch {
+                    // Tek bir bozuk öğe diğerlerini düşürmez.
+                }
+                start = -1;
+            }
+            continue;
+        }
+        // Dizi kapandıysa iş bitti.
+        if (ch === ']' && depth === 0) break;
+    }
+
+    return items.length > 0 ? { [key]: items } : null;
+}
+
 export function parseAIJson(text, defaultValue = null) {
     if (!text) return defaultValue;
 
@@ -166,7 +224,25 @@ export function parseAIJson(text, defaultValue = null) {
         console.error('Critical AI JSON Parsing Failure');
     }
 
-    // Attempt 4 (son çare): metnin içinde kalmış kaçışsız tırnakları onar.
+    // Attempt 4: CEVAP YARIDA KESİLDİYSE TAMAMLANMIŞ ÖĞELERİ KURTAR.
+    //
+    // Canlıda görüldü: mülakat soruları üretilirken model 10 madde için yazı
+    // yazıyor, çıktı bütçesi bitiyor ve JSON bir dizenin ortasında kesiliyor
+    // ("Unterminated string in JSON at position 979"). Yukarıdaki denemelerin
+    // hiçbiri kesik bir diziyi kapatamıyor; sonuç `defaultValue` oluyor ve
+    // MODELİN YAZDIĞI SORULARIN HEPSİ ÇÖPE GİDİYOR.
+    //
+    // Oysa kesilen yalnızca sonuncusu: öncekiler eksiksiz. 8 soruyu atıp
+    // hepsini yedek kalıba düşürmek, elde olan işi bilerek çöpe atmaktır.
+    // Burada dizinin TAMAMLANMIŞ öğeleri toplanıyor, yarım kalan atılıyor.
+    try {
+        const kurtarilan = salvageTruncatedArray(strip(text));
+        if (kurtarilan) return kurtarilan;
+    } catch {
+        // Kurtarma da tutmadı — aşağıdaki onarım denemesine geçiliyor.
+    }
+
+    // Attempt 5 (son çare): metnin içinde kalmış kaçışsız tırnakları onar.
     // Sezgisel olduğu için EN SONA konuldu — yukarıdaki denemelerden biri
     // tutuyorsa buraya hiç gelinmez.
     try {
