@@ -182,3 +182,78 @@ describe('currentYearMonth', () => {
         expect(currentYearMonth(new Date(2026, 7, 18))).toEqual({ year: 2026, month: 8 });
     });
 });
+
+// ── ISO TARİHLER — CANLIDA BEŞ KIRMIZI SUÇLAMA ÜRETEN BOŞLUK ────────────────
+// CV çıkarımı "2025-06 - 2026-07" biçimini üretiyor. Aralık ayracı da tire
+// olduğu için metin dört parçaya bölünüyor ve son parça ("07") yıl olmadığı
+// için ayrıştırma başarısız oluyordu. Beş görevin hiçbirinin tarihi
+// okunamıyor, doğrulama tarafı bu boşluğu sıfır yıl gibi kullanıp
+// "şirket kuruluşundan önce başlamış" diyordu.
+describe('ISO biçimli aralıklar', () => {
+    it('YYYY-MM - YYYY-MM okunuyor', () => {
+        expect(parseDuration('2025-06 - 2026-07')).toEqual({
+            start: { year: 2025, month: 6 },
+            end: { year: 2026, month: 7 },
+            current: false,
+            precision: 'month',
+        });
+    });
+
+    it('ekrandaki beş görevin tamamı ölçülebiliyor', () => {
+        const gercek = ['2025-06 - 2026-07', '2023-08 - 2024-12', '2021-11 - 2023-07',
+            '2019-02 - 2021-11', '2016-06 - 2019-02'];
+        for (const d of gercek) expect(parseDuration(d)).not.toBeNull();
+    });
+
+    it('tire yerine uzun çizgi de olabiliyor', () => {
+        expect(parseDuration('2019-02 – 2021-11').start).toEqual({ year: 2019, month: 2 });
+    });
+
+    it('devam eden görevde ay korunuyor', () => {
+        const r = parseDuration('2025-06 - Halen');
+        expect(r.start).toEqual({ year: 2025, month: 6 });
+        expect(r.current).toBe(true);
+        expect(r.precision).toBe('month');
+    });
+
+    it('gün de yazılmışsa ay hassasiyetine indiriliyor', () => {
+        expect(parseDuration('2020-01-15 - 2023-05-20')).toEqual({
+            start: { year: 2020, month: 1 },
+            end: { year: 2023, month: 5 },
+            current: false,
+            precision: 'month',
+        });
+    });
+
+    it('AY-YIL ters yazımı da okunuyor', () => {
+        expect(parseDuration('06-2019 - 12-2021')).toEqual({
+            start: { year: 2019, month: 6 },
+            end: { year: 2021, month: 12 },
+            current: false,
+            precision: 'month',
+        });
+    });
+
+    // Düzeltmenin bozmaması gereken şey: "2020-2023" bir YIL ARALIĞI, ay
+    // içermiyor. Ay süzgeci 01-12'ye bağlı olmasaydı "2020.20" + "23" diye
+    // bölünür ve yıl aralığı okunamaz hale gelirdi.
+    it('yıl aralığı yıl aralığı olarak kalıyor', () => {
+        expect(parseDuration('2020-2023')).toEqual({
+            start: { year: 2020, month: null },
+            end: { year: 2023, month: null },
+            current: false,
+            precision: 'year',
+        });
+        expect(parseDuration('1998-2005').end).toEqual({ year: 2005, month: null });
+    });
+
+    it('ay adlı biçimler etkilenmiyor', () => {
+        expect(parseDuration('Oca 2020 - Mar 2023').start).toEqual({ year: 2020, month: 1 });
+        expect(parseDuration('01/2020 - 03/2023').end).toEqual({ year: 2023, month: 3 });
+    });
+
+    it('okunan aralık gerçekten ölçülebiliyor', () => {
+        const w = toWindow(parseDuration('2016-06 - 2019-02'), TODAY);
+        expect(formatMonths(w.to - w.from)).toBe('2 yıl 9 ay');
+    });
+});
