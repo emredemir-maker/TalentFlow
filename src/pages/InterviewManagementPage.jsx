@@ -14,7 +14,7 @@ import { buildICS } from '../utils/emailTemplates';
 import AddManualInterviewModal from '../components/AddManualInterviewModal';
 import { downloadInterviewIcs } from '../utils/interviewIcs';
 import { isSessionPast } from '../utils/interviewSession';
-import CalendarInterviewPanel from '../components/CalendarInterviewPanel';
+import InterviewCalendarView from '../components/InterviewCalendarView';
 import { eventMinutes } from '../utils/calendarMatch';
 import SalaryBackfillModal from '../components/SalaryBackfillModal';
 import SalaryBandModal from '../components/SalaryBandModal';
@@ -60,6 +60,7 @@ import {
     Wallet,
     ClipboardCheck,
     CalendarPlus,
+    List,
 } from 'lucide-react';
 
 const PARTICIPANT_INVITES_PATH = 'artifacts/talent-flow/public/data/participantInvites';
@@ -576,6 +577,8 @@ export default function InterviewManagementPage() {
     // ── Liste görünümü (Ekran 4) ──────────────────────────────────────────────
     // Sekmeler prototipteki dört kova: Tümü / Yaklaşan / Tamamlanan / İptal.
     const [ivTab, setIvTab] = useState('all');
+    // Liste mi takvim mi — süzgeçten ayrı bir karar.
+    const [ivView, setIvView] = useState('list');
     const [ivSearch, setIvSearch] = useState('');
     const [ivPage, setIvPage] = useState(0);
     const IV_PAGE_SIZE = 12;
@@ -748,6 +751,29 @@ export default function InterviewManagementPage() {
         // olsaydı ikisi zamanla ayrışırdı.
         setViewCandidateId(candidateId);
         window.dispatchEvent(new CustomEvent('changeView', { detail: 'candidate-process' }));
+    };
+
+    /** Takvimden bir mülakat kaydını açar — listedeki davranışın aynısı. */
+    const takvimOturumAc = (session) => {
+        const key = session.id || session.sessionId;
+        const done = session._effectiveCompleted || session.status === 'completed';
+        if (done) { navigate(`/interview-report/${key}`); return; }
+        if (session.mode === 'face_to_face') { navigate(`/face-interview/${key}`); return; }
+        navigate(`/live-interview/${key}`);
+    };
+
+    /** Takvimden planlı bir mülakatın sonucunu girer — listedeki akışın aynısı. */
+    const takvimOturumSonucu = (session) => {
+        setManualPrefill({
+            sessionId: session.id || session.sessionId,
+            candidateId: session._candidateId || session.candidateId,
+            positionId: session.positionId || null,
+            date: session.date || '',
+            time: session.time || '',
+            interviewerName: session.interviewerName || session.interviewer || '',
+            title: session.title || '',
+        });
+        setManualInterviewOpen(true);
     };
 
     /** Takvim kaydından sonuç girişi — form kayıttan dolu açılıyor. */
@@ -2440,11 +2466,6 @@ export default function InterviewManagementPage() {
                                         { key: 'upcoming', label: 'Yaklaşan', count: activeInterviews.length },
                                         { key: 'done', label: 'Tamamlanan', count: pastInterviews.length },
                                         { key: 'cancelled', label: 'İptal', count: cancelledInterviews.length },
-                                        // TAKVİM SEKMESİ sayı göstermiyor: sayıyı bilmek için
-                                        // takvimi okumak gerekir ve o okuma sekmeye basılınca
-                                        // yapılıyor. Yükleme öncesi "0" yazmak, boş takvim
-                                        // izlenimi verirdi.
-                                        { key: 'calendar', label: 'Takvimim', count: null },
                                     ].map(t => {
                                         const on = ivTab === t.key;
                                         return (
@@ -2468,10 +2489,36 @@ export default function InterviewManagementPage() {
                                     })}
                                 </div>
 
+                                {/* GÖRÜNÜM ANAHTARI — liste mi, takvim mi.
+                                    Takvim önce bir sekmeydi ve "Tümü / Yaklaşan"
+                                    yanında bir SÜZGEÇ gibi okunuyordu; kullanıcı
+                                    takvim ekranını bulamadı. Görünüm seçimi
+                                    süzgeçten ayrı bir karar ve Süreç ekranındaki
+                                    Kanban/Liste anahtarıyla aynı desende. */}
+                                <div className="flex items-center gap-0.5 bg-n50 border border-n200 rounded-md p-0.5">
+                                    {[
+                                        { key: 'list', label: 'Liste', icon: List },
+                                        { key: 'calendar', label: 'Takvim', icon: CalendarDays },
+                                    ].map(v => {
+                                        const on = ivView === v.key;
+                                        return (
+                                            <button
+                                                key={v.key}
+                                                onClick={() => setIvView(v.key)}
+                                                className={`flex items-center gap-1.5 text-[12px] font-semibold px-[11px] py-[5px] rounded ${
+                                                    on ? 'bg-n0 text-n900 shadow-sm' : 'text-n500 hover:text-n700'
+                                                }`}
+                                            >
+                                                <v.icon className="w-[13px] h-[13px]" /> {v.label}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
                                 {/* Kapsam süzgeci — mevcut özellik, korundu.
                                     Departman kullanıcısı zaten yalnızca kendi
                                     mülakatlarını görebiliyor, seçenek gösterilmiyor. */}
-                                {!isDepartmentUser && (
+                                {ivView === 'list' && !isDepartmentUser && (
                                     <button
                                         onClick={() => setShowMyInterviews(v => !v)}
                                         className={`ml-auto flex items-center gap-1.5 text-[12px] font-medium border rounded-md px-[11px] py-[5px] ${
@@ -2488,21 +2535,24 @@ export default function InterviewManagementPage() {
                             {/* TAKVİM SEKMESİ liste yerine geçiyor: aynı kolonlar
                                 anlamlı değil — takvim kaydının değerlendiricisi,
                                 durumu ya da skoru yok. */}
-                            {ivTab === 'calendar' && (
-                                <CalendarInterviewPanel
+                            {ivView === 'calendar' && (
+                                <InterviewCalendarView
+                                    sessions={ivRowsAll}
                                     candidates={enrichedCandidates}
                                     isGoogleConnected={isGoogleConnected}
                                     userId={userId}
                                     userProfile={userProfile}
+                                    onOpenSession={takvimOturumAc}
+                                    onSessionResult={takvimOturumSonucu}
                                     onPrepare={takvimHazirlik}
-                                    onEnterResult={takvimSonucGir}
+                                    onEventResult={takvimSonucGir}
                                     onLink={takvimAdayaBagla}
                                     onConnect={takvimGoogleBagla}
                                 />
                             )}
 
                             {/* Kolon başlıkları */}
-                            {ivTab !== 'calendar' && (
+                            {ivView !== 'calendar' && (
                             <div className="hidden lg:grid grid-cols-[1.5fr_1.25fr_92px_116px_1fr_104px_128px] items-center px-[18px] py-2 border-b border-n200 bg-n50 text-[11px] font-semibold text-n500 flex-shrink-0">
                                 <span>Aday</span>
                                 <span>Pozisyon</span>
@@ -2515,7 +2565,7 @@ export default function InterviewManagementPage() {
                             )}
 
                             {/* Satırlar */}
-                            {ivTab !== 'calendar' && (
+                            {ivView !== 'calendar' && (
                             <div className="flex-1 overflow-y-auto custom-scrollbar">
                                 {ivRows.length === 0 ? (
                                     <div className="px-[18px] py-14 flex flex-col items-center text-center">
@@ -2775,7 +2825,7 @@ export default function InterviewManagementPage() {
                             )}
 
                             {/* Sayfalama — gerçek sayfalar, dekoratif değil. */}
-                            {ivTab !== 'calendar' && (
+                            {ivView !== 'calendar' && (
                             <div className="px-[18px] py-2.5 border-t border-n200 flex items-center text-[11px] text-n500 flex-shrink-0">
                                 <span>
                                     {ivRowsAll.length === 0
