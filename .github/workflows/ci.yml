@@ -15,9 +15,21 @@ on:
     branches: [main]
 
 # Cancel superseded runs when a branch is pushed to repeatedly.
+#
+# MAIN HARİÇ. Dal üzerinde arka arkaya itilen commit'lerde eski turu kesmek
+# doğru: kimse artık o commit'i incelemiyor. `main` başka: oraya giden her
+# commit YAYINA GİDİYOR ve tek başına doğrulanmış olmalı.
+#
+# Canlıda yaşandı — iki PR saniyeler arayla merge edildi, ikisi de main'e
+# ittiği için aynı gruba düştü ve ikincisi birincinin turunu iptal etti
+# (CI #448, altı işin altısı `cancelled`). O sefer kurtaran şey merge'lerin
+# ardışık olmasıydı: ikinci merge commit'i birincinin kodunu da içeriyordu ve
+# turu yeşil geçti. Ama ikinci tur KIRMIZI çıksaydı, birinci PR'ın kodu
+# main'de hiç doğrulanmamış kalacaktı ve bunu gösteren tek kayıt da iptal
+# edilmiş turdu.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   lint:
