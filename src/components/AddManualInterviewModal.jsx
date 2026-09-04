@@ -76,7 +76,8 @@ export default function AddManualInterviewModal({
     // Görüşme sistem dışında (Zoom, Teams, yüz yüze) yapıldığında planlanan
     // oturum sonsuza kadar "Bekliyor" kalıyordu ve sonucu girmenin tek yolu
     // sıfırdan yeni bir kayıt açmaktı: tek görüşme, listede iki satır.
-    // {sessionId, candidateId, positionId, date, time, interviewerName, title}
+    // {sessionId, calendarEventId, candidateId, positionId, date, time,
+    //  durationMinutes, interviewerName, title}
     prefill = null,
 }) {
     // ── Form state
@@ -137,6 +138,7 @@ export default function AddManualInterviewModal({
         if (prefill.date) setDate(String(prefill.date).slice(0, 10));
         if (prefill.time) setTime(prefill.time);
         if (prefill.interviewerName) setInterviewerName(prefill.interviewerName);
+        if (prefill.durationMinutes) setDurationMinutes(prefill.durationMinutes);
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, prefill?.sessionId]);
 
@@ -435,6 +437,10 @@ export default function AddManualInterviewModal({
                     // Sunucu bu kimliği görürse planlı kaydı silip yerine
                     // sonucu yazıyor — aynı görüşme iki satır olmuyor.
                     ...(prefill?.sessionId ? { replacesSessionId: prefill.sessionId } : {}),
+                    // Takvim kaydından geliyorsa bağ kayda yazılıyor: aynı
+                    // etkinliğe ikinci kez sonuç girilmesin ve takvim
+                    // listesinde "sonucu girilmiş" görünsün.
+                    ...(prefill?.calendarEventId ? { calendarEventId: prefill.calendarEventId } : {}),
                 }),
             });
             const data = await res.json();
@@ -458,12 +464,20 @@ export default function AddManualInterviewModal({
                 <div className="px-8 py-5 border-b border-slate-200 flex items-center justify-between bg-gradient-to-r from-indigo-50 to-blue-50">
                     <div>
                         <h2 className="text-xl font-black text-slate-900 tracking-tight">
-                            {prefill?.sessionId ? 'Görüşme Sonucunu Gir' : 'Manuel Görüşme Ekle'}
+                            {prefill?.sessionId || prefill?.calendarEventId ? 'Görüşme Sonucunu Gir' : 'Manuel Görüşme Ekle'}
                         </h2>
+                        {/* İKİ FARKLI GİRİŞ KAPISI, İKİ FARKLI CÜMLE.
+                            Planlı kayıttan gelindiğinde o kayıt sonuçla DEĞİŞİYOR;
+                            takvimden gelindiğinde ortada değişecek bir kayıt yok,
+                            yeni kayıt takvim etkinliğine BAĞLANIYOR. İkisini aynı
+                            cümleyle anlatmak, olmayan bir silme işlemini varmış
+                            gibi gösterirdi. */}
                         <p className="text-xs text-slate-500 mt-0.5">
                             {prefill?.sessionId
                                 ? `${prefill.title || 'Planlanan görüşme'} — sonucu kaydedince planlı kayıt bu sonuçla değişir, listede ikinci satır oluşmaz.`
-                                : 'Sistem dışında yapılmış görüşmeyi kaydet — AI değerlendirmesi otomatik çalışır.'}
+                                : prefill?.calendarEventId
+                                    ? `${prefill.title || 'Takvim kaydı'} — kayıt bu takvim etkinliğine bağlanır, aynı etkinliğe ikinci kez sonuç girilmez.`
+                                    : 'Sistem dışında yapılmış görüşmeyi kaydet — AI değerlendirmesi otomatik çalışır.'}
                         </p>
                     </div>
                     <button
