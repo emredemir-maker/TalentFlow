@@ -6,6 +6,8 @@ import { usePositions } from '../context/PositionsContext';
 import { evaluateInterviewer } from '../services/ai/interview.js';
 import { buildInterviewReport, hasCompetencyScores, hasStarScores } from '../utils/interviewReport';
 import { splitTranscript } from '../services/ai/transcriptSplitter';
+import { recruiterLinesOf } from '../utils/interviewTranscript';
+import { requirementsOf } from '../utils/positionRequirements';
 import { getAuth } from 'firebase/auth';
 import {
     InterviewNarrative,
@@ -203,6 +205,8 @@ export default function InterviewReportPage() {
     const [finalDecision, setFinalDecision] = useState('');
     const [isSavingNotes, setIsSavingNotes] = useState(false);
     const [pdfLoading, setPdfLoading] = useState(false);
+    // Mülakatçı değerlendirmesi neden yapılamadı — boşsa sorun yok.
+    const [evalUnavailable, setEvalUnavailable] = useState('');
     const [isSavingDecision, setIsSavingDecision] = useState(false);
     const [recruiterEval, setRecruiterEval] = useState(null);
     const [evalLoading, setEvalLoading] = useState(false);
@@ -220,11 +224,39 @@ export default function InterviewReportPage() {
         if (!session || evalLoading) return;
         setEvalLoading(true);
         try {
+            // KİM KONUŞTU SORUSU BURADA ÇÖZÜLÜYOR.
+            //
+            // Eskiden yalnızca `transcriptMessages` gönderiliyordu ve o alan
+            // SADECE transkript bir dizi olduğunda doluyor. Manuel görüşmede
+            // transkript düz metin — modele boş dizi gidiyor, model "mülakatçı
+            // hiç konuşmamış" görüp 1/5 veriyordu. Canlı mülakatta da rol
+            // adları tutmuyordu ('YÖNETİCİ' vs 'MÜLAKATÇI').
+            const { lines, reason } = recruiterLinesOf(
+                Array.isArray(session.transcript) && session.transcript.length > 0
+                    ? session.transcript
+                    : (typeof session.transcript === 'string' && session.transcript.trim()
+                        ? session.transcript
+                        : (session.messages || [])),
+                candidate?.name || ''
+            );
+            if (reason) {
+                // ÖLÇÜLEMEDİĞİNİ SÖYLÜYORUZ. Sessizce boş girdiyle model
+                // çağırmak, sessizliği "kötü performans" diye puanlatıyordu.
+                setEvalUnavailable(reason);
+                setRecruiterEval(null);
+                return;
+            }
+            setEvalUnavailable('');
             const result = await evaluateInterviewer({
-                transcript: transcriptMessages.length > 0 ? transcriptMessages : (session.messages || []),
+                recruiterLines: lines,
                 questions:  (session.questions || []).map(q => q.question || q.text || q),
                 positionTitle: session.positionTitle || candidate?.position || '',
             });
+            if (!result) {
+                // Model çağrısı düştü ya da geçersiz yanıt döndü. Boş bırakmak
+                // "henüz analiz edilmedi" gibi okunuyordu.
+                setEvalUnavailable('Değerlendirme üretilemedi; tekrar deneyebilirsiniz.');
+            }
             if (result) {
                 setRecruiterEval(result);
                 setEvalOpen(true);
@@ -301,9 +333,12 @@ export default function InterviewReportPage() {
                 candidate,
                 session,
                 report,
-                recruiterEval,
                 recruiterNotes,
                 finalDecision,
+                // Hiç sorulmamış maddeleri söyleyebilmek için ilanın listesi.
+                // Damgalar eski listeye aitse GÖNDERİLMİYOR: bugünkü metinleri
+                // o rapora yazmak, cevabı yanlış maddeye bağlamak olurdu.
+                requirements: report?.requirementsStale ? [] : requirementsOf(position),
             });
             await downloadPdf(doc, dosyaAdi(candidate, session));
         } catch (err) {
@@ -681,7 +716,9 @@ export default function InterviewReportPage() {
                                 <section className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-3 flex flex-col gap-2">
                                     <div className="flex items-center gap-2">
                                         <Award className="w-[15px] h-[15px] text-brand" />
-                                        <h3 className="text-[12px] font-semibold m-0">Mülakatçı değerlendirmesi</h3>
+                                        <h3 className="text-[12px] font-semibold m-0" title="Adayın değil, görüşmeyi yapan kişinin performansı">
+                                            Mülakatçı değerlendirmesi
+                                        </h3>
                                         <button
                                             onClick={runEvaluateInterviewer}
                                             disabled={evalLoading}
@@ -694,9 +731,19 @@ export default function InterviewReportPage() {
                                     {evalLoading && (
                                         <p className="text-[11px] text-n500 m-0">Mülakatçı performansı analiz ediliyor…</p>
                                     )}
-                                    {!evalLoading && !recruiterEval && (
+                                    {/* ÖLÇÜLEMEDİĞİNİ SÖYLÜYORUZ.
+                                        Eskiden mülakatçı satırı bulunamadığında model yine
+                                        çağrılıyor ve sessizliği "kötü performans" sanıp üç
+                                        boyuta 1/5 veriyordu. */}
+                                    {!evalLoading && !recruiterEval && evalUnavailable && (
+                                        <p className="text-[11px] text-n500 leading-relaxed m-0">
+                                            <strong>Ölçülemedi.</strong> {evalUnavailable} Uydurma bir puan
+                                            basmamak için değerlendirme çalıştırılmadı.
+                                        </p>
+                                    )}
+                                    {!evalLoading && !recruiterEval && !evalUnavailable && (
                                         <p className="text-[11px] text-n400 leading-relaxed m-0">
-                                            "Analiz et" ile bu görüşmenin mülakatçı performans değerlendirmesini üretin.
+                                            &quot;Analiz et&quot; ile bu görüşmenin mülakatçı performans değerlendirmesini üretin.
                                         </p>
                                     )}
                                     {!evalLoading && recruiterEval && (

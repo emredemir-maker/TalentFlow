@@ -218,7 +218,18 @@ ${BIAS_GUARDRAIL}
 // ─── Recruiter / Interviewer Evaluation (Task #8) ─────────────────────────────
 // Analyses the recruiter's performance from a completed session transcript.
 // Returns dimension scores (1-5) with explanations and improvement tips.
-export async function evaluateInterviewer({ transcript = [], questions = [], positionTitle = '' } = {}) {
+/**
+ * Mülakatçının performansını değerlendirir.
+ *
+ * @param {object} input
+ *   recruiterLines — MÜLAKATÇIYA ait cümleler. Çözümlemesi çağıranda
+ *     (utils/interviewTranscript) yapılıyor: canlı akış ile manuel girişin
+ *     transkript biçimleri farklı ve bu ayrım bir yapay zekâ sorusu değil.
+ *   questions — sorulan sorular
+ *   positionTitle — pozisyon başlığı
+ * @returns {Promise<object|null>} ölçülecek satır yoksa `null`
+ */
+export async function evaluateInterviewer({ recruiterLines: recruiterInput = [], questions = [], positionTitle = '' } = {}) {
     const instruction = `Sen kıdemli bir mülakat koçusun. Mülakatçının (recruiter) performansını aşağıdaki dört boyutta değerlendir.
 
 KURALLAR:
@@ -270,9 +281,22 @@ JSON formatında SADECE şu yapıda dön:
   "summary": "Mülakatçıya 2-3 cümle genel geri bildirim (Türkçe)"
 }`;
 
-    const recruiterLines = (transcript || [])
-        .filter(t => t.role === 'MÜLAKATÇI' || t.role === 'RECRUITER' || t.role === 'interviewer')
-        .map(t => t.text || t.content || '');
+    // MÜLAKATÇI SATIRI YOKSA MODEL HİÇ ÇAĞRILMAZ.
+    //
+    // Bu filtre canlıda hiçbir zaman eşleşmiyordu: canlı akış mülakatçıyı
+    // 'YÖNETİCİ' diye etiketliyor, manuel görüşmede ise transkript düz metin
+    // olduğu için buraya boş dizi geliyordu. Model her seferinde "mülakatçı
+    // hiç konuşmamış" görüp üç boyuta 1/5, dördüncüsüne "hiç konuşmadığı için
+    // önyargı gözlenmedi" diye 5/5 veriyordu — ve bu çıktı gerçek bir insanın
+    // performans kaydı olarak saklanıyordu.
+    //
+    // Rol çözümlemesi artık utils/interviewTranscript'te; burada yalnızca
+    // "ölçecek bir şey var mı" sorusu var. Yoksa `null` dönüyoruz: arayüz
+    // "ölçülemedi" diyor, uydurma bir puan basmıyor.
+    const recruiterLines = Array.isArray(recruiterInput)
+        ? recruiterInput.map(t => (typeof t === 'string' ? t : t?.text || t?.content || '')).filter(Boolean)
+        : [];
+    if (recruiterLines.length === 0) return null;
 
     const prompt = buildStructuredPrompt(instruction, {
         "POZİSYON": positionTitle || 'Belirtilmemiş',
