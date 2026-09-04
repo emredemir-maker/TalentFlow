@@ -110,6 +110,27 @@ function observationsByQuestion(aiAnalysis) {
  *   hasAnything: boolean,
  * }}
  */
+/**
+ * Soru/damga hangi maddeye ait? Bağ yoksa null.
+ *
+ * ── SIFIR BİR MADDE NUMARASI DEĞİLDİR ───────────────────────────────────────
+ * Numaralar 1 tabanlı (`requirements[index - 1]`). Ama `Number(null)` SIFIRDIR
+ * ve `Number.isInteger(0)` DOĞRUDUR: "bağ yok" anlamına gelen boş değer,
+ * geçerli bir madde numarası gibi kabul ediliyordu. Sıfır numaralı bir soru
+ * hiçbir maddeye karşılık gelmediği için hem madde listesine hem "diğer
+ * sorular" listesine giremiyor, rapordan sessizce düşüyordu.
+ *
+ * Sunucu bu ölçütü zaten böyle uyguluyor (routes/interview.js: `idx > 0`,
+ * services/scoreBlockReason: sıfır → 'no-link'). Bu satır istemciyi sunucuyla
+ * aynı tanıma getiriyor.
+ *
+ * @returns {number|null} 1 ve üzeri tam sayı; değilse null
+ */
+function requirementIndexOf(value) {
+    const n = Number(value);
+    return Number.isInteger(n) && n > 0 ? n : null;
+}
+
 export function buildInterviewReport(session, position) {
     const verdicts = Array.isArray(session?.requirementVerdicts) ? session.requirementVerdicts : [];
     const asked = Array.isArray(session?.questions) ? session.questions : [];
@@ -127,13 +148,13 @@ export function buildInterviewReport(session, position) {
     const observations = observationsByQuestion(ai);
     const questionByIndex = new Map(
         asked
-            .filter((q) => Number.isInteger(Number(q?.requirementIndex)))
-            .map((q) => [Number(q.requirementIndex), q])
+            .map((q) => [requirementIndexOf(q?.requirementIndex), q])
+            .filter(([index]) => index !== null)
     );
 
     const items = verdicts
         .map((v) => {
-            const index = Number(v?.requirementIndex);
+            const index = requirementIndexOf(v?.requirementIndex);
             const req = requirements[index - 1];
             const q = questionByIndex.get(index);
             return {
@@ -147,13 +168,31 @@ export function buildInterviewReport(session, position) {
                 observation: observations.get(normalize(q?.question)) || '',
             };
         })
-        .filter((it) => Number.isInteger(it.requirementIndex))
+        .filter((it) => it.requirementIndex !== null)
         .sort((a, b) => a.requirementIndex - b.requirementIndex);
 
-    // Maddeye bağlı olmayan sorular kaybolmasın: skora girmiyorlar ama
-    // konuşuldular ve mülakatçının gözlemi onlara da yazılmış olabilir.
+    // ── HİÇBİR SORU KAYBOLMASIN ─────────────────────────────────────────────
+    //
+    // Eskiden bu liste "numarası olmayan sorular" diye kuruluyordu ve bu,
+    // "yukarıda gösterilmeyen sorular" ile AYNI ŞEY DEĞİL. Numarası olan ama
+    // damgası çıkmayan bir soru iki listeye de girmiyordu:
+    //
+    //   • items damgalardan kuruluyor — damga yoksa satır yok
+    //   • unlinked numarası olanı dışlıyordu
+    //
+    // Yani sorulmuş, cevaplanmış ve gözlem yazılmış bir soru RAPORDAN
+    // TAMAMEN düşüyordu. Ulaşılabilir bir durum: damgalama boş cevaplı
+    // soruları eliyor, model bir maddeyi atlayabiliyor, ilan değiştiğinde
+    // numara artık bir maddeye karşılık gelmiyor.
+    //
+    // Artık ölçüt tek: yukarıdaki madde satırlarından birine GİRDİ Mİ?
+    // Girmediyse buraya düşer. Böylece her soru raporda tam olarak bir kez
+    // görünür.
+    const shown = new Set(
+        items.map((it) => questionByIndex.get(it.requirementIndex)).filter(Boolean)
+    );
     const unlinked = asked
-        .filter((q) => !Number.isInteger(Number(q?.requirementIndex)))
+        .filter((q) => !shown.has(q))
         .map((q) => ({
             question: String(q?.question || '').trim(),
             answer: String(q?.answer || '').trim(),
