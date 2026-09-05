@@ -13,8 +13,18 @@
 // Ayırt eden şey durum kodu değil, gövdedeki metin.
 
 /**
- * @typedef {'spend-cap'|'quota'|'rate-limit'|'auth'|'gateway'|null} AiErrorKind
+ * @typedef {'budget'|'spend-cap'|'quota'|'rate-limit'|'auth'|'gateway'|null} AiErrorKind
  */
+
+/**
+ * KURULUMUN KENDİ GÜNLÜK BÜTÇESİ — Google'ın kotası değil.
+ *
+ * İkisini ayırmak şart, çünkü çözümleri farklı: Google kotasında plan
+ * yükseltilir, bunda kurulumu işleten kişi sınırı değiştirir. Aynı kefeye
+ * koymak, kullanıcıyı hiç ilgisi olmayan bir Google sayfasına yollardı.
+ * Sunucu tarafındaki im: functions/services/aiBudget.js BUDGET_MARKER.
+ */
+const OWN_BUDGET = /AI_DAILY_BUDGET_EXCEEDED/;
 
 /** Harcama tavanı — beklemekle geçmez, insan müdahalesi gerekir. */
 const SPEND_CAP = /spending cap|spend cap|billing account has exceeded|harcama (üst )?(sınırı|tavanı)/i;
@@ -43,6 +53,16 @@ export function aiErrorHint(message) {
     const text = String(message ?? '');
     if (!text.trim()) return { kind: null, hint: '' };
 
+    // EN BAŞTA: mesaj "token" ve "günlük" gibi kelimeler taşıyor, aşağıdaki
+    // kota kalıbına da uyar ve yanlış tavsiye verilirdi.
+    if (OWN_BUDGET.test(text)) {
+        return {
+            kind: 'budget',
+            hint: 'Bu kurulum için belirlenmiş günlük AI bütçesi dolmuş — Google kotanızla '
+                + 'ilgisi yok. Sayaç UTC gece yarısı sıfırlanır; daha yüksek bir sınır '
+                + 'gerekiyorsa kurulumu işleten kişiye söyleyin.',
+        };
+    }
     if (SPEND_CAP.test(text)) {
         return {
             kind: 'spend-cap',
@@ -86,5 +106,7 @@ export function aiErrorHint(message) {
  */
 export function isRetryable(message) {
     const { kind } = aiErrorHint(message);
-    return kind !== 'spend-cap' && kind !== 'auth';
+    // Günlük bütçe de tekrar denemeyle geçmez: sayaç gece yarısına kadar
+    // yerinde duruyor ve her deneme aynı yanıtı alır.
+    return kind !== 'spend-cap' && kind !== 'auth' && kind !== 'budget';
 }
