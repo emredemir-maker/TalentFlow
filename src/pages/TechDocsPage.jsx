@@ -256,7 +256,7 @@ function AuthSection() {
 2. Firestore: settings/system.allowedDomains okunur
    a. Domain listede varsa → davet kontrolü ATLANIR
       → Kullanıcı otomatik 'recruiter' rolüyle kaydolur
-   b. Domain listede yoksa → invitations koleksiyonu sorgulanır
+   b. Domain listede yoksa → POST /api/auth/invitation-lookup (sunucu sorgular)
       → Eşleşme varsa kayıt tamamlanır
       → Eşleşme yoksa → "Davet bulunamadı" hatası
 3. İstisna: INITIAL_SUPER_ADMIN_EMAIL her zaman kayıt olabilir`}</CodeBlock>
@@ -340,7 +340,7 @@ const sessionId = 'iv-' + crypto.randomUUID();`}</CodeBlock>
                     ['`users`', 'Kendi kaydı, recruiter, super_admin', 'Kendi kaydı, super_admin'],
                     ['`candidates`', 'canAccessCandidate() (belge), recruiter/dept_user (liste)', 'Recruiter'],
                     ['`departments`', 'Herkese açık', 'Yalnızca super_admin'],
-                    ['`invitations`', 'Herkese açık (kayıt doğrulaması)', 'Yalnızca super_admin'],
+                    ['`invitations`', 'Yalnızca super_admin (kayıt doğrulaması sunucuda)', 'Yalnızca super_admin'],
                     ['`interviews`', 'Auth kullanıcısı (anonim dahil)', 'isAuthenticatedIncAnon()'],
                     ['`positions`', 'Herkese açık', 'Recruiter'],
                 ]}

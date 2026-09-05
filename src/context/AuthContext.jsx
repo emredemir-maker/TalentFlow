@@ -17,12 +17,7 @@ import {
     doc,
     getDoc,
     setDoc,
-    collection,
-    query,
-    where,
-    getDocs,
     serverTimestamp,
-    updateDoc,
     onSnapshot
 } from 'firebase/firestore';
 import { auth, db, googleProvider, isFirebaseConfigured } from '../config/firebase';
@@ -30,7 +25,35 @@ import { auth, db, googleProvider, isFirebaseConfigured } from '../config/fireba
 const AuthContext = createContext(null);
 
 const USERS_PATH = 'artifacts/talent-flow/public/data/users';
-const INVITATIONS_PATH = 'artifacts/talent-flow/public/data/invitations';
+
+/**
+ * Bekleyen daveti SUNUCUDAN sorar.
+ *
+ * ── NEDEN İSTEMCİDEN SORGULANMIYOR ──────────────────────────────────────────
+ * Kayıt sırasında hesap henüz yok, dolayısıyla bu sorgu kimliksiz atılıyordu
+ * ve davetiye koleksiyonu bunun için `allow read: if true` ile açıktı.
+ * Firestore'da `read` hem `get` hem `list` demek: aynı kural, kimliksiz bir
+ * istemcinin koleksiyonun TAMAMINI — davet edilmiş bütün e-postaları ve
+ * rollerini — tek istekte okumasına izin veriyordu. Uygulama bunu yapmıyordu
+ * ama yapılmasını engelleyen bir şey de yoktu.
+ *
+ * Sorgu artık sunucuda (Admin SDK kuralların dışında çalışır) ve koleksiyon
+ * super_admin'e kapalı.
+ *
+ * @returns {Promise<{inviteId: string, role: string, departments: string[]}|null>}
+ *   davet yoksa null; sorgu YAPILAMADIYSA hata fırlatır — çağıran ikisini
+ *   ayırt edebilsin diye ("davetin yok" ile "kontrol edemedik" aynı şey değil).
+ */
+async function lookupInvitation(emailLower) {
+    const res = await fetch('/api/auth/invitation-lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailLower }),
+    });
+    if (!res.ok) throw new Error(`Davetiye servisi yanıt vermedi (${res.status})`);
+    const data = await res.json();
+    return data?.found ? data : null;
+}
 
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
@@ -173,33 +196,25 @@ export function AuthProvider({ children }) {
                     await setDoc(userDocRef, domainProfile);
                     setUserProfile(domainProfile);
                 } else {
-                    const q = query(collection(db, INVITATIONS_PATH),
-                        where("email", "==", emailLower),
-                        where("status", "==", "pending")
-                    );
-                    const inviteSnap = await getDocs(q);
+                    const invitation = await lookupInvitation(emailLower);
 
-                    if (!inviteSnap.empty) {
-                        const inviteDoc = inviteSnap.docs[0];
-                        const invitation = inviteDoc.data();
+                    if (invitation) {
                         const newProfile = {
                             uid: currentUser.uid,
                             email: emailLower,
                             displayName: currentUser.displayName || emailLower.split('@')[0],
                             photoURL: currentUser.photoURL || '',
-                            role: invitation.role || 'recruiter',
-                            departments: invitation.departments ? invitation.departments : (invitation.department ? [invitation.department] : []),
+                            role: invitation.role,
+                            // Sunucu eski tekil `department` alanını da tekilden
+                            // listeye çeviriyor; kuraldaki karşılaştırma bunu bekliyor.
+                            departments: invitation.departments,
                             status: 'active',
                             // Firestore rules verify the requested role against this
                             // invitation doc — without it the create is denied.
-                            inviteId: inviteDoc.id,
+                            inviteId: invitation.inviteId,
                             createdAt: serverTimestamp()
                         };
                         await setDoc(userDocRef, newProfile);
-                        await updateDoc(doc(db, INVITATIONS_PATH, inviteDoc.id), {
-                            status: 'accepted',
-                            acceptedAt: serverTimestamp()
-                        });
                         setUserProfile(newProfile);
                     } else {
                         await signOut(auth);
@@ -289,15 +304,11 @@ export function AuthProvider({ children }) {
             let inviteDocId = null;
 
             try {
-                const q = query(collection(db, INVITATIONS_PATH),
-                    where("email", "==", emailLower),
-                    where("status", "==", "pending")
-                );
-                const inviteSnap = await getDocs(q);
-                if (!inviteSnap.empty) {
-                    invitation = inviteSnap.docs[0].data();
+                const found = await lookupInvitation(emailLower);
+                if (found) {
+                    invitation = found;
                     _invitation = invitation; // accessible in outer catch
-                    inviteDocId = inviteSnap.docs[0].id;
+                    inviteDocId = found.inviteId;
                     console.log(`[Registration] Found valid invitation.`);
                 }
             } catch (snapErr) {
@@ -329,7 +340,7 @@ export function AuthProvider({ children }) {
                 displayName: name,
                 photoURL: '',
                 role: invitation?.role || 'recruiter',
-                departments: invitation?.departments ? invitation.departments : (invitation?.department ? [invitation.department] : [] ),
+                departments: invitation?.departments || [],
                 status: 'active',
                 // Firestore rules verify the requested role against this
                 // invitation doc; domain-allowed signups have no invite.
@@ -345,19 +356,19 @@ export function AuthProvider({ children }) {
                 throw new Error(`Profil oluşturulamadı: ${profileErr.message}`);
             }
 
-            // 5. Mark invitation as accepted (if it existed)
-            if (inviteDocId) {
-                try {
-                    await updateDoc(doc(db, INVITATIONS_PATH, inviteDocId), {
-                        status: 'accepted',
-                        acceptedAt: serverTimestamp()
-                    });
-                    console.log(`[Registration] Invitation marked as accepted.`);
-                } catch (inviteUpdateErr) {
-                    console.error("[Registration] Failed to update invitation status:", inviteUpdateErr);
-                    // Non-critical error, we still continue
-                }
-            }
+            // 5. DAVET "KABUL EDİLDİ" OLARAK İŞARETLENMİYOR — bilinen boşluk.
+            //
+            // Burada bir `updateDoc` duruyordu ama koleksiyonun yazma kuralı
+            // zaten super_admin'e kapalıydı: yeni kaydolan kullanıcı bu yazmayı
+            // hiçbir zaman yapamadı, çağrı yalnızca konsola hata basıyordu.
+            // Sorgu sunucuya taşındıktan sonra istemcinin koleksiyona hiç
+            // erişimi kalmadı, dolayısıyla çağrı kesin olarak ölüydü.
+            //
+            // Sonucu: davetler "pending" kalıyor ve super_admin ekranında
+            // bekliyormuş gibi görünüyor. Aynı daveti başkası kullanamaz
+            // (kural, davetteki e-posta ile giriş yapanın e-postasını
+            // karşılaştırıyor), o yüzden bu bir güvenlik açığı değil — ama
+            // düzeltilmesi gereken ayrı bir iş: kabul işaretini sunucu atmalı.
 
             setUserProfile(profile);
             console.log(`[Registration] Success!`);
