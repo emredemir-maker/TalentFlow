@@ -81,3 +81,30 @@ describe('diğer türler', () => {
         expect(isRetryable('bilinmeyen hata')).toBe(true);
     });
 });
+
+// ── KURULUMUN KENDİ BÜTÇESİ ─────────────────────────────────────────────────
+// Google'ın kotasıyla karıştırılırsa kullanıcı, hiç ilgisi olmayan bir
+// Billing sayfasına yollanır. Sunucudaki im: aiBudget.js BUDGET_MARKER.
+describe('günlük kurulum bütçesi', () => {
+    const MESAJ = 'AI_DAILY_BUDGET_EXCEEDED: Bu kurulumun günlük AI bütçesi doldu '
+        + '(2.000.000 / 2.000.000 token, en çok ~$5.00). Sayaç UTC gece yarısı sıfırlanır.';
+
+    it('kendi bütçesi olarak tanınıyor', () => {
+        expect(aiErrorHint(MESAJ).kind).toBe('budget');
+    });
+
+    it('GOOGLE KOTASIYLA KARIŞTIRILMIYOR', () => {
+        // Mesajın içinde "günlük" geçiyor ve kota kalıbına da uyabilirdi;
+        // sıralama bu yüzden önemli.
+        expect(aiErrorHint(MESAJ).hint).toContain('Google kotanızla');
+        expect(aiErrorHint(MESAJ).hint).not.toContain('planı yükselt');
+    });
+
+    it('tekrar denemek çözmüyor', () => {
+        expect(isRetryable(MESAJ)).toBe(false);
+    });
+
+    it('Google kotası hâlâ kota olarak sınıflanıyor', () => {
+        expect(aiErrorHint('429 RESOURCE_EXHAUSTED quota exceeded').kind).toBe('quota');
+    });
+});

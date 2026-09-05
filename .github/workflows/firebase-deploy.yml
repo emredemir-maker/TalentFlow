@@ -65,11 +65,12 @@ jobs:
 
       - name: Create functions/.env.production
         run: |
-          printf 'EMAIL_USER=%s\nEMAIL_PASS=%s\nVITE_GEMINI_API_KEY=%s\nVITE_FIREBASE_API_KEY=%s\n' \
+          printf 'EMAIL_USER=%s\nEMAIL_PASS=%s\nVITE_GEMINI_API_KEY=%s\nVITE_FIREBASE_API_KEY=%s\nAI_DAILY_TOKEN_LIMIT=%s\n' \
             "$EMAIL_USER" \
             "$EMAIL_PASS" \
             "$VITE_GEMINI_API_KEY" \
             "$VITE_FIREBASE_API_KEY" \
+            "$AI_DAILY_TOKEN_LIMIT" \
             > functions/.env.production
           echo "✅ functions/.env.production oluşturuldu:"
           cat functions/.env.production | sed 's/=.*/=***/' 
@@ -78,6 +79,11 @@ jobs:
           EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
           VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          # SIR DEĞİL ama buradan geçiyor: fonksiyonlar ortam değişkenlerini
+          # yalnızca bu dosyadan okuyor. Secret tanımlı değilse satır boş
+          # yazılır ve günlük AI bütçe freni KAPALI kalır — mevcut kurulumun
+          # davranışı değişmez (bkz. functions/services/aiBudget.js).
+          AI_DAILY_TOKEN_LIMIT: ${{ secrets.AI_DAILY_TOKEN_LIMIT }}
 
       - name: Authenticate to Google Cloud
         run: |

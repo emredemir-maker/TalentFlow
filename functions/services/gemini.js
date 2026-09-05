@@ -31,6 +31,7 @@ import { db } from '../config/firebaseAdmin.js';
 import { buildStructuredPrompt } from './promptGuard.js';
 import { childLogger } from './logger.js';
 import { recordUsage, readUsage } from './usage.js';
+import { assertWithinBudget, noteSpend } from './aiBudget.js';
 
 const log = childLogger('gemini');
 
@@ -139,6 +140,11 @@ export async function generateText(prompt, options = {}) {
         }
     }
 
+    // FREN ÖNBELLEKTEN SONRA. Önbellek isabeti token yakmıyor; bütçe dolduğu
+    // için elimizdeki hazır cevabı vermemek, hiçbir şey kazandırmadan
+    // kullanıcıyı durdurmak olurdu.
+    await assertWithinBudget();
+
     const apiKey = await getApiKey();
     if (!apiKey) throw new Error('AI service unavailable — API key missing');
 
@@ -166,7 +172,11 @@ export async function generateText(prompt, options = {}) {
             }
             // Ölçüm beklenmez (await yok): fatura kaydı yüzünden kullanıcı
             // bekletilmez ve hata yutulur.
-            void recordUsage({ label, modelId, usage: readUsage(result.response) }).catch(() => {});
+            const tuketim = readUsage(result.response);
+            // Yerel sayaç ANINDA artıyor: Firestore yazması beklenmiyor ve
+            // iki tazeleme arasında freni ayakta tutan tek şey bu toplam.
+            noteSpend(tuketim.totalTokens);
+            void recordUsage({ label, modelId, usage: tuketim }).catch(() => {});
             if (key) cacheSet(key, text);
             return text;
         } catch (err) {
@@ -287,6 +297,11 @@ export async function generateGrounded(prompt, options = {}) {
         }
     }
 
+    // ARAMALI ÇAĞRI EN PAHALISI — fren burada da geçerli. Aşağıdaki aramasız
+    // son çare zaten generateText'ten geçiyor ve orada da denetleniyor; ama
+    // aramalı denemeyi hiç başlatmamak gerekiyor.
+    await assertWithinBudget();
+
     const apiKey = await getApiKey();
     if (!apiKey) throw new Error('AI service unavailable — API key missing');
     const genAI = new GoogleGenerativeAI(apiKey);
@@ -305,7 +320,9 @@ export async function generateGrounded(prompt, options = {}) {
                 ...readGrounding(result.response),
                 grounded: true,
             };
-            void recordUsage({ label: 'grounded', modelId, usage: readUsage(result.response) }).catch(() => {});
+            const tuketim = readUsage(result.response);
+            noteSpend(tuketim.totalTokens);
+            void recordUsage({ label: 'grounded', modelId, usage: tuketim }).catch(() => {});
             if (key) cacheSet(key, value);
             return value;
         } catch (err) {

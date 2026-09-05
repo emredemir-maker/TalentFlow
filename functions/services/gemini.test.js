@@ -40,15 +40,21 @@ vi.mock('../config/firebaseAdmin.js', () => ({
 
 // Now safe to import the module.
 const { generateText, generateGrounded, parseProfile, getDefaultCvParsingModel } = await import('./gemini.js');
+const { resetBudgetCache } = await import('./aiBudget.js');
 
 beforeEach(() => {
     mockGenerateContent.mockReset();
     // Force env-key path so getApiKey() succeeds without firestore lookup
     process.env.GEMINI_API_KEY = 'test-key-for-vitest';
+    // Günlük bütçe sayacı modül düzeyinde — testler birbirinin sayısını
+    // devralmasın.
+    resetBudgetCache();
+    delete process.env.AI_DAILY_TOKEN_LIMIT;
 });
 
 afterEach(() => {
     delete process.env.GEMINI_API_KEY;
+    delete process.env.AI_DAILY_TOKEN_LIMIT;
     vi.useRealTimers();
 });
 
@@ -365,5 +371,50 @@ describe('parseProfile model resolution', () => {
         const call = spy.mock.calls.at(-1);
         expect(call?.[0]?.model).toBe('gemini-2.5-flash');
         spy.mockRestore();
+    });
+});
+
+// ── GÜNLÜK BÜTÇE FRENİ ──────────────────────────────────────────────────────
+// Fren aiBudget.js'te ayrıca test ediliyor; buradaki soru KABLONUN takılı
+// olup olmadığı: huniden geçen her çağrı denetleniyor mu, önbellek isabeti
+// gereksiz yere durduruluyor mu.
+describe('günlük AI bütçesi', () => {
+    const cevap = (metin, tokens) => ({
+        response: {
+            text: () => metin,
+            usageMetadata: { promptTokenCount: 0, candidatesTokenCount: tokens, totalTokenCount: tokens },
+        },
+    });
+
+    it('SINIR YOKKEN DAVRANIŞ DEĞİŞMİYOR', async () => {
+        mockGenerateContent.mockResolvedValue(cevap('ok', 5_000_000));
+        await expect(generateText('bütçesiz')).resolves.toBe('ok');
+    });
+
+    it('BÜTÇE DOLUNCA YENİ ÇAĞRI BAŞLAMIYOR', async () => {
+        process.env.AI_DAILY_TOKEN_LIMIT = '1000';
+        mockGenerateContent.mockResolvedValue(cevap('birinci', 1200));
+
+        // İlk çağrı geçiyor — sınır çağrıdan ÖNCEKİ toplama bakıyor.
+        await expect(generateText('ilk istek')).resolves.toBe('birinci');
+        // Aynı çağrı sayacı sınırın üstüne taşıdı; ikincisi başlamamalı.
+        await expect(generateText('ikinci istek')).rejects.toThrow(/AI_DAILY_BUDGET_EXCEEDED/);
+        expect(mockGenerateContent).toHaveBeenCalledTimes(1);
+    });
+
+    it('ÖNBELLEK İSABETİ DURDURULMUYOR', async () => {
+        // Hazır cevabı vermemek hiçbir şey kazandırmaz: token yakılmıyor.
+        process.env.AI_DAILY_TOKEN_LIMIT = '1000';
+        mockGenerateContent.mockResolvedValue(cevap('önbellekli', 1200));
+        await generateText('aynı istek');
+        await expect(generateText('aynı istek')).resolves.toBe('önbellekli');
+        expect(mockGenerateContent).toHaveBeenCalledTimes(1);
+    });
+
+    it('aramalı çağrı da denetleniyor', async () => {
+        process.env.AI_DAILY_TOKEN_LIMIT = '1000';
+        mockGenerateContent.mockResolvedValue(cevap('arama', 1200));
+        await generateGrounded('ilk arama');
+        await expect(generateGrounded('ikinci arama')).rejects.toThrow(/AI_DAILY_BUDGET_EXCEEDED/);
     });
 });
