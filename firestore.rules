@@ -97,11 +97,20 @@ service cloud.firestore {
     }
 
     // ── Invitations ───────────────────────────────────────────────────────────
-    // Open read is required: pre-auth registration checks need to verify
-    // invitation by email before the account even exists.
-    // Write is super_admin only.
+    // KAPALI. Burada `allow read: if true` vardı çünkü kayıt akışı, hesap
+    // henüz yokken e-postaya göre davet arıyordu. Ama Firestore'da `read`
+    // hem `get` hem `list` demek: kural, kimliksiz bir istemcinin davet
+    // edilmiş BÜTÜN e-postaları ve rollerini tek istekte okumasına izin
+    // veriyordu.
+    //
+    // Sorgu sunucuya taşındı (POST /api/auth/invitation-lookup, Admin SDK ile
+    // kuralların dışında çalışır ve yalnızca inviteId/role/departments döner),
+    // dolayısıyla istemcinin bu koleksiyona hiç erişmesi gerekmiyor.
+    //
+    // NOT: Kullanıcı dokümanı yazılırken `inviteMatchesRequest` bu koleksiyonu
+    // okuyor — kural içindeki `get()` çağrıları bu kısıttan etkilenmez.
     match /artifacts/talent-flow/public/data/invitations/{inviteId} {
-      allow read:  if true;
+      allow read:  if isSuperAdmin();
       allow write: if isSuperAdmin();
     }
 
@@ -231,9 +240,16 @@ service cloud.firestore {
     // ── Info Requests (candidate respond link) ────────────────────────────────
     // requestId is an unguessable random ID — acts as a capability token.
     // Candidates need public read so they can view the request and respond.
-    // Writes go through the backend API (Admin SDK), so client writes are denied.
+    //
+    // GET AÇIK, LIST KAPALI. Yetki anahtarı olan şey KİMLİĞİN KENDİSİ: linki
+    // olmayan kayda ulaşamaz. `allow read: if true` ise listelemeyi de açıyor
+    // ve o anda anahtarın bir anlamı kalmıyor — kimliksiz bir istemci bütün
+    // bilgi taleplerini tek istekte döküyordu. Aday tarafı zaten tekil
+    // `getDoc` yapıyor (CandidateRespondPage); listeyi yalnızca giriş yapmış
+    // iç sayfalar okuyor (MessagesPage, CandidateProcessPage).
     match /artifacts/talent-flow/public/data/infoRequests/{requestId} {
-      allow read:  if true;
+      allow get:   if true;
+      allow list:  if isStrictAuthenticated();
       allow write: if isRecruiter();
     }
 
@@ -282,7 +298,15 @@ service cloud.firestore {
     // buraya AÇIK kural eklemek zorundadır (varsayılan: en alttaki deny).
 
     // ── Live Interview Sessions ───────────────────────────────────────────────
-    // • read:   open — sessionId (128-bit UUID) acts as capability token
+    // • get:    open — sessionId (128-bit UUID) acts as capability token
+    // • list:   KAPALI (yalnızca giriş yapmış kullanıcı). Burada `read: if true`
+    //           vardı ve `read` listelemeyi de kapsıyor: kimliksiz bir istemci
+    //           BÜTÜN mülakat oturumlarını — transkriptler, AI analizi,
+    //           skorlar, aday kimlikleri — tek istekte okuyabiliyordu. Yetki
+    //           anahtarı fikri (linki olan tek kaydı görür) ancak liste
+    //           kapalıyken anlamlı. Listeyi yalnızca iç ekranlar okuyor
+    //           (Dashboard, InterviewManagementPage, PipelinePage); aday
+    //           tarafı tekil okuma yapıyor.
     // • create: yalnızca strict-auth (recruiter akışı); aday tarafı doküman
     //           yoksa /api/init-interview-session fallback'ini kullanır
     //           (LiveInterviewPage permission-denied dallarında mevcut)
@@ -296,7 +320,8 @@ service cloud.firestore {
     //           süzülmezse bu kural atlatılabilirdi.
     // • delete: denied
     match /interviews/{sessionId} {
-      allow read:   if true;
+      allow get:    if true;
+      allow list:   if isStrictAuthenticated();
       allow create: if isStrictAuthenticated();
       allow update: if isRecruiter() ||
                        (isAuthenticatedIncAnon() &&

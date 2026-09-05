@@ -22,6 +22,7 @@
 import { Router } from 'express';
 
 import { verifyFirebaseToken, rejectAnonymous } from '../middleware/auth.js';
+import { inviteLimiter } from '../middleware/rateLimit.js';
 import { db } from '../config/firebaseAdmin.js';
 import { integrationConfigs } from '../config/integrations.js';
 import { fsPatch } from '../services/firestoreRest.js';
@@ -322,6 +323,63 @@ router.post('/api/auth/google/refresh', verifyFirebaseToken, rejectAnonymous, as
     } catch (err) {
         log.error('[google/refresh]', err.message);
         res.status(500).json({ error: err.message });
+    }
+});
+
+// ─── Davetiye sorgusu ─────────────────────────────────────────────────────────
+//
+// ── NEDEN SUNUCUDA ──────────────────────────────────────────────────────────
+// Kayıt akışı, hesap HENÜZ YOKKEN "bu e-postaya bekleyen bir davet var mı"
+// sorusunu sormak zorunda: kullanıcı dokümanını yazan Firestore kuralı,
+// istenen rolün karşılığında bir davet kimliği (`inviteId`) görmek istiyor.
+//
+// Bu yüzden davetiye koleksiyonunda `allow read: if true` duruyordu. Ama
+// Firestore'da `read` hem `get` hem `list` demek: kural, kimliksiz bir
+// istemcinin koleksiyonun TAMAMINI dökmesine — yani davet edilmiş bütün
+// e-posta adreslerini ve rollerini tek istekte okumasına — izin veriyordu.
+//
+// Sorgu buraya taşındı. Admin SDK kuralların dışında çalıştığı için istemcinin
+// koleksiyona hiç erişmesi gerekmiyor; kural artık super_admin'e kapalı.
+// Geriye kalan tek bilgi sızıntısı "şu e-posta davetli mi" cevabı — bu, akışın
+// çalışması için zorunlu ve `inviteLimiter` ile saatte 10 denemeye bağlı.
+
+const INVITATIONS_PATH = 'artifacts/talent-flow/public/data/invitations';
+
+/**
+ * Davet dokümanını istemcinin ihtiyaç duyduğu asgari alanlara indirger.
+ *
+ * SADECE ÜÇ ALAN dönüyor: davet dokümanının kendisini olduğu gibi vermek,
+ * kimliksiz bir uçtan davet edenin kimliği ve zaman damgaları gibi alanları da
+ * sızdırırdı.
+ *
+ * Departman listesi eski tekil `department` alanını da tolere ediyor — aynı
+ * geri düşme zinciri Firestore kuralında da var (`inviteDepartments`); ikisi
+ * ayrışırsa kural, istemcinin yazdığı profili reddeder.
+ */
+export function invitationPayload(doc) {
+    const d = (typeof doc?.data === 'function' ? doc.data() : null) || {};
+    const departments = Array.isArray(d.departments)
+        ? d.departments
+        : (d.department ? [d.department] : []);
+    return { inviteId: doc.id, role: d.role || 'recruiter', departments };
+}
+
+router.post('/api/auth/invitation-lookup', inviteLimiter, async (req, res) => {
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    if (!email || !email.includes('@')) {
+        return res.status(400).json({ error: 'Geçerli bir e-posta adresi gerekli.' });
+    }
+    try {
+        const snap = await db.collection(INVITATIONS_PATH)
+            .where('email', '==', email)
+            .where('status', '==', 'pending')
+            .limit(1)
+            .get();
+        if (snap.empty) return res.json({ found: false });
+        return res.json({ found: true, ...invitationPayload(snap.docs[0]) });
+    } catch (err) {
+        log.error('[invitation-lookup]', err.message);
+        return res.status(500).json({ error: 'Davetiye kontrolü yapılamadı.' });
     }
 });
 
