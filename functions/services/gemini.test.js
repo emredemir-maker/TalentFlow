@@ -50,6 +50,7 @@ beforeEach(() => {
     // devralmasın.
     resetBudgetCache();
     delete process.env.AI_DAILY_TOKEN_LIMIT;
+    delete process.env.AI_DAILY_GROUNDED_LIMIT;
 });
 
 afterEach(() => {
@@ -411,10 +412,28 @@ describe('günlük AI bütçesi', () => {
         expect(mockGenerateContent).toHaveBeenCalledTimes(1);
     });
 
-    it('aramalı çağrı da denetleniyor', async () => {
+    it('aramalı çağrı token tavanıyla da denetleniyor', async () => {
         process.env.AI_DAILY_TOKEN_LIMIT = '1000';
         mockGenerateContent.mockResolvedValue(cevap('arama', 1200));
         await generateGrounded('ilk arama');
         await expect(generateGrounded('ikinci arama')).rejects.toThrow(/AI_DAILY_BUDGET_EXCEEDED/);
+    });
+
+    it('ARAMALI ÇAĞRI ADEDİ AYRI SAYILIYOR', async () => {
+        // Token tavanı YOK: bu freni tetikleyen tek şey adet. Aramalı çağrılar
+        // istek başına ayrıca faturalandığı için token tavanı onları görmüyor.
+        process.env.AI_DAILY_GROUNDED_LIMIT = '2';
+        mockGenerateContent.mockResolvedValue(cevap('arama', 10));
+        await generateGrounded('birinci');
+        await generateGrounded('ikinci');
+        await expect(generateGrounded('ucuncu')).rejects.toThrow(/AI_DAILY_BUDGET_EXCEEDED/);
+        expect(mockGenerateContent).toHaveBeenCalledTimes(2);
+    });
+
+    it('adet tavanı aramasız çağrıyı durdurmuyor', async () => {
+        process.env.AI_DAILY_GROUNDED_LIMIT = '1';
+        mockGenerateContent.mockResolvedValue(cevap('duz', 10));
+        await generateGrounded('aramali');
+        await expect(generateText('duz istek')).resolves.toBe('duz');
     });
 });

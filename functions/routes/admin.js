@@ -21,6 +21,8 @@ import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.js';
 import { admin, db } from '../config/firebaseAdmin.js';
 import { integrationConfigs } from '../config/integrations.js';
+import { summarize } from '../services/usage.js';
+import { budgetLimits, todayUsage } from '../services/aiBudget.js';
 import { childLogger } from '../services/logger.js';
 const log = childLogger('admin');
 
@@ -28,6 +30,7 @@ const router = Router();
 
 const INTEGRATIONS_DOC = 'artifacts/talent-flow/public/data/settings/integrations';
 const API_KEYS_DOC = 'artifacts/talent-flow/public/data/settings/api_keys';
+const USAGE_PATH = 'artifacts/talent-flow/public/data/usage';
 
 router.delete('/api/admin/auth-user/:uid', requireAuth(['super_admin']), async (req, res) => {
     try {
@@ -158,6 +161,46 @@ router.post('/api/admin/api-keys', requireAuth(['super_admin']), async (req, res
     } catch (err) {
         log.error({ err }, '[admin/api-keys POST]');
         res.status(500).json({ error: 'Anahtar kaydedilemedi.' });
+    }
+});
+
+// ─── AI kullanım raporu ───────────────────────────────────────────────────────
+//
+// ── NEDEN GEREKLİ ───────────────────────────────────────────────────────────
+// services/usage.js her AI çağrısının tokenını Firestore'a yazıyordu ama
+// HİÇBİR YER OKUMUYORDU: ne bir uç, ne bir ekran. Sayaç vardı, gösterge yoktu.
+// "Hangi özellik ne yakıyor" sorusunun cevabı veritabanında duruyor ve kimse
+// göremiyordu — kurulum topluluğa açılırken bu kabul edilemez.
+//
+// ── NEDEN SUNUCUDAN ─────────────────────────────────────────────────────────
+// Ölçüm koleksiyonunun firestore.rules'ta açık bir kuralı yok, yani en alttaki
+// varsayılan reddediş geçerli ve istemci okuyamıyor. Bilerek: günlük tüketim
+// işletme bilgisi. Admin SDK kuralların dışında çalışıyor ve uç super_admin'e
+// bağlı.
+router.get('/api/admin/usage', requireAuth(['super_admin']), async (req, res) => {
+    // 1-90 gün. Üst sınır Firestore okuma maliyetini bağlıyor: ölçümü okumak
+    // ölçtüğü şeyden pahalı olmamalı.
+    const days = Math.min(Math.max(parseInt(req.query?.days, 10) || 14, 1), 90);
+    try {
+        const snap = await db.collection(USAGE_PATH)
+            .orderBy('day', 'desc')
+            .limit(days)
+            .get();
+
+        const gunler = snap.docs.map((d) => ({ day: d.id, ...summarize(d.data()) }));
+        const bugun = await todayUsage(new Date());
+
+        res.json({
+            days: gunler,
+            limits: budgetLimits(),
+            // Bugünün sayacı FRENİN gördüğü değer — ölçüm dokümanındaki sayı
+            // değil. İkisi arasında bir dakikaya kadar fark olabilir ve
+            // ekranda "neden durdu" sorusunu cevaplayan sayı budur.
+            today: bugun,
+        });
+    } catch (err) {
+        log.error({ err }, '[admin/usage]');
+        res.status(500).json({ error: 'Kullanım kaydı okunamadı.' });
     }
 });
 
