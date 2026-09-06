@@ -32,9 +32,14 @@ import { DEMO_CANDIDATES, DEMO_POSITIONS } from './dataset.mjs';
 
 const BASE = 'artifacts/talent-flow/public/data';
 
-const projectId = process.env.DEMO_PROJECT_ID || '';
-const email = process.env.DEMO_USER_EMAIL || '';
-const password = process.env.DEMO_USER_PASSWORD || '';
+// GÖRÜNMEZ KARAKTERLER KIRPILIYOR. GitHub secret'ına yapıştırırken sona bir
+// satır sonu ya da boşluk karışması çok kolay ve secret değeri aynen
+// saklanıyor. Kırpılmazsa hesabın şifresi o karakterle birlikte kaydediliyor:
+// kullanıcı doğru şifreyi yazıyor, giriş "e-posta veya şifre hatalı" diyor ve
+// hiçbir yerde bunu açıklayan bir iz kalmıyor. Canlıda tam olarak bu yaşandı.
+const projectId = (process.env.DEMO_PROJECT_ID || '').trim();
+const email = (process.env.DEMO_USER_EMAIL || '').trim();
+const password = (process.env.DEMO_USER_PASSWORD || '').trim();
 
 function bitir(mesaj) {
     process.stderr.write(`HATA: ${mesaj}\n`);
