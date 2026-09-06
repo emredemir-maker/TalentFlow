@@ -465,6 +465,19 @@ export default function LoginPage() {
                             <ArrowRight size={13} />
                         </button>
                     </div>
+
+                    {/* Giriş yapamayan ziyaretçi de ürünün ne yaptığını görebilsin:
+                        tanıtım sayfası herkese açık ve hiçbir veri okumuyor. */}
+                    <div style={{ marginTop: '10px', textAlign: 'center' }}>
+                        <a
+                            href="/nasil-calisir"
+                            style={{ fontSize: '12px', color: '#94A3B8', textDecoration: 'none' }}
+                            onMouseEnter={e => e.currentTarget.style.color = '#0C7CB0'}
+                            onMouseLeave={e => e.currentTarget.style.color = '#94A3B8'}
+                        >
+                            TalentFlow nasıl çalışıyor?
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
