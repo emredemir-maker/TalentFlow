@@ -1,6 +1,7 @@
 // src/pages/LoginPage.jsx
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { IS_DEMO } from '../utils/demoMode';
 import { LogIn, AlertCircle, CheckCircle, Loader2, User, Mail, Lock, Sparkles, ArrowRight, Zap, Brain, BarChart3, Clock } from 'lucide-react';
 import TalentInnLogo from '../components/TalentInnLogo';
 
@@ -427,6 +428,9 @@ export default function LoginPage() {
                     </div>
 
                     {/* Google SSO */}
+                    {/* DEMO: Google sağlayıcısı demo projesinde kapalı; düğmeyi bırakmak
+                        tıklayan herkese auth/operation-not-allowed hatası verirdi. */}
+                    {!IS_DEMO && (
                     <button
                         type="button"
                         onClick={loginWithGoogle}
@@ -448,6 +452,7 @@ export default function LoginPage() {
                         </svg>
                         {mode === 'register' ? 'Google ile Kayıt Ol (İsteğe Bağlı)' : 'Google ile Giriş Yap'}
                     </button>
+                    )}
 
                     {/* Toggle mode */}
                     <div style={{ marginTop: '28px', textAlign: 'center' }}>
