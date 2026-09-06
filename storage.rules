@@ -2,20 +2,54 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
-    // ── CV uploads ────────────────────────────────────────────────────────────
-    // AddCandidateModal uploads to: cvs/{timestamp}_{random}.{ext}  (flat path)
-    // Write: any authenticated user (recruiters upload CVs for candidates)
-    // Read:  any authenticated user (dashboard CV viewing)
+    // ── Kimlik yardımcıları ───────────────────────────────────────────────────
+    //
+    // ANONİM OTURUM İÇ KULLANICI DEĞİLDİR. Uygulama aday tarafındaki herkese
+    // açık sayfalarda (/apply/, /live-interview/, /join/) otomatik olarak
+    // anonim oturum açıyor. Yani `request.auth != null` demek "personelden
+    // biri" değil, "başvuru sayfasını açmış herhangi biri" demek.
+    //
+    // Kayıt davet ya da izinli alan adı gerektirdiği için anonim olmayan her
+    // oturum iç kullanıcıya aittir.
+    function isStrictAuth() {
+      return request.auth != null
+        && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    // ── CV dosyaları ──────────────────────────────────────────────────────────
+    //
+    // ── BURADA NE VARDI ─────────────────────────────────────────────────────
+    // `allow read: if request.auth != null` yazıyordu ve bu iki ayrı kapıyı
+    // birden açıyordu:
+    //
+    //   1. ANONİM ERİŞİM — başvuru sayfasını açan herkes anonim token alıyor.
+    //      Aday olarak giren biri iç havuzdaki CV'lere erişebiliyordu.
+    //   2. LİSTELEME — Storage'da da `read` hem `get` hem `list` demek.
+    //      Yani klasörün tamamı dökülüp bütün CV'ler indirilebiliyordu.
+    //
+    // İkisi birlikte, ürünün en hassas verisini (ad, telefon, adres, tüm iş
+    // geçmişi) herkese açık hale getiriyordu. Aynı tuzağı firestore.rules'ta
+    // da bulmuştuk; orada kapatıldı, burada kalmış.
+    //
+    // ── ŞİMDİ ───────────────────────────────────────────────────────────────
+    // get   : yalnızca anonim OLMAYAN oturum (iç kullanıcı)
+    // list  : kapalı — uygulama hiçbir yerde klasör listelemiyor, dosyalara
+    //         kayıtta saklanan indirme adresiyle ulaşılıyor
+    // write : yalnızca iç kullanıcı. Başvuru formu Storage'a dosya YAZMIYOR;
+    //         CV metnini tarayıcıda çıkarıp gönderiyor, dolayısıyla anonim
+    //         yazma yetkisinin bir karşılığı yok.
     match /cvs/{filename} {
-      allow read:  if request.auth != null;
-      allow write: if request.auth != null
+      allow get:   if isStrictAuth();
+      allow list:  if false;
+      allow write: if isStrictAuth()
                       && request.resource.size < 20 * 1024 * 1024;
     }
 
-    // Nested paths under /cvs/ (future-proofing for sub-folder uploads)
+    // Alt klasörler (ileride kullanılırsa) — aynı kural.
     match /cvs/{candidateId}/{allPaths=**} {
-      allow read:  if request.auth != null;
-      allow write: if request.auth != null
+      allow get:   if isStrictAuth();
+      allow list:  if false;
+      allow write: if isStrictAuth()
                       && request.resource.size < 20 * 1024 * 1024;
     }
 
@@ -33,7 +67,11 @@ service firebase.storage {
     // başkasının CV'si var, tarayıcıya açmanın bir sebebi yok.
     match /bulk-imports/{userId}/{allPaths=**} {
       allow read:   if false;
-      allow write:  if request.auth != null
+      // isStrictAuth: anonim oturumun da bir uid'i var, dolayısıyla eski kural
+      // aday tarafındaki bir ziyaretçinin kendi klasörüne 200MB'a kadar dosya
+      // yüklemesine izin veriyordu. Okuma kapalı olduğu için veri sızıntısı
+      // değil ama depolama maliyeti üretmeye açık bir kapıydı.
+      allow write:  if isStrictAuth()
                        && request.auth.uid == userId
                        && request.resource.size < 200 * 1024 * 1024;
     }
@@ -54,8 +92,12 @@ service firebase.storage {
     // BrandingSettingsPage uploads to: branding/logo_{timestamp}_{filename}
     // Write: super_admin only (Custom Claim role OR Firestore role).
     // Read:  any authenticated user.
+    // Okuma anonime de açık: başvuru ve giriş sayfaları logoyu oturum
+    // açılmadan gösteriyor. Listeleme yine de kapalı — dosya adlarını dökmenin
+    // hiçbir meşru kullanımı yok.
     match /branding/{filename} {
-      allow read:  if request.auth != null;
+      allow get:   if request.auth != null;
+      allow list:  if false;
       allow write: if request.auth != null
                       && request.auth.token.role == 'super_admin'
                       && request.resource.size < 10 * 1024 * 1024
@@ -65,8 +107,9 @@ service firebase.storage {
     // ── Profile / avatar images ───────────────────────────────────────────────
     // Write: only the owner of the avatar slot
     match /avatars/{userId}/{allPaths=**} {
-      allow read:  if request.auth != null;
-      allow write: if request.auth != null
+      allow get:   if isStrictAuth();
+      allow list:  if false;
+      allow write: if isStrictAuth()
                       && request.auth.uid == userId
                       && request.resource.size < 5 * 1024 * 1024
                       && isSafeImageType();
