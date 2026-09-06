@@ -115,13 +115,21 @@ jobs:
       # --config firebase.demo.json: üretim config'i hosting site'ını
       # talentflow-84bb6'ya sabitliyor. Yanlış config ile yapılan bir dağıtım
       # demo yapısını üretime gönderirdi.
+      #
+      # --force: Functions v2, derleme kalıntıları için Artifact Registry'de bir
+      # temizleme politikası kurmak istiyor ve etkileşimli onay bekliyor. CI'da
+      # onay gelmeyince dağıtım BAŞARILI olduğu hâlde hata koduyla bitiyor ve
+      # sonraki adımlar hiç çalışmıyor. Bayrak yalnızca bu politikayı kabul
+      # ediyor; başka bir şeyi zorlamıyor. Politika kurulmazsa her dağıtım
+      # depoya kalıntı bırakır ve depolama faturası sessizce büyür.
       - name: Dağıt
         run: |
           firebase deploy \
             --only hosting,functions,firestore,storage \
             --config firebase.demo.json \
             --project "$DEMO_PROJECT_ID" \
-            --non-interactive
+            --non-interactive \
+            --force
 
       - name: Havuzu tohumla
         if: ${{ inputs.seed }}
