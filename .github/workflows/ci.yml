@@ -68,6 +68,56 @@ jobs:
       - name: TypeScript typecheck
         run: npm run typecheck
 
+  audit:
+    name: Bağımlılık taraması
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # ── EŞİK NEDEN "critical" ─────────────────────────────────────────────
+      # Bu iş eklendiğinde depoda 3 kritik ve 40 yüksek açık vardı; hepsi
+      # düzeltilebilir olanları kapatıldıktan sonra kritik SIFIRA indi.
+      # Eşiği kritikte tutmak, sıfırdan geriye gidilmesini engelliyor.
+      #
+      # Yüksek ve orta seviye açıklar RAPORLANIYOR ama işi düşürmüyor: kalanlar
+      # kırıcı sürüm yükseltmesi gerektiriyor (puppeteer, nodemailer, adm-zip)
+      # ve bunlar ayrı ayrı denenmesi gereken işler. Bugün düşüren bir eşik
+      # koymak, herkesin işi kırmızıyken çalışmayı öğrenmesiyle biterdi —
+      # kapatılan bir uyarı, olmayan uyarıdan kötü.
+      #
+      # --omit=dev: geliştirme araçlarının açıkları üretime çıkmıyor. Karışık
+      # bir liste, gerçekten yayına giden riski gizler.
+      - run: npm ci --no-audit --no-fund
+      - name: Kök bağımlılıklar — kritik açık var mı
+        run: npm audit --omit=dev --audit-level=critical
+
+      - run: npm ci --no-audit --no-fund
+        working-directory: ./functions
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: true
+      - name: Fonksiyon bağımlılıkları — kritik açık var mı
+        working-directory: ./functions
+        run: npm audit --omit=dev --audit-level=critical
+
+      # Kalanlar özet olarak görünsün: eşiği geçmeyen açıkların da bir yerde
+      # okunabilir olması gerekiyor, yoksa "kritik yok" cümlesi tabloyu
+      # olduğundan iyi gösterir.
+      - name: Kalan açıkların özeti
+        if: always()
+        run: |
+          echo "### Bağımlılık açıkları" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "kök:" >> $GITHUB_STEP_SUMMARY
+          npm audit --omit=dev 2>&1 | tail -3 >> $GITHUB_STEP_SUMMARY || true
+          echo "functions:" >> $GITHUB_STEP_SUMMARY
+          (cd functions && npm audit --omit=dev 2>&1 | tail -3) >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
   test:
     name: Unit tests
     runs-on: ubuntu-latest
