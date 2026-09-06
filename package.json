@@ -43,7 +43,7 @@
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "@tailwindcss/vite": "^4.1.18",
-    "adm-zip": "^0.5.16",
+    "adm-zip": "^0.6.0",
     "concurrently": "^9.2.1",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
@@ -59,7 +59,7 @@
     "mailparser": "^3.9.6",
     "mammoth": "^1.11.0",
     "multer": "^2.1.1",
-    "nodemailer": "^8.0.1",
+    "nodemailer": "^10.0.0",
     "pdf-parse": "^2.4.5",
     "pdfjs-dist": "^5.4.624",
     "pdfmake": "^0.3.11",
