@@ -15,7 +15,7 @@
     },
     "dependencies": {
         "@google/generative-ai": "^0.24.1",
-        "adm-zip": "^0.5.16",
+        "adm-zip": "^0.6.0",
         "cors": "^2.8.6",
         "dotenv": "^17.3.1",
         "express": "^5.2.1",
@@ -27,7 +27,7 @@
         "imap": "^0.8.19",
         "mammoth": "^1.11.0",
         "multer": "^2.0.2",
-        "nodemailer": "^8.0.1",
+        "nodemailer": "^10.0.0",
         "pdf-parse": "^2.4.5",
         "pino": "^10.3.1",
         "pino-pretty": "^13.1.3",
