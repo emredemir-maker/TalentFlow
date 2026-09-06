@@ -297,6 +297,25 @@ service cloud.firestore {
     // izolasyonu) etkisiz bırakıyordu. Kaldırıldılar; yeni koleksiyonlar
     // buraya AÇIK kural eklemek zorundadır (varsayılan: en alttaki deny).
 
+    // ── Erişim kaydı (denetim defteri) ───────────────────────────────────────
+    //
+    // Bir ihlal incelemesinde sorulan ilk şey "kim, hangi kişisel veriye, ne
+    // zaman erişti". Kayıt yoksa "kimse erişmedi" cümlesi de kurulamıyor.
+    //
+    // YALNIZCA create. Güncelleme ve silme kapalı: sonradan düzenlenebilen bir
+    // denetim kaydının kanıt değeri olmaz. Okuma super_admin'e özel — defterin
+    // kendisi de kim neye baktığını gösteren kişisel veri.
+    //
+    // list kapalı DEĞİL: super_admin'in defteri okuyabilmesi için gerekli;
+    // isRecruiter zaten super_admin'i kapsadığı için burada AÇIKÇA
+    // isSuperAdmin yazılıyor.
+    match /artifacts/talent-flow/public/data/accessLogs/{logId} {
+      allow read:   if isSuperAdmin();
+      allow create: if isStrictAuthenticated()
+                       && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
     // ── Live Interview Sessions ───────────────────────────────────────────────
     // • get:    open — sessionId (128-bit UUID) acts as capability token
     // • list:   KAPALI (yalnızca giriş yapmış kullanıcı). Burada `read: if true`

@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { logAccess, ACCESS_ACTIONS } from '../services/accessLog';
 import { FileText, Download, ExternalLink, User, Briefcase, AlignLeft, AlertCircle } from 'lucide-react';
 import {
     cvProfileFields,
@@ -20,6 +22,24 @@ import {
  * saklamıyor. Bu adaylarda "CV yok" demek yanlış olurdu; veri var, dosya yok.
  */
 export default function CandidateCvPanel({ candidate }) {
+    const { user } = useAuth();
+
+    // CV DOSYASINA ERİŞİM AYRICA KAYDEDİLİYOR.
+    //
+    // Aday detayını açmak zaten deftere yazılıyor ama dosyanın kendisine
+    // ulaşmak ayrı bir olay: indirilen bir CV artık uygulamanın dışında ve
+    // geri alınamıyor. Bir incelemede sorulan soru "kim baktı" değil,
+    // "kim indirdi" oluyor.
+    const cvErisimiKaydet = (nasil) => {
+        if (!user?.uid) return;
+        logAccess(ACCESS_ACTIONS.CV_VIEW, {
+            uid: user.uid,
+            email: user.email,
+            candidateId: candidate?.id,
+            note: nasil,
+        });
+    };
+
     const [mode, setMode] = useState(() => defaultCvMode(candidate));
 
     const cvText = cvTextOf(candidate);
@@ -80,6 +100,7 @@ export default function CandidateCvPanel({ candidate }) {
                                 href={candidate.cvUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
+                                onClick={() => cvErisimiKaydet('yeni sekme')}
                                 className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-n50 border border-n200 text-[11px] font-semibold text-n500 hover:border-brand-200 hover:text-brand hover:bg-brand-50 transition-colors"
                             >
                                 <ExternalLink size={10} /> Yeni Sekmede
@@ -87,6 +108,7 @@ export default function CandidateCvPanel({ candidate }) {
                             <a
                                 href={candidate.cvUrl}
                                 download
+                                onClick={() => cvErisimiKaydet('indirme')}
                                 className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-n50 border border-n200 text-[11px] font-semibold text-n500 hover:border-brand-200 hover:text-brand hover:bg-brand-50 transition-colors"
                             >
                                 <Download size={10} /> İndir
