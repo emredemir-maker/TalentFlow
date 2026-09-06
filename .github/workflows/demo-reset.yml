@@ -1,0 +1,72 @@
+# DEMO HAVUZUNU GECELİK SIFIRLAR.
+#
+# ── NEDEN GEREKLİ ─────────────────────────────────────────────────────────────
+# Demo havuzu ORTAK: bir ziyaretçinin eklediği aday diğerlerinde de görünüyor.
+# Bir hafta sonra havuz test kayıtlarıyla dolar, tanıtımda anlatılan düzen
+# kaybolur ve demo ürünü anlatmak yerine kalabalığı gösterir.
+#
+# İkinci sebep daha ciddi: uyarıya rağmen biri gerçek bir CV yükleyebilir.
+# Gecelik sıfırlama, o kaydın havuzda kalıcı olmamasını garanti ediyor.
+#
+# ── NEDEN AYRI WORKFLOW ──────────────────────────────────────────────────────
+# Dağıtımdan bağımsız: sıfırlama kodu değiştirmiyor, yalnızca veriyi
+# tazeliyor. Aynı dosyaya koymak, her gece gereksiz bir dağıtım anlamına
+# gelirdi.
+name: Reset Demo Data
+
+on:
+  schedule:
+    # Her gece 01:00 UTC (Türkiye'de 04:00) — trafiğin en düşük olduğu saat.
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: demo-reset
+  cancel-in-progress: false
+
+jobs:
+  reset:
+    name: Havuzu sıfırla
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Gerekli secret'lar tanımlı mı
+        run: |
+          eksik=""
+          [ -z "$SA" ] && eksik="$eksik DEMO_FIREBASE_SERVICE_ACCOUNT"
+          [ -z "$PW" ] && eksik="$eksik DEMO_USER_PASSWORD"
+          if [ -n "$eksik" ]; then
+            echo "❌ Eksik secret:$eksik"
+            exit 1
+          fi
+        env:
+          SA: ${{ secrets.DEMO_FIREBASE_SERVICE_ACCOUNT }}
+          PW: ${{ secrets.DEMO_USER_PASSWORD }}
+
+      # Tohumlama yalnızca firebase-admin'e ihtiyaç duyuyor; tüm bağımlılıkları
+      # kurmak her gece birkaç dakika ve gereksiz.
+      - name: Bağımlılıklar
+        run: npm ci --omit=dev --ignore-scripts
+
+      - name: Google Cloud kimliği
+        run: |
+          echo '${{ secrets.DEMO_FIREBASE_SERVICE_ACCOUNT }}' > /tmp/demo-sa.json
+          echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/demo-sa.json" >> $GITHUB_ENV
+
+      # Script'in kendi koruması var: proje kimliği "demo" içermiyorsa
+      # çalışmayı reddediyor. Zamanlanmış bir iş olduğu için bu koruma daha da
+      # önemli — yanlış bir değişken kimsenin bakmadığı bir gece çalışır.
+      - name: Sıfırla ve yeniden doldur
+        run: node scripts/demo-seed/seed.mjs
+        env:
+          DEMO_PROJECT_ID: talentflow-demo-6b894
+          DEMO_USER_EMAIL: ${{ vars.DEMO_USER_EMAIL || 'demo@example.com' }}
+          DEMO_USER_PASSWORD: ${{ secrets.DEMO_USER_PASSWORD }}
