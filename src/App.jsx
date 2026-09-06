@@ -70,6 +70,9 @@ const InterviewManagementPage = lazyPage(() => import('./pages/InterviewManageme
 const LiveInterviewPage       = lazyPage(() => import('./pages/LiveInterviewPage'));
 const FaceToFacePage          = lazyPage(() => import('./pages/FaceToFacePage'));
 const InterviewReportPage     = lazyPage(() => import('./pages/InterviewReportPage'));
+// Tanıtım sayfası: giriş istemiyor, veri okumuyor. Rota düzeyinde ayrı
+// parça — giriş yapan kullanıcının paketine girmiyor.
+const TanitimPage             = lazyPage(() => import('./pages/TanitimPage'));
 const CandidateExitPage       = lazyPage(() => import('./pages/CandidateExitPage'));
 const ApplyPage               = lazyPage(() => import('./pages/ApplyPage'));
 const TechDocsPage            = lazyPage(() => import('./pages/TechDocsPage'));
@@ -107,6 +110,7 @@ export default function App() {
                   <Route path="/face-interview/:sessionId" element={<FaceToFacePage />} />
                   <Route path="/join/:sessionId" element={<LiveInterviewPage />} />
                   <Route path="/interview-report/:sessionId" element={<InterviewReportPage />} />
+                  <Route path="/nasil-calisir" element={<TanitimPage />} />
                   <Route path="/exit" element={<CandidateExitPage />} />
                   <Route path="/apply/:positionId" element={<ApplyPage />} />
                   <Route path="/respond/:id" element={<CandidateRespondPage />} />
