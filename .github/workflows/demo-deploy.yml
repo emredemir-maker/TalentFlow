@@ -81,22 +81,34 @@ jobs:
           VITE_FIREBASE_MESSAGING_SENDER_ID: '212180859821'
           VITE_FIREBASE_APP_ID: '1:212180859821:web:d697aad6c5a6eaea89bf24'
 
+      # ── DOSYA ADI ".env", ".env.production" DEĞİL ────────────────────────
+      # Firebase Functions ortam dosyalarını şu adlarla arıyor: `.env`,
+      # `.env.<proje-kimliği>` ve `.env.<takma-ad>`. ".production" bir Vite
+      # kuralı; .firebaserc'de "production" diye bir takma ad OLMADIĞI için
+      # `.env.production` HİÇ OKUNMUYOR.
+      #
+      # Bu, ilk demo dağıtımında ortaya çıktı: dosya yazıldı, dağıtım geçti,
+      # ama fonksiyonun ortamında ne DEMO_MODE ne de tavanlar vardı — demo
+      # kilidi sessizce kapalıydı. Aynı hata üretim workflow'unda da duruyor
+      # (bkz. ayrı PR); orada fark edilmemesinin sebebi Cloud Run'ın eskiden
+      # elle girilmiş değişkenleri dağıtımlar arasında koruması.
+      #
       # ── EMAIL_USER / EMAIL_PASS BİLEREK YAZILMIYOR ────────────────────────
       # middleware/demoMode.js e-posta uçlarını zaten kapatıyor. Kimlik
       # bilgisini hiç göndermemek İKİNCİ savunma hattı: o kilitte bir hata
       # olsa bile nodemailer'ın gönderecek hesabı yok. Kurulumu işletenin
       # hesabından mesaj çıkmasının maliyeti, bu iki satırı atlamanın
       # rahatlığından çok daha yüksek.
-      - name: functions/.env.production oluştur
+      - name: functions/.env oluştur
         run: |
           printf 'VITE_GEMINI_API_KEY=%s\nVITE_FIREBASE_API_KEY=%s\nDEMO_MODE=true\nAI_DAILY_TOKEN_LIMIT=%s\nAI_DAILY_GROUNDED_LIMIT=%s\n' \
             "$GEMINI" \
             "$API_KEY" \
             "${DEMO_TOKEN_LIMIT:-2000000}" \
             "${DEMO_GROUNDED_LIMIT:-60}" \
-            > functions/.env.production
+            > functions/.env
           echo "✅ oluşturuldu:"
-          sed 's/=.*/=***/' functions/.env.production
+          sed 's/=.*/=***/' functions/.env
         env:
           GEMINI: ${{ secrets.DEMO_GEMINI_API_KEY }}
           API_KEY: ${{ secrets.DEMO_FIREBASE_API_KEY }}
