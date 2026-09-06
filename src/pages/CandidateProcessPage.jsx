@@ -15,6 +15,7 @@ import { usesCurrentRubric } from '../utils/coverageDetail';
 import { extractTextFromFile } from '../services/cvParser';
 import { calculateMatchScore, domainLabel, detectCandidateDomain, detectPositionDomain } from '../services/matchService';
 import { applyPiiMask, stripPiiForAI } from '../utils/pii';
+import { logAccess, ACCESS_ACTIONS } from '../services/accessLog';
 import { cleanRoleText, analysisForPosition, fullAnalysisForPosition } from '../utils/candidateTable';
 import { mustHaveGate, gateLabel } from '../utils/mustHaveGate';
 import { formatBytes, totalBytes, oversizedFiles, MAX_SOURCE_BYTES, MAX_SOURCES } from '../utils/bulkUpload';
@@ -135,6 +136,23 @@ export default function CandidateProcessPage() {
         window.addEventListener('openAddCandidate', handler);
         return () => window.removeEventListener('openAddCandidate', handler);
     }, []);
+
+    // ADAY DETAYI AÇILDIĞINDA DEFTERE YAZILIYOR.
+    //
+    // Kayıt burada, sayfanın kendisinde: listede gezinmek kişisel veriye
+    // erişim değil, ama bir adayın detayını açmak öyle — CV metni, iletişim
+    // bilgisi ve mülakat notları bu ekranda.
+    //
+    // Bağımlılık yalnızca aday kimliği: aynı adayda kalıp sekme değiştirmek
+    // yeni bir kayıt üretmiyor, defter okunabilir kalıyor.
+    useEffect(() => {
+        if (!viewCandidateId || !user?.uid) return;
+        logAccess(ACCESS_ACTIONS.CANDIDATE_VIEW, {
+            uid: user.uid,
+            email: user.email,
+            candidateId: viewCandidateId,
+        });
+    }, [viewCandidateId, user?.uid, user?.email]);
 
     // Unified "Adaya Mesaj Gönder" modal (Geri Bildirim + Bilgi İste)
     const [feedbackModal, setFeedbackModal]         = useState(false);

@@ -21,6 +21,7 @@ import MaintenancePanel from '../components/MaintenancePanel';
 import EvaluationEmailModal from '../components/EvaluationEmailModal';
 import { useAuth } from '../context/AuthContext';
 import { useCandidates } from '../context/CandidatesContext';
+import { logAccess, ACCESS_ACTIONS } from '../services/accessLog';
 import { usePositions } from '../context/PositionsContext';
 import { calculateMatchScore } from '../services/matchService';
 import { deepScanCandidate, rescanCandidateForPosition } from '../services/scanService';
@@ -627,6 +628,15 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, 'Adaylar');
             XLSX.writeFile(wb, `aday-raporu-${new Date().toISOString().slice(0, 10)}.xlsx`);
+            // TOPLU ÇIKARMA DEFTERE YAZILIYOR. Tek aday görüntülemekten farklı
+            // bir olay: yüzlerce kişinin verisi tek dosyada dışarı çıkıyor ve
+            // bir ihlal incelemesinde ilk bakılacak kayıt bu.
+            logAccess(ACCESS_ACTIONS.EXPORT, {
+                uid: user?.uid,
+                email: user?.email,
+                count: exportRows.length,
+                note: 'Excel',
+            });
         } catch (err) {
             console.error('[CandidatesTablePage] Excel export error:', err);
             alert('Excel dışa aktarma başarısız oldu: ' + err.message);
