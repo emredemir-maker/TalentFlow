@@ -13,6 +13,7 @@ import Sidebar from './components/Sidebar';
 import HrAssistantPanel from './components/HrAssistantPanel';
 import LoadingScreen from './components/LoadingScreen';
 import ErrorBoundary from './components/ErrorBoundary';
+import DemoBanner from './components/DemoBanner';
 // LoginPage stays eager — it's the first paint before auth resolves so
 // shipping a separate chunk just to wait for it on cold start hurts TTI.
 import LoginPage from './pages/LoginPage';
@@ -267,7 +268,12 @@ function AuthenticatedApp() {
 
   // Not authenticated? Show Login
   if (!isAuthenticated) {
-    return <LoginPage />;
+    return (
+      <>
+        <DemoBanner />
+        <LoginPage />
+      </>
+    );
   }
 
   // If user is anonymous (candidate), they should not see the dashboard
@@ -312,6 +318,9 @@ function AuthenticatedApp() {
         className={`flex-1 min-h-screen transition-all duration-300 min-w-0
           ${sidebarCollapsed ? 'lg:ml-[80px]' : 'lg:ml-[196px]'}`}
       >
+        {/* Demo kurulumunda her ekranın üstünde duruyor: havuzun ortak ve
+            geçici olduğunu bilmeden yüklenen gerçek bir CV geri alınamaz. */}
+        <DemoBanner />
         {/* In-app route changes — sidebar/header are already painted, so
             the inline spinner is enough until the page chunk arrives. */}
         {/* HER EKRAN KENDİ HATA SINIRI İÇİNDE.

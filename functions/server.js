@@ -22,6 +22,7 @@ import './config/integrations.js';
 
 // Middleware
 import { generalLimiter } from './middleware/rateLimit.js';
+import { demoBlock } from './middleware/demoMode.js';
 import { corsMiddleware } from './middleware/cors.js';
 import { helmetMiddleware, hppMiddleware } from './middleware/security.js';
 
@@ -76,6 +77,12 @@ app.set('trust proxy', 1);
 app.use(corsMiddleware);
 app.use(express.json({ limit: '5mb' }));
 app.use(generalLimiter);
+
+// DEMO KİLİDİ ROTALARDAN ÖNCE. Tek mount noktası: yarın email.js'e eklenecek
+// bir /api/send-... ucu da otomatik olarak kapalı doğuyor. Uçları tek tek
+// işaretlemek, listeye eklenmesi unutulan birinin sessizce açık kalması
+// demekti. DEMO_MODE tanımlı değilse hiçbir şey yapmıyor.
+app.use(demoBlock);
 
 // Serve static files from uploads directory (CV downloads, etc.)
 app.use('/uploads', express.static(path.join(uploadBaseDir, 'uploads')));
