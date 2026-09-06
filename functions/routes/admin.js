@@ -23,6 +23,7 @@ import { admin, db } from '../config/firebaseAdmin.js';
 import { integrationConfigs } from '../config/integrations.js';
 import { summarize } from '../services/usage.js';
 import { budgetLimits, todayUsage } from '../services/aiBudget.js';
+import { splitByRetention, storagePathFromUrl } from '../services/retention.js';
 import { childLogger } from '../services/logger.js';
 const log = childLogger('admin');
 
@@ -31,6 +32,9 @@ const router = Router();
 const INTEGRATIONS_DOC = 'artifacts/talent-flow/public/data/settings/integrations';
 const API_KEYS_DOC = 'artifacts/talent-flow/public/data/settings/api_keys';
 const USAGE_PATH = 'artifacts/talent-flow/public/data/usage';
+const SYSTEM_DOC = 'artifacts/talent-flow/public/data/settings/system';
+const CANDIDATES_PATH = 'artifacts/talent-flow/public/data/candidates';
+const ACCESS_LOG_PATH = 'artifacts/talent-flow/public/data/accessLogs';
 
 router.delete('/api/admin/auth-user/:uid', requireAuth(['super_admin']), async (req, res) => {
     try {
@@ -201,6 +205,130 @@ router.get('/api/admin/usage', requireAuth(['super_admin']), async (req, res) =>
     } catch (err) {
         log.error({ err }, '[admin/usage]');
         res.status(500).json({ error: 'Kullanım kaydı okunamadı.' });
+    }
+});
+
+// ─── Saklama süresi ve imha ───────────────────────────────────────────────────
+//
+// ── NEDEN VARSAYILAN KAPALI ─────────────────────────────────────────────────
+// Süre 6 ay olarak geliyor ama imha AÇIK GELMİYOR. Bu uç geri alınamayan bir
+// işlem yapıyor; ayarı görmeden, kaç kaydın gideceğini bilmeden çalışması
+// gereken bir şey değil. Ekran önce "şu an X kayıt süresini doldurmuş
+// görünüyor" diyor, açma kararını insan veriyor.
+//
+// ── SİLMEK YALNIZCA KAYIT DEĞİL ─────────────────────────────────────────────
+// CV dosyası Storage'da duruyor ve asıl hassas belge o. Kayıt silinip dosya
+// kalırsa "imha edildi" demek yanlış olur.
+
+/** Adayları okur ve saklama kararına göre ayırır. */
+async function retentionDurumu() {
+    const snap = await db.collection(CANDIDATES_PATH).get();
+    const adaylar = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+    const sys = await db.doc(SYSTEM_DOC).get();
+    const veri = sys.exists ? sys.data() : {};
+    // Varsayılan 6 ay. Ayar hiç yazılmamışsa da ekranda bir sayı görünsün ki
+    // "tanımlı değil" ile "6 ay seçilmiş" karışmasın.
+    const months = Number.isFinite(Number(veri?.retentionMonths))
+        ? Number(veri.retentionMonths)
+        : 6;
+    const enabled = veri?.retentionEnabled === true;
+
+    const { due, reasons } = splitByRetention(adaylar, { months });
+    return { adaylar, due, reasons, months, enabled, total: adaylar.length };
+}
+
+router.get('/api/admin/retention', requireAuth(['super_admin']), async (req, res) => {
+    try {
+        const d = await retentionDurumu();
+        res.json({
+            months: d.months,
+            enabled: d.enabled,
+            total: d.total,
+            dueCount: d.due.length,
+            reasons: d.reasons,
+        });
+    } catch (err) {
+        log.error({ err }, '[admin/retention GET]');
+        res.status(500).json({ error: 'Saklama ayarı okunamadı.' });
+    }
+});
+
+router.post('/api/admin/retention', requireAuth(['super_admin']), async (req, res) => {
+    const months = Number(req.body?.months);
+    const enabled = req.body?.enabled === true;
+    // 1-120 ay. Üst sınır yazım hatasına karşı: "600" yazan biri aslında
+    // hiç silmemeyi kastediyor olabilir ama sınırsız bir değer ayarı
+    // anlamsızlaştırır.
+    if (!Number.isFinite(months) || months < 1 || months > 120) {
+        return res.status(400).json({ error: 'Saklama süresi 1-120 ay arasında olmalı.' });
+    }
+    try {
+        await db.doc(SYSTEM_DOC).set({
+            retentionMonths: Math.floor(months),
+            retentionEnabled: enabled,
+            retentionUpdatedAt: new Date().toISOString(),
+            retentionUpdatedBy: req.user.uid,
+        }, { merge: true });
+        log.info({ months, enabled, by: req.user.uid }, 'saklama ayarı güncellendi');
+        res.json({ success: true });
+    } catch (err) {
+        log.error({ err }, '[admin/retention POST]');
+        res.status(500).json({ error: 'Saklama ayarı kaydedilemedi.' });
+    }
+});
+
+router.post('/api/admin/retention/purge', requireAuth(['super_admin']), async (req, res) => {
+    try {
+        const d = await retentionDurumu();
+        if (!d.enabled) {
+            return res.status(400).json({ error: 'İmha kapalı. Önce ayarlardan açın.' });
+        }
+        if (d.due.length === 0) {
+            return res.json({ deleted: 0, files: 0 });
+        }
+
+        let dosya = 0;
+        const bucket = admin.storage().bucket();
+
+        for (let i = 0; i < d.due.length; i += 400) {
+            const dilim = d.due.slice(i, i + 400);
+            const batch = db.batch();
+            for (const c of dilim) batch.delete(db.doc(`${CANDIDATES_PATH}/${c.id}`));
+            await batch.commit();
+
+            // Dosyalar kayıttan SONRA siliniyor: dosya silinip kayıt kalırsa
+            // ekranda açılmayan bir CV bağlantısı kalır. Tersi durumda yetim
+            // bir dosya kalır ve o bir sonraki turda temizlenebilir.
+            for (const c of dilim) {
+                const yol = storagePathFromUrl(c.cvUrl);
+                if (!yol) continue;
+                try {
+                    await bucket.file(yol).delete();
+                    dosya += 1;
+                } catch (err) {
+                    // Dosya zaten yoksa ya da silinemezse imha durmuyor.
+                    log.warn({ yol, err: err.message }, 'CV dosyası silinemedi');
+                }
+            }
+        }
+
+        // İMHA DA DEFTERE YAZILIYOR. Silme, erişimden daha ağır bir işlem;
+        // kimin ne zaman kaç kaydı imha ettiği kayıt altında olmalı.
+        await db.collection(ACCESS_LOG_PATH).add({
+            action: 'purge',
+            uid: req.user.uid,
+            email: req.user.email || '',
+            count: d.due.length,
+            note: `${d.months} ay · ${dosya} dosya`,
+            at: new Date().toISOString(),
+        });
+
+        log.info({ silinen: d.due.length, dosya, by: req.user.uid }, 'saklama süresi imhası');
+        res.json({ deleted: d.due.length, files: dosya });
+    } catch (err) {
+        log.error({ err }, '[admin/retention purge]');
+        res.status(500).json({ error: 'İmha tamamlanamadı.' });
     }
 });
 
