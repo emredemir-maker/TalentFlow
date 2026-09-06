@@ -1,0 +1,46 @@
+# BAĞIMLILIK GÜNCELLEMELERİ.
+#
+# Depoda 3 kritik ve 40'ın üzerinde yüksek seviye açık birikmişti; hiçbiri
+# yeni değildi, yalnızca kimse bakmıyordu. Tarama (ci.yml → audit) birikmeyi
+# görünür kılıyor, bu dosya birikmesini engelliyor.
+#
+# Haftalık ve GRUPLU: her paket için ayrı PR açmak, kimsenin bakmadığı bir
+# PR yığını üretiyor ve sonuç yine aynı oluyor. Tek bir haftalık PR okunuyor.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    groups:
+      # Güvenlik yamaları ayrı grupta: sürüm yükseltmelerinin arasında
+      # kaybolmasın, ayrıca ve öncelikle bakılabilsin.
+      guvenlik:
+        applies-to: security-updates
+        patterns: ['*']
+      bagimliliklar:
+        applies-to: version-updates
+        patterns: ['*']
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /functions
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    groups:
+      guvenlik:
+        applies-to: security-updates
+        patterns: ['*']
+      bagimliliklar:
+        applies-to: version-updates
+        patterns: ['*']
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
