@@ -74,6 +74,12 @@ jobs:
         run: npm run build
         env:
           VITE_DEMO_MODE: 'true'
+          # Giriş formu hazır dolu gelsin diye. Bu şifre gizli değil:
+          # paylaşılan demo hesabına ait ve zaten herkese açık olması
+          # gerekiyor. Ziyaretçinin bir yerden kopyalaması, demoyu
+          # denemenin önündeki gereksiz tek engeldi.
+          VITE_DEMO_LOGIN_EMAIL: ${{ vars.DEMO_USER_EMAIL || 'demo@example.com' }}
+          VITE_DEMO_LOGIN_PASSWORD: ${{ secrets.DEMO_USER_PASSWORD }}
           VITE_FIREBASE_API_KEY: ${{ secrets.DEMO_FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: talentflow-demo-6b894.firebaseapp.com
           VITE_FIREBASE_PROJECT_ID: talentflow-demo-6b894

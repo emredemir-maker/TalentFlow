@@ -1,7 +1,7 @@
 // src/pages/LoginPage.jsx
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { IS_DEMO } from '../utils/demoMode';
+import { IS_DEMO, DEMO_LOGIN, HAS_DEMO_LOGIN } from '../utils/demoMode';
 import { LogIn, AlertCircle, CheckCircle, Loader2, User, Mail, Lock, Sparkles, ArrowRight, Zap, Brain, BarChart3, Clock } from 'lucide-react';
 import TalentInnLogo from '../components/TalentInnLogo';
 
@@ -9,8 +9,12 @@ export default function LoginPage() {
     const { loginWithGoogle, loginWithEmail, registerWithEmail, loading, error } = useAuth();
 
     const [mode, setMode] = useState('login');
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
+    // DEMO KURULUMUNDA FORM HAZIR DOLU. Ziyaretçinin şifreyi bir yerden
+    // kopyalaması gerekmiyor: paylaşılan hesabın bilgileri yapı zamanında
+    // gömülüyor ve tek tıkla giriliyor. Üretimde bu sabitler boş olduğu için
+    // form bugünkü gibi boş açılıyor.
+    const [email, setEmail] = useState(HAS_DEMO_LOGIN ? DEMO_LOGIN.email : '');
+    const [password, setPassword] = useState(HAS_DEMO_LOGIN ? DEMO_LOGIN.password : '');
     const [name, setName] = useState('');
     const [success, setSuccess] = useState(null);
 
@@ -344,6 +348,17 @@ export default function LoginPage() {
                                         autoComplete="name"
                                     />
                                 </div>
+                            </div>
+                        )}
+
+                        {/* Demo kurulumunda alanlar hazır dolu geliyor; ziyaretçi
+                            bunu görmeden formu doldurmaya çalışabilir. */}
+                        {HAS_DEMO_LOGIN && (
+                            <div style={{
+                                background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '8px',
+                                padding: '10px 12px', fontSize: '12px', color: '#1E40AF', lineHeight: 1.5,
+                            }}>
+                                Demo hesabı hazır — <strong>Sisteme Giriş Yap</strong>'a basmanız yeterli.
                             </div>
                         )}
 

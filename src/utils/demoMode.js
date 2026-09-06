@@ -16,3 +16,18 @@ export const IS_DEMO = import.meta.env.VITE_DEMO_MODE === 'true';
 export const DEMO_NOTICE =
     'Bu bir demo kurulumu. Havuzdaki kayıtların tamamı uydurma ve ortak: '
     + 'eklediğiniz her şeyi diğer ziyaretçiler de görür. Gerçek bir CV yüklemeyin.';
+
+// ── PAYLAŞILAN DEMO HESABI ──────────────────────────────────────────────────
+// Bu şifre GİZLİ DEĞİL: paylaşılan bir demo hesabına ait ve zaten herkese
+// açık olması gerekiyor. Yapı zamanında geldiği için depoya yazılmıyor;
+// değiştirmek isteyen secret'ı güncelleyip yeniden dağıtıyor.
+//
+// Üretim yapısında bu değişkenler tanımlı olmadığı için sabitler boş kalıyor
+// ve giriş formu bugünkü gibi boş açılıyor.
+export const DEMO_LOGIN = {
+    email: import.meta.env.VITE_DEMO_LOGIN_EMAIL || '',
+    password: import.meta.env.VITE_DEMO_LOGIN_PASSWORD || '',
+};
+
+/** Formu hazır doldurabilecek kadar bilgi var mı? */
+export const HAS_DEMO_LOGIN = Boolean(IS_DEMO && DEMO_LOGIN.email && DEMO_LOGIN.password);
