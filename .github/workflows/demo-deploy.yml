@@ -127,7 +127,13 @@ jobs:
         if: ${{ inputs.seed }}
         run: node scripts/demo-seed/seed.mjs
         env:
-          DEMO_USER_EMAIL: ${{ vars.DEMO_USER_EMAIL || 'demo@talentflow.app' }}
+          # example.com IANA tarafından TAM OLARAK bu iş için ayrılmış (RFC 2606):
+          # kimseye ait olamaz, kimse kaydedemez. Sahip olmadığımız bir alan adını
+          # herkese açık bir giriş kimliği olarak yayımlamak, o adı gerçekten
+          # alan birinin demoyla ilişkilendirilmesine yol açardı. Hesap Admin SDK
+          # ile oluşturulduğu için doğrulama postası gitmiyor; çalışan bir posta
+          # kutusu olması gerekmiyor.
+          DEMO_USER_EMAIL: ${{ vars.DEMO_USER_EMAIL || 'demo@example.com' }}
           DEMO_USER_PASSWORD: ${{ secrets.DEMO_USER_PASSWORD }}
 
       - name: Adres
