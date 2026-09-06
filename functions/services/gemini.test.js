@@ -219,9 +219,15 @@ describe('generateGrounded — kaynak okuma', () => {
 });
 
 describe('parseProfile', () => {
-    // Each test uses a unique input text so the in-memory cache (keyed on
-    // prompt content) doesn't return a stale entry across tests.
-    const uniq = () => `profile-${Date.now()}-${Math.random()}`;
+    // Her test benzersiz bir girdi kullanıyor ki bellek önbelleği (istem
+    // içeriğine göre anahtarlanıyor) bir önceki testin cevabını döndürmesin.
+    //
+    // RAKAM KULLANILMIYOR: parseProfile artık metni maskeliyor ve telefon
+    // kalıbı uzun rakam dizilerini [TELEFON] yapıyor. Rakamla üretilen
+    // "benzersiz" kimlikler maskelemeden sonra AYNI metne dönüşüyor, istem
+    // aynılaşıyor ve testler birbirinin önbelleğini okuyordu.
+    let sayac = 0;
+    const uniq = () => `profil ${'abcdefghij'.slice(0, (sayac += 1) % 9 + 1)} referans`;
 
     it('parses well-formed JSON output and returns the object', async () => {
         const fakeProfile = {
@@ -240,7 +246,45 @@ describe('parseProfile', () => {
         });
 
         const result = await parseProfile(uniq());
-        expect(result).toEqual(fakeProfile);
+        // İLETİŞİM ALANLARI MODELDEN GELMİYOR. parseProfile artık metni
+        // maskeleyip modele öyle gönderiyor; ad/e-posta/telefon regex ile
+        // ayıklanıp sonuca geri ekleniyor. Girdi metninde iletişim bilgisi
+        // olmadığı için üçü de null.
+        expect(result).toEqual({
+            ...fakeProfile,
+            // Regex bir ad bulamadıysa modelin verdiği ad korunuyor: maskeleme
+            // adı kaçırmışsa bu bilgi zaten modele gitmiş demektir, geri
+            // almamak bir şey kazandırmaz — yalnızca kaydı eksik bırakırdı.
+            name: 'Ada Lovelace',
+            email: null,
+            phone: null,
+        });
+    });
+
+    it('KİMLİK BİLGİLERİ MODELE GÖNDERİLEN METİNDE YOK', async () => {
+        // Bu testin tuttuğu söz: "CV'deki kimlik bilgileri modele gitmez."
+        mockGenerateContent.mockResolvedValue({
+            response: { text: () => JSON.stringify({ name: null, position: 'Ürün Yöneticisi' }) },
+        });
+
+        await parseProfile('Zeynep Aksoy\nzeynep@ornek.com\n+90 532 111 22 33\nÜrün Yöneticisi');
+
+        const gonderilen = JSON.stringify(mockGenerateContent.mock.calls.at(-1));
+        expect(gonderilen).not.toContain('zeynep@ornek.com');
+        expect(gonderilen).not.toContain('532 111 22 33');
+        expect(gonderilen).not.toContain('Aksoy');
+        expect(gonderilen).toContain('[E-POSTA]');
+    });
+
+    it('ayıklanan iletişim bilgileri sonuca geri ekleniyor', async () => {
+        mockGenerateContent.mockResolvedValue({
+            response: { text: () => JSON.stringify({ name: null, position: 'Ürün Müdürü' }) },
+        });
+
+        const r = await parseProfile('Kerem Yalçın\nkerem@ornek.com\nÜrün Müdürü referans metni');
+        expect(r.name).toBe('Kerem Yalçın');
+        expect(r.email).toBe('kerem@ornek.com');
+        expect(r.position).toBe('Ürün Müdürü');
     });
 
     it('strips ```json fences before parsing', async () => {

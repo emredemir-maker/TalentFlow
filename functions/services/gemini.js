@@ -31,6 +31,7 @@ import { db } from '../config/firebaseAdmin.js';
 import { buildStructuredPrompt } from './promptGuard.js';
 import { childLogger } from './logger.js';
 import { recordUsage, readUsage } from './usage.js';
+import { extractPiiFromText, redactPiiFromText } from './pii.js';
 import { assertWithinBudget, noteSpend } from './aiBudget.js';
 
 const log = childLogger('gemini');
@@ -369,6 +370,19 @@ export function getDefaultCvParsingModel() {
 
 export async function parseProfile(text, modelId) {
     const effectiveModelId = modelId || getDefaultCvParsingModel();
+
+    // KİMLİK BİLGİLERİ MODELE GİTMİYOR.
+    //
+    // Önce regex ile ayıklanıyor, sonra metindeki yerleri imlerle
+    // değiştiriliyor; modele yalnızca maskelenmiş metin gidiyor ve ayıklanan
+    // değerler aşağıda sonuca geri ekleniyor.
+    //
+    // Bu yol eskiden HAM metni gönderip adı modelden istiyordu — istemci
+    // tarafındaki ayrıştırma ise maskeliyordu. Aynı ürün, hangi yoldan
+    // geçtiğine göre farklı bir gizlilik sözü veriyordu (bkz. services/pii.js).
+    const contact = extractPiiFromText(text);
+    const safeText = redactPiiFromText(String(text ?? ''), contact.name);
+
     // Profil metni güvenilmeyen girdidir (kazınmış sayfa / yüklenen CV) —
     // buildStructuredPrompt onu sınırlandırılmış veri bloğuna alır.
     const prompt = buildStructuredPrompt(
@@ -383,12 +397,17 @@ export async function parseProfile(text, modelId) {
     - education (Last school/degree)
     - summary (Professional summary in TURKISH, max 400 chars)
 
+    PRIVACY: The text has been anonymised. Wherever you see the placeholders
+    [İSİM], [E-POSTA], [TELEFON], [LINKEDIN] or [GITHUB], the original value was
+    removed on purpose. Return null for those fields and NEVER guess or
+    reconstruct them. Do not copy the placeholders into any output field.
+
     Mark missing fields as null.
     Add "source": "Auto Scraper".
     IMPORTANT: The input text might be in any language, but ALL output text fields MUST be in TURKISH.
 
     Return ONLY raw JSON. No markdown.`,
-        { PROFILE_TEXT: String(text ?? '').slice(0, 20000) }
+        { PROFILE_TEXT: safeText.slice(0, 20000) }
     );
 
     try {
@@ -396,10 +415,36 @@ export async function parseProfile(text, modelId) {
         const responseText = (await generateText(prompt, { modelId: effectiveModelId }))
             .replace(/```json/g, '').replace(/```/g, '').trim();
         const json = JSON.parse(responseText);
-        log.info({ name: json.name, modelId: effectiveModelId }, '✅ Parsed profile');
-        return json;
+        // AD LOGA YAZILMIYOR. Cloud Logging kayıtları uzun süre saklanıyor ve
+        // ayrı bir erişim yüzeyi; aday adını oraya yazmak, veriyi korumak için
+        // uğraştığımız yerin dışına ikinci bir kopya çıkarmak olurdu.
+        log.info({ modelId: effectiveModelId }, '✅ Parsed profile');
+        return mergeContact(json, contact);
     } catch (e) {
         log.error({ err: e, modelId: effectiveModelId }, 'Profile parse error');
         return null;
     }
+}
+
+/**
+ * Regex ile ayıklanan iletişim bilgilerini ayrıştırma sonucuna geri ekler.
+ *
+ * Modelden gelen değere GÜVENİLMİYOR: metin maskelendiği için model bu
+ * alanları uydurmuş ya da imin kendisini ("[İSİM]") yazmış olabilir.
+ */
+export function mergeContact(parsed, contact) {
+    if (!parsed || typeof parsed !== 'object') return parsed;
+    const imMi = (v) => typeof v === 'string' && /\[(İSİM|E-POSTA|TELEFON|LINKEDIN|GITHUB)\]/.test(v);
+    const temiz = (v) => (imMi(v) ? null : v);
+    return {
+        ...parsed,
+        name: contact?.name || temiz(parsed.name) || null,
+        email: contact?.email || null,
+        phone: contact?.phone || null,
+        ...(contact?.linkedinUrl ? { linkedinUrl: contact.linkedinUrl } : {}),
+        position: temiz(parsed.position),
+        company: temiz(parsed.company),
+        location: temiz(parsed.location),
+        summary: temiz(parsed.summary),
+    };
 }
