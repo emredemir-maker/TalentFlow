@@ -138,7 +138,7 @@ jobs:
       # spots without running the suite locally.
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-html
           path: coverage/
@@ -210,14 +210,14 @@ jobs:
       # doesn't require rerunning locally.
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
       - name: Upload Playwright traces
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-traces
           path: test-results/
@@ -260,14 +260,14 @@ jobs:
           CI: 'true'
       - name: Upload Playwright report (auth)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report-auth
           path: playwright-report-auth/
           retention-days: 7
       - name: Upload Playwright traces (auth)
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-traces-auth
           path: test-results/
@@ -322,14 +322,14 @@ jobs:
           CI: 'true'
       - name: Upload Playwright report (emulator)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report-emulator
           path: playwright-report-emulator/
           retention-days: 7
       - name: Upload Playwright traces (emulator)
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-traces-emulator
           path: test-results/
