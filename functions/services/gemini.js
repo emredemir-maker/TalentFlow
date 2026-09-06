@@ -175,7 +175,7 @@ export async function generateText(prompt, options = {}) {
             const tuketim = readUsage(result.response);
             // Yerel sayaç ANINDA artıyor: Firestore yazması beklenmiyor ve
             // iki tazeleme arasında freni ayakta tutan tek şey bu toplam.
-            noteSpend(tuketim.totalTokens);
+            noteSpend({ totalTokens: tuketim.totalTokens });
             void recordUsage({ label, modelId, usage: tuketim }).catch(() => {});
             if (key) cacheSet(key, text);
             return text;
@@ -300,7 +300,11 @@ export async function generateGrounded(prompt, options = {}) {
     // ARAMALI ÇAĞRI EN PAHALISI — fren burada da geçerli. Aşağıdaki aramasız
     // son çare zaten generateText'ten geçiyor ve orada da denetleniyor; ama
     // aramalı denemeyi hiç başlatmamak gerekiyor.
-    await assertWithinBudget();
+    //
+    // grounded:true — ADET tavanı da denetleniyor. Arama destekli çağrılar
+    // token'dan bağımsız, istek başına faturalanıyor: token tavanı bu kalemi
+    // GÖRMÜYOR.
+    await assertWithinBudget({ grounded: true });
 
     const apiKey = await getApiKey();
     if (!apiKey) throw new Error('AI service unavailable — API key missing');
@@ -321,7 +325,7 @@ export async function generateGrounded(prompt, options = {}) {
                 grounded: true,
             };
             const tuketim = readUsage(result.response);
-            noteSpend(tuketim.totalTokens);
+            noteSpend({ totalTokens: tuketim.totalTokens, grounded: true });
             void recordUsage({ label: 'grounded', modelId, usage: tuketim }).catch(() => {});
             if (key) cacheSet(key, value);
             return value;

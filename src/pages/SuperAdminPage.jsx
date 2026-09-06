@@ -11,6 +11,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
+import AiUsagePanel from '../components/AiUsagePanel';
 
 const USERS_PATH = 'artifacts/talent-flow/public/data/users';
 const INVITATIONS_PATH = 'artifacts/talent-flow/public/data/invitations';
@@ -312,7 +313,8 @@ export default function SuperAdminPage() {
                 {[
                     { id: 'users', label: 'Kullanıcılar' },
                     { id: 'domains', label: 'Domain Yönetimi' },
-                    { id: 'settings', label: 'Sistem Ayarları' }
+                    { id: 'settings', label: 'Sistem Ayarları' },
+                    { id: 'usage', label: 'AI Kullanımı' }
                 ].map(t => (
                     <button
                         key={t.id}
@@ -325,6 +327,8 @@ export default function SuperAdminPage() {
                     </button>
                 ))}
             </div>
+
+            {activeTab === 'usage' && <AiUsagePanel />}
 
             {activeTab === 'domains' && (
                 <div className="max-w-lg space-y-4">

@@ -10,6 +10,20 @@
 // paylaşılan bir demoda anahtar İŞLETMECİNİN, faturayı da o ödüyor. Tavanı
 // Google'ın kesmesine bırakmak, faturayı tavan kadar ödemek demek.
 //
+// ── İKİ AYRI TAVAN, ÇÜNKÜ İKİ AYRI FATURA KALEMİ ────────────────────────────
+//   AI_DAILY_TOKEN_LIMIT    — günlük toplam token
+//   AI_DAILY_GROUNDED_LIMIT — günlük ARAMALI çağrı ADEDİ
+//
+// İkincisi şart: Google, arama destekli çağrıları (Grounding with Google
+// Search) token'dan BAĞIMSIZ olarak istek başına faturalandırıyor. Aramalı bir
+// çağrı az token yakıp çok fatura yazabiliyor, yani token tavanı bu kalemi
+// GÖRMÜYOR. Şirket doğrulaması tam da bunu kullanıyor ve demo ortamında en
+// kolay tetiklenen özellik.
+//
+// Aynı sebeple usage.js'teki maliyet tahmini de bu kalemi göstermiyor
+// (PRICING yalnızca token fiyatı taşıyor) — ekranda "arama çağrısı" adedi ayrı
+// gösteriliyor ki fatura ile rapor arasındaki fark görünür olsun.
+//
 // ── NE YAPMIYOR ─────────────────────────────────────────────────────────────
 // Tek bir çağrıyı ortasından kesmiyor. Bir çağrının kaç token yakacağı ancak
 // bittiğinde bilinir, dolayısıyla kural şu: "günün toplamı sınırı geçtiyse
@@ -18,14 +32,14 @@
 // alternatifi, yarım kalmış cevapları kullanıcıya hata olarak göstermek.
 //
 // ── VARSAYILAN KAPALI ───────────────────────────────────────────────────────
-// `AI_DAILY_TOKEN_LIMIT` tanımlı değilse ya da 0 ise fren yoktur ve davranış
-// bugünküyle birebir aynıdır. Mevcut kurulumun çalışma biçimini bir ortam
-// değişkeni sessizce değiştirmemeli; freni isteyen açar.
+// Değişkenler tanımlı değilse ya da 0 ise fren yoktur ve davranış bugünküyle
+// birebir aynıdır. Mevcut kurulumun çalışma biçimini bir ortam değişkeni
+// sessizce değiştirmemeli; freni isteyen açar.
 //
-// Sınır TOKEN cinsinden, çünkü ölçtüğümüz şey bu. Para karşılığı bir TAHMİN
-// (bkz. usage.js PRICING: fiyatlar değişir) ve tahmine dayanarak servisi
-// durdurmak istemedik. Kabaca çevirmek için: gemini-2.5-flash'ta 1M çıktı
-// token'ı ≈ $2.50, 1M girdi ≈ $0.30. Günde ~$5'lık bir tavan için
+// Token sınırı TOKEN cinsinden, çünkü ölçtüğümüz şey bu. Para karşılığı bir
+// TAHMİN (bkz. usage.js PRICING: fiyatlar değişir) ve tahmine dayanarak
+// servisi durdurmak istemedik. Kabaca çevirmek için: gemini-2.5-flash'ta 1M
+// çıktı token'ı ≈ $2.50, 1M girdi ≈ $0.30. Günde ~$5'lık bir tavan için
 // 2_000_000 iyi bir başlangıç.
 
 import { db } from '../config/firebaseAdmin.js';
@@ -37,73 +51,95 @@ const log = childLogger('aiBudget');
 /** Firestore'a en fazla bu sıklıkta sorulur — her AI çağrısında değil. */
 const REFRESH_MS = 60_000;
 
+/** Hatanın makine tarafında tanınması için sabit im. */
+export const BUDGET_MARKER = 'AI_DAILY_BUDGET_EXCEEDED';
+
 /**
- * Ortam değişkeninden günlük token sınırı.
+ * Ortam değişkenini pozitif tam sayıya çevirir.
  *
- * Her çağrıda okunuyor (modül yüklenirken bir kez değil): testler değeri
- * değiştirebilsin ve yanlış yazılmış bir değer sessizce "sınırsız"a
- * dönüşmesin diye ayrı bir fonksiyon.
- *
- * @returns {number} 0 = fren kapalı
+ * Sayı olmayan değer 0 döndürüyor VE loglanıyor: "AI_DAILY_TOKEN_LIMIT=iki
+ * milyon" yazan biri freni kurduğunu sanıp korumasız kalırdı.
  */
-export function budgetLimit() {
-    const raw = process.env.AI_DAILY_TOKEN_LIMIT;
+function limitFromEnv(name) {
+    const raw = process.env[name];
     if (raw === undefined || raw === null || String(raw).trim() === '') return 0;
     const n = Number(raw);
     if (!Number.isFinite(n) || n <= 0) {
-        // SESSİZ KALMIYOR. "AI_DAILY_TOKEN_LIMIT=iki milyon" yazan biri freni
-        // kurduğunu sanıp korumasız kalırdı.
-        log.warn({ raw }, 'AI_DAILY_TOKEN_LIMIT sayı değil — günlük bütçe freni KAPALI');
+        log.warn({ name, raw }, 'sınır sayı değil — bu fren KAPALI');
         return 0;
     }
     return Math.floor(n);
 }
 
-/** Hatanın makine tarafında tanınması için sabit im. */
-export const BUDGET_MARKER = 'AI_DAILY_BUDGET_EXCEEDED';
+/**
+ * Yürürlükteki günlük sınırlar.
+ *
+ * Her çağrıda okunuyor (modül yüklenirken bir kez değil): testler değeri
+ * değiştirebilsin ve dağıtım sonrası değişiklik yeniden başlatma beklemesin.
+ *
+ * @returns {{tokens: number, groundedCalls: number}} 0 = o fren kapalı
+ */
+export function budgetLimits() {
+    return {
+        tokens: limitFromEnv('AI_DAILY_TOKEN_LIMIT'),
+        groundedCalls: limitFromEnv('AI_DAILY_GROUNDED_LIMIT'),
+    };
+}
 
 // Günün harcaması — Firestore'a her çağrıda gitmemek için bellekte tutuluyor.
 // Süreç başına ayrı; birden fazla örnek çalışıyorsa her biri kendi payını
 // sayar ve gerçek toplam ancak yenilemede görünür. Bu yüzden yenileme aralığı
 // kısa: sapma en fazla bir dakikalık trafik kadar olabilir.
-let cache = { day: null, used: 0, at: 0 };
+let cache = { day: null, tokens: 0, groundedCalls: 0, at: 0 };
 
 /** Testler için — modül durumu sıfırlanır. */
 export function resetBudgetCache() {
-    cache = { day: null, used: 0, at: 0 };
+    cache = { day: null, tokens: 0, groundedCalls: 0, at: 0 };
 }
 
-/** Günün toplam token'ını Firestore'daki ölçüm dokümanından okur. */
-async function fetchUsedFromFirestore(day) {
+/** Ölçüm dokümanını okur. Aramalı çağrı adedi `byLabel.grounded.calls`. */
+async function fetchTodayFromFirestore(day) {
     const snap = await db.doc(`artifacts/talent-flow/public/data/usage/${day}`).get();
-    return Number(snap.data()?.totals?.totalTokens) || 0;
+    const d = snap.data() || {};
+    return {
+        tokens: Number(d?.totals?.totalTokens) || 0,
+        groundedCalls: Number(d?.byLabel?.grounded?.calls) || 0,
+    };
 }
 
 /**
- * Günün harcamasını döndürür; gerekiyorsa Firestore'dan tazeler.
+ * Günün tüketimini döndürür; gerekiyorsa Firestore'dan tazeler.
  *
  * @param {Date} now
- * @param {(day: string) => Promise<number>} fetchUsed — testler için
+ * @param {(day: string) => Promise<{tokens: number, groundedCalls: number}>} fetchToday
+ * @returns {Promise<{tokens: number, groundedCalls: number}>}
  */
-export async function usedToday(now, fetchUsed = fetchUsedFromFirestore) {
+export async function todayUsage(now, fetchToday = fetchTodayFromFirestore) {
     const day = dayKey(now);
     const sameDay = cache.day === day;
-    if (sameDay && Date.now() - cache.at < REFRESH_MS) return cache.used;
+    if (sameDay && Date.now() - cache.at < REFRESH_MS) {
+        return { tokens: cache.tokens, groundedCalls: cache.groundedCalls };
+    }
 
     try {
-        const used = await fetchUsed(day);
+        const uzak = await fetchToday(day);
         // YEREL SAYIM KAYBOLMASIN. Firestore'daki yazma gecikmeli
         // (recordUsage beklenmiyor); tazeleme sırasında elimizdeki sayı
         // sunucudakinden büyükse büyüğü tutuyoruz, yoksa fren bir dakikalık
         // trafiği görmezden gelir.
-        cache = { day, used: sameDay ? Math.max(used, cache.used) : used, at: Date.now() };
+        cache = {
+            day,
+            tokens: sameDay ? Math.max(uzak.tokens, cache.tokens) : uzak.tokens,
+            groundedCalls: sameDay ? Math.max(uzak.groundedCalls, cache.groundedCalls) : uzak.groundedCalls,
+            at: Date.now(),
+        };
     } catch (err) {
         // ÖLÇÜM HATASI SERVİSİ DURDURMAZ — usage.js ile aynı kural. Okuyamadık
         // diye "bütçe doldu" demek, çalışan bir kurulumu kapatmak olurdu.
         log.warn({ err: err.message }, 'günlük kullanım okunamadı — eldeki sayıyla devam');
-        if (!sameDay) cache = { day, used: 0, at: Date.now() };
+        if (!sameDay) cache = { day, tokens: 0, groundedCalls: 0, at: Date.now() };
     }
-    return cache.used;
+    return { tokens: cache.tokens, groundedCalls: cache.groundedCalls };
 }
 
 /**
@@ -111,37 +147,51 @@ export async function usedToday(now, fetchUsed = fetchUsedFromFirestore) {
  *
  * Firestore'a yazma zaten `recordUsage` ile yapılıyor ama beklenmiyor; iki
  * tazeleme arasında freni ayakta tutan şey bu yerel toplam.
+ *
+ * @param {{totalTokens?: number, grounded?: boolean, now?: Date}} input
  */
-export function noteSpend(totalTokens, now = new Date()) {
-    const n = Number(totalTokens);
-    if (!Number.isFinite(n) || n <= 0) return;
+export function noteSpend({ totalTokens = 0, grounded = false, now = new Date() } = {}) {
     const day = dayKey(now);
-    if (cache.day !== day) cache = { day, used: 0, at: Date.now() };
-    cache.used += n;
+    if (cache.day !== day) cache = { day, tokens: 0, groundedCalls: 0, at: Date.now() };
+    const n = Number(totalTokens);
+    if (Number.isFinite(n) && n > 0) cache.tokens += n;
+    if (grounded) cache.groundedCalls += 1;
 }
 
 /**
  * Bütçe doluysa hata fırlatır.
  *
+ * @param {{grounded?: boolean, now?: Date, fetchToday?: Function}} input
+ *   grounded — aramalı çağrı mı? Öyleyse ADET tavanı da denetlenir.
  * @throws {Error} mesajı BUDGET_MARKER içerir — arayüz bunu Google'ın
  *   kotasından ayırt edip doğru tavsiyeyi verebilsin diye (utils/aiErrorHint).
  */
-export async function assertWithinBudget({ now = new Date(), fetchUsed } = {}) {
-    const limit = budgetLimit();
-    if (limit <= 0) return;
+export async function assertWithinBudget({ grounded = false, now = new Date(), fetchToday } = {}) {
+    const limits = budgetLimits();
+    const denetlenecek = limits.tokens > 0 || (grounded && limits.groundedCalls > 0);
+    if (!denetlenecek) return;
 
-    const used = await usedToday(now, fetchUsed || fetchUsedFromFirestore);
-    if (used < limit) return;
+    const used = await todayUsage(now, fetchToday || fetchTodayFromFirestore);
 
-    // Tamamı çıktı token'ı sayılarak hesaplanıyor: çıktı girdinin ~8 katı
-    // fiyatlı olduğu için bu bir ÜST SINIR, gerçek tutar bunun altında.
-    // Elimizde yalnızca toplam var; ikisini ayırmak için ölçüm dokümanını
-    // etiket etiket okumak gerekirdi ve bu satır bir hata mesajı.
-    const enCok = estimateCost({ outTokens: used, modelId: 'gemini-2.5-flash' });
-    log.warn({ used, limit }, 'günlük AI bütçesi doldu — yeni çağrı başlatılmıyor');
-    throw new Error(
-        `${BUDGET_MARKER}: Bu kurulumun günlük AI bütçesi doldu `
-        + `(${used.toLocaleString('tr-TR')} / ${limit.toLocaleString('tr-TR')} token, `
-        + `en çok ~$${enCok.toFixed(2)}). Sayaç UTC gece yarısı sıfırlanır.`
-    );
+    if (grounded && limits.groundedCalls > 0 && used.groundedCalls >= limits.groundedCalls) {
+        log.warn({ used: used.groundedCalls, limit: limits.groundedCalls }, 'günlük aramalı çağrı sınırı doldu');
+        throw new Error(
+            `${BUDGET_MARKER}: Bu kurulumun günlük aramalı arama sınırı doldu `
+            + `(${used.groundedCalls} / ${limits.groundedCalls} çağrı). `
+            + 'Arama destekli çağrılar token dışında ayrıca faturalanır. '
+            + 'Sayaç UTC gece yarısı sıfırlanır.'
+        );
+    }
+
+    if (limits.tokens > 0 && used.tokens >= limits.tokens) {
+        // Tamamı çıktı token'ı sayılarak hesaplanıyor: çıktı girdinin ~8 katı
+        // fiyatlı olduğu için bu bir ÜST SINIR, gerçek tutar bunun altında.
+        const enCok = estimateCost({ outTokens: used.tokens, modelId: 'gemini-2.5-flash' });
+        log.warn({ used: used.tokens, limit: limits.tokens }, 'günlük AI bütçesi doldu — yeni çağrı başlatılmıyor');
+        throw new Error(
+            `${BUDGET_MARKER}: Bu kurulumun günlük AI bütçesi doldu `
+            + `(${used.tokens.toLocaleString('tr-TR')} / ${limits.tokens.toLocaleString('tr-TR')} token, `
+            + `en çok ~$${enCok.toFixed(2)}). Sayaç UTC gece yarısı sıfırlanır.`
+        );
+    }
 }
