@@ -1,0 +1,134 @@
+# DEMO KURULUMU DAĞITIMI — ayrı proje, ayrı anahtar, ayrı yapı.
+#
+# ── NEDEN AYRI DOSYA ──────────────────────────────────────────────────────────
+# Üretim dağıtımı firebase.json'daki `site: talentflow-84bb6` ile sabit. Aynı
+# workflow'u parametreleştirmek, bir hata durumunda demo yapısının ÜRETİME
+# gitmesi (ya da tersi) anlamına gelebilirdi. İki ayrı dosya, iki ayrı config,
+# iki ayrı secret kümesi — karışma ihtimali yok.
+#
+# ── NEDEN YALNIZCA ELLE TETİKLENİYOR ─────────────────────────────────────────
+# `push` tetikleyicisi YOK. main'e yapılan her merge demoyu güncellemiyor:
+# demo, tanıtımda gösterilen ve linki paylaşılan bir kurulum; ne zaman
+# değişeceğine insan karar vermeli.
+name: Deploy Demo
+
+on:
+  workflow_dispatch:
+    inputs:
+      seed:
+        description: 'Havuzu sıfırla ve demo verisiyle yeniden doldur'
+        type: boolean
+        default: true
+
+concurrency:
+  group: demo-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Demo kurulumuna dağıt
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    env:
+      DEMO_PROJECT_ID: talentflow-demo-6b894
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Gerekli secret'lar tanımlı mı
+        run: |
+          eksik=""
+          [ -z "$SA" ]      && eksik="$eksik DEMO_FIREBASE_SERVICE_ACCOUNT"
+          [ -z "$API_KEY" ] && eksik="$eksik DEMO_FIREBASE_API_KEY"
+          [ -z "$GEMINI" ]  && eksik="$eksik DEMO_GEMINI_API_KEY"
+          [ -z "$PW" ]      && eksik="$eksik DEMO_USER_PASSWORD"
+          if [ -n "$eksik" ]; then
+            echo "❌ Eksik secret:$eksik"
+            exit 1
+          fi
+          echo "✅ Secret'lar tamam"
+        env:
+          SA: ${{ secrets.DEMO_FIREBASE_SERVICE_ACCOUNT }}
+          API_KEY: ${{ secrets.DEMO_FIREBASE_API_KEY }}
+          GEMINI: ${{ secrets.DEMO_GEMINI_API_KEY }}
+          PW: ${{ secrets.DEMO_USER_PASSWORD }}
+
+      - name: Bağımlılıklar
+        run: npm install
+
+      - name: Fonksiyon bağımlılıkları
+        run: npm install
+        working-directory: ./functions
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: true
+
+      # Demo yapısı: VITE_DEMO_MODE arayüzdeki uyarı bandını açıyor ve
+      # sağlayıcısı kapalı olan Google giriş düğmesini gizliyor.
+      - name: Ön yüzü derle
+        run: npm run build
+        env:
+          VITE_DEMO_MODE: 'true'
+          VITE_FIREBASE_API_KEY: ${{ secrets.DEMO_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: talentflow-demo-6b894.firebaseapp.com
+          VITE_FIREBASE_PROJECT_ID: talentflow-demo-6b894
+          VITE_FIREBASE_STORAGE_BUCKET: talentflow-demo-6b894.firebasestorage.app
+          VITE_FIREBASE_MESSAGING_SENDER_ID: '212180859821'
+          VITE_FIREBASE_APP_ID: '1:212180859821:web:d697aad6c5a6eaea89bf24'
+
+      # ── EMAIL_USER / EMAIL_PASS BİLEREK YAZILMIYOR ────────────────────────
+      # middleware/demoMode.js e-posta uçlarını zaten kapatıyor. Kimlik
+      # bilgisini hiç göndermemek İKİNCİ savunma hattı: o kilitte bir hata
+      # olsa bile nodemailer'ın gönderecek hesabı yok. Kurulumu işletenin
+      # hesabından mesaj çıkmasının maliyeti, bu iki satırı atlamanın
+      # rahatlığından çok daha yüksek.
+      - name: functions/.env.production oluştur
+        run: |
+          printf 'VITE_GEMINI_API_KEY=%s\nVITE_FIREBASE_API_KEY=%s\nDEMO_MODE=true\nAI_DAILY_TOKEN_LIMIT=%s\nAI_DAILY_GROUNDED_LIMIT=%s\n' \
+            "$GEMINI" \
+            "$API_KEY" \
+            "${DEMO_TOKEN_LIMIT:-2000000}" \
+            "${DEMO_GROUNDED_LIMIT:-60}" \
+            > functions/.env.production
+          echo "✅ oluşturuldu:"
+          sed 's/=.*/=***/' functions/.env.production
+        env:
+          GEMINI: ${{ secrets.DEMO_GEMINI_API_KEY }}
+          API_KEY: ${{ secrets.DEMO_FIREBASE_API_KEY }}
+          # Tavanlar secret DEĞİL — değiştirmek için repo değişkeni yeterli.
+          DEMO_TOKEN_LIMIT: ${{ vars.DEMO_TOKEN_LIMIT }}
+          DEMO_GROUNDED_LIMIT: ${{ vars.DEMO_GROUNDED_LIMIT }}
+
+      - name: Google Cloud kimliği
+        run: |
+          echo '${{ secrets.DEMO_FIREBASE_SERVICE_ACCOUNT }}' > /tmp/demo-sa.json
+          echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/demo-sa.json" >> $GITHUB_ENV
+
+      - name: Firebase CLI
+        run: npm install -g firebase-tools
+
+      # --config firebase.demo.json: üretim config'i hosting site'ını
+      # talentflow-84bb6'ya sabitliyor. Yanlış config ile yapılan bir dağıtım
+      # demo yapısını üretime gönderirdi.
+      - name: Dağıt
+        run: |
+          firebase deploy \
+            --only hosting,functions,firestore,storage \
+            --config firebase.demo.json \
+            --project "$DEMO_PROJECT_ID" \
+            --non-interactive
+
+      - name: Havuzu tohumla
+        if: ${{ inputs.seed }}
+        run: node scripts/demo-seed/seed.mjs
+        env:
+          DEMO_USER_EMAIL: ${{ vars.DEMO_USER_EMAIL || 'demo@talentflow.app' }}
+          DEMO_USER_PASSWORD: ${{ secrets.DEMO_USER_PASSWORD }}
+
+      - name: Adres
+        run: echo "🌐 https://$DEMO_PROJECT_ID.web.app"
