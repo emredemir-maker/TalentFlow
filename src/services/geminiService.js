@@ -152,7 +152,7 @@ Sadece şu JSON formatında dön (başka hiçbir şey yazma):
 
 export async function getAvailableModels() {
     return [
-        { id: 'gemini-2.5-flash', displayName: 'Gemini 2.5 Flash (Fast & Deterministic)' }
+        { id: 'gemini-3.6-flash', displayName: 'Gemini 3.6 Flash (Fast & Deterministic)' }
     ];
 }
 

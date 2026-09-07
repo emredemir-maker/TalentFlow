@@ -91,8 +91,14 @@ describe('generateText', () => {
         });
 
         const prompt = `model-distinct-${Date.now()}-${Math.random()}`;
-        await generateText(prompt, { modelId: 'gemini-2.5-flash' });
-        await generateText(prompt, { modelId: 'gemini-2.5-pro' });
+        // Fixture, emekli model eşlemesi eklendiğinde güncellendi. Eskiden
+        // 'gemini-2.5-flash' + 'gemini-2.5-pro' kullanıyordu; ikisi de artık
+        // aynı güncel modele çözümlendiği için önbellek anahtarları da
+        // haklı olarak aynı çıkıyordu ve test kendi kurgusuyla çakışıyordu.
+        // Önbellek İSTENEN değil KULLANILAN modele göre anahtarlanıyor:
+        // aynı modelden aynı cevabı iki kez istemek gereksiz.
+        await generateText(prompt, { modelId: 'gemini-3.6-flash' });
+        await generateText(prompt, { modelId: 'gemini-3.8-flash' });
         // Different model = different cache key = both calls hit the model
         expect(mockGenerateContent).toHaveBeenCalledTimes(2);
     });
@@ -403,7 +409,11 @@ describe('parseProfile model resolution', () => {
         spy.mockRestore();
     });
 
-    it('falls back to gemini-2.5-flash when neither arg nor env var is set', async () => {
+    // Varsayılan kimlik hâlâ 'gemini-2.5-flash'; ama o model yeni API
+    // anahtarlarına kapatıldığı için sunucu çağrıdan hemen önce güncel
+    // karşılığına çeviriyor. Test SDK'ya GERÇEKTEN giden kimliği ölçüyor —
+    // ölçülmesi gereken de o, çünkü canlıda kırılan yer orasıydı.
+    it("varsayılan model, emekli kimlik yerine güncelini SDK'ya gönderiyor", async () => {
         delete process.env.CV_PARSING_MODEL;
         mockGenerateContent.mockResolvedValue({
             response: { text: () => '{"name":"Z"}' },
@@ -414,7 +424,7 @@ describe('parseProfile model resolution', () => {
 
         await parseProfile('text-' + Math.random());
         const call = spy.mock.calls.at(-1);
-        expect(call?.[0]?.model).toBe('gemini-2.5-flash');
+        expect(call?.[0]?.model).toBe('gemini-3.6-flash');
         spy.mockRestore();
     });
 });

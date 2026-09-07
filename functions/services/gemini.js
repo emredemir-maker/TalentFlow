@@ -43,6 +43,42 @@ const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 const MAX_CACHE_ENTRIES = 200;
 const cache = new Map();
 
+// ─── EMEKLİ MODEL EŞLEMESİ ───────────────────────────────────────────────────
+//
+// CANLIDA OLDU: Gemini API anahtarı yenilendi ve uygulama anında çalışmayı
+// bıraktı. Sebebi kota ya da yetki değil, şuydu:
+//
+//   404 — "models/gemini-2.5-flash is no longer available to new users.
+//          Please update your code to use models/gemini-3.6-flash"
+//
+// Model, ESKİ anahtarlar için çalışmaya devam ediyor ama YENİ anahtarlara
+// kapalı. Yani kod hiç değişmeden, yalnızca anahtar döndürüldüğü için
+// bozuldu — ve hata mülakat soruları üretilirken, kullanıcı toplantıdayken
+// çıktı.
+//
+// Model kimliği arayüzde 30 ayrı çağrı noktasına yazılmıştı. Eşlemenin
+// BURADA olmasının sebebi bu: istemcinin gönderdiği kimlik ne olursa olsun
+// tek bir yerden geçiyor. Bir model daha emekliye ayrıldığında değişecek
+// yer yine tek satır olacak.
+//
+// Sunucu, istemciden gelen model kimliğine körü körüne güvenmemeli zaten:
+// istemci paketi kullanıcının tarayıcısında önbellekte kalabiliyor ve
+// dağıtımdan sonra bile eski kimliği göndermeye devam ediyor.
+const EMEKLI_MODELLER = {
+    'gemini-2.5-flash': 'gemini-3.6-flash',
+    'gemini-2.5-pro': 'gemini-3.6-flash',
+    'gemini-1.5-flash': 'gemini-3.6-flash',
+    'gemini-1.5-pro': 'gemini-3.6-flash',
+};
+
+/** Emekli bir model istendiyse güncel karşılığını döndürür. */
+export function modeliCozumle(modelId) {
+    const yedek = EMEKLI_MODELLER[modelId];
+    if (!yedek) return modelId;
+    log.info({ istenen: modelId, kullanilan: yedek }, 'emekli model eşlendi');
+    return yedek;
+}
+
 function cacheKey(prompt, modelId, generationConfig) {
     const h = crypto.createHash('sha256');
     h.update(modelId);
@@ -126,7 +162,8 @@ const MAX_RETRIES = 4;
  * @throws if no API key is configured or if all retries are exhausted
  */
 export async function generateText(prompt, options = {}) {
-    const { modelId = 'gemini-2.5-flash', generationConfig, useCache = true, label = 'other' } = options;
+    const { modelId: istenenModel = 'gemini-2.5-flash', generationConfig, useCache = true, label = 'other' } = options;
+    const modelId = modeliCozumle(istenenModel);
 
     const key = useCache ? cacheKey(prompt, modelId, generationConfig) : null;
     if (key) {
@@ -287,7 +324,8 @@ function readGrounding(response) {
  *   model's own recollection — the UI has to say so.
  */
 export async function generateGrounded(prompt, options = {}) {
-    const { modelId = 'gemini-2.5-flash', maxOutputTokens = 1024, useCache = true } = options;
+    const { modelId: istenenModel = 'gemini-2.5-flash', maxOutputTokens = 1024, useCache = true } = options;
+    const modelId = modeliCozumle(istenenModel);
 
     const key = useCache ? cacheKey(('grounded-search:' + prompt), modelId, { maxOutputTokens }) : null;
     if (key) {
