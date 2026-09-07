@@ -38,12 +38,18 @@ export default defineConfig({
       output: {
         manualChunks: {
           'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          // Firestore KENDİ parçasında. Toplam inen bayt değişmiyor —
+          // AuthContext oturum çözülür çözülmez firestore'a dokunduğu
+          // için ikisi de açılışta iniyor. Ayrımın sebebi ölçüm: tek
+          // parçadayken "firebase büyüdü" diyebiliyorduk ama HANGİSİNİN
+          // büyüdüğünü söyleyemiyorduk. Ayrı bütçelerle bir sonraki
+          // aşmada kaynak tek bakışta görünüyor.
           'firebase': [
             'firebase/app',
             'firebase/auth',
-            'firebase/firestore',
             'firebase/storage',
           ],
+          'firestore': ['firebase/firestore'],
           'firebase-admin': ['firebase'],
           // 'charts' chunk removed — recharts is no longer a dependency
           // (3 chart wrappers under src/components/charts/ that imported

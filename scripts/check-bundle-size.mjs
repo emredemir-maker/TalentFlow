@@ -63,12 +63,47 @@ const BUDGETS = {
     // 138, aşma anında gerçek bir inceleme yapılmasını sağlayacak kadar dar.
     'index-': Number(process.env.BUDGET_INDEX_GZIP_KB) || 138,
 
-    // Firebase SDK chunk — firebase/auth + firestore + storage. Heavy
-    // (~162 KB gzip) but needed on every authenticated route, so it's
-    // the second-biggest item on the initial network. Budget guards
-    // against accidentally pulling in firebase-functions or another
-    // heavy sub-package via a wildcard import.
-    'firebase-': Number(process.env.BUDGET_FIREBASE_GZIP_KB) || 200,
+    // Firebase SDK — app + auth + storage. Firestore ARTIK BURADA DEĞİL,
+    // kendi parçasında (aşağıda). Ayrımın sebebi ölçümdü: tek parçadayken
+    // "firebase büyüdü" diyebiliyorduk, hangisinin büyüdüğünü değil.
+    //
+    // 200 → 70. Bu bir GEVŞETME değil, sıkılaştırma: ölçüm 55.2 KB
+    // (firebase 12.9.0) ve 53.0 KB (12.18.0) — auth/app/storage tarafı
+    // büyümüyor, hatta hafif küçülüyor. 70, gerçek bir wildcard import
+    // kazasını (firebase-functions gibi ağır bir alt paketin sızması)
+    // yakalayacak kadar dar.
+    'firebase-': Number(process.env.BUDGET_FIREBASE_GZIP_KB) || 70,
+
+    // Firestore. İlk ağdaki EN AĞIR ikinci kalem ve kütüphanenin kendi
+    // büyümesi burada yoğunlaşıyor.
+    //
+    // ÖLÇÜM (aynı kod, yalnızca sürüm farkı):
+    //   firebase 12.9.0  → 104.8 KB gz
+    //   firebase 12.18.0 → 161.0 KB gz   (+56.2 KB, %54)
+    //
+    // Artışın tamamı @firebase/firestore 4.11.0 → 4.17.1'den geliyor;
+    // bizim eklediğimiz kod değil. Bütçe 175 ile 12.18.0'ı geçirecek
+    // şekilde AÇIK — yani bir sürüm yükseltmesi bu kapıda durmasın diye
+    // bilerek önden açıldı.
+    //
+    // ── TEMBEL YÜKLEME NEDEN YAPILMADI ───────────────────────────────
+    // İlk düşünce firestore'u ilk rotadan çıkarmaktı. Ölçünce olmadığı
+    // görüldü: AuthContext, onAuthStateChanged geri çağrısının İÇİNDE
+    // doc()/onSnapshot çağırıyor — oturum çözülür çözülmez firestore
+    // gerekiyor. Şu an auth ile firestore PARALEL iniyor; tembelleştirmek
+    // bunu şelaleye çevirir (auth in → token doğrula → sonra 161 KB
+    // inmeye başla) ve giriş yapmış kullanıcı için DAHA YAVAŞ olur.
+    // Kazanç yalnızca giriş ekranını gören kullanıcıda kalırdı.
+    //
+    // Ayrıca 38 dosya `db`'yi config/firebase.js'ten doğrudan alıyor ve
+    // initializeFirestore(persistentLocalCache) her firestore çağrısından
+    // ÖNCE koşmak zorunda. O sıralamayı kaçıran bir refactor, IndexedDB
+    // kalıcı önbelleğini sessizce bellek önbelleğine düşürür — daha önce
+    // çözülmüş bir yavaşlık sorununu geri getirir.
+    //
+    // Bir sonraki aşmada doğru soru "bütçeyi yükseltelim mi" değil,
+    // "firestore neden yine büyüdü ve bu sürümü almak zorunda mıyız".
+    'firestore-': Number(process.env.BUDGET_FIRESTORE_GZIP_KB) || 175,
 
     // React + react-router. Tiny and stable; the budget exists mostly
     // to flag a runtime that flips into an unminified mode.
