@@ -105,13 +105,27 @@ jobs:
       # olsa bile nodemailer'ın gönderecek hesabı yok. Kurulumu işletenin
       # hesabından mesaj çıkmasının maliyeti, bu iki satırı atlamanın
       # rahatlığından çok daha yüksek.
+      # ── TAVANLAR NEDEN DÜŞÜRÜLDÜ (2.000.000 → 400.000, 60 → 20) ──────────
+      # Demo artık ÜRETİM Gemini anahtarını kullanıyor: demo projesinin ön
+      # ödemeli kredisi tükendi ve ayrı kredi yüklemek yerine anahtar
+      # paylaştırıldı. Yani demoda harcanan her token, işletmenin kendi işe
+      # alım işini besleyen krediden çıkıyor.
+      #
+      # Eski tavan (2M token/gün) demo KENDİ kredisindeyken makuldü — en kötü
+      # ihtimalle demo kendi bütçesini bitirirdi. Şimdi en kötü ihtimal, bir
+      # grup ziyaretçinin üretimin kredisini bitirmesi ve şirketin kendi
+      # taramalarının durması. Bunlar aynı risk değil.
+      #
+      # 400.000 token, üç CV'lik oturumlar için bol; bir günü tüketmeye
+      # yetmez. Aramalı çağrı AYRI bir fatura kalemi (istek başına) ve token
+      # tavanı onu görmüyor — 20 ile ayrıca sınırlı.
       - name: functions/.env oluştur
         run: |
           printf 'VITE_GEMINI_API_KEY=%s\nVITE_FIREBASE_API_KEY=%s\nDEMO_MODE=true\nAI_DAILY_TOKEN_LIMIT=%s\nAI_DAILY_GROUNDED_LIMIT=%s\n' \
             "$GEMINI" \
             "$API_KEY" \
-            "${DEMO_TOKEN_LIMIT:-2000000}" \
-            "${DEMO_GROUNDED_LIMIT:-60}" \
+            "${DEMO_TOKEN_LIMIT:-400000}" \
+            "${DEMO_GROUNDED_LIMIT:-20}" \
             > functions/.env
           echo "✅ oluşturuldu:"
           sed 's/=.*/=***/' functions/.env
