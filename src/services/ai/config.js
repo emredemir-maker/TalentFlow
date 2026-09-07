@@ -13,7 +13,11 @@
  * (20 req / min), so there is no need for a separate client-side queue.
  */
 
-const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
+// Sunucu, emekli model kimliklerini zaten güncel karşılığına çeviriyor
+// (functions/services/gemini.js → modeliCozumle). Buradaki varsayılan yine de
+// güncel tutuluyor: tarayıcıda önbelleğe alınmış eski bir paket sunucudaki
+// eşlemeye muhtaç kalıyor, yenisi doğrudan çalışan modeli istiyor.
+const DEFAULT_GEMINI_MODEL = 'gemini-3.6-flash';
 
 /**
  * Returns a lightweight proxy object that forwards generateContent() calls
