@@ -23,18 +23,28 @@ const STEPS = [
 export default function AgentThoughtPanel({ isProcessing, reasoning, decision }) {
     const [currentStep, setCurrentStep] = useState(0);
 
-    // Simulate step progression when processing
+    // ── ADIM SIFIRLAMA: EFEKTTE DEĞİL, RENDER'DA ────────────────────────────
+    // Girdi değiştiğinde adımı sıfırlamak bir yan etki değil, state'i yeni
+    // girdiye uydurmak. Efekte konduğunda panel önce ESKİ adımla bir kez
+    // çiziliyor, hemen ardından sıfırlanıp yeniden çiziliyordu — kullanıcı
+    // yeni bir analiz başlattığında bir kare boyunca öncekinin son adımını
+    // görüyordu. React'in bu durum için önerdiği yol, render sırasında
+    // önceki girdiyle karşılaştırmak.
+    const [oncekiGirdi, setOncekiGirdi] = useState({ isProcessing, reasoning });
+    if (oncekiGirdi.isProcessing !== isProcessing || oncekiGirdi.reasoning !== reasoning) {
+        setOncekiGirdi({ isProcessing, reasoning });
+        if (isProcessing) setCurrentStep(0);
+        else if (reasoning) setCurrentStep(STEPS.length - 1);
+    }
+
+    // Geriye yalnızca gerçek yan etki kalıyor: zamanlayıcı.
     useEffect(() => {
-        if (isProcessing) {
-            setCurrentStep(0);
-            const interval = setInterval(() => {
-                setCurrentStep(prev => (prev < STEPS.length - 1 ? prev + 1 : prev));
-            }, 1500); // 1.5s per step
-            return () => clearInterval(interval);
-        } else if (reasoning) {
-            setCurrentStep(STEPS.length - 1); // Jump to end if done
-        }
-    }, [isProcessing, reasoning]);
+        if (!isProcessing) return undefined;
+        const interval = setInterval(() => {
+            setCurrentStep(prev => (prev < STEPS.length - 1 ? prev + 1 : prev));
+        }, 1500); // 1.5s per step
+        return () => clearInterval(interval);
+    }, [isProcessing]);
 
     if (!isProcessing && !reasoning) return null;
 

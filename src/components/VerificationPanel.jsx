@@ -18,6 +18,7 @@ import {
     UserCheck, PencilLine,
 } from 'lucide-react';
 
+import { useDegisince } from '../utils/useDegisince';
 import { verifyCandidate, buildVerificationSummary, buildStoredReport } from '../services/cvVerification';
 import { saveManualCompanyIntel, clearManualCompanyIntel, companyKey } from '../services/companyIntelStore';
 import { buildManualCompanyRecord, formFromRecord, isManualRecord } from '../utils/manualCompanyIntel';
@@ -428,11 +429,10 @@ export default function VerificationPanel({ candidate, position = null }) {
     // değişiklikte de koşar. Kaydetme başarısız olduğu senaryoda bu, az önce
     // üretilmiş raporu ekrandan siler — kullanıcı taramayı yaptı ve sonucu
     // kaybeder. Taze rapor zaten run() içinde state'e yazılıyor.
-    useEffect(() => {
+    useDegisince(candidate?.id, () => {
         setReport(candidate?.verificationReport || null);
         setError('');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [candidate?.id]);
+    });
 
     const run = useCallback(async (force = false) => {
         setRunning(true);

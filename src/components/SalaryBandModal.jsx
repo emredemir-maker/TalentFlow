@@ -13,7 +13,8 @@
 // period, basis }` olarak yazıyor. Buraya bir alt sınır koysaydık, pozisyon
 // ekranından yapılan ilk düzenlemede sessizce silinirdi. Bütçenin kısıt olan
 // ucu zaten tavan.
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useDegisince } from '../utils/useDegisince';
 import { X, Wallet } from 'lucide-react';
 import { usePositions } from '../context/PositionsContext';
 import {
@@ -42,7 +43,9 @@ export default function SalaryBandModal({ open, onClose }) {
 
     // Pozisyon seçilince KAYITLI BAND alanlara gelir. Boş form göstermek,
     // tanımlı bir bandın üstüne yanlışlıkla yazmayı kolaylaştırırdı.
-    useEffect(() => {
+    // Seçim değişince formu ona uydur — efektte değil, render'da. Efektteyken
+    // form bir kare boyunca ÖNCEKİ pozisyonun bandını gösteriyordu.
+    useDegisince(selected, () => {
         if (!selected) return;
         const band = normalizeBand(selected.salaryBand);
         setMax(band?.max != null ? String(band.max) : '');
@@ -51,16 +54,16 @@ export default function SalaryBandModal({ open, onClose }) {
         setBasis(band?.basis || 'gross');
         setSaved(false);
         setError('');
-    }, [selected]);
+    });
 
     // Modal her açılışta temiz başlar.
-    useEffect(() => {
+    useDegisince(open, () => {
         if (open) return;
         setPositionId('');
         setSaving(false);
         setSaved(false);
         setError('');
-    }, [open]);
+    });
 
     if (!open) return null;
 
