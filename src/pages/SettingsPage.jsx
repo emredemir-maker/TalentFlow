@@ -530,11 +530,14 @@ export default function SettingsPage({ initialTab }) {
                                     </div>
                                     <div className="flex items-end gap-0.5 mt-4 h-7 px-1">
                                         {[...Array(24)].map((_, i) => (
-                                            <div key={i} className="flex-1 rounded-full transition-all duration-150"
+                                            <div key={i} className={`flex-1 rounded-full transition-all duration-150 ${sttStatus === 'listening' ? 'stt-cubuk' : ''}`}
                                                 style={{
                                                     backgroundColor: sttStatus === 'listening' ? '#06B6D4' : sttStatus === 'success' ? '#10B981' : '#E2E8F0',
-                                                    height: sttStatus === 'listening' ? `${20 + Math.abs(Math.sin(i * 0.7 + Date.now() * 0.001)) * 80}%` : sttStatus === 'success' ? '60%' : '20%',
+                                                    height: sttStatus === 'listening' ? '100%' : sttStatus === 'success' ? '60%' : '20%',
                                                     opacity: sttStatus === 'listening' ? 0.5 + (i % 3) * 0.2 : 0.7,
+                                                    // Dalgayı CSS sürüyor: her çubuk kendi gecikmesiyle aynı
+                                                    // keyframe'i oynatıyor, JS'in zamanı okumasına gerek yok.
+                                                    animationDelay: `${(i % 8) * 0.1}s`,
                                                 }}
                                             />
                                         ))}
