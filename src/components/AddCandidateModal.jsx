@@ -14,6 +14,8 @@ import { getAuthHeaders } from '../services/ai/config';
 import { storage } from '../config/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useNotifications } from '../context/NotificationContext';
+import { IS_DEMO } from '../utils/demoMode';
+import { DEMO_CV_LIMITI, kalanKota, kotaDus, kotayaGoreAyir } from '../utils/demoUpload';
 
 const SOURCES = [
     { id: 'İnsan Kaynakları', label: 'Doğrudan Başvuru', sub: 'İç havuz / doğrudan başvuru', icon: Users, color: '#3B82F6' },
@@ -92,6 +94,12 @@ export default function AddCandidateModal({ isOpen, onClose }) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [results, setResults] = useState(null);
+    // Kalan demo hakkı STATE'te tutuluyor, render sırasında okunmuyor.
+    // `kalanKota()` sessionStorage'a bakıyor; onu doğrudan JSX içinde
+    // çağırmak render'ı saf olmaktan çıkarır (React Compiler'ın
+    // set-state-in-effect/purity kuralının yakaladığı sınıf). Değer
+    // bağlanırken bir kez alınıyor, ayrıştırma bitince güncelleniyor.
+    const [kalanHak, setKalanHak] = useState(() => (IS_DEMO ? kalanKota() : 0));
     const fileInputRef = useRef(null);
 
     if (!isOpen) return null;
@@ -118,6 +126,25 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                 }
                 return true;
             });
+            // DEMO: kota kadarını alıyoruz. Fazlasını sessizce atmak,
+            // ziyaretçinin yüklediğini sandığı bir CV'nin hiç işlenmediğini
+            // fark etmemesine yol açardı — elenenler açıkça söyleniyor.
+            if (IS_DEMO) {
+                const { alinan, elenen } = kotayaGoreAyir(validFiles);
+                if (elenen.length > 0) {
+                    setError(
+                        kalanKota() === 0
+                            ? `Demo hakkınız doldu (${DEMO_CV_LIMITI} CV). Sekmeyi yenileyerek yeniden başlayabilirsiniz.`
+                            : `Demoda oturum başına ${DEMO_CV_LIMITI} CV inceleniyor; ${elenen.length} dosya alınmadı.`
+                    );
+                } else {
+                    setError(null);
+                }
+                if (alinan.length > 0) setFiles(prev => [...prev, ...alinan]);
+                setKalanHak(kalanKota());
+                return;
+            }
+
             setFiles(prev => [...prev, ...validFiles]);
             setError(null);
         }
@@ -169,14 +196,24 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                         continue;
                     }
 
-                    try {
-                        const fileExtension = file.name.split('.').pop();
-                        const uniqueName = `cvs/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExtension}`;
-                        const storageRef = ref(storage, uniqueName);
-                        await uploadBytes(storageRef, file);
-                        candidate.cvUrl = await getDownloadURL(storageRef);
-                    } catch (uploadError) {
-                        console.error('Firebase Storage Upload Error:', uploadError);
+                    // DEMO: CV DOSYASI HİÇBİR YERE YÜKLENMİYOR.
+                    //
+                    // Demo havuzu ortak. Dosya Storage'a çıktığı anda başka
+                    // ziyaretçilerin erişebileceği bir yerde duruyor ve
+                    // gecelik sıfırlamaya kadar orada kalıyor. Uyarı bandı
+                    // "gerçek CV yüklemeyin" diyor, ama uyarı bir kontrol
+                    // değil. Ayrıştırma metin üzerinden zaten yapıldı;
+                    // dosyanın kendisine bu akışta ihtiyaç yok.
+                    if (!IS_DEMO) {
+                        try {
+                            const fileExtension = file.name.split('.').pop();
+                            const uniqueName = `cvs/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExtension}`;
+                            const storageRef = ref(storage, uniqueName);
+                            await uploadBytes(storageRef, file);
+                            candidate.cvUrl = await getDownloadURL(storageRef);
+                        } catch (uploadError) {
+                            console.error('Firebase Storage Upload Error:', uploadError);
+                        }
                     }
                     resultsData.push({ fileName: file.name, candidate, success: true, isDuplicate: false });
                 } catch (err) {
@@ -219,6 +256,14 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                 }
             }
 
+            // Kota KAYDETMEDE değil, AYRIŞTIRMADA düşüyor: maliyet burada
+            // oluşuyor (her CV için en az iki AI çağrısı). Sonucu görüp
+            // vazgeçen biri de o çağrıları yaptırmış oluyor.
+            if (IS_DEMO) {
+                kotaDus(files.length);
+                setKalanHak(kalanKota());
+            }
+
             setResults(processedResults);
         } catch (err) {
             setError(err.message);
@@ -229,6 +274,30 @@ export default function AddCandidateModal({ isOpen, onClose }) {
 
     const handleSaveAll = async () => {
         if (!results) return;
+
+        // DEMO: HAVUZA YAZILMIYOR.
+        //
+        // Havuz ortak; buraya yazılan aday, CV metniyle birlikte diğer
+        // bütün ziyaretçilerin ekranına düşer. Demonun göstermek istediği
+        // şey — CV'den yapı çıkarma ve pozisyonla eşleştirme — ekranda
+        // zaten duruyor. Kaydetmek buna bir şey katmıyor, karşılığında
+        // geri alınamayan bir ifşa riski getiriyor.
+        //
+        // Aynı zamanda saklama süresi sorununu da kökten kaldırıyor:
+        // ortada saklanan kişisel veri yok.
+        if (IS_DEMO) {
+            const incelenen = results.filter(r => r.success).length;
+            addNotification({
+                title: 'Demo — kaydedilmedi',
+                message: `${incelenen} CV incelendi ve sonuç ekranda gösterildi. `
+                    + 'Demo kurulumunda CV\'ler havuza yazılmıyor ve dosyalar hiçbir yere '
+                    + 'yüklenmiyor; analiz bittiğinde veri ortadan kalkıyor.',
+                type: 'info',
+            });
+            handleClose();
+            return;
+        }
+
         setLoading(true);
         try {
             // Only save NEW, non-duplicate, successfully parsed candidates
@@ -461,6 +530,25 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                     {/* STEP 1: FILE UPLOAD */}
                     {!results && step === 1 && (
                         <div className="space-y-5">
+                            {/* Demoda ziyaretçi, CV'sine ne olacağını YÜKLEMEDEN
+                                ÖNCE bilmeli. Sonradan çıkan bir bildirim, kararı
+                                çoktan verilmiş bir iş için geç kalır. */}
+                            {IS_DEMO && (
+                                <div className="rounded-2xl border border-blue-200 bg-blue-50/60 px-4 py-3">
+                                    <p className="text-[11px] font-bold text-blue-900 m-0">
+                                        Demo — yüklediğiniz CV kaydedilmez
+                                    </p>
+                                    <p className="text-[10px] leading-relaxed text-blue-800/80 m-0 mt-1">
+                                        Dosya hiçbir yere yüklenmiyor, havuza aday olarak yazılmıyor
+                                        ve başka ziyaretçiler görmüyor. Yalnızca ayrıştırılıp açık
+                                        pozisyonlarla eşleştiriliyor; sonucu kapattığınızda veri
+                                        ortadan kalkıyor.{' '}
+                                        <strong className="font-bold">
+                                            Kalan hakkınız: {kalanHak}/{DEMO_CV_LIMITI} CV
+                                        </strong>
+                                    </p>
+                                </div>
+                            )}
                             <div
                                 onClick={() => fileInputRef.current?.click()}
                                 className={`border-2 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all text-center group
@@ -694,7 +782,13 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                             className="flex-[2] py-3 rounded-2xl bg-[#13294E] hover:bg-blue-800 text-white text-[11px] font-bold transition-all shadow-lg shadow-blue-900/20 disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-2"
                         >
                             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />}
-                            {results.filter(r => r.success).length} Adayı Havuza Ekle
+                            {/* Demoda düğme havuza yazmıyor. Etiketin bunu
+                                söylemesi gerekiyor: "Havuza Ekle" yazan bir
+                                düğmenin eklememesi, ziyaretçinin ürünü yanlış
+                                anlamasına yol açar. */}
+                            {IS_DEMO
+                                ? 'Sonucu Kapat'
+                                : `${results.filter(r => r.success).length} Adayı Havuza Ekle`}
                         </button>
                     </div>
                 )}
