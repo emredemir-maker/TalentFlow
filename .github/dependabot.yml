@@ -4,16 +4,26 @@
 # yeni değildi, yalnızca kimse bakmıyordu. Tarama (ci.yml → audit) birikmeyi
 # görünür kılıyor, bu dosya birikmesini engelliyor.
 #
-# ── NEDEN HER ŞEY TEK GRUPTA ────────────────────────────────────────────────
-# İlk sürümde gruplar `minor` ve `patch` ile sınırlıydı ve MAJOR yükseltmeler
-# grubun dışında kalıp her biri ayrı PR açtı; GitHub Actions'ın grubu ise hiç
-# yoktu. Sonuç ilk çalıştırmada 10 PR oldu — tam da engellemek istediğimiz
-# şey. Kimsenin bakmadığı bir PR yığını, hiç güncelleme yapmamakla aynı yere
-# çıkıyor.
+# ── GRUPLAMA: MAJOR AYRI, GERİSİ BİRLİKTE ───────────────────────────────────
+# Bu ayar iki kez yanlış kuruldu, ikisi de canlıda görüldü:
 #
-# Artık major dahil hepsi tek grupta. Major yükseltme kırıcı olabilir; onu
-# ayrı ayrı PR'lara bölmek riski azaltmıyor, yalnızca okunmayan PR sayısını
-# artırıyor. Gruplanmış tek PR okunuyor, kırılan olursa oradan ayıklanıyor.
+#   1. Gruplar minor/patch ile sınırlı, GitHub Actions'ın grubu yok
+#      → ilk çalıştırmada 10 ayrı PR. Kimsenin bakmadığı bir yığın, hiç
+#        güncelleme yapmamakla aynı yere çıkıyor.
+#
+#   2. Düzeltme olarak major dahil her şey tek gruba alındı
+#      → 29 güncellemelik tek PR ve 7 kontrolün 7'si kırmızı. Dependabot
+#        eslint'i 10'a çıkarmıştı, eslint-plugin-react henüz desteklemiyor,
+#        npm ci ERESOLVE ile düştü. TEK UYUMSUZ MAJOR, İÇİNDEKİ GÜVENLİ
+#        YAMALARIN TAMAMINI KİLİTLEDİ.
+#
+# Doğru şekil ikisinin arası: minor ve patch tek grupta (güvenli, okunur,
+# merge edilebilir); major yükseltmeler AYRI PR'larda, çünkü her biri kendi
+# başına değerlendirilmeli ve reddedilebilmeli. Böylece uyumsuz bir major
+# yalnızca kendini düşürüyor, güvenli yamaları rehin almıyor.
+#
+# Üst sınırlar düşük tutuluyor: ayrı gelen major'lar sıraya giriyor, yığın
+# oluşturmuyor.
 version: 2
 updates:
   - package-ecosystem: npm
@@ -31,6 +41,7 @@ updates:
       bagimliliklar:
         applies-to: version-updates
         patterns: ['*']
+        update-types: [minor, patch]
 
   - package-ecosystem: npm
     directory: /functions
@@ -45,6 +56,7 @@ updates:
       bagimliliklar:
         applies-to: version-updates
         patterns: ['*']
+        update-types: [minor, patch]
 
   - package-ecosystem: github-actions
     directory: /
