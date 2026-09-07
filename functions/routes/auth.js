@@ -55,7 +55,7 @@ router.get('/api/auth/microsoft/url', async (req, res) => {
         const url = `https://login.microsoftonline.com/${cfg.tenantId}/oauth2/v2.0/authorize?${params}`;
         res.json({ url });
     } catch (err) {
-        log.error('[microsoft/url]', err.message);
+        log.error({ err: err.message }, '[microsoft/url]');
         res.status(500).json({ error: err.message });
     }
 });
@@ -132,7 +132,7 @@ router.post('/api/auth/microsoft/exchange', verifyFirebaseToken, rejectAnonymous
         log.info(`[microsoft/exchange] User ${userId} connected Microsoft: ${email}`);
         res.json({ success: true, email });
     } catch (err) {
-        log.error('[microsoft/exchange]', err.message);
+        log.error({ err: err.message }, '[microsoft/exchange]');
         res.status(500).json({ error: err.message });
     }
 });
@@ -180,7 +180,7 @@ router.post('/api/auth/microsoft/refresh', verifyFirebaseToken, rejectAnonymous,
 
         res.json({ success: true, accessToken: access_token });
     } catch (err) {
-        log.error('[microsoft/refresh]', err.message);
+        log.error({ err: err.message }, '[microsoft/refresh]');
         res.status(500).json({ error: err.message });
     }
 });
@@ -213,7 +213,7 @@ router.get('/api/auth/google/url', async (req, res) => {
         });
         res.json({ url: `https://accounts.google.com/o/oauth2/v2/auth?${params}` });
     } catch (err) {
-        log.error('[google/url]', err.message);
+        log.error({ err: err.message }, '[google/url]');
         res.status(500).json({ error: err.message });
     }
 });
@@ -278,7 +278,7 @@ router.post('/api/auth/google/exchange', verifyFirebaseToken, rejectAnonymous, a
         log.info(`[google/exchange] User ${userId} connected: ${email}`);
         res.json({ success: true, email });
     } catch (err) {
-        log.error('[google/exchange]', err.message);
+        log.error({ err: err.message }, '[google/exchange]');
         res.status(500).json({ error: err.message });
     }
 });
@@ -321,7 +321,7 @@ router.post('/api/auth/google/refresh', verifyFirebaseToken, rejectAnonymous, as
 
         res.json({ success: true, accessToken: access_token });
     } catch (err) {
-        log.error('[google/refresh]', err.message);
+        log.error({ err: err.message }, '[google/refresh]');
         res.status(500).json({ error: err.message });
     }
 });
@@ -378,7 +378,7 @@ router.post('/api/auth/invitation-lookup', inviteLimiter, async (req, res) => {
         if (snap.empty) return res.json({ found: false });
         return res.json({ found: true, ...invitationPayload(snap.docs[0]) });
     } catch (err) {
-        log.error('[invitation-lookup]', err.message);
+        log.error({ err: err.message }, '[invitation-lookup]');
         return res.status(500).json({ error: 'Davetiye kontrolü yapılamadı.' });
     }
 });

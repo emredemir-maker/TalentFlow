@@ -46,7 +46,7 @@ router.delete('/api/admin/auth-user/:uid', requireAuth(['super_admin']), async (
         res.json({ success: true });
     } catch (err) {
         if (err.code === 'auth/user-not-found') return res.json({ success: true, note: 'Zaten silinmiş' });
-        log.error('[admin/delete-auth-user]', err.message);
+        log.error({ err: err.message }, '[admin/delete-auth-user]');
         res.status(500).json({ error: err.message });
     }
 });

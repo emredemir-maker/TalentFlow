@@ -117,6 +117,20 @@ export default function AddManualInterviewModal({
     const [salaryHint, setSalaryHint] = useState(null);
     const [salaryHintState, setSalaryHintState] = useState('idle'); // idle|busy|none|error
     const [splitNote, setSplitNote] = useState('');
+    // TRANSKRİPT HATASI AYRI BİR STATE'TE.
+    //
+    // Eskiden `submitError`'a yazılıyordu ve o, formun EN DİBİNDE
+    // çiziliyor: düğme ~970. satırda, hata ~1105'te. Aralarında görüşmeci
+    // notları, değerlendirme, maaş beklentisi ve karar bölümleri var.
+    // Kaydırmalı bir modalda kullanıcı düğmeye basıyor, dönen çark
+    // duruyor ve düğmenin yanında hiçbir şey değişmiyordu — canlıda
+    // "çalışmadı ama hata da vermedi" olarak bildirildi. Oysa hata
+    // fırlatılıyor ve yakalanıyordu; yalnızca ekranın görünmeyen bir
+    // yerinde yazıyordu.
+    //
+    // Başarı mesajı (`splitNote`) zaten düğmenin dibindeydi. Hatanın
+    // başarıdan uzakta durması için bir sebep yok.
+    const [splitError, setSplitError] = useState('');
     const [submitError, setSubmitError] = useState('');
     const [createdResult, setCreatedResult] = useState(null);
 
@@ -288,6 +302,7 @@ export default function AddManualInterviewModal({
         }
         setSubmitError('');
         setSplitNote('');
+        setSplitError('');
         setSplitting(true);
         try {
             const out = await splitTranscript(transcript, questions);
@@ -299,7 +314,7 @@ export default function AddManualInterviewModal({
                       + 'Kaydetmeden önce okuyup düzeltin.'
             );
         } catch (err) {
-            setSubmitError(err.message);
+            setSplitError(err.message);
         } finally {
             setSplitting(false);
         }
@@ -575,6 +590,7 @@ export default function AddManualInterviewModal({
                             handleSplitTranscript={handleSplitTranscript}
                             splitting={splitting}
                             splitNote={splitNote}
+                            splitError={splitError}
                             // free-text
                             transcript={transcript}
                             setTranscript={setTranscript}
@@ -661,6 +677,7 @@ function FormBody(props) {
         handleSplitTranscript,
         splitting,
         splitNote,
+        splitError,
         transcript,
         setTranscript,
         notes,
@@ -980,6 +997,12 @@ function FormBody(props) {
                 </div>
                 {splitNote && (
                     <p className="mt-1.5 text-[10px] text-cyan-700 leading-relaxed">{splitNote}</p>
+                )}
+                {splitError && (
+                    <p className="mt-1.5 flex items-start gap-1.5 text-[10px] leading-relaxed text-red-700">
+                        <AlertCircle className="w-3 h-3 flex-shrink-0 mt-px" />
+                        <span>{splitError}</span>
+                    </p>
                 )}
                 <label className="text-xs font-semibold text-slate-600 mb-1 mt-3 block">
                     Görüşmeci notları (izlenimler, gözlemler)

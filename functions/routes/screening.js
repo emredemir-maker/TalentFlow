@@ -49,7 +49,7 @@ router.post('/api/score-screening-answers', aiLimiter, verifyFirebaseToken, asyn
             : (scores.length > 0 ? Math.round(scores.reduce((sum, s) => sum + s.score, 0) / scores.length) : null);
         res.json({ scores, aggregateScore, summary: parsed.summary || '' });
     } catch (err) {
-        log.error('[score-screening-answers] Error:', err.message);
+        log.error({ err: err.message }, '[score-screening-answers] Error');
         res.status(500).json({ error: err.message });
     }
 });
@@ -73,7 +73,7 @@ router.post('/api/suggest-screening-questions', aiLimiter, requireAuth(), async 
         const questions = (parsed.questions || []).slice(0, 5).filter(q => q && q.trim());
         res.json({ questions });
     } catch (err) {
-        log.error('[suggest-screening-questions] Error:', err.message);
+        log.error({ err: err.message }, '[suggest-screening-questions] Error');
         res.status(500).json({ error: err.message });
     }
 });
@@ -96,7 +96,7 @@ router.post('/api/improve-screening-question', aiLimiter, requireAuth(), async (
         const parsed = JSON.parse(match[0]);
         res.json({ improved: parsed.improved || question });
     } catch (err) {
-        log.error('[improve-screening-question] Error:', err.message);
+        log.error({ err: err.message }, '[improve-screening-question] Error');
         res.status(500).json({ error: err.message });
     }
 });

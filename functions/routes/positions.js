@@ -59,7 +59,7 @@ router.get('/api/positions/:positionId', async (req, res) => {
         if (r.status === 404) return res.status(404).json({ error: 'Pozisyon bulunamadı.' });
         if (!r.ok) {
             const errBody = await r.text();
-            log.error('Firestore GET position error:', r.status, errBody);
+            log.error({ status: r.status, govde: errBody }, 'Firestore GET position error');
             return res.status(500).json({ error: 'Pozisyon yüklenirken hata oluştu.' });
         }
         const docSnap = await r.json();
@@ -67,7 +67,7 @@ router.get('/api/positions/:positionId', async (req, res) => {
         if (data.status !== 'open') return res.status(403).json({ error: 'Bu pozisyon şu an başvuruya kapalı.' });
         res.json({ id: req.params.positionId, ...data });
     } catch (err) {
-        log.error('GET /api/positions/:id error:', err);
+        log.error({ err: err }, 'GET /api/positions/:id error');
         res.status(500).json({ error: 'Pozisyon yüklenirken hata oluştu.' });
     }
 });
@@ -110,14 +110,14 @@ router.post('/api/applications', async (req, res) => {
         });
         if (!r.ok) {
             const errBody = await r.text();
-            log.error('Firestore POST application error:', r.status, errBody);
+            log.error({ status: r.status, govde: errBody }, 'Firestore POST application error');
             return res.status(500).json({ error: 'Başvuru kaydedilemedi.' });
         }
         const docData = await r.json();
         const id = docData.name?.split('/').pop();
         res.json({ id });
     } catch (err) {
-        log.error('POST /api/applications error:', err);
+        log.error({ err: err }, 'POST /api/applications error');
         res.status(500).json({ error: 'Başvuru kaydedilemedi.' });
     }
 });
