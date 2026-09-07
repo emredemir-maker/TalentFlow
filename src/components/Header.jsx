@@ -5,6 +5,7 @@ import { normalizeSkills } from '../utils/normalizeSkills';
 // aramayı çökertti. Neden ve gerileme testi: utils/globalSearchScore.js
 import { kwScoreCandidate, kwScorePosition, kwScorePage } from '../utils/globalSearchScore';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useDegisince } from '../utils/useDegisince';
 import {
     Search, Bell, Settings, Home, X, Users, Briefcase,
     Calendar, MessageSquare, BarChart3, LayoutDashboard, FileText,
@@ -68,7 +69,6 @@ export default function Header({ title }) {
 
     const [query, setQuery]         = useState('');
     const [panelOpen, setPanelOpen] = useState(false);
-    const [kwResults, setKwResults] = useState({ candidates: [], positions: [], pages: [] });
     const [aiLoading, setAiLoading] = useState(false);
     const [aiIds, setAiIds]         = useState(null);
     const [selIdx, setSelIdx]       = useState(0);
@@ -123,12 +123,15 @@ export default function Header({ title }) {
         return () => document.removeEventListener('mousedown', handler);
     }, []);
 
-    useEffect(() => {
-        if (!query.trim()) {
-            setKwResults({ candidates: [], positions: [], pages: [] });
-            setAiIds(null);
-            return;
-        }
+    // ANAHTAR KELİME SONUÇLARI TÜRETİLİYOR, STATE'TE TUTULMUYOR.
+    //
+    // Eskiden bir efekt hesaplayıp `setKwResults` ile state'e yazıyordu.
+    // Sonuç zaten girdilerin (sorgu + aday + pozisyon listeleri) saf bir
+    // fonksiyonu; state'te tutmak her tuş vuruşunda fazladan bir render
+    // turu üretiyordu — kullanıcı yazarken listenin bir kare geriden
+    // gelmesinin sebebi buydu.
+    const kwResults = useMemo(() => {
+        if (!query.trim()) return { candidates: [], positions: [], pages: [] };
         const words = query.toLowerCase().trim().split(/\s+/);
 
         const candidates = enrichedCandidates
@@ -149,10 +152,16 @@ export default function Header({ title }) {
             .sort((a, b) => b._score - a._score)
             .slice(0, 3);
 
-        setKwResults({ candidates, positions: pos, pages });
-        setSelIdx(0);
-        setAiIds(null);
+        return { candidates, positions: pos, pages };
     }, [query, enrichedCandidates, positions]);
+
+    // Sonuç kümesi değişince seçili satır ve AI eşleşmesi sıfırlanır.
+    // Eski efektin aynı bağımlılıklarla yaptığı iş; `kwResults` kimliği
+    // yalnızca o bağımlılıklar değişince yenilendiği için tetikleme aynı.
+    useDegisince(kwResults, () => {
+        if (query.trim()) setSelIdx(0);
+        setAiIds(null);
+    });
 
     useEffect(() => {
         if (!query.trim() || query.trim().length < 3) return;

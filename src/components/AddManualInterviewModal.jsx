@@ -21,11 +21,12 @@
 // Davranış: kayıt başarılı olduğunda parent'a `onCreated(sessionId)`
 // callback'i bildirim için çağrılır. Modal kapanır sadece kullanıcı
 // "Kapat"a basınca (sonuç ekranını incelemek için).
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { getAuth } from 'firebase/auth';
 import { savedPlanFor, planStatus, PLAN_STATUS_TEXT } from '../utils/interviewPlan';
 import { extractSalaryFromTranscript } from '../services/ai/salaryExtractor';
 import { normalizeBand, formatBand, CURRENCIES, CURRENCY_LABEL, PERIODS, PERIOD_LABEL, BASES, BASIS_LABEL } from '../utils/salaryBand';
+import { useDegisince } from '../utils/useDegisince';
 import { NO_SCORE_TEXT } from '../utils/interviewReport';
 import { splitTranscript } from '../services/ai/transcriptSplitter';
 import {
@@ -134,8 +135,10 @@ export default function AddManualInterviewModal({
     const [submitError, setSubmitError] = useState('');
     const [createdResult, setCreatedResult] = useState(null);
 
-    // Reset state every time the modal is opened — prevents stale data on re-open
-    useEffect(() => {
+    // Modal açılışında sıfırlama — EFEKTTE DEĞİL, RENDER'DA.
+    // Efektteyken modal bir kare boyunca ÖNCEKİ görüşmenin verisiyle
+    // çiziliyordu; kullanıcı açar açmaz eski adayı görüyordu.
+    useDegisince(`${open}|${prefill?.sessionId ?? ''}`, () => {
         if (!open) return;
         setStep('form');
         setSubmitError('');
@@ -153,8 +156,7 @@ export default function AddManualInterviewModal({
         if (prefill.time) setTime(prefill.time);
         if (prefill.interviewerName) setInterviewerName(prefill.interviewerName);
         if (prefill.durationMinutes) setDurationMinutes(prefill.durationMinutes);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [open, prefill?.sessionId]);
+    });
 
     // Auto-fill position when candidate is picked
     const selectedCandidate = useMemo(
@@ -166,15 +168,19 @@ export default function AddManualInterviewModal({
         [positions, positionId]
     );
 
-    useEffect(() => {
-        if (!candidateId) return;
+    // Önerilen pozisyon RENDER'DA türetiliyor; state'e yalnızca öneri
+    // DEĞİŞTİĞİNDE yazılıyor. Listeler geç yüklendiğinde de doğru çalışıyor:
+    // aday listesi sonradan geldiğinde öneri değişiyor ve alan o zaman
+    // doluyor — eski efektin `candidates` bağımlılığıyla yaptığı iş.
+    const onerilenPozisyon = useMemo(() => {
         const cand = candidates.find((c) => c.id === candidateId);
-        if (!cand) return;
-        // Pre-fill position from candidate.positionId or candidate.position name
-        if (cand.positionId && positions.find((p) => p.id === cand.positionId)) {
-            setPositionId(cand.positionId);
-        }
+        if (!cand?.positionId) return null;
+        return positions.some((p) => p.id === cand.positionId) ? cand.positionId : null;
     }, [candidateId, candidates, positions]);
+
+    useDegisince(onerilenPozisyon, () => {
+        if (onerilenPozisyon) setPositionId(onerilenPozisyon);
+    });
 
     // Soru listesini önceden doldur — iki kaynak, biri diğerinden çok üstün.
     //
@@ -188,33 +194,41 @@ export default function AddManualInterviewModal({
     // maddeleri sorar ve cevaplar yanlış maddeye yazılırdı.
     //
     // Yazılmış içeriğin üzerine hiçbir koşulda yazılmaz.
-    useEffect(() => {
-        if (!positionId) return;
+    // Önerilen soru listesi RENDER'DA türetiliyor. Kaynak seçimi ve plan
+    // parmak izi kontrolü aynen korundu; değişen tek şey, bunun bir efektin
+    // yan etkisi değil bir hesap olması. Liste kimliği `useMemo` bağımlılıkları
+    // değiştiğinde yenileniyor — eski efektin `positions`/`candidates`
+    // bağımlılıklarıyla yaptığı işi birebir karşılıyor.
+    const onerilenSorular = useMemo(() => {
+        if (!positionId) return null;
         const pos = positions.find((p) => p.id === positionId);
         const cand = candidates.find((c) => c.id === candidateId);
-        const hasContent = questions.some((q) => q.question.trim() || q.answer.trim());
-        if (hasContent) return;
 
         const plan = savedPlanFor(cand, pos);
         if (plan) {
-            setQuestions(
-                plan.probes.map((p) => ({
-                    question: p.question || p.text,
-                    answer: '',
-                    requirementIndex: p.requirementIndex,
-                    listenFor: p.listenFor || '',
-                    must: Boolean(p.must),
-                }))
-            );
-            return;
+            return plan.probes.map((p) => ({
+                question: p.question || p.text,
+                answer: '',
+                requirementIndex: p.requirementIndex,
+                listenFor: p.listenFor || '',
+                must: Boolean(p.must),
+            }));
         }
 
         const screening = (pos?.screeningQuestions || []).filter(
             (q) => typeof q === 'string' && q.trim()
         );
-        if (screening.length === 0) return;
-        setQuestions(screening.map((q) => ({ question: q, answer: '' })));
-    }, [positionId, candidateId, positions, candidates]); // eslint-disable-line react-hooks/exhaustive-deps
+        if (screening.length === 0) return null;
+        return screening.map((q) => ({ question: q, answer: '' }));
+    }, [positionId, candidateId, positions, candidates]);
+
+    // YAZILMIŞ İÇERİĞİN ÜZERİNE HİÇBİR KOŞULDA YAZILMIYOR — kural aynen duruyor.
+    useDegisince(onerilenSorular, () => {
+        if (!onerilenSorular) return;
+        const hasContent = questions.some((q) => q.question.trim() || q.answer.trim());
+        if (hasContent) return;
+        setQuestions(onerilenSorular);
+    });
 
     // Sorular plandan mı geldi? SAKLANMIYOR, türetiliyor.
     //
