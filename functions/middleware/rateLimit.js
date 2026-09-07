@@ -3,7 +3,7 @@
 //
 //   generalLimiter: blanket 200 req / 15 min — applied globally in server.js
 //   aiLimiter:      20 req / min — gates Gemini-backed routes
-//                   (/api/ai/*, /scrape, /process-cv, /direct-add, /gemini-stt,
+//                   (/api/ai/*, /process-cv, /direct-add, /gemini-stt,
 //                    /score-screening-answers, /suggest-screening-questions,
 //                    /improve-screening-question)
 //   inviteLimiter:  10 req / hour — kimliksiz davetiye sorgusu (e-posta sayımına karşı)
