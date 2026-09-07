@@ -144,7 +144,25 @@ service cloud.firestore {
       allow get:           if (isAuthenticatedIncAnon() &&
                                 request.auth.token.firebase.sign_in_provider == 'anonymous') ||
                               canAccessCandidate(resource.data);
-      allow list:          if isRecruiter() || isDepartmentUser();
+      // LİSTELEME KISITI KURALDA, İSTEMCİDE DEĞİL.
+      //
+      // Eskiden burada yalnızca `isDepartmentUser()` vardı ve hangi belgelerin
+      // döndüğünü İSTEMCİNİN koyduğu süzgeç belirliyordu. Departman
+      // kullanıcısı tarayıcı konsolundan süzgeçsiz bir sorgu atarak şirketteki
+      // BÜTÜN adayları okuyabiliyordu — yani ekranda anlatılan kısıt gerçekte
+      // yoktu.
+      //
+      // Firestore, list kurallarını dönecek her belgeye karşı değerlendiriyor
+      // ve biri bile geçemezse sorgunun tamamını reddediyor. Aşağıdaki koşul
+      // bu yüzden süzgeci ZORUNLU kılıyor: süzgeçsiz sorgu reddedilir,
+      // istemcinin attığı iki sorgu (department / visibleToDepartments) geçer.
+      allow list:          if isRecruiter() ||
+                              (isDepartmentUser() && (
+                                resource.data.get('department', '')
+                                  in getUserProfile().get('departments', [])
+                                || getUserProfile().get('departments', []).hasAny(
+                                     resource.data.get('visibleToDepartments', []))
+                              ));
       allow update, delete: if isRecruiter();
     }
 
