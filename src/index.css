@@ -319,3 +319,30 @@ h1, h2, h3, h4 {
   from { background-position: 100% 50%; }
   to   { background-position: 0 50%; }
 }
+
+/* SES SEVİYESİ ÇUBUKLARI — Ayarlar > konuşma tanıma testi.
+ *
+ * Önceden yükseklik render sırasında `Math.sin(... Date.now() ...)` ile
+ * hesaplanıyordu. İki sorunu vardı: React Compiler kuralı render içinde
+ * saat okumayı hata sayıyor, VE animasyon zaten çalışmıyordu — dinleme
+ * sırasında hiçbir şey yeniden render tetiklemediği için değer ilk
+ * çizimde donuyordu. Dalga artık CSS'te; her çubuk aynı keyframe'i
+ * kendi gecikmesiyle oynatıyor.
+ *
+ * Hareketi kapatanlar için çubuk sabit yükseklikte duruyor. */
+@keyframes stt-dalga {
+    0%, 100% { transform: scaleY(0.25); }
+    50%      { transform: scaleY(1); }
+}
+
+.stt-cubuk {
+    transform-origin: bottom;
+    animation: stt-dalga 0.9s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .stt-cubuk {
+        animation: none;
+        transform: scaleY(0.6);
+    }
+}

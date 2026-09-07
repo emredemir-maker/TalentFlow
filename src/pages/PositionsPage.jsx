@@ -52,7 +52,8 @@ const APPLY_SOURCES = ['LinkedIn', 'Kariyer.net', 'Instagram', 'Twitter/X', 'Fac
 function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onToggleStatus, onDelete, isRecruiterOrAdmin, releaseLoading, releasingPosId, onCandidateClick, onRescan, onApplySuggestions, onRescanAfterEdit, onBuildGlossary }) {
     const sc = STATUS_CONFIG[pos.status] || STATUS_CONFIG.closed;
     const candidateCount = pos.matchedCandidates?.length || 0;
-    const openDays = pos.createdAt ? Math.floor((Date.now() - pos.createdAt.toDate?.()?.getTime?.()) / 86400000) : null;
+    const [acilisAni] = useState(() => Date.now());
+    const openDays = pos.createdAt ? Math.floor((acilisAni - pos.createdAt.toDate?.()?.getTime?.()) / 86400000) : null;
 
     const [activeTab, setActiveTab] = useState('detail');
     const [applications, setApplications] = useState([]);
