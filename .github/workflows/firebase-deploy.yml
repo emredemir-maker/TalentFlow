@@ -33,14 +33,27 @@ jobs:
 
       - name: Check required secrets
         run: |
-          if [ -z "$EMAIL_USER" ] || [ -z "$EMAIL_PASS" ]; then
-            echo "❌ EMAIL_USER veya EMAIL_PASS secret eksik!"
+          eksik=""
+          [ -z "$EMAIL_USER" ] && eksik="$eksik EMAIL_USER"
+          [ -z "$EMAIL_PASS" ] && eksik="$eksik EMAIL_PASS"
+          [ -z "$VITE_GEMINI_API_KEY" ] && eksik="$eksik VITE_GEMINI_API_KEY"
+          if [ -n "$eksik" ]; then
+            echo "❌ Eksik secret:$eksik"
             exit 1
           fi
           echo "✅ Tüm gerekli secrets mevcut"
+
+          # Tavanlar ZORUNLU DEĞİL ama boş olmaları sessiz bir risk: fren
+          # kapalı demek. Dağıtımı durdurmuyoruz, görünür kılıyoruz.
+          if [ -z "$AI_DAILY_TOKEN_LIMIT" ] || [ -z "$AI_DAILY_GROUNDED_LIMIT" ]; then
+            echo "::warning::Günlük AI bütçe freni KAPALI — AI_DAILY_TOKEN_LIMIT / AI_DAILY_GROUNDED_LIMIT secret'ları boş." 
+          fi
         env:
           EMAIL_USER: ${{ secrets.EMAIL_USER }}
           EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
+          VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
+          AI_DAILY_TOKEN_LIMIT: ${{ secrets.AI_DAILY_TOKEN_LIMIT }}
+          AI_DAILY_GROUNDED_LIMIT: ${{ secrets.AI_DAILY_GROUNDED_LIMIT }}
 
       - name: Install root dependencies
         run: npm install
@@ -63,7 +76,22 @@ jobs:
         env:
           PUPPETEER_SKIP_DOWNLOAD: true
 
-      - name: Create functions/.env.production
+      # ── DOSYA ADI: .env.production DEĞİL, .env ───────────────────────────
+      #
+      # Firebase Functions YALNIZCA şu adları yüklüyor: `.env`,
+      # `.env.<proje-id>` ve `.env.<takma-ad>`. `.firebaserc`'de yalnızca
+      # `default` var, "production" diye bir takma ad YOK — yani
+      # `functions/.env.production` hiçbir zaman OKUNMADI.
+      #
+      # NASIL ANLAŞILDI: dağıtılmış Cloud Run servisinde EMAIL_USER ve
+      # VITE_GEMINI_API_KEY var ama AI_DAILY_TOKEN_LIMIT YOK. Var olanlar
+      # daha önce elle set edilmiş ve Cloud Run'ın koruduğu kalıntılar;
+      # dosyadan gelen hiçbir şey ulaşmamış. Demo akışı `.env` yazıyor ve
+      # onun değişkenleri konteynerde görünüyor — aradaki tek fark ad.
+      #
+      # SONUÇ: üretimde günlük AI bütçe freni HİÇ ÇALIŞMADI. Bu dosyaya
+      # eklenecek her yeni değişken de aynı sessizlikle kaybolurdu.
+      - name: Create functions/.env
         run: |
           printf 'EMAIL_USER=%s\nEMAIL_PASS=%s\nVITE_GEMINI_API_KEY=%s\nVITE_FIREBASE_API_KEY=%s\nAI_DAILY_TOKEN_LIMIT=%s\nAI_DAILY_GROUNDED_LIMIT=%s\n' \
             "$EMAIL_USER" \
@@ -72,9 +100,9 @@ jobs:
             "$VITE_FIREBASE_API_KEY" \
             "$AI_DAILY_TOKEN_LIMIT" \
             "$AI_DAILY_GROUNDED_LIMIT" \
-            > functions/.env.production
-          echo "✅ functions/.env.production oluşturuldu:"
-          cat functions/.env.production | sed 's/=.*/=***/' 
+            > functions/.env
+          echo "✅ functions/.env oluşturuldu:"
+          sed 's/=.*/=***/' functions/.env
         env:
           EMAIL_USER: ${{ secrets.EMAIL_USER }}
           EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
@@ -107,8 +135,8 @@ jobs:
         run: firebase deploy --only hosting,functions,firestore,storage --project talentflow-84bb6
         env:
           GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcp-sa.json
-        # Env vars are picked up automatically from functions/.env.production (created
-        # in the "Create functions/.env.production" step above). Firebase Functions v2
+        # Env vars are picked up automatically from functions/.env (created
+        # in the "Create functions/.env" step above). Firebase Functions v2
         # injects them into the Cloud Run revision during deploy — no manual gcloud
         # run services update is needed. The previous manual step referenced a fixed
         # image tag (api:version_1) that Firebase no longer produces, causing CI
