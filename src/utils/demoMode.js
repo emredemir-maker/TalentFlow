@@ -12,10 +12,22 @@
 
 export const IS_DEMO = import.meta.env.VITE_DEMO_MODE === 'true';
 
-/** Demo havuzunun ne olduğu — banttan ve giriş ekranından aynı metin okunuyor. */
+/**
+ * Demo havuzunun ne olduğu — banttan ve giriş ekranından aynı metin okunuyor.
+ *
+ * Metin, CV yüklemesi geçici hale getirildikten sonra değişti. Eskisi
+ * "eklediğiniz her şeyi diğer ziyaretçiler de görür. Gerçek bir CV
+ * yüklemeyin." diyordu; bu artık DOĞRU DEĞİL ve yanlış olduğu için de
+ * zararlı: ziyaretçiye hâlâ bir risk varmış gibi anlatmak, olmayan bir
+ * tehlikeden korkutup demonun en ikna edici kısmını denemesini engeller.
+ * CV artık ne Storage'a ne havuza yazılıyor (bkz. utils/demoUpload.js).
+ *
+ * Havuzdaki HAZIR kayıtlar hâlâ ortak — onlar zaten uydurma.
+ */
 export const DEMO_NOTICE =
-    'Bu bir demo kurulumu. Havuzdaki kayıtların tamamı uydurma ve ortak: '
-    + 'eklediğiniz her şeyi diğer ziyaretçiler de görür. Gerçek bir CV yüklemeyin.';
+    'Bu bir demo kurulumu. Havuzdaki kayıtların tamamı uydurma ve ortak; '
+    + 'yaptığınız değişiklikleri diğer ziyaretçiler de görür. Yüklediğiniz '
+    + 'CV\'ler ise kaydedilmez — yalnızca analiz edilir, hiçbir yere yazılmaz.';
 
 // ── PAYLAŞILAN DEMO HESABI ──────────────────────────────────────────────────
 // Bu şifre GİZLİ DEĞİL: paylaşılan bir demo hesabına ait ve zaten herkese
