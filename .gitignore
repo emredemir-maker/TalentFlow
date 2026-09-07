@@ -12,7 +12,7 @@ dist
 dist-ssr
 coverage
 test-results
-playwright-report
+playwright-report*
 *.local
 
 # Editor directories and files
@@ -26,9 +26,15 @@ playwright-report
 *.sln
 *.sw?
 
-.env
-.env.production
-.env.local
+# ── .env: VARSAYILAN OLARAK HEPSİ YOK SAYILIR ────────────────────────────
+# Önceki kural yalnızca tam adı `.env` olanı yakalıyordu. `.env.bak` — içinde
+# gerçek GEMINI_API_KEY ve EMAIL_PASS ile — bir `git add -A` ile commit'e girdi.
+# Kural artık ters yönde çalışıyor: hepsi yok sayılır, bilerek takip edilenler
+# tek tek açılır. Yeni bir `.env.eski` aynı hatayı tekrarlayamaz.
+.env*
+!.env.example
+!.env.e2e-auth
+!.env.e2e-emulator
 
 # Data / Uploads
 chrome-session/
@@ -46,3 +52,8 @@ eslint_out.txt
 tmp_*
 *.tmp
 error.txt
+
+# Tasarım devri paketleri — depoya değil, tasarım aracına ait
+design_handoff_talentflow/
+Incomplete mockup request/
+Incomplete mockup request.zip

@@ -299,7 +299,7 @@ Not: getGlobalGeminiKey() → her zaman null döner (istemci stub)`}</CodeBlock>
                 headers={['Limiter', 'Endpoint\'ler', 'Kısıt']}
                 rows={[
                     ['`generalLimiter`', 'Tüm /api/*', 'Genel istek sınırı'],
-                    ['`aiLimiter`', '/api/ai/*, /api/scrape, /api/process-cv', '20 istek / dakika / IP'],
+                    ['`aiLimiter`', '/api/ai/*, /api/process-cv', '20 istek / dakika / IP'],
                     ['`sessionLimiter`', '/api/session/*, /api/init-interview-session, /api/update-candidate-status', '60 istek / dakika / IP'],
                 ]}
             />
@@ -395,7 +395,7 @@ function DataModelSection() {
   summary: string,          // AI özet
   skills: string[],
   experience: string,
-  source: 'manual' | 'scraper' | 'cv' | 'application',
+  source: 'manual' | 'cv' | 'application',   // 'scraper' eski kayıtlarda kalabilir
   cvUrl: string,            // Firebase Storage URL
   interviewSessions: [{
     id: string,             // iv-{uuid}
@@ -511,7 +511,6 @@ function ApiSection() {
                 rows={[
                     ['POST', '`/api/ai/generate`', 'aiLimiter', 'Gemini metin üretimi (prompt → yanıt)'],
                     ['POST', '`/api/ai/stt`', 'aiLimiter', 'Ses base64 → transkripsiyon + duygu analizi'],
-                    ['GET', '`/api/scrape?q=`', 'aiLimiter', 'Puppeteer ile aday profili bulma'],
                     ['POST', '`/api/process-cv`', 'aiLimiter', 'PDF/DOCX yükleme → metin + AI analizi (Multer)'],
                     ['POST', '`/api/direct-add`', 'aiLimiter', 'Doğrudan aday ekleme + AI zenginleştirme'],
                     ['POST', '`/api/check-duplicate`', '—', 'Admin SDK ile aday tekrar kontrolü'],
@@ -578,7 +577,7 @@ function AiSection() {
             <p className="text-xs text-slate-600 leading-relaxed mb-2">
                 <code className="font-mono text-[11px] bg-slate-100 text-violet-700 px-1.5 py-0.5 rounded">agenticWorkflow.js</code> — Aday verisini sıralı adımlarla işleyen orkestrasyon motoru.
             </p>
-            <CodeBlock lang="akış">{`1. Ham Veri Alımı    → Scraper / CV yükleme / Manuel giriş
+            <CodeBlock lang="akış">{`1. Ham Veri Alımı    → CV yükleme / Başvuru formu / Manuel giriş
 2. Metin Çıkarımı   → cvParser.js (PDF: pdfjs-dist, DOCX: mammoth)
 3. Yapısal Zenginleştirme → Gemini: skill çıkarımı, deneyim ayrıştırma
 4. Yetenek Etiketleme → matchService.js
