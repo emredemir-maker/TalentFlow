@@ -44,7 +44,7 @@ export async function pdf(buffer) {
         }
         throw new Error('PDF parsing library not found or invalid');
     } catch (err) {
-        log.error('PDF Error:', err);
+        log.error({ err: err }, 'PDF Error');
         throw new Error('PDF okunamadı: ' + err.message);
     }
 }

@@ -70,7 +70,7 @@ router.get('/api/session/:sessionId', sessionLimiter, async (req, res) => {
         }
         return res.status(404).json({ found: false, error: 'Seans bulunamadı.' });
     } catch (err) {
-        log.error('GET /api/session error:', err.message);
+        log.error({ err: err.message }, 'GET /api/session error');
         res.status(500).json({ error: err.message });
     }
 });

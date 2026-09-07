@@ -24,7 +24,7 @@ export async function loadIntegrationConfigs() {
             }
         }
     } catch (err) {
-        log.warn('[integrations] Could not load integration configs:', err.message);
+        log.warn({ err: err.message }, '[integrations] Could not load integration configs');
     }
 }
 

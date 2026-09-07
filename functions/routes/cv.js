@@ -191,14 +191,14 @@ router.post('/api/process-cv', aiLimiter, requireAuth(), wrapMulter(upload.array
 
                 return { fileName: file.originalname, candidate, success: true };
             } catch (err) {
-                log.error(`Error processing ${file.originalname}:`, err);
+                log.error({ err: err }, `Error processing ${file.originalname}`);
                 return { fileName: file.originalname, error: err.message };
             }
         }));
 
         res.json({ results });
     } catch (err) {
-        log.error('Bulk CV Processing Error:', err);
+        log.error({ err: err }, 'Bulk CV Processing Error');
         res.status(500).json({ error: err.message });
     }
 });
@@ -237,7 +237,7 @@ router.post('/api/check-duplicate', requireAuth(), async (req, res) => {
             existingName: existing?.name || null,
         });
     } catch (err) {
-        log.error('Duplicate check error:', err.message);
+        log.error({ err: err.message }, 'Duplicate check error');
         res.json({ isDuplicate: false });
     }
 });

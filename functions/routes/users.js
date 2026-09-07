@@ -61,7 +61,7 @@ router.get('/api/users', requireAuth(), async (req, res) => {
         });
         res.json({ users });
     } catch (err) {
-        log.error('[API /api/users] Error:', err);
+        log.error({ err: err }, '[API /api/users] Error');
         res.status(500).json({ error: err.message });
     }
 });
@@ -93,7 +93,7 @@ router.post('/api/users/availability', requireAuth(), async (req, res) => {
             const busy = fbData.calendars?.primary?.busy || [];
             results[uid] = busy.length > 0 ? 'busy' : 'available';
         } catch (err) {
-            log.warn(`[Availability] uid=${uid}:`, err.message);
+            log.warn({ err: err.message }, `[Availability] uid=${uid}`);
             results[uid] = 'unknown';
         }
     }));

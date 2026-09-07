@@ -65,7 +65,7 @@ router.post('/api/ai/generate', aiLimiter, verifyFirebaseToken, async (req, res)
         });
         res.json({ text });
     } catch (err) {
-        log.error(`[ai/generate] failed (key source=${keyInfo.source}):`, err?.message);
+        log.error({ err: err?.message, modelId, label, anahtarKaynagi: keyInfo.source }, '[ai/generate] başarısız');
         res.status(500).json({ error: err?.message || 'AI request failed' });
     }
 });
@@ -108,7 +108,7 @@ router.post('/api/ai/ask', aiLimiter, verifyFirebaseToken, async (req, res) => {
         const result = await generateGrounded(prompt, { modelId, maxOutputTokens: tokenCap });
         res.json(result);
     } catch (err) {
-        log.error(`[ai/ask] failed (key source=${keyInfo.source}):`, err?.message);
+        log.error({ err: err?.message, modelId, anahtarKaynagi: keyInfo.source }, '[ai/ask] başarısız');
         res.status(500).json({ error: err?.message || 'AI request failed' });
     }
 });
@@ -128,7 +128,7 @@ router.post('/api/ai/stt', aiLimiter, verifyFirebaseToken, async (req, res) => {
         ], { useCache: false });
         res.json({ text });
     } catch (err) {
-        log.error('STT Error:', err.message);
+        log.error({ err: err.message }, 'STT Error');
         res.status(500).json({ error: err.message });
     }
 });
@@ -195,7 +195,7 @@ Kurallar:
         log.info(`✅ STT: "${text.substring(0, 60)}" | emotion: ${JSON.stringify(emotion)}`);
         res.json({ success: true, text, emotion });
     } catch (err) {
-        log.error('💥 Gemini STT Error:', err.message);
+        log.error({ err: err.message }, '💥 Gemini STT Error');
         res.status(500).json({ error: err.message });
     }
 });
