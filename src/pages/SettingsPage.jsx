@@ -214,7 +214,7 @@ export default function SettingsPage({ initialTab }) {
         if (!window.confirm("Google bağlantısını kesmek istediğinizden emin misiniz?")) return;
         setIsConnectingGoogle(true);
         try {
-            const res = await disconnectGoogleWorkspace(userId);
+            const res = await disconnectGoogleWorkspace();
             if (res.success) { window.location.reload(); }
             else { alert(`Bağlantı kesme hatası: ${res.error}`); }
         } catch (err) { console.error(err); }
@@ -239,7 +239,7 @@ export default function SettingsPage({ initialTab }) {
         if (!window.confirm("Microsoft bağlantısını kesmek istediğinizden emin misiniz?")) return;
         setIsConnectingMicrosoft(true);
         try {
-            const res = await disconnectMicrosoftWorkspace(userId);
+            const res = await disconnectMicrosoftWorkspace();
             if (res.success) { window.location.reload(); }
             else { alert(`Bağlantı kesme hatası: ${res.error}`); }
         } catch (err) { console.error(err); }

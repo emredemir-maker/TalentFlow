@@ -20,6 +20,10 @@ dotenv.config({ quiet: true });
 import './config/firebaseAdmin.js';
 import './config/integrations.js';
 
+// OAuth jetonları INTEGRATION_ENCRYPTION_KEY ile şifreleniyor; üretimde anahtar
+// yoksa sunucu burada durur (geliştirmede yalnızca uyarır).
+import { assertEncryptionKeyConfigured } from './services/tokenCrypto.js';
+
 // Middleware
 import { generalLimiter } from './middleware/rateLimit.js';
 import { demoBlock } from './middleware/demoMode.js';
@@ -58,6 +62,8 @@ const __dirname = path.dirname(__filename);
 // functions/ dir so files survive hot reloads.
 const isServerless = !!process.env.K_SERVICE || !!process.env.FUNCTION_NAME || !!process.env.FUNCTIONS_EMULATOR;
 const uploadBaseDir = isServerless ? '/tmp' : __dirname;
+
+assertEncryptionKeyConfigured(process.env, logger);
 
 const app = express();
 

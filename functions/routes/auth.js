@@ -7,15 +7,17 @@
 //                                         kimlik için ASLA kullanmaz.
 //   POST /api/auth/<provider>/exchange  — swap the auth code for tokens, fetch
 //                                         the user's email, and persist the
-//                                         tokens onto users/{uid}.integrations.
+//                                         tokens ŞİFRELİ olarak
+//                                         integrationSecrets/{uid}'e; profilde
+//                                         yalnızca connected/email kalır
+//                                         (services/integrationTokens.js).
 //                                         uid DOĞRULANMIŞ Firebase tokenından
 //                                         gelir (req.authUser.uid); anonim
-//                                         oturumlar reddedilir. Falls back to
-//                                         the Firestore REST API (fsPatch) when
-//                                         Admin SDK writes are blocked in dev.
-//   POST /api/auth/<provider>/refresh   — exchange refreshToken for a fresh
-//                                         accessToken; persist the new
-//                                         expiresAt in-place (kendi profiline).
+//                                         oturumlar reddedilir.
+//
+// Yenileme artık burada değil: istemci refresh token'ı hiç görmüyor; sunucu
+// jetonu kullanacağı anda services/integrationTokens.js#getAccessToken ile
+// kendisi yeniliyor.
 //
 // integrationConfigs (clientId/clientSecret/tenantId/redirectUri) is loaded
 // from Firestore at startup and updated via /api/admin/integrations.
@@ -25,14 +27,14 @@ import { verifyFirebaseToken, rejectAnonymous } from '../middleware/auth.js';
 import { inviteLimiter } from '../middleware/rateLimit.js';
 import { db } from '../config/firebaseAdmin.js';
 import { integrationConfigs } from '../config/integrations.js';
-import { fsPatch } from '../services/firestoreRest.js';
+import { tokenStore } from '../services/integrationTokenStore.js';
+import { GOOGLE_SCOPES, MS_SCOPES, expiresAtFrom } from '../services/oauthProviders.js';
 import { childLogger } from '../services/logger.js';
 const log = childLogger('auth');
 
 const router = Router();
 
 // ─── Microsoft 365 ────────────────────────────────────────────────────────────
-const MS_SCOPES = 'openid profile email offline_access User.Read Mail.Send Calendars.ReadWrite OnlineMeetings.ReadWrite';
 
 router.get('/api/auth/microsoft/url', async (req, res) => {
     try {
@@ -107,27 +109,13 @@ router.post('/api/auth/microsoft/exchange', verifyFirebaseToken, rejectAnonymous
             email = profile.mail || profile.userPrincipalName || '';
         } catch { /* non-fatal */ }
 
-        const tokenExpiresAt = Date.now() + (expires_in - 60) * 1000;
-        const integrationData = {
-            connected: true,
+        await tokenStore.connect(userId, 'microsoft', {
             email,
             accessToken: access_token,
             refreshToken: refresh_token,
-            tokenExpiresAt,
-            connectedAt: new Date().toISOString(),
-        };
-
-        try {
-            await db.doc(`artifacts/talent-flow/public/data/users/${userId}`).update({
-                'integrations.microsoft': integrationData
-            });
-        } catch {
-            await fsPatch(
-                `artifacts/talent-flow/public/data/users/${userId}`,
-                { 'integrations.microsoft': integrationData },
-                req.firebaseToken
-            );
-        }
+            tokenExpiresAt: expiresAtFrom(expires_in),
+            authMode: 'server',
+        });
 
         log.info(`[microsoft/exchange] User ${userId} connected Microsoft: ${email}`);
         res.json({ success: true, email });
@@ -137,60 +125,7 @@ router.post('/api/auth/microsoft/exchange', verifyFirebaseToken, rejectAnonymous
     }
 });
 
-router.post('/api/auth/microsoft/refresh', verifyFirebaseToken, rejectAnonymous, async (req, res) => {
-    try {
-        const cfg = integrationConfigs.microsoft365;
-        if (!cfg?.clientId || !cfg?.tenantId || !cfg?.clientSecret) {
-            return res.status(400).json({ error: 'Microsoft 365 yapılandırması eksik.' });
-        }
-        const { refreshToken } = req.body;
-        const userId = req.authUser.uid; // IDOR düzeltmesi: body'deki userId yok sayılır
-        if (!refreshToken) return res.status(400).json({ error: 'refreshToken gerekli.' });
-
-        const tokenRes = await fetch(
-            `https://login.microsoftonline.com/${cfg.tenantId}/oauth2/v2.0/token`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({
-                    client_id: cfg.clientId,
-                    client_secret: cfg.clientSecret,
-                    refresh_token: refreshToken,
-                    grant_type: 'refresh_token',
-                    scope: MS_SCOPES,
-                }),
-            }
-        );
-
-        const tokenData = await tokenRes.json();
-        if (!tokenRes.ok || tokenData.error) {
-            return res.status(400).json({ error: tokenData.error_description || 'Token yenileme başarısız.' });
-        }
-
-        const { access_token, refresh_token: new_refresh, expires_in } = tokenData;
-        const tokenExpiresAt = Date.now() + (expires_in - 60) * 1000;
-
-        try {
-            await db.doc(`artifacts/talent-flow/public/data/users/${userId}`).update({
-                'integrations.microsoft.accessToken': access_token,
-                'integrations.microsoft.refreshToken': new_refresh || refreshToken,
-                'integrations.microsoft.tokenExpiresAt': tokenExpiresAt,
-            });
-        } catch { /* non-fatal */ }
-
-        res.json({ success: true, accessToken: access_token });
-    } catch (err) {
-        log.error({ err: err.message }, '[microsoft/refresh]');
-        res.status(500).json({ error: err.message });
-    }
-});
-
 // ─── Google ───────────────────────────────────────────────────────────────────
-const GOOGLE_SCOPES = [
-    'openid', 'profile', 'email',
-    'https://www.googleapis.com/auth/gmail.modify',
-    'https://www.googleapis.com/auth/calendar.events'
-].join(' ');
 
 router.get('/api/auth/google/url', async (req, res) => {
     try {
@@ -259,21 +194,13 @@ router.post('/api/auth/google/exchange', verifyFirebaseToken, rejectAnonymous, a
             email = profile.email || '';
         } catch { /* non-fatal */ }
 
-        const tokenExpiresAt = Date.now() + ((expires_in || 3600) - 60) * 1000;
-        const integrationData = {
-            connected: true, email, accessToken: access_token,
-            refreshToken: refresh_token, tokenExpiresAt,
-            connectedAt: new Date().toISOString(),
-        };
-
-        try {
-            await db.doc(`artifacts/talent-flow/public/data/users/${userId}`).update({
-                'integrations.google': integrationData
-            });
-        } catch {
-            await fsPatch(`artifacts/talent-flow/public/data/users/${userId}`,
-                { 'integrations.google': integrationData }, req.firebaseToken);
-        }
+        await tokenStore.connect(userId, 'google', {
+            email,
+            accessToken: access_token,
+            refreshToken: refresh_token,
+            tokenExpiresAt: expiresAtFrom(expires_in),
+            authMode: 'server',
+        });
 
         log.info(`[google/exchange] User ${userId} connected: ${email}`);
         res.json({ success: true, email });
@@ -283,46 +210,45 @@ router.post('/api/auth/google/exchange', verifyFirebaseToken, rejectAnonymous, a
     }
 });
 
-router.post('/api/auth/google/refresh', verifyFirebaseToken, rejectAnonymous, async (req, res) => {
+// ─── Firebase popup ile Google bağlantısı ──────────────────────────────────────
+// Admin OAuth istemcisi yapılandırılmamışsa SPA Google'a Firebase
+// signInWithPopup ile bağlanıyor ve elinde kısa ömürlü bir erişim jetonu
+// oluyor (refresh token YOK). Eskiden SPA bunu profile düz yazıyordu; artık
+// buraya gönderiyor, sunucu şifreli depoya yazıyor. Süresi dolunca
+// getAccessToken REAUTH_REQUIRED döner ve SPA popup'ı yeniden açar.
+const FIREBASE_TOKEN_TTL_MS = 55 * 60 * 1000;
+
+router.post('/api/auth/google/firebase-token', verifyFirebaseToken, rejectAnonymous, async (req, res) => {
+    const { accessToken, email } = req.body || {};
+    if (typeof accessToken !== 'string' || accessToken.length < 10 || accessToken.length > 4096) {
+        return res.status(400).json({ error: 'Geçersiz erişim jetonu.' });
+    }
     try {
-        const cfg = integrationConfigs.google;
-        if (!cfg?.clientId || !cfg?.clientSecret) {
-            return res.status(400).json({ error: 'Google yapılandırması eksik.' });
-        }
-        const { refreshToken } = req.body;
-        const userId = req.authUser.uid; // IDOR düzeltmesi: body'deki userId yok sayılır
-        if (!refreshToken) return res.status(400).json({ error: 'refreshToken gerekli.' });
-
-        const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({
-                client_id: cfg.clientId,
-                client_secret: cfg.clientSecret,
-                refresh_token: refreshToken,
-                grant_type: 'refresh_token',
-            }),
+        await tokenStore.connect(req.authUser.uid, 'google', {
+            email: typeof email === 'string' ? email : '',
+            accessToken,
+            tokenExpiresAt: Date.now() + FIREBASE_TOKEN_TTL_MS,
+            authMode: 'firebase',
         });
-
-        const tokenData = await tokenRes.json();
-        if (!tokenRes.ok || tokenData.error) {
-            return res.status(400).json({ error: tokenData.error_description || 'Token yenileme başarısız.' });
-        }
-
-        const { access_token, expires_in } = tokenData;
-        const tokenExpiresAt = Date.now() + ((expires_in || 3600) - 60) * 1000;
-
-        try {
-            await db.doc(`artifacts/talent-flow/public/data/users/${userId}`).update({
-                'integrations.google.accessToken': access_token,
-                'integrations.google.tokenExpiresAt': tokenExpiresAt,
-            });
-        } catch { /* non-fatal */ }
-
-        res.json({ success: true, accessToken: access_token });
+        res.json({ success: true });
     } catch (err) {
-        log.error({ err: err.message }, '[google/refresh]');
-        res.status(500).json({ error: err.message });
+        log.error({ err: err.message }, '[google/firebase-token]');
+        res.status(500).json({ error: 'Bağlantı kaydedilemedi.' });
+    }
+});
+
+// ─── Bağlantıyı kes ───────────────────────────────────────────────────────────
+// Profildeki `integrations` alanı firestore.rules'ta istemci yazımına kapalı
+// (jeton alanları bir daha oraya yazılamasın diye) — kesme de sunucudan.
+router.post('/api/auth/:provider/disconnect', verifyFirebaseToken, rejectAnonymous, async (req, res) => {
+    const { provider } = req.params;
+    if (provider !== 'google' && provider !== 'microsoft') return res.status(400).json({ error: 'Bilinmeyen sağlayıcı.' });
+    try {
+        await tokenStore.disconnect(req.authUser.uid, provider);
+        res.json({ success: true });
+    } catch (err) {
+        log.error({ err: err.message }, `[${provider}/disconnect]`);
+        res.status(500).json({ error: 'Bağlantı kesilemedi.' });
     }
 });
 
