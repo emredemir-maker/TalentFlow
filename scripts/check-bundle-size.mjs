@@ -61,7 +61,16 @@ const BUDGETS = {
     // utils/candidateTable (aşama çözümlemesi) ve utils/interviewSession.
     // Aşama süzgeci veri uygulamaya girerken çalıştığı için lazy olamıyor.
     // 138, aşma anında gerçek bir inceleme yapılmasını sağlayacak kadar dar.
-    'index-': Number(process.env.BUDGET_INDEX_GZIP_KB) || 138,
+    //
+    // 138 → 145 (React 19.2.4 → 19.3.1, bağımlılık grubu #301). Ölçüm:
+    // main 133.6 KB, dal 142.1 KB — büyüme 8.3 KB ve TAMAMI react-dom'un
+    // yeni sürümünden: aynı dalda yalnızca react/react-dom 19.2.4'e
+    // geri alınınca parça 133.8 KB'a dönüyor. Bizim kodumuz değil.
+    // react-dom/client bu parçada çünkü ilk render için şart; react-vendor'a
+    // taşımak toplam inen baytı değiştirmez, yalnızca sayıyı başka bütçeye
+    // kaydırırdı. 145, ~3 KB pay bırakıp bir sonraki aşmada yine inceleme
+    // istiyor.
+    'index-': Number(process.env.BUDGET_INDEX_GZIP_KB) || 145,
 
     // Firebase SDK — app + auth + storage. Firestore ARTIK BURADA DEĞİL,
     // kendi parçasında (aşağıda). Ayrımın sebebi ölçümdü: tek parçadayken

@@ -12,9 +12,7 @@ import {
     deleteDoc,
     doc,
     onSnapshot,
-    serverTimestamp,
-    query,
-    orderBy
+    serverTimestamp
 } from 'firebase/firestore';
 
 const POSITIONS_COLLECTION = 'artifacts/talent-flow/public/data/positions';

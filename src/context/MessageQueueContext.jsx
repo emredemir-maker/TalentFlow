@@ -2,7 +2,7 @@
 // Real-time Firestore listener for messageQueue collection
 
 import { createContext, useContext, useState, useEffect } from 'react';
-import { collection, onSnapshot, query } from 'firebase/firestore';
+import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from './AuthContext';
 
