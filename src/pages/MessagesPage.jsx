@@ -14,7 +14,7 @@ import {
     deleteMessage,
     MESSAGE_STATUS,
 } from '../services/messageQueueService';
-import { fetchEmailThread, ensureValidGoogleToken, connectGoogleWorkspace } from '../services/integrationService';
+import { fetchEmailThread, isGoogleConnected, connectGoogleWorkspace } from '../services/integrationService';
 import {
     Send,
     Clock,
@@ -184,9 +184,8 @@ export default function MessagesPage() {
     const handleCheckReplies = useCallback(async (thread) => {
         setCheckingThread(thread.id);
         try {
-            const token = await ensureValidGoogleToken(userId, userProfile);
-            if (!token) { alert('Google bağlantısı gerekli. Ayarlar → Sistem bölümünden bağlanın.'); return; }
-            const result = await fetchEmailThread(token, thread.threadId);
+            if (!isGoogleConnected(userProfile)) { alert('Google bağlantısı gerekli. Ayarlar → Sistem bölümünden bağlanın.'); return; }
+            const result = await fetchEmailThread(thread.threadId);
             if (result.success) {
                 setThreadMessages(prev => ({ ...prev, [thread.threadId]: result.messages }));
                 const hasReply = result.messages.length > 1;

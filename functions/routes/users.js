@@ -15,6 +15,7 @@ import { Router } from 'express';
 
 import { requireAuth } from '../middleware/auth.js';
 import { db } from '../config/firebaseAdmin.js';
+import { tokenStore } from '../services/integrationTokenStore.js';
 import { childLogger } from '../services/logger.js';
 const log = childLogger('users');
 
@@ -81,11 +82,13 @@ router.post('/api/users/availability', requireAuth(), async (req, res) => {
         try {
             const userDoc = await db.doc(`artifacts/talent-flow/public/data/users/${uid}`).get();
             if (!userDoc.exists) { results[uid] = 'unknown'; return; }
-            const googleIntegration = userDoc.data()?.integrations?.google;
-            if (!googleIntegration?.connected || !googleIntegration?.accessToken) { results[uid] = 'unknown'; return; }
+            if (!userDoc.data()?.integrations?.google?.connected) { results[uid] = 'unknown'; return; }
+            // Jeton şifreli depodan çözülür (gerekirse yenilenir); bağlantı
+            // yenilenmeliyse getAccessToken fırlatır → 'unknown'.
+            const accessToken = await tokenStore.getAccessToken(uid, 'google');
             const resp = await fetch('https://www.googleapis.com/calendar/v3/freeBusy', {
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${googleIntegration.accessToken}`, 'Content-Type': 'application/json' },
+                headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ timeMin: slotStart, timeMax: slotEnd, items: [{ id: 'primary' }] })
             });
             if (!resp.ok) { results[uid] = 'unknown'; return; }

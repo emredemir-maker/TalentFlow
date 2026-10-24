@@ -121,9 +121,14 @@ jobs:
       # tavanı onu görmüyor — 20 ile ayrıca sınırlı.
       - name: functions/.env oluştur
         run: |
-          printf 'VITE_GEMINI_API_KEY=%s\nVITE_FIREBASE_API_KEY=%s\nDEMO_MODE=true\nAI_DAILY_TOKEN_LIMIT=%s\nAI_DAILY_GROUNDED_LIMIT=%s\n' \
+          # INTEGRATION_ENCRYPTION_KEY: DEMO_INTEGRATION_ENCRYPTION_KEY secret'ı
+          # yoksa her dağıtımda rastgele üretiliyor — demo kullanıcısı Google'ı
+          # dağıtımdan sonra yeniden bağlar; sunucu anahtarsız AÇILMIYOR.
+          ENC_KEY="${DEMO_ENC_KEY:-$(openssl rand -base64 32)}"
+          printf 'GEMINI_API_KEY=%s\nVITE_FIREBASE_API_KEY=%s\nINTEGRATION_ENCRYPTION_KEY=%s\nDEMO_MODE=true\nAI_DAILY_TOKEN_LIMIT=%s\nAI_DAILY_GROUNDED_LIMIT=%s\n' \
             "$GEMINI" \
             "$API_KEY" \
+            "$ENC_KEY" \
             "${DEMO_TOKEN_LIMIT:-400000}" \
             "${DEMO_GROUNDED_LIMIT:-20}" \
             > functions/.env
@@ -132,6 +137,7 @@ jobs:
         env:
           GEMINI: ${{ secrets.DEMO_GEMINI_API_KEY }}
           API_KEY: ${{ secrets.DEMO_FIREBASE_API_KEY }}
+          DEMO_ENC_KEY: ${{ secrets.DEMO_INTEGRATION_ENCRYPTION_KEY }}
           # Tavanlar secret DEĞİL — değiştirmek için repo değişkeni yeterli.
           DEMO_TOKEN_LIMIT: ${{ vars.DEMO_TOKEN_LIMIT }}
           DEMO_GROUNDED_LIMIT: ${{ vars.DEMO_GROUNDED_LIMIT }}

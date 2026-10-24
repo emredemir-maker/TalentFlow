@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { analyzeResponseEmail } from '../services/geminiService';
 import { useAuth } from '../context/AuthContext';
-import { checkGmailMessages } from '../services/integrationService';
+import { checkGmailMessages, isGoogleConnected } from '../services/integrationService';
 
 // ─── shared pill ────────────────────────────────────────────
 function TabPill({ id, label, active, onClick }) {
@@ -504,12 +504,11 @@ export default function AnalyticsPage() {
     const openResponseModal = (msg) => setProcessingResponse({ message: msg, emailText: '', loading: false, result: null, checkingMail: false });
 
     const handleCheckEmail = async (msg) => {
-        const token = userProfile?.integrations?.google?.accessToken;
-        if (!token) { alert('Lütfen önce Google hesabınızı bağlayın (Ayarlar → Entegrasyonlar).'); return; }
+        if (!isGoogleConnected(userProfile)) { alert('Lütfen önce Google hesabınızı bağlayın (Ayarlar → Entegrasyonlar).'); return; }
         if (!msg.candidateEmail) { alert('Aday e-posta adresi bulunamadı.'); return; }
         setProcessingResponse({ message: msg, emailText: '', loading: false, result: null, checkingMail: true });
         try {
-            const result = await checkGmailMessages(token, `from:${msg.candidateEmail}`);
+            const result = await checkGmailMessages(`from:${msg.candidateEmail}`);
             if (result.success && result.found) {
                 setProcessingResponse({ message: msg, emailText: result.message.body || result.message.snippet || '', loading: false, result: null, checkingMail: false });
             } else {

@@ -286,7 +286,7 @@ function SecuritySection() {
             </InfoBox>
             <CodeBlock lang="akış">{`Tarayıcı → POST /api/ai/generate { prompt }
               ↓
-        Express backend (VITE_GEMINI_API_KEY sunucuda)
+        Express backend (GEMINI_API_KEY sunucuda)
               ↓
         Gemini API çağrısı
               ↓
@@ -531,9 +531,11 @@ function ApiSection() {
             <Table
                 headers={['Method', 'Endpoint', 'Açıklama']}
                 rows={[
-                    ['POST', '`/api/google/send-email`', 'Gmail üzerinden e-posta gönderimi'],
+                    ['POST', '`/api/google/send-email`', 'Gmail üzerinden e-posta gönderimi (jeton sunucuda)'],
                     ['GET', '`/api/google/check-messages`', 'Gmail inbox okuma'],
-                    ['POST', '`/api/google/create-calendar-event`', 'Google Takvim etkinliği oluşturma'],
+                    ['GET', '`/api/google/thread/:threadId`', 'Mail konuşma geçmişi'],
+                    ['GET', '`/api/google/calendar-events`', 'Takvim etkinliklerini listeleme'],
+                    ['POST', '`/api/google/calendar-events`', 'Google Takvim etkinliği oluşturma'],
                 ]}
             />
 
@@ -946,7 +948,8 @@ function DeploySection() {
                     ['`VITE_FIREBASE_STORAGE_BUCKET`', 'Firebase storage bucket', 'Frontend'],
                     ['`VITE_FIREBASE_MESSAGING_SENDER_ID`', 'FCM sender ID', 'Frontend'],
                     ['`VITE_FIREBASE_APP_ID`', 'Firebase app ID', 'Frontend'],
-                    ['`VITE_GEMINI_API_KEY`', 'Gemini API anahtarı (VITE_ prefix ama backend okur)', 'Backend'],
+                    ['`GEMINI_API_KEY`', 'Gemini API anahtarı (yalnızca backend okur)', 'Backend'],
+                    ['`INTEGRATION_ENCRYPTION_KEY`', 'OAuth jeton şifreleme anahtarı (base64, 32 bayt)', 'Backend'],
                     ['`EMAIL_USER`', 'Gmail hesabı (Nodemailer)', 'Backend'],
                     ['`EMAIL_PASS`', 'Gmail uygulama şifresi', 'Backend'],
                     ['`GITHUB_PERSONAL_ACCESS_TOKEN_NEW`', 'GitHub push tokeni', 'CI/CD'],
