@@ -8,7 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 import { collection, onSnapshot, doc, getDoc, setDoc, deleteDoc, serverTimestamp, query, where, addDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { getCalendarEvents, connectGoogleWorkspace, sendDirectEmail, createDirectCalendarEvent, ensureValidGoogleToken } from '../services/integrationService';
+import { getCalendarEvents, connectGoogleWorkspace, sendDirectEmail, createDirectCalendarEvent } from '../services/integrationService';
 import { getInviteEmail, getParticipantEmail, getRescheduleEmail } from '../utils/templateService';
 import { buildICS } from '../utils/emailTemplates';
 import AddManualInterviewModal from '../components/AddManualInterviewModal';
@@ -256,7 +256,6 @@ export default function InterviewManagementPage() {
     }, [currentUser?.uid]);
 
     const isGoogleConnected = userProfile?.integrations?.google?.connected;
-    const googleToken = userProfile?.integrations?.google?.accessToken;
 
     // ─── CONFLICT DETECTION HELPERS ───────────────────────────────────────────
 
@@ -372,11 +371,10 @@ export default function InterviewManagementPage() {
 
             if (isGoogleConnected) {
                 try {
-                    const token = await ensureValidGoogleToken(userId, userProfile);
-                    if (token) {
+                    {
                         const dayStart = new Date(`${manualDate}T00:00:00`).toISOString();
                         const dayEnd = new Date(`${manualDate}T23:59:59`).toISOString();
-                        const result = await getCalendarEvents(token, dayStart, dayEnd);
+                        const result = await getCalendarEvents(dayStart, dayEnd);
                         if (result.success) {
                             busyEvents = result.events
                                 .filter(e => e.start.dateTime) // skip all-day events (no specific times)
@@ -680,14 +678,14 @@ export default function InterviewManagementPage() {
             const timeMax = new Date();
             timeMax.setDate(timeMax.getDate() + 7);
 
-            // Always get a valid (auto-refreshed if needed) token before calling the API
-            const freshToken = await ensureValidGoogleToken(userId, userProfile);
-            if (!freshToken) {
+            // Jeton sunucuda tutulup gerekirse orada yenileniyor; burada yalnızca
+            // bağlantının varlığına bakılıyor.
+            if (!isGoogleConnected) {
                 alert("Google bağlantısı kurulamadı. Lütfen Ayarlar → Sistem bölümünden yeniden bağlanın.");
                 return;
             }
             
-            const result = await getCalendarEvents(freshToken, timeMin, timeMax.toISOString());
+            const result = await getCalendarEvents(timeMin, timeMax.toISOString());
             
             if (result.success) {
                 const busyEvents = result.events.map(e => ({
@@ -846,8 +844,7 @@ export default function InterviewManagementPage() {
     const handleSendEmail = async () => {
         setIsSendingEmail(true);
         try {
-            const freshToken = await ensureValidGoogleToken(userId, userProfile);
-            if (!freshToken) {
+            if (!isGoogleConnected) {
                 throw new Error("Google bağlantısı kurulamadı. Lütfen Ayarlar → Sistem bölümünden yeniden bağlanın.");
             }
 
@@ -873,7 +870,7 @@ export default function InterviewManagementPage() {
                 attendee:    { name: selectedCandidate.name, email: selectedCandidate.email },
             });
 
-            const result = await sendDirectEmail(userId, freshToken, {
+            const result = await sendDirectEmail({
                 to:      selectedCandidate.email,
                 subject: emailSubject,
                 body:    emailBody,
@@ -1031,11 +1028,9 @@ export default function InterviewManagementPage() {
                 const endDT = new Date(startDT.getTime() + 60 * 60 * 1000);
                 const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-                // ensureValidGoogleToken silently refreshes if the stored token is expired.
-                // This avoids any manual reconnection prompts for the user.
-                const freshCalToken = await ensureValidGoogleToken(userId, userProfile);
-
-                if (!freshCalToken) {
+                // Süresi dolan jetonu sunucu kendisi yeniliyor; kullanıcıdan
+                // yeniden bağlanması yalnızca yenileme de başarısız olursa istenir.
+                if (!isGoogleConnected) {
                     console.warn('[Calendar] Could not obtain valid token — skipping calendar event; will use nodemailer for candidate invite.');
                     alert('⚠️ Google token alınamadı. Mülakat sisteme kaydedilecek ama takvime eklenemeyecek.');
                     // Nodemailer fallback when Google token is unavailable
@@ -1082,7 +1077,7 @@ export default function InterviewManagementPage() {
                     }
                 } else {
                     const participantEmails = selectedParticipants.map(p => p.email).filter(Boolean);
-                    const calResult = await createDirectCalendarEvent(userId, freshCalToken, {
+                    const calResult = await createDirectCalendarEvent({
                         summary: `${selectedCandidate.name} — ${newSession.title}`,
                         description: `Talent-Inn üzerinden planlanan mülakat.\nAday: ${selectedCandidate.name}\nPozisyon: ${selectedCandidate.position || '—'}\nDeğerlendirici: ${interviewerName}\n${participantEmails.length > 0 ? `Katılımcılar: ${participantEmails.join(', ')}\n` : ''}Mülakat linki: ${meetLink}`,
                         startDateTime: toLocalISOString(startDT),
@@ -1133,7 +1128,7 @@ export default function InterviewManagementPage() {
                                 organizer:   { name: userProfile?.displayName || '', email: userProfile?.email || '' },
                                 attendee:    { name: participant.name, email: participant.email },
                             });
-                            await sendDirectEmail(userId, freshCalToken, {
+                            await sendDirectEmail({
                                 to:      participant.email,
                                 subject: `Mülakat Daveti: ${newSession.title} — ${selectedCandidate.name}`,
                                 body:    `Merhaba ${participant.name || participant.email},\n\nTalent-Inn üzerinden bir mülakata katılımcı olarak eklendiniz.\n\nAday: ${selectedCandidate.name}\nPozisyon: ${selectedCandidate.position || '—'}\nTarih: ${slot.date}\nSaat: ${slot.time}\nMülakat Tipi: ${newSession.title}\n\nMülakat Linki: ${platformJoinLink}\n\nTalent-Inn Ekibi`,
@@ -1169,7 +1164,7 @@ export default function InterviewManagementPage() {
                                 organizer:   { name: userProfile?.displayName || '', email: userProfile?.email || '' },
                                 attendee:    { name: selectedCandidate.name, email: selectedCandidate.email },
                             });
-                            await sendDirectEmail(userId, freshCalToken, {
+                            await sendDirectEmail({
                                 to:      selectedCandidate.email,
                                 subject: `Mülakat Davetiniz: ${newSession.title}`,
                                 html:    candidateHtml,
@@ -1488,10 +1483,9 @@ export default function InterviewManagementPage() {
             // Send reschedule / cancellation email to the candidate (non-blocking)
             if (candidate.email && (newStatus === 'postponed' || newStatus === 'cancelled') && originalSession) {
                 try {
-                    const freshToken = await ensureValidGoogleToken(userId, userProfile);
                     // Build email content up front so both the Gmail-API path and the
                     // SMTP fallback below can reuse the same subject/body/html. (Pre-fix
-                    // these consts were declared inside the `if (freshToken)` branch and
+                    // these consts were declared inside the `if (isGoogleConnected)` branch and
                     // the fallback referenced them out of scope → ReferenceError.)
                     const isCancelled = newStatus === 'cancelled';
                     const { html: rescheduleHtml } = await getRescheduleEmail(branding, {
@@ -1512,8 +1506,8 @@ export default function InterviewManagementPage() {
                     const rescheduleBody = isCancelled
                         ? `Sayın ${candidate.name},\n\n${branding.companyName || 'Şirketimiz'} ile planlanmış olan ${originalSession.title || 'mülakat'} (${originalSession.date || ''} ${originalSession.time || ''}) maalesef iptal edilmiştir.\n\nHerhangi bir sorunuz için bizimle iletişime geçebilirsiniz.\n\nSaygılarımızla,\n${userProfile?.displayName || 'İK Ekibi'}`
                         : `Sayın ${candidate.name},\n\n${branding.companyName || 'Şirketimiz'} ile planlanmış olan mülakatınızın (${originalSession.date || ''} ${originalSession.time || ''}) tarihi güncellenmiştir.\n\nYeni tarih: ${newDate || originalSession.date || ''} ${newTime || originalSession.time || ''}\n\nHerhangi bir sorunuz için bizimle iletişime geçebilirsiniz.\n\nSaygılarımızla,\n${userProfile?.displayName || 'İK Ekibi'}`;
-                    if (freshToken) {
-                        await sendDirectEmail(userId, freshToken, {
+                    if (isGoogleConnected) {
+                        await sendDirectEmail({
                             to:      candidate.email,
                             subject: rescheduleSubject,
                             body:    rescheduleBody,

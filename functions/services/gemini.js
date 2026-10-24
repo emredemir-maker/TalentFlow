@@ -129,7 +129,7 @@ export async function getApiKeyDetailed() {
     }
 
     // 2. Fallback to env
-    const envKey = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+    const envKey = process.env.GEMINI_API_KEY;
     if (envKey && envKey.trim() !== '' && envKey !== 'null' && envKey !== 'undefined') {
         log.info('key loaded from env');
         return { key: envKey.trim(), source: 'env' };

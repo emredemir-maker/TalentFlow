@@ -131,7 +131,7 @@ Tarayıcı → POST /api/ai/generate (prompt)
         Yanıt → Tarayıcı
 ```
 
-- `VITE_GEMINI_API_KEY` ortam değişkeni yalnızca `server.js` tarafından okunur.
+- `GEMINI_API_KEY` ortam değişkeni yalnızca sunucu (`functions/services/gemini.js`) tarafından okunur.
 - İstemci tarafında `getGlobalGeminiKey()` her zaman `null` döner (geriye dönük uyumluluk için stub).
 
 ### 3.2 Rate Limiting
@@ -353,7 +353,7 @@ Aday verisini sıralı adımlarla işleyen orkestrasyon motoru:
 6. Firestore Yazma  → Tamamlanmış aday belgesi
 ```
 
-### 6.2 STAR Analizi (`src/services/ai/gemini-logic.js`)
+### 6.2 STAR Analizi
 
 Canlı mülakat sırasında gerçek zamanlı değerlendirme:
 
@@ -476,21 +476,23 @@ Path: `artifacts/talent-flow/public/data/{collection}/{id}`
 ### `integrationService.js`
 Google Workspace API köprüsü — **hibrit OAuth modu**:
 - `connectGoogleWorkspace(userId, forceConsent?)` — Bağlantı akışı (aşağıya bakın)
-- `ensureValidGoogleToken(userId, userProfile)` — Süresi dolan token yenileme
-- `sendDirectEmail(userId, token, emailData)` — Gmail API ile mail gönderme
-- `createDirectCalendarEvent(userId, token, eventData)` — Calendar etkinliği + Meet linki
-- `getCalendarEvents(token, timeMin, timeMax)` — Müsaitlik kontrolü
-- `fetchEmailThread(token, threadId)` — Mail konuşma geçmişi
-- `checkGmailMessages(token, query)` — Gmail arama ve içerik okuma
-- `disconnectGoogleWorkspace(userId)` — Bağlantı kesme
+- `isGoogleConnected(userProfile)` — Profilde bağlantı işaretli mi
+- `sendDirectEmail(emailData)` — `/api/google/send-email` üzerinden mail gönderme
+- `createDirectCalendarEvent(eventData)` — Calendar etkinliği + Meet linki
+- `getCalendarEvents(timeMin, timeMax)` — Müsaitlik kontrolü
+- `fetchEmailThread(threadId)` — Mail konuşma geçmişi
+- `checkGmailMessages(query)` — Gmail arama ve içerik okuma
+- `disconnectGoogleWorkspace()` — Bağlantı kesme
+
+OAuth jetonları istemciye hiç gelmez: sunucu `integrationSecrets/{uid}` altında
+AES-256-GCM ile şifreli saklar (`INTEGRATION_ENCRYPTION_KEY`), süresi dolanı
+kendisi yeniler. Eski düz metin jetonlar ilk kullanımda şifrelenip taşınır
+(`functions/services/integrationTokens.js`).
 
 ### `microsoftIntegrationService.js`
 Microsoft 365 API köprüsü (admin credentials zorunlu):
-- `connectMicrosoft(userId, idToken)` — Server-side OAuth popup akışı
-- `ensureValidMicrosoftToken(userId, userProfile, idToken)` — Refresh token ile yenileme
-- `sendMicrosoftEmail(token, emailData)` — Outlook API ile mail
-- `createMicrosoftCalendarEvent(token, eventData)` — Teams toplantı linki dahil etkinlik
-- `disconnectMicrosoft(userId)` — Bağlantı kesme
+- `connectMicrosoftWorkspace(userId)` — Server-side OAuth popup akışı
+- `disconnectMicrosoftWorkspace()` — Bağlantı kesme (sunucu üzerinden)
 
 ### `applicationService.js`
 Dışarıdan başvuru akışı:

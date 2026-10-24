@@ -23,7 +23,6 @@ export default function EvaluationEmailModal({ isOpen, onClose, candidates, open
     if (!isOpen) return null;
 
     const googleConnected = Boolean(userProfile?.integrations?.google?.connected);
-    const googleToken = userProfile?.integrations?.google?.accessToken;
     const recipients = to.split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean);
     const canSend = googleConnected && recipients.length > 0 && (includeTable || includeLinks) && !sending;
 
@@ -45,7 +44,7 @@ export default function EvaluationEmailModal({ isOpen, onClose, candidates, open
         setError(null);
         try {
             const email = buildEmail();
-            const result = await sendDirectEmail(user.uid, googleToken, {
+            const result = await sendDirectEmail({
                 to: recipients.join(', '),
                 subject: email.subject,
                 body: email.text,

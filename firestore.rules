@@ -173,7 +173,9 @@ service cloud.firestore {
     //           non-admin role justified by a pending invitation or the
     //           allow-listed e-mail domain — see Registration validation above
     // • update: super_admin (any field) · self (own profile, but never the
-    //           privilege/identity fields) · recruiter (department assignment
+    //           privilege/identity fields nor `integrations` — OAuth bağlantı
+    //           durumu yalnızca sunucudan yazılır, jeton alanları bir daha
+    //           profile düşmesin diye) · recruiter (department assignment
     //           only, used by the department management page)
     // • delete: super_admin only
     match /artifacts/talent-flow/public/data/users/{userId} {
@@ -190,7 +192,7 @@ service cloud.firestore {
       allow update: if isSuperAdmin() ||
                        (isStrictAuthenticated() && request.auth.uid == userId &&
                         !request.resource.data.diff(resource.data).affectedKeys()
-                          .hasAny(['role', 'status', 'department', 'departments', 'email', 'uid'])) ||
+                          .hasAny(['role', 'status', 'department', 'departments', 'email', 'uid', 'integrations'])) ||
                        (isRecruiter() &&
                         request.resource.data.diff(resource.data).affectedKeys()
                           .hasOnly(['department', 'departments']));
@@ -200,6 +202,16 @@ service cloud.firestore {
         allow read, write: if isStrictAuthenticated() &&
                               (request.auth.uid == userId || isSuperAdmin());
       }
+    }
+
+    // ── OAuth jetonları (Gmail/Calendar, Microsoft Graph) ────────────────────
+    // Kullanıcı başına ŞİFRELİ erişim/yenileme jetonları. Yalnızca sunucu
+    // (Admin SDK, functions/services/integrationTokens.js) okur ve yazar;
+    // hiçbir istemci rolü — sahibi ve super_admin dahil — erişemez. Eskiden
+    // jetonlar düz metin olarak kullanıcı dokümanındaydı ve kullanıcı
+    // dokümanını her recruiter okuyabiliyordu.
+    match /artifacts/talent-flow/public/data/integrationSecrets/{userId} {
+      allow read, write: if false;
     }
 
     // ── Departments ───────────────────────────────────────────────────────────

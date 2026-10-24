@@ -19,7 +19,6 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
 
     // Google Integration Check
     const googleConnected = userProfile?.integrations?.google?.connected;
-    const googleToken = userProfile?.integrations?.google?.accessToken;
 
     // State
     const [messageSubject, setMessageSubject] = useState('');
@@ -97,7 +96,7 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
     }
 
     async function handleDirectSend() {
-        if (!googleConnected || !googleToken) {
+        if (!googleConnected) {
             setError('Lütfen önce ayarlar sayfasından Google hesabınızı bağlayın.');
             return;
         }
@@ -114,7 +113,7 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
                 const startDateTime = new Date(`${interviewDate}T${interviewTime}:00`).toISOString();
                 const endDateTime = new Date(new Date(`${interviewDate}T${interviewTime}:00`).getTime() + duration * 60000).toISOString();
 
-                const eventResult = await createDirectCalendarEvent(userId, googleToken, {
+                const eventResult = await createDirectCalendarEvent({
                     summary: `Mülakat: ${candidate.name} - ${candidate.matchedPositionTitle || 'Pozisyon'}`,
                     description: `Talent-Inn üzerinden planlanan görüşme.\nTakip ID: ${trackingId}`,
                     startDateTime,
@@ -135,7 +134,7 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
 
             // 2. Handle Email if requested
             if (sendCandidateEmail) {
-                const emailResult = await sendDirectEmail(userId, googleToken, {
+                const emailResult = await sendDirectEmail({
                     to: candidate.email,
                     subject: `${messageSubject} [#${trackingId}]`,
                     body: finalContent

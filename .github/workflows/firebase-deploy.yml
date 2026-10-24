@@ -37,6 +37,7 @@ jobs:
           [ -z "$EMAIL_USER" ] && eksik="$eksik EMAIL_USER"
           [ -z "$EMAIL_PASS" ] && eksik="$eksik EMAIL_PASS"
           [ -z "$VITE_GEMINI_API_KEY" ] && eksik="$eksik VITE_GEMINI_API_KEY"
+          [ -z "$INTEGRATION_ENCRYPTION_KEY" ] && eksik="$eksik INTEGRATION_ENCRYPTION_KEY"
           if [ -n "$eksik" ]; then
             echo "❌ Eksik secret:$eksik"
             exit 1
@@ -52,6 +53,7 @@ jobs:
           EMAIL_USER: ${{ secrets.EMAIL_USER }}
           EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
           VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
+          INTEGRATION_ENCRYPTION_KEY: ${{ secrets.INTEGRATION_ENCRYPTION_KEY }}
           AI_DAILY_TOKEN_LIMIT: ${{ secrets.AI_DAILY_TOKEN_LIMIT }}
           AI_DAILY_GROUNDED_LIMIT: ${{ secrets.AI_DAILY_GROUNDED_LIMIT }}
 
@@ -93,11 +95,12 @@ jobs:
       # eklenecek her yeni değişken de aynı sessizlikle kaybolurdu.
       - name: Create functions/.env
         run: |
-          printf 'EMAIL_USER=%s\nEMAIL_PASS=%s\nVITE_GEMINI_API_KEY=%s\nVITE_FIREBASE_API_KEY=%s\nAI_DAILY_TOKEN_LIMIT=%s\nAI_DAILY_GROUNDED_LIMIT=%s\n' \
+          printf 'EMAIL_USER=%s\nEMAIL_PASS=%s\nGEMINI_API_KEY=%s\nVITE_FIREBASE_API_KEY=%s\nINTEGRATION_ENCRYPTION_KEY=%s\nAI_DAILY_TOKEN_LIMIT=%s\nAI_DAILY_GROUNDED_LIMIT=%s\n' \
             "$EMAIL_USER" \
             "$EMAIL_PASS" \
             "$VITE_GEMINI_API_KEY" \
             "$VITE_FIREBASE_API_KEY" \
+            "$INTEGRATION_ENCRYPTION_KEY" \
             "$AI_DAILY_TOKEN_LIMIT" \
             "$AI_DAILY_GROUNDED_LIMIT" \
             > functions/.env
@@ -106,8 +109,13 @@ jobs:
         env:
           EMAIL_USER: ${{ secrets.EMAIL_USER }}
           EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
+          # GitHub secret'ının adı tarihsel olarak VITE_ önekli; fonksiyona
+          # GEMINI_API_KEY adıyla gidiyor (sunucu yalnızca bu adı okur).
           VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          # OAuth jeton şifreleme anahtarı — DEĞİŞTİRİLİRSE kayıtlı Google/
+          # Microsoft bağlantıları çözülemez ve kullanıcılar yeniden bağlanır.
+          INTEGRATION_ENCRYPTION_KEY: ${{ secrets.INTEGRATION_ENCRYPTION_KEY }}
           # SIR DEĞİL ama buradan geçiyor: fonksiyonlar ortam değişkenlerini
           # yalnızca bu dosyadan okuyor. Secret tanımlı değilse satır boş
           # yazılır ve günlük AI bütçe freni KAPALI kalır — mevcut kurulumun

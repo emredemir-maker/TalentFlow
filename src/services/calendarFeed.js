@@ -7,26 +7,25 @@
 //
 // React'ten bağımsız: durum yönetimi çağıranda, ağ ve ayıklama burada.
 
-import { getCalendarEvents, ensureValidGoogleToken } from './integrationService';
+import { getCalendarEvents, isGoogleConnected } from './integrationService';
 import { normalizeCalendarEvent } from '../utils/calendarMatch';
 
 /**
  * Verilen aralıktaki takvim etkinliklerini getirir.
  *
  * @param {object} input
- *   userId, userProfile — jeton tazelemek için
+ *   userProfile — Google bağlantısı var mı (jetonu sunucu tazeler)
  *   from, to — Date
  * @returns {Promise<{events: Array, error: string}>}
  *   Hata FIRLATILMIYOR: takvim okunamadığında ekranın geri kalanı çalışmaya
  *   devam etmeli. Sebep metin olarak dönüyor ve kullanıcıya gösteriliyor.
  */
-export async function fetchCalendarWindow({ userId, userProfile, from, to }) {
+export async function fetchCalendarWindow({ userProfile, from, to }) {
     try {
-        const token = await ensureValidGoogleToken(userId, userProfile);
-        if (!token) {
+        if (!isGoogleConnected(userProfile)) {
             return { events: [], error: 'Google bağlantısı doğrulanamadı. Ayarlar → Entegrasyonlar bölümünden yeniden bağlanın.' };
         }
-        const result = await getCalendarEvents(token, from.toISOString(), to.toISOString());
+        const result = await getCalendarEvents(from.toISOString(), to.toISOString());
         if (!result?.success) {
             return { events: [], error: result?.error || 'Takvim okunamadı.' };
         }
