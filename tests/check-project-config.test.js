@@ -8,6 +8,7 @@ import {
     productionSiteProblem,
     demoSiteProblem,
     productionFunctionsProblem,
+    productionStorageProblem,
     functionSourceProblem,
     findForbidden,
     validateDemoProjectId,
@@ -150,6 +151,45 @@ describe('productionFunctionsProblem', () => {
             },
         };
         expect(productionFunctionsProblem(stringForm)).toBeNull();
+    });
+});
+
+describe('productionStorageProblem', () => {
+    const P = 'agentinn-nyqpx';
+    it('projenin bucket adı açıkça yazılınca kabul eder', () => {
+        expect(
+            productionStorageProblem(
+                { storage: [{ bucket: `${P}.firebasestorage.app`, rules: 'storage.rules' }] },
+                P
+            )
+        ).toBeNull();
+        expect(
+            productionStorageProblem(
+                { storage: [{ bucket: `${P}.appspot.com`, rules: 'storage.rules' }] },
+                P
+            )
+        ).toBeNull();
+    });
+    it('bucket adı yazılmamış nesne biçimini reddeder (CLI varsayılan bucket sorgusu 404 veriyor)', () => {
+        expect(productionStorageProblem({ storage: { rules: 'storage.rules' } }, P)).toMatch(
+            /bucket adı açıkça/
+        );
+        expect(productionStorageProblem({}, P)).toMatch(/bucket adı açıkça/);
+    });
+    it("başka projenin bucket'ını ve eksik kuralı reddeder", () => {
+        expect(
+            productionStorageProblem(
+                {
+                    storage: [
+                        { bucket: 'deploy-n8n-local.firebasestorage.app', rules: 'storage.rules' },
+                    ],
+                },
+                P
+            )
+        ).toMatch(/olmalı/);
+        expect(
+            productionStorageProblem({ storage: [{ bucket: `${P}.firebasestorage.app` }] }, P)
+        ).toMatch(/rules eksik/);
     });
 });
 
