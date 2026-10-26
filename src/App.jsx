@@ -82,6 +82,7 @@ const CandidateRespondPage    = lazyPage(() => import('./pages/CandidateRespondP
 const IntegrationsPage        = lazyPage(() => import('./pages/IntegrationsPage'));
 const MicrosoftCallbackPage   = lazyPage(() => import('./pages/MicrosoftCallbackPage'));
 const GoogleCallbackPage      = lazyPage(() => import('./pages/GoogleCallbackPage'));
+const HubLaunchPage           = lazyPage(() => import('./pages/HubLaunchPage'));
 
 // Tiny inline fallback for in-app route transitions — a full LoadingScreen
 // flashes too aggressively for sub-second chunk fetches. Used only for
@@ -117,6 +118,7 @@ export default function App() {
                   <Route path="/respond/:id" element={<CandidateRespondPage />} />
                   <Route path="/auth/microsoft/callback" element={<MicrosoftCallbackPage />} />
                   <Route path="/auth/google/callback" element={<GoogleCallbackPage />} />
+                  <Route path="/hub-giris" element={<HubLaunchPage />} />
                   <Route path="/*" element={<AuthenticatedApp />} />
                 </Routes>
               </Suspense>
