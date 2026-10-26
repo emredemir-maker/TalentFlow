@@ -242,8 +242,14 @@ for R in roles/firebase.admin roles/cloudfunctions.admin roles/run.admin roles/a
   bind "$DEPLOYER" "$R"
 done
 # Fonksiyon bu hesapla çalışıyor ve derleniyor; dağıtıcı onun adına iş başlatabilmeli.
-quiet gcloud iam service-accounts add-iam-policy-binding "$COMPUTE" --member="serviceAccount:$DEPLOYER" \
-  --role=roles/iam.serviceAccountUser --project "$P" || warn "serviceAccountUser verilemedi ($COMPUTE)"
+# 1. nesil fonksiyonlar App Engine varsayılan hesabıyla (<proje>@appspot) çalışır; Firebase CLI ikisini de denetler.
+# Eski projelerde appspot hesabı vardır; yoksa atlanır.
+APPSPOT="$P@appspot.gserviceaccount.com"
+for SA in "$COMPUTE" "$APPSPOT"; do
+  quiet gcloud iam service-accounts describe "$SA" --project "$P" || continue
+  quiet gcloud iam service-accounts add-iam-policy-binding "$SA" --member="serviceAccount:$DEPLOYER" \
+    --role=roles/iam.serviceAccountUser --project "$P" || warn "serviceAccountUser verilemedi ($SA)"
+done
 # Organizasyonsuz projelerde varsayılan hesap Editor alır; alamadıysa uygulamanın ihtiyacı tek tek veriliyor
 # (Firestore, Auth özel rol, Storage, derleme ve günlük).
 if gcloud projects get-iam-policy "$P" --flatten='bindings[].members' \
