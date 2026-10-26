@@ -55,7 +55,8 @@ else ok "proje: $P (.firebaserc)"; fi
 
 quiet gcloud projects describe "$P" || die "$P projesine erişilemiyor. Bu hesap projenin sahibi mi? (docs/yeni-proje-kurulumu.md adım 1)"
 gcloud config set project "$P" >/dev/null 2>&1
-PARENT=$(gcloud projects describe "$P" --format='value(parent.type,parent.id)' 2>/dev/null)
+# Bağlı değilse gcloud boşluk/sekme döndürüyor; boşluklar atılır (yoksa "bağlı (  )" diye yanlış uyarı verirdi).
+PARENT=$(gcloud projects describe "$P" --format='value(parent.type,parent.id)' 2>/dev/null | tr -d '[:space:]')
 if [ -n "$PARENT" ]; then warn "proje bir üst kaynağa bağlı ($PARENT). Kişisel kurulum için 'No organization' beklenir; eski şirketin organizasyonu ise DURUN."
 else ok "proje herhangi bir organizasyona bağlı değil"; fi
 NUM=$(gcloud projects describe "$P" --format='value(projectNumber)')
@@ -78,9 +79,10 @@ APIS="firebase.googleapis.com firebasehosting.googleapis.com firebaserules.googl
  eventarc.googleapis.com pubsub.googleapis.com compute.googleapis.com iam.googleapis.com iamcredentials.googleapis.com
  cloudresourcemanager.googleapis.com serviceusage.googleapis.com cloudbilling.googleapis.com logging.googleapis.com
  apikeys.googleapis.com generativelanguage.googleapis.com gmail.googleapis.com calendar-json.googleapis.com"
-# Yalnızca AÇAR; açık bir servisi kapatmaz.
+# Yalnızca AÇAR; açık bir servisi kapatmaz. Google tek çağrıda en çok 20 servis kabul ediyor: 15'erli gruplar.
 # shellcheck disable=SC2086
-if gcloud services enable $APIS --project "$P"; then ok "servisler açık"; else warn "bazı servisler açılamadı; yukarıdaki hatayı okuyun ve yeniden çalıştırın"; fi
+if printf '%s\n' $APIS | xargs -n 15 sh -c 'gcloud services enable "$@" --project "'"$P"'"' _; then ok "servisler açık"
+else warn "bazı servisler açılamadı; yukarıdaki hatayı okuyun ve yeniden çalıştırın"; fi
 
 step "2/10 Firebase projeye ekli mi"
 if [ "$(api "https://firebase.googleapis.com/v1beta1/projects/$P")" = 200 ]; then ok "Firebase ekli"
@@ -96,12 +98,14 @@ step "3/10 Hosting: adlı site (firebase.json → hosting.site)"
 # firebase.json'a yazılır (adın tek yeri orası).
 CFG_SITE=$(node -e 'try{const h=JSON.parse(require("fs").readFileSync("firebase.json","utf8")).hosting;process.stdout.write((Array.isArray(h)?h[0]:h).site||"")}catch{}')
 SITE=""
-for CAND in ${CFG_SITE:-talentflow-app} ${SITE_CANDIDATES:-talentflow-app talentflow-ik talentflow-hr talentflow-$NUM}; do
+for CAND in ${CFG_SITE:-talentflow-app} ${SITE_CANDIDATES:-talentflow-emre talentflow-ik talentflow-hr talentflow-$NUM}; do
   CODE=$(api "https://firebasehosting.googleapis.com/v1beta1/projects/$P/sites/$CAND")
   if [ "$CODE" = 200 ]; then SITE=$CAND; ok "site bu projede zaten var: $CAND"; break; fi
   CODE=$(api -X POST -d '{}' "https://firebasehosting.googleapis.com/v1beta1/projects/$P/sites?siteId=$CAND")
   if [ "$CODE" = 200 ]; then SITE=$CAND; ok "site oluşturuldu: $CAND"; break; fi
-  echo "    $CAND alınamadı (HTTP $CODE) — sıradaki ad deneniyor"
+  # 409 yalnız "ad alınmış" demek değil; Google'ın gerekçesi gösterilir (gövde gizli değer içermez).
+  MSG=$(node -e 'try{const e=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).error;process.stdout.write(e?.message||"")}catch{}' "$OUT")
+  echo "    $CAND alınamadı (HTTP $CODE${MSG:+: $MSG}) — sıradaki ad deneniyor"
 done
 if [ -z "$SITE" ]; then
   warn "site oluşturulamadı. SITE_CANDIDATES=\"baska-ad\" bash scripts/setup-new-project.sh ile deneyin."
