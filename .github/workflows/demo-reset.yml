@@ -30,15 +30,32 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
+    env:
+      DEMO_PROJECT_ID: ${{ vars.DEMO_FIREBASE_PROJECT_ID }}
+
     steps:
+      # Demo proje kimliği tanımlı değilse (demo henüz yeni projeye kurulmadı)
+      # gece işi KIRMIZI düşmek yerine uyarıyla atlanıyor: her gece gelen bir
+      # hata e-postası, gerçek bir hatayı gözden kaçırmayı öğretir.
+      - name: Demo kurulu mu
+        id: gate
+        run: |
+          if [ -z "$DEMO_PROJECT_ID" ]; then
+            echo "::warning::DEMO_FIREBASE_PROJECT_ID repo değişkeni tanımlı değil — sıfırlama atlandı."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/checkout@v7
+        if: steps.gate.outputs.skip != 'true'
 
       - uses: actions/setup-node@v7
+        if: steps.gate.outputs.skip != 'true'
         with:
           node-version: '20'
           cache: npm
 
       - name: Gerekli secret'lar tanımlı mı
+        if: steps.gate.outputs.skip != 'true'
         run: |
           eksik=""
           [ -z "$SA" ] && eksik="$eksik DEMO_FIREBASE_SERVICE_ACCOUNT"
@@ -54,9 +71,11 @@ jobs:
       # Tohumlama yalnızca firebase-admin'e ihtiyaç duyuyor; tüm bağımlılıkları
       # kurmak her gece birkaç dakika ve gereksiz.
       - name: Bağımlılıklar
+        if: steps.gate.outputs.skip != 'true'
         run: npm ci --omit=dev --ignore-scripts
 
       - name: Google Cloud kimliği
+        if: steps.gate.outputs.skip != 'true'
         run: |
           echo '${{ secrets.DEMO_FIREBASE_SERVICE_ACCOUNT }}' > /tmp/demo-sa.json
           echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/demo-sa.json" >> $GITHUB_ENV
@@ -65,8 +84,8 @@ jobs:
       # çalışmayı reddediyor. Zamanlanmış bir iş olduğu için bu koruma daha da
       # önemli — yanlış bir değişken kimsenin bakmadığı bir gece çalışır.
       - name: Sıfırla ve yeniden doldur
+        if: steps.gate.outputs.skip != 'true'
         run: node scripts/demo-seed/seed.mjs
         env:
-          DEMO_PROJECT_ID: talentflow-demo-6b894
           DEMO_USER_EMAIL: ${{ vars.DEMO_USER_EMAIL || 'demo@example.com' }}
           DEMO_USER_PASSWORD: ${{ secrets.DEMO_USER_PASSWORD }}

@@ -511,7 +511,9 @@ export default function CandidateProcessPage() {
         if (!candidate?.email) { alert('Adayın email adresi bulunamadı.'); return; }
         setInfoSending(true);
         try {
-            const APP_URL = 'https://talentflow-84bb6.web.app';
+            // Adayın açacağı bağlantı. Dağıtımda VITE_APP_URL proje kimliğinden
+            // türetilerek veriliyor; yerelde/önizlemede sayfanın kendi kökeni.
+            const APP_URL = import.meta.env.VITE_APP_URL || window.location.origin;
             const requestId = `ir-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
             const respondUrl = `${APP_URL}/respond/${requestId}?type=info`;
 

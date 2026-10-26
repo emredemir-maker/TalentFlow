@@ -48,6 +48,17 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 const router = Router();
 
+// Adaya giden "bilgi talebine yanıt ver" bağlantısının kökü: dağıtımın verdiği
+// adres (functions/.env → APP_URL, firebase-deploy.yml site adından türetir).
+// Eskiden burada eski projenin adresi sabit yazılıydı. Proje kimliğinden
+// <proje>.web.app TÜRETİLMİYOR: proje paylaşılıyor ve uygulama adlı bir sitede;
+// varsayılan site başka bir uygulamanın adresi olabilir. Yanlış uygulamaya
+// giden bir bağlantı, boş kökten daha kötü.
+export function resolveAppUrl(env = process.env) {
+    const explicit = env.VITE_APP_URL || env.APP_URL || '';
+    return explicit.replace(/\/+$/, '');
+}
+
 // ─── Email HTML Template Builder ─────────────────────────────────────────────
 function buildInviteEmailHtml({ companyName = 'Talent-Inn' }, { inviteLink, role, invitedByName = '' }) {
     const roleLabel = role === 'super_admin' ? 'Süper Admin' : role === 'department_user' ? 'Departman Kullanıcısı' : 'Recruiter';
@@ -363,7 +374,7 @@ router.post('/api/send-info-request', generalLimiter, verifyFirebaseToken, async
     const fromName = (b.companyName || 'Talent-Inn').slice(0, 100);
     try {
         const requestId = clientRequestId || `ir-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-        const APP_URL = process.env.VITE_APP_URL || 'https://talentflow-84bb6.web.app';
+        const APP_URL = resolveAppUrl();
         const respondUrl = clientRespondUrl || `${APP_URL}/respond/${requestId}?type=info`;
         try {
             await fsSet(

@@ -19,7 +19,7 @@
 //
 // ── ÇALIŞTIRMA ─────────────────────────────────────────────────────────────
 //   GOOGLE_APPLICATION_CREDENTIALS=<servis-hesabi.json> \
-//   DEMO_PROJECT_ID=talentflow-demo-6b894 \
+//   DEMO_PROJECT_ID=<demo-proje-kimliği; "demo" içermeli> \
 //   DEMO_USER_EMAIL=... DEMO_USER_PASSWORD=... \
 //   node scripts/demo-seed/seed.mjs
 //

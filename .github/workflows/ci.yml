@@ -51,6 +51,12 @@ jobs:
       # check (~50ms) — no npm install needed beyond the one above.
       - name: Backend dependency drift check
         run: npm run check:deps
+      # Firebase proje kimliği koruması: .firebaserc'de yer tutucu ya da eski
+      # projenin kimliği kalmışsa, ya da eski kimlik koda geri sızdıysa düşer.
+      # main'e giden her merge üretime dağıtıldığı için bu kontrol PR'da
+      # yakalamalı; dağıtım workflow'u aynı kontrolü ayrıca yapıyor.
+      - name: Firebase project config guard
+        run: npm run check:project
       # lint:ci enforces the baseline warning count via --max-warnings. Adding
       # warnings without removing equivalents elsewhere will fail this gate.
       - name: ESLint (baseline-locked)

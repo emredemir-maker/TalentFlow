@@ -31,9 +31,53 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
+      # ── HEDEF TEK YERDE: .firebaserc (proje) + firebase.json (site) ─────
+      # Üretim eski şirketin organizasyonundaki projeden kişisel hesaptaki bir
+      # projeye taşındı. Bu proje başka işlerle PAYLAŞILIYOR; uygulama adlı
+      # bir Hosting sitesine dağıtılıyor ve adres site adından türüyor
+      # (https://<site>.web.app). Koruma yer tutucuyu, eski projeyi ve site
+      # adı eksik bir firebase.json'u reddediyor — hiçbir şey dağıtılmaz.
+      # Bkz. docs/yeni-proje-kurulumu.md.
+      #
+      # Türetilemeyen herkese açık değerler (web uygulamasının numaraları,
+      # bucket adı) repo DEĞİŞKENİ: Settings → Secrets and variables →
+      # Actions → Variables. Bucket adı türetilemiyor çünkü eski projelerde
+      # <proje>.appspot.com, yenilerde <proje>.firebasestorage.app.
+      - name: Firebase projesini belirle
+        run: |
+          node scripts/check-project-config.mjs
+          P=$(node scripts/check-project-config.mjs --print)
+          SITE=$(node scripts/check-project-config.mjs --print-site)
+          if [ -z "$SENDER_ID" ] || [ -z "$APP_ID" ]; then
+            echo "❌ Eksik repo değişkeni: FIREBASE_MESSAGING_SENDER_ID ve/veya FIREBASE_APP_ID"
+            exit 1
+          fi
+          # appId "1:<gönderici-no>:web:..." biçiminde. İkisi farklı projelerden
+          # kopyalanırsa giriş çalışır gibi görünüp yanlış uygulamaya bağlanır.
+          case "$APP_ID" in
+            "1:$SENDER_ID:web:"*) ;;
+            *) echo "❌ FIREBASE_APP_ID, FIREBASE_MESSAGING_SENDER_ID ile eşleşmiyor"; exit 1 ;;
+          esac
+          URL="${APP_URL_OVERRIDE:-https://$SITE.web.app}"
+          {
+            echo "PROJECT_ID=$P"
+            echo "APP_URL=${URL%/}"
+            echo "STORAGE_BUCKET=${BUCKET_VAR:-$P.firebasestorage.app}"
+          } >> "$GITHUB_ENV"
+          echo "✅ Proje: $P  site: $SITE  →  ${URL%/}"
+        env:
+          SENDER_ID: ${{ vars.FIREBASE_MESSAGING_SENDER_ID }}
+          APP_ID: ${{ vars.FIREBASE_APP_ID }}
+          # Özel alan adı bağlanırsa (ör. https://ik.ornek.com) yalnızca bu
+          # değişken eklenir; boşsa sitenin web.app adresi kullanılır.
+          APP_URL_OVERRIDE: ${{ vars.APP_URL }}
+          BUCKET_VAR: ${{ vars.FIREBASE_STORAGE_BUCKET }}
+
       - name: Check required secrets
         run: |
           eksik=""
+          [ -z "$FIREBASE_SERVICE_ACCOUNT" ] && eksik="$eksik FIREBASE_SERVICE_ACCOUNT"
+          [ -z "$VITE_FIREBASE_API_KEY" ] && eksik="$eksik VITE_FIREBASE_API_KEY"
           [ -z "$EMAIL_USER" ] && eksik="$eksik EMAIL_USER"
           [ -z "$EMAIL_PASS" ] && eksik="$eksik EMAIL_PASS"
           [ -z "$VITE_GEMINI_API_KEY" ] && eksik="$eksik VITE_GEMINI_API_KEY"
@@ -50,6 +94,8 @@ jobs:
             echo "::warning::Günlük AI bütçe freni KAPALI — AI_DAILY_TOKEN_LIMIT / AI_DAILY_GROUNDED_LIMIT secret'ları boş." 
           fi
         env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
           EMAIL_USER: ${{ secrets.EMAIL_USER }}
           EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
           VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
@@ -64,13 +110,15 @@ jobs:
         run: npm run build
         env:
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
-          VITE_FIREBASE_AUTH_DOMAIN: talentflow-84bb6.firebaseapp.com
-          VITE_FIREBASE_PROJECT_ID: talentflow-84bb6
-          VITE_FIREBASE_STORAGE_BUCKET: talentflow-84bb6.firebasestorage.app
-          VITE_FIREBASE_MESSAGING_SENDER_ID: "132883257197"
-          VITE_FIREBASE_APP_ID: 1:132883257197:web:9c569a6c8fa52b0cfe6c64
-          VITE_SERVER_URL: https://talentflow-84bb6.web.app
-          VITE_APP_URL: https://talentflow-84bb6.web.app
+          # authDomain projenin firebaseapp.com alanı (Auth yönlendirmeleri
+          # orada); bucket repo değişkeninden, adres site adından.
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ env.PROJECT_ID }}.firebaseapp.com
+          VITE_FIREBASE_PROJECT_ID: ${{ env.PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ env.STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ vars.FIREBASE_APP_ID }}
+          VITE_SERVER_URL: ${{ env.APP_URL }}
+          VITE_APP_URL: ${{ env.APP_URL }}
 
       - name: Install Functions dependencies
         run: npm install
@@ -93,9 +141,20 @@ jobs:
       #
       # SONUÇ: üretimde günlük AI bütçe freni HİÇ ÇALIŞMADI. Bu dosyaya
       # eklenecek her yeni değişken de aynı sessizlikle kaybolurdu.
+      #
+      # ── PROJE DEĞERLERİ DE YAZILIYOR (yeni projeyle eklendi) ─────────────
+      # VITE_FIREBASE_PROJECT_ID: Firestore REST yardımcıları (services/
+      # firestoreRest.js, routes/positions.js) proje kimliğini YALNIZCA bu
+      # addan okuyor. Eski Cloud Run servisinde büyük olasılıkla elle
+      # girilmiş bir kalıntı olarak duruyordu (yukarıdaki not); temiz bir
+      # projede o kalıntı yok ve URL "projects/undefined" olurdu.
+      # VITE_FIREBASE_STORAGE_BUCKET: bucket FIREBASE_CONFIG'ten de bulunuyor;
+      # açıkça vermek ilk açılışta tahmine yer bırakmıyor.
+      # APP_URL: adaya giden yanıt bağlantılarının kökü (routes/email.js) ve
+      # CORS izin listesi (middleware/cors.js).
       - name: Create functions/.env
         run: |
-          printf 'EMAIL_USER=%s\nEMAIL_PASS=%s\nGEMINI_API_KEY=%s\nVITE_FIREBASE_API_KEY=%s\nINTEGRATION_ENCRYPTION_KEY=%s\nAI_DAILY_TOKEN_LIMIT=%s\nAI_DAILY_GROUNDED_LIMIT=%s\n' \
+          printf 'EMAIL_USER=%s\nEMAIL_PASS=%s\nGEMINI_API_KEY=%s\nVITE_FIREBASE_API_KEY=%s\nINTEGRATION_ENCRYPTION_KEY=%s\nAI_DAILY_TOKEN_LIMIT=%s\nAI_DAILY_GROUNDED_LIMIT=%s\nVITE_FIREBASE_PROJECT_ID=%s\nVITE_FIREBASE_STORAGE_BUCKET=%s\nAPP_URL=%s\n' \
             "$EMAIL_USER" \
             "$EMAIL_PASS" \
             "$VITE_GEMINI_API_KEY" \
@@ -103,6 +162,9 @@ jobs:
             "$INTEGRATION_ENCRYPTION_KEY" \
             "$AI_DAILY_TOKEN_LIMIT" \
             "$AI_DAILY_GROUNDED_LIMIT" \
+            "$PROJECT_ID" \
+            "$STORAGE_BUCKET" \
+            "$APP_URL" \
             > functions/.env
           echo "✅ functions/.env oluşturuldu:"
           sed 's/=.*/=***/' functions/.env
@@ -126,10 +188,21 @@ jobs:
           # tavanı bu kalemi görmüyor.
           AI_DAILY_GROUNDED_LIMIT: ${{ secrets.AI_DAILY_GROUNDED_LIMIT }}
 
+      # Anahtar dosyası env üzerinden yazılıyor (önceden `echo '${{ … }}'`):
+      # JSON'daki bir tek tırnak kabuğu bozabiliyordu. Ardından anahtarın
+      # HANGİ PROJEYE ait olduğu denetleniyor — eski projenin anahtarı secret'ta
+      # unutulursa dağıtım yetki hatasıyla değil, burada açık bir mesajla durur.
       - name: Authenticate to Google Cloud
         run: |
-          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/gcp-sa.json
+          printf '%s' "$SA_JSON" > /tmp/gcp-sa.json
+          SA_PROJECT=$(node -p "require('/tmp/gcp-sa.json').project_id")
+          if [ "$SA_PROJECT" != "$PROJECT_ID" ]; then
+            echo "❌ FIREBASE_SERVICE_ACCOUNT başka bir projeye ait ($SA_PROJECT ≠ $PROJECT_ID)"
+            exit 1
+          fi
           echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-sa.json" >> $GITHUB_ENV
+        env:
+          SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
 
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
@@ -140,7 +213,19 @@ jobs:
         # dosyada kalıyor, tarayıcı ise eski kurallara çarpıyordu — toplu
         # yüklemenin bulk-imports/{uid}/ yoluna yazması tam olarak böyle
         # "permission denied" alırdı ve sebebi hiçbir logda görünmezdi.
-        run: firebase deploy --only hosting,functions,firestore,storage --project talentflow-84bb6
+        #
+        # --force: yeni projede Functions v2 ilk dağıtımda Artifact Registry
+        # için bir temizleme politikası kurmak istiyor ve etkileşimli onay
+        # bekliyor; CI'da onay gelmeyince dağıtım başarılı olsa da hata
+        # koduyla bitiyor (demo-deploy.yml'de yaşandı). Bayrak bu politikayı
+        # kabul ediyor.
+        #
+        # functions:api — YALNIZCA bu fonksiyon. --force kaynakta olmayan
+        # fonksiyonları sormadan siler; proje paylaşıldığı için düz
+        # `functions` başka bir uygulamanın fonksiyonlarını silebilirdi.
+        # hosting yalnızca firebase.json'daki adlı siteye gider; firestore ve
+        # storage KURALLARI ise proje geneli — bkz. docs/yeni-proje-kurulumu.md.
+        run: firebase deploy --only hosting,functions:api,firestore,storage --project "$PROJECT_ID" --non-interactive --force
         env:
           GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcp-sa.json
         # Env vars are picked up automatically from functions/.env (created
