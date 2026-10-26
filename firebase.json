@@ -12,13 +12,14 @@
         "singleProjectMode": true
     },
     "firestore": {
-        "rules": "firestore.rules"
+        "rules": "firestore.rules",
+        "location": "eur3"
     },
     "storage": {
         "rules": "storage.rules"
     },
     "hosting": {
-        "site": "talentinn-app",
+        "site": "talentinn",
         "public": "dist",
         "ignore": [
             "firebase.json",
@@ -28,7 +29,10 @@
         "rewrites": [
             {
                 "source": "/api/**",
-                "function": "api"
+                "function": {
+                    "functionId": "talentflowApi",
+                    "region": "europe-west1"
+                }
             },
             {
                 "source": "**",
@@ -68,7 +72,7 @@
     "functions": [
         {
             "source": "functions",
-            "codebase": "default",
+            "codebase": "talentflow",
             "ignore": [
                 "node_modules",
                 ".git",

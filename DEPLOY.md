@@ -3,19 +3,16 @@
 Uygulamanız canlıya çıkmaya hazır! Build işlemi tamamlandı ve `dist/` klasörü oluşturuldu.
 Aşağıdaki yöntemlerden birini seçerek yayına alabilirsiniz.
 
-## Yöntem 1: Firebase Hosting (Önerilen)
+## Yöntem 1: Firebase (GitHub Actions — önerilen)
 
-Projeniz zaten Firebase ile yapılandırıldı. Terminalde şu komutu çalıştırın:
+Üretim, Hub-Inn ile **paylaşılan** `agentinn-nyqpx` projesinde. `main`'e merge edilen her değişikliği
+`.github/workflows/firebase-deploy.yml` dağıtır. Elle dağıtmak gerekirse yalnızca TalentFlow'un parçaları:
 
 ```powershell
-npx firebase deploy --only hosting
+npx firebase deploy --only "hosting:talentinn,functions:talentflow,firestore,storage" --project agentinn-nyqpx
 ```
 
-Eğer giriş yapmanız istenirse:
-
-1. `npx firebase login` komutunu çalıştırın.
-2. Açılan tarayıcı penceresinden Google hesabınızla giriş yapın.
-3. Tekrar `npx firebase deploy --only hosting` komutunu çalıştırın.
+Düz `firebase deploy` ya da filtresiz `--only functions` kullanmayın — ayrıntı: `docs/yeni-proje-kurulumu.md`.
 
 ## Yöntem 2: Vercel (Alternatif)
 
