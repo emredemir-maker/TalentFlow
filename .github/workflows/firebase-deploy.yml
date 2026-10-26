@@ -32,12 +32,14 @@ jobs:
           cache: 'npm'
 
       # ── HEDEF TEK YERDE: .firebaserc (proje) + firebase.json (site) ─────
-      # Üretim eski şirketin organizasyonundaki projeden kişisel hesaptaki bir
-      # projeye taşındı. Bu proje başka işlerle PAYLAŞILIYOR; uygulama adlı
-      # bir Hosting sitesine dağıtılıyor ve adres site adından türüyor
-      # (https://<site>.web.app). Koruma yer tutucuyu, eski projeyi ve site
-      # adı eksik bir firebase.json'u reddediyor — hiçbir şey dağıtılmaz.
-      # Bkz. docs/yeni-proje-kurulumu.md.
+      # Üretim Hub-Inn platform projesinde (agentinn-nyqpx). Proje Hub-Inn
+      # (varsayılan site agentinn-nyqpx, codebase `api`, fonksiyon `api`) ve
+      # CX-Inn (site cxinn, Cloud Run cx-inn-api) ile PAYLAŞILIYOR. TalentFlow
+      # yalnızca kendi parçalarını dağıtır: adlı site, `talentflow` codebase'i,
+      # Firestore/Storage kuralları. Koruma (check:project) yer tutucuyu, eski
+      # projeleri, site adı eksik/çoklu hosting girdili bir firebase.json'u,
+      # başka bir uygulamanın sitesini ve `talentflow` dışındaki bir codebase'i
+      # reddediyor — hiçbir şey dağıtılmaz. Bkz. docs/yeni-proje-kurulumu.md.
       #
       # Türetilemeyen herkese açık değerler (web uygulamasının numaraları,
       # bucket adı) repo DEĞİŞKENİ: Settings → Secrets and variables →
@@ -208,24 +210,56 @@ jobs:
         run: npm install -g firebase-tools
 
       - name: Deploy to Firebase
-        # 'storage' listede YOKTU: storage.rules deponun içinde duruyor ama
-        # üretime hiç gitmiyordu. Kuralda yapılan her değişiklik sessizce
-        # dosyada kalıyor, tarayıcı ise eski kurallara çarpıyordu — toplu
-        # yüklemenin bulk-imports/{uid}/ yoluna yazması tam olarak böyle
-        # "permission denied" alırdı ve sebebi hiçbir logda görünmezdi.
+        # ── YALNIZCA TALENTFLOW'UN PARÇALARI (paylaşılan proje) ──────────────
+        # Düz `firebase deploy` YASAK: hosting'in tamamı ve tüm codebase'ler
+        # anlamına gelir. Burada:
+        #   hosting:<site>      → yalnızca firebase.json'daki adlı site
+        #                         (Hub-Inn'in agentinn-nyqpx'i, CX-Inn'in cxinn'i değişmez)
+        #   functions:talentflow → yalnızca bu codebase (talentflowApi). CLI,
+        #                         filtre bir codebase adıysa onu codebase filtresi
+        #                         sayıyor; projedeki diğer fonksiyonlar (Hub-Inn'in
+        #                         `api` codebase'i: api, leadScan) hiç planlanmıyor.
+        #   firestore, storage  → kurallar. Proje GENELİ: (default) veritabanı ve
+        #                         varsayılan bucket. Hub-Inn ve CX-Inn ikisini de
+        #                         kullanmıyor (Postgres); kullanmaya başlarlarsa
+        #                         kuralların tek sahibi konuşulmalı.
+        # 'storage' önceden listede YOKTU: storage.rules üretime hiç gitmiyordu
+        # ve toplu yüklemenin bulk-imports/{uid}/ yoluna yazması sessizce
+        # "permission denied" alıyordu.
         #
-        # --force: yeni projede Functions v2 ilk dağıtımda Artifact Registry
-        # için bir temizleme politikası kurmak istiyor ve etkileşimli onay
-        # bekliyor; CI'da onay gelmeyince dağıtım başarılı olsa da hata
-        # koduyla bitiyor (demo-deploy.yml'de yaşandı). Bayrak bu politikayı
-        # kabul ediyor.
+        # --force KALIYOR — neden güvenli: firebase-tools silme adaylarını
+        # codebase başına hesaplıyor (functionsDeployHelper
+        # groupEndpointsByCodebase + planner.calculateChangesets); filtre
+        # `functions:talentflow` olduğu için aday listesi yalnızca `talentflow`
+        # codebase etiketli (ya da kaynaktaki bir adla eşleşen) fonksiyonlar.
+        # Başka codebase'in fonksiyonu --force ile de silinemez.
+        # Bayrak gerekli çünkü CI'da şu soruları kendisi onaylıyor: Artifact
+        # Registry temizleme politikası (onay gelmezse dağıtım başarılı olsa da
+        # hata koduyla biter — demo-deploy.yml'de yaşandı; europe-west1'deki depo
+        # Hub-Inn'le ortak ve Hub-Inn de --force ile dağıttığı için politika
+        # büyük olasılıkla zaten var) ve `talentflow` içindeki "güvensiz"
+        # güncellemeler/silmeler.
         #
-        # functions:api — YALNIZCA bu fonksiyon. --force kaynakta olmayan
-        # fonksiyonları sormadan siler; proje paylaşıldığı için düz
-        # `functions` başka bir uygulamanın fonksiyonlarını silebilirdi.
-        # hosting yalnızca firebase.json'daki adlı siteye gider; firestore ve
-        # storage KURALLARI ise proje geneli — bkz. docs/yeni-proje-kurulumu.md.
-        run: firebase deploy --only hosting,functions:api,firestore,storage --project "$PROJECT_ID" --non-interactive --force
+        # Son kapı (check:project'ten bağımsız, kasten burada tekrarlanıyor):
+        # tek hosting girdisi + adlı site, tek functions girdisi + codebase
+        # `talentflow`. Biri tutmazsa hiçbir şey dağıtılmaz.
+        run: |
+          SITE=$(node -e '
+            const c = require("./firebase.json");
+            const h = Array.isArray(c.hosting) ? c.hosting : [c.hosting].filter(Boolean);
+            const f = Array.isArray(c.functions) ? c.functions : [c.functions].filter(Boolean);
+            const bad = (m) => { console.error("❌ " + m); process.exit(1); };
+            if (h.length !== 1) bad("firebase.json: tam olarak bir hosting girdisi olmalı (" + h.length + " var)");
+            if (!h[0].site) bad("firebase.json: hosting.site yok — dağıtım projenin varsayılan sitesine (Hub-Inn) giderdi");
+            if (f.length !== 1 || f[0].codebase !== "talentflow") bad("firebase.json: functions tek girdi ve codebase \"talentflow\" olmalı");
+            process.stdout.write(h[0].site);
+          ') || exit 1
+          echo "Dağıtılıyor: site $SITE, codebase talentflow, kurallar → $PROJECT_ID"
+          firebase deploy \
+            --only "hosting:$SITE,functions:talentflow,firestore,storage" \
+            --project "$PROJECT_ID" \
+            --non-interactive \
+            --force
         env:
           GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcp-sa.json
         # Env vars are picked up automatically from functions/.env (created

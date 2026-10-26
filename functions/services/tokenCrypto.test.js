@@ -90,17 +90,17 @@ describe('loadEncryptionKey', () => {
 
 describe('assertEncryptionKeyConfigured', () => {
     it('ÜRETİMDE anahtar yoksa sunucu açılmıyor', () => {
-        expect(() => assertEncryptionKeyConfigured({ K_SERVICE: 'api' })).toThrow(/INTEGRATION_ENCRYPTION_KEY/);
+        expect(() => assertEncryptionKeyConfigured({ K_SERVICE: 'talentflowapi' })).toThrow(/INTEGRATION_ENCRYPTION_KEY/);
     });
 
     it('üretimde geçerli anahtarla açılıyor', () => {
-        expect(() => assertEncryptionKeyConfigured({ K_SERVICE: 'api', INTEGRATION_ENCRYPTION_KEY: KEY_B64 })).not.toThrow();
+        expect(() => assertEncryptionKeyConfigured({ K_SERVICE: 'talentflowapi', INTEGRATION_ENCRYPTION_KEY: KEY_B64 })).not.toThrow();
     });
 
     it('geliştirmede ve emülatörde yalnızca uyarıyor', () => {
         const log = { warn: vi.fn() };
         expect(() => assertEncryptionKeyConfigured({}, log)).not.toThrow();
-        expect(() => assertEncryptionKeyConfigured({ K_SERVICE: 'api', FUNCTIONS_EMULATOR: 'true' }, log)).not.toThrow();
+        expect(() => assertEncryptionKeyConfigured({ K_SERVICE: 'talentflowapi', FUNCTIONS_EMULATOR: 'true' }, log)).not.toThrow();
         expect(log.warn).toHaveBeenCalledTimes(2);
     });
 });

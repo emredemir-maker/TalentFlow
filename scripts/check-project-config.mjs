@@ -3,19 +3,26 @@
 //
 // ── NEDEN VAR ────────────────────────────────────────────────────────────────
 // Üretim, eski şirketin Google organizasyonundaki `talentflow-84bb6` projesinden
-// kişisel hesaptaki bir projeye taşınıyor (veri taşınmadan, temiz kurulum).
+// önce `deploy-n8n-local`'e taşındı; o projenin (ve diğer yedek projenin)
+// Hosting arka ucu Google tarafında bozuk çıktı. TalentFlow şimdi Hub-Inn
+// platform projesinde (`agentinn-nyqpx`) — veri taşınmadan, temiz kurulum.
 // Hedef iki değerle tanımlı ve her biri TEK yerde duruyor:
 //   - proje kimliği  → `.firebaserc` → projects.default
 //   - Hosting sitesi → `firebase.json` → hosting.site
-// Proje başka işlerle paylaşılan, yeniden kullanılan bir proje olduğu için
-// uygulama projenin varsayılan sitesine değil, ADLI bir siteye dağıtılıyor;
-// adres (https://<site>.web.app) site adından türetiliyor.
+// Proje Hub-Inn ve CX-Inn ile PAYLAŞILIYOR. Projenin varsayılan sitesi
+// (agentinn-nyqpx) Hub-Inn'in, `cxinn` CX-Inn'in; TalentFlow kendi adlı
+// sitesine dağıtılıyor ve adres (https://<site>.web.app) site adından türüyor.
+// Fonksiyon da kendi codebase'inde (`talentflow`): Hub-Inn'in `api`
+// codebase'ine ve aynı adlı fonksiyonuna dokunulmamalı.
 //
 // Betik şu hataları yakalıyor:
 //   1. Yer tutucu (`NEW_PROJECT_ID`) ya da eski proje kimliği .firebaserc'de.
-//   2. firebase.json'da site yok — dağıtım projenin varsayılan sitesine (başka
-//      bir uygulamanın adresine) giderdi.
-//   3. Eski kimlik / eski web uygulamasının numarası koda geri sızmış — yeni
+//   2. firebase.json'da site yok, birden fazla hosting girdisi var, ya da site
+//      başka bir uygulamanınki (projenin varsayılan sitesi, cxinn, eski site).
+//   3. Fonksiyonlar `talentflow` codebase'inde değil ya da /api/** yönlendirmesi
+//      TalentFlow'un fonksiyonuna (talentflowApi, europe-west1) gitmiyor —
+//      ör. "api" yazılırsa istekler Hub-Inn'in fonksiyonuna giderdi.
+//   4. Eski kimlik / eski web uygulamasının numarası koda geri sızmış — yeni
 //      kurulum sessizce eski projenin Auth/Firestore'una konuşurdu.
 //
 // Kullanım:
@@ -36,10 +43,21 @@ import process from 'node:process';
 
 export const PLACEHOLDER = 'NEW_PROJECT_ID';
 
-// Bir daha HİÇBİR çalışan dosyada görünmemesi gereken değerler: eski projenin
-// kimliği (aynı zamanda eski site adı) ve eski web uygulamasının gönderici
-// numarası (appId bunu içeriyor).
-export const RETIRED_VALUES = ['talentflow-84bb6', '132883257197'];
+// Bir daha HİÇBİR çalışan dosyada görünmemesi gereken değerler: eski projelerin
+// kimlikleri (talentflow-84bb6 aynı zamanda eski site adı), eski web
+// uygulamasının gönderici numarası (appId bunu içeriyor) ve Hosting'i bozuk
+// çıkan ara projenin site adı.
+export const RETIRED_VALUES = ['talentflow-84bb6', '132883257197', 'deploy-n8n-local', 'talentinn-app'];
+
+// Paylaşılan projede başka uygulamalara ait Hosting siteleri: TalentFlow buraya
+// dağıtılırsa o uygulamanın yayındaki sürümünün üzerine yazar. Projenin
+// varsayılan sitesi (site kimliği = proje kimliği) ayrıca reddediliyor.
+export const FOREIGN_SITES = ['agentinn-nyqpx', 'cxinn'];
+
+// Fonksiyonun tek tanımı functions/index.js; codebase firebase.json'da.
+export const FUNCTIONS_CODEBASE = 'talentflow';
+export const API_FUNCTION_ID = 'talentflowApi';
+export const API_FUNCTION_REGION = 'europe-west1';
 
 // Google Cloud proje kimliği kuralı: 6-30 karakter, küçük harfle başlar,
 // küçük harf/rakam/tire, tireyle bitmez.
@@ -88,7 +106,7 @@ const hostingEntries = (config) =>
  * ŞART. Site adı yoksa dağıtım paylaşılan projenin varsayılan sitesine gider.
  * Hata metni döner; geçerliyse null.
  */
-export function productionSiteProblem(config, file = 'firebase.json') {
+export function productionSiteProblem(config, file = 'firebase.json', projectId = '') {
     const hosting = hostingEntries(config);
     if (hosting.length !== 1) return `${file} → tam olarak bir hosting girdisi bekleniyor (${hosting.length} var).`;
     const site = hosting[0].site;
@@ -96,7 +114,56 @@ export function productionSiteProblem(config, file = 'firebase.json') {
         return `${file} → hosting.site tanımlı değil. Proje paylaşılıyor; uygulama adlı bir siteye dağıtılmalı.`;
     }
     if (site === PLACEHOLDER || RETIRED_VALUES.includes(site)) return `${file} → hosting.site eski/yer tutucu: "${site}".`;
+    if (FOREIGN_SITES.includes(site) || (projectId && site === projectId)) {
+        return `${file} → hosting.site "${site}" başka bir uygulamanın sitesi (Hub-Inn/CX-Inn ya da projenin varsayılan sitesi); dağıtım onun üzerine yazardı.`;
+    }
     if (!SITE_ID_RE.test(site)) return `${file} → hosting.site geçerli bir site kimliği değil: "${site}".`;
+    return null;
+}
+
+/**
+ * Fonksiyonlar ve /api yönlendirmesi: tek functions girdisi, codebase
+ * `talentflow`; hosting'deki her fonksiyon yönlendirmesi talentflowApi'ye
+ * (europe-west1). Paylaşılan projede başka codebase'e ya da Hub-Inn'in `api`
+ * fonksiyonuna giden bir yapılandırma ya onu değiştirir ya da TalentFlow
+ * isteklerini ona yollar. Hata metni döner; geçerliyse null.
+ */
+export function productionFunctionsProblem(config, file = 'firebase.json') {
+    const fns = Array.isArray(config.functions) ? config.functions : [config.functions].filter(Boolean);
+    if (fns.length !== 1) return `${file} → tam olarak bir functions girdisi bekleniyor (${fns.length} var).`;
+    if (fns[0].codebase !== FUNCTIONS_CODEBASE) {
+        return `${file} → functions codebase "${fns[0].codebase || 'default'}"; "${FUNCTIONS_CODEBASE}" olmalı (paylaşılan projede yalnızca kendi codebase'imiz dağıtılır).`;
+    }
+    for (const h of hostingEntries(config)) {
+        for (const r of h.rewrites || []) {
+            if (r.function === undefined) continue;
+            const id = typeof r.function === 'string' ? r.function : r.function?.functionId;
+            // Dize biçiminde bölge üst düzey "region" alanında; yoksa CLI us-central1 varsayar.
+            const region =
+                (typeof r.function === 'string' ? r.region : r.function?.region) || 'us-central1';
+            if (id !== API_FUNCTION_ID || region !== API_FUNCTION_REGION) {
+                return `${file} → "${r.source}" yönlendirmesi ${id}@${region} fonksiyonuna gidiyor; ${API_FUNCTION_ID}@${API_FUNCTION_REGION} olmalı.`;
+            }
+        }
+    }
+    return null;
+}
+
+/**
+ * functions/index.js gerçekten talentflowApi'yi europe-west1'de mi dışa
+ * veriyor? firebase.json'daki yönlendirme ile kaynak ayrışırsa /api/** ya
+ * boşa ya da başka bir uygulamanın fonksiyonuna gider. Hata metni; yoksa null.
+ */
+export function functionSourceProblem(source, file = 'functions/index.js') {
+    if (!new RegExp(`export const ${API_FUNCTION_ID}\\s*=\\s*onRequest\\(`).test(source)) {
+        return `${file} → "${API_FUNCTION_ID}" adlı onRequest dışa aktarımı yok (firebase.json yönlendirmesi bu adı bekliyor).`;
+    }
+    if (/export const api\s*=/.test(source)) {
+        return `${file} → "api" adlı fonksiyon var; bu ad paylaşılan projede Hub-Inn'in fonksiyonu.`;
+    }
+    if (!new RegExp(`region:\\s*["']${API_FUNCTION_REGION}["']`).test(source)) {
+        return `${file} → bölge ${API_FUNCTION_REGION} değil (firebase.json yönlendirmesi bu bölgeyi bekliyor).`;
+    }
     return null;
 }
 
@@ -151,17 +218,31 @@ function main(argv) {
     let site = '';
     try {
         const cfg = JSON.parse(read('firebase.json'));
-        const p = productionSiteProblem(cfg);
+        const p = productionSiteProblem(cfg, 'firebase.json', projectId);
         if (p) problems.push(p);
         else site = hostingEntries(cfg)[0].site;
+        const f = productionFunctionsProblem(cfg);
+        if (f) problems.push(f);
     } catch (err) {
         problems.push(`firebase.json okunamadı: ${err.message}`);
     }
     try {
-        const p = demoSiteProblem(JSON.parse(read('firebase.demo.json')));
+        const demoCfg = JSON.parse(read('firebase.demo.json'));
+        const p = demoSiteProblem(demoCfg);
         if (p) problems.push(p);
+        // Demo da aynı kaynaktan dağıtılıyor: yönlendirme fonksiyonun gerçek
+        // adına/bölgesine gitmeli. Codebase demo projesinde serbest.
+        const f = productionFunctionsProblem({ ...demoCfg, functions: [{ codebase: FUNCTIONS_CODEBASE }] }, 'firebase.demo.json');
+        if (f) problems.push(f);
     } catch (err) {
         problems.push(`firebase.demo.json okunamadı: ${err.message}`);
+    }
+
+    try {
+        const p = functionSourceProblem(read('functions/index.js'));
+        if (p) problems.push(p);
+    } catch (err) {
+        problems.push(`functions/index.js okunamadı: ${err.message}`);
     }
 
     // Depodaki izlenen dosyalarda eski kimlik / yer tutucu taraması. .firebaserc

@@ -181,6 +181,15 @@ jobs:
       # sonraki adımlar hiç çalışmıyor. Bayrak yalnızca bu politikayı kabul
       # ediyor; başka bir şeyi zorlamıyor. Politika kurulmazsa her dağıtım
       # depoya kalıntı bırakır ve depolama faturası sessizce büyür.
+      #
+      # Fonksiyon artık `talentflowApi` (europe-west1) ve kendi hesabıyla
+      # çalışıyor (functions/index.js → serviceAccount "talentflow-runtime@").
+      # Demo projesinde de bu hesap olmalı; yoksa dağıtım durur. Bir kez:
+      #   gcloud iam service-accounts create talentflow-runtime --project <demo>
+      #   + roles/datastore.user, firebaseauth.admin, storage.objectAdmin,
+      #     logging.logWriter (bkz. scripts/setup-new-project.sh adım 8).
+      # Demo codebase'i "default" kaldı: ilk dağıtım eski us-central1 `api`
+      # fonksiyonunu --force ile siler — demo projesi yalnızca demoya ait.
       - name: Dağıt
         run: |
           firebase deploy \

@@ -16,7 +16,7 @@ describe('resolveAppUrl', () => {
     });
 
     it('proje kimliğinden adres TÜRETMEZ — varsayılan site başka bir uygulamanın olabilir', () => {
-        expect(resolveAppUrl({ GCLOUD_PROJECT: 'deploy-n8n-local' })).toBe('');
+        expect(resolveAppUrl({ GCLOUD_PROJECT: 'agentinn-nyqpx' })).toBe('');
         expect(resolveAppUrl({ FIREBASE_CONFIG: JSON.stringify({ projectId: 'x' }) })).toBe('');
     });
 

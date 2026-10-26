@@ -123,7 +123,7 @@ describe('storeCvFile', () => {
     });
 
     it('returns an empty cvUrl (never a dead link) when Storage fails on serverless', async () => {
-        process.env.K_SERVICE = 'api';
+        process.env.K_SERVICE = 'talentflowapi';
         mocks.getStorageBucket.mockReturnValue({
             name: 'test-bucket',
             upload: vi.fn().mockRejectedValue(new Error('permission denied')),

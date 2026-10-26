@@ -11,7 +11,10 @@
     "rewrites": [
       {
         "source": "/api/**",
-        "function": "api"
+        "function": {
+          "functionId": "talentflowApi",
+          "region": "europe-west1"
+        }
       },
       {
         "source": "**",
