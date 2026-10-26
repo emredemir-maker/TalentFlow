@@ -12,13 +12,22 @@
  * Usage (run from repo root):
  *
  *   # Grant by email
- *   node scripts/grant-super-admin.mjs emre.demir@infoset.app
+ *   node scripts/grant-super-admin.mjs emredemir@gmail.com
  *
  *   # Grant by uid
  *   node scripts/grant-super-admin.mjs --uid abc123XYZ
  *
  *   # Revoke (clears claim and demotes Firestore role to 'recruiter')
- *   node scripts/grant-super-admin.mjs emre.demir@infoset.app --revoke
+ *   node scripts/grant-super-admin.mjs emredemir@gmail.com --revoke
+ *
+ * Project: read from .firebaserc (projects.default) — the single place the
+ * Firebase project ID lives. VITE_FIREBASE_PROJECT_ID / FIREBASE_PROJECT_ID
+ * override it (e.g. to target the demo project).
+ *
+ * İLK YÖNETİCİ (temiz kurulum): boş bir projede davet ya da izinli alan adı
+ * olmadığı için ilk giriş "Erişim yetkiniz bulunmuyor" ile reddedilir — ama
+ * Firebase Auth kullanıcısı oluşmuş olur. Bu betik o kullanıcıya rolü verir ve
+ * kullanıcı belgesi hiç yoksa uygulamanın beklediği alanlarla oluşturur.
  *
  * Auth: uses Application Default Credentials. Locally:
  *   gcloud auth application-default login
@@ -29,7 +38,9 @@
  * remain unchanged until they expire (~1 hour).
  */
 import process from 'node:process';
+import { readFileSync } from 'node:fs';
 import admin from 'firebase-admin';
+import { validateProjectId } from './check-project-config.mjs';
 
 const args = process.argv.slice(2);
 const flag = (name) => args.includes(name);
@@ -48,9 +59,25 @@ if (!explicitUid && !positional) {
     process.exit(1);
 }
 
+function projectFromFirebaserc() {
+    try {
+        const rc = JSON.parse(readFileSync(new URL('../.firebaserc', import.meta.url), 'utf8'));
+        return rc?.projects?.default || '';
+    } catch {
+        return '';
+    }
+}
+
 const projectId = process.env.VITE_FIREBASE_PROJECT_ID
     || process.env.FIREBASE_PROJECT_ID
-    || 'talentflow-84bb6';
+    || projectFromFirebaserc();
+
+const projectErr = validateProjectId(projectId);
+if (projectErr) {
+    console.error(`[grant-super-admin] ${projectErr} (.firebaserc → projects.default)`);
+    process.exit(1);
+}
+console.log(`[grant-super-admin] project=${projectId}`);
 
 if (!admin.apps.length) {
     admin.initializeApp({ projectId });
@@ -58,14 +85,21 @@ if (!admin.apps.length) {
 const auth = admin.auth();
 const db = admin.firestore();
 
-async function resolveUid() {
-    if (explicitUid) return explicitUid;
-    const user = await auth.getUserByEmail(positional);
-    return user.uid;
+async function resolveUser() {
+    try {
+        return explicitUid ? await auth.getUser(explicitUid) : await auth.getUserByEmail(positional);
+    } catch (err) {
+        if (err.code === 'auth/user-not-found') {
+            throw new Error('kullanıcı bulunamadı — önce uygulamaya bir kez giriş yapın (Google ya da '
+                + 'e-posta ile kayıt); giriş reddedilse bile Auth kullanıcısı oluşur, sonra bu betiği yeniden çalıştırın');
+        }
+        throw err;
+    }
 }
 
 async function main() {
-    const uid = await resolveUid();
+    const user = await resolveUser();
+    const uid = user.uid;
     const targetRole = revoke ? 'recruiter' : 'super_admin';
 
     // 1. Custom claim
@@ -74,7 +108,26 @@ async function main() {
 
     // 2. Firestore user doc (merge so other fields are preserved)
     const docRef = db.doc(`artifacts/talent-flow/public/data/users/${uid}`);
-    await docRef.set({ role: targetRole }, { merge: true });
+    const existing = await docRef.get();
+    if (existing.exists || revoke) {
+        await docRef.set({ role: targetRole }, { merge: true });
+    } else {
+        // Temiz kurulumdaki ilk yönetici: AuthContext'in davetle oluşturduğu
+        // profille aynı alanlar — yalnızca `role` yazılsaydı arayüz adı, e-postayı
+        // ve durumu boş görürdü.
+        const email = (user.email || '').toLowerCase();
+        await docRef.set({
+            uid,
+            email,
+            displayName: user.displayName || email.split('@')[0] || '',
+            photoURL: user.photoURL || '',
+            role: targetRole,
+            departments: [],
+            status: 'active',
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        console.log('[grant-super-admin] user doc did not exist — created full profile');
+    }
 
     const action = revoke ? 'revoked super_admin from' : 'granted super_admin to';
     console.log(`[grant-super-admin] ${action} uid=${uid}`);

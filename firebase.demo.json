@@ -6,7 +6,6 @@
     "rules": "storage.rules"
   },
   "hosting": {
-    "site": "talentflow-demo-6b894",
     "public": "dist",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [

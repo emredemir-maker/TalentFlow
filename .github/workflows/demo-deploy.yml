@@ -1,10 +1,15 @@
 # DEMO KURULUMU DAĞITIMI — ayrı proje, ayrı anahtar, ayrı yapı.
 #
 # ── NEDEN AYRI DOSYA ──────────────────────────────────────────────────────────
-# Üretim dağıtımı firebase.json'daki `site: talentflow-84bb6` ile sabit. Aynı
-# workflow'u parametreleştirmek, bir hata durumunda demo yapısının ÜRETİME
-# gitmesi (ya da tersi) anlamına gelebilirdi. İki ayrı dosya, iki ayrı config,
-# iki ayrı secret kümesi — karışma ihtimali yok.
+# Üretim dağıtımı .firebaserc'deki projeye ve firebase.json'daki siteye bağlı. Aynı workflow'u
+# parametreleştirmek, bir hata durumunda demo yapısının ÜRETİME gitmesi (ya da
+# tersi) anlamına gelebilirdi. İki ayrı dosya, iki ayrı config, iki ayrı secret
+# kümesi — karışma ihtimali yok.
+#
+# ── DEMO PROJE KİMLİĞİ TEK YERDE: repo değişkeni ─────────────────────────────
+# DEMO_FIREBASE_PROJECT_ID (+ DEMO_FIREBASE_MESSAGING_SENDER_ID,
+# DEMO_FIREBASE_APP_ID). Settings → Secrets and variables → Actions →
+# Variables. Kimlik "demo" içermeli: tohumlama betiği başka projede çalışmıyor.
 #
 # ── NEDEN YALNIZCA ELLE TETİKLENİYOR ─────────────────────────────────────────
 # `push` tetikleyicisi YOK. main'e yapılan her merge demoyu güncellemiyor:
@@ -31,7 +36,7 @@ jobs:
     timeout-minutes: 25
 
     env:
-      DEMO_PROJECT_ID: talentflow-demo-6b894
+      DEMO_PROJECT_ID: ${{ vars.DEMO_FIREBASE_PROJECT_ID }}
 
     steps:
       - uses: actions/checkout@v7
@@ -40,6 +45,21 @@ jobs:
         with:
           node-version: '20'
           cache: npm
+
+      - name: Demo proje kimliği
+        run: |
+          node scripts/check-project-config.mjs --demo-only "$DEMO_PROJECT_ID"
+          if [ -z "$SENDER_ID" ] || [ -z "$APP_ID" ]; then
+            echo "❌ Eksik repo değişkeni: DEMO_FIREBASE_MESSAGING_SENDER_ID ve/veya DEMO_FIREBASE_APP_ID"
+            exit 1
+          fi
+          case "$APP_ID" in
+            "1:$SENDER_ID:web:"*) ;;
+            *) echo "❌ DEMO_FIREBASE_APP_ID, DEMO_FIREBASE_MESSAGING_SENDER_ID ile eşleşmiyor"; exit 1 ;;
+          esac
+        env:
+          SENDER_ID: ${{ vars.DEMO_FIREBASE_MESSAGING_SENDER_ID }}
+          APP_ID: ${{ vars.DEMO_FIREBASE_APP_ID }}
 
       - name: Gerekli secret'lar tanımlı mı
         run: |
@@ -81,11 +101,11 @@ jobs:
           VITE_DEMO_LOGIN_EMAIL: ${{ vars.DEMO_USER_EMAIL || 'demo@example.com' }}
           VITE_DEMO_LOGIN_PASSWORD: ${{ secrets.DEMO_USER_PASSWORD }}
           VITE_FIREBASE_API_KEY: ${{ secrets.DEMO_FIREBASE_API_KEY }}
-          VITE_FIREBASE_AUTH_DOMAIN: talentflow-demo-6b894.firebaseapp.com
-          VITE_FIREBASE_PROJECT_ID: talentflow-demo-6b894
-          VITE_FIREBASE_STORAGE_BUCKET: talentflow-demo-6b894.firebasestorage.app
-          VITE_FIREBASE_MESSAGING_SENDER_ID: '212180859821'
-          VITE_FIREBASE_APP_ID: '1:212180859821:web:d697aad6c5a6eaea89bf24'
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.DEMO_FIREBASE_PROJECT_ID }}.firebaseapp.com
+          VITE_FIREBASE_PROJECT_ID: ${{ vars.DEMO_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ vars.DEMO_FIREBASE_PROJECT_ID }}.firebasestorage.app
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.DEMO_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ vars.DEMO_FIREBASE_APP_ID }}
 
       # ── DOSYA ADI ".env", ".env.production" DEĞİL ────────────────────────
       # Firebase Functions ortam dosyalarını şu adlarla arıyor: `.env`,
@@ -150,9 +170,10 @@ jobs:
       - name: Firebase CLI
         run: npm install -g firebase-tools
 
-      # --config firebase.demo.json: üretim config'i hosting site'ını
-      # talentflow-84bb6'ya sabitliyor. Yanlış config ile yapılan bir dağıtım
-      # demo yapısını üretime gönderirdi.
+      # --config firebase.demo.json: üretim config'i (firebase.json) hosting'i
+      # üretimin adlı sitesine sabitliyor; yanlış config ile yapılan bir
+      # dağıtım demo yapısını üretim sitesine göndermeye çalışırdı. Demo
+      # config'inde site yok: demo projesinin varsayılan sitesi kullanılıyor.
       #
       # --force: Functions v2, derleme kalıntıları için Artifact Registry'de bir
       # temizleme politikası kurmak istiyor ve etkileşimli onay bekliyor. CI'da
