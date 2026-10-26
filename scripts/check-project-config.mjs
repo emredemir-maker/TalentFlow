@@ -150,6 +150,25 @@ export function productionFunctionsProblem(config, file = 'firebase.json') {
 }
 
 /**
+ * Storage kuralları hangi bucket'a gidiyor? Bucket adı yazılmazsa CLI Firebase'den "varsayılan bucket"ı
+ * soruyor; agentinn-nyqpx'te bu sorgu bucket var olduğu hâlde 404 dönüyor ve dağıtım duruyor. Bu yüzden
+ * tek girdi ve projenin kendi bucket'ı (<proje>.firebasestorage.app ya da <proje>.appspot.com) zorunlu.
+ * Hata metni döner; geçerliyse null.
+ */
+export function productionStorageProblem(config, projectId, file = 'firebase.json') {
+    const st = config.storage;
+    if (!Array.isArray(st) || st.length !== 1) {
+        return `${file} → storage tek girdili dizi olmalı ve bucket adı açıkça yazılmalı ([{ "bucket": "...", "rules": "storage.rules" }]).`;
+    }
+    const allowed = [`${projectId}.firebasestorage.app`, `${projectId}.appspot.com`];
+    if (!allowed.includes(st[0].bucket)) {
+        return `${file} → storage.bucket "${st[0].bucket || ''}"; ${allowed.join(' ya da ')} olmalı.`;
+    }
+    if (!st[0].rules) return `${file} → storage.rules eksik.`;
+    return null;
+}
+
+/**
  * functions/index.js gerçekten talentflowApi'yi europe-west1'de mi dışa
  * veriyor? firebase.json'daki yönlendirme ile kaynak ayrışırsa /api/** ya
  * boşa ya da başka bir uygulamanın fonksiyonuna gider. Hata metni; yoksa null.
@@ -223,6 +242,8 @@ function main(argv) {
         else site = hostingEntries(cfg)[0].site;
         const f = productionFunctionsProblem(cfg);
         if (f) problems.push(f);
+        const st = productionStorageProblem(cfg, projectId);
+        if (st) problems.push(st);
     } catch (err) {
         problems.push(`firebase.json okunamadı: ${err.message}`);
     }

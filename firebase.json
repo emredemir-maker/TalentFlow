@@ -15,9 +15,12 @@
         "rules": "firestore.rules",
         "location": "eur3"
     },
-    "storage": {
-        "rules": "storage.rules"
-    },
+    "storage": [
+        {
+            "bucket": "agentinn-nyqpx.firebasestorage.app",
+            "rules": "storage.rules"
+        }
+    ],
     "hosting": {
         "site": "talentinn",
         "public": "dist",

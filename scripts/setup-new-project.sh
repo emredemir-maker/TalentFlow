@@ -314,6 +314,10 @@ for R in roles/firebasehosting.admin roles/cloudfunctions.admin roles/run.admin 
 done
 # Fonksiyon talentflow-runtime ile çalışıyor: dağıtıcı YALNIZCA bu hesap adına iş başlatabilir.
 act_as "$RUNTIME" "$DEPLOYER"
+# Fonksiyon kendi hesabıyla çalışsa da Firebase CLI dağıtım öncesi App Engine varsayılan hesabında
+# (<proje>@appspot) actAs arıyor; yoksa "Missing permissions ... iam.serviceAccounts.ActAs" ile duruyor.
+APPSPOT="$P@appspot.gserviceaccount.com"
+if quiet gcloud iam service-accounts describe "$APPSPOT" --project "$P"; then act_as "$APPSPOT" "$DEPLOYER"; fi
 # Cloud Functions derlemesini Cloud Build'in varsayılan hesabıyla yapıyor. Yeni projelerde bu hesap compute
 # hesabı ve Cloud Functions dağıtıcıdan onun üzerinde de actAs istiyor; eski projelerde Google'ın yönettiği
 # <numara>@cloudbuild hesabı ve actAs gerekmiyor. Yalnızca gerekiyorsa verilir.
