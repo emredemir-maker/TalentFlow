@@ -98,7 +98,7 @@ step "3/10 Hosting: adlı site (firebase.json → hosting.site)"
 # firebase.json'a yazılır (adın tek yeri orası).
 CFG_SITE=$(node -e 'try{const h=JSON.parse(require("fs").readFileSync("firebase.json","utf8")).hosting;process.stdout.write((Array.isArray(h)?h[0]:h).site||"")}catch{}')
 SITE=""
-for CAND in ${CFG_SITE:-talentflow-app} ${SITE_CANDIDATES:-talentflow-emre talentflow-ik talentflow-hr talentflow-$NUM}; do
+for CAND in ${CFG_SITE:-talentinn-app} ${SITE_CANDIDATES:-talentinn-app talentflow-emre talentflow-ik talentflow-hr talentflow-$NUM}; do
   CODE=$(api "https://firebasehosting.googleapis.com/v1beta1/projects/$P/sites/$CAND")
   if [ "$CODE" = 200 ]; then SITE=$CAND; ok "site bu projede zaten var: $CAND"; break; fi
   CODE=$(api -X POST -d '{}' "https://firebasehosting.googleapis.com/v1beta1/projects/$P/sites?siteId=$CAND")

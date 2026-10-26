@@ -5,7 +5,7 @@ Eski proje (`talentflow-84bb6`) eski şirketin Google organizasyonunda duruyor. 
 
 - **Proje:** `deploy-n8n-local`. Proje kotası dolduğu için yeni değil, var olan bir proje yeniden kullanılıyor.
   İçinde başka işler olabilir.
-- **Hosting sitesi:** `talentflow-app` (adres `https://talentflow-app.web.app`). Projenin varsayılan sitesi
+- **Hosting sitesi:** `talentinn-app` (adres `https://talentinn-app.web.app`). Projenin varsayılan sitesi
   (`deploy-n8n-local.web.app`) kullanılmıyor ve hiç değiştirilmiyor.
 
 ## Değerlerin tek yerleri
@@ -61,7 +61,7 @@ bash scripts/setup-new-project.sh
 Betik her adımda ✓ ya da ! yazar. Tekrar çalıştırmak güvenli, hiçbir şey silmez. Yaptıkları:
 
 - Gerekli servisleri açar.
-- `talentflow-app` sitesini oluşturur. Ad alınmışsa yedek bir ad seçer ve `firebase.json`'a yazar.
+- `talentinn-app` sitesini oluşturur. Ad alınmışsa yedek bir ad seçer ve `firebase.json`'a yazar.
 - Firestore'u oluşturur ya da var olanı denetler.
 - Bucket'ı bulur; CORS ayarı boşsa `cors.json`'ı uygular.
 - "TalentFlow" adlı web uygulamasını bulur ya da ekler.
@@ -111,7 +111,7 @@ anahtarı başka projeye aitse kendini durduruyor. Anahtar dosyasını GitHub'a 
 
 Dalı PR'la, CI yeşil olunca merge et. `firebase-deploy.yml` şunları dağıtır:
 
-- Hosting'i yalnızca `talentflow-app` sitesine.
+- Hosting'i yalnızca `talentinn-app` sitesine.
 - Yalnızca `api` fonksiyonunu.
 - Firestore ve Storage kurallarını.
 
@@ -119,7 +119,7 @@ Dalı PR'la, CI yeşil olunca merge et. `firebase-deploy.yml` şunları dağıt�
 
 Boş projede davet de izinli alan adı da yok. Bu yüzden:
 
-1. `https://talentflow-app.web.app`'te Google ile bir kez giriş yap. "Erişim yetkiniz bulunmuyor" demesi normal;
+1. `https://talentinn-app.web.app`'te Google ile bir kez giriş yap. "Erişim yetkiniz bulunmuyor" demesi normal;
    Auth kullanıcısı oluşur.
 2. Git Bash'te:
    ```bash
@@ -141,8 +141,8 @@ Recruiter'ın Gmail'inden aday yazışması ve takvim daveti için:
    **Test users**'a bağlanacak her recruiter'ın Gmail adresini ekle (en fazla 100).
 3. **Data access**: `gmail.modify` ve `calendar.events` kapsamlarını ekle.
 4. **Clients → Create client → Web application**:
-   - Authorized JavaScript origins: `https://talentflow-app.web.app`
-   - Authorized redirect URIs: `https://talentflow-app.web.app/auth/google/callback`
+   - Authorized JavaScript origins: `https://talentinn-app.web.app`
+   - Authorized redirect URIs: `https://talentinn-app.web.app/auth/google/callback`
 5. Client ID ve secret'ı uygulamada **Entegrasyon Merkezi**'ne gir. Bu değerler Firestore'da duruyor ve eski
    projeden taşınmadı.
 
@@ -156,7 +156,7 @@ Kalıcı çözüm "In production" + Google doğrulaması. Restricted kapsam içi
 değerlendirmesi demek.
 
 **Microsoft 365** kullanılıyorsa Azure'daki uygulama kaydına yeni redirect'i ekle:
-`https://talentflow-app.web.app/auth/microsoft/callback`. Kayıt eski şirketin Azure kiracısındaysa yeni bir
+`https://talentinn-app.web.app/auth/microsoft/callback`. Kayıt eski şirketin Azure kiracısındaysa yeni bir
 kayıt gerekir.
 
 ### 12. Demo kurulumu (ayrı proje)
@@ -191,7 +191,7 @@ gcloud projects describe talentflow-demo-6b894 --format="value(parent.type,paren
   hiçbir şey kapatılmaz. Başka bir uygulama Google sağlayıcısını farklı bir istemciyle kullanıyorsa dikkat et.
 - **Fonksiyonlar / Cloud Run**: `us-central1`'de `api` adlı bir fonksiyon ya da servis varsa ilk dağıtım onun
   üzerine yazar. Betik bunu denetliyor.
-- **Hosting**: varsayılan site ve diğer siteler değişmez; dağıtım yalnızca `talentflow-app`'e gider.
+- **Hosting**: varsayılan site ve diğer siteler değişmez; dağıtım yalnızca `talentinn-app`'e gider.
 - **Servis hesabı**: `github-deployer` projede `firebase.admin` gibi geniş roller alır. Anahtarı yalnızca GitHub
   secret'ında tut.
 
