@@ -35,7 +35,7 @@ export const STAGES = [
         key: 'ai_analysis',
         label: 'Ön İnceleme',
         desc: 'AI skorlaması yapıldı, henüz kimseyle görüşülmedi.',
-        color: '#29A9E0', bg: '#ECFAFF', border: '#BAE6FD',
+        color: '#14B8A6', bg: '#ECFAFF', border: '#BAE6FD',
         goodnessOnIncrease: true, terminal: false,
         legacy: ['new', 'pending', 'applied', 'unknown'],
     },

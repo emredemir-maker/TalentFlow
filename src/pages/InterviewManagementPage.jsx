@@ -126,7 +126,7 @@ export default function InterviewManagementPage() {
     const [selectedInterviewer, setSelectedInterviewer] = useState(null);
     const [openMenuId, setOpenMenuId] = useState(null);
     const [postponeModal, setPostponeModal] = useState(null); // { candidateId, sessionId, date, time }
-    const [branding, setBranding] = useState({ companyName: 'Talent-Inn', primaryColor: '#13294E' });
+    const [branding, setBranding] = useState({ companyName: 'Clyro Talent', primaryColor: '#0F766E' });
     // Quick-start state (dashboard-level "Hızlı Mülakat Başlat")
     const [quickModal, setQuickModal]           = useState(false);
     const [quickSearch, setQuickSearch]         = useState('');
@@ -837,7 +837,7 @@ export default function InterviewManagementPage() {
         
         setEmailJoinLink(joinLink);
         setEmailSubject(`Mülakat Daveti: ${typeLabel} Değerlendirmesi - ${selectedCandidate.name}`);
-        setEmailBody(`Merhaba ${selectedCandidate.name},\n\nTalent-Inn ekibi olarak sizinle ${typeLabel} mülakatı gerçekleştirmek istiyoruz.\n\nMülakat Detayları:\n- Tarih: ${manualDate || 'Henüz Belirlenmedi'}\n- Saat: ${manualTime}\n- Platform: Talent-Inn Workspace\n\nMülakat linkiniz: ${joinLink}\n\nHerhangi bir sorunuz olursa bu mail üzerinden bizimle iletişime geçebilirsiniz.\n\nİyi çalışmalar dileriz.`);
+        setEmailBody(`Merhaba ${selectedCandidate.name},\n\nClyro Talent ekibi olarak sizinle ${typeLabel} mülakatı gerçekleştirmek istiyoruz.\n\nMülakat Detayları:\n- Tarih: ${manualDate || 'Henüz Belirlenmedi'}\n- Saat: ${manualTime}\n- Platform: Clyro Talent Workspace\n\nMülakat linkiniz: ${joinLink}\n\nHerhangi bir sorunuz olursa bu mail üzerinden bizimle iletişime geçebilirsiniz.\n\nİyi çalışmalar dileriz.`);
         setIsEmailModalOpen(true);
     };
 
@@ -1079,7 +1079,7 @@ export default function InterviewManagementPage() {
                     const participantEmails = selectedParticipants.map(p => p.email).filter(Boolean);
                     const calResult = await createDirectCalendarEvent({
                         summary: `${selectedCandidate.name} — ${newSession.title}`,
-                        description: `Talent-Inn üzerinden planlanan mülakat.\nAday: ${selectedCandidate.name}\nPozisyon: ${selectedCandidate.position || '—'}\nDeğerlendirici: ${interviewerName}\n${participantEmails.length > 0 ? `Katılımcılar: ${participantEmails.join(', ')}\n` : ''}Mülakat linki: ${meetLink}`,
+                        description: `Clyro Talent üzerinden planlanan mülakat.\nAday: ${selectedCandidate.name}\nPozisyon: ${selectedCandidate.position || '—'}\nDeğerlendirici: ${interviewerName}\n${participantEmails.length > 0 ? `Katılımcılar: ${participantEmails.join(', ')}\n` : ''}Mülakat linki: ${meetLink}`,
                         startDateTime: toLocalISOString(startDT),
                         endDateTime: toLocalISOString(endDT),
                         guestEmail: selectedCandidate.email,
@@ -1131,7 +1131,7 @@ export default function InterviewManagementPage() {
                             await sendDirectEmail({
                                 to:      participant.email,
                                 subject: `Mülakat Daveti: ${newSession.title} — ${selectedCandidate.name}`,
-                                body:    `Merhaba ${participant.name || participant.email},\n\nTalent-Inn üzerinden bir mülakata katılımcı olarak eklendiniz.\n\nAday: ${selectedCandidate.name}\nPozisyon: ${selectedCandidate.position || '—'}\nTarih: ${slot.date}\nSaat: ${slot.time}\nMülakat Tipi: ${newSession.title}\n\nMülakat Linki: ${platformJoinLink}\n\nTalent-Inn Ekibi`,
+                                body:    `Merhaba ${participant.name || participant.email},\n\nClyro Talent üzerinden bir mülakata katılımcı olarak eklendiniz.\n\nAday: ${selectedCandidate.name}\nPozisyon: ${selectedCandidate.position || '—'}\nTarih: ${slot.date}\nSaat: ${slot.time}\nMülakat Tipi: ${newSession.title}\n\nMülakat Linki: ${platformJoinLink}\n\nClyro Talent Ekibi`,
                                 html:    participantHtml,
                                 ics:     participantICS,
                                 replyTo: userProfile?.email || null,

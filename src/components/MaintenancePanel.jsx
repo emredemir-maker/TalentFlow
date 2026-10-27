@@ -377,7 +377,7 @@ export default function MaintenancePanel() {
                 <button
                     onClick={runScan}
                     disabled={loading || Boolean(running)}
-                    className="flex items-center gap-1.5 text-[11px] font-black text-white bg-[#13294E] hover:bg-[#1E3A6E] disabled:opacity-60 px-3.5 py-1.5 rounded-lg transition-colors"
+                    className="flex items-center gap-1.5 text-[11px] font-black text-white bg-[#111312] hover:bg-[#1E3A6E] disabled:opacity-60 px-3.5 py-1.5 rounded-lg transition-colors"
                 >
                     {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
                     {health ? 'Durumu Yenile' : 'Durum Tespitini Başlat'}
@@ -400,14 +400,14 @@ export default function MaintenancePanel() {
                         return (
                             <div
                                 key={s.key}
-                                className={`rounded-xl border px-3 py-2.5 transition-colors ${isCurrent ? 'border-[#13294E] bg-[#13294E]/[0.03] shadow-sm' : 'border-slate-100'}`}
+                                className={`rounded-xl border px-3 py-2.5 transition-colors ${isCurrent ? 'border-[#111312] bg-[#111312]/[0.03] shadow-sm' : 'border-slate-100'}`}
                             >
                                 <div className="flex items-center gap-2">
                                     <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 text-[10px] font-black ${
                                         st === 'done' ? 'bg-emerald-100 text-emerald-700'
                                         : st === 'clear' ? 'bg-slate-100 text-slate-400'
                                         : st === 'skipped' ? 'bg-slate-100 text-slate-400'
-                                        : isCurrent ? 'bg-[#13294E] text-white'
+                                        : isCurrent ? 'bg-[#111312] text-white'
                                         : 'bg-amber-100 text-amber-700'
                                     }`}>
                                         {st === 'done' || st === 'clear' ? <CheckCircle2 className="w-3.5 h-3.5" /> : i + 1}
@@ -463,7 +463,7 @@ export default function MaintenancePanel() {
                                                         }
                                                     }}
                                                     disabled={Boolean(running)}
-                                                    className="text-[11px] font-bold text-[#13294E] bg-slate-100 hover:bg-slate-200 disabled:opacity-60 px-3 py-1.5 rounded-lg transition-colors"
+                                                    className="text-[11px] font-bold text-[#111312] bg-slate-100 hover:bg-slate-200 disabled:opacity-60 px-3 py-1.5 rounded-lg transition-colors"
                                                     title="İlan gereksinimleri değiştiyse mevcut skorları da tazele"
                                                 >
                                                     Tümünü Yeniden Puanla
@@ -472,7 +472,7 @@ export default function MaintenancePanel() {
                                             <button
                                                 onClick={STEP_RUNNERS[s.key]}
                                                 disabled={Boolean(running) || (s.key === 'dup' && selected.size === 0)}
-                                                className="flex items-center gap-1.5 text-[11px] font-black text-white bg-[#13294E] hover:bg-[#1E3A6E] disabled:opacity-60 px-3.5 py-1.5 rounded-lg transition-colors"
+                                                className="flex items-center gap-1.5 text-[11px] font-black text-white bg-[#111312] hover:bg-[#1E3A6E] disabled:opacity-60 px-3.5 py-1.5 rounded-lg transition-colors"
                                             >
                                                 {running === s.key ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ChevronRight className="w-3.5 h-3.5" />}
                                                 {running === s.key ? 'Çalışıyor…' : s.key === 'dup' ? `${s.action} (${selected.size})` : s.action}

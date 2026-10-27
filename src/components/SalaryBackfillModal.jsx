@@ -210,7 +210,7 @@ export default function SalaryBackfillModal({ open, onClose, candidates = [], ui
                 {/* Başlık */}
                 <div className="flex items-start justify-between gap-2 px-5 pt-5 pb-3 border-b border-slate-100">
                     <div className="flex items-center gap-2">
-                        <div className="w-9 h-9 rounded-xl bg-[#13294E] flex items-center justify-center shrink-0">
+                        <div className="w-9 h-9 rounded-xl bg-[#111312] flex items-center justify-center shrink-0">
                             <Wallet className="w-4 h-4 text-white" />
                         </div>
                         <div>

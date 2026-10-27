@@ -482,7 +482,7 @@ export function buildInterviewReportDoc({
     return {
         info: {
             title: `Mülakat Raporu — ${adayAdi}`,
-            author: 'TalentFlow',
+            author: 'Clyro Talent',
             subject: pozisyon || 'Mülakat raporu',
         },
         pageSize: 'A4',
@@ -498,7 +498,7 @@ export function buildInterviewReportDoc({
         // eksik olduğu ancak numarayla anlaşılır.
         footer: (currentPage, pageCount) => ({
             columns: [
-                { text: `TalentFlow · ${now.toLocaleDateString('tr-TR')} tarihinde üretildi`, style: 'footer' },
+                { text: `Clyro Talent · ${now.toLocaleDateString('tr-TR')} tarihinde üretildi`, style: 'footer' },
                 { text: `${currentPage} / ${pageCount}`, style: 'footer', alignment: 'right' },
             ],
             margin: [40, 12, 40, 0],

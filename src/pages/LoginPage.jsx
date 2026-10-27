@@ -66,8 +66,8 @@ export default function LoginPage() {
     };
 
     const handleFocus = (e) => {
-        e.target.style.borderColor = '#29A9E0';
-        e.target.style.boxShadow = '0 0 0 3px rgba(41,169,224,0.15)';
+        e.target.style.borderColor = '#14B8A6';
+        e.target.style.boxShadow = '0 0 0 3px rgba(20,184,166,0.15)';
     };
     const handleBlur = (e) => {
         e.target.style.borderColor = '#E2E8F0';
@@ -94,7 +94,7 @@ export default function LoginPage() {
                 width: '100%',
                 display: 'flex',
                 flexDirection: isNarrow ? 'column' : 'row',
-                fontFamily: "'Inter', ui-sans-serif, system-ui, sans-serif",
+                fontFamily: "'Outfit', ui-sans-serif, system-ui, sans-serif",
                 overflow: 'hidden',
             }}
         >
@@ -107,7 +107,7 @@ export default function LoginPage() {
                     flexDirection: 'column',
                     justifyContent: 'space-between',
                     padding: isNarrow ? '32px 24px 28px' : '56px 48px',
-                    background: 'linear-gradient(155deg, #0F172A 0%, #122E5E 55%, #0F172A 100%)',
+                    background: '#111312', // Clyro mürekkep; vurgu turkuaz
                     position: 'relative',
                     overflow: 'hidden',
                     flexShrink: 0,
@@ -117,13 +117,13 @@ export default function LoginPage() {
                 <div style={{
                     position: 'absolute', top: '-10%', right: '-10%',
                     width: '55%', height: '55%', borderRadius: '50%',
-                    background: 'radial-gradient(circle, rgba(41,169,224,0.18) 0%, transparent 70%)',
+                    background: 'radial-gradient(circle, rgba(20,184,166,0.16) 0%, transparent 70%)',
                     pointerEvents: 'none'
                 }} />
                 <div style={{
                     position: 'absolute', bottom: '-10%', left: '-10%',
                     width: '55%', height: '55%', borderRadius: '50%',
-                    background: 'radial-gradient(circle, rgba(19,194,190,0.10) 0%, transparent 70%)',
+                    background: 'radial-gradient(circle, rgba(20,184,166,0.08) 0%, transparent 70%)',
                     pointerEvents: 'none'
                 }} />
 
@@ -138,8 +138,8 @@ export default function LoginPage() {
                     <div style={{
                         display: 'inline-flex', alignItems: 'center', gap: '8px',
                         padding: '6px 14px', borderRadius: '999px',
-                        backgroundColor: 'rgba(41,169,224,0.12)',
-                        border: '1px solid rgba(41,169,224,0.25)',
+                        backgroundColor: 'rgba(20,184,166,0.12)',
+                        border: '1px solid rgba(20,184,166,0.25)',
                         color: '#8BE3EC',
                         fontSize: '11px', fontWeight: 700,
                         letterSpacing: '1.5px', textTransform: 'uppercase',
@@ -161,7 +161,7 @@ export default function LoginPage() {
                     }}>
                         İşe Alımın <br />
                         <span style={{
-                            backgroundImage: 'linear-gradient(90deg, #29A9E0, #13C2BE)',
+                            backgroundImage: 'linear-gradient(90deg, #14B8A6, #0F766E)',
                             WebkitBackgroundClip: 'text',
                             WebkitTextFillColor: 'transparent',
                             backgroundClip: 'text',
@@ -179,7 +179,7 @@ export default function LoginPage() {
                         marginBottom: '36px',
                         fontWeight: 500,
                     }}>
-                        Talent-Inn, sıradan bir aday takip sisteminden çok daha fazlasıdır. Veriyi stratejiye, adayları ise yetkinlik kanıtlarına dönüştüren uçtan uca bir{' '}
+                        Clyro Talent, sıradan bir aday takip sisteminden çok daha fazlasıdır. Veriyi stratejiye, adayları ise yetkinlik kanıtlarına dönüştüren uçtan uca bir{' '}
                         <span style={{ color: '#F8FAFC', fontWeight: 700 }}>Yapay Zeka Ekosistemidir.</span>
                     </p>
 
@@ -189,12 +189,12 @@ export default function LoginPage() {
                             <li key={f} style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#CBD5E1', fontSize: '13px', fontWeight: 500 }}>
                                 <div style={{
                                     width: '20px', height: '20px', borderRadius: '50%',
-                                    background: 'rgba(41,169,224,0.14)',
-                                    border: '1px solid rgba(41,169,224,0.30)',
+                                    background: 'rgba(20,184,166,0.14)',
+                                    border: '1px solid rgba(20,184,166,0.30)',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                                     flexShrink: 0,
                                 }}>
-                                    <Zap size={10} color="#29A9E0" />
+                                    <Zap size={10} color="#14B8A6" />
                                 </div>
                                 {f}
                             </li>
@@ -211,7 +211,7 @@ export default function LoginPage() {
                                 borderRight: i < stats.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
                                 paddingLeft: i > 0 ? '24px' : '0',
                             }}>
-                                <s.icon size={16} color="#29A9E0" style={{ marginBottom: '8px', opacity: 0.8 }} />
+                                <s.icon size={16} color="#14B8A6" style={{ marginBottom: '8px', opacity: 0.8 }} />
                                 <div style={{ fontSize: '22px', fontWeight: 900, color: '#F8FAFC', lineHeight: 1 }}>{s.value}</div>
                                 <div style={{ fontSize: '11px', color: '#94A3B8', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', marginTop: '4px' }}>{s.label}</div>
                             </div>
@@ -221,7 +221,7 @@ export default function LoginPage() {
 
                 {/* Footer note */}
                 <div style={{ position: 'relative', zIndex: 1, color: '#94A3B8', fontSize: '11px', letterSpacing: '1px', display: isNarrow ? 'none' : 'block' }}>
-                    © 2025 Talent-Inn · AI-Powered Talent Intelligence
+                    © 2025 Clyro Talent · AI-Powered Talent Intelligence
                 </div>
             </div>
 
@@ -274,7 +274,7 @@ export default function LoginPage() {
                                             style={{
                                                 display: 'block', marginTop: '8px',
                                                 background: 'none', border: 'none', padding: 0,
-                                                color: '#0C7CB0', fontSize: '13px', fontWeight: 700,
+                                                color: '#0F766E', fontSize: '13px', fontWeight: 700,
                                                 cursor: 'pointer', textDecoration: 'underline'
                                             }}
                                         >
@@ -301,7 +301,7 @@ export default function LoginPage() {
                                             style={{
                                                 display: 'block', marginTop: '8px',
                                                 background: 'none', border: 'none', padding: 0,
-                                                color: '#0C7CB0', fontSize: '13px', fontWeight: 700,
+                                                color: '#0F766E', fontSize: '13px', fontWeight: 700,
                                                 cursor: 'pointer', textDecoration: 'underline'
                                             }}
                                         >
@@ -411,12 +411,12 @@ export default function LoginPage() {
                             disabled={loading}
                             style={{
                                 width: '100%', height: '50px', borderRadius: '10px',
-                                background: loading ? '#94A3B8' : 'linear-gradient(135deg, #29A9E0 0%, #13C2BE 100%)',
+                                background: loading ? '#94A3B8' : 'linear-gradient(135deg, #14B8A6 0%, #0F766E 100%)',
                                 color: '#fff', fontWeight: 700, fontSize: '14px',
                                 letterSpacing: '0.3px', border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
                                 marginTop: '4px',
-                                boxShadow: loading ? 'none' : '0 8px 24px rgba(41,169,224,0.28)',
+                                boxShadow: loading ? 'none' : '0 8px 24px rgba(20,184,166,0.28)',
                                 transition: 'opacity 0.2s',
                             }}
                             onMouseEnter={e => { if (!loading) e.currentTarget.style.opacity = '0.9'; }}
@@ -478,7 +478,7 @@ export default function LoginPage() {
                                 background: 'none', border: 'none', cursor: 'pointer',
                                 fontSize: '13px', color: '#64748B', display: 'inline-flex', alignItems: 'center', gap: '4px',
                             }}
-                            onMouseEnter={e => e.currentTarget.style.color = '#0C7CB0'}
+                            onMouseEnter={e => e.currentTarget.style.color = '#0F766E'}
                             onMouseLeave={e => e.currentTarget.style.color = '#64748B'}
                         >
                             {mode === 'login' ? 'Hesabınız yok mu? Kayıt olun' : 'Zaten üye misiniz? Giriş yapın'}
@@ -492,10 +492,10 @@ export default function LoginPage() {
                         <a
                             href="/nasil-calisir"
                             style={{ fontSize: '12px', color: '#94A3B8', textDecoration: 'none' }}
-                            onMouseEnter={e => e.currentTarget.style.color = '#0C7CB0'}
+                            onMouseEnter={e => e.currentTarget.style.color = '#0F766E'}
                             onMouseLeave={e => e.currentTarget.style.color = '#94A3B8'}
                         >
-                            TalentFlow nasıl çalışıyor?
+                            Clyro Talent nasıl çalışıyor?
                         </a>
                     </div>
                 </div>

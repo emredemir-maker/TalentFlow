@@ -246,7 +246,7 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
         <header className="h-14 flex items-center justify-between px-4 md:px-8 bg-n0/80 backdrop-blur-md border-b border-n100 sticky top-0 z-40">
 
             {/* ── Mobile Hamburger + Page Title + Home ──
-                Brand identity lives in the sidebar (Talent-Inn + AI Recruitment).
+                Brand identity lives in the sidebar (Clyro Talent + AI Recruitment).
                 Top-bar shows page-level context only — no second brand wordmark.
                 On <lg the hamburger opens the sidebar drawer. */}
             <div className="flex items-center gap-2 md:gap-2 md:mr-6">
