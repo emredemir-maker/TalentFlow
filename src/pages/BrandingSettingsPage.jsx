@@ -13,7 +13,7 @@ import { ORG_PROFILE_FIELD } from '../services/orgProfile';
 const BRANDING_PATH = 'artifacts/talent-flow/public/data/settings/branding';
 
 const PRESET_COLORS = [
-    '#13294E', '#7C3AED', '#DC2626', '#059669',
+    '#111312', '#7C3AED', '#DC2626', '#059669',
     '#D97706', '#0891B2', '#BE185D', '#374151'
 ];
 
@@ -21,7 +21,7 @@ export default function BrandingSettingsPage() {
     const [branding, setBranding] = useState({
         companyName: '',
         logoUrl: '',
-        primaryColor: '#13294E',
+        primaryColor: '#0F766E',
         tagline: '',
         website: '',
         // Sektör uyumu ölçümünün HEDEFİ (utils/sectorFit.js). Boş eksen
@@ -228,7 +228,7 @@ export default function BrandingSettingsPage() {
                                 type="text"
                                 value={branding.companyName}
                                 onChange={e => setBranding(p => ({ ...p, companyName: e.target.value }))}
-                                placeholder="örn: BTC Türk, Infoset, Talent-Inn"
+                                placeholder="örn: BTC Türk, Infoset, Clyro Talent"
                                 className="w-full px-3 py-2.5 text-sm border border-n200 rounded-md bg-n25 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all"
                             />
                         </div>

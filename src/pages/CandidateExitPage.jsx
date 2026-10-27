@@ -95,7 +95,7 @@ export default function CandidateExitPage() {
                 {/* Footer branding */}
                 <div className="mt-6 flex items-center justify-center gap-2 text-slate-400">
                     <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-                    <span className="text-[9px] font-black uppercase tracking-widest">Talent-Inn Experience Center</span>
+                    <span className="text-[9px] font-black uppercase tracking-widest">Clyro Talent Experience Center</span>
                 </div>
             </div>
         </div>

@@ -48,7 +48,7 @@ export function buildInterviewIcs(session, opts = {}) {
         aday ? `Aday: ${aday}` : '',
         pozisyon ? `Pozisyon: ${pozisyon}` : '',
         link ? `Görüşme linki: ${link}` : '',
-        'TalentFlow üzerinden planlandı.',
+        'Clyro Talent üzerinden planlandı.',
     ].filter(Boolean).join('\n');
 
     return buildICS({

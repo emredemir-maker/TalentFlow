@@ -685,7 +685,7 @@ export default function IntegrationsPage() {
                 </div>
 
                 <p className="text-center text-[10px] text-slate-400 pb-6">
-                    Entegrasyon Merkezi · Talent-Inn v2 · Yalnızca Süper Admin erişimi
+                    Entegrasyon Merkezi · Clyro Talent v2 · Yalnızca Süper Admin erişimi
                 </p>
             </div>
         </div>

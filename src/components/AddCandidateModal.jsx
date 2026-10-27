@@ -389,7 +389,7 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                                 return (
                                     <div key={i} className="flex items-center gap-2 flex-1">
                                         <div className="flex items-center gap-2 flex-1">
-                                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 transition-all ${done ? 'bg-emerald-500 text-white' : active ? 'bg-[#13294E] text-white' : 'bg-slate-100 text-slate-400'}`}>
+                                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 transition-all ${done ? 'bg-emerald-500 text-white' : active ? 'bg-[#111312] text-white' : 'bg-slate-100 text-slate-400'}`}>
                                                 {done ? '✓' : idx}
                                             </div>
                                             <span className={`text-[10px] font-bold whitespace-nowrap ${active ? 'text-[#0F172A]' : done ? 'text-emerald-600' : 'text-slate-400'}`}>{s}</span>
@@ -628,7 +628,7 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                                     <button
                                         key={s.id}
                                         onClick={() => { setSourceType(s.id); setSourceDetail(''); }}
-                                        className={`w-full flex items-center gap-3 p-3 rounded-2xl border-2 text-left transition-all ${isActive ? 'border-[#13294E] bg-blue-50/40' : 'border-slate-100 bg-slate-50/50 hover:border-slate-200'}`}
+                                        className={`w-full flex items-center gap-3 p-3 rounded-2xl border-2 text-left transition-all ${isActive ? 'border-[#111312] bg-blue-50/40' : 'border-slate-100 bg-slate-50/50 hover:border-slate-200'}`}
                                     >
                                         <div
                                             className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-all"
@@ -637,11 +637,11 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                                             <s.icon className="w-4 h-4" style={{ color: isActive ? '#fff' : '#94A3B8' }} />
                                         </div>
                                         <div className="flex-1">
-                                            <p className={`text-[11px] font-bold ${isActive ? 'text-[#13294E]' : 'text-[#0F172A]'}`}>{s.label}</p>
+                                            <p className={`text-[11px] font-bold ${isActive ? 'text-[#111312]' : 'text-[#0F172A]'}`}>{s.label}</p>
                                             <p className="text-[9px] text-slate-400 font-medium mt-0.5">{s.sub}</p>
                                         </div>
                                         {isActive && (
-                                            <div className="w-5 h-5 rounded-full bg-[#13294E] flex items-center justify-center shrink-0">
+                                            <div className="w-5 h-5 rounded-full bg-[#111312] flex items-center justify-center shrink-0">
                                                 <Check className="w-3 h-3 text-white" strokeWidth={3} />
                                             </div>
                                         )}
@@ -712,7 +712,7 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                             <button
                                 onClick={handleUpload}
                                 disabled={loading}
-                                className="w-full py-2.5 rounded-2xl bg-[#13294E] hover:bg-blue-800 text-white font-bold text-[12px] transition-all shadow-lg shadow-blue-900/20 hover:shadow-blue-900/30 disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-2"
+                                className="w-full py-2.5 rounded-2xl bg-[#111312] hover:bg-blue-800 text-white font-bold text-[12px] transition-all shadow-lg shadow-blue-900/20 hover:shadow-blue-900/30 disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-2"
                             >
                                 {loading ? (
                                     <>
@@ -745,7 +745,7 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                             {STEPS.map((_, i) => (
                                 <div
                                     key={i}
-                                    className={`h-1.5 rounded-full transition-all duration-300 ${i + 1 === step ? 'w-5 bg-[#13294E]' : i + 1 < step ? 'w-3 bg-emerald-400' : 'w-3 bg-slate-200'}`}
+                                    className={`h-1.5 rounded-full transition-all duration-300 ${i + 1 === step ? 'w-5 bg-[#111312]' : i + 1 < step ? 'w-3 bg-emerald-400' : 'w-3 bg-slate-200'}`}
                                 />
                             ))}
                         </div>
@@ -759,7 +759,7 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                                     setError(null);
                                     setStep(s => s + 1);
                                 }}
-                                className="flex items-center gap-1.5 text-[10px] font-bold text-[#13294E] hover:text-blue-700 transition-all"
+                                className="flex items-center gap-1.5 text-[10px] font-bold text-[#111312] hover:text-blue-700 transition-all"
                             >
                                 İleri
                                 <ChevronRight className="w-4 h-4" />
@@ -779,7 +779,7 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                         <button
                             onClick={handleSaveAll}
                             disabled={loading || !results.some(r => r.success)}
-                            className="flex-[2] py-3 rounded-2xl bg-[#13294E] hover:bg-blue-800 text-white text-[11px] font-bold transition-all shadow-lg shadow-blue-900/20 disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-2"
+                            className="flex-[2] py-3 rounded-2xl bg-[#111312] hover:bg-blue-800 text-white text-[11px] font-bold transition-all shadow-lg shadow-blue-900/20 disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-2"
                         >
                             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />}
                             {/* Demoda düğme havuza yazmıyor. Etiketin bunu

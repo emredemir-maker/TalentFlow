@@ -90,7 +90,7 @@ export default function EvaluationEmailModal({ isOpen, onClose, candidates, open
             <div className="relative w-full max-w-lg bg-white rounded-2xl border border-slate-100 shadow-2xl p-3.5 max-h-[90vh] overflow-y-auto">
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
-                        <div className="w-9 h-9 rounded-xl bg-[#13294E] flex items-center justify-center">
+                        <div className="w-9 h-9 rounded-xl bg-[#111312] flex items-center justify-center">
                             <Mail className="w-4.5 h-4.5 text-white" />
                         </div>
                         <div>
@@ -125,11 +125,11 @@ export default function EvaluationEmailModal({ isOpen, onClose, candidates, open
                     </div>
                     <div className="flex items-center gap-3">
                         <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600 cursor-pointer">
-                            <input type="checkbox" checked={includeTable} onChange={(e) => setIncludeTable(e.target.checked)} className="w-3.5 h-3.5 accent-[#13294E]" />
+                            <input type="checkbox" checked={includeTable} onChange={(e) => setIncludeTable(e.target.checked)} className="w-3.5 h-3.5 accent-[#111312]" />
                             Uyum analizi ve kariyer özeti
                         </label>
                         <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600 cursor-pointer">
-                            <input type="checkbox" checked={includeLinks} onChange={(e) => setIncludeLinks(e.target.checked)} className="w-3.5 h-3.5 accent-[#13294E]" />
+                            <input type="checkbox" checked={includeLinks} onChange={(e) => setIncludeLinks(e.target.checked)} className="w-3.5 h-3.5 accent-[#111312]" />
                             Detay kart linkleri
                         </label>
                     </div>
@@ -167,7 +167,7 @@ export default function EvaluationEmailModal({ isOpen, onClose, candidates, open
                     <button
                         onClick={handleSend}
                         disabled={!canSend}
-                        className="flex-[2] py-2.5 rounded-xl bg-[#13294E] hover:bg-[#1E3A6E] text-white text-[11px] font-black disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
+                        className="flex-[2] py-2.5 rounded-xl bg-[#111312] hover:bg-[#1E3A6E] text-white text-[11px] font-black disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
                     >
                         {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
                         {sending ? 'Gönderiliyor…' : 'Gönder'}

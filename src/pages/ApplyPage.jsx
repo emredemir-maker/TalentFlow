@@ -533,7 +533,7 @@ export default function ApplyPage() {
                     <div className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center shrink-0">
                         <span className="text-white text-[10px] font-black tracking-tight">TI</span>
                     </div>
-                    <span className="text-slate-800 font-black text-sm">Talent-Inn</span>
+                    <span className="text-slate-800 font-black text-sm">Clyro Talent</span>
                     {effectiveSource !== 'Direkt' && (
                         <span className="ml-auto text-[9px] font-black uppercase tracking-widest text-slate-400 border border-slate-200 rounded-full px-2.5 py-1">
                             {effectiveCategory ? `${effectiveCategory} · ${effectiveSource}` : effectiveSource}
@@ -778,7 +778,7 @@ export default function ApplyPage() {
                             </div>
                             <div>
                                 <div className="text-[11px] font-semibold text-slate-700 leading-relaxed">
-                                    <span className="text-indigo-600 font-bold">KVKK Aydınlatma Metni</span>'ni okudum ve kişisel verilerimin Talent-Inn tarafından işlenmesine onay veriyorum.
+                                    <span className="text-indigo-600 font-bold">KVKK Aydınlatma Metni</span>'ni okudum ve kişisel verilerimin Clyro Talent tarafından işlenmesine onay veriyorum.
                                 </div>
                                 <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
                                     <Shield size={10} />

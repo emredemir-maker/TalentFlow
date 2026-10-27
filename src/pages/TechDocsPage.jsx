@@ -473,7 +473,7 @@ function DataModelSection() {
 {
   companyName: string,    // Şirket adı
   logoUrl: string,        // Firebase Storage download URL
-  primaryColor: string,   // HEX renk kodu (örn: '#13294E')
+  primaryColor: string,   // HEX renk kodu (örn: '#111312')
   tagline: string,        // E-posta başlığı altı slogan
   website: string,        // Footer linki
   updatedAt: Timestamp,
@@ -857,7 +857,7 @@ const branding = {
 };
 
 // Varsayılan (branding kayıtlı değilse):
-DEFAULT_BRANDING = { companyName: 'Talent-Inn', primaryColor: '#13294E', ... }`}</CodeBlock>
+DEFAULT_BRANDING = { companyName: 'Talent-Inn', primaryColor: '#111312', ... }`}</CodeBlock>
 
             <SectionTitle>HTML Şablon Yapısı</SectionTitle>
             <CodeBlock lang="html">{`<!-- baseLayout() her şablona sarılır -->

@@ -48,7 +48,7 @@ export default function SuperAdminPage() {
     const [domainSaved, setDomainSaved] = useState(false);
 
     // Branding (for invite emails)
-    const [branding, setBrandingLocal] = useState({ companyName: 'Talent-Inn', primaryColor: '#13294E' });
+    const [branding, setBrandingLocal] = useState({ companyName: 'Clyro Talent', primaryColor: '#0F766E' });
     useEffect(() => {
         const unsub = onSnapshot(collection(db, 'artifacts/talent-flow/public/data/departments'), (snap) => {
             setDepartments(snap.docs.map(d => ({ id: d.id, ...d.data() })));

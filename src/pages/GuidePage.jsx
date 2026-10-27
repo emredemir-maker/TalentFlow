@@ -541,7 +541,7 @@ const FEATURES = [
         color: '#3b82f6',
         title: 'Kurumsal HTML E-posta Şablonları',
         subtitle: 'Markaya özel e-posta tasarımı',
-        description: 'Talent-Inn\'den gönderilen her e-posta, Kurumsal Kimlik ayarlarınızdaki logo, renk ve şirket adınızı yansıtan profesyonel HTML şablonlarla gönderilir. 3 farklı şablon tipi mevcuttur: kullanıcı daveti, mülakat daveti (adaya) ve katılımcı bildirimi.',
+        description: 'Clyro Talent\'tan gönderilen her e-posta, Kurumsal Kimlik ayarlarınızdaki logo, renk ve şirket adınızı yansıtan profesyonel HTML şablonlarla gönderilir. 3 farklı şablon tipi mevcuttur: kullanıcı daveti, mülakat daveti (adaya) ve katılımcı bildirimi.',
         steps: [
             'Ayarlar → "Kurumsal Kimlik" bölümünden logo, renk ve şirket bilgilerini doldurun.',
             'Canlı önizlemede e-postanın son halini görün.',
@@ -568,7 +568,7 @@ const FEATURES = [
                             <span className="bg-brand text-white px-3 py-1 rounded text-[11px] font-semibold inline-block">Mülakata Katıl →</span>
                         </div>
                     </div>
-                    <div className="bg-n50 border-t border-n200 px-3 py-1.5 text-center text-n400 text-[7px]">Talent-Inn Platformu</div>
+                    <div className="bg-n50 border-t border-n200 px-3 py-1.5 text-center text-n400 text-[7px]">Clyro Talent Platformu</div>
                 </div>
             </div>
         )
@@ -708,7 +708,7 @@ const FEATURES = [
                         <div className="inline-block bg-n0/20 rounded px-2 py-0.5 text-white text-[11px] font-semibold">LOGO</div>
                     </div>
                     <div className="p-2 space-y-1.5 bg-n0">
-                        {[['Şirket Adı', 'BTC Türk A.Ş.'], ['Slogan', 'Kripto & Blockchain'], ['Ana Renk', '#13294E']].map(([l, v]) => (
+                        {[['Şirket Adı', 'BTC Türk A.Ş.'], ['Slogan', 'Kripto & Blockchain'], ['Ana Renk', '#111312']].map(([l, v]) => (
                             <div key={l} className="flex items-center gap-2">
                                 <span className="text-[10px] text-n400 w-16">{l}</span>
                                 <span className="text-[10px] font-medium text-n700">{v}</span>
@@ -889,7 +889,7 @@ export default function GuidePage() {
                         <BookOpen className="w-3.5 h-3.5" /> Platform Kılavuzu
                     </div>
                     <h1 className="text-3xl font-semibold text-n900 tracking-tight">
-                        Talent-Inn'i Nasıl Kullanırsınız?
+                        Clyro Talent'ı Nasıl Kullanırsınız?
                     </h1>
                     <p className="text-n500 text-sm leading-relaxed max-w-xl mx-auto">
                         Aday yönetiminden canlı AI mülakatına, analitik raporlardan ekip izolasyonuna — tüm özellikleri adım adım öğrenin.

@@ -262,7 +262,7 @@ function AuthenticatedApp() {
   if (loading) {
     return (
       <LoadingScreen
-        message="Talent-Inn Başlatılıyor..."
+        message="Clyro Talent Başlatılıyor..."
         subtext="Firebase kimlik doğrulaması bekleniyor"
       />
     );

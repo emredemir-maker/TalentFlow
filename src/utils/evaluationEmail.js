@@ -60,7 +60,7 @@ const S = {
     quote: 'font-size:12px;color:#334155;font-style:italic;background:#F8FAFC;border-left:3px solid #94A3B8;padding:8px 10px;margin:10px 0;',
     th: 'text-align:left;font-size:10px;color:#64748B;text-transform:uppercase;padding:4px 8px;border-bottom:1px solid #E2E8F0;',
     td: 'font-size:12px;color:#334155;padding:4px 8px;border-bottom:1px solid #F1F5F9;',
-    link: 'display:inline-block;font-size:12px;font-weight:bold;color:#FFFFFF;background:#13294E;padding:6px 14px;border-radius:8px;text-decoration:none;margin-top:10px;',
+    link: 'display:inline-block;font-size:12px;font-weight:bold;color:#FFFFFF;background:#111312;padding:6px 14px;border-radius:8px;text-decoration:none;margin-top:10px;',
 };
 
 const scoreColor = (s) => (s >= 75 ? '#059669' : s >= 50 ? '#D97706' : '#DC2626');
@@ -124,7 +124,7 @@ export function buildEvaluationEmail({ rows, note, appUrl, includeTable = true, 
     let html = `<div style="max-width:640px;font-family:Arial,Helvetica,sans-serif;">`;
     if (note) html += `<p style="font-size:13px;color:#0F172A;">${escapeHtml(note)}</p>`;
     for (const r of rows) html += candidateCardHtml(r, { appUrl, includeTable, includeLinks });
-    html += `<p style="font-size:10px;color:#94A3B8;">Bu e-posta Talent-Inn üzerinden${senderName ? ` ${escapeHtml(senderName)} tarafından` : ''} gönderildi ve aday kişisel verisi içerir — lütfen kurum dışına iletmeyin.</p>`;
+    html += `<p style="font-size:10px;color:#94A3B8;">Bu e-posta Clyro Talent üzerinden${senderName ? ` ${escapeHtml(senderName)} tarafından` : ''} gönderildi ve aday kişisel verisi içerir — lütfen kurum dışına iletmeyin.</p>`;
     html += `</div>`;
 
     const textLines = [];

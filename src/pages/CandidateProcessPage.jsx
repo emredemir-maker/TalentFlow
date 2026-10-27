@@ -170,7 +170,7 @@ export default function CandidateProcessPage() {
     const [infoReqsLoading, setInfoReqsLoading]     = useState(false);
 
     // Branding — loaded once from Firestore for email template generation
-    const [branding, setBranding] = useState({ companyName: 'Talent-Inn', primaryColor: '#13294E' });
+    const [branding, setBranding] = useState({ companyName: 'Clyro Talent', primaryColor: '#0F766E' });
     useEffect(() => {
         getDoc(doc(db, 'artifacts/talent-flow/public/data/settings', 'branding'))
             .then(snap => { if (snap.exists()) setBranding(snap.data()); })

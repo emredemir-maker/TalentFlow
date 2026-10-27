@@ -27,7 +27,7 @@ async function loadTemplates() {
 // Build the branding header block (logo img or initials div) from branding object.
 // Used to resolve {{BRANDING_HEADER}} at send-time so the current logo/name always shows.
 function buildBrandingHeader(branding) {
-    const color = branding?.primaryColor || '#13294E';
+    const color = branding?.primaryColor || '#111312';
     const company = branding?.companyName || '';
     const tagline = branding?.tagline || '';
     const logoUrl = branding?.logoUrl || '';
@@ -45,7 +45,7 @@ function applyVars(html, vars, branding) {
         companyName:    branding?.companyName   || '',
         tagline:        branding?.tagline        || '',
         logoUrl:        branding?.logoUrl        || '',
-        primaryColor:   branding?.primaryColor   || '#13294E',
+        primaryColor:   branding?.primaryColor   || '#111312',
         BRANDING_HEADER: buildBrandingHeader(branding),
         ...vars,
     };

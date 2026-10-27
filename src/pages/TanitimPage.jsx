@@ -129,7 +129,7 @@ export default function TanitimPage() {
                         <span className="text-brand">Sorulacak soruyu</span> çıkarır.
                     </h1>
                     <p className="text-[15px] text-n600 leading-relaxed m-0 max-w-[46ch]">
-                        TalentFlow, CV'leri puanlayan bir araç değil; bir işe alım görüşmesinde neyin sorulması
+                        Clyro Talent, CV'leri puanlayan bir araç değil; bir işe alım görüşmesinde neyin sorulması
                         gerektiğini kanıta bağlayarak çıkaran bir defter.
                     </p>
                     <button
@@ -154,7 +154,7 @@ export default function TanitimPage() {
                         ya da yok sayıyor — ikisi de kötü.
                     </p>
                     <p className="text-[15px] text-n600 leading-relaxed m-0">
-                        TalentFlow tersinden kuruldu. Önce <strong className="text-n900 font-semibold">ilanın maddeleri</strong>,
+                        Clyro Talent tersinden kuruldu. Önce <strong className="text-n900 font-semibold">ilanın maddeleri</strong>,
                         sonra her madde için <strong className="text-n900 font-semibold">kanıt</strong>, en sonda — ve ancak
                         kanıt varsa — bir oran. Kanıt yoksa sayı da yok; yerine sebebi yazılıyor.
                     </p>

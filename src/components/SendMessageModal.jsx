@@ -115,7 +115,7 @@ export default function SendMessageModal({ candidate, onClose, onSent, initialPu
 
                 const eventResult = await createDirectCalendarEvent({
                     summary: `Mülakat: ${candidate.name} - ${candidate.matchedPositionTitle || 'Pozisyon'}`,
-                    description: `Talent-Inn üzerinden planlanan görüşme.\nTakip ID: ${trackingId}`,
+                    description: `Clyro Talent üzerinden planlanan görüşme.\nTakip ID: ${trackingId}`,
                     startDateTime,
                     endDateTime,
                     guestEmail: sendCandidateEmail ? candidate.email : null // Only add guest if we notify them

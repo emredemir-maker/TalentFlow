@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800;900&family=Poppins:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
 @import "tailwindcss";
 
 /* Dark variant is driven by an explicit [data-theme="dark"] ancestor, NOT the
@@ -10,32 +10,33 @@
 /* ==================== BRAND THEME TOKENS (Tailwind v4) ====================
    These utility colors (bg-electric, text-navy-700, bg-bg-primary, ...) were
    used across the app but never defined, so Tailwind generated no CSS for them.
-   Defining them here both "lights them up" and binds them to the official
-   Talent-inn brand: navy #13294E + cyan→teal accent. */
+   Clyro Talent (Clyro marka paketi): Talent rengi turkuaz #14B8A6; yazı ve
+   butonda koyu tonu #0F766E (ana ton beyazda 2.5:1, okunmaz). "navy" rampası
+   artık Clyro'nun nötr mürekkep tonları; adlar ekranlar bozulmasın diye korunur. */
 @theme {
   /* Accent — brand cyan→teal ("electric") */
-  --color-electric: #29A9E0;
-  --color-electric-light: #5CC4EA;
-  --color-electric-hover: #1E90C4;
+  --color-electric: #14B8A6;
+  --color-electric-light: #5EEAD4;
+  --color-electric-hover: #0F766E;
 
-  /* Navy ramp (anchored on brand navy #13294E) */
-  --color-navy-200: #C3D0E6;
-  --color-navy-300: #9FB2D4;
-  --color-navy-400: #6E84AE;
-  --color-navy-500: #44588A;
-  --color-navy-600: #2A3F6B;
-  --color-navy-700: #1B305A;
-  --color-navy-800: #13294E;
-  --color-navy-900: #0E2042;
-  --color-navy-950: #0A1730;
+  /* "navy" rampası: Clyro nötr mürekkep tonları */
+  --color-navy-200: #D6DBD8;
+  --color-navy-300: #B4BCB8;
+  --color-navy-400: #7A817D;
+  --color-navy-500: #5B625E;
+  --color-navy-600: #3E4441;
+  --color-navy-700: #2B302D;
+  --color-navy-800: #1E2220;
+  --color-navy-900: #161917;
+  --color-navy-950: #111312;
 
   /* Semantic neutrals */
-  --color-text-primary: #1E293B;
-  --color-text-secondary: #475569;
-  --color-text-muted: #94A3B8;
-  --color-bg-primary: #F8FAFC;
-  --color-bg-secondary: #F1F5F9;
-  --color-border-subtle: #E2E8F0;
+  --color-text-primary: #111312;
+  --color-text-secondary: #4C524F;
+  --color-text-muted: #7A817D;
+  --color-bg-primary: #FAFBFA;
+  --color-bg-secondary: #F4F6F5;
+  --color-border-subtle: #E3E7E5;
 
   /* ════════ INFOSET DESIGN SYSTEM ════════
      Kaynak: design_handoff_talentflow/_ds/…/colors_and_type.css
@@ -43,26 +44,27 @@
      HEPSİ YENİ AD. Mevcut tokenların hiçbiri ezilmedi — ezseydik henüz
      dönüştürülmemiş ekranlar da bir anda değişir ve "ekran ekran doğrula"
      kuralı işlemez hâle gelirdi. */
-  --color-brand: #5068FF;
-  --color-brand-600: #3E55E6;
-  --color-brand-700: #2E42C2;
-  --color-brand-50: #EEF1FF;
-  --color-brand-100: #DCE2FF;
-  --color-brand-200: #BAC5FF;
+  /* Clyro Talent: brand = koyu ton (beyaz yazılı butonlar ve bağlantılar). */
+  --color-brand: #0F766E;
+  --color-brand-600: #0D655E;
+  --color-brand-700: #134E4A;
+  --color-brand-50: #E6F6F4;
+  --color-brand-100: #CCFBF1;
+  --color-brand-200: #99F6E4;
 
-  --color-ink: #0E1330;
+  --color-ink: #111312;
   --color-n0: #FFFFFF;
-  --color-n25: #FBFBFD;
-  --color-n50: #F6F7FB;
-  --color-n100: #EEF0F6;
-  --color-n200: #E2E5EE;
-  --color-n300: #CBD0DC;
-  --color-n400: #9AA1B4;
-  --color-n500: #6B7384;
-  --color-n600: #4A5163;
-  --color-n700: #323849;
-  --color-n800: #1D2233;
-  --color-n900: #0E1122;
+  --color-n25: #FBFCFB;
+  --color-n50: #F7F8F7;
+  --color-n100: #F4F6F5;
+  --color-n200: #E3E7E5;
+  --color-n300: #CDD3D0;
+  --color-n400: #9AA19D;
+  --color-n500: #6B726E;
+  --color-n600: #4C524F;
+  --color-n700: #343A37;
+  --color-n800: #1E2220;
+  --color-n900: #111312;
 
   --color-ok: #16A26C;
   --color-ok-bg: #E6F7EF;
@@ -91,8 +93,8 @@
      rounded-lg kullanımını değiştirirdi. */
   --radius-card: 14px;
 
-  --font-infoset: 'Poppins', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-dense: 'Inter', 'Poppins', -apple-system, sans-serif;
+  --font-infoset: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-dense: 'Outfit', -apple-system, sans-serif;
 }
 
 /* ==================== THE COGNITIVE ARCHITECT - DESIGN SYSTEM ==================== */
@@ -100,27 +102,27 @@
   color-scheme: light;       /* keep native controls (inputs, scrollbars) light */
 
   /* Typography — geometric sans display (matches the Talent-inn wordmark) */
-  --font-display: 'Space Grotesk', 'Inter', ui-sans-serif, system-ui, sans-serif;  /* headings */
-  --font-body: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: 'Outfit', ui-sans-serif, system-ui, sans-serif;  /* headings */
+  --font-body: 'Outfit', ui-sans-serif, system-ui, -apple-system, sans-serif;
 
   /* Brand palette — navy + cyan→teal (official Talent-inn identity) */
-  --brand-navy: #13294E;     /* logo outline, deep navy */
-  --brand-cyan: #29A9E0;     /* brand accent (start of gradient) */
-  --brand-teal: #13C2BE;     /* brand accent (end of gradient) */
+  --brand-navy: #111312;     /* Clyro mürekkep */
+  --brand-cyan: #14B8A6;     /* Clyro Talent ana ton */
+  --brand-teal: #0F766E;     /* Clyro Talent koyu ton */
 
   /* Core Palette */
-  --primary: #13294E;        /* Deep Navy - Trust & Intelligence (brand) */
-  --secondary: #29A9E0;      /* Brand Cyan - Action / accent */
+  --primary: #0F766E;        /* Clyro Talent koyu ton (beyaz yazıyla 5.5:1) */
+  --secondary: #14B8A6;      /* Clyro Talent ana ton - vurgu */
   --success: #10B981;        /* Emerald - Growth & Insight */
-  --bg-slate: #F8FAFC;       /* Slate White - Clean Workspace */
+  --bg-slate: #FAFBFA;       /* Clyro zemin */
 
   /* Neutral Palette */
-  --on-surface: #0F172A;
-  --text-primary: #1E293B;
-  --text-secondary: #475569;
-  --text-muted: #94A3B8;
-  --outline: #E2E8F0;
-  --outline-variant: #F1F5F9;
+  --on-surface: #111312;
+  --text-primary: #111312;
+  --text-secondary: #4C524F;
+  --text-muted: #7A817D;
+  --outline: #E3E7E5;
+  --outline-variant: #F4F6F5;
 
   /* Semantic Map */
   --bg-primary: var(--bg-slate);

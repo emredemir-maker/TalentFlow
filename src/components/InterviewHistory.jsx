@@ -79,8 +79,8 @@ export default function InterviewHistory({ sessions = [], onStartSession, onDele
             .meta-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 40px; }
             .meta-item { padding: 20px; background: #f8fbff; border-radius: 20px; border: 1px solid #e2e8f0; }
             .meta-label { font-size: 8px; font-weight: 900; color: #64748b; text-transform: uppercase; letter-spacing: 0.2em; margin-bottom: 6px; }
-            .meta-value { font-size: 14px; font-weight: 700; color: #13294E; }
-            .score-card { background: #13294E; color: #fff; padding: 30px; border-radius: 24px; margin-bottom: 40px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 20px 40px rgba(19, 41, 78,0.1); }
+            .meta-value { font-size: 14px; font-weight: 700; color: #111312; }
+            .score-card { background: #111312; color: #fff; padding: 30px; border-radius: 24px; margin-bottom: 40px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 20px 40px rgba(19, 41, 78,0.1); }
             .score-item { text-align: center; border-right: 1px solid rgba(255,255,255,0.1); flex: 1; }
             .score-item:last-child { border: none; }
             .score-label { font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.2em; opacity: 0.6; margin-bottom: 6px; }
@@ -88,10 +88,10 @@ export default function InterviewHistory({ sessions = [], onStartSession, onDele
             .section-title { font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.2em; margin: 50px 0 20px 0; color: #64748b; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px; }
             p { font-size: 14px; line-height: 1.8; color: #334155; margin-bottom: 20px; }
             .footer { margin-top: 80px; padding-top: 40px; border-top: 2px solid #f1f5f9; text-align: center; }
-            .footer-text { font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.3em; color: #13294E; }
+            .footer-text { font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.3em; color: #111312; }
         </style></head><body>
             <h1>MÜLAKAT ANALİZ RAPORU</h1>
-            <div class="subtitle">Talent-Inn Core Architecture v2.4</div>
+            <div class="subtitle">Clyro Talent Core Architecture v2.4</div>
             
             <div class="meta-grid">
                 <div class="meta-item"><div class="meta-label">OTURUM TÜRÜ</div><div class="meta-value">${session.typeLabel}</div></div>
@@ -106,13 +106,13 @@ export default function InterviewHistory({ sessions = [], onStartSession, onDele
 
             <div class="section-title">STRATEJİK ÖZET</div>
             <p><strong>Değerlendirme Notu:</strong> ${session.aiVerdict || 'Analiz verisi mevcut değil.'}</p>
-            <p style="font-style: italic; color: #13294E; font-weight: 600;">"${session.aiSummary || ''}"</p>
+            <p style="font-style: italic; color: #111312; font-weight: 600;">"${session.aiSummary || ''}"</p>
 
             <div class="section-title">SORU VE CEVAP ANALİZİ</div>
             ${qaHtml}
 
             <div class="footer">
-                <div class="footer-text">Talent-Inn AI Verification Platform</div>
+                <div class="footer-text">Clyro Talent AI Verification Platform</div>
             </div>
         </body></html>`);
         win.document.close();
@@ -121,7 +121,7 @@ export default function InterviewHistory({ sessions = [], onStartSession, onDele
 
     return (
         <div className="space-y-6 italic">
-            <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-[#13294E] mb-6 flex items-center gap-2 opacity-60">
+            <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-[#111312] mb-6 flex items-center gap-2 opacity-60">
                 <Clock className="w-4 h-4" /> MÜLAKAT OTURUMLARI ({sorted.length})
             </h3>
             
@@ -210,7 +210,7 @@ export default function InterviewHistory({ sessions = [], onStartSession, onDele
                                                     </div>
                                                     <div className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl border border-slate-100">
                                                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Platform</span>
-                                                        <span className="text-sm font-black text-slate-800">Talent-Inn Live</span>
+                                                        <span className="text-sm font-black text-slate-800">Clyro Talent Live</span>
                                                     </div>
                                                 </div>
                                                 <button 
@@ -317,7 +317,7 @@ export default function InterviewHistory({ sessions = [], onStartSession, onDele
                                                  <button onClick={(e) => { e.stopPropagation(); onDeleteSession?.(session); }} className="text-[10px] font-black text-red-400 hover:text-red-600 transition-colors uppercase tracking-[0.2em] flex items-center gap-2">
                                                      <Trash2 className="w-4 h-4" /> Oturumu Kayıtlarını Sil
                                                  </button>
-                                                 <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Talent-Inn Analytics Verified</span>
+                                                 <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Clyro Talent Analytics Verified</span>
                                             </div>
                                         </div>
                                     )}
