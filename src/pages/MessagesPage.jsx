@@ -224,24 +224,31 @@ export default function MessagesPage() {
         <div className="infoset min-h-screen">
             <Header title="Mesajlar" />
 
-            {/* Page sub-tabs strip — DM kuyruğu / E-posta yazışmaları / Bilgi talepleri */}
-            <div className="sticky top-[88px] z-30 px-6 lg:px-8 py-3 bg-n0 border-b border-n200 flex items-center justify-end">
-                <div className="flex gap-1 p-1 rounded-md bg-n100 border border-n200">
+            {/* Sayfa başlığı + alt sekmeler — DM kuyruğu / E-posta yazışmaları / Bilgi talepleri.
+                YAPIŞKAN KONUM DÜZELTİLDİ: şerit `top-[88px]`'e yapışıyordu; üst
+                çubuk 56px olduğu için arada 32px'lik bir boşluk kalıyor, kayan
+                sayı kutuları bu boşluktan görünüp şeridin altına giriyordu.
+                Şerit artık tam üst çubuğun altına (56px) yapışıyor ve zemini
+                opak. */}
+            <div className="sticky top-14 z-30 px-6 lg:px-8 py-3 bg-n0 border-b border-n200 flex items-center gap-3 flex-wrap">
+                <h1 className="tf-page-title mr-auto">Mesajlar</h1>
+                <div className="flex gap-0.5 p-0.5 rounded-full bg-n100 overflow-x-auto max-w-full">
                     {PAGE_TABS.map(tab => {
                         const Icon = tab.icon;
                         return (
                             <button
                                 key={tab.id}
                                 onClick={() => setPageTab(tab.id)}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-semibold transition-all cursor-pointer ${pageTab === tab.id ? 'bg-n0 text-brand shadow-sm border border-n200' : 'text-n500 hover:text-n700'}`}
+                                aria-pressed={pageTab === tab.id}
+                                className={`flex-none flex items-center gap-1.5 h-8 px-3 rounded-full text-[13px] font-medium transition-colors cursor-pointer ${pageTab === tab.id ? 'bg-n0 text-n900 shadow-[0_1px_2px_rgba(17,19,18,0.08)]' : 'text-n500 hover:text-n800'}`}
                             >
                                 <Icon className="w-3.5 h-3.5" />
                                 {tab.label}
                                 {tab.id === 'emails' && emailsWithReply > 0 && (
-                                    <span className="w-4 h-4 rounded-full bg-ok text-[10px] text-white font-semibold flex items-center justify-center">{emailsWithReply}</span>
+                                    <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-brand-50 text-[11px] text-brand-700 font-semibold flex items-center justify-center tabular-nums">{emailsWithReply}</span>
                                 )}
                                 {tab.id === 'info_requests' && infoRequests.length > 0 && (
-                                    <span className="w-4 h-4 rounded-full bg-brand text-[10px] text-white font-semibold flex items-center justify-center">{infoRequests.length}</span>
+                                    <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-brand-50 text-[11px] text-brand-700 font-semibold flex items-center justify-center tabular-nums">{infoRequests.length}</span>
                                 )}
                             </button>
                         );
@@ -264,14 +271,15 @@ export default function MessagesPage() {
 
                     {/* Filter tabs */}
                     <div className="px-6 lg:px-8 pb-4">
-                        <div className="flex gap-1 p-1 rounded-md bg-n0 border border-n200 w-fit">
+                        <div className="flex gap-1.5 flex-wrap">
                             {FILTER_TABS.map((tab) => (
                                 <button key={tab.id} onClick={() => setFilter(tab.id)}
-                                    className={`px-3 py-1.5 rounded-md text-[12px] font-semibold transition-all cursor-pointer ${filter === tab.id ? 'bg-brand-50 text-brand' : 'text-n400 hover:text-n700'}`}
+                                    aria-pressed={filter === tab.id}
+                                    className="tf-chip"
                                 >
                                     {tab.label}
                                     {tab.id !== 'all' && (
-                                        <span className="ml-1.5 text-[10px] opacity-60">
+                                        <span className="tabular-nums opacity-70">
                                             {tab.id === 'ready_to_send' ? stats.readyToSend : tab.id === 'sent' ? stats.sent : tab.id === 'draft' ? stats.draft : tab.id === 'failed' ? stats.failed : ''}
                                         </span>
                                     )}
@@ -698,14 +706,19 @@ export default function MessagesPage() {
     );
 }
 
-function StatMini({ icon: Icon, label, value, color, bg }) {
+// Sayı kutusu: zemin renkli değil, beyaz. Renk yalnızca sayı sıfırdan
+// büyükse sayıya geçiyor — sıfır "başarısız" kırmızı yazılınca boş bir
+// kuyruk alarm veriyormuş gibi görünüyordu. Çağıranların verdiği `bg`
+// artık kullanılmıyor.
+function StatMini({ icon: Icon, label, value, color }) {
+    const tone = Number(value) > 0 ? color : 'text-n900';
     return (
-        <div className={`p-3.5 rounded-md ${bg} border border-n200`}>
+        <div className="px-4 py-3 rounded-xl bg-n0 border border-n200">
             <div className="flex items-center gap-2 mb-1">
-                <Icon className={`w-3.5 h-3.5 ${color}`} />
-                <span className="text-[11px] text-n400 font-medium">{label}</span>
+                <Icon className="w-3.5 h-3.5 text-n400" aria-hidden="true" />
+                <span className="text-[12px] text-n500">{label}</span>
             </div>
-            <div className={`text-xl font-extrabold ${color}`}>{value}</div>
+            <div className={`text-[22px] leading-7 font-semibold tabular-nums ${tone}`}>{value}</div>
         </div>
     );
 }

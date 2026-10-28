@@ -66,18 +66,17 @@ export default function Sidebar({
         return (
             <button
                 onClick={() => onNavigate(item.id)}
-                className={`w-full flex items-center gap-3 px-3.5 py-1.5 transition-all duration-200 group relative
+                aria-current={isActive ? 'page' : undefined}
+                title={collapsed ? item.label : undefined}
+                className={`w-full h-9 flex items-center gap-2.5 px-3 rounded-full transition-colors duration-150 group
+                    ${collapsed ? 'lg:justify-center lg:px-0' : ''}
                     ${isActive
-                        ? 'bg-brand-50 text-brand'
-                        : 'text-n600 hover:text-n900 hover:bg-n100'
+                        ? 'bg-pill text-n900'
+                        : 'text-n600 hover:text-n900 hover:bg-pill/60'
                     }`}
             >
-                <item.icon className={`w-[15px] h-[15px] shrink-0 ${isActive ? 'text-brand' : 'text-n400 group-hover:text-n700'}`} />
-                <span className={`text-[12px] font-medium tracking-tight truncate ${labelClass}`}>{item.label}</span>
-
-                {isActive && (
-                    <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-brand" />
-                )}
+                <item.icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-n900' : 'text-n500 group-hover:text-n800'}`} />
+                <span className={`text-[13px] ${isActive ? 'font-semibold' : 'font-medium'} truncate ${labelClass}`}>{item.label}</span>
             </button>
         );
     };
@@ -85,7 +84,7 @@ export default function Sidebar({
     // Mobile drawer (<lg): translate off-screen when not open. Desktop (≥lg)
     // ignores the transform and uses width-based collapse instead.
     const mobileTransform = mobileOpen ? 'translate-x-0' : '-translate-x-full';
-    const desktopWidth = collapsed ? 'lg:w-[80px]' : 'lg:w-[196px]';
+    const desktopWidth = collapsed ? 'lg:w-[72px]' : 'lg:w-[220px]';
 
     return (
         <>
@@ -99,10 +98,9 @@ export default function Sidebar({
             )}
 
             <aside
-                className={`infoset fixed left-0 top-0 h-screen transition-transform duration-300 lg:transition-all z-50 border-r border-n200
-                w-[196px] ${desktopWidth} ${mobileTransform} lg:translate-x-0
-                flex flex-col`}
-                style={{ background: 'var(--color-n50)' }}
+                className={`infoset fixed left-0 top-0 h-dvh transition-transform duration-300 lg:transition-[width] z-50
+                w-[240px] ${desktopWidth} ${mobileTransform} lg:translate-x-0
+                flex flex-col bg-frame`}
             >
                 {/* Mobile close button (top-right inside drawer) */}
                 {onCloseMobile && (
@@ -116,7 +114,7 @@ export default function Sidebar({
                 )}
 
                 {/* Logo Section */}
-                <div className={`h-[52px] shrink-0 flex items-center px-3.5 border-b border-n200 ${collapsed ? 'lg:justify-center lg:px-0' : ''}`}>
+                <div className={`h-[64px] shrink-0 flex items-center px-4 ${collapsed ? 'lg:justify-center lg:px-0' : ''}`}>
                     {/* Collapsed desktop → icon only. Mobile + expanded desktop → full logo */}
                     {collapsed ? (
                         <>
@@ -133,24 +131,21 @@ export default function Sidebar({
                 </div>
 
                 {/* Navigation Items */}
-                <nav className="flex-1 mt-2 space-y-0.5 overflow-y-auto custom-scrollbar">
-                    <div className="mb-4">
-                        <h5 className={`text-[9px] text-n400 font-semibold px-3.5 mb-1.5 uppercase tracking-[0.08em] ${sectionHeaderClass}`}>
-                            Ana Menü
-                        </h5>
+                <nav aria-label="Ana menü" className={`flex-1 px-3 space-y-0.5 overflow-y-auto custom-scrollbar ${collapsed ? 'lg:px-2' : ''}`}>
+                    <div className="space-y-0.5">
                         {menuItems.map(item => <MenuItem key={item.id} item={item} />)}
                     </div>
 
-                    <div className="pt-4">
-                        <h5 className={`text-[9px] text-n400 font-semibold px-3.5 mb-1.5 uppercase tracking-[0.08em] ${sectionHeaderClass}`}>
+                    <div className="pt-5 space-y-0.5">
+                        <h5 className={`text-[12px] text-n500 font-medium px-3 pb-1 ${sectionHeaderClass}`}>
                             Yönetim
                         </h5>
                         {adminItems.map(item => <MenuItem key={item.id} item={item} />)}
                     </div>
 
                     {userProfile?.role === 'super_admin' && (
-                        <div className="pt-4">
-                            <h5 className={`text-[9px] text-n400 font-semibold px-3.5 mb-1.5 uppercase tracking-[0.08em] ${sectionHeaderClass}`}>
+                        <div className="pt-5 space-y-0.5">
+                            <h5 className={`text-[12px] text-n500 font-medium px-3 pb-1 ${sectionHeaderClass}`}>
                                 Geliştirici
                             </h5>
                             {docsItems.map(item => <MenuItem key={item.id} item={item} />)}
@@ -159,9 +154,9 @@ export default function Sidebar({
                 </nav>
 
                 {/* Bottom Profile Section */}
-                <div className="p-3 border-t border-n200">
+                <div className={`p-3 ${collapsed ? 'lg:px-2' : ''}`}>
                     <div className={`flex items-center gap-2 px-2 py-2 ${collapsed ? 'lg:justify-center lg:px-0' : ''}`}>
-                        <div className="w-9 h-9 rounded-full bg-brand-50 border border-n200 overflow-hidden shrink-0">
+                        <div className="w-8 h-8 rounded-full bg-brand-50 overflow-hidden shrink-0">
                              {userProfile?.imgUrl ? (
                                 <img src={userProfile.imgUrl} alt="User" className="w-full h-full object-cover" />
                             ) : (
@@ -171,23 +166,23 @@ export default function Sidebar({
                             )}
                         </div>
                         <div className={`flex flex-col flex-1 min-w-0 ${collapsed ? 'flex lg:hidden' : 'flex'}`}>
-                            <span className="text-n900 text-[12px] font-semibold truncate">{userProfile?.displayName || userProfile?.email || 'Kullanıcı'}</span>
-                            <span className="text-n500 text-[10px] truncate">{roleLabel(userProfile?.role)}</span>
+                            <span className="text-n900 text-[13px] font-semibold truncate">{userProfile?.displayName || userProfile?.email || 'Kullanıcı'}</span>
+                            <span className="text-n500 text-[12px] truncate">{roleLabel(userProfile?.role)}</span>
                         </div>
                     </div>
                     <button
                         onClick={logout}
-                        className={`w-full items-center gap-2 px-2 py-2 text-n500 hover:text-n900 transition-colors mt-1 ${collapsed ? 'flex lg:hidden' : 'flex'}`}
+                        className={`w-full h-9 items-center gap-2.5 px-3 rounded-full text-n600 hover:text-n900 hover:bg-pill/60 transition-colors mt-1 ${collapsed ? 'flex lg:hidden' : 'flex'}`}
                     >
                         <LogOut className="w-4 h-4" />
-                        <span className="text-xs font-medium">Çıkış Yap</span>
+                        <span className="text-[13px] font-medium">Çıkış yap</span>
                     </button>
                 </div>
 
                 {/* Desktop Collapse Toggle (mobile uses overlay click + X button) */}
                 <button
                     onClick={onToggleCollapse}
-                    className="absolute -right-3 top-10 w-6 h-6 bg-n0 border border-n200 rounded-full hidden lg:flex items-center justify-center text-n500 hover:text-n900 transition-all shadow-sm z-[60]"
+                    className="absolute -right-1 top-[22px] w-6 h-6 bg-n0 border border-n200 rounded-full hidden lg:flex items-center justify-center text-n500 hover:text-n900 transition-colors z-[60]"
                     aria-label={collapsed ? 'Menüyü genişlet' : 'Menüyü daralt'}
                 >
                     {collapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}

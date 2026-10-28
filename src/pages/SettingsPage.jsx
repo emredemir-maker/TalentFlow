@@ -303,13 +303,14 @@ export default function SettingsPage({ initialTab }) {
                                                 <li key={item.id}>
                                                     <button
                                                         onClick={() => handleNav(item.id)}
-                                                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-all text-left ${
+                                                        // Seçili öğe ana menüyle aynı: gri hap, teal değil.
+                                                        className={`w-full flex items-center gap-2.5 px-3 h-9 rounded-full text-sm font-medium transition-colors text-left ${
                                                             isActive
-                                                                ? 'bg-brand-50 text-brand border border-brand-100'
-                                                                : 'text-n600 hover:bg-n50 hover:text-n900 border border-transparent'
+                                                                ? 'bg-pill text-n900 font-semibold'
+                                                                : 'text-n600 hover:bg-n100 hover:text-n900'
                                                         }`}
                                                     >
-                                                        <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-brand' : 'text-n400'}`} />
+                                                        <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-n800' : 'text-n400'}`} />
                                                         {item.label}
                                                     </button>
                                                 </li>
@@ -371,7 +372,7 @@ export default function SettingsPage({ initialTab }) {
                                         </button>
                                     ) : (
                                         <button onClick={handleGoogleConnect} disabled={isConnectingGoogle}
-                                            className="px-4 py-2 rounded-md text-xs font-semibold text-white bg-brand hover:bg-brand-600 transition-all flex items-center gap-2 disabled:opacity-50">
+                                            className="tf-btn tf-btn-primary">
                                             {isConnectingGoogle ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Bağlan'}
                                         </button>
                                     )}
@@ -407,7 +408,7 @@ export default function SettingsPage({ initialTab }) {
                                         </button>
                                     ) : (
                                         <button onClick={handleMicrosoftConnect} disabled={isConnectingMicrosoft}
-                                            className="px-4 py-2 rounded-md text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 transition-all flex items-center gap-2 disabled:opacity-50">
+                                            className="tf-btn tf-btn-primary">
                                             {isConnectingMicrosoft ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Bağlan'}
                                         </button>
                                     )}
@@ -669,7 +670,10 @@ function Toggle({ checked, onChange }) {
             onClick={() => onChange(!checked)}
             className={`w-11 h-6 rounded-full transition-colors duration-200 relative ${checked ? 'bg-brand' : 'bg-n200'}`}
         >
-            <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-n0 shadow-sm transition-transform duration-200 ${checked ? 'translate-x-5' : 'translate-x-0.5'}`} />
+            {/* `left-0` ŞART: konumsuz mutlak öğe düğmenin ortasından başlıyor,
+                kaydırma onu rayın dışına taşıyordu (açıkken düğme rayın sağında
+                ayrı bir daire gibi görünüyordu). */}
+            <span className={`absolute top-0.5 left-0 w-5 h-5 rounded-full bg-n0 shadow-sm transition-transform duration-200 ${checked ? 'translate-x-5' : 'translate-x-0.5'}`} />
         </button>
     );
 }

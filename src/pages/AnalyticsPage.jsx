@@ -3,13 +3,14 @@
 
 import { normalizeSkills } from '../utils/normalizeSkills';
 import { resolveCandidateStage } from '../utils/candidateTable';
-import { getStage, reachedStage } from '../utils/pipelineStages';
+import { reachedStage } from '../utils/pipelineStages';
 import { rejectionBreakdown, REJECTION_CATEGORY_BY_ID } from '../utils/rejectionReasons';
 import { useState, useMemo } from 'react';
 import { useCandidates } from '../context/CandidatesContext';
 import { useMessageQueue } from '../context/MessageQueueContext';
 import { usePositions } from '../context/PositionsContext';
 import Header from '../components/Header';
+import { FLOW_TONE } from '../utils/candidateFlow';
 import {
     Users, MessageSquare, Clock, FileText, Loader2, Sparkles, Send, X,
     TrendingUp, Zap, Briefcase, BrainCircuit, Globe, Activity, Target,
@@ -25,7 +26,8 @@ function TabPill({ id, label, active, onClick }) {
     return (
         <button
             onClick={() => onClick(id)}
-            className={`px-3 py-1.5 rounded-md text-[12px] font-semibold transition-all ${active ? 'bg-n0 text-brand shadow-sm border border-n200' : 'text-n500 hover:text-n700'}`}
+            aria-pressed={active}
+            className={`flex-none h-7 px-3 rounded-full text-[13px] font-medium transition-colors ${active ? 'bg-n0 text-n900 shadow-[0_1px_2px_rgba(17,19,18,0.08)]' : 'text-n500 hover:text-n800'}`}
         >
             {label}
         </button>
@@ -61,17 +63,15 @@ function OverviewTab({ candidates, funnelData, rejectionData, trendsData, positi
                     { icon: BrainCircuit, bg: 'bg-brand-50', color: 'text-brand', val: `${avgMatchScore}%`, label: 'Ort. Yetenek Skoru' },
                     { icon: Clock,        bg: 'bg-warn-bg',  color: 'text-warn',  val: pendingReply,        label: 'Yanıt Bekleyen'     },
                     { icon: Target,       bg: 'bg-ok-bg',    color: 'text-ok',    val: `${hiringRate}%`,    label: 'İşe Alım Verimi'    },
-                ].map(({ icon: Icon, bg, color, val, label }) => (
-                    <div key={label} className="bg-n0 border border-n200 rounded-[14px] p-3 flex flex-col gap-2 shadow-sm">
-                        <div className="flex justify-between items-start">
-                            <div className={`w-8 h-8 rounded-md ${bg} ${color} flex items-center justify-center`}>
-                                <Icon size={16} />
-                            </div>
+                ].map(({ icon: Icon, val, label }) => (
+                    // Renkli kutu içindeki simge kalktı: dört kutu aynı şablonun
+                    // kopyası gibi duruyordu. Etiket üstte, sayı altta.
+                    <div key={label} className="bg-n0 border border-n200 rounded-xl px-4 py-3.5 flex flex-col gap-1">
+                        <div className="flex items-center gap-2 text-[12px] text-n500">
+                            <Icon size={14} className="text-n400" aria-hidden="true" />
+                            {label}
                         </div>
-                        <div>
-                            <div className="text-[28px] font-semibold text-n900 leading-none">{val}</div>
-                            <div className="text-[11px] text-n400 font-medium mt-1">{label}</div>
-                        </div>
+                        <div className="text-[26px] font-semibold text-n900 leading-8 tabular-nums">{val}</div>
                     </div>
                 ))}
             </div>
@@ -79,7 +79,7 @@ function OverviewTab({ candidates, funnelData, rejectionData, trendsData, positi
             {/* Chart + Funnel */}
             <div className="grid grid-cols-12 gap-3 items-start">
                 {/* Bar chart */}
-                <div className="col-span-8 bg-n0 border border-n200 rounded-[14px] p-3.5 shadow-sm">
+                <div className="col-span-8 bg-n0 border border-n200 rounded-xl p-3.5">
                     <div className="flex justify-between items-center mb-4">
                         <div className="flex items-center gap-2">
                             <TrendingUp className="text-brand" size={16} />
@@ -132,7 +132,7 @@ function OverviewTab({ candidates, funnelData, rejectionData, trendsData, positi
                 </div>
 
                 {/* Funnel */}
-                <div className="col-span-4 bg-n0 border border-n200 rounded-[14px] p-3.5 shadow-sm">
+                <div className="col-span-4 bg-n0 border border-n200 rounded-xl p-3.5">
                     <div className="flex items-center gap-2 mb-4">
                         <Layers className="text-warn" size={16} />
                         <span className="text-[13px] font-semibold text-n900">Dönüşüm Hunisi</span>
@@ -158,7 +158,7 @@ function OverviewTab({ candidates, funnelData, rejectionData, trendsData, positi
 
 
             {/* Red nedenleri — "neden kaybediyoruz" */}
-            <div className="bg-n0 border border-n200 rounded-[14px] shadow-sm overflow-hidden">
+            <div className="bg-n0 border border-n200 rounded-xl overflow-hidden">
                 <div className="px-5 py-3 border-b border-n200 flex items-center justify-between gap-3 flex-wrap">
                     <div className="flex items-center gap-2">
                         <XCircle className="text-bad" size={15} />
@@ -215,7 +215,7 @@ function OverviewTab({ candidates, funnelData, rejectionData, trendsData, positi
             </div>
 
             {/* Position matrix table */}
-            <div className="bg-n0 border border-n200 rounded-[14px] shadow-sm overflow-hidden">
+            <div className="bg-n0 border border-n200 rounded-xl overflow-hidden">
                 <div className="px-5 py-3 border-b border-n200 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <Briefcase className="text-brand" size={15} />
@@ -224,8 +224,8 @@ function OverviewTab({ candidates, funnelData, rejectionData, trendsData, positi
                     <span className="bg-n100 text-n500 text-[11px] font-semibold px-2.5 py-1 rounded-md">{positionStatusData.length} Pozisyon</span>
                 </div>
                 <div className="bg-n50 px-5 py-2.5 grid grid-cols-[2fr_0.8fr_0.8fr_0.8fr_0.8fr_0.8fr] gap-2 border-b border-n200">
-                    {['POZİSYON', 'TOPLAM', 'İNCELEME', 'MÜLAKAT', 'İŞE ALIM', 'ORT. SKOR'].map(l => (
-                        <div key={l} className="text-[10px] font-semibold text-n400 uppercase tracking-[0.08em]">{l}</div>
+                    {['Pozisyon', 'Toplam', 'İnceleme', 'Mülakat', 'İşe alım', 'Ort. skor'].map(l => (
+                        <div key={l} className="tf-th">{l}</div>
                     ))}
                 </div>
                 <div>
@@ -265,7 +265,7 @@ function AcquisitionTab({ sourceList, subSourceList, topSkills, avgMatchScore, c
     return (
         <div className="grid grid-cols-12 gap-3 min-h-[500px]">
             {/* Source analysis */}
-            <div className="col-span-5 bg-n0 border border-n200 rounded-[14px] shadow-sm flex flex-col">
+            <div className="col-span-5 bg-n0 border border-n200 rounded-xl flex flex-col">
                 <div className="px-5 py-3 border-b border-n200 flex justify-between items-center shrink-0">
                     <div className="flex items-center gap-2">
                         <Globe size={16} className="text-brand" />
@@ -301,7 +301,7 @@ function AcquisitionTab({ sourceList, subSourceList, topSkills, avgMatchScore, c
             </div>
 
             {/* Skill matrix */}
-            <div className="col-span-4 bg-n0 border border-n200 rounded-[14px] shadow-sm flex flex-col">
+            <div className="col-span-4 bg-n0 border border-n200 rounded-xl flex flex-col">
                 <div className="px-5 py-3 border-b border-n200 flex items-center gap-2 shrink-0">
                     <Zap size={16} className="text-brand" />
                     <span className="text-[13px] font-semibold text-n900">Yetenek Matrisi</span>
@@ -336,9 +336,9 @@ function AcquisitionTab({ sourceList, subSourceList, topSkills, avgMatchScore, c
             </div>
 
             {/* Gauge */}
-            <div className="col-span-3 bg-n0 border border-n200 rounded-[14px] shadow-sm flex flex-col items-center justify-center p-6 relative overflow-hidden">
+            <div className="col-span-3 bg-n0 border border-n200 rounded-xl flex flex-col items-center justify-center p-6 relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-brand-50 rounded-full blur-3xl -mr-10 -mt-10 opacity-60" />
-                <div className="text-[10px] font-semibold text-n400 uppercase tracking-[0.08em] mb-6 relative z-10">ORT. UYUM SKORU</div>
+                <div className="text-[12px] text-n500 mb-6 relative z-10">Ort. uyum skoru</div>
                 <div className="relative z-10 w-full flex justify-center">
                     <svg viewBox="0 0 200 110" className="w-full max-w-[180px]">
                         <path d="M 20 100 A 80 80 0 0 1 180 100" stroke="#f1f5f9" strokeWidth="16" fill="none" strokeLinecap="round" />
@@ -396,7 +396,7 @@ function ResponsesTab({ sentMessages, pendingApprovals, onProcess, onCheckMail }
                     { icon: CheckCircle,  bg: 'bg-ok-bg', color: 'text-ok', val: sentMessages.filter(m => m.status === 'replied').length, label: 'Yanıtlanan', sub: sentMessages.length ? `${Math.round(sentMessages.filter(m => m.status === 'replied').length / sentMessages.length * 100)}% yanıt oranı` : '0% yanıt oranı' },
                     { icon: Clock,        bg: 'bg-warn-bg',   color: 'text-warn',   val: pendingApprovals.length,  label: 'Yanıt Bekleyen', sub: 'taslak + hazır' },
                 ].map(({ icon: Icon, bg, color, val, label, sub }) => (
-                    <div key={label} className="bg-n0 border border-n200 rounded-[14px] p-3 flex items-center gap-3 shadow-sm">
+                    <div key={label} className="bg-n0 border border-n200 rounded-xl p-3 flex items-center gap-3">
                         <div className={`${bg} ${color} p-2.5 rounded-md`}><Icon size={20} /></div>
                         <div>
                             <div className="flex items-baseline gap-2">
@@ -410,7 +410,7 @@ function ResponsesTab({ sentMessages, pendingApprovals, onProcess, onCheckMail }
             </div>
 
             {/* Table panel */}
-            <div className="bg-n0 border border-n200 rounded-[14px] shadow-sm overflow-hidden flex flex-col" style={{ minHeight: '420px' }}>
+            <div className="bg-n0 border border-n200 rounded-xl overflow-hidden flex flex-col" style={{ minHeight: '420px' }}>
                 {/* Table header */}
                 <div className="px-5 border-b border-n200 flex items-center justify-between shrink-0">
                     <div className="flex">
@@ -608,10 +608,12 @@ export default function AnalyticsPage() {
         const asamalar = timeFilteredCandidates.map(resolveCandidateStage);
         const kacTane = (hedef) => asamalar.filter((k) => reachedStage(k, hedef)).length;
         return [
-            { name: 'Başvuru',  color: '#6366f1', count: timeFilteredCandidates.length },
-            { name: 'İnceleme', color: getStage('review').color,              count: kacTane('review') },
-            { name: 'Mülakat',  color: getStage('interview_scheduled').color, count: kacTane('interview_scheduled') },
-            { name: 'İşe Alım', color: getStage('hired').color,               count: kacTane('hired') },
+            // Huni tek teal rampasıyla: akış ilerledikçe koyulaşıyor (aday akışı
+            // görselleriyle aynı dil); mor/çivit Clyro Talent paletinde yok.
+            { name: 'Başvuru',  color: FLOW_TONE.ai_analysis,         count: timeFilteredCandidates.length },
+            { name: 'İnceleme', color: FLOW_TONE.review,              count: kacTane('review') },
+            { name: 'Mülakat',  color: FLOW_TONE.interview_scheduled, count: kacTane('interview_scheduled') },
+            { name: 'İşe Alım', color: FLOW_TONE.hired,               count: kacTane('hired') },
         ];
     }, [timeFilteredCandidates]);
 
@@ -673,20 +675,23 @@ export default function AnalyticsPage() {
             {/* Sub-header — "Stratejik Analitik" lives in the top-bar (Header
                 title). Don't repeat it here; just the live-status indicator
                 + record count remain. */}
-            <div className="bg-n0 border-b border-n200 px-6 py-3 flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-2">
-                    <Activity size={16} className="text-brand" />
-                    <span className="w-1.5 h-1.5 rounded-full bg-ok animate-pulse" />
-                    <span className="text-[11px] text-n400">{candidates.length} aktif kayıt</span>
+            <div className="bg-n0 border-b border-n200 px-6 py-4 flex items-center justify-between gap-3 flex-wrap shrink-0">
+                <div>
+                    <h1 className="tf-page-title">Analitik</h1>
+                    <span className="tf-page-sub flex items-center gap-2">
+                        <Activity size={14} className="text-brand" aria-hidden="true" />
+                        {candidates.length} aktif kayıt
+                    </span>
                 </div>
-                <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-1 bg-n100 rounded-md p-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-0.5 bg-n100 rounded-full p-0.5 overflow-x-auto max-w-full">
                         {TABS.map(t => <TabPill key={t.id} id={t.id} label={t.label} active={activeTab === t.id} onClick={setActiveTab} />)}
                     </div>
-                    <div className="flex items-center gap-1 bg-n100 rounded-md p-1">
+                    <div className="flex items-center gap-0.5 bg-n100 rounded-full p-0.5">
                         {[['7d', '7G'], ['30d', '30G']].map(([val, label]) => (
                             <button key={val} onClick={() => setTimeRange(val)}
-                                className={`px-3 py-1.5 rounded-md text-[12px] font-semibold transition-all ${timeRange === val ? 'bg-n0 text-brand shadow-sm border border-n200' : 'text-n500 hover:text-n700'}`}>
+                                aria-pressed={timeRange === val}
+                                className={`h-7 px-3 rounded-full text-[13px] font-medium transition-colors ${timeRange === val ? 'bg-n0 text-n900 shadow-[0_1px_2px_rgba(17,19,18,0.08)]' : 'text-n500 hover:text-n800'}`}>
                                 {label}
                             </button>
                         ))}
@@ -723,7 +728,7 @@ export default function AnalyticsPage() {
             {processingResponse && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-3">
                     <div className="absolute inset-0 bg-n900/30 backdrop-blur-sm" onClick={() => setProcessingResponse(null)} />
-                    <div className="relative w-full max-w-lg bg-n0 border border-n200 rounded-[14px] p-8 space-y-6 shadow-2xl">
+                    <div className="relative w-full max-w-lg bg-n0 border border-n200 rounded-xl p-8 space-y-6 shadow-2xl">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <div className="w-8 h-8 rounded-md bg-brand-50 flex items-center justify-center"><Sparkles className="w-4 h-4 text-brand" /></div>
@@ -734,29 +739,29 @@ export default function AnalyticsPage() {
                         {!processingResponse.result ? (
                             <div className="space-y-4">
                                 {processingResponse.checkingMail ? (
-                                    <div className="h-48 flex flex-col items-center justify-center gap-2 bg-n50 border border-n200 rounded-[14px]">
+                                    <div className="h-48 flex flex-col items-center justify-center gap-2 bg-n50 border border-n200 rounded-xl">
                                         <RefreshCw className="w-8 h-8 text-brand animate-spin" />
                                         <p className="text-xs text-n400 font-semibold uppercase tracking-[0.08em]">Gmail Taranıyor...</p>
                                     </div>
                                 ) : (
                                     <textarea
-                                        className="w-full h-48 bg-n50 border border-n200 rounded-[14px] p-3 text-sm text-n900 outline-none focus:border-brand focus:ring-2 focus:ring-brand-100 resize-none transition-all"
+                                        className="w-full h-48 bg-n50 border border-n200 rounded-xl p-3 text-sm text-n900 outline-none focus:border-brand focus:ring-2 focus:ring-brand-100 resize-none transition-all"
                                         placeholder="Yanıtı buraya yapıştırın veya 'Mail Ara' butonuna tıklayın..."
                                         value={processingResponse.emailText}
                                         onChange={e => setProcessingResponse(prev => ({ ...prev, emailText: e.target.value }))}
                                     />
                                 )}
                                 <button onClick={handleProcessResponse} disabled={processingResponse.checkingMail || !processingResponse.emailText.trim()}
-                                    className="w-full py-3 rounded-[14px] bg-brand hover:bg-brand-600 text-white font-semibold text-xs uppercase tracking-[0.08em] disabled:opacity-40 shadow-sm shadow-none transition-colors">
+                                    className="w-full py-3 rounded-xl bg-brand hover:bg-brand-600 text-white font-semibold text-xs uppercase tracking-[0.08em] disabled:opacity-40 shadow-sm shadow-none transition-colors">
                                     {processingResponse.loading ? <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />Analiz ediliyor...</span> : 'Analiz Et'}
                                 </button>
                             </div>
                         ) : (
                             <div className="space-y-4">
-                                <div className="p-3.5 rounded-[14px] bg-n50 border border-n200">
+                                <div className="p-3.5 rounded-xl bg-n50 border border-n200">
                                     <p className="text-sm italic text-n600 leading-relaxed">"{processingResponse.result.summary}"</p>
                                 </div>
-                                <button onClick={() => setProcessingResponse(null)} className="w-full py-3 rounded-[14px] bg-n100 hover:bg-n100 text-n600 font-semibold text-xs uppercase tracking-[0.08em] transition-colors">Kapat</button>
+                                <button onClick={() => setProcessingResponse(null)} className="w-full py-3 rounded-xl bg-n100 hover:bg-n100 text-n600 font-semibold text-xs uppercase tracking-[0.08em] transition-colors">Kapat</button>
                             </div>
                         )}
                     </div>
