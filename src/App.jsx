@@ -307,7 +307,11 @@ function AuthenticatedApp() {
   };
 
   return (
-    <div className="flex min-h-screen bg-bg-primary transition-colors duration-500">
+    // ÇERÇEVE + BEYAZ SAYFA (Hub ile aynı kurgu). Kenar menü çerçevenin
+    // üstünde duruyor; içerik masaüstünde yuvarlak köşeli beyaz bir sayfada.
+    // `overflow-clip` bilinçli: `overflow-hidden` kaydırma kabı oluşturup
+    // ekranlardaki `sticky` başlıkları bozardı, `clip` yalnızca köşeyi kırpar.
+    <div className="flex min-h-dvh bg-frame">
       <Sidebar
         activeView={activeView}
         onNavigate={setActiveView}
@@ -317,8 +321,9 @@ function AuthenticatedApp() {
         onCloseMobile={() => setMobileSidebarOpen(false)}
       />
       <main
-        className={`flex-1 min-h-screen transition-all duration-300 min-w-0
-          ${sidebarCollapsed ? 'lg:ml-[80px]' : 'lg:ml-[196px]'}`}
+        className={`flex-1 min-w-0 min-h-dvh bg-n0 transition-[margin] duration-300
+          lg:my-2 lg:mr-2 lg:min-h-[calc(100dvh-16px)] lg:rounded-2xl lg:border lg:border-n200 lg:overflow-clip
+          ${sidebarCollapsed ? 'lg:ml-[72px]' : 'lg:ml-[220px]'}`}
       >
         {/* Demo kurulumunda her ekranın üstünde duruyor: havuzun ortak ve
             geçici olduğunu bilmeden yüklenen gerçek bir CV geri alınamaz. */}

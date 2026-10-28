@@ -243,7 +243,7 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
     const hasResults = total > 0;
 
     return (
-        <header className="h-14 flex items-center justify-between px-4 md:px-8 bg-n0/80 backdrop-blur-md border-b border-n100 sticky top-0 z-40">
+        <header data-ui="topbar" className="h-14 flex items-center justify-between px-3 md:px-6 bg-n0 border-b border-n200 sticky top-0 z-40">
 
             {/* ── Mobile Hamburger + Page Title + Home ──
                 Brand identity lives in the sidebar (Clyro Talent + AI Recruitment).
@@ -252,20 +252,20 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
             <div className="flex items-center gap-2 md:gap-2 md:mr-6">
                 <button
                     onClick={() => window.dispatchEvent(new CustomEvent('openMobileSidebar'))}
-                    className="p-2 rounded-md hover:bg-n100 text-n600 transition-all lg:hidden"
+                    className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-n100 text-n700 transition-colors lg:hidden"
                     aria-label="Menüyü aç"
                 >
                     <Menu className="w-5 h-5" />
                 </button>
                 <button
                     onClick={() => dispatchView('dashboard')}
-                    className="p-2 rounded-md hover:bg-n100 text-n500 hover:text-brand-600 transition-all hidden sm:inline-flex"
+                    className="w-9 h-9 rounded-full items-center justify-center hover:bg-n100 text-n500 hover:text-n900 transition-colors hidden sm:inline-flex"
                     title="Anasayfa"
                 >
-                    <Home className="w-5 h-5" />
+                    <Home className="w-[18px] h-[18px]" />
                 </button>
                 {title && (
-                    <h2 className="hidden md:block text-[15px] font-semibold text-n900 tracking-tight">
+                    <h2 className="hidden md:block text-[14px] font-semibold text-n900 tracking-[-0.01em]">
                         {title}
                     </h2>
                 )}
@@ -283,7 +283,7 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                         onFocus={() => setPanelOpen(true)}
                         onKeyDown={handleKeyDown}
                         placeholder={searchPlaceholder}
-                        className="w-full pl-10 md:pl-12 pr-8 md:pr-10 py-2 md:py-2.5 bg-n100 rounded-md focus:bg-n0 focus:ring-1 focus:ring-brand outline-none transition-all text-[12px] md:text-[13px] text-n900 placeholder:text-n400"
+                        className="w-full h-9 pl-10 md:pl-11 pr-8 md:pr-10 bg-n50 border border-n200 rounded-full focus:bg-n0 focus:border-brand focus:ring-2 focus:ring-brand-100 outline-none transition-colors text-[13px] text-n900 placeholder:text-n400"
                     />
                     {query && (
                         <button
@@ -297,7 +297,7 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
 
                 {/* Search Results Panel */}
                 {panelOpen && query.trim() && (
-                    <div className="absolute top-full mt-2 left-0 right-0 bg-n0 rounded-md shadow-2xl border border-n200 overflow-hidden z-50">
+                    <div data-ui="popover" className="absolute top-full mt-2 left-0 right-0 bg-n0 rounded-xl shadow-[0_12px_32px_-12px_rgba(17,19,18,0.25)] border border-n200 overflow-hidden z-50">
 
                         {/* AI loading bar */}
                         {aiLoading && (
@@ -319,7 +319,7 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                             {/* Candidates */}
                             {mergedCandidates.length > 0 && (
                                 <section>
-                                    <div className="px-4 py-1.5 text-[10px] font-semibold text-n400 uppercase tracking-[0.08em] bg-n50 border-b border-n200">
+                                    <div className="px-4 py-1.5 text-[12px] font-medium text-n500 bg-n50 border-b border-n200">
                                         Adaylar
                                     </div>
                                     {mergedCandidates.map((c, i) => (
@@ -329,7 +329,7 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                                             onMouseEnter={() => setSelIdx(i)}
                                             className={`w-full flex items-center gap-2 px-4 py-3 hover:bg-brand-50/60 transition-colors text-left border-b border-n50 ${selIdx === i ? 'bg-brand-50/60' : ''}`}
                                         >
-                                            <div className="w-8 h-8 rounded-full from-brand to-brand-600 flex items-center justify-center text-white text-xs font-semibold shrink-0">
+                                            <div className="w-8 h-8 rounded-full bg-brand-50 text-brand-700 flex items-center justify-center text-xs font-semibold shrink-0">
                                                 {c.name?.[0]?.toUpperCase() || '?'}
                                             </div>
                                             <div className="flex-1 min-w-0">
@@ -360,7 +360,7 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                             {/* Positions */}
                             {kwResults.positions.length > 0 && (
                                 <section>
-                                    <div className="px-4 py-1.5 text-[10px] font-semibold text-n400 uppercase tracking-[0.08em] bg-n50 border-b border-n200 border-t border-t-slate-100">
+                                    <div className="px-4 py-1.5 text-[12px] font-medium text-n500 bg-n50 border-b border-n200 border-t border-t-slate-100">
                                         Pozisyonlar
                                     </div>
                                     {kwResults.positions.map((p, i) => {
@@ -389,7 +389,7 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                             {/* Pages */}
                             {kwResults.pages.length > 0 && (
                                 <section>
-                                    <div className="px-4 py-1.5 text-[10px] font-semibold text-n400 uppercase tracking-[0.08em] bg-n50 border-b border-n200 border-t border-t-slate-100">
+                                    <div className="px-4 py-1.5 text-[12px] font-medium text-n500 bg-n50 border-b border-n200 border-t border-t-slate-100">
                                         Sayfalar
                                     </div>
                                     {kwResults.pages.map((pg, i) => {
@@ -430,16 +430,16 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
             </div>
 
             {/* ── Actions ── */}
-            <div className="flex items-center gap-2 ml-6">
+            <div className="flex items-center gap-1 ml-2 md:ml-6">
 
                 {/* Notifications */}
                 <div className="relative" ref={notifRef}>
                     <button
                         onClick={() => { if (notificationsEnabled) { setNotifOpen(o => !o); setSettOpen(false); } }}
-                        className={`p-2.5 rounded-md transition-colors relative ${notifOpen ? 'bg-brand-50 text-brand-600' : notificationsEnabled ? 'text-n500 hover:bg-n100 hover:text-n900' : 'text-n300 cursor-not-allowed'}`}
+                        className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors relative ${notifOpen ? 'bg-pill text-n900' : notificationsEnabled ? 'text-n500 hover:bg-n100 hover:text-n900' : 'text-n300 cursor-not-allowed'}`}
                         title={notificationsEnabled ? 'Bildirimler' : 'Bildirimler kapalı'}
                     >
-                        <Bell className="w-5 h-5" />
+                        <Bell className="w-[18px] h-[18px]" />
                         {notificationsEnabled && unreadCount > 0 && (
                             <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 bg-bad rounded-full border-2 border-white text-[11px] font-semibold text-white flex items-center justify-center px-0.5 leading-none">
                                 {unreadCount > 9 ? '9+' : unreadCount}
@@ -448,7 +448,7 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                     </button>
 
                     {notificationsEnabled && notifOpen && (
-                        <div className="absolute right-0 top-full mt-2 w-[360px] bg-n0 rounded-md shadow-2xl border border-n200 z-50 overflow-hidden">
+                        <div data-ui="popover" className="absolute right-0 top-full mt-2 w-[min(360px,calc(100vw-24px))] bg-n0 rounded-xl shadow-[0_12px_32px_-12px_rgba(17,19,18,0.25)] border border-n200 z-50 overflow-hidden">
                             <div className="flex items-center justify-between px-4 py-3 border-b border-n200">
                                 <div className="flex items-center gap-2">
                                     <span className="text-sm font-semibold text-n900">Bildirimler</span>
@@ -513,14 +513,14 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                 <div className="relative" ref={settRef}>
                     <button
                         onClick={() => { setSettOpen(o => !o); setNotifOpen(false); }}
-                        className={`p-2.5 rounded-md transition-colors ${settOpen ? 'bg-brand-50 text-brand-600' : 'text-n500 hover:bg-n100 hover:text-n900'}`}
+                        className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${settOpen ? 'bg-pill text-n900' : 'text-n500 hover:bg-n100 hover:text-n900'}`}
                         title="Ayarlar"
                     >
-                        <Settings className="w-5 h-5" />
+                        <Settings className="w-[18px] h-[18px]" />
                     </button>
 
                     {settOpen && (
-                        <div className="absolute right-0 top-full mt-2 w-[210px] bg-n0 rounded-md shadow-2xl border border-n200 z-50 overflow-hidden py-1.5">
+                        <div data-ui="popover" className="absolute right-0 top-full mt-2 w-[220px] bg-n0 rounded-xl shadow-[0_12px_32px_-12px_rgba(17,19,18,0.25)] border border-n200 z-50 overflow-hidden py-1.5">
                             {SETTINGS_ITEMS.map(item => {
                                 const Icon = item.icon;
                                 return (
@@ -540,7 +540,7 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                                     className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-bad-bg transition-colors text-left group"
                                 >
                                     <LogOut className="w-4 h-4 text-n400 group-hover:text-bad shrink-0 transition-colors" />
-                                    <span className="text-[12px] font-medium text-n700 group-hover:text-bad transition-colors">Çıkış Yap</span>
+                                    <span className="text-[12px] font-medium text-n700 group-hover:text-bad transition-colors">Çıkış yap</span>
                                 </button>
                             </div>
                         </div>
@@ -548,13 +548,13 @@ YALNIZCA geçerli JSON döndür, başka hiçbir şey yazma:
                 </div>
 
                 {/* Profile — name/role hidden on small screens */}
-                <div className="flex items-center gap-2 pl-2 sm:pl-4 ml-2 border-l border-n200">
-                    <div className="w-8 h-8 rounded-full from-brand to-brand flex items-center justify-center text-white text-xs font-semibold shrink-0 select-none">
+                <div className="flex items-center gap-2 pl-2 sm:pl-3 ml-1">
+                    <div className="w-8 h-8 rounded-full bg-brand-50 text-brand-700 flex items-center justify-center text-xs font-semibold shrink-0 select-none">
                         {userName[0]?.toUpperCase() || 'U'}
                     </div>
                     <div className="hidden sm:block">
                         <div className="text-[12px] font-semibold text-n900 leading-none truncate max-w-[110px]">{userName}</div>
-                        <div className="text-[10px] text-n500 font-medium mt-0.5">{roleText}</div>
+                        <div className="text-[11px] text-n500 mt-0.5">{roleText}</div>
                     </div>
                 </div>
             </div>

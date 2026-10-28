@@ -23,7 +23,6 @@ import {
     Upload,
     Plus,
     Calendar,
-    ArrowRight,
     SlidersHorizontal,
     ArrowUpRight,
     ArrowDownRight,
@@ -31,8 +30,20 @@ import {
     AlertTriangle,
 } from 'lucide-react';
 
-/** Infoset accent — toplu yükleme eylemi tek başına mor taşır (tasarım tokenları). */
-const VIOLET = '#6E59F2';
+/**
+ * Süreç şeridi renkleri: aşama ilerledikçe koyulaşan tek bir teal rampası,
+ * ret gri. Aşamaların kendi renkleri (pipelineStages) gökkuşağı gibi; bantta
+ * yan yana gelince sırayı değil yalnız farkı anlatıyordu.
+ */
+const RIBBON = {
+    ai_analysis: '#99F6E4',
+    review: '#5EEAD4',
+    interview_scheduled: '#2DD4BF',
+    interview_done: '#14B8A6',
+    offer: '#0D9488',
+    hired: '#0F766E',
+    rejected: '#CDD3D0',
+};
 
 /**
  * Renders a KPI delta with semantically-correct arrow direction and colour.
@@ -62,11 +73,11 @@ function Trend({ val, goodness }) {
     );
 }
 
-/** Prototip skor eşikleri: ≥85 yeşil, ≥70 marka mavisi, altı amber. */
+/** Skor tonu: ≥85 Talent teal, ≥70 nötr mürekkep, altı amber (metin tonu). */
 function scoreTone(score) {
-    if (score >= 85) return '#16A26C';
-    if (score >= 70) return '#5068FF';
-    return '#E8A13B';
+    if (score >= 85) return '#0F766E';
+    if (score >= 70) return '#4C524F';
+    return '#96590A';
 }
 
 function initialOf(name) {
@@ -252,10 +263,10 @@ export default function Dashboard() {
     // real current values without a misleading trend until a real trend source
     // exists. (`change: null` → Trend chip hidden.)
     const kpis = useMemo(() => [
-        { label: "Toplam Aday",    short: "Aday",     value: String(candidates.length),     change: null, goodness: true, desc: "kayıtlı aday",  icon: Users  },
-        { label: "Aktif Pozisyon", short: "Pozisyon", value: String(allOpenCount),          change: null, goodness: true, desc: "açık ilan",     icon: Target },
-        { label: "Uyum Skoru",     short: "Uyum",     value: `${dynamicMetrics.avgMatch}%`, change: null, goodness: true, desc: "ortalama uyum", icon: Star   },
-        { label: "İşe Alım Hızı",  short: "Hız",      value: dynamicMetrics.recruitSpeed,   change: null, goodness: true, desc: "ortalama süre", icon: Clock  },
+        { label: "Toplam aday",    short: "Aday",     value: String(candidates.length),     change: null, goodness: true, desc: "kayıtlı aday",  icon: Users  },
+        { label: "Açık pozisyon", short: "Pozisyon", value: String(allOpenCount),          change: null, goodness: true, desc: "açık ilan",     icon: Target },
+        { label: "Ortalama uyum",     short: "Uyum",     value: `${dynamicMetrics.avgMatch}%`, change: null, goodness: true, desc: "ortalama uyum", icon: Star   },
+        { label: "İşe alım süresi",  short: "Hız",      value: dynamicMetrics.recruitSpeed,   change: null, goodness: true, desc: "ortalama süre", icon: Clock  },
     ], [candidates.length, allOpenCount, dynamicMetrics]);
 
     /**
@@ -299,7 +310,7 @@ export default function Dashboard() {
                 name: c.name || 'Aday',
                 role: cleanRoleText(c.position || c.bestTitle, 'Pozisyon atanmadı'),
                 score: Math.round(Number(c.bestScore) || 0),
-                why: `${getStage(resolveCandidateStage(c)).label} aşamasında · ${
+                why: `${getStage(resolveCandidateStage(c)).label} aşamasında, ${
                     c.matchedPositionTitle
                         ? `${c.matchedPositionTitle} ilanıyla eşleşti`
                         : 'ilan atanmadı'
@@ -365,187 +376,179 @@ export default function Dashboard() {
 
     const shownRows = poolRows.slice(0, 9);
 
-    if (error) return <div className="p-10 text-[10px] font-black text-red-500 uppercase tracking-widest text-center">Sistem Hatası: Veri Senkronizasyonu Başarısız.</div>;
+    if (error) {
+        return (
+            <div className="infoset min-h-dvh">
+                <Header title="Kontrol Paneli" />
+                <div className="p-6">
+                    <div className="tf-empty max-w-lg mx-auto" role="alert">
+                        <div className="tf-empty-title">Veriler eşitlenemedi</div>
+                        Sayfayı yenileyin; sorun sürerse bağlantınızı kontrol edin.
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    const goTo = (view) => window.dispatchEvent(new CustomEvent('changeView', { detail: view }));
+    const totalForRibbon = STAGES.reduce((n, s) => n + (stageCounts[s.key] || 0), 0);
 
     return (
-        <div className="infoset min-h-screen bg-n25">
+        <div className="infoset min-h-dvh bg-n0">
             <Header title="Kontrol Paneli" />
 
-            {/* SAYFA BAŞLIĞI — 52px: tarih + KPI şeridi + birincil eylemler.
-                Ekran adı burada TEKRARLANMIYOR: Header zaten <h2>Kontrol
-                Paneli</h2> basıyor ve ikisi birlikte başlığı ekranda iki kez
-                gösteriyordu. */}
-            <header className="h-[52px] flex items-center gap-3.5 px-[18px] border-b border-n200 bg-n0">
-                <span className="text-[12px] font-medium text-n700">
-                    {new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'long' })}
-                </span>
-                <div className="ml-auto flex items-center gap-3.5">
-                    {isLoading
-                        ? Array.from({ length: 4 }).map((_, i) => (
-                            <div key={i} className="hidden md:block pl-3.5 border-l border-n200">
-                                <div className="h-4 w-16 bg-n100 rounded animate-pulse" />
-                            </div>
-                        ))
-                        : kpis.map((k) => (
-                            <div
-                                key={k.label}
-                                title={`${k.label} — ${k.desc}`}
-                                className="hidden md:flex items-baseline gap-1.5 pl-3.5 border-l border-n200"
-                            >
-                                <span className="text-[10px] text-n500">{k.short}</span>
-                                <span className="text-[16px] font-semibold tracking-[-0.02em]">{k.value}</span>
-                                {k.change && <Trend val={k.change} goodness={k.goodness} />}
-                            </div>
-                        ))}
-                    <button
-                        onClick={openBulkUpload}
-                        style={{ background: VIOLET }}
-                        className="flex items-center gap-1.5 text-[12px] font-semibold text-white px-3 py-1.5 rounded-md hover:opacity-90"
-                    >
-                        <Upload className="w-[13px] h-[13px]" /> Toplu Yükleme
+            {/* SAYFA BAŞLIĞI — bugünün tarihi + dört gösterge + birincil eylemler.
+                Ekran adı Header'da (<h2>Kontrol Paneli</h2>) zaten yazıyor;
+                burada tekrar etmek yerine "bugün"ü başlık yapıyoruz. */}
+            <div className="tf-page-head">
+                <div className="min-w-0">
+                    <h1 className="tf-page-title">
+                        {new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'long' })}
+                    </h1>
+                    <dl className="mt-1.5 flex flex-wrap items-baseline gap-x-5 gap-y-1">
+                        {isLoading
+                            ? Array.from({ length: 4 }).map((_, i) => (
+                                <div key={i} className="h-4 w-20 bg-n100 rounded animate-pulse" />
+                            ))
+                            : kpis.map((k) => (
+                                <div key={k.label} title={`${k.label} — ${k.desc}`} className="flex items-baseline gap-1.5">
+                                    <dt className="text-[13px] text-n500">{k.label}</dt>
+                                    <dd className="m-0 text-[15px] font-semibold text-n900 tabular-nums">{k.value}</dd>
+                                    {k.change && <Trend val={k.change} goodness={k.goodness} />}
+                                </div>
+                            ))}
+                    </dl>
+                </div>
+                <div className="ml-auto flex items-center gap-2">
+                    <button onClick={openBulkUpload} className="tf-btn tf-btn-secondary">
+                        <Upload /> Toplu yükleme
                     </button>
-                    <button
-                        onClick={() => setIsAddModalOpen(true)}
-                        className="flex items-center gap-1.5 text-[13px] font-semibold text-white bg-brand hover:bg-brand-600 px-3 py-1.5 rounded-md"
-                    >
-                        <Plus className="w-3.5 h-3.5" /> Yeni Aday
+                    <button onClick={() => setIsAddModalOpen(true)} className="tf-btn tf-btn-primary">
+                        <Plus /> Yeni aday
                     </button>
                 </div>
-            </header>
+            </div>
+
+            {/* SÜREÇ ŞERİDİ — ekranın tek "imza" öğesi. Havuzun aşamalara
+                dağılımı tek bir oransal bantta; her parça ve altındaki etiket
+                havuz tablosunu o aşamaya süzer (eski hap süzgecinin işi). */}
+            <section aria-label="Aşamalara göre aday dağılımı" className="px-6 pb-5">
+                <div className="flex h-3 rounded-full overflow-hidden bg-n100" aria-hidden="true">
+                    {totalForRibbon > 0 && STAGES.map((s) => {
+                        const n = stageCounts[s.key] || 0;
+                        if (!n) return null;
+                        const active = !poolFilter || poolFilter === s.key;
+                        return (
+                            <div
+                                key={s.key}
+                                className="h-full border-r-2 border-n0 last:border-r-0 transition-opacity"
+                                style={{ flexGrow: n, flexBasis: 0, background: RIBBON[s.key] || '#CDD3D0', opacity: active ? 1 : 0.25 }}
+                            />
+                        );
+                    })}
+                </div>
+                <div className="mt-3 flex items-center gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
+                    <button
+                        onClick={() => setPoolFilter(null)}
+                        aria-pressed={!poolFilter}
+                        className="tf-chip flex-none"
+                    >
+                        Tümü <span className="tabular-nums opacity-70">{candidates.length}</span>
+                    </button>
+                    {STAGES.map(s => (
+                        <button
+                            key={s.key}
+                            onClick={() => setPoolFilter(poolFilter === s.key ? null : s.key)}
+                            aria-pressed={poolFilter === s.key}
+                            className="tf-chip flex-none"
+                        >
+                            <span className="w-2 h-2 rounded-full" style={{ background: RIBBON[s.key] || '#CDD3D0' }} />
+                            {s.label} <span className="tabular-nums opacity-70">{stageCounts[s.key] || 0}</span>
+                        </button>
+                    ))}
+                    {poolFilter && (
+                        <button onClick={() => setPoolFilter(null)} className="flex-none text-[12px] tf-link px-2">Temizle</button>
+                    )}
+                </div>
+            </section>
 
             {/* ÖNE ÇIKAN CV'LER — aşama + meslek alanı süzgecinden geçen en iyi 5 CV */}
-            <div className="px-[18px] py-2.5 bg-n25 border-b border-n200">
-                <div className="flex items-center gap-2.5 mb-2.5 flex-wrap">
-                    <Star className="w-4 h-4 text-brand" />
-                    <h2 className="m-0 text-[13px] font-semibold tracking-[-0.01em]">Öne çıkan CV&apos;ler</h2>
-                    <span className="text-[11px] font-semibold px-2 py-0.5 bg-brand-50 text-brand rounded-full">
-                        İlk {featuredCvs.length}
+            <section className="px-6 pb-6">
+                <div className="flex items-baseline gap-3 mb-3 flex-wrap">
+                    <h2 className="tf-section-title">Öne çıkan CV&apos;ler</h2>
+                    <span className="text-[13px] text-n500">
+                        İnceleme ve ön eleme aşamasında, açık ilanların alanıyla uyumlu en iyi {featuredCvs.length || ''} aday
                     </span>
-                    <span className="text-[11px] text-n500">
-                        İnceleme / Ön Eleme aşamasındaki, açık ilanların alanıyla uyumlu en iyi CV&apos;ler
-                    </span>
-                    <button
-                        onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'candidates-table' }))}
-                        className="ml-auto flex items-center gap-1 text-[11px] font-semibold text-brand hover:text-brand-600"
-                    >
-                        Tümünü gör <ArrowRight className="w-3 h-3" />
+                    <button onClick={() => goTo('candidates-table')} className="ml-auto text-[13px] tf-link">
+                        Tümünü gör
                     </button>
                 </div>
 
                 {featuredCvs.length === 0 ? (
-                    <div className="border border-dashed border-n300 rounded-[10px] p-[26px] text-center">
-                        <div className="text-[12px] font-semibold mb-[3px]">Öne çıkan CV yok</div>
-                        <div className="text-[11px] text-n500">
-                            {openPositions.length === 0
-                                ? 'Açık ilan yok — alan uyumu hesaplanamıyor.'
-                                : 'Ön Eleme / İnceleme aşamasında, açık ilanların alanıyla uyumlu aday bulunmuyor.'}
-                        </div>
+                    <div className="tf-empty">
+                        <div className="tf-empty-title">Öne çıkan CV yok</div>
+                        {openPositions.length === 0
+                            ? 'Açık ilan yok, bu yüzden alan uyumu hesaplanamıyor.'
+                            : 'Ön eleme ya da inceleme aşamasında, açık ilanların alanıyla uyumlu aday bulunmuyor.'}
                     </div>
                 ) : (
-                    <div className="grid gap-2.5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+                    <ol className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 list-none p-0 m-0">
                         {featuredCvs.map((f) => {
                             const tone = scoreTone(f.score);
                             return (
-                                <div
-                                    key={f.id}
-                                    style={{ borderTop: `2px solid ${tone}` }}
-                                    className="bg-n0 border border-n200 rounded-[10px] shadow-sm px-3 py-[11px] flex flex-col gap-[7px]"
-                                >
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-[26px] h-[26px] flex-none rounded-full bg-brand-50 text-brand flex items-center justify-center text-[10px] font-semibold">
+                                <li key={f.id} className="tf-panel p-3.5 flex flex-col gap-2.5">
+                                    <div className="flex items-start gap-2.5">
+                                        <div className="w-8 h-8 flex-none rounded-full bg-brand-50 text-brand-700 flex items-center justify-center text-[12px] font-semibold">
                                             {initialOf(f.name)}
                                         </div>
                                         <div className="min-w-0 flex-1">
-                                            <div className="text-[12px] font-semibold truncate">{f.name}</div>
-                                            <div className="text-[10px] text-n400 truncate">{f.role}</div>
+                                            <div className="text-[14px] font-semibold text-n900 truncate">{f.name}</div>
+                                            <div className="text-[12px] text-n500 truncate">{f.role}</div>
                                         </div>
-                                        {/* Skor VURGU: EMIR 1 kompaktlaştırmasında skorlar küçülmüyor. */}
-                                        <span className="text-[15px] font-semibold" style={{ color: tone }}>%{f.score}</span>
+                                        <span className="text-[20px] leading-none font-semibold tabular-nums" style={{ color: tone }}>{f.score}</span>
                                     </div>
-                                    <div className="h-[3px] bg-n100 rounded-full overflow-hidden">
+                                    <div className="h-1 bg-n100 rounded-full overflow-hidden" aria-hidden="true">
                                         <div className="h-full rounded-full" style={{ width: `${Math.min(f.score, 100)}%`, background: tone }} />
                                     </div>
-                                    <div className="text-[11px] leading-[1.4] text-n600 min-h-[31px]">{f.why}</div>
-                                    <div className="flex items-center gap-1.5">
-                                        <button
-                                            onClick={() => openCandidate(f.id)}
-                                            className="flex-1 text-center text-[11px] font-semibold text-white bg-brand hover:bg-brand-600 py-1.5 rounded-md"
-                                        >
+                                    <p className="m-0 text-[12px] leading-[1.45] text-n600 min-h-[35px]">{f.why}</p>
+                                    <div className="flex items-center gap-1.5 mt-auto">
+                                        <button onClick={() => openCandidate(f.id)} className="tf-btn tf-btn-secondary flex-1 h-8">
                                             Profili aç
                                         </button>
                                         <button
                                             onClick={() => planInterview(f.id)}
                                             title="Mülakat planla"
-                                            className="w-7 h-7 border border-n200 rounded-md flex items-center justify-center text-n400 hover:bg-n50 hover:text-brand"
+                                            aria-label={`${f.name} için mülakat planla`}
+                                            className="tf-btn tf-btn-ghost tf-btn-icon"
                                         >
-                                            <Calendar className="w-3.5 h-3.5" />
+                                            <Calendar />
                                         </button>
                                     </div>
-                                </div>
+                                </li>
                             );
                         })}
-                    </div>
+                    </ol>
                 )}
-            </div>
+            </section>
 
             {/* GÖVDE — havuz tablosu + sağ ray */}
-            <div className="grid grid-cols-1 xl:grid-cols-[1fr_268px]">
+            <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] border-t border-n200">
 
                 {/* SOL — ADAY HAVUZU */}
-                <div className="xl:border-r border-n200 bg-n0">
-                    <div className="flex items-center gap-2.5 px-[18px] pt-2.5 flex-wrap">
-                        <h2 className="m-0 text-[12px] font-semibold">Aday havuzu</h2>
-                        <span className="text-[11px] text-n400">
-                            {candidates.length} aday{poolFilter ? ` · ${poolRows.length} süzüldü` : ''}
+                <section data-ui="table" className="xl:border-r border-n200 min-w-0">
+                    <div className="flex items-center gap-3 px-6 pt-5 pb-3 flex-wrap">
+                        <h2 className="tf-section-title">Aday havuzu</h2>
+                        <span className="text-[13px] text-n500 tabular-nums">
+                            {poolFilter
+                                ? `${poolRows.length} / ${candidates.length} aday, ${getStage(poolFilter).label} süzgeci`
+                                : `${candidates.length} aday`}
                         </span>
-                        <div className="ml-auto flex items-center gap-2">
-                            <button
-                                onClick={openBulkUpload}
-                                style={{ color: '#6D28D9', background: '#F5F3FF', borderColor: '#DDD6FE' }}
-                                className="flex items-center gap-1.5 whitespace-nowrap text-[12px] font-semibold border rounded-md px-[11px] py-[5px]"
-                            >
-                                <Upload className="w-[13px] h-[13px]" /> Toplu yükleme
-                            </button>
-                            <button
-                                onClick={() => setIsAddModalOpen(true)}
-                                className="flex items-center gap-1.5 whitespace-nowrap text-[12px] font-semibold text-white bg-brand hover:bg-brand-600 rounded-md px-[11px] py-[5px]"
-                            >
-                                <Plus className="w-[13px] h-[13px]" /> Yeni aday
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Aşama süzgeci — tek satır pill'ler */}
-                    <div className="flex items-center gap-2 px-[18px] py-2.5 border-b border-n200 overflow-x-auto">
-                        <button
-                            onClick={() => setPoolFilter(null)}
-                            className={`flex-none whitespace-nowrap flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1 rounded-full border ${!poolFilter ? 'bg-brand-50 text-brand border-brand-100' : 'bg-n0 text-n600 border-n200'}`}
-                        >
-                            <span className="w-1.5 h-1.5 rounded-full bg-n400" />
-                            Tümü <span className="text-n400 font-medium">{candidates.length}</span>
-                        </button>
-                        {STAGES.map(s => (
-                            <button
-                                key={s.key}
-                                onClick={() => setPoolFilter(poolFilter === s.key ? null : s.key)}
-                                className={`flex-none whitespace-nowrap flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1 rounded-full border ${poolFilter === s.key ? 'bg-brand-50 text-brand border-brand-100' : 'bg-n0 text-n600 border-n200'}`}
-                            >
-                                <span className="w-1.5 h-1.5 rounded-full" style={{ background: s.color }} />
-                                {s.label} <span className="text-n400 font-medium">{stageCounts[s.key] || 0}</span>
-                            </button>
-                        ))}
-                        {poolFilter && (
-                            <button onClick={() => setPoolFilter(null)} className="flex-none text-[11px] font-medium text-brand">Temizle</button>
-                        )}
-                        <button
-                            onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'candidates-table' }))}
-                            className="ml-auto flex-none flex items-center gap-1.5 text-[12px] text-n500 border border-n200 rounded-md px-2.5 py-1 hover:bg-n50"
-                        >
-                            <SlidersHorizontal className="w-[13px] h-[13px]" /> Filtrele
+                        <button onClick={() => goTo('candidates-table')} className="ml-auto tf-btn tf-btn-secondary">
+                            <SlidersHorizontal /> Filtrele
                         </button>
                     </div>
 
-                    <div className="hidden md:grid grid-cols-[1.6fr_1.3fr_96px_88px_96px_84px] px-[18px] py-2 border-b border-n200 bg-n50 text-[10px] font-semibold text-n500">
+                    <div className="hidden md:grid grid-cols-[1.6fr_1.3fr_96px_120px_96px_84px] px-6 py-2 border-y border-n200 bg-n50 tf-th">
                         <span>Aday</span>
                         <span>Pozisyon</span>
                         <span className="text-right pr-3.5">CV uyumu</span>
@@ -556,15 +559,15 @@ export default function Dashboard() {
 
                     {isLoading ? (
                         Array.from({ length: 6 }).map((_, i) => (
-                            <div key={i} className="px-[18px] py-[9px] border-b border-n100 flex items-center gap-2.5 animate-pulse">
-                                <div className="w-[26px] h-[26px] rounded-full bg-n100" />
+                            <div key={i} className="px-6 py-3 border-b border-n100 flex items-center gap-2.5 animate-pulse">
+                                <div className="w-7 h-7 rounded-full bg-n100" />
                                 <div className="h-3 w-40 bg-n100 rounded" />
                                 <div className="ml-auto h-3 w-16 bg-n100 rounded" />
                             </div>
                         ))
                     ) : shownRows.length === 0 ? (
-                        <div className="px-[18px] py-12 text-center text-[11px] text-n400">
-                            {poolFilter ? 'Bu aşamada aday yok.' : 'Havuzda aday yok.'}
+                        <div className="px-6 py-12 text-center text-[13px] text-n500">
+                            {poolFilter ? 'Bu aşamada aday yok.' : 'Havuzda aday yok. Yeni aday ekleyerek başlayın.'}
                         </div>
                     ) : shownRows.map((r) => {
                         const action = rowActionFor(r.candidate);
@@ -573,38 +576,34 @@ export default function Dashboard() {
                             <div
                                 key={r.id}
                                 onClick={() => openCandidate(r.id)}
-                                className={`grid grid-cols-[1fr_84px] md:grid-cols-[1.6fr_1.3fr_96px_88px_96px_84px] items-center px-[18px] py-[9px] border-b border-n100 text-[12px] cursor-pointer hover:bg-n50`}
+                                className="grid grid-cols-[1fr_84px] md:grid-cols-[1.6fr_1.3fr_96px_120px_96px_84px] items-center px-6 py-2.5 border-b border-n100 text-[13px] cursor-pointer hover:bg-n50"
                             >
                                 <div className="flex items-center gap-2.5 min-w-0">
-                                    <div className="w-[26px] h-[26px] flex-none rounded-full bg-brand-50 text-brand flex items-center justify-center text-[10px] font-semibold">
+                                    <div className="w-7 h-7 flex-none rounded-full bg-brand-50 text-brand-700 flex items-center justify-center text-[11px] font-semibold">
                                         {initialOf(r.name)}
                                     </div>
                                     <div className="min-w-0">
-                                        <div className="font-medium">
-                                            <span className="truncate">{r.name}</span>
-                                        </div>
-                                        <div className="text-[10px] text-n400 truncate">{r.city}</div>
+                                        <div className="font-medium text-n900 truncate">{r.name}</div>
+                                        <div className="text-[12px] text-n500 truncate">{r.city}</div>
                                     </div>
                                 </div>
-                                <div className="hidden md:block min-w-0 text-n600 truncate">{r.role}</div>
-                                <div className="hidden md:flex items-center justify-end gap-[7px] pr-3.5">
-                                    <div className="w-[26px] h-[5px] bg-n100 rounded-full overflow-hidden">
+                                <div className="hidden md:block min-w-0 text-n600 truncate pr-3">{r.role}</div>
+                                <div className="hidden md:flex items-center justify-end gap-2 pr-3.5">
+                                    <div className="w-8 h-1 bg-n100 rounded-full overflow-hidden" aria-hidden="true">
                                         <div className="h-full" style={{ width: `${Math.min(r.score, 100)}%`, background: tone }} />
                                     </div>
-                                    <span className="font-semibold" style={{ color: tone }}>{r.score || '—'}</span>
+                                    <span className="font-semibold tabular-nums" style={{ color: tone }}>{r.score || '—'}</span>
                                 </div>
                                 <div className="hidden md:block">
-                                    <span
-                                        className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
-                                        style={{ background: r.stage.bg, color: r.stage.color }}
-                                    >
+                                    <span className="inline-flex items-center gap-1.5 text-[12px] text-n700">
+                                        <span className="w-2 h-2 rounded-full flex-none" style={{ background: RIBBON[r.stage.key] || r.stage.color }} />
                                         {r.stage.label}
                                     </span>
                                 </div>
-                                <div className="hidden md:block text-[10px] text-n500">{r.last}</div>
+                                <div className="hidden md:block text-[12px] text-n500">{r.last}</div>
                                 <button
                                     onClick={(e) => { e.stopPropagation(); action.onClick(); }}
-                                    className="text-right text-[11px] font-medium text-brand hover:text-brand-600"
+                                    className="text-right text-[13px] tf-link"
                                 >
                                     {action.label}
                                 </button>
@@ -612,36 +611,28 @@ export default function Dashboard() {
                         );
                     })}
 
-                    <div className="px-[18px] py-2.5 flex items-center gap-2.5 text-[11px] text-n500">
-                        <span>{poolRows.length} adaydan {shownRows.length} tanesi gösteriliyor</span>
-                        <button
-                            onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'candidates-table' }))}
-                            className="ml-auto text-brand font-medium hover:text-brand-600"
-                        >
-                            Tümünü gör →
+                    <div className="px-6 py-3 flex items-center gap-2.5 text-[12px] text-n500">
+                        <span className="tabular-nums">{poolRows.length} adaydan {shownRows.length} tanesi gösteriliyor</span>
+                        <button onClick={() => goTo('candidates-table')} className="ml-auto text-[13px] tf-link">
+                            Tümünü gör
                         </button>
                     </div>
-                </div>
+                </section>
 
-                {/* SAĞ RAY — yaklaşan mülakatlar · açık pozisyonlar · sistem durumu */}
-                <div className="p-3.5 flex flex-col gap-2 bg-n25">
-                    <div>
-                        <div className="flex items-center justify-between mb-2.5">
-                            <span className="text-[10px] font-semibold text-n500 tracking-[0.08em] uppercase">Yaklaşan mülakatlar</span>
-                            <button
-                                onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }))}
-                                className="text-[10px] text-brand font-medium"
-                            >
-                                Tümü
-                            </button>
+                {/* SAĞ RAY — yaklaşan mülakatlar, açık pozisyonlar, sistem durumu */}
+                <aside className="px-6 xl:px-5 py-5 flex flex-col gap-6 border-t xl:border-t-0 border-n200">
+                    <section>
+                        <div className="flex items-center justify-between mb-2">
+                            <h2 className="tf-section-title">Yaklaşan mülakatlar</h2>
+                            <button onClick={() => goTo('interviews')} className="text-[13px] tf-link">Tümü</button>
                         </div>
                         {weeklyPlan.length === 0 ? (
-                            <div className="text-[11px] text-n400 py-3">Planlı mülakat bulunmuyor.</div>
+                            <p className="m-0 text-[13px] text-n500 py-2">Planlı mülakat yok.</p>
                         ) : weeklyPlan.map((s) => {
                             const todayStr = new Date().toISOString().split('T')[0];
                             const isToday = s.date === todayStr;
                             const effComp = isSessionDone(s, s.status);
-                            const dot = s.status === 'live' ? '#E5484D' : effComp ? '#16A26C' : isToday ? '#E8A13B' : '#5068FF';
+                            const dot = s.status === 'live' ? '#E5484D' : effComp ? '#16A26C' : isToday ? '#E8A13B' : '#14B8A6';
                             return (
                                 <button
                                     key={`${s.id}-${s.time}`}
@@ -658,61 +649,55 @@ export default function Dashboard() {
                                             navigate(`/live-interview/${s.id}`);
                                         }
                                     }}
-                                    className="w-full flex items-center gap-2.5 py-2 border-t border-n100 text-left hover:bg-n50"
+                                    className="w-full flex items-center gap-3 py-2.5 text-left hover:bg-n50 rounded-lg -mx-2 px-2"
                                 >
-                                    <span className="w-[38px] flex-none text-[11px] font-semibold">{s.time}</span>
+                                    <span className="w-11 flex-none text-[13px] font-semibold tabular-nums text-n900">{s.time}</span>
                                     <div className="flex-1 min-w-0">
-                                        <div className="text-[11px] font-medium truncate">{s.name}</div>
-                                        <div className="text-[10px] text-n400 truncate">
+                                        <div className="text-[13px] font-medium text-n900 truncate">{s.name}</div>
+                                        <div className="text-[12px] text-n500 truncate">
                                             {s.role}
-                                            {!isToday && s.date ? ` · ${new Date(s.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}` : ''}
+                                            {!isToday && s.date ? `, ${new Date(s.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}` : ''}
                                         </div>
                                     </div>
-                                    <span className="w-[7px] h-[7px] flex-none rounded-full" style={{ background: dot }} />
+                                    <span className="w-2 h-2 flex-none rounded-full" style={{ background: dot }} />
                                 </button>
                             );
                         })}
-                    </div>
+                    </section>
 
-                    <div className="h-px bg-n200" />
-
-                    <div>
-                        <div className="flex items-center justify-between mb-2.5">
-                            <span className="text-[10px] font-semibold text-n500 tracking-[0.08em] uppercase">Açık pozisyonlar</span>
-                            <span className="text-[10px] text-n400">{allOpenCount} aktif</span>
+                    <section>
+                        <div className="flex items-center justify-between mb-2">
+                            <h2 className="tf-section-title">Açık pozisyonlar</h2>
+                            <span className="text-[12px] text-n500 tabular-nums">{allOpenCount} aktif</span>
                         </div>
+                        {activePositions.length === 0 && (
+                            <p className="m-0 text-[13px] text-n500 py-2">Açık pozisyon yok.</p>
+                        )}
                         {activePositions.map((pos) => {
                             const posCount = candidates.filter(c => c.position === pos.title || c.bestTitle === pos.title).length;
                             return (
                                 <button
                                     key={pos.id}
                                     onClick={() => {
-                                        window.dispatchEvent(new CustomEvent('changeView', { detail: 'positions' }));
+                                        goTo('positions');
                                         setTimeout(() => {
                                             window.dispatchEvent(new CustomEvent('openPosition', { detail: { positionId: pos.id } }));
                                         }, 80);
                                     }}
-                                    className="w-full flex items-center gap-2.5 py-2 border-t border-n100 text-left hover:bg-n50"
+                                    className="w-full flex items-center gap-3 py-2.5 text-left hover:bg-n50 rounded-lg -mx-2 px-2"
                                 >
-                                    <div className="flex-1 min-w-0">
-                                        <div className="text-[11px] font-medium truncate">{pos.title}</div>
-                                        <div className="text-[10px] text-n400">{posCount} aday</div>
-                                    </div>
+                                    <div className="flex-1 min-w-0 text-[13px] font-medium text-n900 truncate">{pos.title}</div>
+                                    <span className="text-[12px] text-n500 tabular-nums flex-none">{posCount} aday</span>
                                 </button>
                             );
                         })}
-                        <button
-                            onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'positions' }))}
-                            className="mt-2 text-[11px] font-medium text-brand hover:text-brand-600"
-                        >
-                            Tüm pozisyonlar →
+                        <button onClick={() => goTo('positions')} className="mt-2 text-[13px] tf-link">
+                            Tüm pozisyonlar
                         </button>
-                    </div>
+                    </section>
 
-                    <div className="h-px bg-n200" />
-
-                    <div>
-                        <div className="text-[10px] font-semibold text-n500 tracking-[0.08em] uppercase mb-2.5">Sistem durumu</div>
+                    <section>
+                        <h2 className="tf-section-title mb-2">Sistem durumu</h2>
                         {[
                             { label: 'Skorlama motoru', val: 98 },
                             { label: 'Önyargı denetimi', val: 100 },
@@ -721,22 +706,15 @@ export default function Dashboard() {
                             const ok = e.val > 90;
                             const Icon = ok ? Check : AlertTriangle;
                             return (
-                                <div key={e.label} className="flex gap-2.5 py-2 border-t border-n100">
-                                    <div
-                                        className="w-[18px] h-[18px] flex-none mt-px rounded-full flex items-center justify-center"
-                                        style={{ background: ok ? '#E6F7EF' : '#FDF4E4', color: ok ? '#16A26C' : '#E8A13B' }}
-                                    >
-                                        <Icon className="w-[11px] h-[11px]" />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="text-[11px] font-semibold">{e.label}</div>
-                                        <div className="text-[10px] leading-[1.4] text-n400">%{e.val} kullanılabilirlik</div>
-                                    </div>
+                                <div key={e.label} className="flex items-center gap-2.5 py-1.5">
+                                    <Icon className={`w-4 h-4 flex-none ${ok ? 'text-ok' : 'text-warn'}`} aria-hidden="true" />
+                                    <span className="flex-1 text-[13px] text-n800">{e.label}</span>
+                                    <span className="text-[12px] text-n500 tabular-nums">%{e.val}</span>
                                 </div>
                             );
                         })}
-                    </div>
-                </div>
+                    </section>
+                </aside>
             </div>
 
             <AddCandidateModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />

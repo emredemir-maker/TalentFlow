@@ -76,13 +76,12 @@ export default function TalentInnLogo({
 
                     {showSub && (
                         <span style={{
-                            fontSize: '9px',
-                            fontWeight: 600,
-                            letterSpacing: '0.18em',
-                            textTransform: 'uppercase',
-                            color: onDark ? 'rgba(248,250,252,0.6)' : '#7A817D',
+                            fontSize: '11px',
+                            fontWeight: 500,
+                            letterSpacing: 0,
+                            color: onDark ? 'rgba(248,250,252,0.6)' : '#5F6662',
                             fontFamily: "'Outfit', system-ui, sans-serif",
-                            marginTop: '3px',
+                            marginTop: '1px',
                         }}>{subtitle}</span>
                     )}
                 </div>

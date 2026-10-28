@@ -17,11 +17,11 @@ function initials(name = '') {
     return ((parts[0]?.[0] || '') + (parts[1]?.[0] || '')).toUpperCase() || '?';
 }
 
-/** Prototip skor eşikleri: ≥85 yeşil, ≥70 marka mavisi, altı amber. */
+/** Skor tonu: ≥85 Talent teal, ≥70 nötr, altı amber (metin tonu). Kontrol Paneli ile aynı eşikler. */
 function scoreTone(score) {
-    if (score >= 85) return { fg: '#16A26C', bg: '#E6F7EF' };
-    if (score >= 70) return { fg: '#5068FF', bg: '#EEF1FF' };
-    return { fg: '#E8A13B', bg: '#FDF4E4' };
+    if (score >= 85) return { fg: '#0F766E', bg: '#E6F6F4' };
+    if (score >= 70) return { fg: '#343A37', bg: '#F4F6F5' };
+    return { fg: '#96590A', bg: '#FDF4E4' };
 }
 
 /** Kartta ve rayda gösterilen skor — havuzla aynı kaynak (CV uyumu). */
@@ -35,7 +35,7 @@ function ScoreBadge({ score }) {
     return (
         <span
             style={{ color: tone.fg, background: tone.bg }}
-            className="text-[11px] font-semibold px-1.5 rounded-full shrink-0"
+            className="text-[12px] font-semibold px-1.5 rounded-full shrink-0 tabular-nums"
         >
             %{score}
         </span>
@@ -43,30 +43,29 @@ function ScoreBadge({ score }) {
 }
 
 // ── Kanban ────────────────────────────────────────────────────────────────────
-function CandidateCard({ candidate, stageColor, selected, onSelect }) {
+function CandidateCard({ candidate, selected, onSelect }) {
     const score = cardScore(candidate);
     return (
         <button
             onClick={onSelect}
-            className="w-full text-left bg-n0 rounded-[10px] border p-2.5 shadow-sm hover:border-n300 transition-colors"
-            style={{ borderColor: selected ? '#5068FF' : '#E2E5EE' }}
+            aria-pressed={selected}
+            className={`w-full text-left bg-n0 rounded-xl border p-3 transition-colors ${selected ? 'border-n900 ring-1 ring-n900' : 'border-n200 hover:border-n300'}`}
         >
             <div className="flex items-start gap-2.5">
                 <div
-                    className="w-[30px] h-[30px] rounded-full flex items-center justify-center text-[10px] font-semibold text-white shrink-0"
-                    style={{ background: stageColor }}
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-semibold shrink-0 bg-brand-50 text-brand-700"
                 >
                     {initials(candidate.name)}
                 </div>
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
-                        <span className="text-[11px] font-semibold truncate">{candidate.name || 'İsimsiz'}</span>
+                        <span className="text-[13px] font-semibold text-n900 truncate">{candidate.name || 'İsimsiz'}</span>
                         <span className="ml-auto"><ScoreBadge score={score} /></span>
                     </div>
-                    <div className="text-[10px] text-n500 mt-0.5 truncate">
+                    <div className="text-[12px] text-n600 mt-0.5 truncate">
                         {candidate.position || candidate.matchedPositionTitle || '—'}
                     </div>
-                    {candidate.source && <div className="text-[10px] text-n400 mt-[3px] truncate">{candidate.source}</div>}
+                    {candidate.source && <div className="text-[12px] text-n500 mt-0.5 truncate">{candidate.source}</div>}
                 </div>
             </div>
         </button>
@@ -75,32 +74,28 @@ function CandidateCard({ candidate, stageColor, selected, onSelect }) {
 
 function KanbanColumn({ stage, candidates, selectedId, onSelectCandidate }) {
     return (
-        <div className="flex flex-col gap-2 min-w-[180px]">
-            <div
-                className="flex items-center justify-between px-[11px] py-[7px] rounded-md"
-                style={{ background: stage.bg, border: `1px solid ${stage.border}` }}
-            >
-                <div className="flex items-center gap-1.5">
-                    <span className="w-[7px] h-[7px] rounded-full" style={{ background: stage.color }} />
-                    <span className="text-[11px] font-semibold" style={{ color: stage.color }}>{stage.label}</span>
+        <section aria-label={stage.label} className="flex flex-col gap-2 w-[244px] flex-none bg-n50 rounded-2xl p-2">
+            <div className="flex items-center justify-between px-2 pt-1 pb-0.5">
+                <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-2 h-2 rounded-full flex-none" style={{ background: stage.color }} />
+                    <h2 className="m-0 text-[13px] font-semibold text-n900 truncate">{stage.label}</h2>
                 </div>
-                <span className="text-[11px] font-semibold text-n500">{candidates.length}</span>
+                <span className="text-[12px] text-n500 tabular-nums">{candidates.length}</span>
             </div>
             <div className="flex flex-col gap-2">
                 {candidates.length === 0
-                    ? <div className="h-14 rounded-[10px] border border-dashed border-n200 flex items-center justify-center text-[10px] text-n400">Aday yok</div>
+                    ? <div className="h-14 rounded-xl border border-dashed border-n300 flex items-center justify-center text-[12px] text-n500">Aday yok</div>
                     : candidates.map(c => (
                         <CandidateCard
                             key={c.id}
                             candidate={c}
-                            stageColor={stage.color}
                             selected={selectedId === c.id}
                             onSelect={() => onSelectCandidate(c.id)}
                         />
                     ))
                 }
             </div>
-        </div>
+        </section>
     );
 }
 
@@ -374,16 +369,16 @@ export default function PipelinePage() {
     };
 
     return (
-        <div className="infoset flex flex-col min-h-screen bg-n25">
-            {/* ── Başlık (56px) ────────────────────────────────────────────── */}
-            <header className="h-14 bg-n0 border-b border-n200 px-[18px] flex items-center gap-3.5 sticky top-0 z-20">
-                <div>
-                    <h1 className="text-[15px] font-semibold tracking-[-0.02em] m-0">Aday Pipeline</h1>
-                    <span className="text-[10px] text-n400">
-                        {totalCandidates} aday · {allInterviews.length} mülakat
+        <div className="infoset flex flex-col min-h-screen bg-n0">
+            {/* ── Sayfa başlığı ────────────────────────────────────────────── */}
+            <header className="tf-page-head bg-n0 border-b border-n200 sticky top-0 z-20 !pb-4">
+                <div className="min-w-0">
+                    <h1 className="tf-page-title">Aday süreci</h1>
+                    <span className="tf-page-sub block tabular-nums">
+                        {totalCandidates} aday, {allInterviews.length} mülakat
                     </span>
                 </div>
-                <div className="ml-auto flex items-center gap-2">
+                <div className="ml-auto flex items-center gap-2 flex-wrap">
                     {tab === 'kanban' && (
                         <div className="relative hidden md:block">
                             <Search className="w-3.5 h-3.5 text-n400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -392,7 +387,8 @@ export default function PipelinePage() {
                                 placeholder="Aday ara..."
                                 value={search}
                                 onChange={e => setSearch(e.target.value)}
-                                className="pl-8 pr-3 py-1.5 text-[11px] border border-n200 rounded-md bg-n0 focus:outline-none focus:border-brand w-44"
+                                aria-label="Aday ara"
+                                className="h-8 pl-8 pr-3 text-[12px] border border-n200 rounded-full bg-n50 focus:bg-n0 focus:outline-none focus:border-brand w-48"
                             />
                         </div>
                     )}
@@ -401,7 +397,7 @@ export default function PipelinePage() {
                         açıkken gizleniyor ki hangi görünümü değiştirdiği
                         belirsiz kalmasın. */}
                     {tab === 'kanban' && (
-                        <div className="flex items-center bg-n50 border border-n200 rounded-md p-0.5">
+                        <div className="flex items-center bg-n100 rounded-full p-0.5">
                             {[
                                 { id: 'kanban', label: 'Kanban', Icon: LayoutGrid },
                                 { id: 'list', label: 'Liste', Icon: List },
@@ -410,10 +406,10 @@ export default function PipelinePage() {
                                     key={id}
                                     onClick={() => setGorunum(id)}
                                     aria-pressed={viewMode === id}
-                                    className={`flex items-center gap-1.5 text-[12px] font-medium rounded-[5px] px-2.5 py-1 transition-colors ${
+                                    className={`flex items-center gap-1.5 h-7 text-[12px] font-medium rounded-full px-3 transition-colors ${
                                         viewMode === id
-                                            ? 'bg-n0 text-brand shadow-sm'
-                                            : 'text-n500 hover:text-n700'
+                                            ? 'bg-n0 text-n900 shadow-[0_1px_2px_rgba(17,19,18,0.08)]'
+                                            : 'text-n500 hover:text-n800'
                                     }`}
                                 >
                                     <Icon className="w-[13px] h-[13px]" /> {label}
@@ -423,41 +419,38 @@ export default function PipelinePage() {
                     )}
                     <button
                         onClick={() => setTab(tab === 'interviews' ? 'kanban' : 'interviews')}
-                        className={`flex items-center gap-1.5 text-[12px] font-medium border rounded-md px-[11px] py-1.5 ${
-                            tab === 'interviews'
-                                ? 'bg-brand-50 text-brand border-brand-100'
-                                : 'bg-n50 text-n600 border-n200 hover:bg-n100'
-                        }`}
+                        aria-pressed={tab === 'interviews'}
+                        className={`tf-btn tf-btn-secondary ${tab === 'interviews' ? '!bg-pill !border-pill' : ''}`}
                     >
-                        <List className="w-[13px] h-[13px]" /> Mülakatlar
+                        <List /> Mülakatlar
                         {allInterviews.length > 0 && (
-                            <span className="text-[10px] font-semibold text-n400">{allInterviews.length}</span>
+                            <span className="text-[12px] text-n500 tabular-nums">{allInterviews.length}</span>
                         )}
                     </button>
                     <button
                         onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'candidate-process' }))}
-                        className="flex items-center gap-1.5 text-[12px] font-medium text-n600 bg-n50 border border-n200 hover:bg-n100 rounded-md px-[11px] py-1.5"
+                        className="tf-btn tf-btn-secondary"
                     >
-                        <Users className="w-[13px] h-[13px]" /> Aday listesi
+                        <Users /> Aday listesi
                     </button>
                     <button
                         onClick={() => {
                             window.dispatchEvent(new CustomEvent('changeView', { detail: 'candidate-process' }));
                             setTimeout(() => window.dispatchEvent(new CustomEvent('openAddCandidate')), 80);
                         }}
-                        className="flex items-center gap-1.5 text-[13px] font-semibold text-white bg-brand hover:bg-brand-600 rounded-md px-[13px] py-[7px]"
+                        className="tf-btn tf-btn-primary"
                     >
-                        <Upload className="w-3.5 h-3.5" /> Aday ekle
+                        <Upload /> Aday ekle
                     </button>
                 </div>
             </header>
 
             {/* ── Kanban + seçim rayı ──────────────────────────────────────── */}
             {tab === 'kanban' && (
-                <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] items-start">
-                    <div className="px-[18px] py-2.5 xl:border-r border-n200 overflow-x-auto">
+                <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px] items-start flex-1">
+                    <div className="px-6 py-4 xl:border-r border-n200 overflow-x-auto min-w-0 xl:min-h-[calc(100vh-160px)]">
                         {viewMode === 'kanban' ? (
-                            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2.5 items-start">
+                            <div className="flex gap-3 items-start w-max">
                                 {STAGE_DEFS.map(stage => (
                                     <KanbanColumn
                                         key={stage.key}
@@ -478,38 +471,37 @@ export default function PipelinePage() {
                         )}
                     </div>
 
-                    <div className="p-3.5">
+                    <div className="p-5 xl:sticky xl:top-[88px]">
                         {!selected ? (
-                            <div className="border border-dashed border-n300 rounded-[14px] px-[18px] py-7 text-center">
-                                <div className="w-11 h-11 mx-auto mb-2.5 rounded-full bg-n50 flex items-center justify-center">
-                                    <MousePointerClick className="w-5 h-5 text-n400" />
-                                </div>
-                                <div className="text-[12px] font-semibold mb-1">Bir aday seçin</div>
-                                <p className="text-[11px] leading-[1.5] text-n500 m-0">
+                            <div className="tf-empty">
+                                <MousePointerClick className="w-5 h-5 text-n400 mx-auto mb-2" aria-hidden="true" />
+                                <div className="tf-empty-title">Bir aday seçin</div>
+                                <p className="text-[13px] leading-[1.5] text-n500 m-0">
                                     Karttan seçtiğiniz adayın aşamasını buradan taşıyabilir, mülakat planlayabilir
                                     veya süreçten çıkarabilirsiniz.
                                 </p>
                             </div>
                         ) : (
-                            <div className="bg-n0 border border-n200 rounded-[14px] shadow-sm p-3">
+                            <div className="tf-panel p-4">
                                 <div className="flex items-center gap-2.5 mb-3">
-                                    <div className="w-9 h-9 flex-none rounded-full bg-brand-50 text-brand flex items-center justify-center text-[12px] font-semibold">
+                                    <div className="w-9 h-9 flex-none rounded-full bg-brand-50 text-brand-700 flex items-center justify-center text-[12px] font-semibold">
                                         {initials(selected.name)}
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <div className="text-[13px] font-semibold tracking-[-0.01em] truncate">{selected.name || 'İsimsiz'}</div>
-                                        <div className="text-[11px] text-n500 truncate">
+                                        <div className="text-[14px] font-semibold text-n900 tracking-[-0.01em] truncate">{selected.name || 'İsimsiz'}</div>
+                                        <div className="text-[12px] text-n500 truncate">
                                             {selected.position || selected.matchedPositionTitle || '—'}
                                         </div>
                                     </div>
-                                    <button onClick={() => setSelectedId(null)} title="Seçimi kaldır">
+                                    <button onClick={() => setSelectedId(null)} title="Seçimi kaldır" aria-label="Seçimi kaldır" className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-n100">
                                         <X className="w-[15px] h-[15px] text-n400" />
                                     </button>
                                 </div>
 
-                                <div className="flex items-center gap-2 px-[11px] py-2.5 bg-n50 rounded-md mb-3">
-                                    <span className="text-[11px] text-n500">Aşama</span>
-                                    <span className="ml-auto text-[11px] font-semibold" style={{ color: selectedStage?.color }}>
+                                <div className="flex items-center gap-2 px-3 py-2.5 bg-n50 rounded-xl mb-3">
+                                    <span className="text-[13px] text-n500">Aşama</span>
+                                    <span className="ml-auto inline-flex items-center gap-1.5 text-[13px] font-semibold text-n900">
+                                        <span className="w-2 h-2 rounded-full" style={{ background: selectedStage?.color }} />
                                         {selectedStage?.label}
                                     </span>
                                 </div>
@@ -518,19 +510,19 @@ export default function PipelinePage() {
                                     <button
                                         onClick={() => nextKey && updateCandidate(selected.id, { status: nextKey, rejectionReason: null })}
                                         disabled={!nextKey}
-                                        className="text-center text-[12px] font-semibold text-white bg-brand hover:bg-brand-600 py-2.5 rounded-md disabled:opacity-40 disabled:cursor-not-allowed"
+                                        className="tf-btn tf-btn-primary w-full h-9"
                                     >
                                         {nextStage ? `${nextStage.label} aşamasına taşı` : 'Son aşamada'}
                                     </button>
                                     <button
                                         onClick={() => window.dispatchEvent(new CustomEvent('changeView', { detail: 'interviews' }))}
-                                        className="text-center text-[12px] font-medium text-n600 border border-n200 py-2.5 rounded-md hover:bg-n50"
+                                        className="tf-btn tf-btn-secondary w-full h-9"
                                     >
                                         Mülakat planla
                                     </button>
                                     <button
                                         onClick={() => openCandidateDetail(selected.id)}
-                                        className="text-center text-[12px] font-medium text-n600 border border-n200 py-2.5 rounded-md hover:bg-n50"
+                                        className="tf-btn tf-btn-secondary w-full h-9"
                                     >
                                         Aday detayını aç
                                     </button>
@@ -541,7 +533,7 @@ export default function PipelinePage() {
                                         Modalı"sı modal çalışmasıyla gelecek. */}
                                     <button
                                         onClick={() => openCandidateDetail(selected.id)}
-                                        className="text-center text-[11px] font-semibold text-bad py-1.5 hover:underline"
+                                        className="text-center text-[13px] font-medium text-bad-text py-1.5 hover:underline"
                                     >
                                         Süreçten çıkar
                                     </button>

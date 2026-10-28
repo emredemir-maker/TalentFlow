@@ -38,10 +38,10 @@ import { getAuthHeaders } from '../services/ai/config';
 import { calculateMatchScore, filterCandidatesByDomain } from '../services/matchService';
 
 const STATUS_CONFIG = {
-    open:             { label: 'Aktif',        pill: 'bg-ok-bg text-ok border-transparent', dot: 'bg-ok' },
-    closed:           { label: 'Pasif',         pill: 'bg-n100 text-n400 border-n200',     dot: 'bg-n300' },
-    pending_approval: { label: 'Onay Bekliyor', pill: 'bg-warn-bg text-warn border-warn',      dot: 'bg-warn' },
-    rejected:         { label: 'Reddedildi',   pill: 'bg-bad-bg text-bad border-transparent',            dot: 'bg-bad' },
+    open:             { label: 'Aktif',        pill: 'bg-ok-bg text-ok-text border-transparent', dot: 'bg-ok' },
+    closed:           { label: 'Pasif',         pill: 'bg-n100 text-n600 border-transparent',     dot: 'bg-n300' },
+    pending_approval: { label: 'Onay bekliyor', pill: 'bg-warn-bg text-warn-text border-transparent',      dot: 'bg-warn' },
+    rejected:         { label: 'Reddedildi',   pill: 'bg-bad-bg text-bad-text border-transparent',            dot: 'bg-bad' },
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -1576,7 +1576,7 @@ export default function PositionsPage() {
             {/* Gereksinimler değişince etkilenen adaylar yeniden taranırken —
                 işlem sayfadan ayrılınca durur, bu yüzden görünür tutulur. */}
             {rescanProgress && (
-                <div className="mx-6 mt-4 px-5 py-3 rounded-[14px] border border-brand-200 bg-brand-50 flex items-center gap-2">
+                <div className="mx-6 mt-4 px-4 py-3 rounded-xl bg-brand-50 flex items-center gap-2" role="status">
                     <Loader2 className="w-4 h-4 text-brand animate-spin shrink-0" />
                     <p className="text-sm font-semibold text-brand-700">
                         Adaylar yeni gereksinimlere göre yeniden taranıyor — {rescanProgress.done} / {rescanProgress.total}
@@ -1587,43 +1587,59 @@ export default function PositionsPage() {
 
             {/* Pending banner */}
             {isRecruiterOrAdmin && pendingCount > 0 && (
-                <div className="mx-6 mt-4 px-5 py-3 rounded-[14px] border border-warn bg-warn-bg flex items-center justify-between">
+                <div className="mx-6 mt-4 px-4 py-2.5 rounded-xl bg-warn-bg flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
                         <AlertCircle className="w-4 h-4 text-warn" />
-                        <p className="text-sm font-semibold text-warn">{pendingCount} pozisyon talebi onayınızı bekliyor.</p>
+                        <p className="text-[13px] font-semibold text-warn-text m-0">{pendingCount} pozisyon talebi onayınızı bekliyor.</p>
                     </div>
-                    <button onClick={() => setStatusFilter('pending_approval')} className="px-3 py-1.5 rounded-md bg-warn-bg text-warn-text text-xs font-semibold hover:opacity-80">
-                        Talepleri Gör
+                    <button onClick={() => setStatusFilter('pending_approval')} className="tf-btn tf-btn-secondary">
+                        Talepleri gör
                     </button>
                 </div>
             )}
 
-            {/* Body */}
-            <div className="flex flex-1 min-h-0 mt-4 mx-6 mb-8 gap-5">
+            {/* SAYFA BAŞLIĞI */}
+            <div className="tf-page-head">
+                <div className="min-w-0">
+                    <h1 className="tf-page-title">{isDepartmentUser ? `${userDepartments?.join(', ')} pozisyonları` : 'Pozisyon portföyü'}</h1>
+                    <p className="tf-page-sub m-0 tabular-nums">{visiblePositions.length} pozisyon gösteriliyor, {statusCounts.open} aktif</p>
+                </div>
+                <div className="ml-auto flex items-center gap-2 flex-wrap">
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-n400 pointer-events-none" />
+                        <input type="text" aria-label="Pozisyon ara" placeholder="Pozisyon veya departman ara" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-60 h-8 bg-n50 border border-n200 rounded-full pl-9 pr-3 text-[13px] text-n700 placeholder:text-n400 outline-none focus:bg-n0 focus:border-brand focus:ring-2 focus:ring-brand-100 transition-colors" />
+                    </div>
+                    <button onClick={() => setCreateOpen(true)} className="tf-btn tf-btn-primary">
+                        <Plus />{isDepartmentUser ? 'Pozisyon talebi' : 'Yeni pozisyon'}
+                    </button>
+                </div>
+            </div>
 
-                {/* Sidebar */}
-                <aside className="w-[220px] shrink-0 bg-n0 rounded-[14px] border border-n200 shadow-sm flex flex-col py-5 px-4">
-                    <p className="text-[10px] font-semibold text-n400 tracking-[0.08em] uppercase mb-2 px-1">DURUM</p>
-                    <div className="flex flex-col gap-0.5 mb-4">
+            {/* Body */}
+            <div className="flex flex-col md:flex-row flex-1 min-h-0 border-t border-n200">
+
+                {/* Süzgeç rayı — kart değil, sayfanın sol sütunu */}
+                <aside className="md:w-[220px] shrink-0 md:border-r border-b md:border-b-0 border-n200 flex flex-col py-4 px-3">
+                    <p className="text-[12px] font-medium text-n500 mb-1 px-3">Durum</p>
+                    <div className="flex md:flex-col gap-0.5 overflow-x-auto">
                         {[
                             { key: 'all', label: 'Tümü', count: statusCounts.all },
-                            { key: 'open', label: 'Aktif', count: statusCounts.open, badge: 'text-ok bg-ok-bg' },
-                            { key: 'pending_approval', label: 'Bekleyen', count: statusCounts.pending_approval, badge: 'text-warn bg-warn-bg' },
-                            { key: 'closed', label: 'Kapalı', count: statusCounts.closed, badge: 'text-n400 bg-n100' },
-                        ].map(({ key, label, count, badge }) => (
-                            <button key={key} onClick={() => setStatusFilter(key)} className={`flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium transition-all border ${statusFilter === key ? 'bg-brand-50 border-brand-100 text-brand' : 'border-transparent text-n500 hover:bg-n50'}`}>
-                                <span className="flex items-center gap-2">{statusFilter === key && <span className="w-1.5 h-1.5 rounded-full bg-brand" />}{label}</span>
-                                <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded-md ${badge || (statusFilter === key ? 'bg-brand-100 text-brand' : 'bg-n100 text-n400')}`}>{count}</span>
+                            { key: 'open', label: 'Aktif', count: statusCounts.open, dot: 'bg-ok' },
+                            { key: 'pending_approval', label: 'Bekleyen', count: statusCounts.pending_approval, dot: 'bg-warn' },
+                            { key: 'closed', label: 'Kapalı', count: statusCounts.closed, dot: 'bg-n300' },
+                        ].map(({ key, label, count, dot }) => (
+                            <button key={key} onClick={() => setStatusFilter(key)} aria-pressed={statusFilter === key} className={`h-8 shrink-0 gap-3 flex items-center justify-between px-3 rounded-full text-[13px] transition-colors ${statusFilter === key ? 'bg-pill text-n900 font-semibold' : 'text-n600 font-medium hover:bg-n100'}`}>
+                                <span className="flex items-center gap-2">{dot && <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />}{label}</span>
+                                <span className="text-[12px] tabular-nums text-n500">{count}</span>
                             </button>
                         ))}
                     </div>
-                    <div className="border-t border-n200 my-2" />
-                    <p className="text-[10px] font-semibold text-n400 tracking-[0.08em] uppercase mb-2 px-1 mt-2">DEPARTMAN</p>
-                    <div className="flex flex-col gap-0.5 overflow-y-auto flex-1 pb-2">
-                        {[{ key: 'all', label: 'Tüm Departmanlar' }, ...allDepts.map(d => ({ key: d, label: d, count: positions.filter(p => p.department === d).length }))].map(({ key, label, count }) => (
-                            <button key={key} onClick={() => setDeptFilter(key)} className={`flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium transition-all border ${deptFilter === key ? 'bg-brand-50 border-brand-100 text-brand' : 'border-transparent text-n500 hover:bg-n50'}`}>
-                                <span className="flex items-center gap-2">{deptFilter === key && <span className="w-1.5 h-1.5 rounded-full bg-brand" />}<span className="truncate">{label}</span></span>
-                                {count !== undefined && <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-md bg-n100 text-n400">{count}</span>}
+                    <p className="text-[12px] font-medium text-n500 mb-1 px-3 mt-3">Departman</p>
+                    <div className="flex md:flex-col gap-0.5 overflow-x-auto md:overflow-y-auto flex-1 pb-2">
+                        {[{ key: 'all', label: 'Tüm departmanlar' }, ...allDepts.map(d => ({ key: d, label: d, count: positions.filter(p => p.department === d).length }))].map(({ key, label, count }) => (
+                            <button key={key} onClick={() => setDeptFilter(key)} aria-pressed={deptFilter === key} className={`h-8 shrink-0 gap-3 flex items-center justify-between px-3 rounded-full text-[13px] transition-colors ${deptFilter === key ? 'bg-pill text-n900 font-semibold' : 'text-n600 font-medium hover:bg-n100'}`}>
+                                <span className="truncate">{label}</span>
+                                {count !== undefined && <span className="text-[12px] tabular-nums text-n500">{count}</span>}
                             </button>
                         ))}
                     </div>
@@ -1634,45 +1650,28 @@ export default function PositionsPage() {
                 </aside>
 
                 {/* Main */}
-                <div className="flex-1 min-w-0 flex flex-col bg-n0 rounded-[14px] border border-n200 shadow-sm overflow-hidden">
-
-                    {/* Top bar */}
-                    <div className="px-7 py-3 border-b border-n200 flex items-center justify-between shrink-0">
-                        <div className="flex items-center gap-2">
-                            <h1 className="text-lg font-semibold text-n900 tracking-tight">{isDepartmentUser ? `${userDepartments?.join(', ')} Pozisyonları` : 'Pozisyon Portföyü'}</h1>
-                            <span className="rounded-full bg-n100 text-n400 text-[12px] px-2 py-0.5 font-semibold">{visiblePositions.length}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-n400" />
-                                <input type="text" placeholder="Pozisyon veya departman ara..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-56 bg-n50 border border-n200 rounded-md pl-9 pr-3 py-2 text-sm text-n700 placeholder-n400 outline-none focus:border-brand focus:ring-2 focus:ring-brand-100 transition-all" />
-                            </div>
-                            <button onClick={() => setCreateOpen(true)} className="flex items-center gap-2 px-4 py-2.5 rounded-md bg-brand hover:bg-brand-600 text-white font-semibold text-xs shadow-sm shadow-none transition-colors">
-                                <Plus className="w-3.5 h-3.5" />{isDepartmentUser ? 'Pozisyon Talebi' : 'Yeni Pozisyon'}
-                            </button>
-                        </div>
-                    </div>
+                <div className="flex-1 min-w-0 flex flex-col">
 
                     {/* Table header */}
-                    <div className="px-7 pt-4 pb-2 shrink-0">
-                        <div className="grid grid-cols-[2fr_0.8fr_0.8fr_0.9fr_1.2fr_auto] gap-3 text-[10px] font-semibold text-n400 uppercase tracking-[0.08em] border-b border-n200 pb-2 px-4">
-                            <div>POZİSYON / DEPARTMAN</div><div>ADAYLAR</div><div>TECRÜBE</div><div>DURUM</div><div>UYUM SKORU</div><div>İŞLEMLER</div>
+                    <div className="hidden md:block shrink-0 border-b border-n200 bg-n50">
+                        <div className="grid grid-cols-[2fr_0.7fr_0.7fr_0.9fr_1fr_120px] gap-3 tf-th py-2 px-6">
+                            <div>Pozisyon</div><div>Adaylar</div><div>Deneyim</div><div>Durum</div><div>Uyum skoru</div><div className="text-right">İşlemler</div>
                         </div>
                     </div>
 
                     {/* Rows */}
-                    <div className="px-7 pb-6 space-y-2 overflow-y-auto flex-1">
+                    <div className="overflow-y-auto flex-1">
                         {loading ? (
                             <div className="flex flex-col items-center justify-center py-24 gap-2">
                                 <Loader2 className="w-8 h-8 animate-spin text-brand" />
-                                <p className="text-xs font-semibold text-n400 uppercase tracking-[0.08em]">Yükleniyor...</p>
+                                <p className="text-[13px] text-n500" role="status">Pozisyonlar yükleniyor…</p>
                             </div>
                         ) : visiblePositions.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-24 gap-3">
-                                <div className="w-14 h-14 rounded-[14px] bg-n100 flex items-center justify-center"><Briefcase className="w-6 h-6 text-n300" /></div>
-                                <p className="text-sm font-semibold text-n400">{statusFilter === 'pending_approval' ? 'Bekleyen talep yok' : 'Pozisyon bulunamadı'}</p>
-                                <button onClick={() => setCreateOpen(true)} className="px-5 py-2.5 rounded-md bg-n100 hover:bg-n100 text-n600 text-xs font-semibold transition-all">
-                                    {isDepartmentUser ? 'İlk Talebi Oluştur' : 'İlk Pozisyonu Oluştur'}
+                                <Briefcase className="w-6 h-6 text-n300" aria-hidden="true" />
+                                <p className="text-[14px] font-semibold text-n900 m-0">{statusFilter === 'pending_approval' ? 'Bekleyen talep yok' : 'Pozisyon bulunamadı'}</p>
+                                <button onClick={() => setCreateOpen(true)} className="tf-btn tf-btn-secondary">
+                                    {isDepartmentUser ? 'İlk talebi oluştur' : 'İlk pozisyonu oluştur'}
                                 </button>
                             </div>
                         ) : visiblePositions.map((pos) => {
@@ -1683,7 +1682,7 @@ export default function PositionsPage() {
                             const avgScore = pos.matchedCandidates?.length > 0 ? Math.round(pos.matchedCandidates.reduce((a, c) => a + c.score, 0) / pos.matchedCandidates.length) : null;
 
                             return (
-                                <div key={pos.id} className="rounded-[14px] border border-n200 hover:border-brand-100 hover:shadow-sm transition-all bg-n0">
+                                <div key={pos.id} className="border-b border-n100 hover:bg-n50 transition-colors">
                                     {isPending && (
                                         <div className="mx-4 mt-4 px-4 py-2 rounded-md bg-warn-bg border border-warn flex items-center gap-2 text-xs text-warn-text font-semibold">
                                             <Clock className="w-3.5 h-3.5" />{pos.requestedBy?.displayName || 'Departman kullanıcısı'} tarafından talep edildi
@@ -1696,43 +1695,41 @@ export default function PositionsPage() {
                                     )}
 
                                     <div
-                                        className="px-4 py-3 grid grid-cols-[2fr_0.8fr_0.8fr_0.9fr_1.2fr_auto] gap-3 items-center cursor-pointer"
+                                        className="px-6 py-3 grid grid-cols-[1fr_auto] md:grid-cols-[2fr_0.7fr_0.7fr_0.9fr_1fr_120px] gap-x-3 gap-y-2 items-center cursor-pointer"
                                         onClick={() => setDetailPos(pos)}
                                     >
                                         {/* Col 1 */}
                                         <div className="min-w-0">
-                                            <div className="text-sm font-semibold text-n900 truncate mb-1 hover:text-brand transition-colors">{pos.title}</div>
-                                            <span className="rounded-full bg-n100 text-n500 text-[11px] px-2 py-0.5 font-medium">{pos.department}</span>
+                                            <div className="text-[14px] font-semibold text-n900 truncate">{pos.title}</div>
+                                            <div className="text-[12px] text-n500 truncate">{pos.department}</div>
                                         </div>
                                         {/* Col 2 */}
-                                        <div>
-                                            <div className="text-lg font-semibold text-n900 leading-none">{candidateCount}</div>
-                                            <div className="text-[10px] text-n400 mt-0.5">aday</div>
+                                        <div className="hidden md:block text-[13px] text-n800 tabular-nums">
+                                            <span className="font-semibold">{candidateCount}</span> <span className="text-n500">aday</span>
                                         </div>
                                         {/* Col 3 */}
-                                        <div>
-                                            <div className="font-semibold text-n900 leading-none">{pos.minExperience || 0} yıl+</div>
-                                            <div className="text-[10px] text-n400 mt-0.5">min.</div>
+                                        <div className="hidden md:block text-[13px] text-n800 tabular-nums" title="En az deneyim">
+                                            {pos.minExperience || 0} yıl+
                                         </div>
                                         {/* Col 4 */}
-                                        <div>
-                                            <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full border ${sc.pill}`}>
+                                        <div className="hidden md:block">
+                                            <span className={`inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-0.5 rounded-full border ${sc.pill}`}>
                                                 <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />{sc.label}
                                             </span>
                                         </div>
                                         {/* Col 5 */}
-                                        <div className="pr-2">
+                                        <div className="hidden md:block pr-2">
                                             {pos.status === 'open' && avgScore ? (
-                                                <>
-                                                    <div className="font-semibold text-brand text-[16px] leading-none mb-1.5">{avgScore}%</div>
-                                                    <div className="h-1 w-full bg-n100 rounded-full overflow-hidden">
-                                                        <div className="h-full from-brand to-brand rounded-full" style={{ width: `${avgScore}%` }} />
+                                                <div className="flex items-center gap-2">
+                                                    <div className="h-1 flex-1 max-w-[96px] bg-n100 rounded-full overflow-hidden">
+                                                        <div className="h-full bg-brand rounded-full" style={{ width: `${avgScore}%` }} />
                                                     </div>
-                                                </>
-                                            ) : <span className="text-n300 text-sm">—</span>}
+                                                    <span className="font-semibold text-brand text-[13px] tabular-nums">{avgScore}%</span>
+                                                </div>
+                                            ) : <span className="text-n300 text-[13px]">—</span>}
                                         </div>
                                         {/* Col 6 — stop propagation so clicks don't open drawer */}
-                                        <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                                        <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
                                             {pos.status === 'open' && <>
                                                 {/* Visible primary actions:
                                                     - Departmana Aç (recruiter/admin yalnız)
@@ -1741,17 +1738,17 @@ export default function PositionsPage() {
                                                     "..." overflow menu so the row doesn't surface
                                                     four icon buttons at once. */}
                                                 {isRecruiterOrAdmin && (
-                                                    <button onClick={() => handleRelease(pos)} disabled={releaseLoading && releasingPosId === pos.id} className={`p-1.5 rounded-md border transition-colors ${pos.releasedToDepartment ? 'bg-ok-bg border-transparent text-ok-text' : 'bg-brand-50 border-brand-100 text-brand hover:bg-brand-100'}`} title="Departmana Aç">
+                                                    <button onClick={() => handleRelease(pos)} disabled={releaseLoading && releasingPosId === pos.id} className={`w-8 h-8 flex items-center justify-center rounded-full transition-colors ${pos.releasedToDepartment ? 'bg-ok-bg text-ok-text' : 'text-brand hover:bg-brand-50'}`} title="Departmana Aç">
                                                         {releaseLoading && releasingPosId === pos.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Unlock className="w-4 h-4" />}
                                                     </button>
                                                 )}
-                                                <button onClick={() => setEditPos(pos)} className="p-1.5 rounded-md bg-n50 border border-n200 text-n400 hover:bg-warn-bg hover:border-warn hover:text-warn-text transition-colors" title="Düzenle"><Edit2 className="w-4 h-4" /></button>
+                                                <button onClick={() => setEditPos(pos)} className="w-8 h-8 flex items-center justify-center rounded-full text-n500 hover:bg-n100 hover:text-n900 transition-colors" title="Düzenle"><Edit2 className="w-4 h-4" /></button>
 
                                                 {/* Overflow menu: Kapat + Sil */}
                                                 <div className="relative">
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); setOpenActionMenuId(openActionMenuId === pos.id ? null : pos.id); }}
-                                                        className="p-1.5 rounded-md bg-n50 border border-n200 text-n400 hover:bg-n100 hover:text-n600 transition-colors"
+                                                        className="w-8 h-8 flex items-center justify-center rounded-full text-n500 hover:bg-n100 hover:text-n900 transition-colors"
                                                         title="Daha fazla"
                                                         aria-haspopup="menu"
                                                         aria-expanded={openActionMenuId === pos.id}
@@ -1759,19 +1756,19 @@ export default function PositionsPage() {
                                                         <MoreHorizontal className="w-4 h-4" />
                                                     </button>
                                                     {openActionMenuId === pos.id && (
-                                                        <div role="menu" className="absolute right-0 top-full mt-1 w-44 bg-n0 rounded-md shadow-2xl border border-n200 z-50 overflow-hidden py-1">
+                                                        <div role="menu" className="absolute right-0 top-full mt-1 w-48 bg-n0 rounded-xl shadow-[0_12px_32px_-12px_rgba(17,19,18,0.25)] border border-n200 z-50 overflow-hidden py-1">
                                                             <button
                                                                 role="menuitem"
                                                                 onClick={() => { setOpenActionMenuId(null); handleToggleStatus(pos.id, pos.status); }}
-                                                                className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-n50 transition-colors text-left text-[11px] text-n700"
+                                                                className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-n50 transition-colors text-left text-[13px] text-n700"
                                                             >
                                                                 <XCircle className="w-3.5 h-3.5 text-n400 shrink-0" />
-                                                                <span>Pozisyonu Kapat</span>
+                                                                <span>Pozisyonu kapat</span>
                                                             </button>
                                                             <button
                                                                 role="menuitem"
                                                                 onClick={() => { setOpenActionMenuId(null); deletePosition(pos.id); }}
-                                                                className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-bad-bg transition-colors text-left text-[11px] text-bad-text"
+                                                                className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-bad-bg transition-colors text-left text-[13px] text-bad-text"
                                                             >
                                                                 <Trash2 className="w-3.5 h-3.5 shrink-0" />
                                                                 <span>Sil</span>
@@ -1801,9 +1798,9 @@ export default function PositionsPage() {
                     </div>
 
                     {/* Footer */}
-                    <div className="px-7 py-3 border-t border-n200 bg-n50 flex items-center justify-between shrink-0">
-                        <p className="text-xs text-n400 font-medium">{visiblePositions.length} pozisyon gösteriliyor</p>
-                        <div className="flex items-center gap-1"><Cpu className="w-3 h-3 text-brand" /><span className="text-[10px] text-n400">Eşleştirme aktif</span></div>
+                    <div className="px-6 py-3 border-t border-n200 flex items-center justify-between shrink-0">
+                        <p className="text-[12px] text-n500 m-0 tabular-nums">{visiblePositions.length} pozisyon gösteriliyor</p>
+                        <div className="flex items-center gap-1.5"><Cpu className="w-3.5 h-3.5 text-brand" /><span className="text-[12px] text-n500">Eşleştirme aktif</span></div>
                     </div>
                 </div>
             </div>
