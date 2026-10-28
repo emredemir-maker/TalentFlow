@@ -9,11 +9,14 @@
 import { gateLabel } from '../utils/mustHaveGate';
 import { buildCandidateBadges, verificationBucket } from '../utils/candidateBadges';
 import CandidateBadges from '../components/CandidateBadges';
+import FlowTrace from '../components/flow/FlowTrace';
+import MobileMenuButton from '../components/flow/MobileMenuButton';
+import { FLOW_TONE, STALE_DAYS, waitingDays } from '../utils/candidateFlow';
 import { useEffect, useMemo, useState } from 'react';
 import {
     Search, Download, Users, ChevronUp, ChevronDown, ChevronLeft, ChevronRight,
     FilterX, Table2, Wrench, CheckSquare, Square, Layers, X, Loader2, AlertCircle, CheckCircle2,
-    Share2, Building2, Brain, Mail, Mic,
+    Share2, Building2, Brain, Mail, Mic, SlidersHorizontal,
 } from 'lucide-react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -54,15 +57,27 @@ const loadTableState = () => {
 
 // Aşama rozeti adayın TAMAMINI alıyor: "Mülakat Tamamlandı" kayıtlı durumdan
 // değil, tamamlanmış mülakat oturumundan türüyor (bkz. resolveCandidateStage).
+//
+// Rozet yerine ad + akış izi: tabloda on renkli hap yan yana gelince sütun
+// gürültüye dönüyordu; iz aynı bilgiyi (hangi adımda) sırasıyla veriyor.
 function StageChip({ candidate }) {
     const stage = getStage(resolveCandidateStage(candidate));
     return (
-        <span
-            style={{ color: stage.color, background: stage.bg, border: `1px solid ${stage.border}` }}
-            className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-        >
-            <span className="w-1.5 h-1.5 rounded-full" style={{ background: stage.color }} />
-            {stage.label}
+        <span className="inline-flex flex-col gap-1 whitespace-nowrap">
+            <span className="text-[12px] font-medium text-n800">{stage.label}</span>
+            <FlowTrace stageKey={stage.key} />
+        </span>
+    );
+}
+
+/** Bu aşamada kaç gündür — STALE_DAYS ve üstü amber. */
+function WaitCell({ candidate }) {
+    const days = waitingDays(candidate);
+    if (days == null) return <span className="text-n300">—</span>;
+    const stale = days >= STALE_DAYS;
+    return (
+        <span className={`tabular-nums whitespace-nowrap ${stale ? 'text-warn-text font-medium' : 'text-n600'}`}>
+            {days === 0 ? 'Bugün' : `${days} gün`}
         </span>
     );
 }
@@ -97,7 +112,9 @@ function ScoreCell({ value, gate, interviewed, method }) {
     if (value === null || value === undefined || value === '') {
         return <span className="text-n300">—</span>;
     }
-    const color = value >= 75 ? '#059669' : value >= 50 ? '#D97706' : '#DC2626';
+    // Renk yalnızca uçlarda: güçlü uyum koyu teal, zayıf uyum amber; arası
+    // mürekkep. Üç renkli trafik ışığı her satırı ayrı bir uyarıya çeviriyordu.
+    const color = value >= 75 ? '#0F766E' : value >= 50 ? '#343A37' : '#96590A';
     // Zorunlu bir madde karşılanmıyorsa çıplak yüzde yanıltıcı: aday yüksek
     // puanlı görünüyor ama ilanın olmazsa olmazını sağlamıyor. Skoru
     // düşürmüyoruz — kararı insan verecek — ama saklamıyoruz da.
@@ -105,7 +122,7 @@ function ScoreCell({ value, gate, interviewed, method }) {
     return (
         <span className="inline-flex flex-col items-center leading-tight">
             <span className="inline-flex items-center gap-1">
-                <span style={{ color }} className="font-semibold">%{value}</span>
+                <span style={{ color }} className="text-[14px] font-semibold tabular-nums">{value}</span>
                 {/* Skor mülakattan etkilendiyse hücre bunu söylemeli: dün 65
                     gördüğü adayı bugün 78'de bulan kullanıcı nedenini
                     bilmeli. Sessizce değişen sayı, açıklanamayan sayıdır. */}
@@ -137,11 +154,11 @@ function ScoreCell({ value, gate, interviewed, method }) {
     );
 }
 
-function SortableHeader({ label, sortKey, activeKey, dir, onSort, align = 'left' }) {
+function SortableHeader({ label, sortKey, activeKey, dir, onSort, align = 'left', sticky = false }) {
     const isActive = activeKey === sortKey;
     return (
         <th
-            className={`px-3 py-2.5 text-${align} select-none cursor-pointer whitespace-nowrap hover:bg-n100 transition-colors`}
+            className={`px-3 py-2.5 text-${align} select-none cursor-pointer whitespace-nowrap hover:bg-n100 transition-colors ${sticky ? 'sticky left-9 z-[1] bg-n50' : ''}`}
             onClick={() => onSort(sortKey)}
         >
             <span className="inline-flex items-center gap-1 tf-th">
@@ -379,6 +396,15 @@ export default function CandidatesTablePage() {
     );
     const activeFilterChips = useMemo(() => describeActiveFilters(filters), [filters]);
 
+    // İkincil süzgeçler: "Diğer filtreler" katında duranlar. Biri açıksa kat
+    // kendiliğinden açık görünür — açık bir süzgecin gizli kalması, listenin
+    // neden kısa olduğunu sakladığı için.
+    const SECONDARY_KEYS = ['department', 'scan', 'sector', 'verification', 'location', 'minScore', 'dateFrom', 'dateTo'];
+    const secondaryActive = SECONDARY_KEYS.filter((k) => filters[k] !== DEFAULT_FILTERS[k]).length
+        - (filters.dateFrom !== DEFAULT_FILTERS.dateFrom && filters.dateTo !== DEFAULT_FILTERS.dateTo ? 1 : 0);
+    const [moreFilters, setMoreFilters] = useState(false);
+    const moreFiltersShown = moreFilters || secondaryActive > 0;
+
     const handleSort = (key) => {
         if (key === sortKey) {
             setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
@@ -409,6 +435,21 @@ export default function CandidatesTablePage() {
         }),
         [coherentRows, filters, selectedPosition]
     );
+    // Aşama çiplerindeki sayılar, aşama DIŞINDAKİ süzgeçlerin sonucunu sayar:
+    // "bu süzgeçlerle kaç aday hangi aşamada" — çipe basınca göreceğiniz sayı.
+    const stageCountsInView = useMemo(() => {
+        const rows = applyTableFilters(coherentRows, { ...filters, stage: 'all' }, {
+            position: selectedPosition,
+            keywordScoreFn: (c, p) => calculateMatchScore(c, p).score,
+        });
+        const map = { __total: rows.length };
+        for (const c of rows) {
+            const k = resolveCandidateStage(c);
+            map[k] = (map[k] || 0) + 1;
+        }
+        return map;
+    }, [coherentRows, filters, selectedPosition]);
+    const stageTotal = stageCountsInView.__total;
     // Rozet ve doğrulama rütbesi SIRALAMADAN ÖNCE, satır başına bir kez.
     // Sıralayıcı her karşılaştırmada erişimci çağırdığı için rütbeyi orada
     // hesaplamak 662 satırda binlerce CV ayrıştırması demekti.
@@ -649,6 +690,7 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
         <div className="infoset flex flex-col min-h-screen">
             {/* ── Header ───────────────────────────────────────────────────── */}
             <header className="tf-page-head bg-n0 border-b border-n200 sticky top-0 z-20 !pb-4">
+                <MobileMenuButton className="self-center" />
                 <div className="min-w-0">
                     <h1 className="tf-page-title">Aday havuzu</h1>
                     <span className="tf-page-sub tabular-nums block">
@@ -693,9 +735,35 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
                 </div>
             )}
 
-            {/* ── Filter bar ───────────────────────────────────────────────── */}
+            {/* ── Filter bar ───────────────────────────────────────────────────
+                İKİ KAT: üstte en sık kullanılan üç süzgeç (aşama, arama, pozisyon),
+                altta "Diğer filtreler" ile açılan sekiz süzgeç. On bir kontrol
+                tek satırda iki satıra taşıyor ve tablo ekranın altına itiliyordu.
+                Hiçbir süzgeç kalkmadı; açık olan ikincil süzgeç varsa kat açık
+                başlar ve düğme kaç tanesinin açık olduğunu söyler. */}
             <div className="px-6 pt-4">
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 -mx-1 px-1" role="group" aria-label="Aşama süzgeci">
+                    <button
+                        onClick={() => setFilter('stage', 'all')}
+                        aria-pressed={filters.stage === 'all'}
+                        className="tf-chip flex-none"
+                    >
+                        Tüm aşamalar <span className="tabular-nums opacity-70">{stageTotal}</span>
+                    </button>
+                    {STAGES.map((st) => (
+                        <button
+                            key={st.key}
+                            onClick={() => setFilter('stage', filters.stage === st.key ? 'all' : st.key)}
+                            aria-pressed={filters.stage === st.key}
+                            title={st.desc}
+                            className="tf-chip flex-none"
+                        >
+                            <span className="w-2 h-2 rounded-full" style={{ background: FLOW_TONE[st.key] || '#CDD3D0' }} aria-hidden="true" />
+                            {st.label} <span className="tabular-nums opacity-70">{stageCountsInView[st.key] || 0}</span>
+                        </button>
+                    ))}
+                </div>
+                <div className="flex flex-wrap items-center gap-2 mt-2.5">
                     <div className="relative">
                         <Search className="w-3.5 h-3.5 text-n400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                         <input
@@ -707,10 +775,6 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
                             className="h-8 pl-8 pr-3 text-[12px] border border-n200 rounded-full bg-n50 focus:bg-n0 focus:outline-none focus:border-brand w-60"
                         />
                     </div>
-                    <select value={filters.stage} onChange={(e) => setFilter('stage', e.target.value)} className={SELECT_CLS}>
-                        <option value="all">Tüm Aşamalar</option>
-                        {STAGES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
-                    </select>
                     <select value={filters.position} onChange={(e) => setFilter('position', e.target.value)} className={SELECT_CLS} title="Açık pozisyona uygunluk filtresi">
                         <option value="all">Tüm Pozisyonlar</option>
                         {openPositions.map((p) => <option key={p.id} value={p.title}>{p.title}</option>)}
@@ -730,55 +794,18 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
                             <option value="pool">Tüm havuzu bu ilana göre sırala</option>
                         </select>
                     )}
-                    <select value={filters.department} onChange={(e) => setFilter('department', e.target.value)} className={SELECT_CLS}>
-                        <option value="all">Tüm Departmanlar</option>
-                        {departments.filter((d) => d !== 'all').map((d) => <option key={d} value={d}>{d}</option>)}
-                    </select>
                     <select value={filters.source} onChange={(e) => setFilter('source', e.target.value)} className={SELECT_CLS}>
                         <option value="all">Tüm Kaynaklar</option>
                         {sourcesOptions.filter((s) => s !== 'all').map((s) => <option key={s} value={s}>{s}</option>)}
                     </select>
-                    <select value={filters.scan} onChange={(e) => setFilter('scan', e.target.value)} className={SELECT_CLS} title="Otonom (derin) tarama durumu">
-                        <option value="all">Tarama: Tümü</option>
-                        <option value="scanned">Taranmış</option>
-                        <option value="unscanned">Taranmamış</option>
-                    </select>
-                    {/* Sektör uyumu. "Ölçülemedi" AYRI bir seçenek: taraması
-                        yapılmamış adayı "sektör dışı" saymak, bakmadığımız
-                        şeyi olumsuz sonuç gibi göstermek olurdu. */}
-                    <select value={filters.sector} onChange={(e) => setFilter('sector', e.target.value)} className={SELECT_CLS} title="Kurumun hedef sektörüne göre aday deneyimi">
-                        <option value="all">Sektör: Tümü</option>
-                        <option value="match">Aynı sektör</option>
-                        <option value="near_or_match">Aynı ya da komşu sektör</option>
-                        <option value="near">Yalnızca komşu sektör</option>
-                        <option value="outside">Sektör dışı</option>
-                        <option value="unmeasured">Sektör ölçülemedi</option>
-                    </select>
-                    <select value={filters.verification} onChange={(e) => setFilter('verification', e.target.value)} className={SELECT_CLS} title="CV doğrulama bulguları">
-                        <option value="all">Doğrulama: Tümü</option>
-                        <option value="contradiction">Çelişkili</option>
-                        <option value="attention">Dikkat gerektiren</option>
-                        <option value="clean">Temiz (taranmış)</option>
-                        <option value="unverified">Doğrulanmamış</option>
-                    </select>
-                    <select value={filters.location} onChange={(e) => setFilter('location', e.target.value)} className={SELECT_CLS} title="CV'den okunan konum bilgisi">
-                        <option value="all">Konum: Tümü</option>
-                        <option value="istanbul">İstanbul içi</option>
-                        <option value="outside">İstanbul dışı</option>
-                        <option value="unknown">Konum bilinmiyor</option>
-                    </select>
-                    <input
-                        type="number" min="0" max="100"
-                        placeholder="Min skor"
-                        value={filters.minScore}
-                        onChange={(e) => setFilter('minScore', e.target.value)}
-                        className={`${SELECT_CLS} w-24`}
-                    />
-                    <div className="flex items-center gap-1">
-                        <input type="date" value={filters.dateFrom} onChange={(e) => setFilter('dateFrom', e.target.value)} className={SELECT_CLS} title="Başvuru tarihi (başlangıç)" />
-                        <span className="text-n300 text-[11px]">–</span>
-                        <input type="date" value={filters.dateTo} onChange={(e) => setFilter('dateTo', e.target.value)} className={SELECT_CLS} title="Başvuru tarihi (bitiş)" />
-                    </div>
+                    <button
+                        onClick={() => setMoreFilters((v) => !v)}
+                        aria-expanded={moreFiltersShown}
+                        className={`tf-btn tf-btn-secondary ${moreFiltersShown ? '!bg-pill !border-pill' : ''}`}
+                    >
+                        <SlidersHorizontal /> Diğer filtreler
+                        {secondaryActive > 0 && <span className="tabular-nums text-brand-700 font-semibold">{secondaryActive}</span>}
+                    </button>
                     {hasActiveFilters && (
                         <button
                             onClick={clearFilters}
@@ -788,6 +815,57 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
                         </button>
                     )}
                 </div>
+
+                {moreFiltersShown && (
+                    <div className="flex flex-wrap items-center gap-2 mt-2.5 p-2.5 bg-n50 rounded-2xl">
+                        <select value={filters.department} onChange={(e) => setFilter('department', e.target.value)} className={SELECT_CLS}>
+                            <option value="all">Tüm Departmanlar</option>
+                            {departments.filter((d) => d !== 'all').map((d) => <option key={d} value={d}>{d}</option>)}
+                        </select>
+                        <select value={filters.scan} onChange={(e) => setFilter('scan', e.target.value)} className={SELECT_CLS} title="Otonom (derin) tarama durumu">
+                            <option value="all">Tarama: Tümü</option>
+                            <option value="scanned">Taranmış</option>
+                            <option value="unscanned">Taranmamış</option>
+                        </select>
+                        {/* Sektör uyumu. "Ölçülemedi" AYRI bir seçenek: taraması
+                            yapılmamış adayı "sektör dışı" saymak, bakmadığımız
+                            şeyi olumsuz sonuç gibi göstermek olurdu. */}
+                        <select value={filters.sector} onChange={(e) => setFilter('sector', e.target.value)} className={SELECT_CLS} title="Kurumun hedef sektörüne göre aday deneyimi">
+                            <option value="all">Sektör: Tümü</option>
+                            <option value="match">Aynı sektör</option>
+                            <option value="near_or_match">Aynı ya da komşu sektör</option>
+                            <option value="near">Yalnızca komşu sektör</option>
+                            <option value="outside">Sektör dışı</option>
+                            <option value="unmeasured">Sektör ölçülemedi</option>
+                        </select>
+                        <select value={filters.verification} onChange={(e) => setFilter('verification', e.target.value)} className={SELECT_CLS} title="CV doğrulama bulguları">
+                            <option value="all">Doğrulama: Tümü</option>
+                            <option value="contradiction">Çelişkili</option>
+                            <option value="attention">Dikkat gerektiren</option>
+                            <option value="clean">Temiz (taranmış)</option>
+                            <option value="unverified">Doğrulanmamış</option>
+                        </select>
+                        <select value={filters.location} onChange={(e) => setFilter('location', e.target.value)} className={SELECT_CLS} title="CV'den okunan konum bilgisi">
+                            <option value="all">Konum: Tümü</option>
+                            <option value="istanbul">İstanbul içi</option>
+                            <option value="outside">İstanbul dışı</option>
+                            <option value="unknown">Konum bilinmiyor</option>
+                        </select>
+                        <input
+                            type="number" min="0" max="100"
+                            placeholder="Min skor"
+                            aria-label="En düşük skor"
+                            value={filters.minScore}
+                            onChange={(e) => setFilter('minScore', e.target.value)}
+                            className={`${SELECT_CLS} w-24`}
+                        />
+                        <div className="flex items-center gap-1">
+                            <input type="date" value={filters.dateFrom} onChange={(e) => setFilter('dateFrom', e.target.value)} className={SELECT_CLS} title="Başvuru tarihi (başlangıç)" aria-label="Başvuru tarihi, başlangıç" />
+                            <span className="text-n400 text-[12px]">–</span>
+                            <input type="date" value={filters.dateTo} onChange={(e) => setFilter('dateTo', e.target.value)} className={SELECT_CLS} title="Başvuru tarihi (bitiş)" aria-label="Başvuru tarihi, bitiş" />
+                        </div>
+                    </div>
+                )}
 
                 {/* AÇIK FİLTRE ÇİPLERİ.
                     Çubukta on bir kontrol var ve satır kaydırıyor; kullanıcı
@@ -925,7 +1003,7 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
                         <table className="w-full text-[12px]" aria-busy={loading}>
                             <thead className="bg-n50 border-b border-n200">
                                 <tr>
-                                    <th className="px-3 py-2.5 w-9">
+                                    <th className="px-3 py-2.5 w-9 sticky left-0 z-[1] bg-n50">
                                         <button
                                             onClick={toggleAllFiltered}
                                             title={allFilteredSelected ? 'Seçimi kaldır' : 'Filtrelenen tüm adayları seç'}
@@ -934,21 +1012,22 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
                                             {allFilteredSelected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
                                         </button>
                                     </th>
-                                    <SortableHeader label="Aday" sortKey="name" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
-                                    <SortableHeader label="Pozisyon" sortKey="position" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
-                                    <SortableHeader label="CV'ye Göre" sortKey="cvRole" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
-                                    <SortableHeader label="Departman" sortKey="department" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
-                                    <SortableHeader label="Konum" sortKey="location" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
-                                    <SortableHeader label="Aşama" sortKey="stage" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
-                                    <SortableHeader label="Kaynak" sortKey="source" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
-                                    <SortableHeader label="Tarama" sortKey="scanStatus" activeKey={sortKey} dir={sortDir} onSort={handleSort} align="center" />
-                                    <SortableHeader label="Doğrulama" sortKey="verification" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                                    <SortableHeader label="Aday" sortKey="name" activeKey={sortKey} dir={sortDir} onSort={handleSort} sticky />
                                     <SortableHeader label="AI" sortKey="bestScore" activeKey={sortKey} dir={sortDir} onSort={handleSort} align="center" />
                                     {selectedPosition && (
                                         <SortableHeader label="Poz. Uyum" sortKey="positionScore" activeKey={sortKey} dir={sortDir} onSort={handleSort} align="center" />
                                     )}
                                     <SortableHeader label="Mülakat" sortKey="interviewScore" activeKey={sortKey} dir={sortDir} onSort={handleSort} align="center" />
                                     <SortableHeader label="Genel" sortKey="combinedScore" activeKey={sortKey} dir={sortDir} onSort={handleSort} align="center" />
+                                    <SortableHeader label="Aşama" sortKey="stage" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                                    <th className="px-3 py-2.5 text-left whitespace-nowrap"><span className="tf-th" title="Son işlemden bu yana geçen gün">Bekliyor</span></th>
+                                    <SortableHeader label="Kaynak" sortKey="source" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                                    <SortableHeader label="Pozisyon" sortKey="position" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                                    <SortableHeader label="CV'ye Göre" sortKey="cvRole" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                                    <SortableHeader label="Departman" sortKey="department" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                                    <SortableHeader label="Konum" sortKey="location" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
+                                    <SortableHeader label="Tarama" sortKey="scanStatus" activeKey={sortKey} dir={sortDir} onSort={handleSort} align="center" />
+                                    <SortableHeader label="Doğrulama" sortKey="verification" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                                     <SortableHeader label="Deneyim" sortKey="experience" activeKey={sortKey} dir={sortDir} onSort={handleSort} align="center" />
                                     <SortableHeader label="Başvuru" sortKey="appliedDate" activeKey={sortKey} dir={sortDir} onSort={handleSort} />
                                 </tr>
@@ -967,13 +1046,13 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
                                 {loading && (
                                     <>
                                         <tr className="sr-only">
-                                            <td colSpan={selectedPosition ? 16 : 15} role="status">
+                                            <td colSpan={selectedPosition ? 17 : 16} role="status">
                                                 Adaylar yükleniyor…
                                             </td>
                                         </tr>
                                         {Array.from({ length: 8 }).map((_, satir) => (
                                             <tr key={`iskelet-${satir}`} className="border-b border-n100" aria-hidden="true">
-                                                {Array.from({ length: selectedPosition ? 16 : 15 }).map((_, sutun) => (
+                                                {Array.from({ length: selectedPosition ? 17 : 16 }).map((_, sutun) => (
                                                     <td key={sutun} className="px-3 py-2.5">
                                                         <div
                                                             className="skeleton h-3 rounded"
@@ -987,7 +1066,7 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
                                 )}
                                 {!loading && pageRows.length === 0 && (
                                     <tr>
-                                        <td colSpan={selectedPosition ? 16 : 15} className="px-4 py-12 text-center">
+                                        <td colSpan={selectedPosition ? 17 : 16} className="px-4 py-12 text-center">
                                             <p className="text-n500 text-[13px] font-medium">
                                                 {hasActiveFilters ? 'Filtrelere uyan aday bulunamadı.' : 'Henüz aday yok.'}
                                             </p>
@@ -1003,17 +1082,26 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
                                     <tr
                                         key={c.id}
                                         onClick={() => openCandidate(c.id)}
-                                        className={`border-b border-n100 last:border-0 hover:bg-n25 cursor-pointer ${selectedIds.has(c.id) ? 'bg-brand-50' : ''}`}
+                                        className={`border-b border-n100 last:border-0 cursor-pointer ${selectedIds.has(c.id) ? 'bg-brand-50' : 'bg-n0 hover:bg-n25'}`}
                                     >
-                                        <td className="px-3 py-2.5" onClick={(e) => { e.stopPropagation(); toggleRow(c.id); }}>
+                                        <td className="px-3 py-2.5 sticky left-0 z-[1] bg-inherit w-9" onClick={(e) => { e.stopPropagation(); toggleRow(c.id); }}>
                                             <button className="text-n400 hover:text-n700 transition-colors flex items-center" aria-label="Adayı seç">
                                                 {selectedIds.has(c.id) ? <CheckSquare className="w-4 h-4 text-brand" /> : <Square className="w-4 h-4" />}
                                             </button>
                                         </td>
-                                        <td className="px-3 py-2.5">
+                                        <td className="px-3 py-2.5 sticky left-9 z-[1] bg-inherit">
                                             <p className="font-semibold text-n900 whitespace-nowrap">{c.name || 'İsimsiz'}</p>
-                                            <p className="text-[10px] text-n400 whitespace-nowrap">{c.email || '—'}</p>
+                                            <p className="text-[12px] text-n500 whitespace-nowrap">{c.email || '—'}</p>
                                         </td>
+                                        <td className="px-3 py-2.5 text-center"><ScoreCell value={c.bestScore} method={c.scoreMethod} /></td>
+                                        {selectedPosition && (
+                                            <td className="px-3 py-2.5 text-center"><ScoreCell value={c.positionScore} gate={c.positionGate} interviewed={c.positionInterviewed} method={c.positionScoreMethod} /></td>
+                                        )}
+                                        <td className="px-3 py-2.5 text-center"><ScoreCell value={c.interviewScore} /></td>
+                                        <td className="px-3 py-2.5 text-center"><ScoreCell value={c.combinedScore} /></td>
+                                        <td className="px-3 py-2.5"><StageChip candidate={c} /></td>
+                                        <td className="px-3 py-2.5"><WaitCell candidate={c} /></td>
+                                        <td className="px-3 py-2.5 text-n500 whitespace-nowrap">{c.source || '—'}</td>
                                         {/* Serbest metin kolonları genişlik sınırlı: AI'nın ürettiği
                                             uzun rol adları tabloyu yatayda taşırıyordu — kesilen
                                             metnin tamamı tooltip'te. */}
@@ -1036,8 +1124,6 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
                                                 ? <p className={`truncate max-w-[130px] ${isIstanbulLocation(c.location) ? '' : 'text-warn'}`} title={c.location}>{c.location}</p>
                                                 : <span className="text-n300">—</span>}
                                         </td>
-                                        <td className="px-3 py-2.5"><StageChip candidate={c} /></td>
-                                        <td className="px-3 py-2.5 text-n500 whitespace-nowrap">{c.source || '—'}</td>
                                         <td className="px-3 py-2.5 text-center">
                                             {isDeepScanned(c) ? (
                                                 <span
@@ -1071,12 +1157,6 @@ Tavan nedeniyle ${skipped} aday bu turda DIŞARIDA kalacak; işlemi tekrarlayabi
                                                 <span className="text-n300" title="Bu aday için doğrulama henüz çalıştırılmadı">—</span>
                                             )}
                                         </td>
-                                        <td className="px-3 py-2.5 text-center"><ScoreCell value={c.bestScore} method={c.scoreMethod} /></td>
-                                        {selectedPosition && (
-                                            <td className="px-3 py-2.5 text-center"><ScoreCell value={c.positionScore} gate={c.positionGate} interviewed={c.positionInterviewed} method={c.positionScoreMethod} /></td>
-                                        )}
-                                        <td className="px-3 py-2.5 text-center"><ScoreCell value={c.interviewScore} /></td>
-                                        <td className="px-3 py-2.5 text-center"><ScoreCell value={c.combinedScore} /></td>
                                         <td className="px-3 py-2.5 text-center text-n600">
                                             {c.experience != null && c.experience !== '' ? `${c.experience} yıl` : '—'}
                                         </td>

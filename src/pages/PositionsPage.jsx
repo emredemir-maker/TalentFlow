@@ -22,6 +22,9 @@ import {
 } from '../services/applicationService';
 
 import PotentialCandidatesTab from '../components/PotentialCandidatesTab';
+import MiniFunnel from '../components/flow/MiniFunnel';
+import { positionHealth, HEALTH_LABEL } from '../utils/candidateFlow';
+import { resolveCandidateStage } from '../utils/candidateTable';
 import { useCandidates } from '../context/CandidatesContext';
 import { extractPositionFromJD } from '../services/geminiService';
 import {
@@ -1563,6 +1566,34 @@ export default function PositionsPage() {
         return f;
     }, [positions, isDepartmentUser, userDepartments, searchTerm, statusFilter, deptFilter]);
 
+    /**
+     * İLAN BAŞINA AKIŞ — her ilanın adaylarının aşamalara dağılımı ve sağlığı.
+     *
+     * Aday eşleştirme kuralı satırdaki "N aday" sayısıyla AYNI (position,
+     * matchedPositionTitle ya da bestTitle ilan başlığına eşit); iki sayı
+     * birbirini tutmak zorunda. Sağlık yalnızca açık ilanlar için anlamlı.
+     */
+    const flowByPosition = useMemo(() => {
+        const map = {};
+        const list = enrichedCandidates || [];
+        for (const pos of positions) {
+            const mine = list.filter(c => c.position === pos.title || c.matchedPositionTitle === pos.title || c.bestTitle === pos.title);
+            const counts = {};
+            const entries = mine.map((c) => {
+                const stage = resolveCandidateStage(c);
+                counts[stage] = (counts[stage] || 0) + 1;
+                return { stage, candidate: c };
+            });
+            map[pos.id] = {
+                count: mine.length,
+                counts,
+                health: pos.status === 'open' ? positionHealth(entries) : null,
+            };
+        }
+        return map;
+    }, [positions, enrichedCandidates]);
+    const attentionCount = Object.values(flowByPosition).filter((f) => f.health && f.health !== 'ok').length;
+
     const statusCounts = useMemo(() => ({
         all: positions.length, open: positions.filter(p => p.status === 'open').length,
         pending_approval: positions.filter(p => p.status === 'pending_approval').length,
@@ -1602,7 +1633,10 @@ export default function PositionsPage() {
             <div className="tf-page-head">
                 <div className="min-w-0">
                     <h1 className="tf-page-title">{isDepartmentUser ? `${userDepartments?.join(', ')} pozisyonları` : 'Pozisyon portföyü'}</h1>
-                    <p className="tf-page-sub m-0 tabular-nums">{visiblePositions.length} pozisyon gösteriliyor, {statusCounts.open} aktif</p>
+                    <p className="tf-page-sub m-0 tabular-nums">
+                        {visiblePositions.length} pozisyon gösteriliyor, {statusCounts.open} aktif
+                        {attentionCount > 0 && <span className="text-warn-text font-medium">, {attentionCount} ilanın akışı dikkat istiyor</span>}
+                    </p>
                 </div>
                 <div className="ml-auto flex items-center gap-2 flex-wrap">
                     <div className="relative">
@@ -1654,8 +1688,8 @@ export default function PositionsPage() {
 
                     {/* Table header */}
                     <div className="hidden md:block shrink-0 border-b border-n200 bg-n50">
-                        <div className="grid grid-cols-[2fr_0.7fr_0.7fr_0.9fr_1fr_120px] gap-3 tf-th py-2 px-6">
-                            <div>Pozisyon</div><div>Adaylar</div><div>Deneyim</div><div>Durum</div><div>Uyum skoru</div><div className="text-right">İşlemler</div>
+                        <div className="grid grid-cols-[minmax(0,1.5fr)_200px_minmax(0,0.9fr)_96px_120px] gap-4 tf-th py-2 px-6">
+                            <div>Pozisyon</div><div>Aday akışı</div><div>Adaylar</div><div>Uyum skoru</div><div className="text-right">İşlemler</div>
                         </div>
                     </div>
 
@@ -1678,7 +1712,8 @@ export default function PositionsPage() {
                             const sc = STATUS_CONFIG[pos.status] || STATUS_CONFIG.closed;
                             const isPending = pos.status === 'pending_approval';
                             const isRejected = pos.status === 'rejected';
-                            const candidateCount = candidates.filter(c => c.position === pos.title || c.matchedPositionTitle === pos.title || c.bestTitle === pos.title).length;
+                            const flow = flowByPosition[pos.id] || { count: 0, counts: {}, health: null };
+                            const candidateCount = flow.count;
                             const avgScore = pos.matchedCandidates?.length > 0 ? Math.round(pos.matchedCandidates.reduce((a, c) => a + c.score, 0) / pos.matchedCandidates.length) : null;
 
                             return (
@@ -1695,38 +1730,49 @@ export default function PositionsPage() {
                                     )}
 
                                     <div
-                                        className="px-6 py-3 grid grid-cols-[1fr_auto] md:grid-cols-[2fr_0.7fr_0.7fr_0.9fr_1fr_120px] gap-x-3 gap-y-2 items-center cursor-pointer"
+                                        className="px-6 py-4 grid grid-cols-[1fr_auto] md:grid-cols-[minmax(0,1.5fr)_200px_minmax(0,0.9fr)_96px_120px] gap-x-4 gap-y-2 items-center cursor-pointer"
                                         onClick={() => setDetailPos(pos)}
                                     >
-                                        {/* Col 1 */}
+                                        {/* Pozisyon — ad, departman, deneyim ve durum tek hücrede */}
                                         <div className="min-w-0">
-                                            <div className="text-[14px] font-semibold text-n900 truncate">{pos.title}</div>
-                                            <div className="text-[12px] text-n500 truncate">{pos.department}</div>
+                                            <div className="text-[15px] font-semibold text-n900 truncate">{pos.title}</div>
+                                            <div className="mt-0.5 flex items-center gap-2 text-[12px] text-n500 min-w-0 flex-wrap">
+                                                <span className="truncate">{pos.department}</span>
+                                                <span className="tabular-nums whitespace-nowrap" title="En az deneyim">{pos.minExperience || 0} yıl+</span>
+                                                <span className={`inline-flex items-center gap-1.5 text-[12px] font-medium px-2 py-px rounded-full border ${sc.pill}`}>
+                                                    <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />{sc.label}
+                                                </span>
+                                            </div>
                                         </div>
-                                        {/* Col 2 */}
-                                        <div className="hidden md:block text-[13px] text-n800 tabular-nums">
-                                            <span className="font-semibold">{candidateCount}</span> <span className="text-n500">aday</span>
-                                        </div>
-                                        {/* Col 3 */}
-                                        <div className="hidden md:block text-[13px] text-n800 tabular-nums" title="En az deneyim">
-                                            {pos.minExperience || 0} yıl+
-                                        </div>
-                                        {/* Col 4 */}
+                                        {/* Aday akışı — ilanın kendi hunisi */}
                                         <div className="hidden md:block">
-                                            <span className={`inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-0.5 rounded-full border ${sc.pill}`}>
-                                                <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />{sc.label}
-                                            </span>
+                                            <MiniFunnel counts={flow.counts} rejected={flow.counts.rejected || 0} />
                                         </div>
-                                        {/* Col 5 */}
-                                        <div className="hidden md:block pr-2">
+                                        {/* Adaylar + sağlık */}
+                                        <div className="hidden md:flex flex-col gap-1 text-[13px] text-n800 tabular-nums min-w-0">
+                                            <span><span className="font-semibold">{candidateCount}</span> <span className="text-n500">aday</span></span>
+                                            {flow.health && (
+                                                <span className={`self-start text-[12px] font-medium px-2 py-px rounded-full ${
+                                                    flow.health === 'ok' ? 'bg-brand-50 text-brand-700'
+                                                        : flow.health === 'thin' ? 'bg-n100 text-n600' : 'bg-warn-bg text-warn-text'
+                                                }`}>
+                                                    {HEALTH_LABEL[flow.health]}
+                                                </span>
+                                            )}
+                                        </div>
+                                        {/* Uyum skoru */}
+                                        <div className="hidden md:block">
                                             {pos.status === 'open' && avgScore ? (
-                                                <div className="flex items-center gap-2">
-                                                    <div className="h-1 flex-1 max-w-[96px] bg-n100 rounded-full overflow-hidden">
-                                                        <div className="h-full bg-brand rounded-full" style={{ width: `${avgScore}%` }} />
-                                                    </div>
-                                                    <span className="font-semibold text-brand text-[13px] tabular-nums">{avgScore}%</span>
-                                                </div>
+                                                <span className="font-semibold text-brand-700 text-[15px] tabular-nums">{avgScore}%</span>
                                             ) : <span className="text-n300 text-[13px]">—</span>}
+                                        </div>
+                                        {/* Telefonda huni ve sayı başlığın altında, tam genişlikte */}
+                                        <div className="md:hidden col-span-2 order-last flex items-end gap-3">
+                                            <MiniFunnel counts={flow.counts} rejected={flow.counts.rejected || 0} />
+                                            <span className="ml-auto text-[13px] text-n700 tabular-nums">{candidateCount} aday</span>
+                                            {flow.health && flow.health !== 'ok' && (
+                                                <span className="text-[12px] font-medium px-2 py-px rounded-full bg-warn-bg text-warn-text">{HEALTH_LABEL[flow.health]}</span>
+                                            )}
                                         </div>
                                         {/* Col 6 — stop propagation so clicks don't open drawer */}
                                         <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>

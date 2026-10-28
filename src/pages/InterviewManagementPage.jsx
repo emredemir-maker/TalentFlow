@@ -15,6 +15,8 @@ import AddManualInterviewModal from '../components/AddManualInterviewModal';
 import { downloadInterviewIcs } from '../utils/interviewIcs';
 import { isSessionPast } from '../utils/interviewSession';
 import InterviewCalendarView from '../components/InterviewCalendarView';
+import FlowTrace from '../components/flow/FlowTrace';
+import { resolveCandidateStage } from '../utils/candidateTable';
 import { eventMinutes, buildSessionFromEvent } from '../utils/calendarMatch';
 import SalaryBackfillModal from '../components/SalaryBackfillModal';
 import SalaryBandModal from '../components/SalaryBandModal';
@@ -61,6 +63,7 @@ import {
     ClipboardCheck,
     CalendarPlus,
     List,
+    CalendarClock,
 } from 'lucide-react';
 
 const PARTICIPANT_INVITES_PATH = 'artifacts/talent-flow/public/data/participantInvites';
@@ -88,13 +91,37 @@ function ivStatusChip(status, isDone) {
     if (status === 'live') return { label: 'Canlı', bg: '#ECFDF5', fg: '#059669' };
     if (status === 'cancelled') return { label: 'İptal', bg: '#FEF2F2', fg: '#DC2626' };
     if (status === 'postponed') return { label: 'Ertelendi', bg: 'var(--color-warn-bg)', fg: 'var(--color-warn)' };
-    if (isDone || status === 'completed') return { label: 'Tamamlandı', bg: '#F5F3FF', fg: '#7C3AED' };
-    return { label: 'Bekliyor', bg: '#EFF6FF', fg: '#2563EB' };
+    // Tamamlanan teal, bekleyen nötr: mor ve mavi Clyro Talent paletinde yok;
+    // renk yalnızca bir şey olduğunda (canlı, iptal, ertelendi) sinyal veriyor.
+    if (isDone || status === 'completed') return { label: 'Tamamlandı', bg: '#E6F6F4', fg: '#0F766E' };
+    return { label: 'Bekliyor', bg: '#F4F6F5', fg: '#343A37' };
 }
 
 function ivInitials(name = '') {
     const parts = String(name).trim().split(/\s+/);
     return ((parts[0]?.[0] || '') + (parts[1]?.[0] || '')).toLocaleUpperCase('tr') || '?';
+}
+
+/**
+ * Ajanda gün başlığı: "Bugün", "Yarın", "Dün" ya da "31 Ekim Cumartesi".
+ * Tarih yoksa "Tarihsiz" — uydurma bir gün değil. Yerel saatle hesaplanıyor
+ * (Türkiye'de gece yarısından sonra UTC bir önceki günü gösterirdi).
+ */
+function ivDayKey(raw) {
+    const part = String(raw || '').split('T')[0];
+    return /^\d{4}-\d{2}-\d{2}$/.test(part) ? part : '';
+}
+function ivDayHeading(key) {
+    if (!key) return { title: 'Tarihsiz', sub: '' };
+    const d = new Date(`${key}T00:00:00`);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const diff = Math.round((d - today) / 86400000);
+    const long = d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'long' });
+    if (diff === 0) return { title: 'Bugün', sub: long, today: true };
+    if (diff === 1) return { title: 'Yarın', sub: long };
+    if (diff === -1) return { title: 'Dün', sub: long };
+    return { title: long, sub: diff > 1 && diff < 7 ? 'Bu hafta' : '' };
 }
 
 /** '17.08.2026' — tarih yoksa tire, uydurma bir gün değil. */
@@ -576,7 +603,9 @@ export default function InterviewManagementPage() {
     // Sekmeler prototipteki dört kova: Tümü / Yaklaşan / Tamamlanan / İptal.
     const [ivTab, setIvTab] = useState('all');
     // Liste mi takvim mi — süzgeçten ayrı bir karar.
-    const [ivView, setIvView] = useState('list');
+    // Varsayılan görünüm ajanda: mülakat ekranının ilk sorusu "bugün ve bu
+    // hafta kimi görüyoruz". Liste ve takvim aynen duruyor.
+    const [ivView, setIvView] = useState('agenda');
     const [ivSearch, setIvSearch] = useState('');
     const [ivPage, setIvPage] = useState(0);
     const IV_PAGE_SIZE = 12;
@@ -1550,6 +1579,293 @@ export default function InterviewManagementPage() {
 
 
 
+    const renderIvRow = (s, agenda) => {
+        const sessionKey = s.id || s.sessionId;
+        const resolvedCandidateId = s._candidateId || s.candidateId;
+        const status = s._effectiveStatus || sessionStatuses[sessionKey] || s.status;
+        const isLive = status === 'live';
+        const isDone = s._effectiveCompleted || status === 'completed';
+        const isCancelled = status === 'cancelled';
+        const chip = ivStatusChip(status, isDone);
+        const isMenuOpen = openMenuId === sessionKey;
+        const canModify = !isLive && !isDone;
+        const isManual = s.mode === 'manual';
+        // Görüşme skoru — Pipeline ekranıyla AYNI kaynak.
+        // Manuel görüşmenin `aggregateScore`'u başka bir
+        // cetvel (kanıt oranı); ikisini aynı yıldıza
+        // basmak iki ölçüyü karıştırmak olurdu.
+        const ivScore = Math.round(Number(s.finalScore || s.aiOverallScore) || 0);
+        const participants = Array.isArray(s.participants) ? s.participants : [];
+        const openSession = () => {
+            if (isDone) { navigate(`/interview-report/${sessionKey}`); return; }
+            if (s.mode === 'face_to_face') { navigate(`/face-interview/${sessionKey}`); return; }
+            navigate(`/live-interview/${sessionKey}`);
+        };
+        // Sonuc girisi YALNIZCA planli kayitlarda: tamamlanmisin
+        // zaten raporu var, iptal edilenin sonucu yok.
+        const sonucGirilebilir = !isDone && !isCancelled && !isLive && Boolean(resolvedCandidateId);
+        const gecti = isSessionPast(s);
+        const sonucGir = () => {
+            setOpenMenuId(null);
+            setManualPrefill({
+                sessionId: sessionKey,
+                candidateId: resolvedCandidateId,
+                positionId: s.positionId || null,
+                date: s.date || '',
+                time: s.time || '',
+                interviewerName: s.interviewerName || s.interviewer || '',
+                title: s.title || '',
+            });
+            setManualInterviewOpen(true);
+        };
+        const takvimeEkle = () => {
+            setOpenMenuId(null);
+            const ok = downloadInterviewIcs(s, {
+                candidateName: s.candidateName,
+                positionTitle: s.positionTitle,
+                organizer: { name: userProfile?.displayName || '', email: userProfile?.email || '' },
+            });
+            if (!ok) window.alert('Bu gorusmede tarih ya da saat yok; takvim dosyasi uretilemedi.');
+        };
+
+            const actionsCell = (
+                <div className="flex items-center justify-end gap-2">
+                    {isDone && ivScore > 0 && (
+                        <span className="text-[13px] font-semibold tabular-nums text-n900" title="Mülakat skoru">{ivScore}</span>
+                    )}
+                    {isCancelled ? (
+                        <button
+                            onClick={() => handleUpdateSessionStatus(resolvedCandidateId, sessionKey, 'scheduled')}
+                            className="tf-btn tf-btn-secondary h-8"
+                        >
+                            Yeniden Planla
+                        </button>
+                    ) : (
+                        <button
+                            onClick={sonucGirilebilir && gecti ? sonucGir : openSession}
+                            title={sonucGirilebilir && gecti
+                                ? 'Görüşme yapıldıysa sonucunu buradan girin — başka bir uygulamada yapılmış olabilir'
+                                : undefined}
+                            className={`tf-btn h-8 ${
+                                isLive
+                                    ? '!bg-ok text-white hover:opacity-90'
+                                    : isDone
+                                        ? 'tf-btn-secondary'
+                                        : 'tf-btn-primary'
+                            }`}
+                        >
+                            {/* SAATI GECMIS GORUSMEDE YAPILACAK IS "KATILMAK" DEGIL.
+                                Gorusme baska bir uygulamada yapilmis olabilir; bu
+                                ekrandan yapilabilecek tek anlamli sey sonucu girmek. */}
+                            {isLive ? 'Katıl' : isDone ? 'Rapor' : gecti && sonucGirilebilir ? 'Sonucu gir' : 'Görüntüle'}
+                        </button>
+                    )}
+
+                    {/* Ertele / iptal / sil — mevcut satır menüsü.
+                        Prototipte tek bir CTA var ama bu üç işlem
+                        başka hiçbir ekrandan yapılamıyor. */}
+                    {!s._fromInvite && (
+                        <div className="relative">
+                            <button
+                                onClick={(e) => { e.stopPropagation(); setOpenMenuId(isMenuOpen ? null : sessionKey); }}
+                                className={`w-6 h-6 flex items-center justify-center rounded ${
+                                    isMenuOpen ? 'bg-n100 text-n900' : 'text-n400 hover:bg-n50 hover:text-n900'
+                                }`}
+                                aria-label="Diğer işlemler"
+                            >
+                                <MoreVertical className="w-3.5 h-3.5" />
+                            </button>
+                            {isMenuOpen && (
+                                <div
+                                    className="absolute right-0 top-7 w-44 bg-n0 rounded-[10px] shadow-lg border border-n200 py-1 z-40"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    {sonucGirilebilir && (
+                                        <button
+                                            onClick={sonucGir}
+                                            className="w-full flex items-center gap-2 px-3 py-2 text-[11px] font-semibold text-n700 hover:bg-n50 text-left"
+                                        >
+                                            <ClipboardCheck className="w-3.5 h-3.5" /> Sonucu gir
+                                        </button>
+                                    )}
+                                    {/* TAKVIM BLOKE ETME - entegrasyon gerektirmeyen yol.
+                                        Takvim etkinligi yalnizca Google Workspace bagliysa
+                                        olusuyor; bagli degilse kullanicinin kendi takviminde
+                                        hicbir iz kalmiyordu. .ics dosyasini Outlook, Apple
+                                        Takvim ve Google Takvim aciyor. */}
+                                    {!isCancelled && s.date && s.time && (
+                                        <button
+                                            onClick={takvimeEkle}
+                                            className="w-full flex items-center gap-2 px-3 py-2 text-[11px] font-semibold text-n700 hover:bg-n50 text-left"
+                                        >
+                                            <CalendarPlus className="w-3.5 h-3.5" /> Takvimime ekle
+                                        </button>
+                                    )}
+                                    {canModify && !isCancelled && (
+                                        <button
+                                            onClick={() => {
+                                                setOpenMenuId(null);
+                                                setPostponeModal({ candidateId: resolvedCandidateId, sessionId: sessionKey, date: s.date || '', time: s.time || '09:00' });
+                                            }}
+                                            className="w-full flex items-center gap-2 px-3 py-2 text-[11px] font-semibold text-warn-text hover:bg-warn-bg text-left"
+                                        >
+                                            <AlertCircle className="w-3.5 h-3.5" /> Ertele
+                                        </button>
+                                    )}
+                                    {canModify && !isCancelled && (
+                                        <button
+                                            onClick={async () => {
+                                                setOpenMenuId(null);
+                                                if (window.confirm('Bu mülakatı iptal etmek istediğinize emin misiniz?')) {
+                                                    await handleUpdateSessionStatus(resolvedCandidateId, sessionKey, 'cancelled');
+                                                }
+                                            }}
+                                            className="w-full flex items-center gap-2 px-3 py-2 text-[11px] font-semibold text-bad-text hover:bg-bad-bg text-left"
+                                        >
+                                            <AlertTriangle className="w-3.5 h-3.5" /> İptal Et
+                                        </button>
+                                    )}
+                                    {isCancelled && (
+                                        <button
+                                            onClick={async () => {
+                                                setOpenMenuId(null);
+                                                await handleUpdateSessionStatus(resolvedCandidateId, sessionKey, 'scheduled');
+                                            }}
+                                            className="w-full flex items-center gap-2 px-3 py-2 text-[11px] font-semibold text-brand hover:bg-brand-50 text-left"
+                                        >
+                                            <RefreshCw className="w-3.5 h-3.5" /> Yeniden Planla
+                                        </button>
+                                    )}
+                                    <div className="my-1 border-t border-n100" />
+                                    <button
+                                        onClick={() => {
+                                            setOpenMenuId(null);
+                                            handleDeleteSession(resolvedCandidateId, sessionKey);
+                                        }}
+                                        className="w-full flex items-center gap-2 px-3 py-2 text-[11px] font-semibold text-n500 hover:bg-n50 text-left"
+                                    >
+                                        <Trash2 className="w-3.5 h-3.5" /> Sil
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            );
+            if (agenda) {
+                // AJANDA SATIRI — saat önde ve büyük; aday, pozisyonu ve adayın
+                // akıştaki yeri yan yana. Eylemler tablo satırıyla birebir aynı.
+                const cand = s.candidate || null;
+                const stageKey = cand ? resolveCandidateStage(cand) : null;
+                const cvScore = Math.round(Number(s.matchScore) || 0);
+                return (
+                    <div
+                        key={sessionKey}
+                        className="grid grid-cols-[56px_minmax(0,1fr)_auto] md:grid-cols-[64px_minmax(0,1.6fr)_minmax(0,1fr)_112px_auto] items-center gap-x-4 gap-y-1 px-4 md:px-6 py-3 rounded-xl hover:bg-n50"
+                        style={isLive ? { background: 'rgba(22,162,108,.06)' } : undefined}
+                    >
+                        <div className="flex flex-col">
+                            <span className="text-[17px] leading-6 font-semibold tabular-nums text-n900">{s.time || '—'}</span>
+                            {isLive && <span className="text-[12px] font-medium text-ok-text">Canlı</span>}
+                        </div>
+                        <div className="min-w-0">
+                            <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-[14px] font-medium text-n900 truncate">{s.candidateName || 'Aday'}</span>
+                                {cvScore > 0 && <span className="text-[12px] text-n500 tabular-nums flex-none">uyum {cvScore}</span>}
+                            </div>
+                            <div className="mt-0.5 flex items-center gap-2 min-w-0 text-[12px] text-n500">
+                                <span className="truncate">{s.role || s.positionTitle || s.position || '—'}</span>
+                                {stageKey && <FlowTrace stageKey={stageKey} />}
+                            </div>
+                        </div>
+                        <div className="hidden md:block min-w-0 text-[12px] text-n600">
+                            <div className="truncate">
+                                {IV_TYPE_LABEL[s.interviewType] || IV_TYPE_LABEL[s.type] || 'Görüşme'}, {isManual ? 'manuel' : s.mode === 'face_to_face' ? 'yüz yüze' : 'görüntülü'}
+                            </div>
+                            <div className="truncate text-n500">
+                                {s.interviewerName || s.interviewer || 'Değerlendirici yok'}
+                                {participants.length > 0 ? `, +${participants.length} katılımcı` : ''}
+                            </div>
+                        </div>
+                        <div className="hidden md:block">
+                            <span className="text-[12px] font-medium px-2 py-0.5 rounded-full" style={{ background: chip.bg, color: chip.fg }}>
+                                {chip.label}
+                            </span>
+                        </div>
+                        {actionsCell}
+                    </div>
+                );
+            }
+        return (
+            <div
+                key={sessionKey}
+                className="grid grid-cols-1 lg:grid-cols-[1.5fr_1.25fr_92px_116px_1fr_104px_128px] items-center gap-y-1 px-[18px] py-2.5 border-b border-n100 text-[12px] hover:bg-n25"
+                style={isLive ? { background: 'rgba(22,162,108,.05)' } : undefined}
+            >
+                {/* Aday */}
+                <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-7 h-7 flex-none rounded-full bg-brand-50 text-brand flex items-center justify-center text-[11px] font-semibold">
+                        {ivInitials(s.candidateName)}
+                    </div>
+                    <div className="min-w-0">
+                        <div className="font-medium truncate">{s.candidateName || 'Aday'}</div>
+                        <div className="text-[11px] text-n400">
+                            {participants.length > 0 ? `+${participants.length} katılımcı` : 'katılımcı yok'}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Pozisyon */}
+                <div className="min-w-0 text-n600 truncate">
+                    {s.role || s.positionTitle || s.position || '—'}
+                </div>
+
+                {/* Tür — manuel görüşmede transkript uyarısı burada */}
+                <div className="text-[11px] text-n500">
+                    <div>{IV_TYPE_LABEL[s.interviewType] || IV_TYPE_LABEL[s.type] || 'Görüşme'}</div>
+                    {isManual ? (
+                        <span
+                            title="Manuel girildi — canlı transkript yok. Raporda 'manuel girildi' olarak işaretlenir."
+                            className="inline-flex items-center gap-1 text-[11px] text-warn mt-0.5"
+                        >
+                            <AlertCircle className="w-[11px] h-[11px]" /> Transkript yok
+                        </span>
+                    ) : (
+                        <span className="flex items-center gap-1 text-[11px] text-n400 mt-0.5">
+                            <Video className="w-[11px] h-[11px]" />
+                            {s.mode === 'face_to_face' ? 'Yüz yüze' : 'Görüntülü'}
+                        </span>
+                    )}
+                </div>
+
+                {/* Tarih & saat */}
+                <div className="text-[11px] text-n600">
+                    <div>{ivDateLabel(s.date)}</div>
+                    <div className="text-[11px] text-n400">{s.time || '—'}</div>
+                </div>
+
+                {/* Değerlendirici */}
+                <div className="text-[11px] text-n600 truncate">
+                    {s.interviewerName || s.interviewer || '—'}
+                </div>
+
+                {/* Durum */}
+                <div className="flex items-center gap-1.5">
+                    {isLive && (
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: chip.fg }} />
+                    )}
+                    <span
+                        className="text-[12px] font-semibold px-2 py-0.5 rounded-full"
+                        style={{ background: chip.bg, color: chip.fg }}
+                    >
+                        {chip.label}
+                    </span>
+                </div>
+                {actionsCell}
+            </div>
+        );
+    };
+
     return (
         <div className="infoset flex flex-col h-screen">
             <Header title="Mülakat Yönetimi" />
@@ -2282,12 +2598,12 @@ export default function InterviewManagementPage() {
             {!isPlanningMode && (
                 <div className="flex-1 flex flex-col overflow-hidden">
                     {/* ── Başlık ─────────────────────────────────────────────── */}
-                    <div className="h-14 flex-shrink-0 bg-n0 border-b border-n200 px-[18px] flex items-center gap-3.5">
+                    <div className="flex-shrink-0 bg-n0 border-b border-n200 px-4 md:px-6 py-4 flex items-center gap-3.5 flex-wrap">
                         <div>
-                            <h1 className="text-[15px] font-semibold tracking-[-0.02em] text-n900 m-0">Mülakat Yönetimi</h1>
-                            <span className="text-[11px] text-n400">
-                                {stats.total} mülakat · {stats.today} bugün
-                                {stats.live > 0 ? ` · ${stats.live} canlı` : ''}
+                            <h1 className="tf-page-title">Mülakat Yönetimi</h1>
+                            <span className="tf-page-sub block tabular-nums">
+                                {stats.total} mülakat, {stats.today} bugün
+                                {stats.live > 0 ? `, ${stats.live} canlı` : ''}
                             </span>
                         </div>
                         <div className="ml-auto flex items-center gap-2">
@@ -2300,7 +2616,8 @@ export default function InterviewManagementPage() {
                                     value={ivSearch}
                                     onChange={(e) => setIvSearch(e.target.value)}
                                     placeholder="Aday veya pozisyon ara…"
-                                    className="pl-8 pr-3 py-1.5 text-[11px] border border-n200 rounded-md bg-n50 focus:outline-none focus:border-brand w-44"
+                                    aria-label="Aday veya pozisyon ara"
+                                    className="h-8 pl-8 pr-3 text-[13px] border border-n200 rounded-full bg-n50 focus:bg-n0 focus:outline-none focus:border-brand w-56"
                                 />
                             </div>
                             {/* Single primary action with grouped sub-actions.
@@ -2310,7 +2627,7 @@ export default function InterviewManagementPage() {
                             <div className="relative" onClick={(e) => e.stopPropagation()}>
                                 <button
                                     onClick={() => setNewInterviewMenuOpen(o => !o)}
-                                    className="flex items-center gap-1.5 text-[13px] font-semibold text-white bg-brand hover:bg-brand-600 rounded-md px-[13px] py-[7px]"
+                                    className="tf-btn tf-btn-primary"
                                     aria-haspopup="menu"
                                     aria-expanded={newInterviewMenuOpen}
                                 >
@@ -2463,14 +2780,17 @@ export default function InterviewManagementPage() {
                     </div>
 
                     {/* ── Tablo + sağ ray ────────────────────────────────────── */}
-                    <div className="flex-1 grid grid-cols-1 xl:grid-cols-[1fr_280px] overflow-hidden">
+                    {/* Telefonda tek kaydırma: ray listenin altına iniyor ve
+                        liste ekranın yarısına sıkışmıyor. Masaüstünde iki
+                        sütun ayrı ayrı kayıyor (eski davranış). */}
+                    <div className="flex-1 min-h-0 grid grid-cols-1 xl:grid-cols-[1fr_300px] overflow-y-auto xl:overflow-hidden">
 
                         {/* SOL: sekmeler + 7 kolonlu tablo ───────────────────── */}
-                        <div className="flex flex-col overflow-hidden xl:border-r border-n200 bg-n0">
+                        <div className="flex flex-col xl:overflow-hidden xl:border-r border-n200 bg-n0">
 
                             {/* Sekme pill'leri */}
-                            <div className="flex items-center gap-2.5 px-[18px] py-[11px] border-b border-n200 flex-shrink-0">
-                                <div className="flex items-center gap-0.5 bg-n50 border border-n200 rounded-md p-0.5">
+                            <div className="flex items-center gap-2.5 px-4 md:px-6 py-3 border-b border-n200 flex-shrink-0 flex-wrap">
+                                <div className="flex items-center gap-0.5 bg-n100 rounded-full p-0.5">
                                     {[
                                         { key: 'all', label: 'Tümü', count: activeInterviews.length + pastInterviews.length },
                                         { key: 'upcoming', label: 'Yaklaşan', count: activeInterviews.length },
@@ -2482,15 +2802,14 @@ export default function InterviewManagementPage() {
                                             <button
                                                 key={t.key}
                                                 onClick={() => setIvTab(t.key)}
-                                                className={`flex items-center gap-1.5 text-[12px] font-semibold px-[11px] py-[5px] rounded ${
-                                                    on ? 'bg-n0 text-n900 shadow-sm' : 'text-n500 hover:text-n700'
+                                                aria-pressed={on}
+                                                className={`flex items-center gap-1.5 h-7 text-[13px] font-medium px-3 rounded-full ${
+                                                    on ? 'bg-n0 text-n900 shadow-[0_1px_2px_rgba(17,19,18,0.08)]' : 'text-n500 hover:text-n800'
                                                 }`}
                                             >
                                                 {t.label}
                                                 {t.count !== null && (
-                                                    <span className={`text-[12px] font-semibold px-1.5 rounded-full ${
-                                                        on ? 'bg-brand-50 text-brand' : 'bg-n100 text-n400'
-                                                    }`}>
+                                                    <span className="text-[12px] tabular-nums text-n500">
                                                         {t.count}
                                                     </span>
                                                 )}
@@ -2505,8 +2824,9 @@ export default function InterviewManagementPage() {
                                     takvim ekranını bulamadı. Görünüm seçimi
                                     süzgeçten ayrı bir karar ve Süreç ekranındaki
                                     Kanban/Liste anahtarıyla aynı desende. */}
-                                <div className="flex items-center gap-0.5 bg-n50 border border-n200 rounded-md p-0.5">
+                                <div className="flex items-center gap-0.5 bg-n100 rounded-full p-0.5">
                                     {[
+                                        { key: 'agenda', label: 'Ajanda', icon: CalendarClock },
                                         { key: 'list', label: 'Liste', icon: List },
                                         { key: 'calendar', label: 'Takvim', icon: CalendarDays },
                                     ].map(v => {
@@ -2515,8 +2835,9 @@ export default function InterviewManagementPage() {
                                             <button
                                                 key={v.key}
                                                 onClick={() => setIvView(v.key)}
-                                                className={`flex items-center gap-1.5 text-[12px] font-semibold px-[11px] py-[5px] rounded ${
-                                                    on ? 'bg-n0 text-n900 shadow-sm' : 'text-n500 hover:text-n700'
+                                                aria-pressed={on}
+                                                className={`flex items-center gap-1.5 h-7 text-[13px] font-medium px-3 rounded-full ${
+                                                    on ? 'bg-n0 text-n900 shadow-[0_1px_2px_rgba(17,19,18,0.08)]' : 'text-n500 hover:text-n800'
                                                 }`}
                                             >
                                                 <v.icon className="w-[13px] h-[13px]" /> {v.label}
@@ -2528,14 +2849,11 @@ export default function InterviewManagementPage() {
                                 {/* Kapsam süzgeci — mevcut özellik, korundu.
                                     Departman kullanıcısı zaten yalnızca kendi
                                     mülakatlarını görebiliyor, seçenek gösterilmiyor. */}
-                                {ivView === 'list' && !isDepartmentUser && (
+                                {ivView !== 'calendar' && !isDepartmentUser && (
                                     <button
                                         onClick={() => setShowMyInterviews(v => !v)}
-                                        className={`ml-auto flex items-center gap-1.5 text-[12px] font-medium border rounded-md px-[11px] py-[5px] ${
-                                            showMyInterviews
-                                                ? 'bg-brand-50 text-brand border-brand-100'
-                                                : 'bg-n50 text-n600 border-n200 hover:bg-n100'
-                                        }`}
+                                        aria-pressed={showMyInterviews}
+                                        className={`ml-auto tf-btn tf-btn-secondary ${showMyInterviews ? '!bg-pill !border-pill' : ''}`}
                                     >
                                         <User className="w-[13px] h-[13px]" /> Benim mülakatlarım
                                     </button>
@@ -2561,8 +2879,9 @@ export default function InterviewManagementPage() {
                                 />
                             )}
 
-                            {/* Kolon başlıkları */}
-                            {ivView !== 'calendar' && (
+                            {/* Kolon başlıkları — yalnız liste görünümünde; ajandada
+                                saat ve gün başlıkları sütun başlığının işini görüyor. */}
+                            {ivView === 'list' && (
                             <div className="hidden lg:grid grid-cols-[1.5fr_1.25fr_92px_116px_1fr_104px_128px] items-center px-[18px] py-2 border-b border-n200 bg-n50 text-[11px] font-semibold text-n500 flex-shrink-0">
                                 <span>Aday</span>
                                 <span>Pozisyon</span>
@@ -2576,7 +2895,7 @@ export default function InterviewManagementPage() {
 
                             {/* Satırlar */}
                             {ivView !== 'calendar' && (
-                            <div className="flex-1 overflow-y-auto custom-scrollbar">
+                            <div className="flex-1 xl:overflow-y-auto custom-scrollbar">
                                 {ivRows.length === 0 ? (
                                     <div className="px-[18px] py-14 flex flex-col items-center text-center">
                                         <div className="w-11 h-11 rounded-full bg-n50 flex items-center justify-center mb-2.5">
@@ -2591,246 +2910,30 @@ export default function InterviewManagementPage() {
                                                 : 'Yeni Mülakat menüsünden bir seans planlayarak başlayabilirsiniz.'}
                                         </p>
                                     </div>
-                                ) : ivRows.map(s => {
-                                    const sessionKey = s.id || s.sessionId;
-                                    const resolvedCandidateId = s._candidateId || s.candidateId;
-                                    const status = s._effectiveStatus || sessionStatuses[sessionKey] || s.status;
-                                    const isLive = status === 'live';
-                                    const isDone = s._effectiveCompleted || status === 'completed';
-                                    const isCancelled = status === 'cancelled';
-                                    const chip = ivStatusChip(status, isDone);
-                                    const isMenuOpen = openMenuId === sessionKey;
-                                    const canModify = !isLive && !isDone;
-                                    const isManual = s.mode === 'manual';
-                                    // Görüşme skoru — Pipeline ekranıyla AYNI kaynak.
-                                    // Manuel görüşmenin `aggregateScore`'u başka bir
-                                    // cetvel (kanıt oranı); ikisini aynı yıldıza
-                                    // basmak iki ölçüyü karıştırmak olurdu.
-                                    const ivScore = Math.round(Number(s.finalScore || s.aiOverallScore) || 0);
-                                    const participants = Array.isArray(s.participants) ? s.participants : [];
-                                    const openSession = () => {
-                                        if (isDone) { navigate(`/interview-report/${sessionKey}`); return; }
-                                        if (s.mode === 'face_to_face') { navigate(`/face-interview/${sessionKey}`); return; }
-                                        navigate(`/live-interview/${sessionKey}`);
-                                    };
-                                    // Sonuc girisi YALNIZCA planli kayitlarda: tamamlanmisin
-                                    // zaten raporu var, iptal edilenin sonucu yok.
-                                    const sonucGirilebilir = !isDone && !isCancelled && !isLive && Boolean(resolvedCandidateId);
-                                    const gecti = isSessionPast(s);
-                                    const sonucGir = () => {
-                                        setOpenMenuId(null);
-                                        setManualPrefill({
-                                            sessionId: sessionKey,
-                                            candidateId: resolvedCandidateId,
-                                            positionId: s.positionId || null,
-                                            date: s.date || '',
-                                            time: s.time || '',
-                                            interviewerName: s.interviewerName || s.interviewer || '',
-                                            title: s.title || '',
-                                        });
-                                        setManualInterviewOpen(true);
-                                    };
-                                    const takvimeEkle = () => {
-                                        setOpenMenuId(null);
-                                        const ok = downloadInterviewIcs(s, {
-                                            candidateName: s.candidateName,
-                                            positionTitle: s.positionTitle,
-                                            organizer: { name: userProfile?.displayName || '', email: userProfile?.email || '' },
-                                        });
-                                        if (!ok) window.alert('Bu gorusmede tarih ya da saat yok; takvim dosyasi uretilemedi.');
-                                    };
-                                    return (
-                                        <div
-                                            key={sessionKey}
-                                            className="grid grid-cols-1 lg:grid-cols-[1.5fr_1.25fr_92px_116px_1fr_104px_128px] items-center gap-y-1 px-[18px] py-2.5 border-b border-n100 text-[12px] hover:bg-n25"
-                                            style={isLive ? { background: 'rgba(22,162,108,.05)' } : undefined}
-                                        >
-                                            {/* Aday */}
-                                            <div className="flex items-center gap-2.5 min-w-0">
-                                                <div className="w-7 h-7 flex-none rounded-full bg-brand-50 text-brand flex items-center justify-center text-[11px] font-semibold">
-                                                    {ivInitials(s.candidateName)}
+                                ) : ivView === 'agenda' ? (
+                                    // AJANDA — satırlar güne göre gruplu. Sıra listedekiyle
+                                    // aynı (yaklaşanlar artan, geçmiş azalan); ardışık aynı
+                                    // günler tek başlık altında toplanıyor.
+                                    ivRows.reduce((groups, row) => {
+                                        const key = ivDayKey(row.date);
+                                        const last = groups[groups.length - 1];
+                                        if (last && last.key === key) last.rows.push(row);
+                                        else groups.push({ key, rows: [row] });
+                                        return groups;
+                                    }, []).map((g) => {
+                                        const h = ivDayHeading(g.key);
+                                        return (
+                                            <section key={g.key || 'tarihsiz'} className="px-2 md:px-0 pt-4">
+                                                <div className="flex items-baseline gap-3 px-4 md:px-6 pb-1.5">
+                                                    <h2 className={`m-0 text-[15px] font-semibold ${h.today ? 'text-brand-700' : 'text-n900'}`}>{h.title}</h2>
+                                                    {h.sub && <span className="text-[13px] text-n500">{h.sub}</span>}
+                                                    <span className="ml-auto text-[12px] text-n500 tabular-nums">{g.rows.length} mülakat</span>
                                                 </div>
-                                                <div className="min-w-0">
-                                                    <div className="font-medium truncate">{s.candidateName || 'Aday'}</div>
-                                                    <div className="text-[11px] text-n400">
-                                                        {participants.length > 0 ? `+${participants.length} katılımcı` : 'katılımcı yok'}
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* Pozisyon */}
-                                            <div className="min-w-0 text-n600 truncate">
-                                                {s.role || s.positionTitle || s.position || '—'}
-                                            </div>
-
-                                            {/* Tür — manuel görüşmede transkript uyarısı burada */}
-                                            <div className="text-[11px] text-n500">
-                                                <div>{IV_TYPE_LABEL[s.interviewType] || IV_TYPE_LABEL[s.type] || 'Görüşme'}</div>
-                                                {isManual ? (
-                                                    <span
-                                                        title="Manuel girildi — canlı transkript yok. Raporda 'manuel girildi' olarak işaretlenir."
-                                                        className="inline-flex items-center gap-1 text-[11px] text-warn mt-0.5"
-                                                    >
-                                                        <AlertCircle className="w-[11px] h-[11px]" /> Transkript yok
-                                                    </span>
-                                                ) : (
-                                                    <span className="flex items-center gap-1 text-[11px] text-n400 mt-0.5">
-                                                        <Video className="w-[11px] h-[11px]" />
-                                                        {s.mode === 'face_to_face' ? 'Yüz yüze' : 'Görüntülü'}
-                                                    </span>
-                                                )}
-                                            </div>
-
-                                            {/* Tarih & saat */}
-                                            <div className="text-[11px] text-n600">
-                                                <div>{ivDateLabel(s.date)}</div>
-                                                <div className="text-[11px] text-n400">{s.time || '—'}</div>
-                                            </div>
-
-                                            {/* Değerlendirici */}
-                                            <div className="text-[11px] text-n600 truncate">
-                                                {s.interviewerName || s.interviewer || '—'}
-                                            </div>
-
-                                            {/* Durum */}
-                                            <div className="flex items-center gap-1.5">
-                                                {isLive && (
-                                                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: chip.fg }} />
-                                                )}
-                                                <span
-                                                    className="text-[12px] font-semibold px-2 py-0.5 rounded-full"
-                                                    style={{ background: chip.bg, color: chip.fg }}
-                                                >
-                                                    {chip.label}
-                                                </span>
-                                            </div>
-
-                                            {/* Aksiyon */}
-                                            <div className="flex items-center justify-end gap-2">
-                                                {isDone && ivScore > 0 && (
-                                                    <span className="text-[11px] font-semibold text-warn">★ {ivScore}</span>
-                                                )}
-                                                {isCancelled ? (
-                                                    <button
-                                                        onClick={() => handleUpdateSessionStatus(resolvedCandidateId, sessionKey, 'scheduled')}
-                                                        className="text-[12px] font-semibold px-2.5 py-[5px] rounded-md bg-n0 text-n600 border border-n200 hover:bg-n50"
-                                                    >
-                                                        Yeniden Planla
-                                                    </button>
-                                                ) : (
-                                                    <button
-                                                        onClick={sonucGirilebilir && gecti ? sonucGir : openSession}
-                                                        title={sonucGirilebilir && gecti
-                                                            ? 'Görüşme yapıldıysa sonucunu buradan girin — başka bir uygulamada yapılmış olabilir'
-                                                            : undefined}
-                                                        className={`text-[12px] font-semibold px-2.5 py-[5px] rounded-md border ${
-                                                            isLive
-                                                                ? 'bg-ok text-white border-transparent hover:opacity-90'
-                                                                : isDone
-                                                                    ? 'bg-n0 text-n600 border-n200 hover:bg-n50'
-                                                                    : 'bg-brand text-white border-transparent hover:bg-brand-600'
-                                                        }`}
-                                                    >
-                                                        {/* SAATI GECMIS GORUSMEDE YAPILACAK IS "KATILMAK" DEGIL.
-                                                            Gorusme baska bir uygulamada yapilmis olabilir; bu
-                                                            ekrandan yapilabilecek tek anlamli sey sonucu girmek. */}
-                                                        {isLive ? 'Katıl' : isDone ? 'Rapor' : gecti && sonucGirilebilir ? 'Sonucu gir' : 'Görüntüle'}
-                                                    </button>
-                                                )}
-
-                                                {/* Ertele / iptal / sil — mevcut satır menüsü.
-                                                    Prototipte tek bir CTA var ama bu üç işlem
-                                                    başka hiçbir ekrandan yapılamıyor. */}
-                                                {!s._fromInvite && (
-                                                    <div className="relative">
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); setOpenMenuId(isMenuOpen ? null : sessionKey); }}
-                                                            className={`w-6 h-6 flex items-center justify-center rounded ${
-                                                                isMenuOpen ? 'bg-n100 text-n900' : 'text-n400 hover:bg-n50 hover:text-n900'
-                                                            }`}
-                                                            aria-label="Diğer işlemler"
-                                                        >
-                                                            <MoreVertical className="w-3.5 h-3.5" />
-                                                        </button>
-                                                        {isMenuOpen && (
-                                                            <div
-                                                                className="absolute right-0 top-7 w-44 bg-n0 rounded-[10px] shadow-lg border border-n200 py-1 z-40"
-                                                                onClick={(e) => e.stopPropagation()}
-                                                            >
-                                                                {sonucGirilebilir && (
-                                                                    <button
-                                                                        onClick={sonucGir}
-                                                                        className="w-full flex items-center gap-2 px-3 py-2 text-[11px] font-semibold text-n700 hover:bg-n50 text-left"
-                                                                    >
-                                                                        <ClipboardCheck className="w-3.5 h-3.5" /> Sonucu gir
-                                                                    </button>
-                                                                )}
-                                                                {/* TAKVIM BLOKE ETME - entegrasyon gerektirmeyen yol.
-                                                                    Takvim etkinligi yalnizca Google Workspace bagliysa
-                                                                    olusuyor; bagli degilse kullanicinin kendi takviminde
-                                                                    hicbir iz kalmiyordu. .ics dosyasini Outlook, Apple
-                                                                    Takvim ve Google Takvim aciyor. */}
-                                                                {!isCancelled && s.date && s.time && (
-                                                                    <button
-                                                                        onClick={takvimeEkle}
-                                                                        className="w-full flex items-center gap-2 px-3 py-2 text-[11px] font-semibold text-n700 hover:bg-n50 text-left"
-                                                                    >
-                                                                        <CalendarPlus className="w-3.5 h-3.5" /> Takvimime ekle
-                                                                    </button>
-                                                                )}
-                                                                {canModify && !isCancelled && (
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            setOpenMenuId(null);
-                                                                            setPostponeModal({ candidateId: resolvedCandidateId, sessionId: sessionKey, date: s.date || '', time: s.time || '09:00' });
-                                                                        }}
-                                                                        className="w-full flex items-center gap-2 px-3 py-2 text-[11px] font-semibold text-warn-text hover:bg-warn-bg text-left"
-                                                                    >
-                                                                        <AlertCircle className="w-3.5 h-3.5" /> Ertele
-                                                                    </button>
-                                                                )}
-                                                                {canModify && !isCancelled && (
-                                                                    <button
-                                                                        onClick={async () => {
-                                                                            setOpenMenuId(null);
-                                                                            if (window.confirm('Bu mülakatı iptal etmek istediğinize emin misiniz?')) {
-                                                                                await handleUpdateSessionStatus(resolvedCandidateId, sessionKey, 'cancelled');
-                                                                            }
-                                                                        }}
-                                                                        className="w-full flex items-center gap-2 px-3 py-2 text-[11px] font-semibold text-bad-text hover:bg-bad-bg text-left"
-                                                                    >
-                                                                        <AlertTriangle className="w-3.5 h-3.5" /> İptal Et
-                                                                    </button>
-                                                                )}
-                                                                {isCancelled && (
-                                                                    <button
-                                                                        onClick={async () => {
-                                                                            setOpenMenuId(null);
-                                                                            await handleUpdateSessionStatus(resolvedCandidateId, sessionKey, 'scheduled');
-                                                                        }}
-                                                                        className="w-full flex items-center gap-2 px-3 py-2 text-[11px] font-semibold text-brand hover:bg-brand-50 text-left"
-                                                                    >
-                                                                        <RefreshCw className="w-3.5 h-3.5" /> Yeniden Planla
-                                                                    </button>
-                                                                )}
-                                                                <div className="my-1 border-t border-n100" />
-                                                                <button
-                                                                    onClick={() => {
-                                                                        setOpenMenuId(null);
-                                                                        handleDeleteSession(resolvedCandidateId, sessionKey);
-                                                                    }}
-                                                                    className="w-full flex items-center gap-2 px-3 py-2 text-[11px] font-semibold text-n500 hover:bg-n50 text-left"
-                                                                >
-                                                                    <Trash2 className="w-3.5 h-3.5" /> Sil
-                                                                </button>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
+                                                <div className="md:px-2">{g.rows.map((row) => renderIvRow(row, true))}</div>
+                                            </section>
+                                        );
+                                    })
+                                ) : ivRows.map(row => renderIvRow(row, false))}
                             </div>
                             )}
 
@@ -2863,16 +2966,16 @@ export default function InterviewManagementPage() {
                         </div>
 
                         {/* SAĞ RAY: bugün + değerlendirici yükü ───────────────── */}
-                        <aside className="p-3.5 flex flex-col gap-2 bg-n25 overflow-y-auto custom-scrollbar">
+                        <aside className="p-5 flex flex-col gap-4 bg-n25 overflow-y-auto custom-scrollbar">
                             <div>
                                 <div className="flex items-center justify-between mb-2.5">
-                                    <span className="text-[11px] font-semibold text-n500 tracking-[0.08em] uppercase">Bugün</span>
-                                    <span className="text-[11px] text-n400">
+                                    <h2 className="tf-section-title">Bugün</h2>
+                                    <span className="text-[12px] text-n500">
                                         {new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })}
                                     </span>
                                 </div>
                                 {todaySessions.length === 0 ? (
-                                    <div className="text-[11px] text-n400 py-3">Bugüne planlı mülakat yok.</div>
+                                    <div className="text-[13px] text-n500 py-3">Bugüne planlı mülakat yok.</div>
                                 ) : todaySessions.map(s => {
                                     const status = s._effectiveStatus || s.status;
                                     const chip = ivStatusChip(status, s._effectiveCompleted);
@@ -2885,10 +2988,10 @@ export default function InterviewManagementPage() {
                                             }}
                                             className="w-full flex items-center gap-2.5 py-2 border-t border-n100 text-left hover:bg-n50"
                                         >
-                                            <span className="w-10 flex-none text-[11px] font-semibold">{s.time || '—'}</span>
+                                            <span className="w-11 flex-none text-[13px] font-semibold tabular-nums">{s.time || '—'}</span>
                                             <div className="flex-1 min-w-0">
-                                                <div className="text-[11px] font-medium truncate">{s.candidateName}</div>
-                                                <div className="text-[11px] text-n400 truncate">{s.role || '—'}</div>
+                                                <div className="text-[13px] font-medium truncate">{s.candidateName}</div>
+                                                <div className="text-[12px] text-n500 truncate">{s.role || '—'}</div>
                                             </div>
                                             <span
                                                 className="flex-none text-[12px] font-semibold px-[7px] py-0.5 rounded-full"
@@ -2904,18 +3007,16 @@ export default function InterviewManagementPage() {
                             <div className="h-px bg-n200" />
 
                             <div>
-                                <div className="text-[11px] font-semibold text-n500 tracking-[0.08em] uppercase mb-2.5">
-                                    Değerlendirici yükü
-                                </div>
+                                <h2 className="tf-section-title mb-2">Değerlendirici yükü</h2>
                                 {reviewerLoad.length === 0 ? (
-                                    <div className="text-[11px] text-n400 py-1">Planlı mülakat yok.</div>
+                                    <div className="text-[13px] text-n500 py-1">Planlı mülakat yok.</div>
                                 ) : reviewerLoad.map(r => (
                                     <div key={r.name} className="flex items-center gap-2 py-[5px]">
-                                        <span className="flex-1 text-[11px] text-n600 truncate">{r.name}</span>
-                                        <span className="text-[11px] font-semibold">{r.count}</span>
+                                        <span className="flex-1 text-[13px] text-n700 truncate">{r.name}</span>
+                                        <span className="text-[13px] font-semibold tabular-nums">{r.count}</span>
                                     </div>
                                 ))}
-                                <p className="text-[11px] text-n400 mt-2 m-0">
+                                <p className="text-[12px] text-n500 mt-2 m-0">
                                     Tamamlanmamış mülakat sayısı.
                                 </p>
                             </div>

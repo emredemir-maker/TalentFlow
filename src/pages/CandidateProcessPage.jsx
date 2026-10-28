@@ -27,6 +27,8 @@ import Header from '../components/Header';
 import SystemScanner from '../components/SystemScanner';
 import AddCandidateModal from '../components/AddCandidateModal';
 import CandidateAvatar from '../components/CandidateAvatar';
+import CandidateStory from '../components/flow/CandidateStory';
+import FlowTrace from '../components/flow/FlowTrace';
 import CandidateCvPanel from '../components/CandidateCvPanel';
 import ScoreBreakdownPanel, { RequirementTiers } from '../components/ScoreBreakdownPanel';
 import InterviewPlanPanel from '../components/InterviewPlanPanel';
@@ -1171,14 +1173,29 @@ export default function CandidateProcessPage() {
                 {/* ── RIGHT: DETAIL PANEL ───────────────────────────────────── */}
                 <main className="flex-1 overflow-hidden flex flex-col bg-n50">
                     {candidate ? (
-                        <div className="flex-1 overflow-hidden flex flex-col bg-n0">
+                        <div className="flex-1 overflow-hidden flex bg-n0">
+                            {/* SOL: ADAYIN HİKÂYESİ (lg ve üstü) — kimlik, uyum
+                                skoru ve gerekçesi, akıştaki yolculuk, notlar.
+                                Telefonda yer yok; orada aşağıdaki kısa başlık
+                                aynı kimlik ve ölçüleri taşıyor. */}
+                            <CandidateStory
+                                candidate={candidate}
+                                score={score}
+                                starScore={starScore}
+                                isTop2Percent={isTop2Percent}
+                                summary={typeof displayedAnalysis?.summary === 'string' ? displayedAnalysis.summary : ''}
+                                onOpenComments={() => setCommentModal(true)}
+                                onOpenTab={setActiveTab}
+                                className="hidden lg:flex"
+                            />
+                            <div className="flex-1 min-w-0 overflow-hidden flex flex-col">
 
                             {/* ── ADAY BAŞLIĞI (prototip) ─────────────────
                                 44px köşeli avatar, ad + rozetler tek satırda,
                                 sağda STAR / Eleme ölçüleri. Rozetlerin her biri
                                 AYRI bir ölçü: endeks skoru, STAR kanıt
                                 yoğunluğu ve eleme skoru aynı sayı değil. */}
-                            <div className="px-6 pt-5 pb-4 flex items-center gap-3 flex-wrap">
+                            <div className="px-4 md:px-6 pt-4 pb-3 flex items-center gap-3 flex-wrap lg:hidden">
                                 <CandidateAvatar
                                     name={candidate.name}
                                     photo={candidate.photo}
@@ -1234,6 +1251,10 @@ export default function CandidateProcessPage() {
                                                 <Mail className="w-3.5 h-3.5" /> {candidate.email}
                                             </span>
                                         )}
+                                    </div>
+                                    <div className="mt-2 flex items-center gap-2 text-[12px] text-n600">
+                                        <FlowTrace stageKey={resolveCandidateStage(candidate)} />
+                                        {getStage(resolveCandidateStage(candidate)).label}
                                     </div>
                                 </div>
 
@@ -2358,6 +2379,7 @@ export default function CandidateProcessPage() {
                                         <div className="fixed inset-0 z-40" onClick={() => setStatusDropdownOpen(false)} />
                                     )}
                                 </div>
+                            </div>
                             </div>
                         </div>
                     ) : (
