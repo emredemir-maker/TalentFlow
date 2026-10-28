@@ -1,6 +1,6 @@
 # Clyro Talent — çok şirketli (multi-tenant) geçiş planı
 
-> Durum: **plan** (kod değişikliği yok). Tarih: 2026-10-28. Kaynak: `origin/main` @ `697ea53`.
+> Durum: **plan** (kod değişikliği yok). Tarih: 2026-10-28 (K10 kararıyla güncellendi: veri taşınmaz). Kaynak: `origin/main` @ `697ea53`.
 > Bağlam: Hub-Inn `docs/ROADMAP.md` → "Tam yayına hazırlık" → "Kiracıların uygulamalarda ayrılması"
 > ("TalentFlow tek şirketlik: veri her şirket için ayrılır, mevcut veri taşınır") ve DECISIONS X6/X9.
 > Bu belgede **tenant = şirket = Hub çalışma alanı**. Tenant kimliği olarak Hub'daki `tenants.id` (UUID) kullanılır.
@@ -9,22 +9,26 @@
 
 ## 0. Özet
 
+> **2026-10-28 güncellemesi (K10, Emre):** Talent'ta bugün gerçek veri yok, yalnız test/demo verisi var.
+> **Veri taşınmaz;** tenant yolları boş başlar, eski ortak yol dondurulur ve temizlenir. Taşıma provası, bakım penceresi
+> ve iki yolu birden destekleyen "veri kökü çözücü" plandan çıkarıldı.
+
 - **Model:** yol tabanlı — her şirketin verisi `tenants/{tenantId}/…` altında. Yetki kaynağı
   `tenants/{tenantId}/members/{uid}` üyelik belgesi (rol + departmanlar). Kurallar her eşleşmede bu belgeye bakar.
 - **Hub köprüsü:** kod değişimi tarayıcıdan değil **Talent sunucusundan** yapılır (Signals'taki desen). Hub, kodun
   ait olduğu tenant'ı ve Hub rolünü sunucuya döner; Talent sunucusu tenant + üyelik belgesini yazar. Firebase jetonuna
   yetki taşıyan özel talep (custom claim) **eklenmez**.
-- **Geçiş:** önce kurallar (ek), sonra "veri kökü çözücü" ile kod (mevcut şirket eski yolda kalır), sonra kısa bir
-  bakım penceresinde veri kopyası + tek bayrak çevirme. Geri dönüş = bayrağı geri çevirmek.
+- **Geçiş:** iş bir entegrasyon dalında birikir, `main`'e tek birleştirmeyle geçilir (kurallar + kod birlikte). Eski
+  ortak yol aynı anda kurallarda kapanır; ilk şirket (Emre) Hub'dan ilk girişte boş alanla başlar. Geri dönüş = birleştirme
+  commit'ini geri almak.
 - **Maliyet:** Gemini kullanım ölçümü ve fren tenant başına; anonim (aday) AI çağrıları tenant'a bağlanır.
-- **Yayın öncesi zorunlu:** 1–8 numaralı PR'lar (bkz. §6). Eski yolun kilitlenmesi (PR 9) ikinci şirket gelmeden önce.
-
+- **Yayın öncesi zorunlu:** PR 0–8'in tamamı (bkz. §6).
 ---
 
 ## 1. Envanter
 
 Kısaltma: `D = artifacts/talent-flow/public/data`. "Kapsam" sütunu hedef modeldeki yerini gösterir:
-**T** = şirkete ait (tenant altına taşınır), **P** = platforma ait (global kalır), **U** = kullanıcıya ait ama şirket
+**T** = şirkete ait (tenant altında yeniden başlar), **P** = platforma ait (global kalır), **U** = kullanıcıya ait ama şirket
 içinde tutulur.
 
 ### 1.1 Firestore koleksiyonları
@@ -114,19 +118,19 @@ Firestore tetikleyicisi yok; toplu içe aktarma işçisi süreç içinde döngü
 | Ölçüt | A) Yol tabanlı `tenants/{t}/…` | B) `tenantId` alanı + kurallar |
 |---|---|---|
 | Kural zorlaması | Eşleşme `match /tenants/{t}/{coll}/{id}` — tenant yolun parçası; her alt eşleşmede tek `isMember(t)` yeter. Liste sorgusu başka tenant'a **yapısal olarak** ulaşamaz. | Her kuralda `resource.data.tenantId == myTenant()` + her `create/update`'te `request.resource.data.tenantId` değişmezliği. Unutulan tek koşul = sızıntı. Liste kuralı istemcinin `where('tenantId')` koymasını zorunlu kılar (bugünkü departman kuralı gibi), ama `myTenant()` için yine üyelik okuması gerekir. |
-| Sunucu (Admin SDK, kuralları atlar) | Tenant'sız yol eski köke gider; eski kök kilitlenince boş/red → **güvenli hata**. | Unutulan `where('tenantId')` → **tüm şirketlerin verisi** döner. Sunucuda koruma yalnız disipline kalır. |
+| Sunucu (Admin SDK, kuralları atlar) | Tenant'sız yol eski köke gider; eski kök kapalı ve boş → **güvenli hata**. | Unutulan `where('tenantId')` → **tüm şirketlerin verisi** döner. Sunucuda koruma yalnız disipline kalır. |
 | Sorgu maliyeti | Ek okuma yok; koleksiyonlar küçük kalır. | Her sorguya ek eşitlik filtresi; okuma sayısı aynı. |
 | İndeksler | Bileşik indeks koleksiyon kimliğine bağlıdır (`candidates`), üst yoldan bağımsız → **mevcut indeksler aynen çalışır.** Yalnız sunucu işçisi için 1–2 collection group indeksi. | `tenantId` + `orderBy` / `array-contains-any` / `in` kombinasyonları için yeni bileşik indeksler (sources `orderBy createdAt`, candidates `department in`, `visibleToDepartments array-contains-any`, applications `positionId+email` …). |
 | Storage | `tenants/{t}/cvs/**` — kural yoldaki `t` ile `firestore.exists(.../members/uid)` | Storage'da alan yok; yine yol tabanlı olmak zorunda → iki model karışır. |
 | Şirket silme / dışa aktarma (KVKK, ayrılan müşteri) | `recursiveDelete(tenants/{t})` tek çağrı; dışa aktarma betikle tek ağaç. | Her koleksiyonda `where tenantId` ile tarama-silme. |
-| Geçiş | Kopyala → çevir; eski veri dokunulmadan kalır (geri dönüş kolay). | Yerinde alan ekleme; geri dönüşte ayırt etmek zor; indeksler hazır olmadan sorgular kırılır. |
+| Geçiş | Veri taşınmadığı için (K10) yeni yollar boş başlar; eski kök kapatılıp silinir. Taşıma gerekseydi de kopyala → çevir ile eski veri dokunulmadan kalırdı. | Yerinde alan ekleme; geri dönüşte ayırt etmek zor; indeksler hazır olmadan sorgular kırılır. |
 | Hub köprüsü | Tenant kimliği = Hub UUID = yol parçası; hata ayıklaması kolay. | Aynı. |
-| Dezavantaj | Tüm yol sabitleri değişir (geniş ama mekanik diff); kök `interviews` taşınır; genel bağlantılar için çözücü gerekir. | Diff daha küçük görünür ama her sorgu/kural elden geçer; risk dağınık. |
+| Dezavantaj | Tüm yol sabitleri değişir (geniş ama mekanik diff); kök `interviews` tenant altına alınır; genel bağlantılar için çözücü gerekir. | Diff daha küçük görünür ama her sorgu/kural elden geçer; risk dağınık. |
 
 ### 2.2 Öneri: A (yol tabanlı) + üyelik belgesi
 
 ```
-tenants/{tenantId}                      # ad, durum (active|trial|expired|suspended), plan, aiLimits, dataRoot, hubSyncedAt
+tenants/{tenantId}                      # ad, durum (active|trial|expired|suspended), plan, aiLimits, hubSyncedAt
 tenants/{tenantId}/members/{uid}        # role (admin|recruiter|department_user), departments[], status, hubRole, email
 tenants/{tenantId}/candidates|positions|applications|departments|sources|settings|invitations|
                    infoRequests|emailThreads|messageQueue|participantInvites|bulkImportJobs(/items)|
@@ -192,8 +196,7 @@ kimlik taşıyor. Hedef:
 - Sunucu, oluşturma anında `publicLinks/{rastgele 128 bit}` yazar → `{tenantId, kind, targetId}`.
 - Aday sayfası önce `GET /api/public/resolve/:linkId` (hız sınırlı) ile tenant'ı ve hedefi alır; sonra
   `tenants/{t}/…/{targetId}` tekil `get` yapar (kural: `kind`'e göre ilgili alanlar).
-- **Eski bağlantılar çalışmaya devam eder:** taşıma betiği mevcut tüm ilan/oturum/talep kimlikleri için
-  `publicLinks/{eskiKimlik}` yazar (linkId = eski kimlik).
+- **Eski bağlantılar çalışmaz** (test verisine aitler, K10); `publicLinks` yalnız yeni kayıtlar için yazılır.
 - Anonim aday `candidates`'e doğrudan `create` yapamaz (bugün `firestore.rules:143` izin veriyor → herhangi bir
   tenant'a çöp kayıt açılabilirdi); başvuru yalnız `/api/applications` üzerinden.
 
@@ -258,8 +261,7 @@ match /publicLinks/{id}    { allow get, list, write: if false; }   // yalnız /a
 match /platform/{doc=**}   { allow read, write: if false; }
 match /platformUsage/{d}   { allow read, write: if false; }
 
-// GEÇİŞ DÖNEMİ: eski kök yalnız ilk şirketin üyelerine (sabit LEGACY_TENANT_ID)
-// mevcut kurallar + "&& isMember(LEGACY_TENANT_ID)". Taşımadan sonra: allow read, write: if false.
+// ESKİ KÖK: artifacts/talent-flow/** ve kök interviews/** → allow read, write: if false (veri taşınmaz, K10).
 ```
 
 İlkeler:
@@ -279,7 +281,7 @@ function role(t) { return firestore.get(/databases/(default)/documents/tenants/$
 match /tenants/{t}/cvs/{all=**}              { allow get: if isMember(t); allow list: if false; allow write: if isMember(t) && role(t) in ['admin','recruiter'] && request.resource.size < 20*1024*1024; }
 match /tenants/{t}/bulk-imports/{uid}/{all=**} { allow read: if false; allow write: if isMember(t) && request.auth.uid == uid && request.resource.size < 200*1024*1024; }
 match /tenants/{t}/branding/{f}              { allow get: if request.auth != null; allow list: if false; allow write: if isMember(t) && role(t) == 'admin' && isSafeImageType() && request.resource.size < 10*1024*1024; }
-// geçiş: cvs/** ve branding/** yalnız LEGACY_TENANT_ID üyelerine; taşımadan sonra kapalı.
+// eski cvs/**, branding/**, bulk-imports/** → kapalı (veri taşınmaz, silinir).
 ```
 
 Storage → Firestore çapraz kuralları için ilk dağıtımda Firebase CLI, Storage hizmet hesabına Firestore okuma rolü
@@ -304,91 +306,63 @@ Mevcut: Playwright + emülatör (`playwright.config.emulator.js`, CI `e2e-emulat
    - Anonim: kapalı ilan `get` → red; açık ilan `get` → izin; `list` → red; `candidates` `create` → red;
      mülakat korumalı alanları → red.
    - `userTenants`, `publicLinks`, `platform/*`, `integrationSecrets` → istemciden her şey red.
-   - Eski kök: LEGACY üyesi izin, B üyesi red; kilit sonrası herkes red.
+   - Eski kök (`artifacts/talent-flow/**`, kök `interviews`): herkes için red.
    - Storage: B üyesi A'nın `cvs` dosyasına `get` → red; başkasının `bulk-imports/{uid}` klasörüne yazma → red.
    - Her koruma için bir kez "koşulu kaldır → test düşüyor mu" denemesi (Hub-Inn kuralı).
 2. **Sunucu izolasyon testleri** — `functions/` testlerine emülatöre bağlı süit: her uç A kullanıcısıyla çağrılır, B'nin
    kimliği gövdeye/parametreye konur → 404; mükerrer kontrolü B'nin adayını bulmaz; işçi yalnız kendi tenant'ına yazar;
    `/api/public/resolve` bilinmeyen kimlikte 404 ve hız sınırı.
 3. **Statik denetim** — `scripts/check-tenant-paths.mjs` (CI): `artifacts/talent-flow` ve kök `interviews` dizgileri
-   yalnız yol çözücü modülünde ve taşıma betiğinde geçebilir; `db.collection('`/`collection(db, '` ile sabit yol yasak.
+   yalnız yol modülünde ve temizlik betiğinde geçebilir; `db.collection('`/`collection(db, '` ile sabit yol yasak.
 4. **E2E (Playwright emülatör)** — iki tenant tohumlanır; A ile girişte panoda yalnız A'nın adayları; şirket seçicide
    iki şirketi olan kullanıcı geçiş yapınca liste değişir; Hub giriş akışı sahte Hub sunucusuyla.
 
 ---
 
-## 4. Veri taşıma (mevcut veri → ilk tenant)
+## 4. Veri: taşıma yok, eski yol dondurulur ve temizlenir
 
-### 4.1 Yaklaşım: veri kökü çözücü + kopyala-çevir
+Karar (K10, 2026-10-28): mevcut veri test/demo verisi, **taşınmaz**. Yeni tenant yolları boş başlar.
 
-- `tenants/{t}.dataRoot`: `'legacy'` (= `artifacts/talent-flow/public/data` + kök `interviews`) ya da `'tenant'`.
-- Sunucu (`functions/services/tenantPaths.js`) ve istemci (`src/config/tenantPaths.js`) tüm yolları
-  `pathFor(tenant, 'candidates')` ile üretir. İlk şirket taşınana kadar `legacy`; yeni şirketler doğrudan `tenant`.
-- Bu sayede kod `main`'e (otomatik yayın) **davranış değiştirmeden** birleşir; veri taşıması koddan bağımsız, tek
-  bayrakla yapılır.
+### 4.1 Neden çözücü ve prova gerekmiyor
 
-### 4.2 Betik: `scripts/migrate-to-tenant.mjs`
+- Korunacak veri olmadığı için iki kökü birden destekleyen ara katmana (`dataRoot: legacy|tenant`) gerek yok; kod
+  doğrudan `tenants/{t}/…` yollarını kullanır (yine tek bir yol modülünden: `functions/services/tenantPaths.js`,
+  `src/config/tenantPaths.js` — statik denetim için).
+- `main` otomatik yayınlandığı için yarım geçiş canlıyı bozar. Bu yüzden PR 1–7 **entegrasyon dalında**
+  (`claude/talent-mt`) incelenip birleşir; dal emülatör E2E'si ve kural testleriyle yeşil tutulur; `main`'e tek
+  birleştirmeyle geçilir (kurallar + sunucu + istemci aynı yayında).
+- Önyükleme betiği yok: Emre'nin şirketi ve yönetici üyeliği Hub'dan ilk girişte (§2.3) kendiliğinden oluşur.
 
-```
-node scripts/migrate-to-tenant.mjs --tenant <hubTenantUuid> --plan       # yalnız sayım, tahmini süre, eşleme raporu
-node scripts/migrate-to-tenant.mjs --tenant <uuid> --dry-run             # her şeyi okur, dönüştürür, YAZMAZ; fark raporu
-node scripts/migrate-to-tenant.mjs --tenant <uuid> --apply               # kopyalar (idempotent)
-node scripts/migrate-to-tenant.mjs --tenant <uuid> --verify              # sayım + belge özeti karşılaştırması
-node scripts/migrate-to-tenant.mjs --tenant <uuid> --flip | --unflip     # dataRoot çevir / geri al
-node scripts/migrate-to-tenant.mjs --tenant <uuid> --reverse-sync --since <ts>   # geri dönüşte yeni yazımları eski köke
-```
+### 4.2 Geçiş günü sırası
 
-Kurallar:
-- Admin SDK + `BulkWriter`; **aynı belge kimlikleri** korunur → yeniden çalıştırmak aynı sonucu verir (idempotent).
-  Her hedef belgeye `_mig: {from, hash, at}`; aynı `hash` varsa atlanır. İlerleme `tenants/{t}/_migration/state`'te
-  (koleksiyon + son belge kimliği) → yarıda kalırsa kaldığı yerden.
-- Eşleme: `D/<coll>` → `tenants/{t}/<coll>` (alt koleksiyonlarla, `listCollections()` ile özyinelemeli);
-  `interviews/*` → `tenants/{t}/interviews/*`; `D/users/{uid}` → `members/{uid}` (`super_admin` → `admin`,
-  diğer roller aynı) + alt koleksiyonlar `members/{uid}/…` + `userTenants/{uid}`; `settings/system|branding|emailTemplates`
-  → tenant; `settings/api_keys|integrations` → `platform/secrets` (tenant'a **kopyalanmaz**); `usage` → tenant +
-  `platformUsage`; bütün ilan/oturum/bilgi talebi/katılımcı kimlikleri için `publicLinks/{eskiKimlik}`.
-  `bulkImportJobs` ve `messageQueue` belgelerine `tenantId` alanı eklenir (collection group işçisi için).
-- Storage: **taşınmaz** (ilk aşama). Eski `cvs/`, `branding/` yalnız LEGACY üyelerine açık kalır; `cvUrl` adresleri
-  değişmez. İsteğe bağlı sonraki iş: `gcloud storage cp` ile `tenants/{t}/…`'ye kopya + `cvUrl` yeniden yazımı.
-- Zaman damgaları, `Timestamp` türleri ve dizi alanları olduğu gibi kopyalanır (Admin SDK değer türünü korur).
-- Doğrulama: koleksiyon başına sayım eşitliği + her belge için kararlı JSON özeti (SHA-256) eşitliği; fark varsa
-  `--flip` çalışmaz.
+| Adım | Ne |
+|---|---|
+| 1 | (İsteğe bağlı) Eski yolun tek seferlik dışa aktarımı: `gcloud firestore export gs://<yedek-kovası>/talent-legacy-<tarih>` — demo verisi olsa da geri dönüş için ucuz güvence. |
+| 2 | Entegrasyon dalı `main`'e birleşir → otomatik yayın: yeni kurallar (eski kök `allow read, write: if false`), yeni sunucu ve istemci. |
+| 3 | Emre Hub'dan Talent'ı açar → `tenants/{hubTenantId}` + yönetici üyeliği oluşur; boş alanda duman testi (ilan aç, başvuru yap, aday ekle, mülakat bağlantısı). İkinci bir deneme şirketiyle izolasyon kontrolü. |
+| 4 | Sonucu STATUS'a yaz. |
 
-### 4.3 Yedek
+Kesinti: yalnız yayının kendisi (birkaç dakika); bakım penceresi yok. Eski bağlantılar (eski ilan/mülakat adresleri)
+bilerek çalışmaz — test verisine aitler.
 
-1. Firestore **PITR** (zaman içinde geri dönüş, 7 gün) açılır — taşımadan en az bir gün önce.
-2. Yönetilen dışa aktarım: `gcloud firestore export gs://<yedek-kovası>/talent-pre-mt-<tarih>` (veritabanının tamamı;
-   Firestore'u yalnız Talent kullanıyor — `firebase-deploy.yml:221–225`). Kova ayrı, yaşam döngüsü 90 gün.
-3. Storage: `gcloud storage cp -r gs://<bucket>/cvs gs://<yedek>/cvs-<tarih>` (taşınmasa da güvence; soft delete
-   varsayılan 7 gün ayrıca var).
-4. Yedekten deneme geri yükleme: dışa aktarımı **emülatöre** ya da geçici bir veritabanına (`--database`) alıp betiğin
-   `--dry-run`/`--apply`/`--verify` provası.
+### 4.3 Eski yolun temizliği (PR 8 içinde)
 
-### 4.4 Sıra (dağıtım: kurallar → kod → veri)
+- Kurallar: `artifacts/talent-flow/public/data/**` ve kök `interviews/**` için açık red (varsayılan red zaten kapsar;
+  açık kural niyeti belgeler). Storage: eski `cvs/**`, `branding/**`, `bulk-imports/**` kapalı.
+- Kod: eski yol sabitleri, kayıt/izinli alan adı akışı, `scripts/grant-super-admin.mjs`, `TechDocsPage` yol metinleri
+  kaldırılır; `docs/YETKI-MATRISI.md` yeni modele göre güncellenir.
+- Veri: geçişten ~7 gün sonra `firebase firestore:delete --recursive artifacts/talent-flow` ve kök `interviews`; Storage
+  `gcloud storage rm -r gs://<bucket>/cvs gs://<bucket>/branding gs://<bucket>/bulk-imports`. Kullanıcıların eski
+  Firebase `role` talepleri (`token.role`) `setCustomUserClaims(uid, null)` ile temizlenir (ortak Auth'ta başka
+  uygulamayı yanıltmasın). Silme Emre'nin onayıyla.
+- Firestore PITR (7 gün) gerçek müşteri verisi gelmeden önce açılır (PR 0); düzenli yedek Hub ROADMAP "Operasyon" işinde.
 
-| Adım | Ne | Kesinti |
-|---|---|---|
-| 1 | PR 1 (kurallar, yalnız **ek**) yayında: tenant yolları + eski köke `isMember(LEGACY)` şartı. Önce §4.5'teki önyükleme. | yok |
-| 2 | Önyükleme betiği: `tenants/{LEGACY}` (`dataRoot: legacy`) + `members` (mevcut `users`'tan) + `userTenants`. | yok |
-| 3 | PR 2–5 (sunucu + istemci çözücü, Hub köprüsü, genel bağlantılar) yayında; ilk şirket hâlâ eski yolda. Davranış aynı. | yok |
-| 4 | Prova: üretim dışa aktarımıyla emülatörde tam koşu + E2E. | yok |
-| 5 | **Bakım penceresi:** `tenants/{LEGACY}.status = 'maintenance'` (kurallar ve sunucu yazmayı reddeder; arayüz bant gösterir) → `--apply` → `--verify` → `--flip` → `status = 'active'` → canlı duman testi (Emre). | yazma ~15–45 dk |
-| 6 | 7 gün izleme; eski kök salt okunur durur. | yok |
-| 7 | PR 9: eski kök kuralları `if false`, eski yol kodu ve `dataRoot: legacy` dalı silinir. 30 gün sonra eski veri silinir (yedek kalır). | yok |
+### 4.4 Geri dönüş
 
-Kesinti tahmini: BulkWriter ile tek bölgede saniyede ~500–1.000 yazım; 50.000 belgeye kadar kopya birkaç dakika,
-doğrulama okuması benzer. Pencere esas olarak doğrulama ve duman testi için: **30–45 dk, okuma açık, yazma kapalı**.
-Gerçek sayılar `--plan` çıktısından gelir (bu belge yazılırken üretim verisine erişilmedi). Pencere sırasında planlı
-canlı mülakat olmamalı (aday tarafı yazamaz).
-
-### 4.5 Geri dönüş
-
-- `--flip` öncesi: `tenants/{t}` altındaki kopya silinir (`recursiveDelete`), eski veri hiç değişmemiştir.
-- `--flip` sonrası, yeni yazım yokken: `--unflip` (anında).
-- `--flip` sonrası, yeni yazım varken: kısa bakım → `--reverse-sync --since <flipZamanı>` (`_mig.at`'tan yeni ya da
-  `_mig` olmayan belgeleri eski köke yazar) → `--unflip`.
-- Son çare: PITR ile pencere öncesine dönüş ya da dışa aktarımdan geri yükleme.
-- Kurallar ve kod geri alınmaz; çözücü her iki kökü desteklediği için yalnız bayrak döner.
+- Geçiş sonrası sorun: `main`'deki birleştirme commit'i geri alınır (revert) → otomatik yayın eski kodu **ve** eski
+  kuralları geri getirir; eski veri 7 gün silinmeden durduğu için uygulama eski hâline döner. Bu sürede yeni yollara
+  yazılan deneme verisi kaybedilebilir (önemli değil).
+- Eski veri silindikten sonra geri dönüş yalnız ileri düzeltmedir (dışa aktarım varsa ondan geri yükleme).
 
 ---
 
@@ -427,28 +401,26 @@ canlı mülakat olmamalı (aday tarafı yazamaz).
 ## 6. PR'lara bölünmüş plan
 
 Boyut: S ≤ 1 gün, M 2–3 gün, L 4–6 gün (tek geliştirici + ajan, test dahil).
-Her PR `main`'e birleşince otomatik yayınlanır → her biri **tek başına güvenli** olmalı.
+PR 0 doğrudan `main`'e (davranış değişmez); PR 1–7 entegrasyon dalına (`claude/talent-mt`); geçiş tek birleştirme.
 
 | # | PR | İçerik | Boyut | Risk | Yayın öncesi şart mı |
 |---|---|---|---|---|---|
-| 0 | Hazırlık | `firestore.indexes.json` konsoldan dışa alınıp repoya; PITR açılır; kural test altyapısı (`@firebase/rules-unit-testing`, CI işi) bugünkü kurallarla yeşil. | S | Düşük | Evet |
-| 1 | Kurallar: tenant yolları (ek) | §3.1/§3.2 tenant eşleşmeleri; eski köke `isMember(LEGACY)` şartı; `token.role` güveni kaldırılır; tam test matrisi. Öncesinde önyükleme betiği (`tenants/{LEGACY}` + `members` + `userTenants`) üretimde çalışır. | M | **Orta** — önyükleme eksikse mevcut kullanıcılar kilitlenir. Önyükleme `--verify` olmadan birleştirme yok. | Evet |
-| 2 | Sunucu tenant bağlamı | `requireAuth` → `requireTenant(roles)` (üyelikten rol, `req.tenant`, 402/askı); `tenantPaths.js` çözücü; tüm `functions/` yolları; mükerrer kontrolü/işçi/bakım/saklama tenant içinde; `/api/users` tenant üyeleri; `auth-user` silme → üyelik kaldırma; işçi collection group. Sunucu izolasyon testleri + statik yol denetimi. | L | Orta-yüksek (geniş diff). Çözücü ilk şirkette eski yolu verdiği için davranış aynı. | Evet |
-| 3 | İstemci tenant bağlamı | `TenantContext` + `userTenants`; tüm `src/` yolları çözücüden; şirket seçici; profil/kayıt yazımı kaldırılır, davet kabulü sunucuya; `SettingsPage` istemci Gemini kaldırılır. | L | Orta (birçok ekran). E2E iki tenant. | Evet |
-| 4 | Hub köprüsü | Talent `POST /api/hub/exchange` (sunucudan sunucuya, OIDC), tenant/üyelik senkronu, rol eşlemesi, `membership-revoked` ucu. **Eşlik eden Hub-Inn PR'ı:** exchange yanıtına tenant + rol + uygulama hakkı; OIDC doğrulama; üyelik değişince Talent'a bildirim. Bağımsız güvenlik incelemesi. | M (+ Hub M) | **Yüksek** (kimlik). Signals desenini birebir izle. | Evet |
-| 5 | Herkese açık bağlantılar | `publicLinks` + `/api/public/resolve`; apply/interview/respond/join sayfaları; anonim `candidates` create kapanır; `positions` liste kapanır; `init-interview-session` tenant'ı bağlantıdan alır; `/api/session` tam taramadan kurtulur. | M | Orta (aday deneyimi). Eski kimlikler için `publicLinks` taşıma betiğinde. | Evet |
-| 6 | Storage tenant yolları | Yeni yüklemeler `tenants/{t}/…`; Storage kuralları çapraz Firestore; `bulkSources` önek denetimi; yeni CV'lerde jetonlu adres yerine kural denetimli indirme. | M | Orta (CLI'nin Storage→Firestore rol onayı). | Evet |
-| 7 | AI bütçesi ve hız sınırları | §5.2; tenant/kullanıcı payı; anonim serbest istem kapanır; panel. | M | Düşük-orta (yanlış sınır = hizmet durması; varsayılanlar cömert başlar). | Evet |
-| 8 | Taşıma betiği + prova + pencere | `migrate-to-tenant.mjs` (plan/dry-run/apply/verify/flip/unflip/reverse-sync), bakım modu, prova raporu, üretimde koşu (Emre'nin onayıyla). | M | **Yüksek** (veri). Yedek + prova + geri dönüş yolu. | Evet |
-| 9 | Eski kökü kilitle ve temizle | Eski kök kuralları `false`; `dataRoot: legacy` dalı, eski yol sabitleri, `grant-super-admin.mjs` (platform yöneticisi listesine geçer), `TechDocsPage` yol metinleri, `YETKI-MATRISI.md` güncellenir. 30 gün sonra eski veri silinir. | S–M | Düşük | **İkinci şirket açılmadan önce** |
-| 10 | Sonra | Storage dosyalarını tenant yoluna taşıma; tenant dışa aktarma/silme (KVKK talebi, ayrılan müşteri); şirket başına gönderen e-posta; alan adı doğrulamalı otomatik katılım; dış sızma testi. | — | — | Sızma testi yayın öncesi (Hub ROADMAP) |
+| 0 | Hazırlık (`main`) | `firestore.indexes.json` konsoldan dışa alınıp repoya; PITR açılır; kural test altyapısı (`@firebase/rules-unit-testing`, CI işi) bugünkü kurallarla yeşil; entegrasyon dalı açılır. | S | Düşük | Evet |
+| 1 | Kurallar | §3.1/§3.2 tenant eşleşmeleri; eski kök kapalı; `token.role` güveni kaldırılır; tam test matrisi. | M | Orta (kural hatası = ya erişim kaybı ya sızıntı; matris bunu yakalar) | Evet |
+| 2 | Sunucu tenant bağlamı | `requireAuth` → `requireTenant(roles)` (üyelikten rol, `req.tenant`, 402/askı); `tenantPaths.js`; tüm `functions/` yolları; mükerrer kontrolü/işçi/bakım/saklama tenant içinde; `/api/users` tenant üyeleri; `auth-user` silme → üyelik kaldırma; işçi collection group. Sunucu izolasyon testleri + statik yol denetimi. | M–L | Orta (geniş ama mekanik diff) | Evet |
+| 3 | İstemci tenant bağlamı | `TenantContext` + `userTenants`; tüm `src/` yolları; şirket seçici; profil/kayıt yazımı kaldırılır, davet kabulü sunucuya; `SettingsPage` istemci Gemini kaldırılır. | L | Orta (birçok ekran). E2E iki tenant. | Evet |
+| 4 | Hub köprüsü | Talent `POST /api/hub/exchange` (sunucudan sunucuya, OIDC), tenant/üyelik oluşturma ve senkron, rol eşlemesi, `membership-revoked` ucu. **Eşlik eden Hub-Inn PR'ı:** exchange yanıtına tenant + rol + uygulama hakkı; OIDC doğrulama; üyelik değişince Talent'a bildirim. Bağımsız güvenlik incelemesi. | M (+ Hub M) | **Yüksek** (kimlik). Signals desenini birebir izle. | Evet |
+| 5 | Herkese açık bağlantılar | `publicLinks` + `/api/public/resolve`; apply/interview/respond/join sayfaları; anonim `candidates` create kapanır; `positions` liste kapanır; `init-interview-session` tenant'ı bağlantıdan alır; `/api/session` tam taramadan kurtulur. | M | Orta (aday deneyimi) | Evet |
+| 6 | Storage tenant yolları | Yüklemeler `tenants/{t}/…`; Storage kuralları çapraz Firestore; `bulkSources` önek denetimi; jetonlu adres yerine kural denetimli indirme. | S–M | Orta (CLI'nin Storage→Firestore rol onayı) | Evet |
+| 7 | AI bütçesi ve hız sınırları | §5.2; tenant/kullanıcı payı; anonim serbest istem kapanır; panel. | M | Düşük-orta (yanlış sınır = hizmet durması; varsayılanlar cömert başlar) | Evet |
+| 8 | Geçiş + eski yolu temizleme | Entegrasyon dalı → `main` (§4.2); duman testi; 7 gün sonra eski veri, eski kod ve eski `role` talepleri temizlenir (§4.3). | S | Düşük (geri dönüş = revert) | Evet (temizlik ikinci şirketten önce) |
+| 9 | Sonra | Tenant dışa aktarma/silme (KVKK talebi, ayrılan müşteri); şirket başına gönderen e-posta; alan adı doğrulamalı otomatik katılım; dış sızma testi. | — | — | Sızma testi yayın öncesi (Hub ROADMAP) |
 
-Toplam kaba efor: **~4–5 hafta** (PR 0–9), Hub tarafı ek ~1 hafta. Kritik yol: 0 → 1 → 2 → (3, 4, 5, 6, 7 paralel
-olabilir) → 8 → 9.
+Toplam kaba efor: **~3–4 hafta** (PR 0–8; önceki taşımalı plan ~4–5 hafta idi), Hub tarafı ek ~1 hafta. Kritik yol:
+0 → 1 → 2 → (3, 4, 5, 6, 7 paralel olabilir) → 8.
 
-**Clyro genel açılışından önce mutlaka:** PR 0–9'un tamamı + bağımsız güvenlik incelemesi (kimlik/tenant/yetki
-dokunan her PR'da) + iki tenant'lı uçtan uca deneme (Hub ROADMAP "Uçtan uca deneme") + sızma testi. İkinci gerçek
-şirket, PR 9 yayında olmadan Talent'a alınmaz.
+**Clyro genel açılışından önce mutlaka:** PR 0–8'in tamamı + bağımsız güvenlik incelemesi (kimlik/tenant/yetki
+dokunan her PR'da) + iki tenant'lı uçtan uca deneme (Hub ROADMAP "Uçtan uca deneme") + sızma testi.
 
 ---
 
@@ -464,7 +436,7 @@ dokunan her PR'da) + iki tenant'lı uçtan uca deneme (Hub ROADMAP "Uçtan uca d
 | K6 | Şirket istihbaratı (`companyIntel`) | Tenant'a ait (yan kanal yok, AI maliyeti şirket başına tekrarlar). Alternatif: sunucuya özel ortak önbellek, istemci hiç okumaz. |
 | K7 | Aday e-postalarının göndericisi | Bugün tek SMTP hesabı (`EMAIL_USER`) tüm şirketler için. Açılışta: şirketin bağladığı Gmail/Microsoft hesabı zorunlu mu, yoksa ortak `noreply@clyrolabs.com` + şirket adı mı? |
 | K8 | AI kotaları (X9) | Plan başına günlük/aylık token ve aramalı çağrı sayısı; aşımda durdur mu, ücretli ek mi? Başlangıç önerisi: şirket başına günde 2M token, 200 aramalı çağrı; kullanıcı başına bunun %40'ı. |
-| K9 | Bakım penceresi zamanı | Mesai dışı, 45 dk, öncesinde ekibe duyuru. Pencereyi Emre başlatır (canlı veri). |
-| K10 | Mevcut veri gerçekten taşınacak mı? | Hub DECISIONS 2026-10-26 "Talent kişisel hesapta yeni ve boş projede, veri taşınmaz" diyordu; ROADMAP ise "mevcut veri taşınır". Mevcut veri test/deneme verisiyse taşıma yerine sıfırdan başlamak PR 8'i küçültür (bu belge taşıma varsayımıyla yazıldı). |
+| K9 | ~~Bakım penceresi zamanı~~ | **Gerek kalmadı** (K10: taşıma yok). Geçiş günü yalnız birleştirme + duman testi; eski veri silme onayı Emre'de. |
+| K10 | Mevcut veri taşınacak mı? | **Karar (Emre, 2026-10-28): hayır, sıfırdan başla.** Talent'taki veri yalnız test/demo; tenant yolları boş başlar, eski yol dondurulur ve silinir (§4). |
 | K11 | Platform yöneticisi | Talent'ta platform yöneticisi (Emre) şirket verisini üye olmadan göremez (Hub kuralı). Destek için geçici, kayıtlı "destek üyeliği" isteniyor mu? |
 | K12 | Paylaşılan Firebase projesi | Firestore/Storage kuralları proje genelinde ve yalnız Talent'ın. Hub/CX ileride Firestore kullanırsa kuralların tek sahibi konuşulmalı (`firebase-deploy.yml:221–225` notu). Ayrı veritabanı (`--database talent`) bu geçişte mi? Öneri: hayır, sonra. |
