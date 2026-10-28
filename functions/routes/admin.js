@@ -2,10 +2,8 @@
 // requireAuth(['super_admin']) so a regular recruiter or department user
 // returns 403 even with a valid Firebase ID token.
 //
-//   DELETE /api/admin/auth-user/:uid     — purge a Firebase Auth account.
-//                                          Self-deletion blocked. 'user-not-
-//                                          found' is treated as already-done
-//                                          (idempotent).
+//   DELETE /api/admin/auth-user/:uid     — no-op kept for old clients; the
+//                                          shared Clyro account is never deleted.
 //   GET  /api/admin/integrations         — read OAuth client config (Microsoft
 //                                          365 today; Google added later).
 //                                          clientSecret is masked to a boolean
@@ -36,19 +34,11 @@ const SYSTEM_DOC = 'artifacts/talent-flow/public/data/settings/system';
 const CANDIDATES_PATH = 'artifacts/talent-flow/public/data/candidates';
 const ACCESS_LOG_PATH = 'artifacts/talent-flow/public/data/accessLogs';
 
-router.delete('/api/admin/auth-user/:uid', requireAuth(['super_admin']), async (req, res) => {
-    try {
-        const { uid } = req.params;
-        if (!uid) return res.status(400).json({ error: 'uid gerekli' });
-        if (uid === req.user?.uid) return res.status(403).json({ error: 'Kendi hesabınızı silemezsiniz.' });
-        await admin.auth().deleteUser(uid);
-        log.info(`[admin] Firebase Auth kullanıcısı silindi: ${uid}`);
-        res.json({ success: true });
-    } catch (err) {
-        if (err.code === 'auth/user-not-found') return res.json({ success: true, note: 'Zaten silinmiş' });
-        log.error({ err: err.message }, '[admin/delete-auth-user]');
-        res.status(500).json({ error: err.message });
-    }
+// Firebase Auth hesabı burada silinmez: giriş Clyro Hub, CX ve Talent'ta ortak; hesabı silmek kişinin diğer
+// uygulamalardaki hesabını da siler. Talent erişimi profil belgesi silinince (ya da dondurulunca) zaten biter.
+// Eski istemciler için uç kalır ama hiçbir şey silmez.
+router.delete('/api/admin/auth-user/:uid', requireAuth(['super_admin']), (_req, res) => {
+    res.json({ success: true, note: 'Ortak Clyro hesabı silinmez; yalnız Talent erişimi kaldırıldı.' });
 });
 
 // Admin SDK ile okunur/yazılır: firestore.rules bu dokümanı client'a tamamen
