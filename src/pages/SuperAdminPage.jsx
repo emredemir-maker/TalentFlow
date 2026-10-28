@@ -116,16 +116,7 @@ export default function SuperAdminPage() {
             const q = query(collection(db, INVITATIONS_PATH), where("email", "==", userToDelete.email.toLowerCase()));
             const inviteSnap = await getDocs(q);
             for (const d of inviteSnap.docs) await deleteDoc(doc(db, INVITATIONS_PATH, d.id));
-            // 3. Firebase Auth hesabını sil (sunucu tarafı, prod'da çalışır)
-            try {
-                const token = await user.getIdToken();
-                await fetch(`/api/admin/auth-user/${userToDelete.id}`, {
-                    method: 'DELETE',
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-            } catch (authDelErr) {
-                console.warn('[handleDeleteUser] Auth hesabı silinemedi (geliştirme ortamında normal):', authDelErr.message);
-            }
+            // Ortak Clyro hesabı (Hub, CX, Talent) silinmez; profil silinince Talent erişimi biter.
         } catch (err) { alert("Kullanıcı silinirken bir hata oluştu."); }
     };
 
