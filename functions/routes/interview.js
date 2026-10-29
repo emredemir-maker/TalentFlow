@@ -5,7 +5,7 @@
 //                                            questions, recruiter presence,
 //                                            and the current question index
 //                                            for the matching session.
-//   POST /api/init-interview-session      — creates /interviews/{sessionId}
+//   POST /api/init-interview-session      — creates tenants/{t}/interviews/{sessionId}
 //                                            via Admin SDK on first recruiter
 //                                            join. Idempotent — re-running with
 //                                            the same id merges initialData.
@@ -24,11 +24,23 @@
 // All session endpoints are throttled by sessionLimiter (60 req/min/IP) —
 // tight enough to block sessionId enumeration, loose enough for normal
 // heartbeat polling.
+//
+// ŞİRKET: kayıtlar tenants/{t}/interviews ve tenants/{t}/candidates altında.
+// Aday tarafındaki (kimliksiz) uçlar şirketi bağlantıdaki `tenantId`'den alır
+// (geçici — PR 5'te publicLinks çözücüsü); oturum kimliği hâlâ yetki anahtarı,
+// şirket kimliği aramayı yalnız o şirketin ağacına daraltır. İç kullanıcı uçları
+// requireTenant arkasında.
 import { Router } from 'express';
 
 import { sessionLimiter, aiLimiter } from '../middleware/rateLimit.js';
 import { db, admin } from '../config/firebaseAdmin.js';
-import { requireAuth } from '../middleware/auth.js';
+import {
+    requireTenant,
+    resolveTenantAccess,
+    loadPublicTenant,
+    WRITER_ROLES,
+} from '../middleware/auth.js';
+import { isValidDocId } from '../services/tenantPaths.js';
 import { generateText } from '../services/gemini.js';
 import { sanitizeForPrompt } from '../services/promptGuard.js';
 import {
@@ -48,7 +60,10 @@ router.get('/api/session/:sessionId', sessionLimiter, async (req, res) => {
     const { sessionId } = req.params;
     if (!sessionId) return res.status(400).json({ error: 'sessionId required' });
     try {
-        const snapshot = await db.collection('artifacts/talent-flow/public/data/candidates').get();
+        const tenant = await loadPublicTenant(String(req.query.tenantId || ''));
+        if (!tenant) return res.status(404).json({ found: false, error: 'Seans bulunamadı.' });
+        // Yalnız bu şirketin adayları taranıyor (tam tarama PR 5'te kalkıyor).
+        const snapshot = await db.collection(tenant.paths.candidates()).get();
         for (const docSnap of snapshot.docs) {
             const data = docSnap.data();
             const session = (data.interviewSessions || []).find(s => s.id === sessionId);
@@ -71,7 +86,7 @@ router.get('/api/session/:sessionId', sessionLimiter, async (req, res) => {
         return res.status(404).json({ found: false, error: 'Seans bulunamadı.' });
     } catch (err) {
         log.error({ err: err.message }, 'GET /api/session error');
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Seans okunamadı.' });
     }
 });
 
@@ -120,20 +135,27 @@ export function filterSessionMerge(data) {
     return { safe, dropped };
 }
 
+// Oturum OLUŞTURMA yalnız şirketin admin/recruiter'ı (kurallardaki create ile
+// aynı): kimliksiz bir çağrı başka şirketin ağacına mülakat belgesi açamaz.
+// Var olan oturuma korumasız alan birleştirme aday tarafına açık kalır.
 router.post('/api/init-interview-session', sessionLimiter, async (req, res) => {
-    const { sessionId, initialData } = req.body;
-    if (!sessionId || typeof sessionId !== 'string' || !sessionId.startsWith('iv-')) {
+    const { sessionId, initialData, tenantId } = req.body;
+    if (!sessionId || typeof sessionId !== 'string' || !sessionId.startsWith('iv-') || !isValidDocId(sessionId)) {
         return res.status(400).json({ error: 'Invalid sessionId.' });
     }
-    if (initialData && typeof initialData !== 'object') {
+    if (initialData && (typeof initialData !== 'object' || Array.isArray(initialData))) {
         return res.status(400).json({ error: 'initialData must be an object.' });
     }
     try {
-        const sessionRef = db.doc(`interviews/${sessionId}`);
+        const tenant = await loadPublicTenant(String(tenantId || ''), { write: true });
+        if (!tenant) return res.status(404).json({ error: 'Oturum bulunamadı.' });
+        const sessionRef = db.doc(tenant.paths.interview(sessionId));
         const snap = await sessionRef.get();
         if (!snap.exists) {
+            const access = await resolveTenantAccess(req, tenant.id, WRITER_ROLES, { write: true });
+            if (!access.ok) return res.status(access.status).json(access.body);
             await sessionRef.set({ sessionId, createdAt: new Date().toISOString(), ...(initialData || {}) });
-            log.info(`[init-interview-session] Created /interviews/${sessionId}`);
+            log.info(`[init-interview-session] Created tenants/${tenant.id}/interviews/${sessionId}`);
         } else {
             if (initialData && Object.keys(initialData).length > 0) {
                 const { safe, dropped } = filterSessionMerge(initialData);
@@ -142,7 +164,7 @@ router.post('/api/init-interview-session', sessionLimiter, async (req, res) => {
                 }
                 if (Object.keys(safe).length > 0) await sessionRef.set(safe, { merge: true });
             }
-            log.info(`[init-interview-session] /interviews/${sessionId} already exists.`);
+            log.info(`[init-interview-session] tenants/${tenant.id}/interviews/${sessionId} already exists.`);
         }
         res.json({ success: true });
     } catch (err) {
@@ -152,10 +174,11 @@ router.post('/api/init-interview-session', sessionLimiter, async (req, res) => {
 });
 
 router.post('/api/update-candidate-status', sessionLimiter, async (req, res) => {
-    const { sessionId, candidateId, updates } = req.body;
+    const { sessionId, candidateId, updates, tenantId } = req.body;
     if (!sessionId || !candidateId || !updates || typeof updates !== 'object') {
         return res.status(400).json({ error: "Missing required fields." });
     }
+    if (!isValidDocId(String(candidateId))) return res.status(404).json({ error: 'Seans bulunamadı.' });
 
     const safeUpdates = {};
     for (const key of Object.keys(updates)) {
@@ -170,7 +193,9 @@ router.post('/api/update-candidate-status', sessionLimiter, async (req, res) => 
     }
 
     try {
-        const candidateRef = db.doc(`artifacts/talent-flow/public/data/candidates/${candidateId}`);
+        const tenant = await loadPublicTenant(String(tenantId || ''), { write: true });
+        if (!tenant) return res.status(404).json({ error: 'Seans bulunamadı.' });
+        const candidateRef = db.doc(tenant.paths.candidate(candidateId));
         await db.runTransaction(async (t) => {
             const doc = await t.get(candidateRef);
             if (!doc.exists) throw new Error("Candidate not found.");
@@ -188,8 +213,10 @@ router.post('/api/update-candidate-status', sessionLimiter, async (req, res) => 
 
         res.json({ success: true });
     } catch (error) {
-        log.error("Failed to update candidate session via proxy:", error);
-        res.status(500).json({ error: error.message });
+        // Aday ya da oturum bu şirkette yoksa 404 (başka şirketin kaydı da böyle görünür).
+        if (/not found/i.test(error?.message || '')) return res.status(404).json({ error: 'Seans bulunamadı.' });
+        log.error({ err: error.message }, 'Failed to update candidate session via proxy');
+        res.status(500).json({ error: 'Seans güncellenemedi.' });
     }
 });
 
@@ -346,7 +373,7 @@ YALNIZCA aşağıdaki JSON formatında yanıt ver, başka hiçbir şey yazma:
 router.post(
     '/api/create-manual-interview',
     aiLimiter,
-    requireAuth(['recruiter', 'admin', 'super_admin']),
+    requireTenant(WRITER_ROLES),
     async (req, res) => {
         const {
             candidateId,
@@ -422,7 +449,7 @@ router.post(
         // İlan SUNUCUDAN okunuyor: madde metinleri ve parmak izi tek kaynaktan
         // gelmeli. İstemcinin gönderdiğine güvenilseydi bayat bir sekme, eski
         // madde metinleriyle damga üretirdi.
-        const gradingContext = await loadGradingContext(positionId, safeQuestions);
+        const gradingContext = await loadGradingContext(req.paths, positionId, safeQuestions);
 
         const [evalResult, verdictResult] = await Promise.allSettled([
             runManualEvaluation({
@@ -493,11 +520,11 @@ router.post(
 );
 
 /** İlanı okuyup değerlendirilecek maddeleri ve parmak izini hazırlar. */
-async function loadGradingContext(positionId, safeQuestions) {
+async function loadGradingContext(paths, positionId, safeQuestions) {
     const empty = { items: [], fingerprint: null, allowed: new Set(), requirements: [] };
-    if (!positionId) return empty;
+    if (!positionId || !isValidDocId(String(positionId))) return empty;
     try {
-        const snap = await db.doc(`artifacts/talent-flow/public/data/positions/${positionId}`).get();
+        const snap = await db.doc(paths.position(positionId)).get();
         if (!snap.exists) return empty;
         const position = snap.data();
         const requirements = positionRequirements(position);
@@ -601,7 +628,7 @@ async function runManualEvaluation(input) {
     };
 }
 
-/** Kaydı /interviews/{sessionId} altına yazar ve aday belgesine yansıtır. */
+/** Kaydı tenants/{t}/interviews/{sessionId} altına yazar ve aday belgesine yansıtır. */
 /**
  * Planli kaydin yerine sonucu koyar.
  *
@@ -646,7 +673,7 @@ async function persistManualInterview({
 
     const sessionId = `mi-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
     try {
-        await db.doc(`interviews/${sessionId}`).set({
+        await db.doc(req.paths.interview(sessionId)).set({
             sessionId,
             mode: 'manual',
             candidateId,
@@ -702,9 +729,7 @@ async function persistManualInterview({
         // ÜZERİNE YAZILMAZ — ikisi ayrı kanıt ve birleşimi okuma anında
         // hesaplanıyor (src/utils/interviewCoverage.js).
         try {
-            const candidateRef = db.doc(
-                `artifacts/talent-flow/public/data/candidates/${candidateId}`
-            );
+            const candidateRef = db.doc(req.paths.candidate(candidateId));
             const yeniOturum = {
                 id: sessionId,
                 mode: 'manual',
@@ -762,7 +787,7 @@ async function persistManualInterview({
                 // aday linki hâlâ açık kalır ve `/interviews` üzerinden okuyan
                 // ekranlar oturumu "bekliyor" görmeye devam eder.
                 try {
-                    await db.doc(`interviews/${replacesSessionId}`).set({
+                    await db.doc(req.paths.interview(replacesSessionId)).set({
                         status: 'superseded',
                         supersededBy: sessionId,
                         supersededAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -777,7 +802,7 @@ async function persistManualInterview({
                 );
             }
         } catch (mirrorErr) {
-            // Yansıtma en iyi çaba — asıl kayıt /interviews/ altında.
+            // Yansıtma en iyi çaba — asıl kayıt tenants/{t}/interviews altında.
             log.warn(
                 { err: mirrorErr.message },
                 '[create-manual-interview] candidate mirror failed'
@@ -824,7 +849,7 @@ async function persistManualInterview({
 router.post(
     '/api/reevaluate-interview',
     aiLimiter,
-    requireAuth(['recruiter', 'admin', 'super_admin']),
+    requireTenant(WRITER_ROLES),
     async (req, res) => {
         const { sessionId, questions } = req.body || {};
         if (!sessionId || typeof sessionId !== 'string') {
@@ -833,7 +858,8 @@ router.post(
 
         let record;
         try {
-            const snap = await db.doc(`interviews/${sessionId}`).get();
+            if (!isValidDocId(sessionId)) return res.status(404).json({ error: 'Görüşme kaydı bulunamadı.' });
+            const snap = await db.doc(req.paths.interview(sessionId)).get();
             if (!snap.exists) return res.status(404).json({ error: 'Görüşme kaydı bulunamadı.' });
             record = snap.data();
         } catch (err) {
@@ -853,7 +879,7 @@ router.post(
             return res.status(400).json({ error: 'Değerlendirilecek içerik yok.' });
         }
 
-        const gradingContext = await loadGradingContext(record.positionId, safeQuestions);
+        const gradingContext = await loadGradingContext(req.paths, record.positionId, safeQuestions);
 
         const [evalResult, verdictResult] = await Promise.allSettled([
             runManualEvaluation({
@@ -883,7 +909,7 @@ router.post(
         );
 
         try {
-            await db.doc(`interviews/${sessionId}`).set({
+            await db.doc(req.paths.interview(sessionId)).set({
                 questions: safeQuestions,
                 aiAnalysis,
                 requirementVerdicts,
@@ -900,6 +926,7 @@ router.post(
             }, { merge: true });
 
             await mirrorReevaluation({
+                paths: req.paths,
                 candidateId: record.candidateId,
                 sessionId,
                 positionTitle: record.positionTitle,
@@ -933,11 +960,11 @@ router.post(
  * bütün gün kaçındığımız "iki ekran iki sayı" sapmasının aynısı.
  */
 async function mirrorReevaluation({
-    candidateId, sessionId, positionTitle, date, evidence, requirementVerdicts, fingerprint,
+    paths, candidateId, sessionId, positionTitle, date, evidence, requirementVerdicts, fingerprint,
 }) {
     if (!candidateId) return;
-    const ref = db.doc(`artifacts/talent-flow/public/data/candidates/${candidateId}`);
     try {
+        const ref = db.doc(paths.candidate(candidateId));
         const snap = await ref.get();
         if (!snap.exists) return;
         const sessions = Array.isArray(snap.data().interviewSessions)

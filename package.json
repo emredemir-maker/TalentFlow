@@ -15,7 +15,7 @@
         "test": "vitest run",
         "test:watch": "vitest",
         "test:coverage": "vitest run --coverage",
-        "test:rules": "npx firebase emulators:exec --config firebase.rules-test.json --only firestore,storage --project demo-talentflow-rules \"vitest run --config vitest.rules.config.js\"",
+        "test:rules": "npx firebase emulators:exec --config firebase.rules-test.json --only firestore,storage,auth --project demo-talentflow-rules \"vitest run --config vitest.rules.config.js\"",
         "test:e2e": "playwright test",
         "test:e2e:ui": "playwright test --ui",
         "test:e2e:headed": "playwright test --headed",
@@ -26,6 +26,7 @@
         "check:deps": "node scripts/check-deps-sync.mjs",
         "check:bundle-size": "node scripts/check-bundle-size.mjs",
         "check:project": "node scripts/check-project-config.mjs",
+        "check:tenant-paths": "node scripts/check-tenant-paths.mjs",
         "preview": "vite preview",
         "prepare": "husky"
     },

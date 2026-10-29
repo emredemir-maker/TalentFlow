@@ -34,6 +34,7 @@ export default defineConfig({
             // Güvenlik kuralı testleri emülatör ister — `npm run test:rules`
             // (vitest.rules.config.js) ile ayrı koşar.
             'tests/rules/**',
+            'tests/server/**',
         ],
         coverage: {
             provider: 'v8',

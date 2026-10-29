@@ -22,7 +22,8 @@ import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 
 import { aiLimiter } from '../middleware/rateLimit.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireTenant, WRITER_ROLES } from '../middleware/auth.js';
+import { storagePaths } from '../services/tenantPaths.js';
 import { wrapMulter } from '../middleware/multipart.js';
 import { pdf } from '../services/pdf.js';
 import { parseProfile } from '../services/gemini.js';
@@ -98,10 +99,12 @@ export function buildLocalCvUrl(filename) {
 // AddCandidateModal.jsx uses for client-side uploads, covered by the
 // existing /cvs/{filename} block in storage.rules.
 // Exported for tests (see cv.test.js — Storage is mocked there).
-export async function storeCvFile(file) {
+export async function storeCvFile(file, tenantId) {
     try {
         const bucket = getStorageBucket();
-        const destination = `cvs/${file.filename}`;
+        // Şirketin klasörü (storage.rules: tenants/{t}/cvs/**). Eski ortak
+        // `cvs/` kökü kurallarda kapalı (K10).
+        const destination = storagePaths.cv(tenantId, file.filename);
         const token = randomUUID();
         await bucket.upload(file.path, {
             destination,
@@ -129,7 +132,7 @@ export async function storeCvFile(file) {
     }
 }
 
-router.post('/api/direct-add', aiLimiter, requireAuth(), async (req, res) => {
+router.post('/api/direct-add', aiLimiter, requireTenant(WRITER_ROLES), async (req, res) => {
     try {
         const { text, url } = req.body;
         log.info(`📥 Direct Add request for: ${url}`);
@@ -153,7 +156,7 @@ router.post('/api/direct-add', aiLimiter, requireAuth(), async (req, res) => {
     }
 });
 
-router.post('/api/process-cv', aiLimiter, requireAuth(), wrapMulter(upload.array('cvs', 20)), async (req, res) => {
+router.post('/api/process-cv', aiLimiter, requireTenant(WRITER_ROLES), wrapMulter(upload.array('cvs', 20)), async (req, res) => {
     try {
         if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'Dosya seçilmedi' });
 
@@ -187,7 +190,7 @@ router.post('/api/process-cv', aiLimiter, requireAuth(), wrapMulter(upload.array
                 const candidate = await parseProfile(text);
                 if (!candidate) return { fileName: file.originalname, error: 'AI ayrıştırma hatası' };
 
-                candidate.cvUrl = await storeCvFile(file);
+                candidate.cvUrl = await storeCvFile(file, req.tenant.id);
 
                 return { fileName: file.originalname, candidate, success: true };
             } catch (err) {
@@ -203,15 +206,19 @@ router.post('/api/process-cv', aiLimiter, requireAuth(), wrapMulter(upload.array
     }
 });
 
-router.post('/api/check-duplicate', requireAuth(), async (req, res) => {
+router.post('/api/check-duplicate', requireTenant(WRITER_ROLES, { write: false }), async (req, res) => {
     try {
         const norm = (s) => (s || '').trim().toLowerCase().replace(/[\s\-().+]/g, '');
-        const email = norm(req.body?.email);
+        // E-postada nokta anlamlı: telefon normalleştirmesi (noktayı da siler)
+        // e-postaya uygulanınca hiçbir adres eşleşmiyordu.
+        const email = String(req.body?.email || '').trim().toLowerCase();
         const phone = norm(req.body?.phone);
 
         if (!email && !phone) return res.json({ isDuplicate: false });
 
-        const candidatesRef = db.collection('artifacts/talent-flow/public/data/candidates');
+        // Yalnız bu şirketin havuzu: başka şirketin adayı "mükerrer" diye ifşa
+        // edilmez (plan §1.1).
+        const candidatesRef = db.collection(req.paths.candidates());
         let existing = null;
         let foundBy = null;
 

@@ -14,28 +14,28 @@
 //                                            classifies as extras.
 import { Router } from 'express';
 
-import { requireAuth } from '../middleware/auth.js';
+import { requireTenant, WRITER_ROLES } from '../middleware/auth.js';
 import { db, admin } from '../config/firebaseAdmin.js';
 import { groupDuplicateCandidates, richnessOf } from '../services/duplicateScan.js';
 import { computePrescore } from '../services/prescore.js';
 import { planMatchRepairs, collectJobIdsNeedingLookup } from '../services/matchRepair.js';
 import { needsEnrichment, extractExperiences } from '../services/enrich.js';
-import { POSITIONS_COLL } from '../services/bulkWorker.js';
 import { childLogger } from '../services/logger.js';
 
 const log = childLogger('maintenance');
 const router = Router();
 
-const CANDIDATES_COLL = 'artifacts/talent-flow/public/data/candidates';
-const BULK_JOBS_COLL = 'artifacts/talent-flow/public/data/bulkImportJobs';
-const ROLES = ['super_admin', 'recruiter'];
+// Bakım uçları aday siler/yazar → kurallardaki candidates yazımıyla aynı
+// roller. Her sorgu şirketin yolunda (req.paths): mükerrer taraması, ön skor,
+// eşleşme onarımı ve zenginleştirme yalnız bu şirketin havuzunu görür.
+const ROLES = WRITER_ROLES;
 
-async function readCandidatesFlat() {
+async function readCandidatesFlat(paths) {
     // select(): yalnızca mükerrer tespitinde kullanılan küçük alanlar tel
     // üzerinden gelir. Projeksiyonsuz tam koleksiyon okuması (cvText +
     // positionAnalyses + aiAnalysis dahil) Hosting'in 60 sn sınırını aşıyor
     // ve eşzamanlı isteklerde 2GiB belleği taşırıp 502'ye yol açıyordu.
-    const snap = await db.collection(CANDIDATES_COLL)
+    const snap = await db.collection(paths.candidates())
         .select('name', 'email', 'phone', 'source', 'bulkJobId', 'createdAt',
             'experiences', 'skills', 'summary', 'education')
         .get();
@@ -56,15 +56,15 @@ async function readCandidatesFlat() {
     });
 }
 
-router.get('/api/maintenance/bulk-jobs', requireAuth(ROLES), async (req, res) => {
+router.get('/api/maintenance/bulk-jobs', requireTenant(ROLES), async (req, res) => {
     try {
-        // Tüm iş geçmişini okumak yerine sorguyu sınırla: super_admin son 20
+        // Tüm iş geçmişini okumak yerine sorguyu sınırla: admin son 20
         // işi, recruiter yalnızca kendi işlerini çeker (tek alanlı otomatik
         // indeks yeterli; composite indeks gerekmesin diye recruiter tarafı
         // bellekte sıralanır).
-        const query = req.user.role === 'super_admin'
-            ? db.collection(BULK_JOBS_COLL).orderBy('createdAt', 'desc').limit(20)
-            : db.collection(BULK_JOBS_COLL).where('createdBy', '==', req.user.uid);
+        const query = req.user.role === 'admin'
+            ? db.collection(req.paths.bulkJobs()).orderBy('createdAt', 'desc').limit(20)
+            : db.collection(req.paths.bulkJobs()).where('createdBy', '==', req.user.uid);
         const snap = await query.get();
         let jobs = snap.docs.map((d) => {
             const j = d.data();
@@ -89,9 +89,9 @@ router.get('/api/maintenance/bulk-jobs', requireAuth(ROLES), async (req, res) =>
     }
 });
 
-router.get('/api/maintenance/duplicate-scan', requireAuth(ROLES), async (req, res) => {
+router.get('/api/maintenance/duplicate-scan', requireTenant(ROLES), async (req, res) => {
     try {
-        const candidates = await readCandidatesFlat();
+        const candidates = await readCandidatesFlat(req.paths);
         const groups = groupDuplicateCandidates(candidates);
         res.json({
             totalCandidates: candidates.length,
@@ -105,7 +105,7 @@ router.get('/api/maintenance/duplicate-scan', requireAuth(ROLES), async (req, re
     }
 });
 
-router.post('/api/maintenance/duplicate-clean', requireAuth(ROLES), async (req, res) => {
+router.post('/api/maintenance/duplicate-clean', requireTenant(ROLES), async (req, res) => {
     try {
         const ids = req.body?.ids;
         if (!Array.isArray(ids) || ids.length === 0) {
@@ -117,7 +117,7 @@ router.post('/api/maintenance/duplicate-clean', requireAuth(ROLES), async (req, 
         // Sunucu tarafı yeniden doğrulama: istemci ne gönderirse göndersin,
         // yalnızca taramanın "fazlalık" saydığı kayıtlar silinebilir — her
         // grubun en eski (korunan) kaydı hiçbir koşulda silinemez.
-        const candidates = await readCandidatesFlat();
+        const candidates = await readCandidatesFlat(req.paths);
         const groups = groupDuplicateCandidates(candidates);
         const deletable = new Set(groups.flatMap((g) => g.extras.map((e) => e.id)));
         const toDelete = [...new Set(ids)].filter((id) => deletable.has(id));
@@ -126,7 +126,7 @@ router.post('/api/maintenance/duplicate-clean', requireAuth(ROLES), async (req, 
         while (deleted < toDelete.length) {
             const chunk = toDelete.slice(deleted, deleted + 400); // Firestore batch limiti 500
             const batch = db.batch();
-            for (const id of chunk) batch.delete(db.collection(CANDIDATES_COLL).doc(id));
+            for (const id of chunk) batch.delete(db.collection(req.paths.candidates()).doc(id));
             await batch.commit();
             deleted += chunk.length;
         }
@@ -144,7 +144,7 @@ router.post('/api/maintenance/duplicate-clean', requireAuth(ROLES), async (req, 
 // fonksiyon zaman aşımına takılmaz ve her istek aktif olduğundan CPU
 // kısıtlaması yaşanmaz. Yalnızca skoru hiç olmayan (<=0) adaylar seçilir;
 // gerçek skoru olan hiçbir kayıtın üzerine yazılmaz.
-router.post('/api/maintenance/prescore', requireAuth(ROLES), async (req, res) => {
+router.post('/api/maintenance/prescore', requireTenant(ROLES), async (req, res) => {
     try {
         const batchSize = Math.min(60, Math.max(1, parseInt(req.body?.batchSize, 10) || 40));
         const scoreOf = (c) => Number(c.initialAiScore || 0) || Number(c.matchScore || 0) || Number(c.aiScore || 0);
@@ -160,7 +160,7 @@ router.post('/api/maintenance/prescore', requireAuth(ROLES), async (req, res) =>
         // koleksiyon taranır, sonra sadece bu partinin adayları gerekli
         // alanlarla çekilir. Eski tam-koleksiyon okuması cvText dahil her
         // şeyi belleğe alıp Gemini çağrıları boyunca tutuyordu (502/OOM).
-        const scoreSnap = await db.collection(CANDIDATES_COLL)
+        const scoreSnap = await db.collection(req.paths.candidates())
             .select('initialAiScore', 'matchScore', 'aiScore', 'prescoreRunId')
             .get();
         const pendingRefs = scoreSnap.docs
@@ -177,7 +177,7 @@ router.post('/api/maintenance/prescore', requireAuth(ROLES), async (req, res) =>
         // başlık kelimelerine değil, ilanın gereksinimlerine de bakar.
         let openPositions = [];
         try {
-            const posSnap = await db.collection(POSITIONS_COLL).where('status', '==', 'open').get();
+            const posSnap = await db.collection(req.paths.positions()).where('status', '==', 'open').get();
             openPositions = posSnap.docs
                 .map((d) => ({
                     title: d.data().title,
@@ -260,14 +260,14 @@ router.post('/api/maintenance/prescore', requireAuth(ROLES), async (req, res) =>
 // Bakım süreci durum tespiti — panelin adım adım yönlendirmesi için tüm
 // sayaçları TEK aday projeksiyon okumasıyla üretir: takılı işler, mükerrer
 // fazlalıklar, geçersiz pozisyon eşleşmeleri ve 0 skorlu adaylar.
-router.get('/api/maintenance/health-check', requireAuth(ROLES), async (req, res) => {
+router.get('/api/maintenance/health-check', requireTenant(ROLES), async (req, res) => {
     try {
-        const posSnap = await db.collection(POSITIONS_COLL).where('status', '==', 'open').get();
+        const posSnap = await db.collection(req.paths.positions()).where('status', '==', 'open').get();
         const openPositions = posSnap.docs
             .map((d) => ({ id: d.id, title: d.data().title }))
             .filter((p) => Boolean(p.title));
 
-        const candSnap = await db.collection(CANDIDATES_COLL)
+        const candSnap = await db.collection(req.paths.candidates())
             .select('name', 'email', 'phone', 'source', 'bulkJobId', 'createdAt',
                 'matchedPositionTitle', 'positionId', 'position', 'skills',
                 'initialAiScore', 'matchScore', 'aiScore', 'prescoredAt',
@@ -302,7 +302,7 @@ router.get('/api/maintenance/health-check', requireAuth(ROLES), async (req, res)
             const jobsById = new Map();
             if (jobIds.length > 0) {
                 const jobDocs = await db.getAll(
-                    ...jobIds.map((id) => db.doc(`${BULK_JOBS_COLL}/${id}`)),
+                    ...jobIds.map((id) => db.doc(req.paths.bulkJob(id))),
                     { fieldMask: ['positionId', 'positionTitle'] }
                 );
                 for (const j of jobDocs) if (j.exists) jobsById.set(j.id, j.data());
@@ -310,7 +310,7 @@ router.get('/api/maintenance/health-check', requireAuth(ROLES), async (req, res)
             invalidMatches = planMatchRepairs(candidates, openPositions, jobsById).length;
         }
 
-        const errSnap = await db.collection(BULK_JOBS_COLL).where('status', '==', 'error').get();
+        const errSnap = await db.collection(req.paths.bulkJobs()).where('status', '==', 'error').get();
         const stuckJobs = errSnap.docs.filter((d) => {
             const j = d.data();
             return (j.totalCount || 0) > 0 && (j.processedCount || 0) >= (j.totalCount || 0);
@@ -337,9 +337,9 @@ router.get('/api/maintenance/health-check', requireAuth(ROLES), async (req, res)
 // Pozisyon eşleşme onarımı: geçmişte doğrulanmadan yazılmış (sistemde
 // olmayan) matchedPositionTitle değerlerini deterministik kurallarla düzeltir
 // — AI çağrısı yapmaz, skorlara dokunmaz. Kurallar: services/matchRepair.js.
-router.post('/api/maintenance/validate-matches', requireAuth(ROLES), async (req, res) => {
+router.post('/api/maintenance/validate-matches', requireTenant(ROLES), async (req, res) => {
     try {
-        const posSnap = await db.collection(POSITIONS_COLL).where('status', '==', 'open').get();
+        const posSnap = await db.collection(req.paths.positions()).where('status', '==', 'open').get();
         const openPositions = posSnap.docs
             .map((d) => ({ id: d.id, title: d.data().title }))
             .filter((p) => Boolean(p.title));
@@ -347,7 +347,7 @@ router.post('/api/maintenance/validate-matches', requireAuth(ROLES), async (req,
             return res.status(400).json({ error: 'Onarım için en az bir açık pozisyon gerekli.' });
         }
 
-        const candSnap = await db.collection(CANDIDATES_COLL)
+        const candSnap = await db.collection(req.paths.candidates())
             .select('matchedPositionTitle', 'positionId', 'bulkJobId', 'position', 'skills')
             .get();
         const candidates = candSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -356,7 +356,7 @@ router.post('/api/maintenance/validate-matches', requireAuth(ROLES), async (req,
         const jobIds = collectJobIdsNeedingLookup(candidates, openPositions);
         const jobsById = new Map();
         if (jobIds.length > 0) {
-            const jobRefs = jobIds.map((id) => db.doc(`${BULK_JOBS_COLL}/${id}`));
+            const jobRefs = jobIds.map((id) => db.doc(req.paths.bulkJob(id)));
             const jobDocs = await db.getAll(...jobRefs, { fieldMask: ['positionId', 'positionTitle'] });
             for (const j of jobDocs) if (j.exists) jobsById.set(j.id, j.data());
         }
@@ -374,7 +374,7 @@ router.post('/api/maintenance/validate-matches', requireAuth(ROLES), async (req,
                 // set(merge) — update() DEĞİL. update(), belgelerden biri
                 // silinmişse TÜM batch'i düşürür; 400 kaydın onarımı tek bir
                 // eksik belge yüzünden sessizce boşa giderdi.
-                batch.set(db.collection(CANDIDATES_COLL).doc(p.id), {
+                batch.set(db.collection(req.paths.candidates()).doc(p.id), {
                     ...p.update,
                     matchRepairedAt: admin.firestore.FieldValue.serverTimestamp(),
                 }, { merge: true });
@@ -393,7 +393,7 @@ router.post('/api/maintenance/validate-matches', requireAuth(ROLES), async (req,
         // yakınsamadığı anlamına gelir ve mesajda açıkça söylenir.
         let stillBroken = 0;
         if (toApply.length > 0) {
-            const recheckRefs = toApply.map((p) => db.collection(CANDIDATES_COLL).doc(p.id));
+            const recheckRefs = toApply.map((p) => db.collection(req.paths.candidates()).doc(p.id));
             const rechecked = [];
             for (let i = 0; i < recheckRefs.length; i += 300) {
                 const docs = await db.getAll(...recheckRefs.slice(i, i + 300), {
@@ -422,11 +422,11 @@ router.post('/api/maintenance/validate-matches', requireAuth(ROLES), async (req,
 // adaylara odaklı bir Gemini çağrısıyla experiences doldurur. prescore ile
 // aynı desende çalışır: küçük parti + 40 sn süre bütçesi + kalan sayısı,
 // istemci kalan 0 olana dek zincirler.
-router.post('/api/maintenance/enrich-profiles', requireAuth(ROLES), async (req, res) => {
+router.post('/api/maintenance/enrich-profiles', requireTenant(ROLES), async (req, res) => {
     try {
         const batchSize = Math.min(20, Math.max(1, parseInt(req.body?.batchSize, 10) || 10));
 
-        const scoreSnap = await db.collection(CANDIDATES_COLL)
+        const scoreSnap = await db.collection(req.paths.candidates())
             .select('experiences', 'cvText', 'enrichedAt', 'location')
             .get();
         const pendingRefs = scoreSnap.docs
@@ -488,9 +488,9 @@ router.post('/api/maintenance/enrich-profiles', requireAuth(ROLES), async (req, 
 // etiketinde takılı kalmış toplu işleri 'completed' olarak kapatır (ör. eski
 // '__none__' rezerve alan adı hatası). Kayıt kaybı yoktur — yalnızca etiket
 // düzeltilir; orijinal hata mesajı lastErrorMessage alanında saklanır.
-router.post('/api/maintenance/close-stuck-jobs', requireAuth(ROLES), async (req, res) => {
+router.post('/api/maintenance/close-stuck-jobs', requireTenant(ROLES), async (req, res) => {
     try {
-        const snap = await db.collection(BULK_JOBS_COLL).where('status', '==', 'error').get();
+        const snap = await db.collection(req.paths.bulkJobs()).where('status', '==', 'error').get();
         let closed = 0;
         const batch = db.batch();
         for (const d of snap.docs) {

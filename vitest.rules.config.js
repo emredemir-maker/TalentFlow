@@ -10,7 +10,8 @@ export default defineConfig({
     test: {
         environment: 'node',
         globals: false,
-        include: ['tests/rules/**/*.test.js'],
+        // tests/server: sunucu yalıtım testleri aynı emülatöre bağlanır.
+        include: ['tests/rules/**/*.test.js', 'tests/server/**/*.test.js'],
         // Tüm dosyalar aynı emülatörü ve aynı proje kimliğini paylaşıyor; her
         // dosya başında veri temizleniyor. Paralel çalışırsa bir dosyanın
         // temizliği ötekinin tohumunu siler.

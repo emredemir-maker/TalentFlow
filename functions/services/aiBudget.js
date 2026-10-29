@@ -45,6 +45,7 @@
 import { db } from '../config/firebaseAdmin.js';
 import { childLogger } from './logger.js';
 import { dayKey, estimateCost } from './usage.js';
+import { PLATFORM_PATHS } from './tenantPaths.js';
 
 const log = childLogger('aiBudget');
 
@@ -99,7 +100,7 @@ export function resetBudgetCache() {
 
 /** Ölçüm dokümanını okur. Aramalı çağrı adedi `byLabel.grounded.calls`. */
 async function fetchTodayFromFirestore(day) {
-    const snap = await db.doc(`artifacts/talent-flow/public/data/usage/${day}`).get();
+    const snap = await db.doc(PLATFORM_PATHS.usageDay(day)).get();
     const d = snap.data() || {};
     return {
         tokens: Number(d?.totals?.totalTokens) || 0,

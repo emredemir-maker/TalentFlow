@@ -140,8 +140,12 @@ export function storagePathFromUrl(url) {
     try {
         const yol = decodeURIComponent(m[1]);
         // Yalnızca bilinen klasörler: adresin bir kısmını yanlış çözüp
-        // rastgele bir nesneyi silmeye çalışmamak için.
-        return /^(cvs|bulk-imports)\//.test(yol) ? yol : null;
+        // rastgele bir nesneyi silmeye çalışmamak için. Çok şirketli düzende
+        // dosyalar `tenants/{t}/cvs|bulk-imports/…` altında; çağıran ayrıca
+        // önekin KENDİ şirketi olduğunu denetler (routes/admin.js). '..' ya da
+        // boş parça içeren yol reddedilir.
+        if (yol.split('/').some((p) => p === '' || p === '.' || p === '..')) return null;
+        return /^tenants\/[A-Za-z0-9_-]{1,64}\/(cvs|bulk-imports)\//.test(yol) ? yol : null;
     } catch {
         return null;
     }

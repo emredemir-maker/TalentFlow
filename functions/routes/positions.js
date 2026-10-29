@@ -1,123 +1,99 @@
-// Public job-board endpoints. These two are hit unauthenticated by candidates
-// from the /apply/:positionId page, so they go through the Firestore REST API
-// (with the public Web API key) — Admin SDK would bypass security rules.
+// Herkese açık ilan uçları — /apply/:positionId sayfasındaki aday (kimliksiz)
+// çağırır.
 //
-//   GET  /api/positions/:positionId  — read a single open position. 404 if
-//                                       missing, 403 if status !== 'open'.
-//   POST /api/applications           — submit a candidate application from
-//                                       the public form.
+//   GET  /api/positions/:positionId?tenantId=…  — açık ilanı okur. Yoksa, kapalıysa
+//                                       ya da şirket kapalıysa 404/403.
+//   POST /api/applications           — başvuru formunu kaydeder.
 //
-// fsVal/fsToJs convert between plain JS values and Firestore's typed envelope.
-// Note: this is a *narrower* converter than services/firestoreRest.js#toFsValue
-// (which preserves doubles via doubleValue, dates via timestampValue, and
-// nested objects). The two diverged historically — keep them separate to avoid
-// silently changing the type-coercion semantics of existing public traffic.
+// ŞİRKET: bağlantıdaki `tenantId` (geçici — PR 5'te publicLinks çözücüsü gelir
+// ve bağlantı yalnız rastgele bir kimlik taşır). İlan kimliği hâlâ arama
+// anahtarı; şirket kimliği aramayı yalnız o şirketin ağacına daraltır, başka
+// şirketin ilanına ya da başvuru koleksiyonuna ulaştırmaz.
+//
+// Başvuru oluşturma istemciye kurallarda KAPALI (firestore.rules applications
+// `create: false`): hedef şirketi ve ilanı istemci değil sunucu doğrular. Bu
+// yüzden eskiden kullanılan Firestore REST + web anahtarı yolu yerine Admin SDK.
 import { Router } from 'express';
+
+import { db } from '../config/firebaseAdmin.js';
+import { loadPublicTenant } from '../middleware/auth.js';
+import { isValidDocId } from '../services/tenantPaths.js';
 import { childLogger } from '../services/logger.js';
 const log = childLogger('positions');
 
-const FS_BASE = () =>
-    `https://firestore.googleapis.com/v1/projects/${process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID}/databases/(default)/documents`;
-const FS_API_KEY = process.env.VITE_FIREBASE_API_KEY;
-
-function fsVal(v) {
-    if (v === null || v === undefined) return { nullValue: null };
-    if (typeof v === 'boolean') return { booleanValue: v };
-    if (typeof v === 'number') return { integerValue: String(Math.round(v)) };
-    if (typeof v === 'string') return { stringValue: v };
-    if (Array.isArray(v)) return { arrayValue: { values: v.map(fsVal) } };
-    if (typeof v === 'object') {
-        const fields = {};
-        for (const [k, val] of Object.entries(v)) fields[k] = fsVal(val);
-        return { mapValue: { fields } };
-    }
-    return { stringValue: String(v) };
-}
-
-function fsToJs(fields) {
-    if (!fields) return {};
-    const out = {};
-    for (const [k, v] of Object.entries(fields)) {
-        if ('stringValue' in v) out[k] = v.stringValue;
-        else if ('integerValue' in v) out[k] = Number(v.integerValue);
-        else if ('doubleValue' in v) out[k] = v.doubleValue;
-        else if ('booleanValue' in v) out[k] = v.booleanValue;
-        else if ('nullValue' in v) out[k] = null;
-        else if ('arrayValue' in v) out[k] = (v.arrayValue.values || []).map(i => fsToJs(i.mapValue?.fields || { _: i }));
-        else if ('mapValue' in v) out[k] = fsToJs(v.mapValue.fields);
-        else out[k] = null;
-    }
-    return out;
-}
-
 const router = Router();
+
+/** Açık ilanı şirketin ağacından okur; yoksa/kapalıysa null ya da 'closed'. */
+async function readOpenPosition(tenant, positionId) {
+    if (!isValidDocId(positionId)) return null;
+    const snap = await db.doc(tenant.paths.position(positionId)).get();
+    if (!snap.exists) return null;
+    const data = snap.data() || {};
+    if (data.status !== 'open') return 'closed';
+    return data;
+}
 
 router.get('/api/positions/:positionId', async (req, res) => {
     try {
-        const url = `${FS_BASE()}/artifacts%2Ftalent-flow%2Fpublic%2Fdata%2Fpositions/${req.params.positionId}?key=${FS_API_KEY}`;
-        const r = await fetch(url);
-        if (r.status === 404) return res.status(404).json({ error: 'Pozisyon bulunamadı.' });
-        if (!r.ok) {
-            const errBody = await r.text();
-            log.error({ status: r.status, govde: errBody }, 'Firestore GET position error');
-            return res.status(500).json({ error: 'Pozisyon yüklenirken hata oluştu.' });
-        }
-        const docSnap = await r.json();
-        const data = fsToJs(docSnap.fields || {});
-        if (data.status !== 'open') return res.status(403).json({ error: 'Bu pozisyon şu an başvuruya kapalı.' });
+        const tenant = await loadPublicTenant(String(req.query.tenantId || ''));
+        if (!tenant) return res.status(404).json({ error: 'Pozisyon bulunamadı.' });
+        const data = await readOpenPosition(tenant, req.params.positionId);
+        if (!data) return res.status(404).json({ error: 'Pozisyon bulunamadı.' });
+        if (data === 'closed') return res.status(403).json({ error: 'Bu pozisyon şu an başvuruya kapalı.' });
+        // Açık ilanın tamamı — kurallar da anonim adaya aynı belgeyi açıyor.
         res.json({ id: req.params.positionId, ...data });
     } catch (err) {
-        log.error({ err: err }, 'GET /api/positions/:id error');
+        log.error({ err: err.message }, 'GET /api/positions/:id error');
         res.status(500).json({ error: 'Pozisyon yüklenirken hata oluştu.' });
     }
 });
 
+const str = (v, max) => String(v ?? '').trim().slice(0, max);
+
 router.post('/api/applications', async (req, res) => {
     try {
         const {
-            positionId, positionTitle,
+            tenantId,
+            positionId,
             name, email, phone, linkedin,
             cvText, cvFileName,
             source,
             parsedCandidate, aiScore, aiScoreBreakdown, aiSummary,
-        } = req.body;
+        } = req.body || {};
         if (!positionId || !name || !email || !phone) {
             return res.status(400).json({ error: 'Zorunlu alanlar eksik.' });
         }
-        const fields = {
-            positionId: fsVal(positionId),
-            positionTitle: fsVal(positionTitle || ''),
-            name: fsVal(String(name).trim()),
-            email: fsVal(String(email).trim().toLowerCase()),
-            phone: fsVal(String(phone).trim()),
-            linkedin: fsVal(String(linkedin || '').trim()),
-            cvFileName: fsVal(cvFileName || ''),
-            cvText: fsVal(cvText ? String(cvText).slice(0, 6000) : ''),
-            source: fsVal(source || 'Direkt'),
-            aiScore: fsVal(aiScore || 0),
-            aiSummary: fsVal(aiSummary || ''),
-            status: fsVal('new'),
-            kvkkConsent: fsVal(true),
-        };
-        if (parsedCandidate) fields.parsedCandidate = fsVal(parsedCandidate);
-        if (aiScoreBreakdown) fields.aiScoreBreakdown = fsVal(aiScoreBreakdown);
+        // Yazma: şirket deneme/aktif ve yazma süresi içinde olmalı (K5).
+        const tenant = await loadPublicTenant(String(tenantId || ''), { write: true });
+        if (!tenant) return res.status(404).json({ error: 'Pozisyon bulunamadı.' });
+        const position = await readOpenPosition(tenant, positionId);
+        if (!position) return res.status(404).json({ error: 'Pozisyon bulunamadı.' });
+        if (position === 'closed') return res.status(403).json({ error: 'Bu pozisyon şu an başvuruya kapalı.' });
 
-        const url = `${FS_BASE()}/artifacts%2Ftalent-flow%2Fpublic%2Fdata%2Fapplications?key=${FS_API_KEY}`;
-        const r = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fields }),
-        });
-        if (!r.ok) {
-            const errBody = await r.text();
-            log.error({ status: r.status, govde: errBody }, 'Firestore POST application error');
-            return res.status(500).json({ error: 'Başvuru kaydedilemedi.' });
-        }
-        const docData = await r.json();
-        const id = docData.name?.split('/').pop();
-        res.json({ id });
+        const doc = {
+            positionId,
+            // Başlık istemciden değil ilandan: başka bir ilanın adıyla başvuru açılamaz.
+            positionTitle: str(position.title, 300),
+            name: str(name, 200),
+            email: str(email, 320).toLowerCase(),
+            phone: str(phone, 50),
+            linkedin: str(linkedin, 500),
+            cvFileName: str(cvFileName, 300),
+            cvText: str(cvText, 6000),
+            source: str(source || 'Direkt', 100),
+            aiScore: Number.isFinite(Number(aiScore)) ? Math.round(Number(aiScore)) : 0,
+            aiSummary: str(aiSummary, 4000),
+            status: 'new',
+            kvkkConsent: true,
+            createdAt: new Date().toISOString(),
+        };
+        if (parsedCandidate && typeof parsedCandidate === 'object') doc.parsedCandidate = parsedCandidate;
+        if (aiScoreBreakdown && typeof aiScoreBreakdown === 'object') doc.aiScoreBreakdown = aiScoreBreakdown;
+
+        const ref = await db.collection(tenant.paths.applications()).add(doc);
+        res.json({ id: ref.id });
     } catch (err) {
-        log.error({ err: err }, 'POST /api/applications error');
+        log.error({ err: err.message }, 'POST /api/applications error');
         res.status(500).json({ error: 'Başvuru kaydedilemedi.' });
     }
 });

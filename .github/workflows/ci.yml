@@ -63,6 +63,10 @@ jobs:
       # yakalamalı; dağıtım workflow'u aynı kontrolü ayrıca yapıyor.
       - name: Firebase project config guard
         run: npm run check:project
+      # Çok şirketli model: functions/ içinde eski ortak köke ya da sabit yola
+      # giden Firestore çağrısı kalmasın (scripts/check-tenant-paths.mjs).
+      - name: Tenant path guard
+        run: npm run check:tenant-paths
       # lint:ci enforces the baseline warning count via --max-warnings. Adding
       # warnings without removing equivalents elsewhere will fail this gate.
       - name: ESLint (baseline-locked)
@@ -186,6 +190,8 @@ jobs:
   # burada yakalanır. Emülatör kurulumu e2e-emulator işiyle aynı (Java 21 +
   # firebase-tools); ayrı yapılandırma (firebase.rules-test.json) üretim
   # firebase.json'una dokunmadan Storage emülatörünü de açar.
+  # Aynı iş sunucu şirket yalıtım testlerini de koşar (tests/server/): gerçek
+  # Express yönlendiricileri + Admin SDK, Firestore/Storage/Auth emülatörüne.
   rules-test:
     name: Güvenlik kuralı testleri (emülatör)
     runs-on: ubuntu-latest
