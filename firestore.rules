@@ -59,6 +59,15 @@ service cloud.firestore {
         (member(t).get('expiresAt', null) == null || request.time < member(t).expiresAt);
     }
 
+    // Üyelik belgesindeki rol, üyeliğin geçerliliğine BAKMADAN (süresi dolmuş
+    // destek üyesini dışarıda tutmak için). Yetki vermek için ASLA kullanılmaz;
+    // yalnız bir dalı kapatmak için.
+    function storedRoleIs(t, role) {
+      return request.auth != null &&
+        exists(memberPath(t)) &&
+        member(t).get('role', '') == role;
+    }
+
     function hasRole(t, roles) {
       return isMember(t) && member(t).get('role', '') in roles;
     }
@@ -267,10 +276,11 @@ service cloud.firestore {
         // Aday (anonim) ve katılımcılar transkript/durum/sinyalleşme yazar;
         // değerlendirme alanlarına yalnız recruiter.
         // Destek üyesi (K11) salt okunur: listeden öğrendiği oturumlara bu
-        // daldan da yazamasın diye açıkça dışarıda.
+        // daldan da yazamasın diye açıkça dışarıda — süresi DOLDUKTAN sonra da
+        // (isMember düşünce hasRole de düşerdi; burada kayıtlı rol okunuyor).
         allow update: if canWrite(tenantId, writerRoles()) ||
           (anyAuth() && tenantOpenForWrites(tenantId) && !interviewProtectedTouched() &&
-            !hasRole(tenantId, ['support']));
+            !storedRoleIs(tenantId, 'support'));
         allow delete: if false;
       }
 

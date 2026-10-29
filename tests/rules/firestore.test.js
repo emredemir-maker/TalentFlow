@@ -484,6 +484,12 @@ describe('destek üyeliği (K11)', () => {
                 .doc(`${T('A')}/interviews/existing`)
                 .update({ status: 'completed' })
         );
+        // Süresi dolmuş destek üyesi de öğrendiği oturuma yazamaz.
+        await deny(
+            dbFor('aSupportExpired')
+                .doc(`${T('A')}/interviews/existing`)
+                .update({ transcript: ['x'] })
+        );
         await deny(
             dbFor('aSupportExpired')
                 .collection(`${T('A')}/candidates`)

@@ -222,7 +222,7 @@ export const COLLECTIONS = {
             get: EVERYONE,
             list: A_ALL,
             create: A_WRITERS,
-            update: ANY_AUTH.filter((k) => k !== 'aSupport'),
+            update: ANY_AUTH.filter((k) => k !== 'aSupport' && k !== 'aSupportExpired'),
             delete: NONE,
         },
     },
