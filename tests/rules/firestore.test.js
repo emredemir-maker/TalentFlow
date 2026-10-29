@@ -180,29 +180,71 @@ describe('users (profil ve rol)', () => {
         await deny(as(U.dept).doc(`${D}/users/${U.recruiter}`).get());
         await allow(as(U.recruiter).collection(`${D}/users`).get());
     });
-    // ── BUGÜN AÇIK: kendine rol yazma ───────────────────────────────────────
-    // `users/{userId}` altındaki `match /{allChildren=**}` rules_version 2'de
-    // SIFIR ya da daha fazla yol parçasıyla eşleşiyor, yani alt koleksiyonları
-    // değil profil belgesinin KENDİSİNİ de kapsıyor. Kurallar OR'landığı için
-    // kayıt doğrulaması (davet / izinli alan adı) ve "rolünü değiştiremez"
-    // koşulu bu eşleşmeyle atlanıyor: anonim olmayan her oturum kendi profiline
-    // super_admin yazabiliyor. Bu PR davranışı değiştirmiyor; düzeltme ayrı PR'da
-    // (`fix(rules): …`) ve aşağıdaki iki test orada tersine döner.
-    it('BUGÜN AÇIK: oturum açan herkes kendine super_admin profili açar', async () => {
+    // Profil belgesi yalnız create/update kurallarıyla yazılır. Eskiden
+    // `match /{allChildren=**}` profil belgesinin kendisini de kapsıyor ve bu
+    // doğrulamaları atlatıyordu (herkes kendine super_admin yazabiliyordu).
+    it('kendine super_admin profili açmak reddedilir', async () => {
         const uid = 'u-escalate';
-        const ctx = db(strictCtx(env, uid, { email: 'x@other.test' }));
-        await allow(
-            ctx.doc(`${D}/users/${uid}`).set({ uid, role: 'super_admin', email: 'x@other.test' })
+        const ctx = db(strictCtx(env, uid, { email: 'x@allowed.test' }));
+        await deny(
+            ctx.doc(`${D}/users/${uid}`).set({ uid, role: 'super_admin', email: 'x@allowed.test' })
         );
     });
-    it('BUGÜN AÇIK: kişi kendi rolünü ve departmanını değiştirir', async () => {
+    it('kişi kendi rolünü, departmanını, entegrasyonunu değiştiremez; diğer alanları değiştirir', async () => {
         const uid = 'u-escalate-2';
         await seed(env, {
             [`${D}/users/${uid}`]: { uid, role: 'department_user', departments: [] },
         });
         const me = as(uid).doc(`${D}/users/${uid}`);
-        await allow(me.update({ role: 'super_admin' }));
-        await allow(me.update({ departments: ['Eng', 'Sales'] }));
+        await deny(me.update({ role: 'super_admin' }));
+        await deny(me.update({ departments: ['Eng', 'Sales'] }));
+        await deny(me.update({ integrations: { gmail: true } }));
+        await deny(me.delete());
+        await allow(me.update({ displayName: 'Yeni ad' }));
+    });
+    it('izinli alan adından recruiter kaydı açılır (K4 kaldıracak)', async () => {
+        const uid = 'u-new-domain';
+        const ctx = db(strictCtx(env, uid, { email: 'someone@allowed.test' }));
+        await allow(
+            ctx
+                .doc(`${D}/users/${uid}`)
+                .set({ uid, role: 'recruiter', email: 'someone@allowed.test' })
+        );
+    });
+    it('izinsiz alan adı, başkasının e-postası ve davetsiz department_user reddedilir', async () => {
+        const uid = 'u-new-bad';
+        await deny(
+            db(strictCtx(env, uid, { email: 'x@other.test' }))
+                .doc(`${D}/users/${uid}`)
+                .set({ uid, role: 'recruiter', email: 'x@other.test' })
+        );
+        await deny(
+            db(strictCtx(env, uid, { email: 'x@allowed.test' }))
+                .doc(`${D}/users/${uid}`)
+                .set({ uid, role: 'recruiter', email: 'y@allowed.test' })
+        );
+        await deny(
+            db(strictCtx(env, uid, { email: 'x@allowed.test' }))
+                .doc(`${D}/users/${uid}`)
+                .set({
+                    uid,
+                    role: 'department_user',
+                    email: 'x@allowed.test',
+                    departments: ['Eng'],
+                })
+        );
+    });
+    it('geçerli davetle department_user kaydı açılır; departman uyuşmazsa reddedilir (K3 kaldıracak)', async () => {
+        const uid = 'u-invitee';
+        const ctx = db(strictCtx(env, uid, { email: 'invitee@example.test' }));
+        const profile = {
+            uid,
+            role: 'department_user',
+            email: 'invitee@example.test',
+            inviteId: 'inv-1',
+        };
+        await deny(ctx.doc(`${D}/users/${uid}`).set({ ...profile, departments: ['Sales'] }));
+        await allow(ctx.doc(`${D}/users/${uid}`).set({ ...profile, departments: ['Eng'] }));
     });
     it('başkasının profilini açmak ya da değiştirmek reddedilir; anonim profil açamaz', async () => {
         await deny(
