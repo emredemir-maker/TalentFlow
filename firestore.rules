@@ -198,7 +198,17 @@ service cloud.firestore {
                           .hasOnly(['department', 'departments']));
       allow delete: if isSuperAdmin();
 
-      match /{allChildren=**} {
+      // ALT KOLEKSİYONLAR — en az bir yol parçası ZORUNLU.
+      //
+      // Burada `match /{allChildren=**}` vardı. rules_version 2'de `=**`
+      // SIFIR ya da daha fazla parçayla eşleşiyor; yani bu eşleşme profil
+      // belgesinin KENDİSİNİ de kapsıyordu. Firestore eşleşen kuralları OR'ladığı
+      // için yukarıdaki create/update doğrulaması (davet, izinli alan adı,
+      // "kendi rolünü değiştiremez") tamamen atlanıyordu: oturum açan herkes
+      // kendi profiline `role: 'super_admin'` yazabiliyordu.
+      // `{subcollection}` parçası eşleşmeyi alt koleksiyonlarla sınırlıyor
+      // (settings/preferences, assistantChats/…, …). Test: tests/rules/firestore.test.js.
+      match /{subcollection}/{allChildren=**} {
         allow read, write: if isStrictAuthenticated() &&
                               (request.auth.uid == userId || isSuperAdmin());
       }
