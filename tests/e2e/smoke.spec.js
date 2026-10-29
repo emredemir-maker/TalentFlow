@@ -13,7 +13,7 @@
 //   - Route registration regression (404s on public paths)
 //   - Critical bundle missing (e.g., a manualChunks split that excludes
 //     a routing dependency)
-//   - Login form removed/renamed without intent
+//   - Login screen regressing to direct sign-in/sign-up (K3, K4)
 //
 // What these don't catch (deferred to follow-up auth-fixtured PR):
 //   - Login submission (needs a real Firebase account)
@@ -22,7 +22,7 @@
 import { expect, test } from '@playwright/test';
 
 test.describe('SPA boot & public routes', () => {
-    test('root redirects unauthenticated users to /login', async ({ page }) => {
+    test('root shows the Hub sign-in screen to unauthenticated users', async ({ page }) => {
         // Capture console errors so a silent SPA crash surfaces in the
         // test report instead of looking like an empty page.
         const errors = [];
@@ -30,32 +30,27 @@ test.describe('SPA boot & public routes', () => {
 
         await page.goto('/');
 
-        // The router lands unauthenticated traffic on the login screen.
-        // Wait for the login marketing copy as the canonical "we mounted"
-        // signal — it's the first non-loader text that appears.
-        await expect(page.getByText('İşe Alımın')).toBeVisible({ timeout: 10_000 });
-        await expect(page.getByText(/Yapay Zeka Mimarı/)).toBeVisible();
+        // Giriş yalnız Clyro Hub'dan (K3): giriş ekranı Hub'a yönlendiren
+        // düğmeyi gösterir.
+        await expect(page.getByRole('heading', { name: 'Hoş Geldiniz' })).toBeVisible({
+            timeout: 10_000,
+        });
+        await expect(page.getByRole('button', { name: 'Clyro Hub ile giriş yap' })).toBeVisible();
 
         // No JS errors during boot
         expect(errors, errors.join('\n')).toHaveLength(0);
     });
 
-    test('login page renders email/password form', async ({ page }) => {
+    test('production build has no direct email/password sign-in or sign-up (K3, K4)', async ({
+        page,
+    }) => {
         await page.goto('/login');
-
-        // Right-panel header confirms we're on the auth form, not a
-        // redirect-loop or loader-stuck state.
         await expect(page.getByRole('heading', { name: 'Hoş Geldiniz' })).toBeVisible();
-
-        // Email + password inputs present and interactive — typing should
-        // succeed without errors. We don't submit (would hit Firebase).
-        const emailInput = page.locator('input[type="email"]').first();
-        await expect(emailInput).toBeVisible();
-        await emailInput.fill('smoke-test@example.com');
-        await expect(emailInput).toHaveValue('smoke-test@example.com');
-
-        const passwordInput = page.locator('input[type="password"]').first();
-        await expect(passwordInput).toBeVisible();
+        // Talent'ın kendi e-posta/şifre girişi, kaydı ve Google girişi kalktı.
+        await expect(page.locator('input[type="password"]')).toHaveCount(0);
+        await expect(
+            page.getByRole('button', { name: /Sisteme Giriş Yap|Kayıt|Google/ })
+        ).toHaveCount(0);
     });
 
     test('exit page renders the post-interview thank-you', async ({ page }) => {

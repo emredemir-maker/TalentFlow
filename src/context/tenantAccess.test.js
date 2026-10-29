@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../config/firebase', () => ({ auth: null, db: {}, isFirebaseConfigured: false }));
 
-const { pickTenant, tenantAccessOf, memberIsActive } = await import('./AuthContext.jsx');
+const { pickTenant, resolveActiveTenant, tenantAccessOf, memberIsActive } = await import('./AuthContext.jsx');
 
 const NOW = Date.parse('2026-10-29T12:00:00Z');
 const day = 864e5;
@@ -36,5 +36,24 @@ describe('memberIsActive', () => {
         expect(memberIsActive({ status: 'active', role: 'support', expiresAt: NOW - 1 }, NOW)).toBe(false);
         expect(memberIsActive({ status: 'active', role: 'super_admin' }, NOW)).toBe(false);
         expect(memberIsActive(null, NOW)).toBe(false);
+    });
+});
+
+describe('resolveActiveTenant (aday bağlantısı)', () => {
+    it('herkese açık sayfada bağlantıdaki şirket kaydedilmiş seçimi ve listeyi ezer', () => {
+        // İki şirketli recruiter, son seçimi B, A'nın mülakat bağlantısını açıyor.
+        expect(resolveActiveTenant({ ids: ['A', 'B'], last: 'B', publicPath: true, urlTenant: 'A' })).toEqual({
+            active: 'A',
+            member: 'A',
+        });
+        // Anonim aday: üyelik listesi boş — bağlantı şirketi silinmez.
+        expect(resolveActiveTenant({ ids: [], publicPath: true, urlTenant: 'A' })).toEqual({ active: 'A', member: null });
+    });
+    it('iç sayfada bağlantı parametresi yok sayılır', () => {
+        expect(resolveActiveTenant({ ids: ['A', 'B'], last: 'B', publicPath: false, urlTenant: 'A' })).toEqual({
+            active: 'B',
+            member: 'B',
+        });
+        expect(resolveActiveTenant({ ids: [], publicPath: true, urlTenant: null })).toEqual({ active: null, member: null });
     });
 });

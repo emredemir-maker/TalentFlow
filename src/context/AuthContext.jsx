@@ -100,6 +100,23 @@ export function pickTenant(tenantIds, { hub, last } = {}) {
     return null;
 }
 
+/**
+ * Etkin şirket kararı. Aday (herkese açık) sayfasında BAĞLANTIDAKİ şirket
+ * kazanır: kaydedilmiş seçim ya da üyelik listesi onu ezmez — yoksa iki
+ * şirkette üye bir recruiter'ın açtığı A şirketi mülakatının yazımları
+ * B'nin ağacına düşerdi.
+ * @returns {{ active: string|null, member: string|null }} active: yolların
+ *   kurulacağı şirket; member: üyelik/şirket belgesi dinlenecek şirket
+ *   (listede değilse null).
+ */
+export function resolveActiveTenant({ ids, hub, last, publicPath = false, urlTenant = null }) {
+    if (publicPath && urlTenant) {
+        return { active: urlTenant, member: ids.includes(urlTenant) ? urlTenant : null };
+    }
+    const picked = pickTenant(ids, { hub, last });
+    return { active: picked, member: picked };
+}
+
 // E2E mock-auth (yalnız `vite build --mode e2e-auth`; üretimde dal derlenmez).
 const MOCK = import.meta.env.VITE_E2E_MOCK_AUTH === 'true';
 const MOCK_TENANT = 'e2e-tenant';
@@ -183,13 +200,16 @@ export function AuthProvider({ children }) {
     useEffect(() => {
         if (MOCK || !tenants) return;
         const ids = tenants.map((t) => t.id);
+        const publicPath = isPublicPath();
+        const urlTenant = publicPath ? tenantFromLocation() : null;
         const hub = readStore(sessionStorage, HUB_TENANT_KEY);
         const last = readStore(localStorage, LAST_TENANT_KEY);
-        const picked = pickTenant(ids, { hub, last });
-        if (hub) writeStore(sessionStorage, HUB_TENANT_KEY, null);
-        if (picked) writeStore(localStorage, LAST_TENANT_KEY, picked);
-        setActiveTenantId(picked);
-        setTenantIdState(picked);
+        const { active, member: memberTenant } = resolveActiveTenant({ ids, hub, last, publicPath, urlTenant });
+        if (hub && !urlTenant) writeStore(sessionStorage, HUB_TENANT_KEY, null);
+        // Aday sayfasındaki bağlantı şirketi kalıcı seçim sayılmaz.
+        if (active && !urlTenant) writeStore(localStorage, LAST_TENANT_KEY, active);
+        setActiveTenantId(active);
+        setTenantIdState(memberTenant);
     }, [tenants]);
 
     // ── Üyelik ve şirket belgesi ────────────────────────────────────────
