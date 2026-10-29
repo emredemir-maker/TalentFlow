@@ -29,3 +29,8 @@ export function setMemberDepartments(member, departments) {
 export function removeMember(uid) {
     return call('DELETE', uid);
 }
+
+/** Departman listesinden yalnız verilen departmanı çıkarır (diğerleri kalır). */
+export function withoutDepartment(departments, name) {
+    return (Array.isArray(departments) ? departments : []).filter((d) => d !== name);
+}

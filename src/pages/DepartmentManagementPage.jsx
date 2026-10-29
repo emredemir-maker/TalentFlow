@@ -15,7 +15,7 @@ import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 import { usePositions } from '../context/PositionsContext';
 import { tc } from '../config/tenantPaths';
-import { setMemberDepartments, updateMember } from '../services/memberAdmin';
+import { setMemberDepartments, updateMember, withoutDepartment } from '../services/memberAdmin';
 
 const DEPARTMENTS_PATH = () => tc('departments');
 const USERS_PATH = () => tc('members');
@@ -188,12 +188,13 @@ export default function DepartmentManagementPage() {
         } catch (err) { alert('Atama yapılamadı: ' + err.message); }
     };
 
-    const handleRemoveUser = async (userId) => {
+    // Yalnız BU departmandan çıkarır; kişinin diğer departmanları kalır.
+    const handleRemoveUser = async (userId, deptName) => {
         if (!window.confirm('Bu kullanıcıyı departmandan çıkarmak istediğinize emin misiniz?')) return;
         const u = allUsers.find(x => x.id === userId);
         if (!u) return;
         try {
-            await setMemberDepartments(u, []);
+            await setMemberDepartments(u, withoutDepartment(u.departments, deptName));
         } catch (err) { alert('Kaldırılamadı: ' + err.message); }
     };
 
@@ -402,7 +403,7 @@ export default function DepartmentManagementPage() {
                                                             {u.role === 'admin' ? 'Admin' : u.role === 'department_user' ? 'Dept' : 'Recruiter'}
                                                         </span>
                                                         <button
-                                                            onClick={() => handleRemoveUser(u.id)}
+                                                            onClick={() => handleRemoveUser(u.id, dept.name)}
                                                             className="p-1.5 rounded-md text-n300 hover:text-bad-text hover:bg-bad-bg transition-all opacity-0 group-hover:opacity-100"
                                                         >
                                                             <UserMinus className="w-3.5 h-3.5" />

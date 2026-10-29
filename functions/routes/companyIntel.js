@@ -44,7 +44,14 @@ export function idFromName(name) {
     return id ? { key, id } : null;
 }
 
-router.post('/api/company-intel/resolve', aiLimiter, requireTenant(WRITER_ROLES), async (req, res) => {
+// Yalnız önbellek okuması (cacheOnly) AI çağrısı yapmaz: AI kotasına (aiLimiter)
+// sayılmaz — bir doğrulama raporu şirket başına bir okuma yapıyor ve kota
+// dolunca okumalar "önbellekte yok" sayılırdı. Genel istek sınırı
+// (generalLimiter, server.js) yine geçerli.
+const aiLimiterUnlessCacheOnly = (req, res, next) =>
+    req.body?.cacheOnly === true ? next() : aiLimiter(req, res, next);
+
+router.post('/api/company-intel/resolve', aiLimiterUnlessCacheOnly, requireTenant(WRITER_ROLES), async (req, res) => {
     const ref = idFromName(req.body?.name);
     if (!ref) return res.status(400).json({ error: 'Şirket adı gerekli.' });
     const force = req.body?.force === true;
