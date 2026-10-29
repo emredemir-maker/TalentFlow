@@ -657,4 +657,27 @@ describe('toplu içe aktarma işçisi (collection group)', () => {
         expect((await get('legacy/x/bulkImportJobs/old')).data().status).toBe('queued');
         expect(await claimNextQueuedJob()).toBeNull();
     });
+    it('eski kökte 10+ bekleyen iş şirket işini engellemez (sayfalama)', async () => {
+        const batch = db.batch();
+        for (let i = 0; i < 25; i += 1) {
+            batch.set(
+                db.doc(
+                    `artifacts/talent-flow/public/data/bulkImportJobs/old-${String(i).padStart(2, '0')}`
+                ),
+                {
+                    status: 'queued',
+                    createdAt: new Date(0),
+                }
+            );
+        }
+        await batch.commit();
+        await db
+            .doc('tenants/A/bulkImportJobs/jlate')
+            .set({ status: 'queued', createdAt: new Date(5) });
+        expect(await claimNextQueuedJob()).toBe('tenants/A/bulkImportJobs/jlate');
+        const legacy = await db
+            .collection('artifacts/talent-flow/public/data/bulkImportJobs')
+            .get();
+        expect(legacy.docs.every((d) => d.data().status === 'queued')).toBe(true);
+    });
 });

@@ -401,15 +401,38 @@ export function tenantJobDocs(docs) {
     return docs.filter((d) => tenantIdFromPath(d.ref.path) !== null);
 }
 
-// Atomically claim a single queued job via Firestore transaction.
-export async function claimNextQueuedJob() {
+const QUEUE_PAGE = 10;
+const QUEUE_MAX_PAGES = 100;
+
+/**
+ * Kuyruktaki ŞİRKET işlerini bulur.
+ *
+ * Collection group sorgusunda `limit` süzgeçten ÖNCE uygulanıyor: eski ortak
+ * kökte bekleyen ≥10 iş varken tek sayfalık sorgu yalnız onları getirir,
+ * süzgeç hepsini atar ve şirket işleri hiç alınmazdı (eski kökteki işler
+ * değişmediği için sonsuza kadar). Firestore collection group sorgusunu yol
+ * önekine daraltamadığı için sayfa sayfa ilerleniyor: sonuçlar belge yoluna
+ * göre sıralı geliyor, dışarıda kalan sayfanın son belgesinden devam edilir.
+ * Sayfa sayısı sınırlı (en çok QUEUE_PAGE × QUEUE_MAX_PAGES belge).
+ */
+export async function findQueuedTenantJobs() {
     // Tek alanlı collection group sorgusu (firestore.indexes.json →
     // fieldOverrides: bulkImportJobs.status, COLLECTION_GROUP).
-    const snap = await db.collectionGroup(BULK_JOBS_GROUP)
-        .where('status', '==', 'queued')
-        .limit(10)
-        .get();
-    const docs = tenantJobDocs(snap.docs);
+    const base = db.collectionGroup(BULK_JOBS_GROUP).where('status', '==', 'queued');
+    let query = base.limit(QUEUE_PAGE);
+    for (let page = 0; page < QUEUE_MAX_PAGES; page += 1) {
+        const snap = await query.get();
+        const docs = tenantJobDocs(snap.docs);
+        if (docs.length > 0 || snap.size < QUEUE_PAGE) return docs;
+        query = base.startAfter(snap.docs[snap.docs.length - 1]).limit(QUEUE_PAGE);
+    }
+    log.warn('[bulk-import] kuyruk taraması sayfa sınırına ulaştı');
+    return [];
+}
+
+// Atomically claim a single queued job via Firestore transaction.
+export async function claimNextQueuedJob() {
+    const docs = await findQueuedTenantJobs();
     if (docs.length === 0) return null;
     // Pick earliest by createdAt if available, else first result
     const sorted = docs.sort((a, b) => {
