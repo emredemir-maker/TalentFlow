@@ -6,13 +6,15 @@
 // data-clyro-consent özniteliği olan her bağlantı ya da window.clyroConsent.open() şeridi yeniden açar.
 (function () {
   var KEY = 'clyro-consent';
-  var SITE_KEY = 'clyro_pk_02a612cce8a1eb03a3491d1e2853bd27f8fee5e2143b94b1';
+  var me = document.currentScript;
+  // Her sitenin kendi site anahtarı (raporda siteler ayrışsın): kod satırında data-site-key; yoksa clyrolabs.com'unki.
+  // data-key değil: clyro.js kendi etiketini data-key ile arıyor, bu etiketi onunla karıştırmasın.
+  var SITE_KEY = (me && me.getAttribute('data-site-key')) || 'clyro_pk_02a612cce8a1eb03a3491d1e2853bd27f8fee5e2143b94b1';
   var SRC = 'https://cx.clyrolabs.com/clyro.js';
   var KVKK = 'https://clyrolabs.com/kvkk';
   var bar = null;
   // data-skip="/yol1/,/yol2/": bu yollarla başlayan sayfalarda (ör. CX'in müşterinin müşterisine açılan anket bağlantısı)
   // ne sorulur ne takip edilir; o ziyaretçi bizim değil, kendi firmasının ziyaretçisidir.
-  var me = document.currentScript;
   var skip = ((me && me.getAttribute('data-skip')) || '').split(',').filter(Boolean);
 
   function get() { try { return localStorage.getItem(KEY); } catch (e) { return null; } }
