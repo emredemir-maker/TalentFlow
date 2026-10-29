@@ -22,6 +22,7 @@ import {
     Brain, Star, MessageSquare, Award, Sparkles,
     Loader2, RefreshCw,
 } from 'lucide-react';
+import { tc } from '../config/tenantPaths';
 
 /**
  * STAR satırları — canlı mülakatın yazdığı `session.starScores`.
@@ -81,7 +82,7 @@ export default function InterviewReportPage() {
     //
     // Aday belgesindeki `interviewSessions[]` yalnızca bir ÖZET taşıyor:
     // id, tarih, tip, sonuç, skor. Transkript, sorular, cevaplar ve
-    // değerlendirme `/interviews/{sessionId}` altında duruyor.
+    // değerlendirme `tenants/{t}/interviews/{sessionId}` altında duruyor.
     //
     // Bu sayfa yalnızca özete bakıyordu ve manuel görüşmelerde rapor HEP BOŞ
     // çıkıyordu — kullanıcı transkript girdiği hâlde. Canlı mülakatlarda
@@ -99,7 +100,7 @@ export default function InterviewReportPage() {
             try {
                 const { doc, getDoc } = await import('firebase/firestore');
                 const { db } = await import('../config/firebase');
-                const snap = await getDoc(doc(db, 'interviews', String(sessionId)));
+                const snap = await getDoc(doc(db, tc('interviews'), String(sessionId)));
                 if (alive && snap.exists()) setFullRecord(snap.data());
             } catch {
                 // Kayıt okunamazsa özetle devam edilir; rapor eksik görünür

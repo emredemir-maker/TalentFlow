@@ -5,20 +5,23 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from './AuthContext';
+import { tc } from '../config/tenantPaths';
 
 const MessageQueueContext = createContext();
 
-const QUEUE_PATH = 'artifacts/talent-flow/public/data/messageQueue';
+const QUEUE_PATH = () => tc('messageQueue');
 
 export function MessageQueueProvider({ children }) {
-    const { isAuthenticated } = useAuth();
+    const { isAuthenticated, user } = useAuth();
+    // Anonim aday oturumu şirket listelerini okuyamaz (kurallar); dinleyici kurulmaz.
+    const isMember = isAuthenticated && !user?.isAnonymous;
     const [messages, setMessages] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!isAuthenticated) return;
+        if (!isMember) return;
 
-        const queueRef = collection(db, QUEUE_PATH);
+        const queueRef = collection(db, QUEUE_PATH());
         // Rule 2: No orderBy/limit — client-side filtering
         const unsubscribe = onSnapshot(
             queueRef,
@@ -43,7 +46,7 @@ export function MessageQueueProvider({ children }) {
         );
 
         return () => unsubscribe();
-    }, [isAuthenticated]);
+    }, [isMember]);
 
     // Computed stats
     const stats = {

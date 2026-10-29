@@ -29,6 +29,7 @@ import { STAGES, getStage, nextStageKey } from '../utils/pipelineStages';
 import { resolveCandidateStage } from '../utils/candidateTable';
 import { resolveRejection } from '../utils/rejectionReasons';
 import { isSessionDone } from '../utils/interviewSession';
+import { tc, withTenantParam } from '../config/tenantPaths';
 
 // Aşama ve red nedeni tanımları ARTIK KOPYALANMIYOR.
 // Aşamalar: utils/pipelineStages · Red nedenleri: utils/rejectionReasons
@@ -67,7 +68,7 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
 
     // Fetch sources
     useEffect(() => {
-        const unsub = onSnapshot(query(collection(db, 'artifacts/talent-flow/public/data/sources'), orderBy('createdAt', 'asc')), (snap) => {
+        const unsub = onSnapshot(query(collection(db, tc('sources')), orderBy('createdAt', 'asc')), (snap) => {
             setSources(snap.docs.map(d => ({ id: d.id, ...d.data() })));
         });
         return unsub;
@@ -414,10 +415,10 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                             interviewSessions: [...(candidate.interviewSessions || []), newSession],
                                             status: 'interview_scheduled'
                                         });
-                                        navigate(`/live-interview/${sessId}`);
+                                        navigate(withTenantParam(`/live-interview/${sessId}`));
                                     } catch (err) {
                                         console.error("Failed to create live session:", err);
-                                        navigate(`/live-interview/${sessId}`);
+                                        navigate(withTenantParam(`/live-interview/${sessId}`));
                                     }
                                 }}
                                 className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/20 transition-all shadow-sm" title="Yeni Canlı Mülakat">
@@ -809,10 +810,10 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                             interviewSessions: [...(candidate.interviewSessions || []), newSession],
                                             status: 'interview_scheduled'
                                         });
-                                        navigate(`/live-interview/${sessId}`);
+                                        navigate(withTenantParam(`/live-interview/${sessId}`));
                                     } catch (err) {
                                         console.error("Failed to create live session:", err);
-                                        navigate(`/live-interview/${sessId}`);
+                                        navigate(withTenantParam(`/live-interview/${sessId}`));
                                     }
                                 }}
                                 className="w-full py-3 rounded-3xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-cyan-500/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
@@ -826,18 +827,18 @@ export default function CandidateDrawer({ candidate: initialCandidate, onClose, 
                                 onStartSession={async (session) => {
                                     const effComp = isSessionDone(session);
                                     if (effComp) {
-                                        navigate(`/interview-report/${session.id}`);
+                                        navigate(withTenantParam(`/interview-report/${session.id}`));
                                         return;
                                     }
                                     try {
-                                        const snap = await getDoc(doc(db, 'interviews', session.id));
+                                        const snap = await getDoc(doc(db, tc('interviews'), session.id));
                                         if (snap.exists() && snap.data()?.status === 'completed') {
-                                            navigate(`/interview-report/${session.id}`);
+                                            navigate(withTenantParam(`/interview-report/${session.id}`));
                                         } else {
-                                            navigate(`/live-interview/${session.id}`);
+                                            navigate(withTenantParam(`/live-interview/${session.id}`));
                                         }
                                     } catch {
-                                        navigate(`/live-interview/${session.id}`);
+                                        navigate(withTenantParam(`/live-interview/${session.id}`));
                                     }
                                 }}
                             />

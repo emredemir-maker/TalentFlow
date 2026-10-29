@@ -159,49 +159,8 @@ function infoCard(rows, color) {
 }
 
 
-// ─── 1. KULLANICI DAVET MAİLİ (system → new user) ───────────────────────────
-export function buildInviteEmail(branding, { inviteLink, role, invitedByName }) {
-    const b = { ...DEFAULT_BRANDING, ...branding };
-    const color = b.primaryColor || '#111312';
-    const roleLabel =
-        role === 'super_admin' ? 'Süper Admin' :
-        role === 'department_user' ? 'Departman Kullanıcısı' : 'Recruiter';
+// buildInviteEmail KALDIRILDI (K3): Talent'ın kendi daveti yok, kişiler Hub'dan davet edilir.
 
-    const content = `
-      <h2 style="color:#0F172A;font-size:24px;font-weight:800;margin:0 0 10px 0;letter-spacing:-0.5px;">
-        Platforma Hoş Geldiniz
-      </h2>
-      <p style="color:#475569;font-size:15px;line-height:1.7;margin:0 0 28px 0;">
-        ${invitedByName ? `<strong>${invitedByName}</strong> tarafından` : ''} <strong>${b.companyName}</strong>'a
-        <span style="color:${color};font-weight:700;">${roleLabel}</span> olarak davet edildiniz.
-        Aşağıdaki butona tıklayarak hesabınızı oluşturun ve hemen kullanmaya başlayın.
-      </p>
-
-      <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;padding:20px 24px;margin-bottom:28px;">
-        <table cellpadding="0" cellspacing="0" width="100%">
-          ${infoRow('Platform', b.companyName)}
-          ${infoRow('Rol', roleLabel)}
-        </table>
-      </div>
-
-      ${primaryButton(inviteLink, 'Daveti Kabul Et &rarr;', color)}
-
-      <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:14px 18px;">
-        <p style="color:#92400E;font-size:12px;margin:0;line-height:1.6;">
-          <strong>Güvenlik Notu:</strong> Bu davet bağlantısı kişiseldir ve yalnızca bir kez kullanılabilir. Başkalarıyla paylaşmayınız.
-        </p>
-      </div>
-
-      <p style="color:#94A3B8;font-size:12px;margin:20px 0 0 0;line-height:1.6;">
-        Butona tıklayamıyorsanız bu adresi kopyalayın:<br/>
-        <a href="${inviteLink}" style="color:${color};word-break:break-all;font-size:11px;">${inviteLink}</a>
-      </p>
-    `;
-    return baseLayout(b, content);
-}
-
-
-// ─── 2. MÜLAKAT DAVET MAİLİ (recruiter → candidate) ─────────────────────────
 export function buildInterviewInviteEmail(branding, {
     candidateName, recruiterName, position,
     date, time, interviewType, joinLink, companyEmail

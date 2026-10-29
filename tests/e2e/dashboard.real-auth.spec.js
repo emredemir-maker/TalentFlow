@@ -18,7 +18,7 @@
 //     real third-party services and live in manual QA
 
 import { expect, test } from '@playwright/test';
-import { TEST_USER } from './fixtures/global-setup.js';
+import { MULTI_USER, TENANTS, TEST_USER } from './fixtures/global-setup.js';
 
 test.describe('Real-auth login + dashboard', () => {
     test('email/password login lands on the dashboard', async ({ page }) => {
@@ -39,10 +39,8 @@ test.describe('Real-auth login + dashboard', () => {
         await page.locator('input[type="email"]').first().fill(TEST_USER.email);
         await page.locator('input[type="password"]').first().fill(TEST_USER.password);
 
-        // LoginPage has TWO buttons whose label contains "Giriş Yap":
-        // the email/password submit ("Sisteme Giriş Yap") and the
-        // Google sign-in CTA ("Google ile Giriş Yap"). Pin the exact
-        // submit-button label to avoid strict-mode violations.
+        // Giriş Hub'dan (K3); e-posta/şifre formu yalnız emülatör derlemesinde
+        // ("Sisteme Giriş Yap"). "Clyro Hub ile giriş yap" ayrı düğme.
         await page.getByRole('button', { name: 'Sisteme Giriş Yap' }).click();
 
         // After successful auth, AuthContext sets user + profile and
@@ -81,5 +79,53 @@ test.describe('Real-auth login + dashboard', () => {
         });
         // And the LoginPage heading should NOT be visible
         await expect(page.getByRole('heading', { name: 'Hoş Geldiniz' })).toBeHidden();
+    });
+
+    test('tek şirketli kullanıcı kendi şirketinin adayını görür, başkasınınkini görmez', async ({
+        page,
+    }) => {
+        await page.goto('/');
+        await expect(page.getByRole('heading', { name: 'Hoş Geldiniz' })).toBeVisible({
+            timeout: 15_000,
+        });
+        await page.locator('input[type="email"]').first().fill(TEST_USER.email);
+        await page.locator('input[type="password"]').first().fill(TEST_USER.password);
+        await page.getByRole('button', { name: 'Sisteme Giriş Yap' }).click();
+        await expect(page.getByRole('heading', { name: 'Aday havuzu' })).toBeVisible({
+            timeout: 20_000,
+        });
+        await expect(page.getByText(TENANTS.A.candidate).first()).toBeVisible({ timeout: 15_000 });
+        await expect(page.getByText(TENANTS.B.candidate)).toHaveCount(0);
+        // Tek şirkette seçici görünmez.
+        await expect(page.getByRole('combobox', { name: 'Şirket' })).toHaveCount(0);
+    });
+
+    test('iki şirketli kullanıcı şirket seçer; geçişte liste değişir', async ({ page }) => {
+        await page.goto('/');
+        await expect(page.getByRole('heading', { name: 'Hoş Geldiniz' })).toBeVisible({
+            timeout: 15_000,
+        });
+        await page.locator('input[type="email"]').first().fill(MULTI_USER.email);
+        await page.locator('input[type="password"]').first().fill(MULTI_USER.password);
+        await page.getByRole('button', { name: 'Sisteme Giriş Yap' }).click();
+
+        // Seçim yokken şirket seçici ekranı.
+        await expect(page.getByRole('heading', { name: 'Şirket seçin' })).toBeVisible({
+            timeout: 20_000,
+        });
+        await page.getByRole('button', { name: TENANTS.A.name }).click();
+        await expect(page.getByRole('heading', { name: 'Aday havuzu' })).toBeVisible({
+            timeout: 20_000,
+        });
+        await expect(page.getByText(TENANTS.A.candidate).first()).toBeVisible({ timeout: 15_000 });
+        await expect(page.getByText(TENANTS.B.candidate)).toHaveCount(0);
+
+        // Kenar menüdeki seçiciyle B'ye geç.
+        await page.getByRole('combobox', { name: 'Şirket' }).selectOption(TENANTS.B.id);
+        await expect(page.getByRole('heading', { name: 'Aday havuzu' })).toBeVisible({
+            timeout: 20_000,
+        });
+        await expect(page.getByText(TENANTS.B.candidate).first()).toBeVisible({ timeout: 15_000 });
+        await expect(page.getByText(TENANTS.A.candidate)).toHaveCount(0);
     });
 });

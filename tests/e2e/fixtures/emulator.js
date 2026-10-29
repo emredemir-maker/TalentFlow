@@ -61,67 +61,65 @@ export async function createAuthUser({ email, password, displayName }) {
     return { uid: data.localId, idToken: data.idToken };
 }
 
-/**
- * Write a recruiter-shaped profile doc at
- * artifacts/talent-flow/public/data/users/{uid}. Mirrors the shape
- * AuthContext expects so the in-app shell renders normally.
- *
- * The Firestore emulator enforces the project's real firestore.rules,
- * so this call has to carry an Authorization Bearer token belonging
- * to the user whose UID is in the path. Pass the idToken returned by
- * createAuthUser.
- */
-export async function writeUserProfile({ uid, idToken, email, displayName, role }) {
-    const docPath = `artifacts/talent-flow/public/data/users/${uid}`;
-    const res = await fetch(`${FIRESTORE_BASE}/${docPath}`, {
-        method: 'PATCH',
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({
-            fields: {
-                uid: { stringValue: uid },
-                email: { stringValue: email },
-                displayName: { stringValue: displayName },
-                name: { stringValue: displayName },
-                role: { stringValue: role },
-                status: { stringValue: 'active' },
-                departments: { arrayValue: { values: [] } },
+/** JS değeri → Firestore REST değer zarfı (yalnız tohumda kullanılan tipler). */
+function fsValue(v) {
+    if (v instanceof Date) return { timestampValue: v.toISOString() };
+    if (Array.isArray(v)) return { arrayValue: { values: v.map(fsValue) } };
+    if (v && typeof v === 'object') {
+        return {
+            mapValue: {
+                fields: Object.fromEntries(Object.entries(v).map(([k, x]) => [k, fsValue(x)])),
             },
-        }),
-    });
-    if (!res.ok) {
-        throw new Error(`Profile write failed: ${res.status} ${await res.text()}`);
+        };
     }
+    if (typeof v === 'number') return { integerValue: String(v) };
+    if (typeof v === 'boolean') return { booleanValue: v };
+    return { stringValue: String(v) };
 }
 
 /**
- * Seed settings/system with an e-mail domain allow-list. Firestore rules
- * only let a user create their own recruiter profile when their e-mail
- * domain is allow-listed (or a pending invitation exists), so this has to
- * run before writeUserProfile. Uses the emulator-only "Bearer owner"
- * token, which bypasses security rules for admin-style seeding.
+ * Bir belgeyi kuralları atlayarak yazar (emülatöre özel "Bearer owner").
+ * Çok şirketli modelde üyeliği ve şirket listesini istemci yazamaz — yalnız
+ * sunucu (Hub senkronu, PR 4) yazar; testte onun yerine tohum yazıyor.
  */
-export async function seedAllowedDomains(domains) {
-    const docPath = 'artifacts/talent-flow/public/data/settings/system';
+export async function seedDoc(docPath, data) {
+    const fields = Object.fromEntries(Object.entries(data).map(([k, v]) => [k, fsValue(v)]));
     const res = await fetch(`${FIRESTORE_BASE}/${docPath}`, {
         method: 'PATCH',
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: 'Bearer owner',
-        },
-        body: JSON.stringify({
-            fields: {
-                allowedDomains: {
-                    arrayValue: { values: domains.map((d) => ({ stringValue: d })) },
-                },
-            },
-        }),
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer owner' },
+        body: JSON.stringify({ fields }),
     });
-    if (!res.ok) {
-        throw new Error(`Allowed-domains seed failed: ${res.status} ${await res.text()}`);
+    if (!res.ok) throw new Error(`Seed failed for ${docPath}: ${res.status} ${await res.text()}`);
+}
+
+/** Şirket belgesi (açık, 1 yıl yazılabilir). */
+export async function seedTenant(tenantId, name) {
+    const inAYear = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+    await seedDoc(`tenants/${tenantId}`, {
+        name,
+        status: 'active',
+        writeUntil: inAYear,
+        readUntil: inAYear,
+    });
+}
+
+/**
+ * Kişiyi şirketlere üye yapar: tenants/{t}/members/{uid} + userTenants/{uid}.
+ * @param {{uid: string, email: string, displayName: string, memberships: Array<{tenantId: string, name: string, role: string}>}} p
+ */
+export async function seedMemberships({ uid, email, displayName, memberships }) {
+    const map = {};
+    for (const m of memberships) {
+        await seedDoc(`tenants/${m.tenantId}/members/${uid}`, {
+            role: m.role,
+            status: 'active',
+            departments: [],
+            email,
+            displayName,
+        });
+        map[m.tenantId] = { name: m.name, role: m.role };
     }
+    await seedDoc(`userTenants/${uid}`, { tenants: map });
 }
 
 /**

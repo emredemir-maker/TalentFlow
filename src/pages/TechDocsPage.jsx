@@ -231,7 +231,7 @@ function AuthSection() {
             <CodeBlock lang="akış">{`1. Kullanıcı giriş yapar (Email/Password veya Google OAuth)
 2. Firebase Auth → ID Token üretilir
 3. AuthContext: Firestore'dan kullanıcı profili okunur
-   → artifacts/talent-flow/public/data/users/{uid}
+   → tenants/{tenantId}/users/{uid}
 4. userProfile.role belirlenir
 5. RBAC uygulanır (korumalı rota bileşenleri)`}</CodeBlock>
 
@@ -366,7 +366,7 @@ function DataModelSection() {
     return (
         <div>
             <SectionTitle>Koleksiyon Yolları</SectionTitle>
-            <CodeBlock lang="firestore">{`artifacts/talent-flow/public/data/
+            <CodeBlock lang="firestore">{`tenants/{tenantId}/
 ├── users/           {uid}
 ├── candidates/      {candidateId}
 ├── positions/       {positionId}
@@ -432,7 +432,7 @@ function DataModelSection() {
 }`}</CodeBlock>
 
             <SectionTitle>Pozisyon Belgesi Şeması (Ek Alanlar)</SectionTitle>
-            <CodeBlock lang="javascript">{`// artifacts/talent-flow/public/data/positions/{positionId}
+            <CodeBlock lang="javascript">{`// tenants/{tenantId}/positions/{positionId}
 {
   title: string,
   department: string,
@@ -450,7 +450,7 @@ function DataModelSection() {
             </InfoBox>
 
             <SectionTitle>bulkImportJobs Belgesi Şeması</SectionTitle>
-            <CodeBlock lang="javascript">{`// artifacts/talent-flow/public/data/bulkImportJobs/{jobId}
+            <CodeBlock lang="javascript">{`// tenants/{tenantId}/bulkImportJobs/{jobId}
 {
   status: 'queued' | 'processing' | 'done' | 'error',
   total: number,          // Toplam dosya sayısı
@@ -469,7 +469,7 @@ function DataModelSection() {
 }`}</CodeBlock>
 
             <SectionTitle>settings/branding Belgesi Şeması</SectionTitle>
-            <CodeBlock lang="javascript">{`// artifacts/talent-flow/public/data/settings/branding
+            <CodeBlock lang="javascript">{`// tenants/{tenantId}/settings/branding
 {
   companyName: string,    // Şirket adı
   logoUrl: string,        // Firebase Storage download URL
@@ -480,7 +480,7 @@ function DataModelSection() {
 }`}</CodeBlock>
 
             <SectionTitle>settings/system Belgesi Şeması</SectionTitle>
-            <CodeBlock lang="javascript">{`// artifacts/talent-flow/public/data/settings/system
+            <CodeBlock lang="javascript">{`// tenants/{tenantId}/settings/system
 {
   allowedDomains: string[],  // Davet gerektirmeyen e-posta domain'leri
                               // ör: ['btcturk.com', 'infoset.app']
@@ -847,7 +847,7 @@ function EmailSection() {
             />
 
             <SectionTitle>Branding Nesnesi</SectionTitle>
-            <CodeBlock lang="javascript">{`// Firestore: artifacts/talent-flow/public/data/settings/branding
+            <CodeBlock lang="javascript">{`// Firestore: tenants/{tenantId}/settings/branding
 const branding = {
     companyName: string,    // Şirket adı (fallback: 'Talent-Inn')
     logoUrl: string,        // Firebase Storage URL veya boş
@@ -903,7 +903,7 @@ DEFAULT_BRANDING = { companyName: 'Talent-Inn', primaryColor: '#111312', ... }`}
 7. UI: "Yanıt Var" rozeti yeşil olarak gösterilir`}</CodeBlock>
 
             <SectionTitle>emailThreads Koleksiyon Şeması</SectionTitle>
-            <CodeBlock lang="javascript">{`// artifacts/talent-flow/public/data/emailThreads/{autoId}
+            <CodeBlock lang="javascript">{`// tenants/{tenantId}/emailThreads/{autoId}
 {
     threadId: string,         // Gmail thread ID
     messageId: string,        // Gmail message ID (ilk mesaj)

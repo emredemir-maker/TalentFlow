@@ -6,6 +6,7 @@ import { X, Save, Layers, Share2, Loader2, CheckCircle, AlertCircle, ChevronRigh
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { STAGES } from '../utils/pipelineStages';
+import { tc } from '../config/tenantPaths';
 
 // Aşama listesi ARTIK KOPYALANMIYOR — tek kaynak utils/pipelineStages.
 // Kopya olduğu sürece yeni bir aşama eklendiğinde burası sessizce eksik
@@ -38,7 +39,7 @@ export default function BulkUpdateModal({ isOpen, onClose, selectedIds, type, on
     const fetchSources = async () => {
         setFetchLoading(true);
         try {
-            const q = query(collection(db, 'artifacts/talent-flow/public/data/sources'), orderBy('name', 'asc'));
+            const q = query(collection(db, tc('sources')), orderBy('name', 'asc'));
             const snap = await getDocs(q);
             setAvailableSources(snap.docs.map(d => ({ id: d.id, ...d.data() })));
         } catch (err) {

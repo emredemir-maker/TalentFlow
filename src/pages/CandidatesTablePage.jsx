@@ -35,6 +35,7 @@ import {
     VERIFICATION_RANK, describeActiveFilters, FILTER_RESET_FIELDS,
     SCORE_METHOD, SCORE_METHOD_LABEL,
 } from '../utils/candidateTable';
+import { tc } from '../config/tenantPaths';
 
 const PAGE_SIZE = 50;
 
@@ -204,8 +205,8 @@ function BulkActionModal({ isOpen, type, count, applying, onApply, onClose }) {
                 setter([]);
             }
         };
-        if (type === 'source') { setSources(null); load('artifacts/talent-flow/public/data/sources', setSources); }
-        if (type === 'department') { setDepartments(null); load('artifacts/talent-flow/public/data/departments', setDepartments); }
+        if (type === 'source') { setSources(null); load(tc('sources'), setSources); }
+        if (type === 'department') { setDepartments(null); load(tc('departments'), setDepartments); }
     }, [isOpen, type]);
 
     if (!isOpen) return null;
@@ -337,7 +338,7 @@ export default function CandidatesTablePage() {
     );
     // Bakım uçları backend'de super_admin/recruiter ile korunuyor; butonu
     // yetkisiz role gösterip 403 yedirmek yerine hiç göstermiyoruz.
-    const canMaintain = role === 'super_admin' || role === 'recruiter';
+    const canMaintain = role === 'admin' || role === 'recruiter';
 
     const [filters, setFilters] = useState(() => ({ ...DEFAULT_FILTERS, ...(loadTableState().filters || {}) }));
     const [sortKey, setSortKey] = useState(() => loadTableState().sortKey || 'appliedDate');

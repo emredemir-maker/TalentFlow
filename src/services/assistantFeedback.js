@@ -8,12 +8,13 @@
 // Bu yüzden düğme bugün var, kullanan taraf sonra gelecek.
 //
 // Kayıt kullanıcının kendi alt koleksiyonunda:
-//   artifacts/talent-flow/public/data/users/{uid}/assistantFeedback/{autoId}
+//   tenants/{tenantId}/members/{uid}/assistantFeedback/{autoId}
 // Bu yol firestore.rules'ta zaten kapalı (`users/{userId}/{allChildren=**}`).
 
 import { addDoc, collection } from 'firebase/firestore';
 
 import { db } from '../config/firebase';
+import { tc } from '../config/tenantPaths';
 
 /**
  * Bir cevaba dair geri bildirimi yazar.
@@ -30,7 +31,7 @@ export async function saveFeedback(uid, entry) {
     if (!db) throw new Error('Firestore yapılandırılmamış.');
     if (!uid) throw new Error('Oturum bilgisi çözümlenemedi.');
     await addDoc(
-        collection(db, `artifacts/talent-flow/public/data/users/${uid}/assistantFeedback`),
+        collection(db, `${tc('members')}/${uid}/assistantFeedback`),
         {
             question: String(entry?.question || '').slice(0, 500),
             tool: entry?.tool || null,

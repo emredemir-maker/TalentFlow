@@ -18,6 +18,7 @@
 
 /** Storage kuralı ve sunucu doğrulamasıyla aynı üst sınır. */
 export const MAX_SOURCE_BYTES = 200 * 1024 * 1024;
+import { storagePaths } from '../config/tenantPaths';
 
 /** Tek seferde bildirilebilecek kaynak dosya sayısı (sunucu ile aynı). */
 export const MAX_SOURCES = 50;
@@ -48,8 +49,10 @@ export function sanitizeStorageName(name) {
  * gerçekten okur. Sıra numarası önde çünkü aynı adı taşıyan iki dosya
  * ('cv.pdf') aksi hâlde birbirini ezerdi.
  */
-export function bulkStoragePath(uid, token, index, originalName) {
-    return `bulk-imports/${uid}/${token}/${index}-${sanitizeStorageName(originalName)}`;
+export function bulkStoragePath(uid, token, index, originalName, tenantId) {
+    // Şirketin klasörü: tenants/{t}/bulk-imports/{uid}/… (storage.rules ve
+    // sunucudaki bulkSources önek denetimiyle aynı).
+    return storagePaths.bulkImport(uid, `${token}/${index}-${sanitizeStorageName(originalName)}`, tenantId);
 }
 
 /** Tek başına boyut sınırını aşan dosyalar — yüklemeye hiç başlanmamalı. */

@@ -3,7 +3,8 @@
 // role needs to be displayed.
 
 export const ROLE_LABELS = {
-    super_admin: 'Sistem Yöneticisi',
+    admin: 'Şirket Yöneticisi',
+    support: 'Destek (salt okunur)',
     recruiter: 'Recruiter',
     department_user: 'Departman Kullanıcısı',
     candidate: 'Aday',

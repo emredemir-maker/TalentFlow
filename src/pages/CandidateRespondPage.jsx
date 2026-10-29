@@ -9,6 +9,8 @@ import {
     CheckCircle2, XCircle, Loader2, AlertCircle, Send,
     FileText, Calendar, Clock, Paperclip, Sparkles
 } from 'lucide-react';
+import { tc, getActiveTenantId } from '../config/tenantPaths';
+import { publicApiHeaders } from '../services/publicApi';
 
 const API_BASE = import.meta.env.VITE_SERVER_URL || '';
 
@@ -31,13 +33,13 @@ export default function CandidateRespondPage() {
         const fetchData = async () => {
             try {
                 if (type === 'info') {
-                    const snap = await getDoc(doc(db, `artifacts/talent-flow/public/data/infoRequests/${id}`));
+                    const snap = await getDoc(doc(db, `${tc('infoRequests')}/${id}`));
                     if (!snap.exists()) throw new Error('Talep bulunamadı veya süresi doldu.');
                     const d = snap.data();
                     if (d.status === 'responded') { setDone(true); }
                     setData(d);
                 } else {
-                    const snap = await getDoc(doc(db, `interviews/${id}`));
+                    const snap = await getDoc(doc(db, `${tc('interviews')}/${id}`));
                     if (!snap.exists()) throw new Error('Mülakat daveti bulunamadı.');
                     const d = snap.data();
                     if (d.candidateResponse?.status) {
@@ -69,8 +71,8 @@ export default function CandidateRespondPage() {
         try {
             const res = await fetch(`${API_BASE}/api/candidate-respond`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id, type: 'invite', action }),
+                headers: await publicApiHeaders(),
+                body: JSON.stringify({ tenantId: getActiveTenantId(), id, type: 'invite', action }),
             });
             if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Yanıt kaydedilemedi.'); }
             setDone(true);
@@ -88,8 +90,8 @@ export default function CandidateRespondPage() {
         try {
             const res = await fetch(`${API_BASE}/api/candidate-respond`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id, type: 'info', responseData: responseText }),
+                headers: await publicApiHeaders(),
+                body: JSON.stringify({ tenantId: getActiveTenantId(), id, type: 'info', responseData: responseText }),
             });
             if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Yanıt gönderilemedi.'); }
             setDone(true);

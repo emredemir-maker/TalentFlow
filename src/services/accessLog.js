@@ -32,8 +32,9 @@ import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 
 import { db } from '../config/firebase';
 import { IS_DEMO } from '../utils/demoMode';
+import { tc } from '../config/tenantPaths';
 
-const PATH = 'artifacts/talent-flow/public/data/accessLogs';
+const PATH = () => tc('accessLogs');
 
 export const ACCESS_ACTIONS = {
     CANDIDATE_VIEW: 'candidate-view',
@@ -69,7 +70,7 @@ export function logAccess(action, detay = {}) {
         ...(detay.note ? { note: String(detay.note).slice(0, 200) } : {}),
     };
 
-    void addDoc(collection(db, PATH), kayit).catch((err) => {
+    void addDoc(collection(db, PATH()), kayit).catch((err) => {
         console.warn('[accessLog] kaydedilemedi:', err?.message);
     });
 }

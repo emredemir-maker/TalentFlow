@@ -1,7 +1,7 @@
 // İncelenecek görüşmeleri toplar.
 //
 // Aday belgesindeki `interviewSessions[]` yalnızca bir ÖZET taşıyor; damgalar,
-// sorular ve transcript tam kayıtta (`interviews/{sessionId}`). İnceleme
+// sorular ve transcript tam kayıtta (`tenants/{t}/interviews/{sessionId}`). İnceleme
 // çerçevesi damgalara dayandığı için tam kaydı okumak zorunlu.
 //
 // ── ÖRNEKLEM ────────────────────────────────────────────────────────────────
@@ -20,6 +20,7 @@
 import { doc, getDoc } from 'firebase/firestore';
 
 import { db } from '../config/firebase';
+import { tc } from '../config/tenantPaths';
 
 /** Tek soruda okunacak en fazla görüşme kaydı. */
 export const MAX_SESSIONS = 60;
@@ -81,7 +82,7 @@ export async function loadInterviewEntries({ candidates = [], position = '', can
     const entries = [];
     for (const p of slice) {
         try {
-            const snap = await getDoc(doc(db, 'interviews', p.sessionId));
+            const snap = await getDoc(doc(db, tc('interviews'), p.sessionId));
             if (!snap.exists()) continue;
             entries.push({ candidateId: p.candidateId, candidateName: p.candidateName, session: snap.data() });
         } catch {

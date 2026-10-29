@@ -13,8 +13,9 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
+import { tc } from '../config/tenantPaths';
 
-const SOURCES_PATH = 'artifacts/talent-flow/public/data/sources';
+const SOURCES_PATH = () => tc('sources');
 
 const ICONS = {
     Globe: Globe,
@@ -56,7 +57,7 @@ export default function SourceManagementPage() {
             if (user !== undefined) setLoading(false);
             return;
         }
-        const q = query(collection(db, SOURCES_PATH), orderBy('createdAt', 'asc'));
+        const q = query(collection(db, SOURCES_PATH()), orderBy('createdAt', 'asc'));
         const unsub = onSnapshot(q, (snap) => {
             setSources(snap.docs.map(d => ({ id: d.id, ...d.data() })));
             setLoading(false);
@@ -94,12 +95,12 @@ export default function SourceManagementPage() {
         try {
             if (modalType === 'main' || modalType === 'edit_main') {
                 if (modalType === 'edit_main') {
-                    await updateDoc(doc(db, SOURCES_PATH, formData.id), {
+                    await updateDoc(doc(db, SOURCES_PATH(), formData.id), {
                         name: formData.name.trim(), icon: formData.icon,
                         color: formData.color, updatedAt: serverTimestamp()
                     });
                 } else {
-                    await addDoc(collection(db, SOURCES_PATH), {
+                    await addDoc(collection(db, SOURCES_PATH()), {
                         name: formData.name.trim(), icon: formData.icon,
                         color: formData.color, subSources: [],
                         createdBy: user?.uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
@@ -108,7 +109,7 @@ export default function SourceManagementPage() {
             } else if (modalType === 'detail') {
                 if (formData.isNewMain) {
                     if (!formData.mainName?.trim()) throw new Error("Yeni ana kaynak adı gerekli.");
-                    const newDoc = await addDoc(collection(db, SOURCES_PATH), {
+                    const newDoc = await addDoc(collection(db, SOURCES_PATH()), {
                         name: formData.mainName.trim(), icon: formData.icon,
                         color: formData.color, subSources: [formData.name.trim()],
                         createdBy: user?.uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
@@ -119,7 +120,7 @@ export default function SourceManagementPage() {
                     const parentSource = sources.find(s => s.id === parentId);
                     if (!parentSource) throw new Error("Ana kaynak bulunamadı.");
                     const updatedSubs = [...(parentSource.subSources || []), formData.name.trim()];
-                    await updateDoc(doc(db, SOURCES_PATH, parentId), { subSources: updatedSubs, updatedAt: serverTimestamp() });
+                    await updateDoc(doc(db, SOURCES_PATH(), parentId), { subSources: updatedSubs, updatedAt: serverTimestamp() });
                 }
             }
             setShowModal(false);
@@ -134,7 +135,7 @@ export default function SourceManagementPage() {
 
     const handleDeleteSource = async (source) => {
         if (!window.confirm(`"${source.name}" kaynağını ve tüm alt detaylarını silmek istediğinize emin misiniz?`)) return;
-        try { await deleteDoc(doc(db, SOURCES_PATH, source.id)); }
+        try { await deleteDoc(doc(db, SOURCES_PATH(), source.id)); }
         catch (err) { alert('Silme hatası: ' + err.message); }
     };
 
@@ -142,7 +143,7 @@ export default function SourceManagementPage() {
         if (!window.confirm(`"${subName}" alt detayını silmek istediğinize emin misiniz?`)) return;
         try {
             const updatedSubs = source.subSources.filter(s => s !== subName);
-            await updateDoc(doc(db, SOURCES_PATH, source.id), { subSources: updatedSubs, updatedAt: serverTimestamp() });
+            await updateDoc(doc(db, SOURCES_PATH(), source.id), { subSources: updatedSubs, updatedAt: serverTimestamp() });
         } catch (err) { alert('Hata: ' + err.message); }
     };
 
@@ -157,7 +158,7 @@ export default function SourceManagementPage() {
                 { name: 'Direkt Başvuru', icon: 'Link2', color: '#8b5cf6', subSources: ['Şirket Web Sitesi', 'E-posta'] }
             ];
             for (const s of defaults) {
-                await addDoc(collection(db, SOURCES_PATH), {
+                await addDoc(collection(db, SOURCES_PATH()), {
                     ...s, createdBy: user?.uid,
                     createdAt: serverTimestamp(), updatedAt: serverTimestamp()
                 });

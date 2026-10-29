@@ -20,10 +20,11 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { getLogger } from './logger';
 import { normalizeTarget } from '../utils/sectorFit';
+import { tc } from '../config/tenantPaths';
 
 const log = getLogger('orgProfile');
 
-const BRANDING_PATH = 'artifacts/talent-flow/public/data/settings/branding';
+const BRANDING_PATH = () => `${tc('settings')}/branding`;
 
 /**
  * Kurumsal Kimlik dokümanındaki alan adı.
@@ -43,7 +44,7 @@ const FIELD = ORG_PROFILE_FIELD;
  */
 export async function readOrgProfile() {
     try {
-        const snap = await getDoc(doc(db, BRANDING_PATH));
+        const snap = await getDoc(doc(db, BRANDING_PATH()));
         if (!snap.exists()) return null;
         return normalizeTarget(snap.data()?.[FIELD]);
     } catch (err) {
@@ -64,6 +65,6 @@ export async function writeOrgProfile(profile) {
         model: profile?.model || null,
         type: profile?.type || null,
     };
-    await setDoc(doc(db, BRANDING_PATH), { [FIELD]: value }, { merge: true });
+    await setDoc(doc(db, BRANDING_PATH()), { [FIELD]: value }, { merge: true });
     return normalizeTarget(value);
 }

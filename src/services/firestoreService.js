@@ -12,12 +12,13 @@ import {
     serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { tc } from '../config/tenantPaths';
 
-const CANDIDATES_PATH = 'artifacts/talent-flow/public/data/candidates';
-const USERS_PATH = 'artifacts/talent-flow/public/data/users';
+const CANDIDATES_PATH = () => tc('candidates');
+const USERS_PATH = () => tc('members');
 
 export async function addCandidate(candidateData) {
-    const candidatesRef = collection(db, CANDIDATES_PATH);
+    const candidatesRef = collection(db, CANDIDATES_PATH());
     const docRef = await addDoc(candidatesRef, {
         ...candidateData,
         createdAt: serverTimestamp(),
@@ -27,7 +28,7 @@ export async function addCandidate(candidateData) {
 }
 
 export async function getCandidate(candidateId) {
-    const docRef = doc(db, CANDIDATES_PATH, candidateId);
+    const docRef = doc(db, CANDIDATES_PATH(), candidateId);
     const snapshot = await getDoc(docRef);
     if (snapshot.exists()) {
         return { id: snapshot.id, ...snapshot.data() };
@@ -36,23 +37,23 @@ export async function getCandidate(candidateId) {
 }
 
 export async function updateCandidate(candidateId, updates) {
-    const docRef = doc(db, CANDIDATES_PATH, candidateId);
+    const docRef = doc(db, CANDIDATES_PATH(), candidateId);
     await updateDoc(docRef, { ...updates, updatedAt: serverTimestamp() });
 }
 
 export async function deleteCandidate(candidateId) {
-    const docRef = doc(db, CANDIDATES_PATH, candidateId);
+    const docRef = doc(db, CANDIDATES_PATH(), candidateId);
     await deleteDoc(docRef);
 }
 
 export async function getUserSettings(userId) {
-    const docRef = doc(db, `${USERS_PATH}/${userId}/settings`, 'preferences');
+    const docRef = doc(db, `${USERS_PATH()}/${userId}/settings`, 'preferences');
     const snapshot = await getDoc(docRef);
     return snapshot.exists() ? snapshot.data() : null;
 }
 
 export async function saveUserSettings(userId, settings) {
-    const docRef = doc(db, `${USERS_PATH}/${userId}/settings`, 'preferences');
+    const docRef = doc(db, `${USERS_PATH()}/${userId}/settings`, 'preferences');
     await setDoc(docRef, { ...settings, updatedAt: serverTimestamp() }, { merge: true });
 }
 

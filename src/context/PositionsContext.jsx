@@ -14,8 +14,9 @@ import {
     onSnapshot,
     serverTimestamp
 } from 'firebase/firestore';
+import { tc } from '../config/tenantPaths';
 
-const POSITIONS_COLLECTION = 'artifacts/talent-flow/public/data/positions';
+const POSITIONS_COLLECTION = () => tc('positions');
 
 const PositionsContext = createContext();
 
@@ -24,7 +25,9 @@ export function usePositions() {
 }
 
 export function PositionsProvider({ children }) {
-    const { isAuthenticated } = useAuth();
+    const { isAuthenticated, user } = useAuth();
+    // Anonim aday oturumu şirket listelerini okuyamaz (kurallar); dinleyici kurulmaz.
+    const isMember = isAuthenticated && !user?.isAnonymous;
     const [positions, setPositions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -34,10 +37,10 @@ export function PositionsProvider({ children }) {
 
     // Initial listener for real-time updates
     useEffect(() => {
-        if (!isAuthenticated) return;
+        if (!isMember) return;
 
         setLoading(true);
-        const positionsRef = collection(db, POSITIONS_COLLECTION);
+        const positionsRef = collection(db, POSITIONS_COLLECTION());
 
         const unsubscribe = onSnapshot(positionsRef, (snapshot) => {
             const positionsList = snapshot.docs.map(doc => ({
@@ -74,12 +77,12 @@ export function PositionsProvider({ children }) {
         });
 
         return () => unsubscribe();
-    }, [isAuthenticated]);
+    }, [isMember]);
 
     // Add a new position (recruiter/admin creates directly as open)
     const addPosition = async (positionData, initialStatus = 'open') => {
         try {
-            await addDoc(collection(db, POSITIONS_COLLECTION), {
+            await addDoc(collection(db, POSITIONS_COLLECTION()), {
                 ...positionData,
                 status: initialStatus,
                 matchedCandidates: [],
@@ -95,7 +98,7 @@ export function PositionsProvider({ children }) {
     // Department user requests a position (pending_approval)
     const addPositionRequest = async (positionData, requestedBy) => {
         try {
-            await addDoc(collection(db, POSITIONS_COLLECTION), {
+            await addDoc(collection(db, POSITIONS_COLLECTION()), {
                 ...positionData,
                 status: 'pending_approval',
                 requestedBy: requestedBy || null,
@@ -112,7 +115,7 @@ export function PositionsProvider({ children }) {
     // Recruiter approves a pending position request
     const approvePosition = async (id) => {
         try {
-            const docRef = doc(db, POSITIONS_COLLECTION, id);
+            const docRef = doc(db, POSITIONS_COLLECTION(), id);
             await updateDoc(docRef, {
                 status: 'open',
                 approvedAt: serverTimestamp(),
@@ -127,7 +130,7 @@ export function PositionsProvider({ children }) {
     // Reject a pending position request
     const rejectPosition = async (id, reason = '') => {
         try {
-            const docRef = doc(db, POSITIONS_COLLECTION, id);
+            const docRef = doc(db, POSITIONS_COLLECTION(), id);
             await updateDoc(docRef, {
                 status: 'rejected',
                 rejectionReason: reason,
@@ -142,7 +145,7 @@ export function PositionsProvider({ children }) {
     // Update an existing position
     const updatePosition = async (id, updates) => {
         try {
-            const docRef = doc(db, POSITIONS_COLLECTION, id);
+            const docRef = doc(db, POSITIONS_COLLECTION(), id);
             await updateDoc(docRef, {
                 ...updates,
                 updatedAt: serverTimestamp()
@@ -156,7 +159,7 @@ export function PositionsProvider({ children }) {
     // Delete a position
     const deletePosition = async (id) => {
         try {
-            await deleteDoc(doc(db, POSITIONS_COLLECTION, id));
+            await deleteDoc(doc(db, POSITIONS_COLLECTION(), id));
         } catch (err) {
             console.error("Error deleting position:", err);
             throw err;

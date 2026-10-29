@@ -1,7 +1,7 @@
 // src/pages/ApplyPage.jsx — Public job application page (no auth required)
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { doc, getDoc, collection, addDoc, getDocs, query, where, serverTimestamp, onSnapshot, orderBy } from 'firebase/firestore';
+import { doc, getDoc, collection, query, serverTimestamp, onSnapshot, orderBy } from 'firebase/firestore';
 import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { db, auth } from '../config/firebase';
 import { extractTextFromFile } from '../services/cvParser';
@@ -16,15 +16,15 @@ import {
     ChevronRight, Shield, Globe, Layers, Link2, Share2, Users, Zap, Search as SearchIcon,
     ChevronDown
 } from 'lucide-react';
+import { tc, getActiveTenantId } from '../config/tenantPaths';
 
-const SOURCES_PATH = 'artifacts/talent-flow/public/data/sources';
+const SOURCES_PATH = () => tc('sources');
 
 const SOURCE_ICONS = {
     Globe, Layers, Link2, Share2, Users, Zap, Search: SearchIcon,
 };
 
-const POSITIONS_COLLECTION = 'artifacts/talent-flow/public/data/positions';
-const APPLICATIONS_COLLECTION = 'artifacts/talent-flow/public/data/applications';
+const POSITIONS_COLLECTION = () => tc('positions');
 
 // ──────────────────────────────────────────────
 // Helpers
@@ -102,7 +102,7 @@ export default function ApplyPage() {
             if (!firebaseUser) return; // wait for AuthContext to sign in anonymously
             if (cancelled) return;
             try {
-                const snap = await getDoc(doc(db, POSITIONS_COLLECTION, positionId));
+                const snap = await getDoc(doc(db, POSITIONS_COLLECTION(), positionId));
                 if (!snap.exists()) { setPosError('Pozisyon bulunamadı.'); return; }
                 const data = snap.data();
                 if (data.status !== 'open') { setPosError('Bu pozisyon şu an başvuruya kapalı.'); return; }
@@ -128,7 +128,7 @@ export default function ApplyPage() {
             if (!firebaseUser) return; // not yet signed in — wait
             if (sourceUnsub) return;  // already subscribed
 
-            const q = query(collection(db, SOURCES_PATH), orderBy('createdAt', 'asc'));
+            const q = query(collection(db, SOURCES_PATH()), orderBy('createdAt', 'asc'));
             sourceUnsub = onSnapshot(q, (snap) => {
                 const loaded = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 setSources(loaded);
@@ -377,26 +377,23 @@ export default function ApplyPage() {
             if (parsedCandidate) appData.parsedCandidate = parsedCandidate;
             if (scoreBreakdown) appData.aiScoreBreakdown = scoreBreakdown;
 
-            // Guard: block duplicate applications (same email + same position)
-            const emailForDupCheck = form.email.trim().toLowerCase();
-            try {
-                const dupAppSnap = await getDocs(
-                    query(
-                        collection(db, APPLICATIONS_COLLECTION),
-                        where('positionId', '==', position.id),
-                        where('email', '==', emailForDupCheck)
-                    )
-                );
-                if (!dupAppSnap.empty) {
-                    setStep('duplicate');
-                    return;
-                }
-            } catch (dupCheckErr) {
-                console.warn('Duplicate application check failed (non-blocking):', dupCheckErr.message);
+            // Kayıt SUNUCUDA (kurallar başvuru oluşturmayı istemciye kapatır):
+            // hedef şirket ve ilan sunucuda doğrulanır, mükerrer başvuru
+            // (aynı e-posta + aynı ilan) orada reddedilir.
+            const { createdAt: _c, status: _s, kvkkConsent: _k, ...payload } = appData;
+            const saveRes = await fetch('/api/applications', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...payload, tenantId: getActiveTenantId() }),
+            });
+            if (saveRes.status === 409) {
+                setStep('duplicate');
+                return;
             }
-
-            // Save application — candidate creation is done manually by recruiter/super admin
-            await addDoc(collection(db, APPLICATIONS_COLLECTION), appData);
+            if (!saveRes.ok) {
+                const errBody = await saveRes.json().catch(() => ({}));
+                throw new Error(errBody.error || 'Başvuru kaydedilemedi.');
+            }
 
             setAiScore(score);
             setStep('success');

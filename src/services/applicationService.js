@@ -4,8 +4,9 @@ import {
     collection, addDoc, getDocs, updateDoc, deleteDoc, doc,
     query, where, serverTimestamp, onSnapshot
 } from 'firebase/firestore';
+import { tc } from '../config/tenantPaths';
 
-const APPLICATIONS_COLLECTION = 'artifacts/talent-flow/public/data/applications';
+const APPLICATIONS_COLLECTION = () => tc('applications');
 
 // Detect traffic source from URL param or document.referrer
 export function detectSource(refParam) {
@@ -47,7 +48,7 @@ export async function submitApplication({
     source,
     parsedCandidate, aiScore, aiScoreBreakdown, aiSummary,
 }) {
-    const docRef = await addDoc(collection(db, APPLICATIONS_COLLECTION), {
+    const docRef = await addDoc(collection(db, APPLICATIONS_COLLECTION()), {
         positionId,
         positionTitle,
         name: name.trim(),
@@ -71,7 +72,7 @@ export async function submitApplication({
 // Get all applications for a position (one-time fetch)
 export async function getApplicationsForPosition(positionId) {
     const q = query(
-        collection(db, APPLICATIONS_COLLECTION),
+        collection(db, APPLICATIONS_COLLECTION()),
         where('positionId', '==', positionId)
     );
     const snap = await getDocs(q);
@@ -83,7 +84,7 @@ export async function getApplicationsForPosition(positionId) {
 // Real-time listener for applications of a position
 export function subscribeToApplications(positionId, callback) {
     const q = query(
-        collection(db, APPLICATIONS_COLLECTION),
+        collection(db, APPLICATIONS_COLLECTION()),
         where('positionId', '==', positionId)
     );
     return onSnapshot(q, snap => {
@@ -96,19 +97,19 @@ export function subscribeToApplications(positionId, callback) {
 
 // Update application status
 export async function updateApplicationStatus(applicationId, status) {
-    await updateDoc(doc(db, APPLICATIONS_COLLECTION, applicationId), { status });
+    await updateDoc(doc(db, APPLICATIONS_COLLECTION(), applicationId), { status });
 }
 
 // Delete an application
 export async function deleteApplication(applicationId) {
-    await deleteDoc(doc(db, APPLICATIONS_COLLECTION, applicationId));
+    await deleteDoc(doc(db, APPLICATIONS_COLLECTION(), applicationId));
 }
 
 // Check if an application already exists for this email+position combination
 export async function checkDuplicateApplication(positionId, email) {
     const emailNorm = email.trim().toLowerCase();
     const q = query(
-        collection(db, APPLICATIONS_COLLECTION),
+        collection(db, APPLICATIONS_COLLECTION()),
         where('positionId', '==', positionId),
         where('email', '==', emailNorm)
     );

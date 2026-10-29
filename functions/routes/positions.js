@@ -89,6 +89,22 @@ router.post('/api/applications', async (req, res) => {
         };
         if (parsedCandidate && typeof parsedCandidate === 'object') doc.parsedCandidate = parsedCandidate;
         if (aiScoreBreakdown && typeof aiScoreBreakdown === 'object') doc.aiScoreBreakdown = aiScoreBreakdown;
+        const { sourceCategory, screeningAnswers, screeningResult, screeningScore, screeningLevel } = req.body || {};
+        if (sourceCategory) doc.sourceCategory = str(sourceCategory, 100);
+        if (Array.isArray(screeningAnswers)) doc.screeningAnswers = screeningAnswers.slice(0, 50);
+        if (screeningResult && typeof screeningResult === 'object') doc.screeningResult = screeningResult;
+        if (Number.isFinite(Number(screeningScore))) doc.screeningScore = Math.round(Number(screeningScore));
+        if (screeningLevel) doc.screeningLevel = str(screeningLevel, 50);
+
+        // Mükerrer başvuru (aynı ilan + aynı e-posta) — istemci başvuruları
+        // okuyamadığı için denetim burada.
+        const dup = await db
+            .collection(tenant.paths.applications())
+            .where('positionId', '==', positionId)
+            .where('email', '==', doc.email)
+            .limit(1)
+            .get();
+        if (!dup.empty) return res.status(409).json({ error: 'Bu ilana zaten başvurdunuz.', duplicate: true });
 
         const ref = await db.collection(tenant.paths.applications()).add(doc);
         res.json({ id: ref.id });

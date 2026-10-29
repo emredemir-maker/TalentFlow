@@ -39,6 +39,7 @@ import RequirementReviewPanel from '../components/RequirementReviewPanel';
 import RequirementListEditor from '../components/RequirementListEditor';
 import { getAuthHeaders } from '../services/ai/config';
 import { calculateMatchScore, filterCandidatesByDomain } from '../services/matchService';
+import { tc, withTenantParam } from '../config/tenantPaths';
 
 const STATUS_CONFIG = {
     open:             { label: 'Aktif',        pill: 'bg-ok-bg text-ok-text border-transparent', dot: 'bg-ok' },
@@ -90,8 +91,10 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
     }, [pos, candidates]);
 
     // Build the apply URL
-    const baseUrl = typeof window !== 'undefined' ? `${window.location.origin}/apply/${pos.id}` : `/apply/${pos.id}`;
-    const applyUrl = `${baseUrl}?ref=${encodeURIComponent(linkSource.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`;
+    // Şirket bağlantıda (?tenantId=…; PR 5'te publicLinks gelir).
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const baseUrl = withTenantParam(`${origin}/apply/${pos.id}`);
+    const applyUrl = `${baseUrl}&ref=${encodeURIComponent(linkSource.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`;
 
     // Load applications when tab opens
     useEffect(() => {
@@ -107,7 +110,7 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
     // Load departments once for shortlist modal
     useEffect(() => {
         const unsub = onSnapshot(
-            collection(db, 'artifacts/talent-flow/public/data/departments'),
+            collection(db, tc('departments')),
             (snap) => setDepartments(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
             () => {}
         );
@@ -125,9 +128,9 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
         if (syncingAppId) return;
         setSyncingAppId(app.id);
         try {
-            const CANDIDATES_COLLECTION = 'artifacts/talent-flow/public/data/candidates';
+            const CANDIDATES_COLLECTION = () => tc('candidates');
             const emailNorm = app.email?.trim().toLowerCase() || '';
-            const q = query(collection(db, CANDIDATES_COLLECTION), where('email', '==', emailNorm));
+            const q = query(collection(db, CANDIDATES_COLLECTION()), where('email', '==', emailNorm));
             const existing = await getDocs(q);
             if (!existing.empty) {
                 setSyncedAppIds(prev => new Set([...prev, app.id]));
@@ -169,7 +172,7 @@ function PositionDetailDrawer({ pos, candidates, onClose, onEdit, onRelease, onT
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp(),
             };
-            await addDoc(collection(db, CANDIDATES_COLLECTION), candidateData);
+            await addDoc(collection(db, CANDIDATES_COLLECTION()), candidateData);
             await updateApplicationStatus(app.id, 'shortlisted');
             setSyncedAppIds(prev => new Set([...prev, app.id]));
         } catch (err) {
@@ -1263,7 +1266,7 @@ export default function PositionsPage() {
     }, []);
 
     useEffect(() => {
-        const unsub = onSnapshot(collection(db, 'artifacts/talent-flow/public/data/departments'), (snap) => {
+        const unsub = onSnapshot(collection(db, tc('departments')), (snap) => {
             setDepartments(snap.docs.map(d => ({ id: d.id, ...d.data() })));
         });
         return unsub;
@@ -1553,7 +1556,7 @@ export default function PositionsPage() {
         finally { setReleasingPosId(null); setReleaseLoading(false); }
     };
 
-    const isRecruiterOrAdmin = role === 'recruiter' || role === 'super_admin';
+    const isRecruiterOrAdmin = role === 'recruiter' || role === 'admin';
     const pendingCount = positions.filter(p => p.status === 'pending_approval').length;
     const allDepts = useMemo(() => Array.from(new Set(positions.map(p => p.department).filter(Boolean))), [positions]);
 

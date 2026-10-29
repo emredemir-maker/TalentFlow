@@ -436,6 +436,46 @@ describe('üyelik kaldırma (auth-user silme yerine)', () => {
     });
 });
 
+describe('rol ve departman ataması', () => {
+    it("A yöneticisi kendi üyesinin rolünü/departmanını değiştirir; B'nin üyesine 404; destek verilemez", async () => {
+        const ok = await call('PATCH', '/api/admin/members/aDept', {
+            uid: 'aAdmin',
+            tenant: 'A',
+            body: { role: 'department_user', departments: ['Eng', 'Sales', 'Eng'] },
+        });
+        expect(ok.status).toBe(200);
+        expect((await get('tenants/A/members/aDept')).data().departments).toEqual(['Eng', 'Sales']);
+        const cross = await call('PATCH', '/api/admin/members/bRecruiter', {
+            uid: 'aAdmin',
+            tenant: 'A',
+            body: { role: 'admin' },
+        });
+        expect(cross.status).toBe(404);
+        expect((await get('tenants/B/members/bRecruiter')).data().role).toBe('recruiter');
+        const sup = await call('PATCH', '/api/admin/members/aDept', {
+            uid: 'aAdmin',
+            tenant: 'A',
+            body: { role: 'support' },
+        });
+        expect(sup.status).toBe(400);
+    });
+    it('yönetici olmayan rol atayamaz; son yöneticinin rolü düşürülemez', async () => {
+        const r = await call('PATCH', '/api/admin/members/aDept', {
+            uid: 'aDept',
+            tenant: 'A',
+            body: { role: 'admin' },
+        });
+        expect(r.status).toBe(403);
+        const last = await call('PATCH', '/api/admin/members/aAdmin', {
+            uid: 'aAdmin',
+            tenant: 'A',
+            body: { role: 'recruiter' },
+        });
+        expect(last.status).toBe(409);
+        expect((await get('tenants/A/members/aAdmin')).data().role).toBe('admin');
+    });
+});
+
 describe('platform yöneticisi', () => {
     it('şirket yöneticisi platform ayarlarını açamaz; platform yöneticisi açar', async () => {
         expect(

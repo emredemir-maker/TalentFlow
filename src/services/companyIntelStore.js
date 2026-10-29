@@ -14,16 +14,36 @@
 // bir haberde geçmiş olabilir. Bulunan kayıt 180 gün, bulunamayan 30 gün
 // tazedir.
 
-import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
-
-import { db } from '../config/firebase';
-import { resolveCompany, companyKey } from './ai/companyIntel';
+import { companyKey, recordFromAnswer } from './ai/companyIntel';
+import { getAuthHeaders } from './ai/config';
 import { isManualRecord } from '../utils/manualCompanyIntel';
 import { getLogger } from './logger';
 
 const log = getLogger('companyIntel');
 
-const INTEL_PATH = 'artifacts/talent-flow/public/data/companyIntel';
+// ── PLATFORM ÖNBELLEĞİ (K6) ────────────────────────────────────────────────
+// Önbellek artık platformda ortak ve SUNUCUDA (platform/companyIntel; istemciye
+// kapalı). İstemci okumaz/yazmaz: /api/company-intel/* uçlarını çağırır. Arama
+// sorgusu sunucuda yalnız şirket adıyla kurulur — aday bağlamı (`hint`) ortak
+// önbelleğe girmez. Elle doğrulama kaydı şirkete özel kalır.
+
+async function intelApi(method, path, body) {
+    const res = await fetch(`/api/company-intel/${path}`, {
+        method,
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
+        body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.error || `Şirket bilgisi alınamadı (${res.status})`);
+    return data;
+}
+
+/** Sunucu yanıtı → kanıt kaydı (elle kayıt olduğu gibi). */
+function recordFrom(name, data) {
+    if (data?.source === 'manual') return data.record || null;
+    if (data?.source === 'cache' || data?.source === 'live') return recordFromAnswer(name, data.answer, data.resolvedAt);
+    return null;
+}
 
 /** Bulunan kaydın tazelik süresi. Şirket bilgisi hızlı değişmez. */
 export const FRESH_DAYS = 180;
@@ -67,29 +87,24 @@ export function isFresh(record, now = Date.now()) {
     return now - at < days * 24 * 60 * 60 * 1000;
 }
 
-/** Önbellekten okur; yoksa ya da okunamazsa null. */
-export async function readCompanyIntel(key) {
-    const id = docIdFor(key);
-    if (!id) return null;
+/**
+ * Önbellekten okur (şirketin elle kaydı ya da taze ortak kayıt); yoksa ya da
+ * okunamazsa null. Canlı arama YAPMAZ.
+ */
+export async function readCompanyIntel(name) {
+    if (!docIdFor(companyKey(name))) return null;
     try {
-        const snap = await getDoc(doc(db, INTEL_PATH, id));
-        return snap.exists() ? snap.data() : null;
+        return recordFrom(name, await intelApi('POST', 'resolve', { name, cacheOnly: true }));
     } catch (err) {
         // Önbellek okunamıyorsa iş DURMAZ — canlı aramaya düşeriz.
-        log.warn(`önbellek okunamadı (${id}): ${err?.message}`);
+        log.warn(`önbellek okunamadı (${name}): ${err?.message}`);
         return null;
     }
 }
 
-/** Önbelleğe yazar. Yazma başarısız olursa sonuç yine kullanılır. */
-export async function writeCompanyIntel(key, record) {
-    const id = docIdFor(key);
-    if (!id) return;
-    try {
-        await setDoc(doc(db, INTEL_PATH, id), { ...record, key }, { merge: true });
-    } catch (err) {
-        log.warn(`önbelleğe yazılamadı (${id}): ${err?.message}`);
-    }
+/** Canlı (kaynaklı) arama — sunucu sorar ve ortak önbelleğe yazar. */
+export async function lookupCompanyLive(name, { force = false } = {}) {
+    return recordFrom(name, await intelApi('POST', 'resolve', { name, force }));
 }
 
 /**
@@ -108,10 +123,13 @@ export async function writeCompanyIntel(key, record) {
  *   skipped: tavana takıldığı için taranmayanlar; rapor bunu YAZMAK zorunda.
  */
 export async function resolveCompanies(companies, {
+    // `hint` artık sorguya girmiyor (ortak önbellek, K6); imza uyumu için duruyor.
+    // eslint-disable-next-line no-unused-vars
     hint = '',
     force = false,
     maxLookups = MAX_LOOKUPS,
-    resolve = resolveCompany,
+    resolve = (name) => lookupCompanyLive(name, { force }),
+    read = readCompanyIntel,
     onProgress = null,
 } = {}) {
     const list = Array.isArray(companies) ? companies : [];
@@ -129,7 +147,7 @@ export async function resolveCompanies(companies, {
         // önbelleği tazelemek için var; bir insanın araştırıp yazdığı bilgiyi
         // sessizce silmek için değil. Otomatik aramaya dönmek isteyen
         // kullanıcı elle doğrulamayı açıkça kaldırır (clearManualCompanyIntel).
-        const cached = await readCompanyIntel(key);
+        const cached = await read(name);
         if (isManualRecord(cached) || (!force && isFresh(cached))) {
             intel.set(key, cached);
             intel.set(name, cached);
@@ -144,10 +162,10 @@ export async function resolveCompanies(companies, {
 
         looked += 1;
         try {
-            const record = await resolve(name, { hint });
+            // Sunucu sorgular ve ortak önbelleğe kendisi yazar.
+            const record = await resolve(name, { force });
             intel.set(key, record);
             intel.set(name, record);
-            await writeCompanyIntel(key, record);
         } catch (err) {
             // Tek şirketin çözümlenememesi raporu düşürmez; o şirket
             // "doğrulanamadı" olur ve sebebi rapora yazılır.
@@ -170,10 +188,10 @@ export async function resolveCompanies(companies, {
  * @throws yazma başarısız olursa — okuma aksine burada hata YUTULMAZ:
  *   kullanıcı bir form doldurdu, kaydedilmediyse bunu bilmek zorunda.
  */
-export async function saveManualCompanyIntel(key, record) {
-    const id = docIdFor(key);
-    if (!id) throw new Error('Şirket adı kayıt için uygun değil.');
-    await setDoc(doc(db, INTEL_PATH, id), { ...record, key });
+export async function saveManualCompanyIntel(name, record) {
+    if (!docIdFor(companyKey(name))) throw new Error('Şirket adı kayıt için uygun değil.');
+    // Şirkete özel kayıt (tenants/{t}/companyIntelManual); ortak önbellek değişmez.
+    await intelApi('PUT', 'manual', { name, record });
 }
 
 /**
@@ -183,10 +201,9 @@ export async function saveManualCompanyIntel(key, record) {
  * kaydı "taze" gibi gösterirdi. Dokümanı silmek bir sonraki taramanın
  * şirketi sıfırdan çözümlemesini garanti ediyor; maliyeti tek bir arama.
  */
-export async function clearManualCompanyIntel(key) {
-    const id = docIdFor(key);
-    if (!id) throw new Error('Şirket adı kayıt için uygun değil.');
-    await deleteDoc(doc(db, INTEL_PATH, id));
+export async function clearManualCompanyIntel(name) {
+    if (!docIdFor(companyKey(name))) throw new Error('Şirket adı kayıt için uygun değil.');
+    await intelApi('DELETE', 'manual', { name });
 }
 
 export { companyKey };

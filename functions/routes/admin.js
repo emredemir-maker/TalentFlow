@@ -4,6 +4,7 @@
 //     DELETE /api/admin/members/:uid       — üyeliği kaldırır (Firebase hesabı
 //                                            SİLİNMEZ: Hub/CX ile ortak).
 //     DELETE /api/admin/auth-user/:uid     — eski istemci adı; aynı iş.
+//     PATCH  /api/admin/members/:uid       — rol ve departman (K2).
 //     GET    /api/admin/usage              — şirketin AI kullanımı.
 //     GET/POST /api/admin/retention, POST /api/admin/retention/purge
 //                                          — saklama süresi ve imha.
@@ -88,6 +89,79 @@ async function removeMemberHandler(req, res) {
         res.status(500).json({ error: 'Üyelik kaldırılamadı.' });
     }
 }
+
+// ── Rol ve departman (§2.4, K2) ─────────────────────────────────────────────
+// Üyeliği istemci yazamaz (firestore.rules); şirket yöneticisi bu uçla rol ve
+// departman atar. Destek rolü buradan verilemez (K11: yalnız admin konsolu).
+// Son yönetici kilidi burada da geçerli: son yöneticinin rolü düşürülemez.
+const ASSIGNABLE_ROLES = ['admin', 'recruiter', 'department_user'];
+
+export function parseMemberPatch(body) {
+    const role = body?.role;
+    if (!ASSIGNABLE_ROLES.includes(role)) return { error: 'Geçersiz rol.' };
+    const raw = role === 'department_user' ? body?.departments ?? [] : [];
+    if (!Array.isArray(raw) || raw.length > 50) return { error: 'Geçersiz departman listesi.' };
+    const departments = [...new Set(raw.map((d) => (typeof d === 'string' ? d.trim() : '')).filter(Boolean))];
+    if (departments.some((d) => d.length > 100)) return { error: 'Geçersiz departman listesi.' };
+    return { role, departments };
+}
+
+export async function updateMembership({ db: fdb, paths, tenantId, uid, patch, by, now = new Date() }) {
+    const memberRef = fdb.doc(paths.member(uid));
+    return fdb.runTransaction(async (tx) => {
+        const snap = await tx.get(memberRef);
+        const cur = snap.exists ? snap.data() : null;
+        if (!cur || cur.status !== 'active' || cur.role === 'support') return { status: 404 };
+        if (cur.role === 'admin' && patch.role !== 'admin') {
+            const admins = await tx.get(
+                fdb.collection(paths.members()).where('role', '==', 'admin').where('status', '==', 'active')
+            );
+            if (admins.size <= 1) return { status: 409 };
+        }
+        tx.update(memberRef, {
+            role: patch.role,
+            departments: patch.departments,
+            roleUpdatedAt: now.toISOString(),
+            roleUpdatedBy: by,
+        });
+        tx.set(
+            fdb.doc(PLATFORM_PATHS.userTenants(uid)),
+            { tenants: { [tenantId]: { role: patch.role } } },
+            { merge: true }
+        );
+        return { status: 200 };
+    });
+}
+
+router.patch('/api/admin/members/:uid', requireTenantAdmin, async (req, res) => {
+    const patch = parseMemberPatch(req.body);
+    if (patch.error) return res.status(400).json({ error: patch.error });
+    try {
+        const r = await updateMembership({
+            db,
+            paths: req.paths,
+            tenantId: req.tenant.id,
+            uid: req.params.uid,
+            patch,
+            by: req.user.uid,
+        });
+        if (r.status === 404) return res.status(404).json({ error: 'Üye bulunamadı.' });
+        if (r.status === 409) return res.status(409).json({ error: 'Şirketin son yöneticisinin rolü değiştirilemez.' });
+        await db.collection(req.paths.accessLogs()).add({
+            action: 'member_role_changed',
+            uid: req.user.uid,
+            email: req.user.email || '',
+            target: req.params.uid,
+            note: `${patch.role}${patch.departments.length ? ` · ${patch.departments.join(', ')}` : ''}`,
+            at: new Date().toISOString(),
+        });
+        res.json({ success: true });
+    } catch (err) {
+        if (err?.name === 'TenantPathError') return res.status(400).json({ error: err.message });
+        log.error({ err: err.message }, '[admin/members PATCH]');
+        res.status(500).json({ error: 'Üyelik güncellenemedi.' });
+    }
+});
 
 router.delete('/api/admin/members/:uid', requireTenantAdmin, removeMemberHandler);
 router.delete('/api/admin/auth-user/:uid', requireTenantAdmin, removeMemberHandler);

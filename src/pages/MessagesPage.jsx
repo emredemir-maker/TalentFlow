@@ -39,6 +39,7 @@ import {
     Paperclip,
     User,
 } from 'lucide-react';
+import { tc } from '../config/tenantPaths';
 
 const STATUS_CONFIG = {
     draft: { label: 'Taslak', icon: Edit3, color: 'text-n500', bg: 'bg-n100', ring: 'ring-n200' },
@@ -95,7 +96,7 @@ export default function MessagesPage() {
     useEffect(() => {
         if (!currentUser?.email) { setInfoReqLoading(false); return; }
         const q = query(
-            collection(db, 'artifacts/talent-flow/public/data/infoRequests'),
+            collection(db, tc('infoRequests')),
             where('recruiterEmail', '==', currentUser.email)
         );
         const unsub = onSnapshot(q, snap => {
@@ -134,7 +135,7 @@ export default function MessagesPage() {
     const handleMarkReplied = useCallback(async (reqId) => {
         setMarkingReplied(reqId);
         try {
-            await updateDoc(doc(db, 'artifacts/talent-flow/public/data/infoRequests', reqId), {
+            await updateDoc(doc(db, tc('infoRequests'), reqId), {
                 status: 'responded',
                 respondedAt: new Date(),
             });
@@ -150,7 +151,7 @@ export default function MessagesPage() {
     useEffect(() => {
         if (!userId) return;
         const q = query(
-            collection(db, 'artifacts/talent-flow/public/data/emailThreads'),
+            collection(db, tc('emailThreads')),
             where('recruiterId', '==', userId)
         );
         const unsub = onSnapshot(q, snap => {
@@ -190,7 +191,7 @@ export default function MessagesPage() {
                 setThreadMessages(prev => ({ ...prev, [thread.threadId]: result.messages }));
                 const hasReply = result.messages.length > 1;
                 if (hasReply !== thread.hasReply) {
-                    await updateDoc(doc(db, 'artifacts/talent-flow/public/data/emailThreads', thread.id), { hasReply });
+                    await updateDoc(doc(db, tc('emailThreads'), thread.id), { hasReply });
                     if (hasReply && !thread.hasReply) {
                         addNotification({
                             title: 'Yeni E-posta Yanıtı',

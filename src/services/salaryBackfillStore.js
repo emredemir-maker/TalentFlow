@@ -1,11 +1,11 @@
 // GERİYE DÖNÜK TARAMANIN OKUMA/YAZMA UCU.
 //
 // Okuma: aday belgesindeki `interviewSessions[]` yalnızca bir ÖZET taşıyor;
-// transkript ve `candidateSalary` tam kayıtta (`interviews/{sessionId}`).
+// transkript ve `candidateSalary` tam kayıtta (`tenants/{t}/interviews/{sessionId}`).
 // Beklentinin kayıtlı olup olmadığını özet üzerinden tahmin etmek yanlış
 // satırları listeye sokardı — tam kaydı okumak zorunlu.
 //
-// Yazma: kaynak `interviews/{sessionId}`. Fark raporu (utils/interviewReview.js)
+// Yazma: kaynak `tenants/{t}/interviews/{sessionId}`. Fark raporu (utils/interviewReview.js)
 // beklentiyi ORADAN okuyor. Aday belgesindeki kopyaya dokunulmuyor: o alanı
 // bugün hiçbir ekran okumuyor ve diziyi istemciden yeniden yazmak, bu projede
 // bir kez yaşanmış olan "hayalet yazım" yarışını geri getirir
@@ -16,6 +16,7 @@ import { doc, getDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { buildBackfillRows, sessionTime, MAX_ROWS } from '../utils/salaryBackfill';
 import { normalizeBand } from '../utils/salaryBand';
+import { tc } from '../config/tenantPaths';
 
 /**
  * En fazla kaç kayıt OKUNUR.
@@ -62,7 +63,7 @@ export async function loadBackfillRows({ candidates = [] } = {}) {
         const item = pending[index];
         read += 1;
         try {
-            const snap = await getDoc(doc(db, 'interviews', item.sessionId));
+            const snap = await getDoc(doc(db, tc('interviews'), item.sessionId));
             if (!snap.exists()) continue;
             const session = snap.data();
             // Beklentisi dolu olanı entries'e hiç almıyoruz; buildBackfillRows
@@ -116,7 +117,7 @@ export async function saveBackfill(items = [], { uid = null } = {}) {
     for (let i = 0; i < list.length; i += CHUNK) {
         const batch = writeBatch(db);
         for (const item of list.slice(i, i + CHUNK)) {
-            batch.update(doc(db, 'interviews', item.row.sessionId), {
+            batch.update(doc(db, tc('interviews'), item.row.sessionId), {
                 candidateSalary: normalizeBand(item.band),
                 candidateSalaryMeta: {
                     source: item.source === 'transcript' ? 'transcript' : 'manual',

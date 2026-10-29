@@ -18,6 +18,8 @@ import CandidateExitPage from './CandidateExitPage';
 import { db } from '../config/firebase';
 import { doc, onSnapshot, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { getAuthHeaders } from '../services/ai/config';
+import { tc, withTenantParam, getActiveTenantId } from '../config/tenantPaths';
+import { publicApiHeaders } from '../services/publicApi';
 
 export default function LiveInterviewPage() {
     const { sessionId } = useParams();
@@ -304,7 +306,7 @@ export default function LiveInterviewPage() {
         if (effectiveSession.status === 'completed' && phase !== 'finished') {
             if (isRecruiter) {
                 console.log("[LiveInterview] Session completed. Redirecting recruiter to report...");
-                navigate(`/interview-report/${sessionId}`);
+                navigate(withTenantParam(`/interview-report/${sessionId}`));
             } else {
                 console.log("[LiveInterview] Session completed. Moving candidate to exit page.");
                 setPhase('finished');
@@ -345,7 +347,7 @@ export default function LiveInterviewPage() {
 
         if (isAuthenticated && (role || userProfile)) {
             const currentRole = role || userProfile?.role;
-            const isRec = currentRole === 'recruiter' || currentRole === 'admin' || currentRole === 'super_admin' || user?.email?.includes('recruiter');
+            const isRec = currentRole === 'recruiter' || currentRole === 'admin' || user?.email?.includes('recruiter');
             setIsRecruiter(isRec);
         } else {
             setIsRecruiter(false);
@@ -356,7 +358,7 @@ export default function LiveInterviewPage() {
     // The candidate writes lobby state here; the candidates collection never gets those updates.
     useEffect(() => {
         if (!isRecruiter || !sessionId) return;
-        const sessionRef = doc(db, 'interviews', sessionId);
+        const sessionRef = doc(db, tc('interviews'), sessionId);
         const unsub = onSnapshot(sessionRef, (snap) => {
             if (snap.exists()) {
                 const data = snap.data();
@@ -383,7 +385,7 @@ export default function LiveInterviewPage() {
         if (!sessionId) return;
 
         console.log('[Candidate Listener] Starting Firestore listener on /interviews/', sessionId);
-        const sessionRef = doc(db, 'interviews', sessionId);
+        const sessionRef = doc(db, tc('interviews'), sessionId);
         const unsub = onSnapshot(sessionRef, (snap) => {
             setApiSessionLoading(false); // First callback received — stop showing "loading"
             if (snap.exists()) {
@@ -436,7 +438,7 @@ export default function LiveInterviewPage() {
         // After finishSession, block any ghost writes to candidates collection
         if (isFinishedRef.current) return;
 
-        const sessionRef = doc(db, 'interviews', sessionId);
+        const sessionRef = doc(db, tc('interviews'), sessionId);
         const candidateId = data.candidateId || candidateData?.id || apiCandidateId;
         const payload = { ...data, sessionId, ...(candidateId ? { candidateId } : {}) };
 
@@ -453,8 +455,8 @@ export default function LiveInterviewPage() {
                 try {
                     await fetch('/api/init-interview-session', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ sessionId, initialData: payload }),
+                        headers: await publicApiHeaders(),
+                        body: JSON.stringify({ tenantId: getActiveTenantId(), sessionId, initialData: payload }),
                     });
                     // After backend creates the doc, the next client write is an UPDATE (allowed).
                 } catch (apiErr) {
@@ -535,7 +537,7 @@ export default function LiveInterviewPage() {
             if (remote) setRemoteStream(remote);
         };
 
-        const sessionRef = doc(db, 'interviews', sessionId);
+        const sessionRef = doc(db, tc('interviews'), sessionId);
 
         if (isRecruiter) {
             pc.onicecandidate = async ({ candidate }) => {
@@ -795,32 +797,32 @@ export default function LiveInterviewPage() {
             // Mark the public Firestore interview doc as completed so candidates get notified
             // Try direct write first; fall back to backend Admin SDK if permission-denied (first CREATE)
             try {
-                await setDoc(doc(db, 'interviews', sessionId), { status: 'completed', completedAt: new Date().toISOString() }, { merge: true });
+                await setDoc(doc(db, tc('interviews'), sessionId), { status: 'completed', completedAt: new Date().toISOString() }, { merge: true });
             } catch (writeErr) {
                 if (writeErr?.code === 'permission-denied') {
                     console.warn("[LiveInterview] Direct setDoc denied — using backend to mark completed");
                     await fetch('/api/init-interview-session', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ sessionId, status: 'completed', completedAt: new Date().toISOString() })
+                        headers: await publicApiHeaders(),
+                        body: JSON.stringify({ tenantId: getActiveTenantId(), sessionId, initialData: { status: 'completed', completedAt: new Date().toISOString() } })
                     });
                 } else {
                     throw writeErr;
                 }
             }
             console.log("[LiveInterview] Session saved successfully.");
-            navigate(`/interview-report/${sessionId}`);
+            navigate(withTenantParam(`/interview-report/${sessionId}`));
         } catch (err) {
             console.error("Error saving session:", err);
             // Fallback: use backend to at least mark the public doc as completed
             try {
                 await fetch('/api/init-interview-session', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ sessionId, status: 'completed', completedAt: new Date().toISOString() })
+                    headers: await publicApiHeaders(),
+                    body: JSON.stringify({ tenantId: getActiveTenantId(), sessionId, initialData: { status: 'completed', completedAt: new Date().toISOString() } })
                 });
             } catch (_) {}
-            navigate(`/interview-report/${sessionId}`);
+            navigate(withTenantParam(`/interview-report/${sessionId}`));
         }
     };
 
@@ -1023,10 +1025,10 @@ export default function LiveInterviewPage() {
                 };
                 setTranscript(prev => [...prev, newEntry]);
                 // Use arrayUnion so neither side overwrites the other's transcript entries
-                updateDoc(doc(db, 'interviews', sessionId), {
+                updateDoc(doc(db, tc('interviews'), sessionId), {
                     transcript: arrayUnion(newEntry), sessionId
                 }).catch(() => {
-                    setDoc(doc(db, 'interviews', sessionId), {
+                    setDoc(doc(db, tc('interviews'), sessionId), {
                         transcript: [newEntry], sessionId
                     }, { merge: true });
                 });
@@ -1093,12 +1095,12 @@ export default function LiveInterviewPage() {
                     setTranscript(prev => [...prev, newEntry]);
                     // Push only this new entry to Firestore via arrayUnion — prevents one side
                     // from overwriting the other side's transcript entries.
-                    updateDoc(doc(db, 'interviews', sessionId), {
+                    updateDoc(doc(db, tc('interviews'), sessionId), {
                         transcript: arrayUnion(newEntry),
                         sessionId
                     }).catch(() => {
                         // Doc might not exist yet — fall back to setDoc
-                        setDoc(doc(db, 'interviews', sessionId), {
+                        setDoc(doc(db, tc('interviews'), sessionId), {
                             transcript: [newEntry], sessionId
                         }, { merge: true });
                     });
@@ -1402,7 +1404,7 @@ export default function LiveInterviewPage() {
                                             </div>
                                             <button
                                                 onClick={() => {
-                                                    navigator.clipboard.writeText(`${window.location.origin}/join/${sessionId}`);
+                                                    navigator.clipboard.writeText(withTenantParam(`${window.location.origin}/join/${sessionId}`));
                                                     alert("Aday linki kopyalandı!");
                                                 }}
                                                 className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-900/40 hover:bg-black transition-all cursor-pointer"
@@ -1663,7 +1665,7 @@ export default function LiveInterviewPage() {
                                                         await persistSessionData(startData);
                                                         // Notify additional participants
                                                         if (lobbyParticipants.length > 0) {
-                                                            const joinLink = `${window.location.origin}/join/${sessionId}`;
+                                                            const joinLink = withTenantParam(`${window.location.origin}/join/${sessionId}`);
                                                             try {
                                                                 await fetch('/api/send-participant-invite', {
                                                                     method: 'POST',
@@ -1953,7 +1955,7 @@ export default function LiveInterviewPage() {
 
                     <div className="flex flex-col gap-2 w-full">
                         <button
-                            onClick={() => navigate(`/interview-report/${sessionId}`)}
+                            onClick={() => navigate(withTenantParam(`/interview-report/${sessionId}`))}
                             className="w-full flex items-center justify-center gap-2 text-[12px] font-semibold text-white bg-brand hover:bg-brand-600 rounded-md py-2.5"
                         >
                             <FileText className="w-3.5 h-3.5" /> Raporu görüntüle
@@ -2048,7 +2050,7 @@ export default function LiveInterviewPage() {
 
                         <button
                             onClick={() => {
-                                navigator.clipboard.writeText(`${window.location.origin}/join/${sessionId}`);
+                                navigator.clipboard.writeText(withTenantParam(`${window.location.origin}/join/${sessionId}`));
                                 alert('Aday linki kopyalandı!');
                             }}
                             className="flex items-center gap-1.5 text-[12px] font-medium text-n600 bg-n50 border border-n200 hover:bg-n100 rounded-md px-[11px] py-[5px]"

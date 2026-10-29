@@ -15,6 +15,7 @@ import { FLOW_TONE, STALE_DAYS, waitingDays, waitingLabel, nextStepFor } from '.
 import { isSessionDone } from '../utils/interviewSession';
 import FlowTrace from '../components/flow/FlowTrace';
 import MobileMenuButton from '../components/flow/MobileMenuButton';
+import { tc } from '../config/tenantPaths';
 
 function initials(name = '') {
     const parts = name.trim().split(/\s+/);
@@ -349,7 +350,7 @@ export default function PipelinePage() {
     const [sessionStatuses, setSessionStatuses] = useState({});
     useEffect(() => {
         const unsub = onSnapshot(
-            collection(db, 'interviews'),
+            collection(db, tc('interviews')),
             snap => {
                 const map = {};
                 snap.forEach(d => { map[d.id] = d.data().status; });

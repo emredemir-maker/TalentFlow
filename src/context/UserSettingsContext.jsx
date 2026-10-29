@@ -1,11 +1,12 @@
 // src/context/UserSettingsContext.jsx
 // User Settings Context - Per-user settings from Firestore
-// Path: /artifacts/talent-flow/users/{userId}/settings
+// Path: tenants/{tenantId}/members/{userId}/settings
 
 import { createContext, useContext, useState, useEffect, useCallback , useMemo } from 'react';
 import { doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from './AuthContext';
+import { tc } from '../config/tenantPaths';
 
 const UserSettingsContext = createContext(null);
 
@@ -20,12 +21,14 @@ const DEFAULT_SETTINGS = {
 };
 
 export function UserSettingsProvider({ children }) {
-    const { userId, isAuthenticated, loading: authLoading } = useAuth();
+    const { userId, isAuthenticated, loading: authLoading, user, tenantId } = useAuth();
+    // Anonim aday oturumunun şirket üyeliği yok; tercihleri yalnız yerelde.
+    const isMember = isAuthenticated && !!tenantId && !user?.isAnonymous;
     const [settings, setSettings] = useState(DEFAULT_SETTINGS);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (authLoading || !isAuthenticated || !userId) {
+        if (authLoading || !isMember || !userId) {
             // Load theme from localStorage as fallback even if not logged in
             const localTheme = localStorage.getItem('tf_theme');
             if (localTheme) {
@@ -34,8 +37,8 @@ export function UserSettingsProvider({ children }) {
             return;
         }
 
-        // Firestore path corrected: /artifacts/talent-flow/public/data/users/{userId}/settings/preferences
-        const settingsPath = `artifacts/talent-flow/public/data/users/${userId}/settings`;
+        // Yol: tenants/{tenantId}/members/{userId}/settings/preferences
+        const settingsPath = `${tc('members')}/${userId}/settings`;
         const settingsDocRef = doc(db, settingsPath, 'preferences');
 
         const unsubscribe = onSnapshot(
@@ -65,7 +68,7 @@ export function UserSettingsProvider({ children }) {
         );
 
         return () => unsubscribe();
-    }, [userId, isAuthenticated, authLoading]);
+    }, [userId, isMember, authLoading]);
 
     const updateSettings = useCallback(
         async (updates) => {
@@ -78,8 +81,8 @@ export function UserSettingsProvider({ children }) {
                 return newSettings;
             });
 
-            if (!userId) return;
-            const settingsDocRef = doc(db, `artifacts/talent-flow/public/data/users/${userId}/settings`, 'preferences');
+            if (!userId || !isMember) return;
+            const settingsDocRef = doc(db, `${tc('members')}/${userId}/settings`, 'preferences');
             try {
                 await updateDoc(settingsDocRef, updates);
             } catch (err) {
@@ -91,7 +94,7 @@ export function UserSettingsProvider({ children }) {
                 }
             }
         },
-        [userId, settings]
+        [userId, settings, isMember]
     );
 
     const saveCustomPosition = useCallback(

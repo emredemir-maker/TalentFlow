@@ -9,8 +9,10 @@ import { Building2, Upload, CheckCircle, Loader2, Palette, Globe, Type, Image, X
 
 import { SECTOR_OPTIONS, MODEL_OPTIONS, TYPE_OPTIONS } from '../utils/sectorTaxonomy';
 import { ORG_PROFILE_FIELD } from '../services/orgProfile';
+import { tc } from '../config/tenantPaths';
+import { storagePaths } from '../config/tenantPaths';
 
-const BRANDING_PATH = 'artifacts/talent-flow/public/data/settings/branding';
+const BRANDING_PATH = () => `${tc('settings')}/branding`;
 
 const PRESET_COLORS = [
     '#111312', '#7C3AED', '#DC2626', '#059669',
@@ -38,7 +40,7 @@ export default function BrandingSettingsPage() {
     useEffect(() => {
         const load = async () => {
             try {
-                const snap = await getDoc(doc(db, BRANDING_PATH));
+                const snap = await getDoc(doc(db, BRANDING_PATH()));
                 if (snap.exists()) setBranding(prev => ({ ...prev, ...snap.data() }));
             } catch (e) {
                 console.warn('Branding load error:', e);
@@ -57,7 +59,7 @@ export default function BrandingSettingsPage() {
 
         setUploadingLogo(true);
         try {
-            const storageRef = ref(storage, `branding/logo_${Date.now()}_${file.name}`);
+            const storageRef = ref(storage, storagePaths.branding(`logo_${Date.now()}_${file.name.replace(/[^\w.-]+/g, '_')}`));
             await uploadBytes(storageRef, file);
             const url = await getDownloadURL(storageRef);
             setBranding(prev => ({ ...prev, logoUrl: url }));
@@ -71,7 +73,7 @@ export default function BrandingSettingsPage() {
     const handleSave = async () => {
         setSaving(true);
         try {
-            await setDoc(doc(db, BRANDING_PATH), branding, { merge: true });
+            await setDoc(doc(db, BRANDING_PATH()), branding, { merge: true });
             setSaved(true);
             setTimeout(() => setSaved(false), 3000);
         } catch (err) {

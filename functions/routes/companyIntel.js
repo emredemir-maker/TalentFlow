@@ -1,7 +1,7 @@
 // Şirket bilgisi uçları (K6) — ortak platform önbelleği + şirkete özel elle
 // doğrulama. Gerekçe: services/companyIntel.js.
 //
-//   POST   /api/company-intel/resolve  {name, force?} — önce bu şirketin elle
+//   POST   /api/company-intel/resolve  {name, force?, cacheOnly?} — önce bu şirketin elle
 //          girdiği kayıt, sonra ortak önbellek, yoksa sunucuda kaynaklı arama.
 //   PUT    /api/company-intel/manual   {name, record} — elle doğrulama (yalnız
 //          bu şirkette görünür).
@@ -66,6 +66,9 @@ router.post('/api/company-intel/resolve', aiLimiter, requireTenant(WRITER_ROLES)
             const c = cached.data();
             return res.json({ key: ref.key, source: 'cache', answer: c.answer, resolvedAt: c.resolvedAt });
         }
+        // Yalnız önbellek sorulduysa canlı aramaya düşülmez (istemci canlı
+        // arama tavanını kendisi sayıyor).
+        if (req.body?.cacheOnly === true) return res.json({ key: ref.key, source: 'miss' });
 
         // 3) Canlı, kaynaklı arama — sorgu sunucuda ve ANAHTARDAN kurulur: aynı
         // anahtarın istemi her zaman aynı, ham addaki (anahtara girmeyen, ör.

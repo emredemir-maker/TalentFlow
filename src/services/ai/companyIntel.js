@@ -195,10 +195,23 @@ export async function resolveCompany(company, { hint = '' } = {}) {
     // etiketli satırlar eksik kalıyor VE grounding metadata boşalıyor — iki
     // belirti, tek sebep.
     const answer = await askGrounded(buildCompanyQuery(name, { hint }), { maxOutputTokens: 4096 });
+    return recordFromAnswer(name, answer);
+}
 
-    const parsed = parseCompanyAnswer(answer.text);
-    const sources = Array.isArray(answer.sources) ? answer.sources : [];
-    const searchQueries = Array.isArray(answer.searchQueries) ? answer.searchQueries : [];
+/**
+ * Kaynaklı yanıtı kanıt kaydına çevirir. Sunucunun ortak önbelleğinden
+ * (POST /api/company-intel/resolve → `answer`) gelen ham yanıt da buradan geçer:
+ * ayrıştırma ve "kaynaksız kanıt gösterilmez" kuralı tek yerde.
+ *
+ * @param {string} company
+ * @param {{text?: string, sources?: Array, searchQueries?: Array, grounded?: boolean, searchSuggestionHtml?: string}} answer
+ * @param {string} [resolvedAt]
+ */
+export function recordFromAnswer(company, answer, resolvedAt = new Date().toISOString()) {
+    const name = String(company || '').trim();
+    const parsed = parseCompanyAnswer(answer?.text || '');
+    const sources = Array.isArray(answer?.sources) ? answer.sources : [];
+    const searchQueries = Array.isArray(answer?.searchQueries) ? answer.searchQueries : [];
 
     // KAYNAKSIZ KANIT GÖSTERİLMEZ — kural burada, prompt'ta değil. Modele
     // "kaynaksız yazma" demek bir dilek; bu bir kısıt.
@@ -215,11 +228,11 @@ export async function resolveCompany(company, { hint = '' } = {}) {
             // ikisini aynı cümleyle anlatırsa kullanıcı haklı olarak çelişki
             // görür (marketResearch.js'te canlıda yaşandı).
             withheldReason: searchQueries.length > 0 ? 'searched-uncited' : 'not-searched',
-            grounded: Boolean(answer.grounded),
+            grounded: Boolean(answer?.grounded),
             searchQueries,
             sources: [],
-            searchSuggestionHtml: answer.searchSuggestionHtml || '',
-            resolvedAt: new Date().toISOString(),
+            searchSuggestionHtml: answer?.searchSuggestionHtml || '',
+            resolvedAt,
         };
     }
 
@@ -228,11 +241,11 @@ export async function resolveCompany(company, { hint = '' } = {}) {
         ...parsed,
         withheld: false,
         withheldReason: '',
-        grounded: Boolean(answer.grounded),
+        grounded: Boolean(answer?.grounded),
         searchQueries,
         sources,
-        searchSuggestionHtml: answer.searchSuggestionHtml || '',
-        resolvedAt: new Date().toISOString(),
+        searchSuggestionHtml: answer?.searchSuggestionHtml || '',
+        resolvedAt,
     };
 }
 
