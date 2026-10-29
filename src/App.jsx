@@ -17,6 +17,7 @@ import DemoBanner from './components/DemoBanner';
 // LoginPage stays eager — it's the first paint before auth resolves so
 // shipping a separate chunk just to wait for it on cold start hurts TTI.
 import LoginPage from './pages/LoginPage';
+import { ReadOnlyBanner, tenantGateScreen } from './components/TenantGate';
 
 /**
  * Deploy sırasında AÇIK kalan sekmeler için sayfa yükleyici.
@@ -190,7 +191,8 @@ function gorunumCoz(pathname, search) {
 }
 
 function AuthenticatedApp() {
-  const { loading, error, isAuthenticated, user, userProfile } = useAuth();
+  const authCtx = useAuth();
+  const { loading, user, userProfile } = authCtx;
   const { viewCandidateId } = useCandidates();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   // Mobile drawer (<lg). Desktop layout (≥lg) uses sidebarCollapsed instead.
@@ -268,8 +270,8 @@ function AuthenticatedApp() {
     );
   }
 
-  // Not authenticated? Show Login
-  if (!isAuthenticated) {
+  // Oturum yok → giriş (Hub'a yönlenir, K3).
+  if (!user) {
     return (
       <>
         <DemoBanner />
@@ -282,6 +284,10 @@ function AuthenticatedApp() {
   if (user?.isAnonymous) {
     return <Navigate to="/exit" replace />;
   }
+
+  // Şirket kapısı: şirket yok / seçilmedi / üyelik yok / şirket kapalı.
+  const gate = tenantGateScreen(authCtx);
+  if (gate) return gate;
 
   const renderPage = () => {
     switch (activeView) {
@@ -298,8 +304,8 @@ function AuthenticatedApp() {
       case 'departments': return <SettingsPage initialTab="departments" />;
       case 'guide': return <SettingsPage initialTab="guide" />;
       case 'super-admin': return <SettingsPage initialTab="system" />;
-      case 'tech-docs': return userProfile?.role === 'super_admin' ? <TechDocsPage /> : <Dashboard />;
-      case 'integrations': return userProfile?.role === 'super_admin' ? <IntegrationsPage /> : <Dashboard />;
+      case 'tech-docs': return userProfile?.role === 'admin' ? <TechDocsPage /> : <Dashboard />;
+      case 'integrations': return userProfile?.role === 'admin' ? <IntegrationsPage /> : <Dashboard />;
       case 'live-interview': return <LiveInterviewPage />;
       case 'interview-report': return <InterviewReportPage />;
       default: return <Dashboard />;
@@ -328,6 +334,8 @@ function AuthenticatedApp() {
         {/* Demo kurulumunda her ekranın üstünde duruyor: havuzun ortak ve
             geçici olduğunu bilmeden yüklenen gerçek bir CV geri alınamaz. */}
         <DemoBanner />
+        {/* Salt okunur bant (K5) ya da destek üyeliği (K11). */}
+        <ReadOnlyBanner />
         {/* In-app route changes — sidebar/header are already painted, so
             the inline spinner is enough until the page chunk arrives. */}
         {/* HER EKRAN KENDİ HATA SINIRI İÇİNDE.

@@ -1,472 +1,350 @@
 // src/context/AuthContext.jsx
-// Authentication Context - Rule 3 Compliance
-// Uses onAuthStateChanged to bind user session to global state
+// Kimlik + şirket (tenant) bağlamı.
+//
+// ── MODEL (docs/coklu-sirket-plani.md §2.2, §2.4) ──────────────────────────
+//   • Giriş yalnız Hub'dan (K3): Talent'ın kendi e-posta/şifre ve Google girişi,
+//     davet ve izinli alan adıyla kaydı (K4) KALDIRILDI. İstemci profil ya da
+//     üyelik YAZMAZ; üyeliği yalnız sunucu yazar (Hub senkronu, PR 4).
+//   • Kişinin şirketleri `userTenants/{uid}`'den (yalnız sunucu yazar). Etkin
+//     şirket: Hub'dan gelişte Hub'ın verdiği, yoksa son seçilen (localStorage),
+//     tek şirket varsa o. Birden çok şirket ve seçim yoksa seçici gösterilir.
+//   • Yetki `tenants/{t}/members/{uid}` belgesinden (rol + departmanlar); jeton
+//     talebine (`token.role`) bakılmaz. Eski `super_admin` → `admin`.
+//   • Şirket durumu (K5): okuma `readUntil`, yazma `writeUntil`; salt okunur
+//     bantta uygulama açılır, yazmalar kurallarda/sunucuda reddedilir ve üstte
+//     bir şerit gösterilir.
+//
+// Tüketiciler için `useAuth()` eski alan adlarını korur (userProfile, role,
+// isSuperAdmin…): userProfile artık üyelik belgesi + kimlik bilgisi.
 
-import { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import { onAuthStateChanged, signOut, signInAnonymously, signInWithEmailAndPassword } from 'firebase/auth';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { auth, db, isFirebaseConfigured } from '../config/firebase';
+import { IS_DEMO } from '../utils/demoMode';
 import {
-    signInWithPopup,
-    onAuthStateChanged,
-    signOut,
-    createUserWithEmailAndPassword,
-    signInWithEmailAndPassword,
-    sendPasswordResetEmail,
-    updateProfile,
-    signInAnonymously
-} from 'firebase/auth';
-import {
-    doc,
-    getDoc,
-    setDoc,
-    serverTimestamp,
-    onSnapshot
-} from 'firebase/firestore';
-import { auth, db, googleProvider, isFirebaseConfigured } from '../config/firebase';
+    getActiveTenantId,
+    isValidTenantId,
+    memberPath,
+    setActiveTenantId,
+    tenantFromLocation,
+    tenantRoot,
+    userTenantsPath,
+} from '../config/tenantPaths';
 
 const AuthContext = createContext(null);
 
-const USERS_PATH = 'artifacts/talent-flow/public/data/users';
+/** Hub adresi (giriş ve şirket yönetimi orada). */
+export const HUB_INN_URL = import.meta.env.VITE_HUB_INN_URL || 'https://agentinn-nyqpx.web.app';
+
+export const LAST_TENANT_KEY = 'tf-active-tenant';
 
 /**
- * Bekleyen daveti SUNUCUDAN sorar.
- *
- * ── NEDEN İSTEMCİDEN SORGULANMIYOR ──────────────────────────────────────────
- * Kayıt sırasında hesap henüz yok, dolayısıyla bu sorgu kimliksiz atılıyordu
- * ve davetiye koleksiyonu bunun için `allow read: if true` ile açıktı.
- * Firestore'da `read` hem `get` hem `list` demek: aynı kural, kimliksiz bir
- * istemcinin koleksiyonun TAMAMINI — davet edilmiş bütün e-postaları ve
- * rollerini — tek istekte okumasına izin veriyordu. Uygulama bunu yapmıyordu
- * ama yapılmasını engelleyen bir şey de yoktu.
- *
- * Sorgu artık sunucuda (Admin SDK kuralların dışında çalışır) ve koleksiyon
- * super_admin'e kapalı.
- *
- * @returns {Promise<{inviteId: string, role: string, departments: string[]}|null>}
- *   davet yoksa null; sorgu YAPILAMADIYSA hata fırlatır — çağıran ikisini
- *   ayırt edebilsin diye ("davetin yok" ile "kontrol edemedik" aynı şey değil).
+ * Hatırlanan şirket seçimini unutur. Çıkışta ve şirket kapısı ekranında
+ * çağrılır: askıdaki/kapalı ya da üyeliği bitmiş bir şirket hatırlandıysa
+ * sonraki açılış yine aynı engel ekranına düşmesin.
  */
-async function lookupInvitation(emailLower) {
-    const res = await fetch('/api/auth/invitation-lookup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: emailLower }),
-    });
-    if (!res.ok) throw new Error(`Davetiye servisi yanıt vermedi (${res.status})`);
-    const data = await res.json();
-    return data?.found ? data : null;
+export function forgetRememberedTenant(store = typeof localStorage !== 'undefined' ? localStorage : null) {
+    if (store) writeStore(store, LAST_TENANT_KEY, null);
 }
+/** HubLaunchPage, Hub'ın gönderdiği şirketi buraya yazar (tek seferlik). */
+export const HUB_TENANT_KEY = 'tf-hub-tenant';
+
+const readStore = (store, key) => {
+    try {
+        return store.getItem(key);
+    } catch {
+        return null;
+    }
+};
+const writeStore = (store, key, value) => {
+    try {
+        if (value == null) store.removeItem(key);
+        else store.setItem(key, value);
+    } catch {
+        /* özel mod */
+    }
+};
+
+const PUBLIC_PREFIXES = ['/join/', '/live-interview/', '/interview-report/', '/apply/', '/respond/', '/face-interview/'];
+export function isPublicPath(path = window.location.pathname) {
+    return PUBLIC_PREFIXES.some((p) => path.startsWith(p));
+}
+
+/** Firestore Timestamp | Date | ISO → ms. */
+function toMillis(v) {
+    if (v == null) return NaN;
+    if (typeof v.toMillis === 'function') return v.toMillis();
+    if (v instanceof Date) return v.getTime();
+    if (typeof v === 'number') return v;
+    if (typeof v === 'string') return Date.parse(v);
+    if (typeof v.seconds === 'number') return v.seconds * 1000;
+    return NaN;
+}
+
+/**
+ * Şirket durumu — firestore.rules tenantReadable/tenantOpenForWrites ile aynı.
+ * @returns {{readable: boolean, writable: boolean, suspended: boolean}}
+ */
+export function tenantAccessOf(tenant, now = Date.now()) {
+    const status = tenant?.status || '';
+    const readable = ['trial', 'active', 'readonly'].includes(status) && now < toMillis(tenant?.readUntil);
+    const writable =
+        readable && ['trial', 'active'].includes(status) && now < toMillis(tenant?.writeUntil);
+    return { readable, writable, suspended: status === 'suspended' };
+}
+
+/** Üyelik geçerli mi — firestore.rules isMember ile aynı. */
+export function memberIsActive(member, now = Date.now()) {
+    if (!member || member.status !== 'active') return false;
+    if (member.expiresAt != null && !(now < toMillis(member.expiresAt))) return false;
+    return ['admin', 'recruiter', 'department_user', 'support'].includes(member.role);
+}
+
+/** Etkin şirketi seçer: Hub'ın verdiği > son seçilen > tek şirket. */
+export function pickTenant(tenantIds, { hub, last } = {}) {
+    if (hub && tenantIds.includes(hub)) return hub;
+    if (last && tenantIds.includes(last)) return last;
+    if (tenantIds.length === 1) return tenantIds[0];
+    return null;
+}
+
+/**
+ * Etkin şirket kararı. Aday (herkese açık) sayfasında BAĞLANTIDAKİ şirket
+ * kazanır: kaydedilmiş seçim ya da üyelik listesi onu ezmez — yoksa iki
+ * şirkette üye bir recruiter'ın açtığı A şirketi mülakatının yazımları
+ * B'nin ağacına düşerdi.
+ * @returns {{ active: string|null, member: string|null }} active: yolların
+ *   kurulacağı şirket; member: üyelik/şirket belgesi dinlenecek şirket
+ *   (listede değilse null).
+ */
+export function resolveActiveTenant({ ids, hub, last, publicPath = false, urlTenant = null }) {
+    if (publicPath && urlTenant) {
+        return { active: urlTenant, member: ids.includes(urlTenant) ? urlTenant : null };
+    }
+    const picked = pickTenant(ids, { hub, last });
+    return { active: picked, member: picked };
+}
+
+// E2E mock-auth (yalnız `vite build --mode e2e-auth`; üretimde dal derlenmez).
+const MOCK = import.meta.env.VITE_E2E_MOCK_AUTH === 'true';
+const MOCK_TENANT = 'e2e-tenant';
 
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
-    const [userProfile, setUserProfile] = useState(null); // { role, status, etc }
-    const [loading, setLoading] = useState(true);
+    const [authLoading, setAuthLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    useEffect(() => {
-        // ── E2E mock-auth short-circuit ──────────────────────────────────
-        // Vite resolves `import.meta.env.VITE_E2E_MOCK_AUTH` at build time.
-        // When the env var is set to 'true' (only the Playwright "auth"
-        // project does this), AuthContext skips Firebase entirely and
-        // hands the rest of the app a fixed authenticated session. The
-        // production build is unaffected because the env var is not set
-        // there — the dead branch is removed by Rollup's tree shaker.
-        //
-        // The mock user is a recruiter (not super_admin) so any test that
-        // *does* exercise super-admin gates surfaces the right error,
-        // and not a falsely-allowed path.
-        if (import.meta.env.VITE_E2E_MOCK_AUTH === 'true') {
-            setUser({
-                uid: 'e2e-test-recruiter',
-                email: 'e2e@test.local',
-                displayName: 'E2E Test Recruiter',
-                isAnonymous: false,
-            });
-            setUserProfile({
-                uid: 'e2e-test-recruiter',
-                email: 'e2e@test.local',
-                displayName: 'E2E Test Recruiter',
-                name: 'E2E Test Recruiter',
-                role: 'recruiter',
-                departments: [],
-                status: 'active',
-            });
-            setLoading(false);
-            return;
-        }
+    const [tenants, setTenants] = useState(null); // null = yükleniyor
+    const [tenantId, setTenantIdState] = useState(null);
+    const [member, setMember] = useState(undefined); // undefined = yükleniyor
+    const [tenant, setTenant] = useState(undefined);
 
+    // ── Kimlik ──────────────────────────────────────────────────────────
+    useEffect(() => {
+        if (MOCK) {
+            setUser({ uid: 'e2e-test-recruiter', email: 'e2e@test.local', displayName: 'E2E Test Recruiter', isAnonymous: false });
+            setTenants([{ id: MOCK_TENANT, name: 'E2E Şirketi', role: 'recruiter' }]);
+            setActiveTenantId(MOCK_TENANT);
+            setTenantIdState(MOCK_TENANT);
+            setMember({ role: 'recruiter', departments: [], status: 'active', displayName: 'E2E Test Recruiter' });
+            setTenant({ name: 'E2E Şirketi', status: 'active', writeUntil: Date.now() + 864e5, readUntil: Date.now() + 864e5 });
+            setAuthLoading(false);
+            return undefined;
+        }
         if (!isFirebaseConfigured || !auth) {
             setError('Firebase yapılandırılmamış. Lütfen VITE_FIREBASE_* ortam değişkenlerini ayarlayın.');
-            setLoading(false);
-            return;
+            setAuthLoading(false);
+            return undefined;
         }
-
-        let unsubscribeProfile = null;
-
-        const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
-            if (currentUser) {
-                // Anonymous sessions are only valid on candidate-facing public routes.
-                // If a stale anonymous session is restored on a non-public route (e.g. the
-                // dashboard), sign it out immediately so the user lands on the Login page
-                // instead of being stuck on /exit.
-                if (currentUser.isAnonymous) {
-                    const path = window.location.pathname;
-                    const isPublicRoute = path.startsWith('/join/') ||
-                                         path.startsWith('/live-interview/') ||
-                                         path.startsWith('/interview-report/') ||
-                                         path.startsWith('/apply/');
-                    if (!isPublicRoute) {
-                        // Signing out triggers onAuthStateChanged again with null → LoginPage
-                        signOut(auth);
-                        return;
-                    }
-                    setUser(currentUser);
-                    setUserProfile({ role: 'candidate', isAnonymous: true });
-                    setLoading(false);
-                    return;
-                }
-
-                setUser(currentUser);
-
-                // Set up real-time listener for the user profile
-                const userDocRef = doc(db, USERS_PATH, currentUser.uid);
-
-                unsubscribeProfile = onSnapshot(userDocRef, (docSnap) => {
-                    if (docSnap.exists()) {
-                        const profileData = docSnap.data();
-                        if (profileData.status === 'disabled') {
-                            signOut(auth);
-                            setError('Hesabınız dondurulmuştur. Lütfen sistem yöneticisi ile iletişime geçin.');
-                            setUser(null);
-                            setUserProfile(null);
-                            return;
-                        }
-                        setUserProfile(profileData);
-                    } else {
-                        // Profile doesn't exist yet, handle initial creation logic if needed
-                        // (Keeping the logic from the previous implementation but making it more robust)
-                        handleInitialProfile(currentUser);
-                    }
-                    setLoading(false);
-                }, (err) => {
-                    console.error("Profile Listener Error:", err);
-                    setLoading(false);
-                });
-            } else {
-                setUser(null);
-                setUserProfile(null);
-                if (unsubscribeProfile) unsubscribeProfile();
-                setLoading(false);
+        return onAuthStateChanged(auth, (currentUser) => {
+            if (currentUser?.isAnonymous && !isPublicPath()) {
+                // Aday sayfasından kalan anonim oturum iç ekranda geçersiz.
+                signOut(auth);
+                return;
             }
+            setUser(currentUser || null);
+            setAuthLoading(false);
         });
-
-        async function handleInitialProfile(currentUser) {
-            if (!currentUser || !currentUser.email || currentUser.isAnonymous) return;
-            try {
-                const emailLower = currentUser.email.toLowerCase();
-                const emailDomain = emailLower.split('@')[1] || '';
-
-                // Safety check for user doc
-                const userDocRef = doc(db, USERS_PATH, currentUser.uid);
-                const docSnap = await getDoc(userDocRef);
-                if (docSnap.exists()) {
-                    setUserProfile(docSnap.data());
-                    return;
-                }
-
-                // Check allowed domains from Firestore
-                let allowedDomains = [];
-                try {
-                    const systemSnap = await getDoc(doc(db, 'artifacts/talent-flow/public/data/settings', 'system'));
-                    if (systemSnap.exists()) allowedDomains = systemSnap.data().allowedDomains || [];
-                } catch { /* ignore */ }
-
-                const isDomainAllowed = allowedDomains.includes(emailDomain);
-
-                if (isDomainAllowed) {
-                    // Domain whitelist bypass — automatically allow as recruiter
-                    const domainProfile = {
-                        uid: currentUser.uid,
-                        email: emailLower,
-                        displayName: currentUser.displayName || emailLower.split('@')[0],
-                        photoURL: currentUser.photoURL || '',
-                        role: 'recruiter',
-                        departments: [],
-                        status: 'active',
-                        createdAt: serverTimestamp()
-                    };
-                    await setDoc(userDocRef, domainProfile);
-                    setUserProfile(domainProfile);
-                } else {
-                    const invitation = await lookupInvitation(emailLower);
-
-                    if (invitation) {
-                        const newProfile = {
-                            uid: currentUser.uid,
-                            email: emailLower,
-                            displayName: currentUser.displayName || emailLower.split('@')[0],
-                            photoURL: currentUser.photoURL || '',
-                            role: invitation.role,
-                            // Sunucu eski tekil `department` alanını da tekilden
-                            // listeye çeviriyor; kuraldaki karşılaştırma bunu bekliyor.
-                            departments: invitation.departments,
-                            status: 'active',
-                            // Firestore rules verify the requested role against this
-                            // invitation doc — without it the create is denied.
-                            inviteId: invitation.inviteId,
-                            createdAt: serverTimestamp()
-                        };
-                        await setDoc(userDocRef, newProfile);
-                        setUserProfile(newProfile);
-                    } else {
-                        await signOut(auth);
-                        setError('Erişim yetkiniz bulunmuyor.');
-                    }
-                }
-            } catch (err) {
-                console.error("Initial Profile Creation Error:", err);
-            }
-        }
-
-        return () => {
-            unsubscribeAuth();
-            if (unsubscribeProfile) unsubscribeProfile();
-        };
     }, []);
 
-    // Anonymous SignIn for Public Routes - Separate effect to handle dependency changes correctly
+    // Aday sayfaları: anonim oturum + şirket bağlantıdan (?tenantId=…).
     useEffect(() => {
-        const path = window.location.pathname;
-        const isPublicRoute = path.startsWith('/join/') ||
-                              path.startsWith('/live-interview/') ||
-                              path.startsWith('/interview-report/') ||
-                              path.startsWith('/apply/');
-
-        if (isPublicRoute && !user && !loading) {
-            console.log("[TalentFlow] Public route & unauthenticated. Triggering anonymous sign-in...");
-            signInAnonymously(auth).catch(err => console.error("Anonymous Sign-In Error:", err));
-        }
-    }, [user, loading]);
-
-    const loginWithGoogle = async () => {
-        setLoading(true);
-        setError(null);
-        try {
-            await signInWithPopup(auth, googleProvider);
-        } catch (err) {
-            setError(err.message);
-            setLoading(false);
-        }
-    };
-
-    const loginWithEmail = async (email, password) => {
-        setLoading(true);
-        setError(null);
-        try {
-            await signInWithEmailAndPassword(auth, email, password);
-        } catch (err) {
-            let msg = "Giriş yapılamadı. Lütfen tekrar deneyin.";
-            if (err.code === 'auth/user-not-found')       msg = "Bu e-posta ile kayıtlı bir hesap bulunamadı.";
-            if (err.code === 'auth/wrong-password')       msg = "Hatalı şifre. Lütfen tekrar deneyin.";
-            if (err.code === 'auth/invalid-credential')   msg = "E-posta veya şifre hatalı.";
-            if (err.code === 'auth/invalid-email')        msg = "Geçersiz e-posta adresi.";
-            if (err.code === 'auth/user-disabled')        msg = "Bu hesap devre dışı bırakıldı.";
-            if (err.code === 'auth/too-many-requests')    msg = "Çok fazla başarısız deneme. Lütfen birkaç dakika bekleyin.";
-            setError(msg);
-            setLoading(false);
-            throw err;
-        }
-    };
-
-    const registerWithEmail = async (email, password, name) => {
-        setLoading(true);
-        setError(null);
-        console.log(`[Registration] Starting for ${email}...`);
-        // Accessible in catch block for "email-already-in-use" reinvite flow
-        let _invitation = null;
-        let _emailLower = '';
-        try {
-            // 1. Check if invitation exists or domain is allow-listed.
-            // Super-admin bootstrapping is no longer hard-coded by email;
-            // run scripts/grant-super-admin.mjs after the account exists.
-            _emailLower = email.trim().toLowerCase();
-            const emailLower = _emailLower;
-
-            // Check allowed domains
-            const emailDomain = emailLower.split('@')[1] || '';
-            let allowedDomains = [];
-            try {
-                const systemSnap = await getDoc(doc(db, 'artifacts/talent-flow/public/data/settings', 'system'));
-                if (systemSnap.exists()) allowedDomains = systemSnap.data().allowedDomains || [];
-            } catch { /* ignore */ }
-            const isDomainAllowed = allowedDomains.includes(emailDomain);
-
-            console.log(`[Registration] Checking invitations for ${emailLower}...`);
-            let invitation = null;
-            let inviteDocId = null;
-
-            try {
-                const found = await lookupInvitation(emailLower);
-                if (found) {
-                    invitation = found;
-                    _invitation = invitation; // accessible in outer catch
-                    inviteDocId = found.inviteId;
-                    console.log(`[Registration] Found valid invitation.`);
-                }
-            } catch (snapErr) {
-                console.error("[Registration] Invitation check failed:", snapErr);
-                if (!isDomainAllowed) {
-                    throw new Error(`Davetiye kontrolü başarısız: ${snapErr.message}`);
-                }
+        if (MOCK || !auth) return;
+        if (isPublicPath()) {
+            const t = tenantFromLocation();
+            if (t) setActiveTenantId(t);
+            if (!user && !authLoading) {
+                signInAnonymously(auth).catch((err) => console.error('Anonymous Sign-In Error:', err));
             }
-
-            if (!invitation && !isDomainAllowed) {
-                console.warn(`[Registration] No invitation and domain not allow-listed.`);
-                throw new Error("Geçerli bir davetiyeniz bulunmuyor. Lütfen administratörden davet isteyeniz.");
-            }
-
-            // 2. Create Auth User
-            console.log(`[Registration] Creating auth user...`);
-            const userCredential = await createUserWithEmailAndPassword(auth, emailLower, password);
-            const newUser = userCredential.user;
-
-            // 3. Set Display Name
-            console.log(`[Registration] Updating profile display name...`);
-            await updateProfile(newUser, { displayName: name });
-
-            // 4. Create User Profile
-            console.log(`[Registration] Creating Firestore profile...`);
-            const profile = {
-                uid: newUser.uid,
-                email: newUser.email,
-                displayName: name,
-                photoURL: '',
-                role: invitation?.role || 'recruiter',
-                departments: invitation?.departments || [],
-                status: 'active',
-                // Firestore rules verify the requested role against this
-                // invitation doc; domain-allowed signups have no invite.
-                ...(inviteDocId ? { inviteId: inviteDocId } : {}),
-                createdAt: serverTimestamp()
-            };
-
-            try {
-                await setDoc(doc(db, USERS_PATH, newUser.uid), profile);
-                console.log(`[Registration] Firestore profile created.`);
-            } catch (profileErr) {
-                console.error("[Registration] Profile creation error:", profileErr);
-                throw new Error(`Profil oluşturulamadı: ${profileErr.message}`);
-            }
-
-            // 5. DAVET "KABUL EDİLDİ" OLARAK İŞARETLENMİYOR — bilinen boşluk.
-            //
-            // Burada bir `updateDoc` duruyordu ama koleksiyonun yazma kuralı
-            // zaten super_admin'e kapalıydı: yeni kaydolan kullanıcı bu yazmayı
-            // hiçbir zaman yapamadı, çağrı yalnızca konsola hata basıyordu.
-            // Sorgu sunucuya taşındıktan sonra istemcinin koleksiyona hiç
-            // erişimi kalmadı, dolayısıyla çağrı kesin olarak ölüydü.
-            //
-            // Sonucu: davetler "pending" kalıyor ve super_admin ekranında
-            // bekliyormuş gibi görünüyor. Aynı daveti başkası kullanamaz
-            // (kural, davetteki e-posta ile giriş yapanın e-postasını
-            // karşılaştırıyor), o yüzden bu bir güvenlik açığı değil — ama
-            // düzeltilmesi gereken ayrı bir iş: kabul işaretini sunucu atmalı.
-
-            setUserProfile(profile);
-            console.log(`[Registration] Success!`);
-            return newUser;
-        } catch (err) {
-            console.error("[Registration] General error:", err);
-            let msg = err.message;
-            if (err.code === 'auth/email-already-in-use') {
-                if (_invitation) {
-                    // User was deleted from Firestore but Auth account still exists.
-                    // Send a password reset email so they can access their existing Auth account.
-                    try {
-                        await sendPasswordResetEmail(auth, _emailLower);
-                        console.log('[Registration] Reinvite: password reset email sent to', _emailLower);
-                    } catch (resetErr) {
-                        console.warn('[Registration] Reinvite: password reset failed:', resetErr.message);
-                    }
-                    msg = '__EMAIL_REINVITE__Bu e-posta daha önce sisteme kayıtlıydı — davet kabul edildi. Şifre sıfırlama bağlantısı e-postanıza gönderildi. E-postanızı kontrol edin, yeni şifrenizi belirleyin ve giriş yapın.';
-                } else {
-                    msg = '__EMAIL_IN_USE__Bu e-posta adresi zaten kayıtlı. Mevcut hesabınızla giriş yapmayı deneyin veya şifrenizi sıfırlayın.';
-                }
-            } else if (err.code === 'auth/invalid-email') {
-                msg = 'Geçersiz e-posta adresi.';
-            } else if (err.code === 'auth/weak-password') {
-                msg = 'Şifre çok kısa — en az 6 karakter kullanın.';
-            } else if (err.code === 'auth/operation-not-allowed') {
-                msg = 'E-posta ile kayıt şu an devre dışı.';
-            }
-            setError(msg);
-            setLoading(false);
-            throw err;
         }
-    };
+    }, [user, authLoading]);
 
-    const resetPassword = async (email) => {
-        setLoading(true);
+    // ── Şirket listesi ──────────────────────────────────────────────────
+    useEffect(() => {
+        if (MOCK) return undefined;
+        if (!user || user.isAnonymous) {
+            setTenants(user ? [] : null);
+            return undefined;
+        }
+        setTenants(null);
+        return onSnapshot(
+            doc(db, userTenantsPath(user.uid)),
+            (snap) => {
+                const map = (snap.exists() && snap.data()?.tenants) || {};
+                const list = Object.entries(map)
+                    .filter(([id]) => isValidTenantId(id))
+                    .map(([id, v]) => ({ id, name: v?.name || id, role: v?.role || '' }))
+                    .sort((a, b) => a.name.localeCompare(b.name, 'tr'));
+                setTenants(list);
+            },
+            (err) => {
+                console.error('userTenants okunamadı:', err);
+                setTenants([]);
+            }
+        );
+    }, [user]);
+
+    // ── Etkin şirket seçimi ─────────────────────────────────────────────
+    useEffect(() => {
+        if (MOCK || !tenants) return;
+        const ids = tenants.map((t) => t.id);
+        const publicPath = isPublicPath();
+        const urlTenant = publicPath ? tenantFromLocation() : null;
+        const hub = readStore(sessionStorage, HUB_TENANT_KEY);
+        const last = readStore(localStorage, LAST_TENANT_KEY);
+        const { active, member: memberTenant } = resolveActiveTenant({ ids, hub, last, publicPath, urlTenant });
+        if (hub && !urlTenant) writeStore(sessionStorage, HUB_TENANT_KEY, null);
+        // Aday sayfasındaki bağlantı şirketi kalıcı seçim sayılmaz.
+        if (active && !urlTenant) writeStore(localStorage, LAST_TENANT_KEY, active);
+        setActiveTenantId(active);
+        setTenantIdState(memberTenant);
+    }, [tenants]);
+
+    // ── Üyelik ve şirket belgesi ────────────────────────────────────────
+    useEffect(() => {
+        if (MOCK) return undefined;
+        if (!user || user.isAnonymous || !tenantId) {
+            setMember(undefined);
+            setTenant(undefined);
+            return undefined;
+        }
+        setMember(undefined);
+        setTenant(undefined);
+        const unsubMember = onSnapshot(
+            doc(db, memberPath(user.uid, tenantId)),
+            (snap) => setMember(snap.exists() ? snap.data() : null),
+            () => setMember(null)
+        );
+        const unsubTenant = onSnapshot(
+            doc(db, tenantRoot(tenantId)),
+            (snap) => setTenant(snap.exists() ? snap.data() : null),
+            () => setTenant(null)
+        );
+        return () => {
+            unsubMember();
+            unsubTenant();
+        };
+    }, [user, tenantId]);
+
+    /** Şirket değiştir: seçimi saklar ve uygulamayı o şirketle baştan açar. */
+    const selectTenant = useCallback((id) => {
+        if (!isValidTenantId(id)) return;
+        writeStore(localStorage, LAST_TENANT_KEY, id);
+        if (id === getActiveTenantId()) return;
+        // Tüm dinleyiciler ve önbellekler eski şirketin yollarında; temiz bir
+        // açılış en güvenlisi (bir ekranın eski şirkete yazması ihtimali yok).
+        window.location.assign('/panel');
+    }, []);
+
+    /** Giriş Hub'dan (K3). */
+    const loginWithHub = useCallback(() => {
+        window.location.assign(HUB_INN_URL);
+    }, []);
+
+    /** YALNIZ emülatör (E2E) ve demo derlemesi: e-posta/şifre ile giriş. Üretimde kapalı. */
+    const loginWithEmulatorPassword = useCallback(async (email, password) => {
+        if (import.meta.env.VITE_USE_FIREBASE_EMULATOR !== 'true' && !IS_DEMO) throw new Error('Kullanılamaz.');
         setError(null);
-        try {
-            await sendPasswordResetEmail(auth, email);
-            setLoading(false);
-            return true;
-        } catch (err) {
-            setError(err.message);
-            setLoading(false);
-            throw err;
-        }
-    };
+        await signInWithEmailAndPassword(auth, email, password);
+    }, []);
 
-    const logout = () => signOut(auth);
+    const logout = useCallback(() => {
+        setActiveTenantId(null);
+        forgetRememberedTenant();
+        return signOut(auth);
+    }, []);
 
-    /**
-     * DEPARTMAN LİSTESİ HER RENDER'DA YENİ DİZİ OLMAMALI.
-     *
-     * Eskiden burada her render'da taze bir dizi üretiliyordu: departmanı
-     * olmayan bir recruiter için bile `[]` yeni bir referanstı. Bu dizi
-     * CandidatesContext'teki aday dinleyicisinin bağımlılık dizisinde
-     * duruyor — yani her render aboneliği yıkıp yeniden kuruyordu.
-     * Ölçüldü: tek sayfa açılışında koleksiyon dinleyicisi BEŞ KEZ
-     * kuruluyordu ve her biri tüm aday belgelerini baştan indiriyordu.
-     * "Ekran önce boş geliyor, sonra doluyor" bunun görünen yüzüydü.
-     */
+    /** Engel ekranından: hatırlanan seçimi unut, şirket seçimine dön. */
+    const resetTenantSelection = useCallback(() => {
+        forgetRememberedTenant();
+        window.location.assign('/panel');
+    }, []);
+
+    const anonymous = !!user?.isAnonymous;
+    const activeMember = memberIsActive(member) ? member : null;
+
+    const userProfile = useMemo(() => {
+        if (!user) return null;
+        if (anonymous) return { role: 'candidate', isAnonymous: true };
+        if (!activeMember) return null;
+        const name = activeMember.displayName || user.displayName || activeMember.email || user.email || '';
+        return {
+            ...activeMember,
+            uid: user.uid,
+            email: activeMember.email || user.email || '',
+            displayName: name,
+            name,
+            photoURL: activeMember.photoURL || user.photoURL || '',
+        };
+    }, [user, anonymous, activeMember]);
+
+    const access = useMemo(() => tenantAccessOf(tenant), [tenant]);
+
     const userDepartments = useMemo(
-        () => userProfile?.departments || (userProfile?.department ? [userProfile.department] : []),
-        [userProfile?.departments, userProfile?.department]
+        () => (Array.isArray(userProfile?.departments) ? userProfile.departments : []),
+        [userProfile?.departments]
     );
 
-    /**
-     * Context değeri de memoize: düz nesne her render'da yeni referans
-     * üretiyor ve bu context'i tüketen HER bileşeni yeniden render ettiriyordu.
-     *
-     * Fonksiyonlar bilerek bağımlılıkta yok: hiçbiri bileşen state'ini
-     * okumuyor, yalnızca stabil setter'ları (setLoading/setError) ve firebase
-     * API'lerini çağırıyorlar. Bağımlılığa eklenselerdi memo hiç tutmazdı.
-     */
-    const value = useMemo(() => ({
-        user,
-        userProfile,
-        role: userProfile?.role || null,
-        isSuperAdmin: userProfile?.role === 'super_admin',
-        isDepartmentUser: userProfile?.role === 'department_user',
-        userDepartments,
-        userId: user?.uid || null,
-        isAuthenticated: !!user && !!userProfile,
-        loading,
-        error,
-        loginWithGoogle,
-        loginWithEmail,
-        registerWithEmail,
-        resetPassword,
-        logout
-     
-    }), [user, userProfile, userDepartments, loading, error]);
+    // Yükleniyor: kimlik; ya da iç kullanıcı için şirket listesi/üyelik/şirket.
+    const loading =
+        authLoading ||
+        (!!user && !anonymous && (tenants === null || (!!tenantId && (member === undefined || tenant === undefined))));
 
-    return (
-        <AuthContext.Provider value={value}>
-            {children}
-        </AuthContext.Provider>
+    const role = userProfile?.role || null;
+    const value = useMemo(
+        () => ({
+            user,
+            userProfile,
+            role,
+            isAdmin: role === 'admin',
+            // Eski ad — tüketiciler değişmesin diye; artık şirket yöneticisi.
+            isSuperAdmin: role === 'admin',
+            isDepartmentUser: role === 'department_user',
+            isSupport: role === 'support',
+            userDepartments,
+            userId: user?.uid || null,
+            isAuthenticated: !!user && !!userProfile && (anonymous || access.readable),
+            loading,
+            error,
+            // Şirket
+            tenants: tenants || [],
+            tenantId,
+            tenant: tenant || null,
+            tenantReadable: access.readable,
+            tenantWritable: access.writable && role !== 'support',
+            tenantSuspended: access.suspended,
+            membershipMissing: !!user && !anonymous && !!tenantId && member === null,
+            selectTenant,
+            resetTenantSelection,
+            loginWithHub,
+            loginWithEmulatorPassword,
+            logout,
+        }),
+        [user, userProfile, role, userDepartments, anonymous, access, loading, error, tenants, tenantId, tenant, member, selectTenant, resetTenantSelection, loginWithHub, loginWithEmulatorPassword, logout]
     );
+
+    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
@@ -476,5 +354,8 @@ export function useAuth() {
     }
     return context;
 }
+
+/** Plan adıyla erişim (TenantContext): şirket alanları useAuth'ta. */
+export const useTenant = useAuth;
 
 export default AuthContext;

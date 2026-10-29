@@ -6,14 +6,27 @@
 import {
     clearEmulators,
     createAuthUser,
-    seedAllowedDomains,
-    writeUserProfile,
+    seedDoc,
+    seedMemberships,
+    seedTenant,
 } from './emulator.js';
 
 export const TEST_USER = {
     email: 'recruiter@talentflow-e2e.local',
     password: 'TestPass123!',
     displayName: 'Test Recruiter',
+};
+
+// İki şirketli kullanıcı: şirket seçici ve yalıtım (plan §3.3 madde 4).
+export const MULTI_USER = {
+    email: 'multi@talentflow-e2e.local',
+    password: 'TestPass123!',
+    displayName: 'Multi Recruiter',
+};
+
+export const TENANTS = {
+    A: { id: 'e2e-tenant-a', name: 'Alfa Şirketi', candidate: 'Ayşe Alfa' },
+    B: { id: 'e2e-tenant-b', name: 'Beta Şirketi', candidate: 'Bora Beta' },
 };
 
 export default async function globalSetup() {
@@ -35,16 +48,33 @@ export default async function globalSetup() {
     }
 
     await clearEmulators();
-    // Firestore rules require role evidence at profile creation — allow-list
-    // the test domain so the recruiter profile write below passes the rules.
-    await seedAllowedDomains(['talentflow-e2e.local']);
-    const { uid, idToken } = await createAuthUser(TEST_USER);
-    await writeUserProfile({
+    // Üyelik ve şirket listesi yalnız sunucu tarafından yazılır (kurallar
+    // istemciye kapalı); testte tohum doğrudan emülatöre yazılır.
+    for (const t of Object.values(TENANTS)) {
+        await seedTenant(t.id, t.name);
+        await seedDoc(`tenants/${t.id}/candidates/c-${t.id}`, {
+            name: t.candidate,
+            email: `${t.id}@aday.test`,
+            status: 'new',
+            appliedDate: new Date().toISOString(),
+        });
+    }
+    const { uid } = await createAuthUser(TEST_USER);
+    await seedMemberships({
         uid,
-        idToken,
         email: TEST_USER.email,
         displayName: TEST_USER.displayName,
-        role: 'recruiter',
+        memberships: [{ tenantId: TENANTS.A.id, name: TENANTS.A.name, role: 'recruiter' }],
+    });
+    const multi = await createAuthUser(MULTI_USER);
+    await seedMemberships({
+        uid: multi.uid,
+        email: MULTI_USER.email,
+        displayName: MULTI_USER.displayName,
+        memberships: [
+            { tenantId: TENANTS.A.id, name: TENANTS.A.name, role: 'recruiter' },
+            { tenantId: TENANTS.B.id, name: TENANTS.B.name, role: 'recruiter' },
+        ],
     });
     console.info(`[global-setup] Seeded recruiter ${TEST_USER.email} (uid=${uid})`);
 }

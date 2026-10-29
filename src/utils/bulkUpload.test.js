@@ -54,17 +54,17 @@ describe('bulkStoragePath', () => {
     // uid yolun içinde: Storage kuralı ve sunucu doğrulaması aynı tek gerçeği
     // okur, ikisinin ayrışma ihtimali kalmaz.
     it('puts the uid inside the path', () => {
-        expect(bulkStoragePath('u1', 'tok', 0, 'cv.pdf')).toBe('bulk-imports/u1/tok/0-cv.pdf');
+        expect(bulkStoragePath('u1', 'tok', 0, 'cv.pdf', 'T1')).toBe('tenants/T1/bulk-imports/u1/tok/0-cv.pdf');
     });
 
     it('keeps same-named files apart with the index', () => {
-        const a = bulkStoragePath('u1', 'tok', 0, 'cv.pdf');
-        const b = bulkStoragePath('u1', 'tok', 1, 'cv.pdf');
+        const a = bulkStoragePath('u1', 'tok', 0, 'cv.pdf', 'T1');
+        const b = bulkStoragePath('u1', 'tok', 1, 'cv.pdf', 'T1');
         expect(a).not.toBe(b);
     });
 
     it('cannot be pushed outside the user folder by a crafted filename', () => {
-        expect(bulkStoragePath('u1', 'tok', 0, '../../u2/cv.pdf')).toBe('bulk-imports/u1/tok/0-cv.pdf');
+        expect(bulkStoragePath('u1', 'tok', 0, '../../u2/cv.pdf', 'T1')).toBe('tenants/T1/bulk-imports/u1/tok/0-cv.pdf');
     });
 });
 

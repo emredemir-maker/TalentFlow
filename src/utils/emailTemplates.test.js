@@ -13,7 +13,6 @@ import {
     buildICS,
     buildInfoRequestEmail,
     buildInterviewInviteEmail,
-    buildInviteEmail,
     buildRescheduleEmail,
 } from './emailTemplates.js';
 
@@ -21,30 +20,6 @@ const branding = {
     companyName: 'Talent-Inn Test',
     primaryColor: '#1E3A8A',
 };
-
-describe('buildInviteEmail', () => {
-    it('embeds the invite link and inviter name', () => {
-        const html = buildInviteEmail(branding, {
-            inviteLink: 'https://example.com/invite/abc',
-            role: 'recruiter',
-            invitedByName: 'Ada Lovelace',
-        });
-        expect(html).toContain('https://example.com/invite/abc');
-        expect(html).toContain('Ada Lovelace');
-        expect(html).toContain('Talent-Inn Test'); // branding applied
-    });
-
-    it('uses Turkish role labels', () => {
-        const recruiter = buildInviteEmail(branding, { inviteLink: 'x', role: 'recruiter' });
-        expect(recruiter).toContain('Recruiter');
-
-        const superAdmin = buildInviteEmail(branding, { inviteLink: 'x', role: 'super_admin' });
-        expect(superAdmin).toContain('Süper Admin');
-
-        const dept = buildInviteEmail(branding, { inviteLink: 'x', role: 'department_user' });
-        expect(dept).toContain('Departman Kullanıcısı');
-    });
-});
 
 describe('buildInterviewInviteEmail', () => {
     it('includes all key fields and the join link', () => {

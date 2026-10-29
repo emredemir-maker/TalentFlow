@@ -1,504 +1,92 @@
 // src/pages/LoginPage.jsx
-import { useState, useEffect } from 'react';
+//
+// GİRİŞ YALNIZ CLYRO HUB'DAN (K3, docs/coklu-sirket-plani.md §2.4).
+// Talent'ın kendi e-posta/şifre ve Google girişi, kayıt formu, davet bağlantısı
+// ve izinli alan adıyla kayıt (K4) kaldırıldı. Hub'da Talent açılınca
+// /hub-giris tek kullanımlık kodla oturum açar.
+//
+// İstisna — yalnız iki derleme kipinde e-posta/şifre formu görünür:
+//   • emülatör E2E derlemesi (VITE_USE_FIREBASE_EMULATOR=true): gerçek kimlik
+//     akışının testi Hub olmadan yapılabilsin;
+//   • demo kurulumu (IS_DEMO): paylaşılan demo hesabı.
+// Üretim derlemesinde ikisi de kapalı; dal derlemede elenir.
+import { useState } from 'react';
+import { LogIn, Loader2, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { IS_DEMO, DEMO_LOGIN, HAS_DEMO_LOGIN } from '../utils/demoMode';
-import { LogIn, AlertCircle, CheckCircle, Loader2, User, Mail, Lock, Sparkles, ArrowRight, Zap, Brain, BarChart3, Clock } from 'lucide-react';
 import TalentInnLogo from '../components/TalentInnLogo';
 
-export default function LoginPage() {
-    const { loginWithGoogle, loginWithEmail, registerWithEmail, loading, error } = useAuth();
+const PASSWORD_FORM = import.meta.env.VITE_USE_FIREBASE_EMULATOR === 'true' || IS_DEMO;
 
-    const [mode, setMode] = useState('login');
-    // DEMO KURULUMUNDA FORM HAZIR DOLU. Ziyaretçinin şifreyi bir yerden
-    // kopyalaması gerekmiyor: paylaşılan hesabın bilgileri yapı zamanında
-    // gömülüyor ve tek tıkla giriliyor. Üretimde bu sabitler boş olduğu için
-    // form bugünkü gibi boş açılıyor.
+function PasswordForm() {
+    const { loginWithEmulatorPassword } = useAuth();
     const [email, setEmail] = useState(HAS_DEMO_LOGIN ? DEMO_LOGIN.email : '');
     const [password, setPassword] = useState(HAS_DEMO_LOGIN ? DEMO_LOGIN.password : '');
-    const [name, setName] = useState('');
-    const [success, setSuccess] = useState(null);
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState('');
 
-    // Stack the split layout below 860px so the hero panel and form don't
-    // squeeze side-by-side on phones (headline wrapped one word per line).
-    const [isNarrow, setIsNarrow] = useState(
-        typeof window !== 'undefined' && window.matchMedia('(max-width: 860px)').matches
-    );
-    useEffect(() => {
-        const mq = window.matchMedia('(max-width: 860px)');
-        const onChange = (e) => setIsNarrow(e.matches);
-        mq.addEventListener('change', onChange);
-        return () => mq.removeEventListener('change', onChange);
-    }, []);
-
-    useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        const inviteEmail = params.get('invite');
-        if (inviteEmail) {
-            setEmail(inviteEmail);
-            setMode('register');
-        }
-    }, []);
-
-    const handleSubmit = async (e) => {
+    const submit = async (e) => {
         e.preventDefault();
+        setBusy(true);
+        setError('');
         try {
-            if (mode === 'login') {
-                await loginWithEmail(email, password);
-            } else {
-                await registerWithEmail(email, password, name);
-                setSuccess('Kayıt başarılı! Sisteme erişim sağlanıyor...');
-            }
-        } catch {}
+            await loginWithEmulatorPassword(email.trim(), password);
+        } catch {
+            setError('E-posta veya şifre hatalı.');
+            setBusy(false);
+        }
     };
-
-    const inputStyle = {
-        backgroundColor: '#FFFFFF',
-        border: '1.5px solid #E2E8F0',
-        color: '#1E293B',
-        borderRadius: '10px',
-        width: '100%',
-        height: '48px',
-        paddingLeft: '44px',
-        paddingRight: '16px',
-        fontSize: '14px',
-        outline: 'none',
-        transition: 'border-color 0.2s, box-shadow 0.2s',
-    };
-
-    const handleFocus = (e) => {
-        e.target.style.borderColor = '#14B8A6';
-        e.target.style.boxShadow = '0 0 0 3px rgba(20,184,166,0.15)';
-    };
-    const handleBlur = (e) => {
-        e.target.style.borderColor = '#E2E8F0';
-        e.target.style.boxShadow = 'none';
-    };
-
-    const stats = [
-        { value: '3s', label: 'CV Analizi', icon: BarChart3 },
-        { value: '%90', label: 'Tahmin Skoru', icon: Brain },
-        { value: '24/7', label: 'Akıllı Asistan', icon: Clock },
-    ];
-
-    const features = [
-        'Nöral CV Ayrıştırma ve Eşleştirme',
-        'Gerçek Zamanlı STAR Mülakat Analizi',
-        'Bias Korumalı AI Değerlendirme',
-        'Agentic İşe Alım İş Akışları',
-    ];
 
     return (
-        <div
-            style={{
-                minHeight: '100vh',
-                width: '100%',
-                display: 'flex',
-                flexDirection: isNarrow ? 'column' : 'row',
-                fontFamily: "'Outfit', ui-sans-serif, system-ui, sans-serif",
-                overflow: 'hidden',
-            }}
-        >
-            {/* ── LEFT PANEL ── */}
-            <div
-                style={{
-                    width: isNarrow ? '100%' : '45%',
-                    minHeight: isNarrow ? 'auto' : '100vh',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    padding: isNarrow ? '32px 24px 28px' : '56px 48px',
-                    background: '#111312', // Clyro mürekkep; vurgu turkuaz
-                    position: 'relative',
-                    overflow: 'hidden',
-                    flexShrink: 0,
-                }}
-            >
-                {/* Decorative glows */}
-                <div style={{
-                    position: 'absolute', top: '-10%', right: '-10%',
-                    width: '55%', height: '55%', borderRadius: '50%',
-                    background: 'radial-gradient(circle, rgba(20,184,166,0.16) 0%, transparent 70%)',
-                    pointerEvents: 'none'
-                }} />
-                <div style={{
-                    position: 'absolute', bottom: '-10%', left: '-10%',
-                    width: '55%', height: '55%', borderRadius: '50%',
-                    background: 'radial-gradient(circle, rgba(20,184,166,0.08) 0%, transparent 70%)',
-                    pointerEvents: 'none'
-                }} />
+        <form onSubmit={submit} className="space-y-3 text-left">
+            <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="E-posta"
+                autoComplete="username"
+                className="w-full border border-n200 rounded-md px-3 py-2 text-sm"
+            />
+            <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Şifre"
+                autoComplete="current-password"
+                className="w-full border border-n200 rounded-md px-3 py-2 text-sm"
+            />
+            {error && (
+                <p className="text-[12px] text-bad-text flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5" /> {error}
+                </p>
+            )}
+            <button type="submit" disabled={busy} className="w-full tf-btn tf-btn-secondary justify-center">
+                {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                Sisteme Giriş Yap
+            </button>
+        </form>
+    );
+}
 
-                {/* Logo */}
-                <div style={{ position: 'relative', zIndex: 1 }}>
-                    <TalentInnLogo iconSize={46} showText={true} showSub={true} textSize="20px" onDark />
+export default function LoginPage() {
+    const { loginWithHub, error } = useAuth();
+    return (
+        <div className="min-h-dvh flex items-center justify-center p-6 bg-frame">
+            <div className="max-w-sm w-full bg-n0 rounded-2xl border border-n200 p-8 space-y-5 text-center">
+                <div className="flex justify-center">
+                    <TalentInnLogo />
                 </div>
-
-                {/* Hero Text */}
-                <div style={{ position: 'relative', zIndex: 1, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', paddingTop: isNarrow ? '24px' : '48px', paddingBottom: isNarrow ? '8px' : '48px' }}>
-                    {/* Badge */}
-                    <div style={{
-                        display: 'inline-flex', alignItems: 'center', gap: '8px',
-                        padding: '6px 14px', borderRadius: '999px',
-                        backgroundColor: 'rgba(20,184,166,0.12)',
-                        border: '1px solid rgba(20,184,166,0.25)',
-                        color: '#8BE3EC',
-                        fontSize: '11px', fontWeight: 700,
-                        letterSpacing: '1.5px', textTransform: 'uppercase',
-                        marginBottom: '28px',
-                        width: 'fit-content',
-                    }}>
-                        <Sparkles size={12} />
-                        Gelişmiş Yetenek Kontrol Merkezi
-                    </div>
-
-                    {/* Main heading */}
-                    <h1 style={{
-                        fontSize: 'clamp(36px, 3.5vw, 52px)',
-                        fontWeight: 900,
-                        lineHeight: 1.05,
-                        letterSpacing: '-1.5px',
-                        color: '#F8FAFC',
-                        marginBottom: '20px',
-                    }}>
-                        İşe Alımın <br />
-                        <span style={{
-                            backgroundImage: 'linear-gradient(90deg, #14B8A6, #0F766E)',
-                            WebkitBackgroundClip: 'text',
-                            WebkitTextFillColor: 'transparent',
-                            backgroundClip: 'text',
-                        }}>
-                            Yapay Zeka Mimarı
-                        </span>
-                    </h1>
-
-                    {/* Description */}
-                    <p style={{
-                        color: '#94A3B8',
-                        fontSize: '15px',
-                        lineHeight: '1.7',
-                        maxWidth: '400px',
-                        marginBottom: '36px',
-                        fontWeight: 500,
-                    }}>
-                        Clyro Talent, sıradan bir aday takip sisteminden çok daha fazlasıdır. Veriyi stratejiye, adayları ise yetkinlik kanıtlarına dönüştüren uçtan uca bir{' '}
-                        <span style={{ color: '#F8FAFC', fontWeight: 700 }}>Yapay Zeka Ekosistemidir.</span>
+                <div className="space-y-1">
+                    <h1 className="text-xl font-semibold text-n900">Hoş Geldiniz</h1>
+                    <p className="text-sm text-n500">
+                        Clyro Talent'a şirketinizin Clyro Hub hesabıyla girilir.
                     </p>
-
-                    {/* Feature list — hidden on narrow screens to keep the form reachable */}
-                    <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 40px 0', display: isNarrow ? 'none' : 'flex', flexDirection: 'column', gap: '12px' }}>
-                        {features.map((f) => (
-                            <li key={f} style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#CBD5E1', fontSize: '13px', fontWeight: 500 }}>
-                                <div style={{
-                                    width: '20px', height: '20px', borderRadius: '50%',
-                                    background: 'rgba(20,184,166,0.14)',
-                                    border: '1px solid rgba(20,184,166,0.30)',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    flexShrink: 0,
-                                }}>
-                                    <Zap size={10} color="#14B8A6" />
-                                </div>
-                                {f}
-                            </li>
-                        ))}
-                    </ul>
-
-                    {/* Stats */}
-                    <div style={{ display: isNarrow ? 'none' : 'flex', gap: '0', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '28px' }}>
-                        {stats.map((s, i) => (
-                            <div key={s.label} style={{
-                                flex: 1,
-                                display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
-                                paddingRight: i < stats.length - 1 ? '24px' : '0',
-                                borderRight: i < stats.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
-                                paddingLeft: i > 0 ? '24px' : '0',
-                            }}>
-                                <s.icon size={16} color="#14B8A6" style={{ marginBottom: '8px', opacity: 0.8 }} />
-                                <div style={{ fontSize: '22px', fontWeight: 900, color: '#F8FAFC', lineHeight: 1 }}>{s.value}</div>
-                                <div style={{ fontSize: '11px', color: '#94A3B8', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', marginTop: '4px' }}>{s.label}</div>
-                            </div>
-                        ))}
-                    </div>
                 </div>
-
-                {/* Footer note */}
-                <div style={{ position: 'relative', zIndex: 1, color: '#94A3B8', fontSize: '11px', letterSpacing: '1px', display: isNarrow ? 'none' : 'block' }}>
-                    © 2025 Clyro Talent · AI-Powered Talent Intelligence
-                </div>
-            </div>
-
-            {/* ── RIGHT PANEL ── */}
-            <div style={{
-                flex: 1,
-                backgroundColor: '#F8FAFC',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: '48px 40px',
-                overflowY: 'auto',
-            }}>
-                <div style={{ width: '100%', maxWidth: '420px' }}>
-                    {/* Header */}
-                    <div style={{ marginBottom: '36px' }}>
-                        <h2 style={{ fontSize: '26px', fontWeight: 800, color: '#0F172A', marginBottom: '8px', letterSpacing: '-0.5px' }}>
-                            {mode === 'login' ? 'Hoş Geldiniz' : 'Hesap Oluşturun'}
-                        </h2>
-                        <p style={{ color: '#64748B', fontSize: '14px', lineHeight: '1.5' }}>
-                            {mode === 'login'
-                                ? 'Platforma erişmek için bilgilerinizi girin.'
-                                : 'Davetiyenizle yeni hesabınızı oluşturun.'}
-                        </p>
-                    </div>
-
-                    {/* Error / Info Alert */}
-                    {error && (() => {
-                        const isEmailInUse = error.startsWith('__EMAIL_IN_USE__');
-                        const isReinvite = error.startsWith('__EMAIL_REINVITE__');
-                        const displayMsg = isEmailInUse
-                            ? error.replace('__EMAIL_IN_USE__', '')
-                            : isReinvite
-                            ? error.replace('__EMAIL_REINVITE__', '')
-                            : error;
-                        if (isReinvite) {
-                            return (
-                                <div style={{
-                                    display: 'flex', alignItems: 'flex-start', gap: '10px',
-                                    padding: '12px 14px', borderRadius: '10px', marginBottom: '20px',
-                                    backgroundColor: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)',
-                                    color: '#059669', fontSize: '13px'
-                                }}>
-                                    <CheckCircle size={15} style={{ flexShrink: 0, marginTop: '1px' }} />
-                                    <span style={{ flex: 1 }}>
-                                        {displayMsg}
-                                        <button
-                                            type="button"
-                                            onClick={() => { setMode('login'); }}
-                                            style={{
-                                                display: 'block', marginTop: '8px',
-                                                background: 'none', border: 'none', padding: 0,
-                                                color: '#0F766E', fontSize: '13px', fontWeight: 700,
-                                                cursor: 'pointer', textDecoration: 'underline'
-                                            }}
-                                        >
-                                            → Şifremi belirledim, giriş yapayım
-                                        </button>
-                                    </span>
-                                </div>
-                            );
-                        }
-                        return (
-                            <div style={{
-                                display: 'flex', alignItems: 'flex-start', gap: '10px',
-                                padding: '12px 14px', borderRadius: '10px', marginBottom: '20px',
-                                backgroundColor: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
-                                color: '#EF4444', fontSize: '13px'
-                            }}>
-                                <AlertCircle size={15} style={{ flexShrink: 0, marginTop: '1px' }} />
-                                <span style={{ flex: 1 }}>
-                                    {displayMsg}
-                                    {isEmailInUse && (
-                                        <button
-                                            type="button"
-                                            onClick={() => { setMode('login'); }}
-                                            style={{
-                                                display: 'block', marginTop: '8px',
-                                                background: 'none', border: 'none', padding: 0,
-                                                color: '#0F766E', fontSize: '13px', fontWeight: 700,
-                                                cursor: 'pointer', textDecoration: 'underline'
-                                            }}
-                                        >
-                                            → Giriş ekranına geç
-                                        </button>
-                                    )}
-                                </span>
-                            </div>
-                        );
-                    })()}
-
-                    {/* Success Alert */}
-                    {success && (
-                        <div style={{
-                            display: 'flex', alignItems: 'flex-start', gap: '10px',
-                            padding: '12px 14px', borderRadius: '10px', marginBottom: '20px',
-                            backgroundColor: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)',
-                            color: '#10B981', fontSize: '13px'
-                        }}>
-                            <CheckCircle size={15} style={{ flexShrink: 0, marginTop: '1px' }} />
-                            <span>{success}</span>
-                        </div>
-                    )}
-
-                    {/* Form */}
-                    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        {/* Name — register only */}
-                        {mode === 'register' && (
-                            <div>
-                                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#1E293B', marginBottom: '6px' }}>
-                                    Görünen Ad
-                                </label>
-                                <div style={{ position: 'relative' }}>
-                                    <User size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
-                                    <input
-                                        type="text"
-                                        required
-                                        value={name}
-                                        onChange={(e) => setName(e.target.value)}
-                                        placeholder="Ad Soyad"
-                                        style={inputStyle}
-                                        onFocus={handleFocus}
-                                        onBlur={handleBlur}
-                                        autoComplete="name"
-                                    />
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Demo kurulumunda alanlar hazır dolu geliyor; ziyaretçi
-                            bunu görmeden formu doldurmaya çalışabilir. */}
-                        {HAS_DEMO_LOGIN && (
-                            <div style={{
-                                background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '8px',
-                                padding: '10px 12px', fontSize: '12px', color: '#1E40AF', lineHeight: 1.5,
-                            }}>
-                                Demo hesabı hazır — <strong>Sisteme Giriş Yap</strong>'a basmanız yeterli.
-                            </div>
-                        )}
-
-                        {/* Email */}
-                        <div>
-                            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#1E293B', marginBottom: '6px' }}>
-                                E-posta Adresi
-                            </label>
-                            <div style={{ position: 'relative' }}>
-                                <Mail size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
-                                <input
-                                    type="email"
-                                    required
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    placeholder="ornek@sirket.com"
-                                    style={inputStyle}
-                                    onFocus={handleFocus}
-                                    onBlur={handleBlur}
-                                    autoComplete="email"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Password */}
-                        <div>
-                            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#1E293B', marginBottom: '6px' }}>
-                                Şifre
-                            </label>
-                            <div style={{ position: 'relative' }}>
-                                <Lock size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
-                                <input
-                                    type="password"
-                                    required
-                                    minLength={6}
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    placeholder="••••••••"
-                                    style={inputStyle}
-                                    onFocus={handleFocus}
-                                    onBlur={handleBlur}
-                                    autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                                />
-                            </div>
-                        </div>
-
-                        {/* Submit */}
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            style={{
-                                width: '100%', height: '50px', borderRadius: '10px',
-                                background: loading ? '#94A3B8' : 'linear-gradient(135deg, #14B8A6 0%, #0F766E 100%)',
-                                color: '#fff', fontWeight: 700, fontSize: '14px',
-                                letterSpacing: '0.3px', border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                                marginTop: '4px',
-                                boxShadow: loading ? 'none' : '0 8px 24px rgba(20,184,166,0.28)',
-                                transition: 'opacity 0.2s',
-                            }}
-                            onMouseEnter={e => { if (!loading) e.currentTarget.style.opacity = '0.9'; }}
-                            onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}
-                        >
-                            {loading ? (
-                                <Loader2 size={18} className="animate-spin" />
-                            ) : (
-                                <>
-                                    <LogIn size={16} />
-                                    {mode === 'login' ? 'Sisteme Giriş Yap' : 'Hesap Oluştur'}
-                                </>
-                            )}
-                        </button>
-                    </form>
-
-                    {/* Divider */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '24px 0' }}>
-                        <div style={{ flex: 1, height: '1px', backgroundColor: '#E2E8F0' }} />
-                        <span style={{ color: '#94A3B8', fontSize: '11px', fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
-                            {mode === 'register' ? 'veya Google ile hızlı giriş' : 'Güvenli Kimlik Doğrulama'}
-                        </span>
-                        <div style={{ flex: 1, height: '1px', backgroundColor: '#E2E8F0' }} />
-                    </div>
-
-                    {/* Google SSO */}
-                    {/* DEMO: Google sağlayıcısı demo projesinde kapalı; düğmeyi bırakmak
-                        tıklayan herkese auth/operation-not-allowed hatası verirdi. */}
-                    {!IS_DEMO && (
-                    <button
-                        type="button"
-                        onClick={loginWithGoogle}
-                        style={{
-                            width: '100%', height: '48px', borderRadius: '10px',
-                            backgroundColor: '#FFFFFF', border: '1.5px solid #E2E8F0',
-                            color: '#1E293B', fontWeight: 600, fontSize: '14px',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
-                            cursor: 'pointer', transition: 'background-color 0.15s, border-color 0.15s',
-                        }}
-                        onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#F1F5F9'; e.currentTarget.style.borderColor = '#CBD5E1'; }}
-                        onMouseLeave={e => { e.currentTarget.style.backgroundColor = '#FFFFFF'; e.currentTarget.style.borderColor = '#E2E8F0'; }}
-                    >
-                        <svg viewBox="0 0 24 24" style={{ width: '18px', height: '18px' }} xmlns="http://www.w3.org/2000/svg">
-                            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-                            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
-                            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-                        </svg>
-                        {mode === 'register' ? 'Google ile Kayıt Ol (İsteğe Bağlı)' : 'Google ile Giriş Yap'}
-                    </button>
-                    )}
-
-                    {/* Toggle mode */}
-                    <div style={{ marginTop: '28px', textAlign: 'center' }}>
-                        <button
-                            type="button"
-                            onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setSuccess(null); }}
-                            style={{
-                                background: 'none', border: 'none', cursor: 'pointer',
-                                fontSize: '13px', color: '#64748B', display: 'inline-flex', alignItems: 'center', gap: '4px',
-                            }}
-                            onMouseEnter={e => e.currentTarget.style.color = '#0F766E'}
-                            onMouseLeave={e => e.currentTarget.style.color = '#64748B'}
-                        >
-                            {mode === 'login' ? 'Hesabınız yok mu? Kayıt olun' : 'Zaten üye misiniz? Giriş yapın'}
-                            <ArrowRight size={13} />
-                        </button>
-                    </div>
-
-                    {/* Giriş yapamayan ziyaretçi de ürünün ne yaptığını görebilsin:
-                        tanıtım sayfası herkese açık ve hiçbir veri okumuyor. */}
-                    <div style={{ marginTop: '10px', textAlign: 'center' }}>
-                        <a
-                            href="/nasil-calisir"
-                            style={{ fontSize: '12px', color: '#94A3B8', textDecoration: 'none' }}
-                            onMouseEnter={e => e.currentTarget.style.color = '#0F766E'}
-                            onMouseLeave={e => e.currentTarget.style.color = '#94A3B8'}
-                        >
-                            Clyro Talent nasıl çalışıyor?
-                        </a>
-                    </div>
-                </div>
+                {error && <p className="text-[12px] text-bad-text">{error}</p>}
+                <button type="button" onClick={loginWithHub} className="w-full tf-btn tf-btn-primary justify-center">
+                    <LogIn className="w-4 h-4" /> Clyro Hub ile giriş yap
+                </button>
+                {PASSWORD_FORM && <PasswordForm />}
             </div>
         </div>
     );

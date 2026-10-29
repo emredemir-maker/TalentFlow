@@ -1,7 +1,7 @@
 // Şirket bilgisi uçları (K6) — ortak platform önbelleği + şirkete özel elle
 // doğrulama. Gerekçe: services/companyIntel.js.
 //
-//   POST   /api/company-intel/resolve  {name, force?} — önce bu şirketin elle
+//   POST   /api/company-intel/resolve  {name, force?, cacheOnly?} — önce bu şirketin elle
 //          girdiği kayıt, sonra ortak önbellek, yoksa sunucuda kaynaklı arama.
 //   PUT    /api/company-intel/manual   {name, record} — elle doğrulama (yalnız
 //          bu şirkette görünür).
@@ -44,7 +44,14 @@ export function idFromName(name) {
     return id ? { key, id } : null;
 }
 
-router.post('/api/company-intel/resolve', aiLimiter, requireTenant(WRITER_ROLES), async (req, res) => {
+// Yalnız önbellek okuması (cacheOnly) AI çağrısı yapmaz: AI kotasına (aiLimiter)
+// sayılmaz — bir doğrulama raporu şirket başına bir okuma yapıyor ve kota
+// dolunca okumalar "önbellekte yok" sayılırdı. Genel istek sınırı
+// (generalLimiter, server.js) yine geçerli.
+const aiLimiterUnlessCacheOnly = (req, res, next) =>
+    req.body?.cacheOnly === true ? next() : aiLimiter(req, res, next);
+
+router.post('/api/company-intel/resolve', aiLimiterUnlessCacheOnly, requireTenant(WRITER_ROLES), async (req, res) => {
     const ref = idFromName(req.body?.name);
     if (!ref) return res.status(400).json({ error: 'Şirket adı gerekli.' });
     const force = req.body?.force === true;
@@ -66,6 +73,9 @@ router.post('/api/company-intel/resolve', aiLimiter, requireTenant(WRITER_ROLES)
             const c = cached.data();
             return res.json({ key: ref.key, source: 'cache', answer: c.answer, resolvedAt: c.resolvedAt });
         }
+        // Yalnız önbellek sorulduysa canlı aramaya düşülmez (istemci canlı
+        // arama tavanını kendisi sayıyor).
+        if (req.body?.cacheOnly === true) return res.json({ key: ref.key, source: 'miss' });
 
         // 3) Canlı, kaynaklı arama — sorgu sunucuda ve ANAHTARDAN kurulur: aynı
         // anahtarın istemi her zaman aynı, ham addaki (anahtara girmeyen, ör.

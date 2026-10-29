@@ -12,8 +12,9 @@ import {
     CheckCircle, Loader2, LayoutTemplate, Variable
 } from 'lucide-react';
 import { invalidateTemplateCache } from '../utils/templateService';
+import { tc } from '../config/tenantPaths';
 
-const SETTINGS_PATH = 'artifacts/talent-flow/public/data/settings';
+const SETTINGS_PATH = () => tc('settings');
 
 // ─── Template types ───────────────────────────────────────────────────────────
 const TEMPLATE_TYPES = [
@@ -471,8 +472,8 @@ export default function EmailTemplateEditorPage() {
         const load = async () => {
             try {
                 const [brandingSnap, templatesSnap] = await Promise.all([
-                    getDoc(doc(db, SETTINGS_PATH, 'branding')),
-                    getDoc(doc(db, SETTINGS_PATH, 'emailTemplates')),
+                    getDoc(doc(db, SETTINGS_PATH(), 'branding')),
+                    getDoc(doc(db, SETTINGS_PATH(), 'emailTemplates')),
                 ]);
                 if (brandingSnap.exists()) setBranding(brandingSnap.data());
 
@@ -592,7 +593,7 @@ export default function EmailTemplateEditorPage() {
                     updatedAt: new Date().toISOString(),
                 };
             });
-            await setDoc(doc(db, SETTINGS_PATH, 'emailTemplates'), toSave, { merge: true });
+            await setDoc(doc(db, SETTINGS_PATH(), 'emailTemplates'), toSave, { merge: true });
             invalidateTemplateCache();
             setSaveStatus('success');
             setTimeout(() => setSaveStatus('idle'), 2500);

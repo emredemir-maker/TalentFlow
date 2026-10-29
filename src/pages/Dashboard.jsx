@@ -34,6 +34,7 @@ import {
     Check,
     AlertTriangle,
 } from 'lucide-react';
+import { tc, withTenantParam } from '../config/tenantPaths';
 
 /**
  * Renders a KPI delta with semantically-correct arrow direction and colour.
@@ -196,7 +197,7 @@ export default function Dashboard() {
     const [sessionStatuses, setSessionStatuses] = useState({});
     useEffect(() => {
         const unsubscribe = onSnapshot(
-            collection(db, 'interviews'),
+            collection(db, tc('interviews')),
             (snap) => {
                 const map = {};
                 snap.forEach(docSnap => { map[docSnap.id] = docSnap.data().status; });
@@ -402,9 +403,9 @@ export default function Dashboard() {
     const rowActionFor = (c) => {
         const sessions = Array.isArray(c.interviewSessions) ? c.interviewSessions : [];
         const live = sessions.find(s => (sessionStatuses[s.id] || s.status) === 'live');
-        if (live) return { label: 'Katıl', onClick: () => navigate(`/live-interview/${live.id}`) };
+        if (live) return { label: 'Katıl', onClick: () => navigate(withTenantParam(`/live-interview/${live.id}`)) };
         const done = sessions.find(s => isSessionDone(s, sessionStatuses[s.id] || s.status));
-        if (done) return { label: 'Rapor', onClick: () => navigate(`/interview-report/${done.id}`) };
+        if (done) return { label: 'Rapor', onClick: () => navigate(withTenantParam(`/interview-report/${done.id}`)) };
         return { label: 'İncele', onClick: () => openCandidate(c.id) };
     };
 
@@ -507,16 +508,16 @@ export default function Dashboard() {
     /** Mülakat satırının tıklaması — eski "Yaklaşan mülakatlar" zinciri aynen. */
     const openSession = async (s) => {
         const effComp = isSessionDone(s, s.status);
-        if (effComp) { navigate(`/interview-report/${s.id}`); return; }
+        if (effComp) { navigate(withTenantParam(`/interview-report/${s.id}`)); return; }
         try {
-            const snap = await getDoc(doc(db, 'interviews', s.id));
+            const snap = await getDoc(doc(db, tc('interviews'), s.id));
             if (snap.exists() && snap.data()?.status === 'completed') {
-                navigate(`/interview-report/${s.id}`);
+                navigate(withTenantParam(`/interview-report/${s.id}`));
             } else {
-                navigate(`/live-interview/${s.id}`);
+                navigate(withTenantParam(`/live-interview/${s.id}`));
             }
         } catch {
-            navigate(`/live-interview/${s.id}`);
+            navigate(withTenantParam(`/live-interview/${s.id}`));
         }
     };
 

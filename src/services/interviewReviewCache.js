@@ -15,6 +15,7 @@
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 import { db } from '../config/firebase';
+import { tc } from '../config/tenantPaths';
 
 /**
  * Çerçevenin parmak izi (djb2).
@@ -34,7 +35,7 @@ export function reviewFingerprint(summary) {
 function cacheRef(uid, fingerprint) {
     if (!db) throw new Error('Firestore yapılandırılmamış.');
     if (!uid) throw new Error('Oturum bilgisi çözümlenemedi.');
-    return doc(db, `artifacts/talent-flow/public/data/users/${uid}/assistantReviews/${fingerprint}`);
+    return doc(db, `${tc('members')}/${uid}/assistantReviews/${fingerprint}`);
 }
 
 /** Saklanmış yorum; yoksa null. */

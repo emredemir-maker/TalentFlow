@@ -1,7 +1,7 @@
 // Asistan sohbetinin kalıcı hâli.
 //
 // Sohbet kullanıcının kendi alt koleksiyonunda duruyor:
-//   artifacts/talent-flow/public/data/users/{uid}/assistantChats/current
+//   tenants/{tenantId}/members/{uid}/assistantChats/current
 //
 // Bu yol firestore.rules'ta ZATEN kapalı — `users/{userId}/{allChildren=**}`
 // yalnızca o kullanıcıya (ve super_admin'e) okuma/yazma veriyor. Yeni kural
@@ -15,13 +15,14 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 import { db } from '../config/firebase';
 import { serializeTurns } from '../utils/assistantContext';
+import { tc } from '../config/tenantPaths';
 
 const CHAT_ID = 'current';
 
 function chatRef(uid) {
     if (!db) throw new Error('Firestore yapılandırılmamış.');
     if (!uid) throw new Error('Oturum bilgisi çözümlenemedi.');
-    return doc(db, `artifacts/talent-flow/public/data/users/${uid}/assistantChats/${CHAT_ID}`);
+    return doc(db, `${tc('members')}/${uid}/assistantChats/${CHAT_ID}`);
 }
 
 /**

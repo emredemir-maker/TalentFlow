@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { roleLabel } from '../utils/roles';
+import TenantSwitcher from './TenantSwitcher';
 import TalentInnLogo, { TIIconMark } from './TalentInnLogo';
 
 export default function Sidebar({
@@ -143,7 +144,7 @@ export default function Sidebar({
                         {adminItems.map(item => <MenuItem key={item.id} item={item} />)}
                     </div>
 
-                    {userProfile?.role === 'super_admin' && (
+                    {userProfile?.role === 'admin' && (
                         <div className="pt-5 space-y-0.5">
                             <h5 className={`text-[12px] text-n500 font-medium px-3 pb-1 ${sectionHeaderClass}`}>
                                 Geliştirici
@@ -155,6 +156,8 @@ export default function Sidebar({
 
                 {/* Bottom Profile Section */}
                 <div className={`p-3 ${collapsed ? 'lg:px-2' : ''}`}>
+                    {/* Birden çok şirkette üyeyse şirket seçici. */}
+                    <TenantSwitcher className={`mb-2 ${collapsed ? 'lg:hidden' : ''}`} />
                     <div className={`flex items-center gap-2 px-2 py-2 ${collapsed ? 'lg:justify-center lg:px-0' : ''}`}>
                         <div className="w-8 h-8 rounded-full bg-brand-50 overflow-hidden shrink-0">
                              {userProfile?.imgUrl ? (

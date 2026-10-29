@@ -5,6 +5,16 @@ import { AuthProvider } from './context/AuthContext';
 import App from './App';
 import ErrorBoundary from './components/ErrorBoundary';
 import './index.css';
+import { installTenantFetch } from './services/tenantFetch';
+import { setActiveTenantId, tenantFromLocation } from './config/tenantPaths';
+import { isPublicPath } from './context/AuthContext';
+
+// Kendi API'mize giden isteklere etkin şirket başlığı (X-Tenant-Id).
+installTenantFetch();
+
+// Aday sayfaları şirketi bağlantıdan alır (?tenantId=…, PR 5'e kadar). İlk
+// çizimden ÖNCE: sayfanın ilk okuması şirket yolunu kullanıyor.
+if (isPublicPath()) setActiveTenantId(tenantFromLocation());
 
 const container = document.getElementById('root');
 if (!container) {

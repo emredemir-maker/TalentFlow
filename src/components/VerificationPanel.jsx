@@ -20,7 +20,7 @@ import {
 
 import { useDegisince } from '../utils/useDegisince';
 import { verifyCandidate, buildVerificationSummary, buildStoredReport } from '../services/cvVerification';
-import { saveManualCompanyIntel, clearManualCompanyIntel, companyKey } from '../services/companyIntelStore';
+import { saveManualCompanyIntel, clearManualCompanyIntel } from '../services/companyIntelStore';
 import { buildManualCompanyRecord, formFromRecord, isManualRecord } from '../utils/manualCompanyIntel';
 import ManualCompanyForm from './ManualCompanyForm';
 import { useAuth } from '../context/AuthContext';
@@ -494,12 +494,12 @@ export default function VerificationPanel({ candidate, position = null }) {
             // aynı güvende değil ve raporu okuyan bunu görmeli.
             research,
         });
-        await saveManualCompanyIntel(companyKey(company), record);
+        await saveManualCompanyIntel(company, record);
         await run(false);
     }, [run, user, userProfile]);
 
     const removeManual = useCallback(async (company) => {
-        await clearManualCompanyIntel(companyKey(company));
+        await clearManualCompanyIntel(company);
         // Kayıt silindi; şirket artık önbellekte yok. Yeniden değerlendirme
         // onu sıfırdan çözümleyecek — elle girilen bilgi geri gelmez.
         await run(false);

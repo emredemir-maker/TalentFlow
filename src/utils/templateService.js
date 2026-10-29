@@ -5,8 +5,9 @@
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { buildInterviewInviteEmail, buildRescheduleEmail, buildParticipantNotificationEmail, buildFeedbackEmail, buildInfoRequestEmail, buildInterviewConfirmationEmail } from './emailTemplates';
+import { tc } from '../config/tenantPaths';
 
-const SETTINGS_PATH = 'artifacts/talent-flow/public/data/settings';
+const SETTINGS_PATH = () => tc('settings');
 
 let _templateCache = null;
 let _cacheTs = 0;
@@ -15,7 +16,7 @@ const CACHE_TTL = 60_000; // 1 minute
 async function loadTemplates() {
     if (_templateCache && Date.now() - _cacheTs < CACHE_TTL) return _templateCache;
     try {
-        const snap = await getDoc(doc(db, SETTINGS_PATH, 'emailTemplates'));
+        const snap = await getDoc(doc(db, SETTINGS_PATH(), 'emailTemplates'));
         _templateCache = snap.exists() ? snap.data() : {};
     } catch {
         _templateCache = {};

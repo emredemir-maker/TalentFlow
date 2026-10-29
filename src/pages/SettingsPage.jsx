@@ -10,7 +10,6 @@ import {
 } from 'lucide-react';
 import { connectGoogleWorkspace, disconnectGoogleWorkspace } from '../services/integrationService';
 import { connectMicrosoftWorkspace, disconnectMicrosoftWorkspace } from '../services/microsoftIntegrationService';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 
 import SourceManagementPage from './SourceManagementPage';
 import DepartmentManagementPage from './DepartmentManagementPage';
@@ -72,7 +71,7 @@ export default function SettingsPage({ initialTab }) {
     const [hasSavedGeminiKey, setHasSavedGeminiKey] = useState(false);
     const [savedKeyLast4, setSavedKeyLast4] = useState(null);
 
-    const isSuperAdmin = userProfile?.role === 'super_admin';
+    const isSuperAdmin = userProfile?.role === 'admin';
 
     useEffect(() => {
         if (!isSuperAdmin || !user) return;

@@ -5,17 +5,36 @@
 // buradaki testlerin çoğu "kaç canlı arama yapıldı" sayıyor.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+// Önbellek artık sunucuda (K6): istemci /api/company-intel/* çağırır. Testler
+// sunucuyu fetch düzeyinde taklit ediyor; `getDoc` "sunucunun önbellekte
+// bulduğu kayıt", `setDoc`/`deleteDoc` "elle kayıt uçları" yerine geçiyor.
 const getDoc = vi.fn();
 const setDoc = vi.fn();
 const deleteDoc = vi.fn();
 
-vi.mock('firebase/firestore', () => ({
-    doc: (_db, path, id) => ({ path, id }),
-    getDoc: (...args) => getDoc(...args),
-    setDoc: (...args) => setDoc(...args),
-    deleteDoc: (...args) => deleteDoc(...args),
-}));
-vi.mock('../config/firebase', () => ({ db: {} }));
+vi.mock('./ai/config', () => ({ getAuthHeaders: async () => ({ Authorization: 'Bearer t' }) }));
+
+const fetchMock = vi.fn(async (url, init) => {
+    const body = JSON.parse(init.body);
+    const ok = (data) => ({ ok: true, status: 200, json: async () => data });
+    if (url.endsWith('/resolve') && body.cacheOnly) {
+        const snap = await getDoc(body.name);
+        if (!snap.exists()) return ok({ source: 'miss' });
+        const data = snap.data();
+        if (data.source === 'manual') return ok({ source: 'manual', record: data });
+        return ok({ source: 'cache', answer: { text: '', sources: [{ uri: 'https://x' }] }, resolvedAt: data.resolvedAt });
+    }
+    if (url.endsWith('/manual') && init.method === 'PUT') {
+        await setDoc(body.name, body.record);
+        return ok({ success: true });
+    }
+    if (url.endsWith('/manual') && init.method === 'DELETE') {
+        await deleteDoc(body.name);
+        return ok({ success: true });
+    }
+    throw new Error(`beklenmeyen çağrı ${url}`);
+});
+vi.stubGlobal('fetch', fetchMock);
 
 const {
     docIdFor, isFresh, resolveCompanies, readCompanyIntel,
@@ -31,6 +50,7 @@ const hit = (data) => ({ exists: () => true, data: () => data });
 
 beforeEach(() => {
     getDoc.mockReset();
+    fetchMock.mockClear();
     setDoc.mockReset();
     deleteDoc.mockReset();
     getDoc.mockResolvedValue(miss());
@@ -94,11 +114,18 @@ describe('resolveCompanies', () => {
         expect(r.looked).toBe(0);
     });
 
-    it('searches and writes back on a miss', async () => {
+    it('searches on a miss (the server writes the shared cache)', async () => {
         const r = await resolveCompanies(companies, { resolve });
         expect(resolve).toHaveBeenCalledTimes(2);
-        expect(setDoc).toHaveBeenCalledTimes(2);
+        // İstemci ortak önbelleğe yazmaz (K6).
+        expect(setDoc).not.toHaveBeenCalled();
         expect(r.looked).toBe(2);
+    });
+
+    it('aday bağlamı (hint) sunucuya gönderilmez', async () => {
+        await resolveCompanies(companies, { resolve, hint: 'İzmir, Yazılımcı' });
+        const bodies = fetchMock.mock.calls.map(([, init]) => init.body).join(' ');
+        expect(bodies).not.toContain('İzmir');
     });
 
     it('re-searches a stale record', async () => {
@@ -208,12 +235,11 @@ describe('elle doğrulanan şirket kaydı', () => {
         expect(out.looked).toBe(1);
     });
 
-    it('kaydederken MERGE KULLANILMIYOR — melez kayıt oluşmasın', async () => {
-        await saveManualCompanyIntel('delta yazilim', manuel());
+    it('elle kayıt sunucunun şirkete özel ucuna gider (kaydın tamamı)', async () => {
+        await saveManualCompanyIntel('Delta Yazılım', manuel());
         expect(setDoc).toHaveBeenCalledTimes(1);
-        // Üçüncü argüman (merge seçeneği) verilmemiş olmalı.
-        expect(setDoc.mock.calls[0][2]).toBeUndefined();
-        expect(setDoc.mock.calls[0][1].key).toBe('delta yazilim');
+        expect(setDoc.mock.calls[0][0]).toBe('Delta Yazılım');
+        expect(setDoc.mock.calls[0][1].source).toBe('manual');
     });
 
     it('kaydetme hatası YUTULMUYOR — kullanıcı formu doldurdu, bilmeli', async () => {
@@ -221,10 +247,10 @@ describe('elle doğrulanan şirket kaydı', () => {
         await expect(saveManualCompanyIntel('delta yazilim', manuel())).rejects.toThrow('izin yok');
     });
 
-    it('kaldırma dokümanı tamamen siliyor', async () => {
-        await clearManualCompanyIntel('delta yazilim');
+    it('kaldırma sunucuya gidiyor', async () => {
+        await clearManualCompanyIntel('Delta Yazılım');
         expect(deleteDoc).toHaveBeenCalledTimes(1);
-        expect(deleteDoc.mock.calls[0][0].id).toBe('delta-yazilim');
+        expect(deleteDoc.mock.calls[0][0]).toBe('Delta Yazılım');
     });
 
     it('geçersiz şirket adı sessizce başarılı sayılmıyor', async () => {

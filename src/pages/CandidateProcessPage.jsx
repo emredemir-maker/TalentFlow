@@ -22,7 +22,7 @@ import { formatBytes, totalBytes, oversizedFiles, MAX_SOURCE_BYTES, MAX_SOURCES 
 import { uploadBulkSources } from '../services/bulkStorageUpload';
 import { getFeedbackEmail } from '../utils/templateService';
 import { db } from '../config/firebase';
-import { doc, getDoc, getDocs, onSnapshot, setDoc, serverTimestamp, collection, query, where } from 'firebase/firestore';
+import { doc, getDoc, getDocs, onSnapshot, collection, query, where } from 'firebase/firestore';
 import Header from '../components/Header';
 import SystemScanner from '../components/SystemScanner';
 import AddCandidateModal from '../components/AddCandidateModal';
@@ -48,6 +48,7 @@ import {
     Sparkles, Trash2, RefreshCw, Layers, TrendingUp, Upload, FileQuestion, AlertTriangle,
     Users
 } from 'lucide-react';
+import { tc, withTenantParam } from '../config/tenantPaths';
 
 
 const STATUS_CONFIG = {
@@ -174,7 +175,7 @@ export default function CandidateProcessPage() {
     // Branding — loaded once from Firestore for email template generation
     const [branding, setBranding] = useState({ companyName: 'Clyro Talent', primaryColor: '#0F766E' });
     useEffect(() => {
-        getDoc(doc(db, 'artifacts/talent-flow/public/data/settings', 'branding'))
+        getDoc(doc(db, tc('settings'), 'branding'))
             .then(snap => { if (snap.exists()) setBranding(snap.data()); })
             .catch(() => {});
     }, []);
@@ -242,7 +243,7 @@ export default function CandidateProcessPage() {
         };
         const unsubs = bulkJobIds.map((jobId) =>
             onSnapshot(
-                doc(db, `artifacts/talent-flow/public/data/bulkImportJobs/${jobId}`),
+                doc(db, `${tc('bulkImportJobs')}/${jobId}`),
                 (snap) => {
                     // Silinmiş/bulunamayan job takibi kilitlemesin — sıfır
                     // katkılı "tamamlanmış" sayılır.
@@ -312,7 +313,7 @@ export default function CandidateProcessPage() {
                 // Single-field query (auto-indexed); status filtered client-side
                 // to avoid needing a composite Firestore index.
                 const snap = await getDocs(query(
-                    collection(db, 'artifacts/talent-flow/public/data/bulkImportJobs'),
+                    collection(db, tc('bulkImportJobs')),
                     where('createdBy', '==', user.uid)
                 ));
                 const active = snap.docs
@@ -513,28 +514,9 @@ export default function CandidateProcessPage() {
         if (!candidate?.email) { alert('Adayın email adresi bulunamadı.'); return; }
         setInfoSending(true);
         try {
-            // Adayın açacağı bağlantı. Dağıtımda VITE_APP_URL proje kimliğinden
-            // türetilerek veriliyor; yerelde/önizlemede sayfanın kendi kökeni.
-            const APP_URL = import.meta.env.VITE_APP_URL || window.location.origin;
-            const requestId = `ir-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-            const respondUrl = `${APP_URL}/respond/${requestId}?type=info`;
-
-            // Write the record from the client (Firebase client SDK always has auth)
-            await setDoc(doc(db, `artifacts/talent-flow/public/data/infoRequests/${requestId}`), {
-                requestId,
-                candidateId: candidate.id || null,
-                sessionId: candidate.sessionId || null,
-                candidateEmail: candidate.email,
-                candidateName: candidate.name,
-                recruiterName: userProfile?.displayName || userProfile?.name || user?.email || '',
-                recruiterEmail: user?.email || '',
-                position: candidate.matchedPositionTitle || candidate.position || '',
-                requestMessage: infoMessage,
-                requestedItems: infoItems,
-                status: 'pending',
-                createdAt: serverTimestamp(),
-            });
-
+            // Talep kaydını ve adayın bağlantısını SUNUCU üretir (kimlik
+            // sunucuda; ortak gelen kutusunda başka şirketin kimliği
+            // kopyalanamasın) — istemci kayıt yazmaz.
             const API_BASE = import.meta.env.VITE_SERVER_URL || '';
             const token = await user?.getIdToken?.() || '';
             const res = await fetch(`${API_BASE}/api/send-info-request`, {
@@ -550,8 +532,6 @@ export default function CandidateProcessPage() {
                     requestedItems: infoItems,
                     candidateId: candidate.id || null,
                     sessionId: candidate.sessionId || null,
-                    requestId,
-                    respondUrl,
                 }),
             });
             if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Bilgi talebi gönderilemedi.'); }
@@ -816,7 +796,7 @@ export default function CandidateProcessPage() {
         if (!candidate?.id) { setCandidateInfoReqs([]); return; }
         setInfoReqsLoading(true);
         const q = query(
-            collection(db, 'artifacts/talent-flow/public/data/infoRequests'),
+            collection(db, tc('infoRequests')),
             where('candidateId', '==', candidate.id)
         );
         const unsub = onSnapshot(q, snap => {
@@ -1950,7 +1930,7 @@ export default function CandidateProcessPage() {
                                                         ? ({ children, ...props }) => (
                                                             <button
                                                                 {...props}
-                                                                onClick={() => navigate(`/interview-report/${session.id}`)}
+                                                                onClick={() => navigate(withTenantParam(`/interview-report/${session.id}`))}
                                                                 className="w-full text-left group cursor-pointer"
                                                             >
                                                                 {children}
@@ -2013,7 +1993,7 @@ export default function CandidateProcessPage() {
                                                                 <div className="flex items-center gap-2 shrink-0">
                                                                     {isLive && (
                                                                         <button
-                                                                            onClick={e => { e.stopPropagation(); navigate(`/live-interview/${session.id}`); }}
+                                                                            onClick={e => { e.stopPropagation(); navigate(withTenantParam(`/live-interview/${session.id}`)); }}
                                                                             className="bg-bad text-white px-4 py-1.5 rounded-md text-[11px] font-semibold uppercase tracking-[0.08em] hover:bg-bad transition-all shadow-sm animate-pulse"
                                                                         >
                                                                             SEANSA KATIL

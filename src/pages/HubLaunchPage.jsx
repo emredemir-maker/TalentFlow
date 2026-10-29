@@ -7,6 +7,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signInWithCustomToken } from 'firebase/auth';
 import { auth } from '../config/firebase';
+import { HUB_TENANT_KEY } from '../context/AuthContext';
+import { isValidTenantId } from '../config/tenantPaths';
 
 // Alan adı değişince VITE_HUB_INN_URL ile.
 const HUB_INN_URL = import.meta.env.VITE_HUB_INN_URL || 'https://agentinn-nyqpx.web.app';
@@ -19,6 +21,15 @@ async function exchangeCode(code) {
     });
     const body = await res.json().catch(() => null);
     if (!res.ok || !body?.token) throw new Error(body?.error || "Hub-Inn'e ulaşılamadı.");
+    // Hub hangi şirketten açıldığını dönerse (PR 4) o şirket seçilir.
+    const hubTenant = body?.tenant?.id;
+    if (isValidTenantId(hubTenant)) {
+        try {
+            sessionStorage.setItem(HUB_TENANT_KEY, hubTenant);
+        } catch {
+            /* özel mod */
+        }
+    }
     return body.token;
 }
 
@@ -47,7 +58,7 @@ export default function HubLaunchPage() {
                 {error ? (
                     <>
                         <p className="text-slate-800">{error}</p>
-                        <p className="text-sm text-slate-500">Hub-Inn'den yeniden açabilir ya da buradan giriş yapabilirsiniz.</p>
+                        <p className="text-sm text-slate-500">Clyro Hub'dan Talent'ı yeniden açın.</p>
                         <a href="/" className="text-sm text-indigo-600 underline">Giriş ekranına git</a>
                     </>
                 ) : (

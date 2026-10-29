@@ -8,6 +8,7 @@ import { resolveCandidateStage } from '../utils/candidateTable';
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, where, getDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from './AuthContext';
+import { tc, getActiveTenantId } from '../config/tenantPaths';
 
 const CandidatesContext = createContext(null);
 
@@ -18,7 +19,7 @@ const CandidatesContext = createContext(null);
  */
 const FIRST_SNAPSHOT_TIMEOUT_MS = 12000;
 
-const CANDIDATES_COLLECTION = 'artifacts/talent-flow/public/data/candidates';
+const CANDIDATES_COLLECTION = () => tc('candidates');
 
 export function CandidatesProvider({ children }) {
     const { isAuthenticated, loading: authLoading, isDepartmentUser, userDepartments, role, user } = useAuth();
@@ -46,7 +47,7 @@ export function CandidatesProvider({ children }) {
     // CRUD Operations
     const addCandidate = async (candidateData) => {
         try {
-            const docRef = await addDoc(collection(db, CANDIDATES_COLLECTION), {
+            const docRef = await addDoc(collection(db, CANDIDATES_COLLECTION()), {
                 ...candidateData,
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp()
@@ -61,7 +62,7 @@ export function CandidatesProvider({ children }) {
     const updateCandidate = async (id, updates) => {
         try {
             console.log(`[Firestore] Updating candidate ${id}...`, updates);
-            const docRef = doc(db, CANDIDATES_COLLECTION, id);
+            const docRef = doc(db, CANDIDATES_COLLECTION(), id);
             await updateDoc(docRef, {
                 ...updates,
                 updatedAt: serverTimestamp()
@@ -75,7 +76,7 @@ export function CandidatesProvider({ children }) {
 
     const deleteCandidate = async (id) => {
         try {
-            const docRef = doc(db, CANDIDATES_COLLECTION, id);
+            const docRef = doc(db, CANDIDATES_COLLECTION(), id);
             await deleteDoc(docRef);
         } catch (err) {
             console.error('Error deleting candidate:', err);
@@ -139,8 +140,17 @@ export function CandidatesProvider({ children }) {
             });
         }, FIRST_SNAPSHOT_TIMEOUT_MS);
 
+        // Şirket seçilmemişse (aday bağlantısında şirket yok ya da iç kullanıcı
+        // henüz seçmedi) okunacak bir ağaç yok.
+        if (!getActiveTenantId()) {
+            clearTimeout(firstSnapshotTimer);
+            setCandidates([]);
+            setLoading(false);
+            return;
+        }
+
         // onSnapshot for real-time listening for candidates
-        const candidatesRef = collection(db, CANDIDATES_COLLECTION);
+        const candidatesRef = collection(db, CANDIDATES_COLLECTION());
 
         // IF UNAUTHENTICATED on a public route — wait for AuthContext to complete anonymous sign-in.
         // Never call signInAnonymously here; AuthContext is the single authority for that.
@@ -165,7 +175,7 @@ export function CandidatesProvider({ children }) {
                 let innerUnsub = null;
 
                 // Read the session document (allow read: if true) to get the real candidateId
-                getDoc(doc(db, 'interviews', sessionIdFromUrl)).then((sessionSnap) => {
+                getDoc(doc(db, tc('interviews'), sessionIdFromUrl)).then((sessionSnap) => {
                     if (!sessionSnap.exists()) {
                         console.warn(`[TalentFlow] Session doc not found: ${sessionIdFromUrl}`);
                         setCandidates([]);
@@ -180,7 +190,7 @@ export function CandidatesProvider({ children }) {
                         return;
                     }
                     console.log(`[TalentFlow] Starting TARGETED listener for candidate: ${candidateId}`);
-                    const candidateDocRef = doc(db, CANDIDATES_COLLECTION, candidateId);
+                    const candidateDocRef = doc(db, CANDIDATES_COLLECTION(), candidateId);
                     innerUnsub = onSnapshot(candidateDocRef, (docSnap) => {
                         if (docSnap.exists()) {
                             setCandidates([{ id: docSnap.id, ...docSnap.data() }]);
@@ -325,7 +335,7 @@ export function CandidatesProvider({ children }) {
         }
 
             // onSnapshot for sources to get colors
-            const sourcesRef = collection(db, 'artifacts/talent-flow/public/data/sources');
+            const sourcesRef = collection(db, tc('sources'));
             unsubSources = onSnapshot(sourcesRef, (snapshot) => {
                 const colors = {};
                 snapshot.docs.forEach(doc => {

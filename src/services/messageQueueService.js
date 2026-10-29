@@ -12,8 +12,9 @@ import {
     Timestamp,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { tc } from '../config/tenantPaths';
 
-const QUEUE_PATH = 'artifacts/talent-flow/public/data/messageQueue';
+const QUEUE_PATH = () => tc('messageQueue');
 
 // ==================== MESSAGE STATUS ENUM ====================
 
@@ -43,7 +44,7 @@ export const MESSAGE_STATUS = {
  * @returns {Promise<string>} Document ID of the created message
  */
 export async function createMessage(messageData) {
-    const queueRef = collection(db, QUEUE_PATH);
+    const queueRef = collection(db, QUEUE_PATH());
 
     const message = {
         candidateId: messageData.candidateId || '',
@@ -75,7 +76,7 @@ export async function createMessage(messageData) {
  * Updates a message's status in the queue.
  */
 export async function updateMessageStatus(messageId, newStatus) {
-    const docRef = doc(db, QUEUE_PATH, messageId);
+    const docRef = doc(db, QUEUE_PATH(), messageId);
 
     const update = {
         status: newStatus,
@@ -101,7 +102,7 @@ export async function updateMessageStatus(messageId, newStatus) {
  * Updates message content (used when user edits the draft).
  */
 export async function updateMessageContent(messageId, newContent) {
-    const docRef = doc(db, QUEUE_PATH, messageId);
+    const docRef = doc(db, QUEUE_PATH(), messageId);
     await updateDoc(docRef, {
         messageContent: newContent,
         updatedAt: serverTimestamp(),
@@ -115,7 +116,7 @@ export async function updateMessageContent(messageId, newContent) {
  * This is the human-in-the-loop approval step.
  */
 export async function approveMessage(messageId, finalContent) {
-    const docRef = doc(db, QUEUE_PATH, messageId);
+    const docRef = doc(db, QUEUE_PATH(), messageId);
     await updateDoc(docRef, {
         messageContent: finalContent,
         status: MESSAGE_STATUS.READY_TO_SEND,
@@ -133,7 +134,7 @@ export async function approveMessage(messageId, finalContent) {
  * For now, it marks the message as 'sent' with a sentTimestamp.
  */
 export async function simulateSend(messageId) {
-    const docRef = doc(db, QUEUE_PATH, messageId);
+    const docRef = doc(db, QUEUE_PATH(), messageId);
     await updateDoc(docRef, {
         status: MESSAGE_STATUS.SENT,
         sentTimestamp: serverTimestamp(),
@@ -147,7 +148,7 @@ export async function simulateSend(messageId) {
  * Marks a message as failed (e.g., LinkedIn rate limit).
  */
 export async function markMessageFailed(messageId, errorReason) {
-    const docRef = doc(db, QUEUE_PATH, messageId);
+    const docRef = doc(db, QUEUE_PATH(), messageId);
     await updateDoc(docRef, {
         status: MESSAGE_STATUS.FAILED,
         errorReason: errorReason || 'Bilinmeyen hata',
@@ -161,7 +162,7 @@ export async function markMessageFailed(messageId, errorReason) {
  * Deletes a message from the queue.
  */
 export async function deleteMessage(messageId) {
-    const docRef = doc(db, QUEUE_PATH, messageId);
+    const docRef = doc(db, QUEUE_PATH(), messageId);
     await deleteDoc(docRef);
 }
 
@@ -182,7 +183,7 @@ export async function batchApprove(messageIds) {
 /**
  * This is the queue structure that a Chrome Extension would poll:
  *
- * Collection: artifacts/talent-flow/public/data/messageQueue
+ * Collection: tenants/{tenantId}/messageQueue
  *
  * Document structure:
  * {

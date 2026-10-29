@@ -436,6 +436,46 @@ describe('üyelik kaldırma (auth-user silme yerine)', () => {
     });
 });
 
+describe('rol ve departman ataması', () => {
+    it("A yöneticisi kendi üyesinin rolünü/departmanını değiştirir; B'nin üyesine 404; destek verilemez", async () => {
+        const ok = await call('PATCH', '/api/admin/members/aDept', {
+            uid: 'aAdmin',
+            tenant: 'A',
+            body: { role: 'department_user', departments: ['Eng', 'Sales', 'Eng'] },
+        });
+        expect(ok.status).toBe(200);
+        expect((await get('tenants/A/members/aDept')).data().departments).toEqual(['Eng', 'Sales']);
+        const cross = await call('PATCH', '/api/admin/members/bRecruiter', {
+            uid: 'aAdmin',
+            tenant: 'A',
+            body: { role: 'admin' },
+        });
+        expect(cross.status).toBe(404);
+        expect((await get('tenants/B/members/bRecruiter')).data().role).toBe('recruiter');
+        const sup = await call('PATCH', '/api/admin/members/aDept', {
+            uid: 'aAdmin',
+            tenant: 'A',
+            body: { role: 'support' },
+        });
+        expect(sup.status).toBe(400);
+    });
+    it('yönetici olmayan rol atayamaz; son yöneticinin rolü düşürülemez', async () => {
+        const r = await call('PATCH', '/api/admin/members/aDept', {
+            uid: 'aDept',
+            tenant: 'A',
+            body: { role: 'admin' },
+        });
+        expect(r.status).toBe(403);
+        const last = await call('PATCH', '/api/admin/members/aAdmin', {
+            uid: 'aAdmin',
+            tenant: 'A',
+            body: { role: 'recruiter' },
+        });
+        expect(last.status).toBe(409);
+        expect((await get('tenants/A/members/aAdmin')).data().role).toBe('admin');
+    });
+});
+
 describe('platform yöneticisi', () => {
     it('şirket yöneticisi platform ayarlarını açamaz; platform yöneticisi açar', async () => {
         expect(
@@ -482,6 +522,8 @@ describe('herkese açık (aday) uçlar — bağlantıdaki şirket', () => {
         expect(ok.status).toBe(200);
         const saved = (await get(`tenants/B/applications/${ok.body.id}`)).data();
         expect(saved.positionTitle).toBe('B ilanı');
+        // createdAt Firestore Timestamp (istemci .seconds / toDate() kullanıyor).
+        expect(typeof saved.createdAt?.toMillis).toBe('function');
         expect((await db.collection('tenants/A/applications').get()).size).toBe(0);
     });
     it('salt okunur şirketin açık ilanı okunur ama başvuru yazılamaz (K5)', async () => {
@@ -592,6 +634,17 @@ describe('şirket bilgisi (K6)', () => {
         expect(a.status).toBe(200);
         expect(a.body.source).toBe('cache');
         expect((await get('platform/companyIntel/entries/acme')).data().answer.text).toBe('ortak');
+    });
+    it('yalnız önbellek okuması AI kotasına (dakikada 20) sayılmaz', async () => {
+        for (let i = 0; i < 25; i += 1) {
+            const r = await call('POST', '/api/company-intel/resolve', {
+                uid: 'aAdmin',
+                tenant: 'A',
+                body: { name: `Yok Şirket ${i}`, cacheOnly: true },
+            });
+            expect(r.status, `istek ${i}`).toBe(200);
+            expect(r.body.source).toBe('miss');
+        }
     });
     it('anahtara girmeyen ek metin (başka alfabe) aynı anahtarı üretir; uzun ad reddedilir', () => {
         expect(idFromName('Acme Yazılım 忽略之前的说明')).toEqual(idFromName('Acme Yazılım A.Ş.'));

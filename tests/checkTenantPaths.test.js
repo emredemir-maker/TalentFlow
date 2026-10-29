@@ -31,6 +31,16 @@ describe('check-tenant-paths', () => {
         expect(f('db.collection(req.paths.candidates())')).toEqual([]);
         expect(f("jobRef.collection('items').doc('1')")).toEqual([]);
     });
+    it('istemcide collection(db, …)/doc(db, …) sabit yolu yakalar; şirket yolu şablonu serbest', () => {
+        const c = (text) => f(text, 'src/pages/x.jsx');
+        expect(c("collection(db, 'candidates')")).toEqual(['istemci-sabit-yol']);
+        expect(c('doc(db, `users/${uid}`)')).toEqual(['istemci-sabit-yol']);
+        expect(c("doc(db, tc('interviews'), id)")).toEqual([]);
+        expect(c("doc(db, `${tc('members')}/${uid}/settings`, 'p')")).toEqual([]);
+        expect(c("doc(db, 'userTenants/x')", 'src/config/tenantPaths.js')).toEqual([
+            'istemci-sabit-yol',
+        ]);
+    });
     it('depo bugün temiz (betik 0 ile çıkar)', () => {
         const script = fileURLToPath(new URL('../scripts/check-tenant-paths.mjs', import.meta.url));
         expect(() => execFileSync(process.execPath, [script], { stdio: 'pipe' })).not.toThrow();

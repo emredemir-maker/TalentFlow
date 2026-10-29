@@ -41,6 +41,6 @@ export const corsMiddleware = cors({
             callback(new Error('CORS Policy: Not allowed origin'));
         }
     },
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true
 });

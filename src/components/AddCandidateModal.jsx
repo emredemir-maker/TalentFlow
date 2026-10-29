@@ -16,6 +16,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useNotifications } from '../context/NotificationContext';
 import { IS_DEMO } from '../utils/demoMode';
 import { DEMO_CV_LIMITI, kalanKota, kotaDus, kotayaGoreAyir } from '../utils/demoUpload';
+import { storagePaths } from '../config/tenantPaths';
 
 const SOURCES = [
     { id: 'İnsan Kaynakları', label: 'Doğrudan Başvuru', sub: 'İç havuz / doğrudan başvuru', icon: Users, color: '#3B82F6' },
@@ -207,7 +208,7 @@ export default function AddCandidateModal({ isOpen, onClose }) {
                     if (!IS_DEMO) {
                         try {
                             const fileExtension = file.name.split('.').pop();
-                            const uniqueName = `cvs/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExtension}`;
+                            const uniqueName = storagePaths.cv(`${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExtension}`);
                             const storageRef = ref(storage, uniqueName);
                             await uploadBytes(storageRef, file);
                             candidate.cvUrl = await getDownloadURL(storageRef);

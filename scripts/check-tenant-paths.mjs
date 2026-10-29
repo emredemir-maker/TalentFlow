@@ -7,11 +7,12 @@
 // kimliğiyle kurulması. Bu betik o disiplini CI'da zorlar:
 //
 //   1. Eski ortak kök (`artifacts/talent-flow`, URL kodlu hâli dahil) functions/
-//      altında yalnız yol modülünde geçebilir.
+//      ve src/ altında yalnız sunucu yol modülünde geçebilir.
 //   2. Kök `interviews/` koleksiyonuna dizgiyle giden yol yok.
 //   3. `db.collection(…)`, `db.doc(…)`, `db.collectionGroup(…)` ilk argümanı
 //      dizgi/şablon olamaz — yol yol modülünden gelmeli. (Bir şirket belgesine
 //      bağlı göreli alt koleksiyon — `jobRef.collection('items')` — serbest.)
+//   4. İstemcide `collection(db, '…')` / `doc(db, '…')` aynı şekilde yasak.
 //
 // Test dosyaları (*.test.js) ve node_modules taranmaz.
 // Çalıştırma: npm run check:tenant-paths (CI lint işinde).
@@ -21,7 +22,10 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '..');
 const FUNCTIONS = join(ROOT, 'functions');
+const SRC = join(ROOT, 'src');
+// Yol modülleri: sunucu ve istemci. Eski kök yalnız sunucu modülünün açıklamasında.
 const PATH_MODULE = 'functions/services/tenantPaths.js';
+const CLIENT_PATH_MODULE = 'src/config/tenantPaths.js';
 
 const RULES = [
     {
@@ -40,6 +44,15 @@ const RULES = [
         re: /\bdb\s*\.\s*(collection|doc|collectionGroup)\s*\(\s*['"`]/,
         msg: 'db.collection/doc/collectionGroup içinde sabit yol — tenantPaths.js kullanın',
     },
+    {
+        // İstemci SDK'sı: collection(db, '…') / doc(db, '…') ilk yol argümanı
+        // sabit dizgi olamaz — şirket yolu src/config/tenantPaths.js'ten.
+        // (userTenants yolu da oradan: userTenantsPath.)
+        id: 'istemci-sabit-yol',
+        re: /\b(collection|doc|collectionGroup)\s*\(\s*db\s*,\s*(['"]|`(?!\$\{))/,
+        msg: 'collection(db, …)/doc(db, …) içinde sabit yol — src/config/tenantPaths.js kullanın',
+        allow: (file) => file === CLIENT_PATH_MODULE,
+    },
 ];
 
 function walk(dir, out = []) {
@@ -48,7 +61,7 @@ function walk(dir, out = []) {
         const full = join(dir, name);
         const st = statSync(full);
         if (st.isDirectory()) walk(full, out);
-        else if (name.endsWith('.js') && !name.endsWith('.test.js')) out.push(full);
+        else if (/\.(js|jsx|mjs)$/.test(name) && !/\.test\.(js|jsx)$/.test(name)) out.push(full);
     }
     return out;
 }
@@ -70,7 +83,7 @@ export function findViolations(files) {
 
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
 if (isMain) {
-    const files = walk(FUNCTIONS).map((full) => ({
+    const files = [...walk(FUNCTIONS), ...walk(SRC)].map((full) => ({
         file: relative(ROOT, full).split(sep).join('/'),
         text: readFileSync(full, 'utf8'),
     }));

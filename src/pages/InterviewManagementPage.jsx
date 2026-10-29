@@ -65,8 +65,10 @@ import {
     List,
     CalendarClock,
 } from 'lucide-react';
+import { tc, withTenantParam, getActiveTenantId } from '../config/tenantPaths';
+import { publicApiHeaders } from '../services/publicApi';
 
-const PARTICIPANT_INVITES_PATH = 'artifacts/talent-flow/public/data/participantInvites';
+const PARTICIPANT_INVITES_PATH = () => tc('participantInvites');
 
 /** Tabloda gösterilen görüşme türü etiketleri. */
 const IV_TYPE_LABEL = {
@@ -239,14 +241,14 @@ export default function InterviewManagementPage() {
     }, []);
 
     // ─── PUBLIC INTERVIEW STATUS MAP ──────────────────────────────────────────
-    // `interviews/{sessionId}` is the authoritative source for completion status.
+    // `tenants/{t}/interviews/{sessionId}` is the authoritative source for completion status.
     // The candidate-array copy can be ghost-written by a race condition in the
     // heartbeat, so we always overlay the public doc status on top.
     const [sessionStatuses, setSessionStatuses] = useState({});
 
     useEffect(() => {
         const unsubscribe = onSnapshot(
-            collection(db, 'interviews'),
+            collection(db, tc('interviews')),
             (snap) => {
                 const map = {};
                 snap.forEach(docSnap => {
@@ -270,7 +272,7 @@ export default function InterviewManagementPage() {
     useEffect(() => {
         if (!currentUser?.uid) return;
         const q = query(
-            collection(db, PARTICIPANT_INVITES_PATH),
+            collection(db, PARTICIPANT_INVITES_PATH()),
             where('participantIds', 'array-contains', currentUser.uid)
         );
         const unsub = onSnapshot(q,
@@ -449,7 +451,7 @@ export default function InterviewManagementPage() {
 
     // Load branding settings for email templates
     useEffect(() => {
-        getDoc(doc(db, 'artifacts/talent-flow/public/data/settings', 'branding'))
+        getDoc(doc(db, tc('settings'), 'branding'))
             .then(snap => { if (snap.exists()) setBranding(b => ({ ...b, ...snap.data() })); })
             .catch(() => {});
     }, []);
@@ -784,9 +786,9 @@ export default function InterviewManagementPage() {
     const takvimOturumAc = (session) => {
         const key = session.id || session.sessionId;
         const done = session._effectiveCompleted || session.status === 'completed';
-        if (done) { navigate(`/interview-report/${key}`); return; }
-        if (session.mode === 'face_to_face') { navigate(`/face-interview/${key}`); return; }
-        navigate(`/live-interview/${key}`);
+        if (done) { navigate(withTenantParam(`/interview-report/${key}`)); return; }
+        if (session.mode === 'face_to_face') { navigate(withTenantParam(`/face-interview/${key}`)); return; }
+        navigate(withTenantParam(`/live-interview/${key}`));
     };
 
     /** Takvimden planlı bir mülakatın sonucunu girer — listedeki akışın aynısı. */
@@ -862,7 +864,7 @@ export default function InterviewManagementPage() {
         }
 
         const typeLabel = interviewType === 'technical' ? 'Teknik' : (interviewType === 'hr' ? 'İK' : 'Product');
-        const joinLink = `${window.location.origin}/join/iv-${selectedCandidate.id.substring(0, 4)}-${Date.now()}`;
+        const joinLink = withTenantParam(`${window.location.origin}/join/iv-${selectedCandidate.id.substring(0, 4)}-${Date.now()}`);
         
         setEmailJoinLink(joinLink);
         setEmailSubject(`Mülakat Daveti: ${typeLabel} Değerlendirmesi - ${selectedCandidate.name}`);
@@ -910,7 +912,7 @@ export default function InterviewManagementPage() {
 
             // Store threadId for reply tracking
             if (result.success && result.threadId) {
-                addDoc(collection(db, 'artifacts/talent-flow/public/data/emailThreads'), {
+                addDoc(collection(db, tc('emailThreads')), {
                     threadId: result.threadId,
                     messageId: result.messageId,
                     candidateId: selectedCandidate.id,
@@ -1026,7 +1028,7 @@ export default function InterviewManagementPage() {
             
             // Cryptographically random session ID — prevents enumeration attacks
             const sessionId = `iv-${crypto.randomUUID()}`;
-            const platformJoinLink = `${window.location.origin}/join/${sessionId}`;
+            const platformJoinLink = withTenantParam(`${window.location.origin}/join/${sessionId}`);
             let meetLink = platformJoinLink;
             let calendarEventLink = null;
 
@@ -1263,8 +1265,8 @@ export default function InterviewManagementPage() {
             try {
                 await fetch('/api/init-interview-session', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
+                    headers: await publicApiHeaders(),
+                    body: JSON.stringify({ tenantId: getActiveTenantId(),
                         sessionId,
                         initialData: {
                             status: newSession.status,
@@ -1285,7 +1287,7 @@ export default function InterviewManagementPage() {
             const participantIds = newSession.participants.map(p => p.userId).filter(Boolean);
             if (participantIds.length > 0) {
                 try {
-                    await setDoc(doc(db, PARTICIPANT_INVITES_PATH, sessionId), {
+                    await setDoc(doc(db, PARTICIPANT_INVITES_PATH(), sessionId), {
                         sessionId,
                         candidateId: selectedCandidate.id,
                         candidateName: selectedCandidate.name,
@@ -1315,7 +1317,7 @@ export default function InterviewManagementPage() {
             setTimeout(() => {
                 setSaveStatus('idle');
                 if (startNow) {
-                    navigate(`/live-interview/${newSession.id}`);
+                    navigate(withTenantParam(`/live-interview/${newSession.id}`));
                 } else {
                     setSelectedCandidate(null);
                     setWizardPosition(null);
@@ -1335,7 +1337,7 @@ export default function InterviewManagementPage() {
         try {
             const interviewerName = currentUser?.displayName || 'Değerlendirici';
             const sessionId = `iv-${crypto.randomUUID()}`;
-            const platformJoinLink = `${window.location.origin}/join/${sessionId}`;
+            const platformJoinLink = withTenantParam(`${window.location.origin}/join/${sessionId}`);
             const typeLabel = quickType === 'technical' ? 'Teknik Mülakat' : quickType === 'hr' ? 'İK Filtre' : 'Product Mülakatı';
             const now = new Date();
             const newSession = {
@@ -1363,8 +1365,8 @@ export default function InterviewManagementPage() {
             try {
                 await fetch('/api/init-interview-session', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
+                    headers: await publicApiHeaders(),
+                    body: JSON.stringify({ tenantId: getActiveTenantId(),
                         sessionId,
                         initialData: {
                             status: 'live',
@@ -1383,7 +1385,7 @@ export default function InterviewManagementPage() {
             setQuickModal(false);
             setQuickCandidate(null);
             setQuickSearch('');
-            navigate(`/live-interview/${sessionId}`);
+            navigate(withTenantParam(`/live-interview/${sessionId}`));
         } catch (err) {
             console.error('[handleQuickStart] Error:', err);
             alert('Mülakat başlatılamadı: ' + err.message);
@@ -1410,7 +1412,7 @@ export default function InterviewManagementPage() {
                 interviewer: interviewerName,
                 interviewerId: userId,
                 status: 'live',
-                meetLink: `${window.location.origin}/face-interview/${sessionId}`,
+                meetLink: withTenantParam(`${window.location.origin}/face-interview/${sessionId}`),
                 positionId:    quickPosition?.id    || quickCandidate.positionId    || null,
                 positionTitle: quickPosition?.title || quickCandidate.position || quickCandidate.bestTitle || null,
                 participants: [],
@@ -1425,8 +1427,8 @@ export default function InterviewManagementPage() {
             try {
                 await fetch('/api/init-interview-session', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
+                    headers: await publicApiHeaders(),
+                    body: JSON.stringify({ tenantId: getActiveTenantId(),
                         sessionId,
                         initialData: {
                             status: 'live',
@@ -1446,7 +1448,7 @@ export default function InterviewManagementPage() {
             setQuickModal(false);
             setQuickCandidate(null);
             setQuickSearch('');
-            navigate(`/face-interview/${sessionId}`);
+            navigate(withTenantParam(`/face-interview/${sessionId}`));
         } catch (err) {
             console.error('[handleFaceToFaceStart] Error:', err);
             alert('Yüz yüze mülakat başlatılamadı: ' + err.message);
@@ -1470,7 +1472,7 @@ export default function InterviewManagementPage() {
             });
             // Clean up participantInvites so cross-dept calendar entries don't go stale
             try {
-                await deleteDoc(doc(db, PARTICIPANT_INVITES_PATH, sessionId));
+                await deleteDoc(doc(db, PARTICIPANT_INVITES_PATH(), sessionId));
             } catch (piErr) {
                 console.warn('[ParticipantInvites] Delete failed (non-blocking):', piErr.message);
             }
@@ -1500,7 +1502,7 @@ export default function InterviewManagementPage() {
             await updateCandidate(candidateId, { interviewSessions: updatedSessions });
             // Mirror status (and optional reschedule) into participantInvites for cross-dept view
             try {
-                await setDoc(doc(db, PARTICIPANT_INVITES_PATH, sessionId), {
+                await setDoc(doc(db, PARTICIPANT_INVITES_PATH(), sessionId), {
                     status: newStatus,
                     ...(newDate ? { date: newDate } : {}),
                     ...(newTime ? { time: newTime } : {}),
@@ -1597,9 +1599,9 @@ export default function InterviewManagementPage() {
         const ivScore = Math.round(Number(s.finalScore || s.aiOverallScore) || 0);
         const participants = Array.isArray(s.participants) ? s.participants : [];
         const openSession = () => {
-            if (isDone) { navigate(`/interview-report/${sessionKey}`); return; }
-            if (s.mode === 'face_to_face') { navigate(`/face-interview/${sessionKey}`); return; }
-            navigate(`/live-interview/${sessionKey}`);
+            if (isDone) { navigate(withTenantParam(`/interview-report/${sessionKey}`)); return; }
+            if (s.mode === 'face_to_face') { navigate(withTenantParam(`/face-interview/${sessionKey}`)); return; }
+            navigate(withTenantParam(`/live-interview/${sessionKey}`));
         };
         // Sonuc girisi YALNIZCA planli kayitlarda: tamamlanmisin
         // zaten raporu var, iptal edilenin sonucu yok.
@@ -2490,7 +2492,7 @@ export default function InterviewManagementPage() {
                                         <span className="text-[11px] font-mono text-ok font-semibold">{window.location.origin}/join/iv-{selectedCandidate?.id?.substring(0,6)}…</span>
                                     </div>
                                     <button
-                                        onClick={() => selectedCandidate && navigator.clipboard.writeText(`${window.location.origin}/join/iv-${selectedCandidate.id}-preview`)}
+                                        onClick={() => selectedCandidate && navigator.clipboard.writeText(withTenantParam(`${window.location.origin}/join/iv-${selectedCandidate.id}-preview`))}
                                         className="p-2 text-ok hover:bg-n0 rounded-md border border-transparent"
                                     >
                                         <Copy className="w-3.5 h-3.5" />
@@ -2983,7 +2985,7 @@ export default function InterviewManagementPage() {
                                         <button
                                             key={`today-${s.id}`}
                                             onClick={() => {
-                                                if (s._effectiveCompleted) { navigate(`/interview-report/${s.id}`); return; }
+                                                if (s._effectiveCompleted) { navigate(withTenantParam(`/interview-report/${s.id}`)); return; }
                                                 navigate(s.mode === 'face_to_face' ? `/face-interview/${s.id}` : `/live-interview/${s.id}`);
                                             }}
                                             className="w-full flex items-center gap-2.5 py-2 border-t border-n100 text-left hover:bg-n50"

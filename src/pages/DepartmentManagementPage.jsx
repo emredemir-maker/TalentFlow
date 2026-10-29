@@ -14,10 +14,12 @@ import {
 import { db } from '../config/firebase';
 import { useAuth } from '../context/AuthContext';
 import { usePositions } from '../context/PositionsContext';
+import { tc } from '../config/tenantPaths';
+import { setMemberDepartments, updateMember, withoutDepartment } from '../services/memberAdmin';
 
-const DEPARTMENTS_PATH = 'artifacts/talent-flow/public/data/departments';
-const USERS_PATH = 'artifacts/talent-flow/public/data/users';
-const POSITIONS_PATH = 'artifacts/talent-flow/public/data/positions';
+const DEPARTMENTS_PATH = () => tc('departments');
+const USERS_PATH = () => tc('members');
+const POSITIONS_PATH = () => tc('positions');
 
 const COLORS = [
     '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b',
@@ -42,11 +44,11 @@ export default function DepartmentManagementPage() {
     const [searchUser, setSearchUser] = useState('');
 
     useEffect(() => {
-        const unsub1 = onSnapshot(query(collection(db, DEPARTMENTS_PATH)), (snap) => {
+        const unsub1 = onSnapshot(query(collection(db, DEPARTMENTS_PATH())), (snap) => {
             setDepartments(snap.docs.map(d => ({ id: d.id, ...d.data() })));
             setLoading(false);
         });
-        const unsub2 = onSnapshot(query(collection(db, USERS_PATH)), (snap) => {
+        const unsub2 = onSnapshot(query(collection(db, USERS_PATH()), where('status', '==', 'active')), (snap) => {
             setAllUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
         });
         return () => { unsub1(); unsub2(); };
@@ -90,7 +92,7 @@ export default function DepartmentManagementPage() {
         setSaving(true);
         try {
             if (editingDept) {
-                await updateDoc(doc(db, DEPARTMENTS_PATH, editingDept.id), {
+                await updateDoc(doc(db, DEPARTMENTS_PATH(), editingDept.id), {
                     name: formData.name.trim(), description: formData.description.trim(),
                     color: formData.color, updatedAt: serverTimestamp()
                 });
@@ -103,18 +105,15 @@ export default function DepartmentManagementPage() {
                         u.department === oldName ||
                         (Array.isArray(u.departments) && u.departments.includes(oldName))
                     );
+                    // Üyelik sunucudan güncellenir (istemci üyelik yazamaz).
                     for (const u of usersToUpdate) {
-                        const updates = {};
-                        if (u.department === oldName) updates.department = newName;
-                        if (Array.isArray(u.departments) && u.departments.includes(oldName)) {
-                            updates.departments = u.departments.map(d => d === oldName ? newName : d);
-                        }
-                        await updateDoc(doc(db, USERS_PATH, u.id), updates);
+                        if (!Array.isArray(u.departments)) continue;
+                        await setMemberDepartments(u, u.departments.map(d => d === oldName ? newName : d));
                     }
 
                     // Cascade rename → positions
                     const posSnap = await getDocs(
-                        query(collection(db, POSITIONS_PATH), where('department', '==', oldName))
+                        query(collection(db, POSITIONS_PATH()), where('department', '==', oldName))
                     );
                     if (!posSnap.empty) {
                         const batch = writeBatch(db);
@@ -125,7 +124,7 @@ export default function DepartmentManagementPage() {
                     }
                 }
             } else {
-                await addDoc(collection(db, DEPARTMENTS_PATH), {
+                await addDoc(collection(db, DEPARTMENTS_PATH()), {
                     name: formData.name.trim(), description: formData.description.trim(),
                     color: formData.color, createdBy: user?.uid,
                     createdAt: serverTimestamp(), updatedAt: serverTimestamp()
@@ -154,18 +153,14 @@ export default function DepartmentManagementPage() {
             // Clear department from users (both field formats)
             if (userCount > 0) {
                 for (const u of stats.users) {
-                    const updates = {};
-                    if (u.department === dept.name) updates.department = null;
-                    if (Array.isArray(u.departments) && u.departments.includes(dept.name)) {
-                        updates.departments = u.departments.filter(d => d !== dept.name);
-                    }
-                    await updateDoc(doc(db, USERS_PATH, u.id), updates);
+                    if (!Array.isArray(u.departments)) continue;
+                    await setMemberDepartments(u, u.departments.filter(d => d !== dept.name));
                 }
             }
 
             // Clear department from positions using a batch
             const posSnap = await getDocs(
-                query(collection(db, POSITIONS_PATH), where('department', '==', dept.name))
+                query(collection(db, POSITIONS_PATH()), where('department', '==', dept.name))
             );
             if (!posSnap.empty) {
                 const batch = writeBatch(db);
@@ -175,20 +170,32 @@ export default function DepartmentManagementPage() {
                 await batch.commit();
             }
 
-            await deleteDoc(doc(db, DEPARTMENTS_PATH, dept.id));
+            await deleteDoc(doc(db, DEPARTMENTS_PATH(), dept.id));
         } catch (err) {
             console.error('Dept delete error:', err);
             alert('Departman silinirken hata oluştu: ' + err.message);
         }
     };
 
+    // Departman ataması yalnız department_user üyeliğinde tutulur (K2);
+    // sunucu ucu üzerinden (istemci üyelik yazamaz).
     const handleAssignUser = async (userId, deptName) => {
-        await updateDoc(doc(db, USERS_PATH, userId), { department: deptName });
+        const u = allUsers.find(x => x.id === userId);
+        if (!u) return;
+        try {
+            const current = Array.isArray(u.departments) ? u.departments : [];
+            await updateMember(u.id, { role: 'department_user', departments: [...new Set([...current, deptName])] });
+        } catch (err) { alert('Atama yapılamadı: ' + err.message); }
     };
 
-    const handleRemoveUser = async (userId) => {
+    // Yalnız BU departmandan çıkarır; kişinin diğer departmanları kalır.
+    const handleRemoveUser = async (userId, deptName) => {
         if (!window.confirm('Bu kullanıcıyı departmandan çıkarmak istediğinize emin misiniz?')) return;
-        await updateDoc(doc(db, USERS_PATH, userId), { department: null });
+        const u = allUsers.find(x => x.id === userId);
+        if (!u) return;
+        try {
+            await setMemberDepartments(u, withoutDepartment(u.departments, deptName));
+        } catch (err) { alert('Kaldırılamadı: ' + err.message); }
     };
 
     const resetForm = () => {
@@ -393,10 +400,10 @@ export default function DepartmentManagementPage() {
                                                             <p className="text-[10px] text-n400 truncate">{u.email}</p>
                                                         </div>
                                                         <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-n100 text-n500">
-                                                            {u.role === 'super_admin' ? 'Admin' : u.role === 'department_user' ? 'Dept' : 'Recruiter'}
+                                                            {u.role === 'admin' ? 'Admin' : u.role === 'department_user' ? 'Dept' : 'Recruiter'}
                                                         </span>
                                                         <button
-                                                            onClick={() => handleRemoveUser(u.id)}
+                                                            onClick={() => handleRemoveUser(u.id, dept.name)}
                                                             className="p-1.5 rounded-md text-n300 hover:text-bad-text hover:bg-bad-bg transition-all opacity-0 group-hover:opacity-100"
                                                         >
                                                             <UserMinus className="w-3.5 h-3.5" />
@@ -564,7 +571,7 @@ export default function DepartmentManagementPage() {
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <p className="text-sm font-semibold text-n700 truncate">{u.displayName}</p>
-                                                    <p className="text-[10px] text-n400 truncate">{u.email} · {u.role === 'super_admin' ? 'Admin' : u.role === 'department_user' ? 'Dept Kullanıcısı' : 'Recruiter'}</p>
+                                                    <p className="text-[10px] text-n400 truncate">{u.email} · {u.role === 'admin' ? 'Admin' : u.role === 'department_user' ? 'Dept Kullanıcısı' : 'Recruiter'}</p>
                                                 </div>
                                                 <span className="text-xs font-semibold text-brand opacity-0 group-hover:opacity-100 transition-all">Ata →</span>
                                             </div>

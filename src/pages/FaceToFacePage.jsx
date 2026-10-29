@@ -15,6 +15,7 @@ import {
 import { doc, updateDoc, arrayUnion, setDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { getAuthHeaders } from '../services/ai/config';
+import { tc, withTenantParam } from '../config/tenantPaths';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -262,8 +263,8 @@ export default function FaceToFacePage() {
 
         // Save to Firestore
         if (sessionId) {
-            updateDoc(doc(db, 'interviews', sessionId), { transcript: arrayUnion(entry), sessionId })
-                .catch(() => setDoc(doc(db, 'interviews', sessionId), { transcript: [entry], sessionId }, { merge: true }));
+            updateDoc(doc(db, tc('interviews'), sessionId), { transcript: arrayUnion(entry), sessionId })
+                .catch(() => setDoc(doc(db, tc('interviews'), sessionId), { transcript: [entry], sessionId }, { merge: true }));
         }
     }, [sessionId]);
 
@@ -457,19 +458,19 @@ export default function FaceToFacePage() {
 
             // Mark Firestore /interviews/{sessionId} as completed
             try {
-                await updateDoc(doc(db, 'interviews', sessionId), {
+                await updateDoc(doc(db, tc('interviews'), sessionId), {
                     status: 'completed',
                     completedAt: now,
                     interviewScore: avgScore,
                     aiSummary,
                 });
             } catch {
-                await setDoc(doc(db, 'interviews', sessionId), {
+                await setDoc(doc(db, tc('interviews'), sessionId), {
                     status: 'completed', completedAt: now, interviewScore: avgScore, aiSummary
                 }, { merge: true });
             }
 
-            navigate(`/interview-report/${sessionId}`);
+            navigate(withTenantParam(`/interview-report/${sessionId}`));
         } catch (err) {
             console.error('[FaceToFace] Finish error:', err);
             setFinishLoading(false);

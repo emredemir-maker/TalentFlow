@@ -322,14 +322,6 @@ jobs:
     name: E2E (Playwright real-auth via Firebase emulator)
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # GEÇİCİ — ÇOK ŞİRKETLİ GEÇİŞ (docs/coklu-sirket-plani.md §6).
-    # Entegrasyon dalında (claude/talent-mt) yeni kurallar PR 1'le geliyor,
-    # istemci ise PR 3'e kadar eski ortak köke (artifacts/talent-flow/…)
-    # yazıp okuyor; o kök artık kapalı. Bu yüzden bu iş dalda PR 3 birleşene
-    # kadar kırmızı kalmak ZORUNDA. Yalnız o dala giden PR'larda ve o dala
-    # push'ta engelleyici değil; main'e giden her PR'da (entegrasyon dalının
-    # main'e birleşmesi dahil) eskisi gibi engelleyici. PR 3 bu satırı siler.
-    continue-on-error: ${{ github.base_ref == 'claude/talent-mt' || github.ref == 'refs/heads/claude/talent-mt' }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
