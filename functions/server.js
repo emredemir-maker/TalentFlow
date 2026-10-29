@@ -44,6 +44,7 @@ import maintenanceRoutes from './routes/maintenance.js';
 import emailRoutes, { cleanupOldFiles } from './routes/email.js';
 import positionsRoutes from './routes/positions.js';
 import usersRoutes from './routes/users.js';
+import companyIntelRoutes from './routes/companyIntel.js';
 import { createBulkRouter } from './routes/bulk.js';
 
 // Bulk-import worker — long-running poller that drains the
@@ -107,6 +108,7 @@ app.use(maintenanceRoutes);
 app.use(emailRoutes);
 app.use(positionsRoutes);
 app.use(usersRoutes);
+app.use(companyIntelRoutes);
 // bulk needs the on-disk uploads root, so it's a factory not a default export.
 app.use(createBulkRouter(uploadBaseDir));
 

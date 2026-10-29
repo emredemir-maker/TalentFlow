@@ -79,7 +79,7 @@ describe('storeCvFile', () => {
         return p;
     };
 
-    it('uploads to cvs/<filename> with a download token and returns the token URL', async () => {
+    it('uploads to tenants/<t>/cvs/<filename> with a download token and returns the token URL', async () => {
         const upload = vi.fn().mockResolvedValue([]);
         mocks.getStorageBucket.mockReturnValue({ name: 'test-bucket', upload });
         const tempPath = makeTempFile('cv-42.pdf');
@@ -88,18 +88,18 @@ describe('storeCvFile', () => {
             path: tempPath,
             filename: 'cv-42.pdf',
             mimetype: 'application/pdf',
-        });
+        }, 'tenant-a');
 
         expect(upload).toHaveBeenCalledTimes(1);
         const [srcPath, options] = upload.mock.calls[0];
         expect(srcPath).toBe(tempPath);
-        expect(options.destination).toBe('cvs/cv-42.pdf');
+        expect(options.destination).toBe('tenants/tenant-a/cvs/cv-42.pdf');
         expect(options.metadata.contentType).toBe('application/pdf');
 
         const token = options.metadata.metadata.firebaseStorageDownloadTokens;
         expect(token).toBeTruthy();
         expect(url).toBe(
-            `https://firebasestorage.googleapis.com/v0/b/test-bucket/o/cvs%2Fcv-42.pdf?alt=media&token=${token}`
+            `https://firebasestorage.googleapis.com/v0/b/test-bucket/o/tenants%2Ftenant-a%2Fcvs%2Fcv-42.pdf?alt=media&token=${token}`
         );
         // Temp copy is deleted once Storage holds the file
         expect(fs.existsSync(tempPath)).toBe(false);
@@ -115,7 +115,7 @@ describe('storeCvFile', () => {
             path: tempPath,
             filename: 'cv-7.pdf',
             mimetype: 'application/pdf',
-        });
+        }, 'tenant-a');
 
         expect(url).toBe('http://localhost:3001/uploads/cvs/cv-7.pdf');
         // File must survive — it's what the /uploads static mount serves
@@ -134,7 +134,7 @@ describe('storeCvFile', () => {
             path: tempPath,
             filename: 'cv-9.pdf',
             mimetype: 'application/pdf',
-        });
+        }, 'tenant-a');
 
         expect(url).toBe('');
         // /tmp copy is useless without a link — cleaned up

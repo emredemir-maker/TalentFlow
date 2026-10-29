@@ -16,9 +16,10 @@ vi.mock('./pdf.js', () => ({ pdf: mockPdf }));
 // stands in for collection().where(field,'==',value).limit(1).get() so
 // findDuplicateCandidate's query fan-out is testable.
 const mockWhereGet = vi.hoisted(() => vi.fn());
+const mockCollection = vi.hoisted(() => vi.fn());
 vi.mock('../config/firebaseAdmin.js', () => ({
     db: {
-        collection: () => ({
+        collection: (p) => (mockCollection(p), {
             where: (field, _op, value) => ({ limit: () => ({ get: () => mockWhereGet(field, value) }) }),
         }),
         runTransaction: vi.fn(),
@@ -28,7 +29,10 @@ vi.mock('../config/firebaseAdmin.js', () => ({
     },
 }));
 
-const {extractCvText, findDuplicateCandidate, resolvePreScore, matchOpenTitle, sanitizeSuggestedRole,
+const { tenantPaths } = await import('./tenantPaths.js');
+const PATHS = tenantPaths('tenant-a');
+
+const {extractCvText, findDuplicateCandidate, tenantJobDocs, resolvePreScore, matchOpenTitle, sanitizeSuggestedRole,
     calculateSimpleMatchScore, positionRequirements,
 } = await import('./bulkWorker.js');
 
@@ -85,10 +89,11 @@ describe('findDuplicateCandidate', () => {
 
     beforeEach(() => {
         mockWhereGet.mockReset();
+        mockCollection.mockReset();
     });
 
     it('returns null without querying when neither email nor phone exists', async () => {
-        const result = await findDuplicateCandidate({ name: 'Ali' }, {});
+        const result = await findDuplicateCandidate(PATHS, { name: 'Ali' }, {});
         expect(result).toBeNull();
         expect(mockWhereGet).not.toHaveBeenCalled();
     });
@@ -97,15 +102,18 @@ describe('findDuplicateCandidate', () => {
         mockWhereGet.mockImplementation((field, value) =>
             Promise.resolve(field === 'email' && value === 'ali@firma.com' ? hitSnap : emptySnap)
         );
-        const result = await findDuplicateCandidate({ email: '  Ali@Firma.com ' }, {});
+        const result = await findDuplicateCandidate(PATHS, { email: '  Ali@Firma.com ' }, {});
         expect(result).toEqual({ id: 'existing-1', foundBy: 'email' });
+        // Sorgu yalnız işin şirketinin aday koleksiyonunda.
+        expect(mockCollection).toHaveBeenCalledWith('tenants/tenant-a/candidates');
+        expect(mockCollection.mock.calls.every(([p]) => p === 'tenants/tenant-a/candidates')).toBe(true);
     });
 
     it('uses the item email when the parsed profile has none', async () => {
         mockWhereGet.mockImplementation((field, value) =>
             Promise.resolve(field === 'email' && value === 'json@kayit.com' ? hitSnap : emptySnap)
         );
-        const result = await findDuplicateCandidate(null, { email: 'json@kayit.com' });
+        const result = await findDuplicateCandidate(PATHS, null, { email: 'json@kayit.com' });
         expect(result).toEqual({ id: 'existing-1', foundBy: 'email' });
     });
 
@@ -113,13 +121,13 @@ describe('findDuplicateCandidate', () => {
         mockWhereGet.mockImplementation((field, value) =>
             Promise.resolve(field === 'phone' && value === '905551112233' ? hitSnap : emptySnap)
         );
-        const result = await findDuplicateCandidate({ email: 'yeni@aday.com', phone: '+90 555 111 22 33' }, {});
+        const result = await findDuplicateCandidate(PATHS, { email: 'yeni@aday.com', phone: '+90 555 111 22 33' }, {});
         expect(result).toEqual({ id: 'existing-1', foundBy: 'phone' });
     });
 
     it('returns null when no email or phone matches', async () => {
         mockWhereGet.mockResolvedValue(emptySnap);
-        const result = await findDuplicateCandidate({ email: 'yok@aday.com', phone: '+90 555 000 00 00' }, {});
+        const result = await findDuplicateCandidate(PATHS, { email: 'yok@aday.com', phone: '+90 555 000 00 00' }, {});
         expect(result).toBeNull();
     });
 });
@@ -448,5 +456,18 @@ describe('calculateSimpleMatchScore — yetkinlik / araç dengesi', () => {
         // özetinde geçmeleri isabet sayılmamalı.
         const filler = { position: 'Barista', skills: [], summary: 'Kahve deneyimi ve bilgisi vardır.' };
         expect(calculateSimpleMatchScore(filler, position)).toBe(0);
+    });
+});
+
+describe('tenantJobDocs (collection group süzgeci)', () => {
+    const doc = (path) => ({ ref: { path } });
+    it('yalnız tenants/{t}/bulkImportJobs/{id} yolundaki işler kalır', () => {
+        const kept = tenantJobDocs([
+            doc('tenants/A/bulkImportJobs/j1'),
+            doc('artifacts/x/public/data/bulkImportJobs/old'),
+            doc('tenants/A/other/x/bulkImportJobs/j2'),
+            doc('tenants/B/bulkImportJobs/j3'),
+        ]).map((d) => d.ref.path);
+        expect(kept).toEqual(['tenants/A/bulkImportJobs/j1', 'tenants/B/bulkImportJobs/j3']);
     });
 });

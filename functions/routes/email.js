@@ -1,9 +1,9 @@
 // All email-sending and email-receiving (IMAP) flows live here. Six endpoints
-// + the HTML invite-email template + the IMAP poller for candidate replies.
+// + the IMAP poller for candidate replies. İç kullanıcı uçları
+// requireTenant(WRITER_ROLES) arkasında; kayıtlar şirketin yolunda
+// (tenants/{t}/infoRequests, tenants/{t}/interviews).
 //
-//   POST /api/send-invite              — recruiter/admin/department-user
-//                                         platform invitation. Uses the
-//                                         buildInviteEmailHtml() template.
+//   (POST /api/send-invite KALDIRILDI — K3: üyelik yalnız Hub'dan.)
 //   POST /api/send-feedback            — post-application outcome email.
 //                                         Accepts a pre-built HTML body from
 //                                         the frontend template service or
@@ -35,12 +35,11 @@ import fs from 'fs';
 import path from 'path';
 
 import { generalLimiter } from '../middleware/rateLimit.js';
-import { verifyFirebaseToken, requireAuth } from '../middleware/auth.js';
+import { randomUUID } from 'crypto';
+
+import { requireTenant, loadPublicTenant, WRITER_ROLES } from '../middleware/auth.js';
+import { isValidDocId } from '../services/tenantPaths.js';
 import { db, admin } from '../config/firebaseAdmin.js';
-// fsGet/fsPatch/fsSet are caller-token Firestore REST helpers — they hit
-// Firestore impersonating the end user so security rules apply, vs. the
-// admin SDK which bypasses rules.
-import { fsGet, fsPatch, fsSet } from '../services/firestoreRest.js';
 import { childLogger } from '../services/logger.js';
 const log = childLogger('email');
 
@@ -58,167 +57,6 @@ export function resolveAppUrl(env = process.env) {
     const explicit = env.VITE_APP_URL || env.APP_URL || '';
     return explicit.replace(/\/+$/, '');
 }
-
-// ─── Email HTML Template Builder ─────────────────────────────────────────────
-function buildInviteEmailHtml({ companyName = 'Talent-Inn' }, { inviteLink, role, invitedByName = '' }) {
-    const roleLabel = role === 'super_admin' ? 'Süper Admin' : role === 'department_user' ? 'Departman Kullanıcısı' : 'Recruiter';
-    const TI_COLOR = '#1E3A8A';
-    const TI_LIGHT = '#EEF2FF';
-    return `<!DOCTYPE html>
-<html lang="tr"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Talent-Inn Daveti</title></head>
-<body style="margin:0;padding:0;background:#F1F5F9;font-family:'Segoe UI',Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#F1F5F9;padding:32px 16px;"><tr><td align="center">
-<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 8px 32px rgba(30,58,138,0.10);">
-
-  <!-- TALENT-INN HEADER — always platform branded -->
-  <tr><td style="background:linear-gradient(135deg,${TI_COLOR} 0%,#3B5FD9 100%);padding:36px 40px 28px 40px;text-align:center;">
-    <div style="display:inline-block;background:rgba(255,255,255,0.12);border-radius:14px;padding:10px 22px;margin-bottom:14px;">
-      <span style="color:#ffffff;font-size:26px;font-weight:800;letter-spacing:-0.5px;">Talent</span><span style="color:#93C5FD;font-size:26px;font-weight:800;letter-spacing:-0.5px;">-Inn</span>
-    </div>
-    <p style="color:rgba(255,255,255,0.80);font-size:13px;margin:0;letter-spacing:0.02em;">AI Destekli İK Yönetimi &amp; Otonom Mülakat Koçu</p>
-  </td></tr>
-
-  <!-- BODY -->
-  <tr><td style="padding:36px 40px 28px 40px;">
-    <h2 style="color:#0F172A;font-size:22px;font-weight:800;margin:0 0 6px 0;">Platforma Davet Edildiniz! 🎉</h2>
-    <p style="color:#475569;font-size:15px;line-height:1.6;margin:0 0 28px 0;">
-      ${invitedByName ? `<strong style="color:#0F172A;">${invitedByName}</strong> sizi ` : 'Siz '}
-      <strong style="color:#0F172A;">${companyName}</strong> adına
-      <strong>Talent-Inn</strong> platformuna
-      <span style="display:inline-block;background:${TI_LIGHT};color:${TI_COLOR};font-weight:700;font-size:13px;padding:2px 10px;border-radius:6px;border:1px solid #C7D2FE;">${roleLabel}</span>
-      olarak davet etti.
-    </p>
-
-    <!-- WHAT IS TALENT-INN -->
-    <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:14px;padding:22px 26px;margin-bottom:28px;">
-      <p style="color:#64748B;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;margin:0 0 14px 0;">Talent-Inn nedir?</p>
-      <p style="color:#334155;font-size:14px;line-height:1.65;margin:0 0 16px 0;">
-        Talent-Inn; yapay zeka destekli bir <strong>İnsan Kaynakları yönetimi ve işe alım platformudur</strong>.
-        CV analizi, aday pipeline takibi ve <strong>otonom mülakat koçu</strong> sayesinde işe alım süreçlerinizi uçtan uca dijitalleştirir.
-      </p>
-      <table cellpadding="0" cellspacing="0" width="100%">
-        <tr>
-          <td style="width:50%;vertical-align:top;padding:4px 8px 4px 0;">
-            <span style="color:${TI_COLOR};font-size:15px;">&#10003;</span>
-            <span style="color:#334155;font-size:13px;"> AI CV Analizi &amp; Skorlama</span>
-          </td>
-          <td style="width:50%;vertical-align:top;padding:4px 0 4px 8px;">
-            <span style="color:${TI_COLOR};font-size:15px;">&#10003;</span>
-            <span style="color:#334155;font-size:13px;"> Otonom Mülakat Koçu</span>
-          </td>
-        </tr>
-        <tr>
-          <td style="width:50%;vertical-align:top;padding:4px 8px 4px 0;">
-            <span style="color:${TI_COLOR};font-size:15px;">&#10003;</span>
-            <span style="color:#334155;font-size:13px;"> Aday Pipeline Yönetimi</span>
-          </td>
-          <td style="width:50%;vertical-align:top;padding:4px 0 4px 8px;">
-            <span style="color:${TI_COLOR};font-size:15px;">&#10003;</span>
-            <span style="color:#334155;font-size:13px;"> Gerçek Zamanlı Raporlama</span>
-          </td>
-        </tr>
-        <tr>
-          <td style="width:50%;vertical-align:top;padding:4px 8px 4px 0;">
-            <span style="color:${TI_COLOR};font-size:15px;">&#10003;</span>
-            <span style="color:#334155;font-size:13px;"> STAR Yetkinlik Değerlendirmesi</span>
-          </td>
-          <td style="width:50%;vertical-align:top;padding:4px 0 4px 8px;">
-            <span style="color:${TI_COLOR};font-size:15px;">&#10003;</span>
-            <span style="color:#334155;font-size:13px;"> Departman Bazlı Erişim</span>
-          </td>
-        </tr>
-      </table>
-    </div>
-
-    <!-- INVITE DETAILS BOX -->
-    <div style="background:${TI_LIGHT};border:1px solid #C7D2FE;border-radius:12px;padding:18px 22px;margin-bottom:28px;">
-      <p style="color:#3730A3;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;margin:0 0 10px 0;">Davet Detayları</p>
-      <table cellpadding="0" cellspacing="0" width="100%">
-        <tr><td style="color:#6366F1;font-size:13px;padding:3px 0;width:110px;">Şirket</td><td style="color:#1E1B4B;font-size:13px;font-weight:700;padding:3px 0;">${companyName}</td></tr>
-        <tr><td style="color:#6366F1;font-size:13px;padding:3px 0;">Rol</td><td style="color:#1E1B4B;font-size:13px;font-weight:700;padding:3px 0;">${roleLabel}</td></tr>
-        ${invitedByName ? `<tr><td style="color:#6366F1;font-size:13px;padding:3px 0;">Davet Eden</td><td style="color:#1E1B4B;font-size:13px;font-weight:700;padding:3px 0;">${invitedByName}</td></tr>` : ''}
-        <tr><td style="color:#6366F1;font-size:13px;padding:3px 0;">Platform</td><td style="color:#1E1B4B;font-size:13px;font-weight:700;padding:3px 0;">Talent-Inn</td></tr>
-      </table>
-    </div>
-
-    <!-- CTA -->
-    <div style="text-align:center;margin-bottom:28px;">
-      <a href="${inviteLink}" style="background:linear-gradient(135deg,${TI_COLOR} 0%,#3B5FD9 100%);color:#ffffff;padding:16px 40px;text-decoration:none;border-radius:12px;font-weight:800;font-size:15px;display:inline-block;letter-spacing:0.01em;">Daveti Kabul Et &amp; Başla →</a>
-    </div>
-
-    <!-- ONE-TIME LINK WARNING -->
-    <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:12px 16px;margin-bottom:20px;">
-      <p style="color:#92400E;font-size:12px;margin:0;"><strong>&#9888; Not:</strong> Bu davet linki kişiseldir ve yalnızca bir kez kullanılabilir. Başkasıyla paylaşmayın.</p>
-    </div>
-
-    <p style="color:#94A3B8;font-size:11px;margin:0;">Butona tıklayamıyorsanız bu bağlantıyı kopyalayın:<br/><a href="${inviteLink}" style="color:${TI_COLOR};word-break:break-all;font-size:11px;">${inviteLink}</a></p>
-  </td></tr>
-
-  <!-- FOOTER -->
-  <tr><td style="background:#F8FAFC;padding:20px 40px;border-top:1px solid #E2E8F0;text-align:center;">
-    <p style="color:#64748B;font-size:12px;font-weight:700;margin:0 0 4px 0;">Talent-Inn &mdash; AI Destekli İK &amp; Mülakat Platformu</p>
-    <p style="color:#94A3B8;font-size:11px;margin:0;">Bu e-posta <strong>${companyName}</strong> adına Talent-Inn tarafından gönderilmiştir.</p>
-  </td></tr>
-
-</table>
-</td></tr></table>
-</body></html>`;
-}
-
-// Invite Email Endpoint — davetleri yalnızca super_admin yönetir (davet
-// oluşturma UI'ı SuperAdminPage; firestore.rules'ta invitations yazımı da
-// super_admin'e özel). Kimlik doğrulamasız hali markalı phishing relay'i
-// olarak kullanılabiliyordu.
-router.post('/api/send-invite', generalLimiter, requireAuth(['super_admin']), async (req, res) => {
-    const { email, role, inviteLink, branding, invitedByName } = req.body;
-    log.info(`✉️ Received invite request for: ${email}, role: ${role}`);
-
-    if (!email || !inviteLink) {
-        log.warn('❌ Missing email or inviteLink in request');
-        return res.status(400).json({ error: 'Email ve davet linki gereklidir.' });
-    }
-    if (!EMAIL_RE.test(email)) {
-        return res.status(400).json({ error: 'Geçersiz email adresi.' });
-    }
-
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-        log.error('❌ Email configuration missing in .env (EMAIL_USER or EMAIL_PASS)');
-        return res.status(500).json({ error: 'Sistem email yapılandırması eksik (.env kontrol edin).' });
-    }
-
-    try {
-        const transporter = nodemailer.createTransport({
-            host: 'smtp.gmail.com',
-            port: 465,
-            secure: true,
-            auth: {
-                user: process.env.EMAIL_USER,
-                pass: process.env.EMAIL_PASS
-            },
-            connectionTimeout: 10000,
-            greetingTimeout: 5000,
-            socketTimeout: 20000
-        });
-
-        const brandingData = branding || {};
-        const companyName = brandingData.companyName || 'Talent-Inn';
-        const roleLabel = role === 'super_admin' ? 'Süper Admin' : role === 'department_user' ? 'Departman Kullanıcısı' : 'Recruiter';
-
-        const mailOptions = {
-            from: `"Talent-Inn" <${process.env.EMAIL_USER}>`,
-            to: email,
-            subject: `Talent-Inn'e Davet Edildiniz — ${roleLabel} | ${companyName}`,
-            html: buildInviteEmailHtml({ companyName }, { inviteLink, role, invitedByName })
-        };
-
-        await transporter.sendMail(mailOptions);
-        log.info(`✉️ Invite email sent successfully to: ${email}`);
-        res.json({ success: true, message: 'Davet maili başarıyla gönderildi.' });
-    } catch (error) {
-        log.error({ err: error }, '❌ Nodemailer Error');
-        res.status(500).json({ error: 'Mail gönderilirken bir hata oluştu: ' + (error.code || error.message) });
-    }
-});
 
 // --- Cleanup Routine (GDPR/KVKK Compliance) ---
 // uploadBaseDir is supplied by the caller (server.js) on startup so this
@@ -244,7 +82,7 @@ export function cleanupOldFiles(uploadBaseDir) {
     if (count > 0) log.info(`🧹 KVKK Veri Minimizasyonu: ${count} adet eski ham CV dosyası diskten silindi. (İletişim kayıtları korunuyor)`);
 }
 // Candidate Feedback Email Endpoint (Task #7)
-router.post('/api/send-feedback', generalLimiter, verifyFirebaseToken, async (req, res) => {
+router.post('/api/send-feedback', generalLimiter, requireTenant(WRITER_ROLES), async (req, res) => {
     const { to, candidateName, recruiterName, position, outcome, feedbackText, branding, html: prebuiltHtml } = req.body;
     if (!to || !feedbackText) return res.status(400).json({ error: 'Email ve geri bildirim metni gereklidir.' });
     if (!EMAIL_RE.test(to)) return res.status(400).json({ error: 'Geçersiz email adresi.' });
@@ -317,7 +155,7 @@ ${position ? `<p style="margin:8px 0 0;font-size:12px;color:#64748B;">Başvurula
 });
 
 // --- Interview Invite via Nodemailer (Google-bağımsız fallback) ---
-router.post('/api/send-interview-invite', generalLimiter, verifyFirebaseToken, async (req, res) => {
+router.post('/api/send-interview-invite', generalLimiter, requireTenant(WRITER_ROLES), async (req, res) => {
     const { to, subject, html, ics, candidateName, branding } = req.body;
     if (!to || !html) return res.status(400).json({ error: 'Email ve HTML içerik gereklidir.' });
     if (!EMAIL_RE.test(to)) return res.status(400).json({ error: 'Geçersiz email adresi.' });
@@ -357,8 +195,11 @@ router.post('/api/send-interview-invite', generalLimiter, verifyFirebaseToken, a
 
 
 // /api/gemini-stt moved to routes/ai.js
-router.post('/api/send-info-request', generalLimiter, verifyFirebaseToken, async (req, res) => {
-    const { to, candidateName, recruiterName, recruiterEmail, position, requestMessage, requestedItems, sessionId, candidateId, branding, requestId: clientRequestId, respondUrl: clientRespondUrl } = req.body;
+router.post('/api/send-info-request', generalLimiter, requireTenant(WRITER_ROLES), async (req, res) => {
+    // requestId ve respondUrl istemciden ALINMAZ: gelen kutusu tüm şirketlerde
+    // ortak ve yanıt konudaki kimlikle eşleşiyor; istemci kimliği seçebilseydi
+    // başka şirketin talebinin kimliğini kopyalayıp yanıtını kendine çekebilirdi.
+    const { to, candidateName, recruiterName, recruiterEmail, position, requestMessage, requestedItems, sessionId, candidateId, branding } = req.body;
     if (!to || !candidateName) return res.status(400).json({ error: 'Email ve aday adı gereklidir.' });
     const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
     if (!emailRe.test(to)) return res.status(400).json({ error: 'Geçersiz email adresi.' });
@@ -373,13 +214,13 @@ router.post('/api/send-info-request', generalLimiter, verifyFirebaseToken, async
     const b = branding || { companyName: 'Talent-Inn', primaryColor: '#1E3A8A' };
     const fromName = (b.companyName || 'Talent-Inn').slice(0, 100);
     try {
-        const requestId = clientRequestId || `ir-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        const requestId = `ir-${randomUUID()}`;
         const APP_URL = resolveAppUrl();
-        const respondUrl = clientRespondUrl || `${APP_URL}/respond/${requestId}?type=info`;
+        // Şirket kimliği bağlantıda (geçici — PR 5'te publicLinks).
+        const respondUrl = `${APP_URL}/respond/${requestId}?type=info&tenantId=${encodeURIComponent(req.tenant.id)}`;
         try {
-            await fsSet(
-                'artifacts/talent-flow/public/data/infoRequests',
-                requestId,
+            // Rol ve şirket requireTenant'ta denetlendi; kayıt şirketin yolunda.
+            await db.doc(req.paths.infoRequest(requestId)).set(
                 {
                     requestId,
                     candidateId: candidateId || null,
@@ -393,8 +234,7 @@ router.post('/api/send-info-request', generalLimiter, verifyFirebaseToken, async
                     requestedItems: requestedItems || [],
                     status: 'pending',
                     createdAt: new Date(),
-                },
-                req.firebaseToken
+                }
             );
             log.info(`✅ infoRequest Firestore'a yazıldı: ${requestId}`);
         } catch (dbErr) {
@@ -435,19 +275,27 @@ router.post('/api/send-info-request', generalLimiter, verifyFirebaseToken, async
 });
 
 // ─── Candidate Respond (public — no auth required) ────────────────────────────
+// Şirket: bağlantıdaki `tenantId` (geçici — PR 5'te publicLinks çözücüsü
+// gelir ve bağlantı yalnız rastgele bir kimlik taşır). Kimlik hâlâ yetki
+// anahtarı; şirket kimliği yalnız aramayı o şirketin ağacına daraltır.
 router.post('/api/candidate-respond', generalLimiter, async (req, res) => {
-    const { id, type, action, responseData } = req.body;
+    const { id, type, action, responseData, tenantId } = req.body;
     if (!id || !type) return res.status(400).json({ error: 'id ve type gereklidir.' });
+    if (!isValidDocId(id)) return res.status(404).json({ error: 'Talep bulunamadı.' });
     try {
+        // Kapalı/salt okunur/askıdaki şirkete aday yazımı yok (K5).
+        const tenant = await loadPublicTenant(String(tenantId || ''), { write: true });
+        if (!tenant) return res.status(404).json({ error: 'Talep bulunamadı.' });
+        const paths = tenant.paths;
         const now = admin.firestore.FieldValue.serverTimestamp();
         if (type === 'info') {
-            const ref = db.doc(`artifacts/talent-flow/public/data/infoRequests/${id}`);
+            const ref = db.doc(paths.infoRequest(id));
             const snap = await ref.get();
             if (!snap.exists) return res.status(404).json({ error: 'Talep bulunamadı.' });
             await ref.update({ status: 'responded', responseData: responseData || '', respondedAt: now });
             const data = snap.data();
-            if (data.sessionId) {
-                await db.doc(`interviews/${data.sessionId}`).set({
+            if (data.sessionId && isValidDocId(data.sessionId)) {
+                await db.doc(paths.interview(data.sessionId)).set({
                     infoResponses: admin.firestore.FieldValue.arrayUnion({
                         requestId: id,
                         candidateName: data.candidateName,
@@ -459,7 +307,12 @@ router.post('/api/candidate-respond', generalLimiter, async (req, res) => {
         } else if (type === 'invite') {
             const validActions = ['confirm', 'decline'];
             if (!validActions.includes(action)) return res.status(400).json({ error: 'Geçersiz action.' });
-            await db.doc(`interviews/${id}`).set({
+            // Yalnız VAR OLAN oturum: merge ile set, olmayan kimlikte boş bir
+            // mülakat belgesi açardı.
+            const ref = db.doc(paths.interview(id));
+            const snap = await ref.get();
+            if (!snap.exists) return res.status(404).json({ error: 'Talep bulunamadı.' });
+            await ref.set({
                 candidateResponse: { status: action, respondedAt: new Date().toISOString() },
             }, { merge: true });
         } else {
@@ -468,7 +321,7 @@ router.post('/api/candidate-respond', generalLimiter, async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         log.error({ err: error }, '❌ Candidate respond error');
-        res.status(500).json({ error: 'Yanıt kaydedilemedi: ' + error.message });
+        res.status(500).json({ error: 'Yanıt kaydedilemedi.' });
     }
 });
 
@@ -643,23 +496,41 @@ function fetchImapInfoReplies() {
     });
 }
 
-router.post('/api/check-info-replies', generalLimiter, verifyFirebaseToken, async (req, res) => {
+/**
+ * Gelen yanıt bu talebe uygulanacak mı; uygulanacaksa yazılacak alanlar.
+ * Yalnız talebin gönderildiği adresten gelen yanıt: konudaki kimliği bilen
+ * başkası (ortak gelen kutusuna yazan herkes) yanıt enjekte edemesin.
+ * @returns {object|null}
+ */
+export function replyPatch(existing, reply, now = new Date()) {
+    const from = String(reply?.from || '').trim().toLowerCase();
+    if (!from || String(existing?.candidateEmail || '').trim().toLowerCase() !== from) return null;
+    const status = existing.status;
+    if (status !== 'pending' && existing.replyBody) return null;
+    const patch = { replySubject: reply.subject, replyBody: reply.replyBody || '' };
+    if (status === 'pending') {
+        patch.status = 'responded';
+        patch.respondedAt = now;
+    }
+    return patch;
+}
+
+router.post('/api/check-info-replies', generalLimiter, requireTenant(WRITER_ROLES), async (req, res) => {
     try {
         const replies = await fetchImapInfoReplies();
         log.info({ err: replies.map(r => r.requestId) }, `📬 IMAP tarama tamamlandı: ${replies.length} eşleşme`);
         let updated = 0;
-        const token = req.firebaseToken;
         for (const reply of replies) {
             try {
-                const docPath = `artifacts/talent-flow/public/data/infoRequests/${reply.requestId}`;
-                const existing = await fsGet(docPath, token);
-                if (!existing) { log.warn(`⚠️ requestId ${reply.requestId} bulunamadı`); continue; }
-                const status = existing.fields?.status?.stringValue;
-                const existingReplyBody = existing.fields?.replyBody?.stringValue || '';
-                if (status !== 'pending' && existingReplyBody) continue;
-                const patch = { replySubject: reply.subject, replyBody: reply.replyBody || '' };
-                if (status === 'pending') { patch.status = 'responded'; patch.respondedAt = new Date(); }
-                await fsPatch(docPath, patch, token);
+                // Gelen kutusu ortak; yalnız BU ŞİRKETİN talebiyle eşleşen yanıt
+                // işlenir. Başka şirketin talebi burada "bulunamadı" olur.
+                if (!isValidDocId(reply.requestId)) continue;
+                const ref = db.doc(req.paths.infoRequest(reply.requestId));
+                const snap = await ref.get();
+                if (!snap.exists) continue;
+                const patch = replyPatch(snap.data() || {}, reply);
+                if (!patch) continue;
+                await ref.update(patch);
                 updated++;
                 log.info(`✅ Yanıt işaretlendi: ${reply.requestId}`);
             } catch (err) {
@@ -675,8 +546,8 @@ router.post('/api/check-info-replies', generalLimiter, verifyFirebaseToken, asyn
 });
 
 // ── Send participant invite emails when a quick-start interview goes live
-// requireAuth: mülakatı başlatan recruiter çağırır; alıcı listesi doğrulanır.
-router.post('/api/send-participant-invite', generalLimiter, requireAuth(), async (req, res) => {
+// requireTenant: mülakatı başlatan recruiter çağırır; alıcı listesi doğrulanır.
+router.post('/api/send-participant-invite', generalLimiter, requireTenant(WRITER_ROLES), async (req, res) => {
     const { participants, joinLink, sessionId, candidateName, recruiterName } = req.body;
     if (!participants || !Array.isArray(participants) || participants.length === 0) {
         return res.status(400).json({ error: 'participants listesi gereklidir.' });

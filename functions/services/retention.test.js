@@ -136,10 +136,17 @@ describe('splitByRetention', () => {
 });
 
 describe('storagePathFromUrl', () => {
-    const URL_ORNEK = 'https://firebasestorage.googleapis.com/v0/b/x.appspot.com/o/cvs%2F1712345_ab.pdf?alt=media&token=abc';
+    const URL_ORNEK = 'https://firebasestorage.googleapis.com/v0/b/x.appspot.com/o/tenants%2FA%2Fcvs%2F1712345_ab.pdf?alt=media&token=abc';
 
     it('nesne yolunu çözüyor', () => {
-        expect(storagePathFromUrl(URL_ORNEK)).toBe('cvs/1712345_ab.pdf');
+        expect(storagePathFromUrl(URL_ORNEK)).toBe('tenants/A/cvs/1712345_ab.pdf');
+    });
+
+    it('ESKİ ORTAK KÖK ve "..": null', () => {
+        const eskiKok = 'https://firebasestorage.googleapis.com/v0/b/x/o/cvs%2F1.pdf?alt=media';
+        const kacis = 'https://firebasestorage.googleapis.com/v0/b/x/o/tenants%2FA%2Fcvs%2F..%2F..%2FB%2Fcvs%2F1.pdf?alt=media';
+        expect(storagePathFromUrl(eskiKok)).toBeNull();
+        expect(storagePathFromUrl(kacis)).toBeNull();
     });
 
     it('ÇÖZÜLEMEYEN ADRES null — tahmin edilmiyor', () => {

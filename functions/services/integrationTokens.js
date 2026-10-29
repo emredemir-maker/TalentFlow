@@ -2,10 +2,12 @@
 // Microsoft Graph (microsoft).
 //
 // ── NEREDE DURUYOR ──────────────────────────────────────────────────────────
-//   integrationSecrets/{uid}.<provider>  — accessToken, refreshToken (ŞİFRELİ),
-//                                          tokenExpiresAt, authMode
-//   users/{uid}.integrations.<provider>   — connected, email, connectedAt,
-//                                          authMode (SIR YOK; arayüz bunu okur)
+//   tenants/{t}/integrationSecrets/{uid}.<provider> — accessToken, refreshToken
+//                                          (ŞİFRELİ), tokenExpiresAt, authMode
+//   tenants/{t}/members/{uid}.integrations.<provider> — connected, email,
+//                                          connectedAt, authMode (SIR YOK)
+// Bağlantı ŞİRKET BAŞINA: iki şirkette üye olan kişi her birinde ayrı bağlar
+// (plan §1.1); bir şirketin işlemi ötekinin jetonunu kullanamaz.
 // integrationSecrets firestore.rules'ta istemciye tamamen kapalı; yalnızca
 // Admin SDK (bu modül) okur/yazar. Jeton çözümü SADECE sunucuda yapılır ve
 // refresh token sunucudan hiç çıkmaz.
@@ -20,9 +22,8 @@
 // testler Firestore'a dokunmadan bütün akışı koşabilsin. Gerçek bağlantı
 // services/integrationTokenStore.js'te.
 import { decryptToken, encryptToken, isEncryptedToken } from './tokenCrypto.js';
+import { tenantPaths } from './tenantPaths.js';
 
-export const USERS_PATH = 'artifacts/talent-flow/public/data/users';
-export const SECRETS_PATH = 'artifacts/talent-flow/public/data/integrationSecrets';
 export const PROVIDERS = ['google', 'microsoft'];
 
 const LEGACY_TOKEN_FIELDS = ['accessToken', 'refreshToken', 'tokenExpiresAt'];
@@ -54,10 +55,10 @@ const assertProvider = (provider) => {
  */
 export function createIntegrationTokenStore({ db, deleteField, refreshProvider, now = Date.now, getKey, log }) {
     const key = () => (getKey ? getKey() : undefined);
-    const secretsRef = (uid) => db.doc(`${SECRETS_PATH}/${uid}`);
-    const userRef = (uid) => db.doc(`${USERS_PATH}/${uid}`);
+    const secretsRef = (t, uid) => db.doc(tenantPaths(t).integrationSecret(uid));
+    const userRef = (t, uid) => db.doc(tenantPaths(t).member(uid));
 
-    async function saveTokens(uid, provider, { accessToken, refreshToken, tokenExpiresAt, authMode }) {
+    async function saveTokens(t, uid, provider, { accessToken, refreshToken, tokenExpiresAt, authMode }) {
         assertProvider(provider);
         const entry = {
             accessToken: encryptToken(accessToken, key()),
@@ -68,11 +69,11 @@ export function createIntegrationTokenStore({ db, deleteField, refreshProvider, 
         // merge eskisini koruyor; undefined yazmak onu silmek olurdu.
         if (refreshToken !== undefined) entry.refreshToken = refreshToken ? encryptToken(refreshToken, key()) : null;
         if (authMode !== undefined) entry.authMode = authMode;
-        await secretsRef(uid).set({ [provider]: entry }, { merge: true });
+        await secretsRef(t, uid).set({ [provider]: entry }, { merge: true });
     }
 
-    async function readEntry(uid, provider) {
-        const snap = await secretsRef(uid).get();
+    async function readEntry(t, uid, provider) {
+        const snap = await secretsRef(t, uid).get();
         const raw = snap.exists ? snap.data()?.[provider] : null;
         if (!raw?.accessToken && !raw?.refreshToken) return null;
         let entry;
@@ -89,13 +90,13 @@ export function createIntegrationTokenStore({ db, deleteField, refreshProvider, 
         }
         const plainLeft = (raw.accessToken && !isEncryptedToken(raw.accessToken))
             || (raw.refreshToken && !isEncryptedToken(raw.refreshToken));
-        if (plainLeft) await saveTokens(uid, provider, entry);
+        if (plainLeft) await saveTokens(t, uid, provider, entry);
         return entry;
     }
 
     /** Eski düz metin jetonları kullanıcı dokümanından alıp şifreli depoya taşır. */
-    async function migrateLegacy(uid, provider) {
-        const snap = await userRef(uid).get();
+    async function migrateLegacy(t, uid, provider) {
+        const snap = await userRef(t, uid).get();
         const legacy = snap.exists ? snap.data()?.integrations?.[provider] : null;
         if (!legacy?.accessToken && !legacy?.refreshToken) return null;
 
@@ -105,9 +106,9 @@ export function createIntegrationTokenStore({ db, deleteField, refreshProvider, 
             tokenExpiresAt: legacy.tokenExpiresAt ?? null,
             authMode: legacy.authMode || 'server',
         };
-        await saveTokens(uid, provider, entry);
+        await saveTokens(t, uid, provider, entry);
         try {
-            await userRef(uid).update(Object.fromEntries(
+            await userRef(t, uid).update(Object.fromEntries(
                 LEGACY_TOKEN_FIELDS.map((f) => [`integrations.${provider}.${f}`, deleteField()])
             ));
         } catch (err) {
@@ -123,9 +124,9 @@ export function createIntegrationTokenStore({ db, deleteField, refreshProvider, 
      * yeniler ve yenisini şifreli kaydeder.
      * @throws {IntegrationError} NOT_CONNECTED | REAUTH_REQUIRED
      */
-    async function getAccessToken(uid, provider) {
+    async function getAccessToken(t, uid, provider) {
         assertProvider(provider);
-        const entry = (await readEntry(uid, provider)) || (await migrateLegacy(uid, provider));
+        const entry = (await readEntry(t, uid, provider)) || (await migrateLegacy(t, uid, provider));
         if (!entry?.accessToken && !entry?.refreshToken) {
             throw new IntegrationError('NOT_CONNECTED', 'Hesap bağlı değil.');
         }
@@ -146,7 +147,7 @@ export function createIntegrationTokenStore({ db, deleteField, refreshProvider, 
             log?.warn?.({ err: err.message, uid, provider }, '[integrationTokens] refresh failed');
             throw new IntegrationError('REAUTH_REQUIRED', 'Oturum yenilenemedi; yeniden bağlanın.');
         }
-        await saveTokens(uid, provider, {
+        await saveTokens(t, uid, provider, {
             accessToken: fresh.accessToken,
             refreshToken: fresh.refreshToken || undefined,
             tokenExpiresAt: fresh.tokenExpiresAt,
@@ -155,12 +156,12 @@ export function createIntegrationTokenStore({ db, deleteField, refreshProvider, 
     }
 
     /** Bağlantıyı kaydeder: jetonlar şifreli depoya, görünür alanlar profile. */
-    async function connect(uid, provider, { email, accessToken, refreshToken, tokenExpiresAt, authMode }) {
+    async function connect(t, uid, provider, { email, accessToken, refreshToken, tokenExpiresAt, authMode }) {
         // Google yeniden onayda refresh token'ı her zaman tekrar vermiyor:
         // gelmediyse kayıtlı olan korunur.
-        await saveTokens(uid, provider, { accessToken, refreshToken: refreshToken || undefined, tokenExpiresAt, authMode });
+        await saveTokens(t, uid, provider, { accessToken, refreshToken: refreshToken || undefined, tokenExpiresAt, authMode });
         // Haritanın TAMAMI yazılıyor: eski düz metin alanlar da böylece siliniyor.
-        await userRef(uid).update({
+        await userRef(t, uid).update({
             [`integrations.${provider}`]: {
                 connected: true,
                 email: email || '',
@@ -170,10 +171,10 @@ export function createIntegrationTokenStore({ db, deleteField, refreshProvider, 
         });
     }
 
-    async function disconnect(uid, provider) {
+    async function disconnect(t, uid, provider) {
         assertProvider(provider);
-        await secretsRef(uid).set({ [provider]: deleteField() }, { merge: true });
-        await userRef(uid).update({
+        await secretsRef(t, uid).set({ [provider]: deleteField() }, { merge: true });
+        await userRef(t, uid).update({
             [`integrations.${provider}`]: { connected: false, disconnectedAt: new Date(now()).toISOString() },
         });
     }

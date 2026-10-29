@@ -4,6 +4,7 @@
 // Routes that need OAuth credentials should import the live `integrationConfigs`
 // object — values are mutated in place so a single import sees fresh state.
 import { db } from './firebaseAdmin.js';
+import { PLATFORM_PATHS } from '../services/tenantPaths.js';
 import { childLogger } from '../services/logger.js';
 const log = childLogger('integrations');
 
@@ -11,7 +12,7 @@ export const integrationConfigs = { google: null, microsoft365: null };
 
 export async function loadIntegrationConfigs() {
     try {
-        const snap = await db.doc('artifacts/talent-flow/public/data/settings/integrations').get();
+        const snap = await db.doc(PLATFORM_PATHS.integrations).get();
         if (snap.exists) {
             const data = snap.data();
             if (data.google) {

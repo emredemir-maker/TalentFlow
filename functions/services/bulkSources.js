@@ -25,8 +25,8 @@
 // yalnızca YOL gönderilir ve istek milisaniyeler içinde cevap döner. Açma ve
 // metin çıkarma işini worker yapar; orada HTTP saati işlemiyor.
 
-/** Storage'da toplu yüklemelerin kökü. */
-export const BULK_PREFIX = 'bulk-imports';
+
+import { storagePaths } from './tenantPaths.js';
 
 /** Tek istekte bildirilebilecek kaynak dosya sayısı. */
 export const MAX_SOURCES = 50;
@@ -48,8 +48,9 @@ export function extensionOf(name) {
  * Yolun İÇİNDE uid taşınması tesadüf değil: hem Storage kuralı hem sunucu
  * doğrulaması aynı tek gerçeği okur, ikisinin ayrışma ihtimali kalmaz.
  */
-export function bulkPrefixFor(uid) {
-    return `${BULK_PREFIX}/${uid}/`;
+export function bulkPrefixFor(tenantId, uid) {
+    // tenants/{t}/bulk-imports/{uid}/ — storage.rules ile aynı yol.
+    return storagePaths.bulkImportPrefix(tenantId, uid);
 }
 
 /**
@@ -62,20 +63,26 @@ export function bulkPrefixFor(uid) {
  * Kimlik DOĞRULANMIŞ tokendan gelir, gövdeden değil.
  *
  * @param {unknown} raw — istek gövdesindeki sources alanı
- * @param {string} uid — requireAuth'un çözdüğü kullanıcı
+ * @param {string} tenantId — requireTenant'ın çözdüğü şirket
+ * @param {string} uid — requireTenant'ın çözdüğü kullanıcı
  * @returns {{sources: Array<{storagePath:string, originalName:string, size:number, ext:string}>, error: string|null}}
  */
-export function parseSources(raw, uid) {
+export function parseSources(raw, tenantId, uid) {
     const fail = (error) => ({ sources: [], error });
 
-    if (!uid) return fail('Kimlik çözümlenemedi.');
+    if (!uid || !tenantId) return fail('Kimlik çözümlenemedi.');
     if (!Array.isArray(raw)) return fail('sources bir dizi olmalıdır.');
     if (raw.length === 0) return fail('İşlenecek dosya bulunamadı.');
     if (raw.length > MAX_SOURCES) {
         return fail(`Tek seferde en fazla ${MAX_SOURCES} dosya bildirilebilir (${raw.length} geldi).`);
     }
 
-    const prefix = bulkPrefixFor(uid);
+    let prefix;
+    try {
+        prefix = bulkPrefixFor(tenantId, uid);
+    } catch {
+        return fail('Kimlik çözümlenemedi.');
+    }
     const seen = new Set();
     const sources = [];
 
@@ -90,7 +97,7 @@ export function parseSources(raw, uid) {
             return fail('storagePath geçersiz karakter içeriyor.');
         }
         if (!storagePath.startsWith(prefix)) {
-            return fail('storagePath bu kullanıcıya ait değil.');
+            return fail('storagePath bu kullanıcıya ve şirkete ait değil.');
         }
         if (seen.has(storagePath)) return fail('Aynı dosya iki kez bildirilmiş.');
         seen.add(storagePath);

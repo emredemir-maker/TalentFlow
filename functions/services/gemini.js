@@ -31,6 +31,7 @@ import { db } from '../config/firebaseAdmin.js';
 import { buildStructuredPrompt } from './promptGuard.js';
 import { childLogger } from './logger.js';
 import { recordUsage, readUsage } from './usage.js';
+import { PLATFORM_PATHS } from './tenantPaths.js';
 import { extractPiiFromText, redactPiiFromText } from './pii.js';
 import { assertWithinBudget, noteSpend } from './aiBudget.js';
 
@@ -116,7 +117,7 @@ function cacheSet(key, value) {
 export async function getApiKeyDetailed() {
     // 1. Firestore (admin saved via Settings → API & Ses Motoru)
     try {
-        const settingsDoc = await db.doc('artifacts/talent-flow/public/data/settings/api_keys').get();
+        const settingsDoc = await db.doc(PLATFORM_PATHS.apiKeys).get();
         if (settingsDoc.exists) {
             const raw = settingsDoc.data()?.gemini;
             if (raw && String(raw).length > 5) {

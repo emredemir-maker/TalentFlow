@@ -9,7 +9,7 @@
 import { Router } from 'express';
 
 import { aiLimiter } from '../middleware/rateLimit.js';
-import { verifyFirebaseToken, requireAuth } from '../middleware/auth.js';
+import { verifyFirebaseToken, requireTenant, WRITER_ROLES } from '../middleware/auth.js';
 import { generateText } from '../services/gemini.js';
 import { buildStructuredPrompt, sanitizeForPrompt } from '../services/promptGuard.js';
 import { childLogger } from '../services/logger.js';
@@ -55,7 +55,7 @@ router.post('/api/score-screening-answers', aiLimiter, verifyFirebaseToken, asyn
 });
 
 // Pozisyon editörü (recruiter) çağırır → rol kapısı.
-router.post('/api/suggest-screening-questions', aiLimiter, requireAuth(), async (req, res) => {
+router.post('/api/suggest-screening-questions', aiLimiter, requireTenant(WRITER_ROLES), async (req, res) => {
     const { positionTitle, requirements } = req.body || {};
     if (!positionTitle && !requirements) {
         return res.status(400).json({ error: 'positionTitle or requirements is required.' });
@@ -78,7 +78,7 @@ router.post('/api/suggest-screening-questions', aiLimiter, requireAuth(), async 
     }
 });
 
-router.post('/api/improve-screening-question', aiLimiter, requireAuth(), async (req, res) => {
+router.post('/api/improve-screening-question', aiLimiter, requireTenant(WRITER_ROLES), async (req, res) => {
     const { question, positionTitle, requirements } = req.body || {};
     if (!question?.trim()) return res.status(400).json({ error: 'question is required.' });
     const prompt = buildStructuredPrompt(

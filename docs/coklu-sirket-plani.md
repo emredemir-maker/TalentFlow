@@ -444,6 +444,30 @@ PR 0 doğrudan `main`'e (davranış değişmez); PR 1–7b entegrasyon dalına (
 | 8 | Geçiş + eski yolu temizleme | Entegrasyon dalı → `main` (§4.2); duman testi; 7 gün sonra eski veri, eski kod ve eski `role` talepleri temizlenir (§4.3). | S | Düşük (geri dönüş = revert) | Evet (temizlik ikinci şirketten önce) |
 | 9 | Sonra | Tenant dışa aktarma/silme (KVKK talebi, ayrılan müşteri); şirket kendi alan adından gönderim (isterse); ayrı Firestore veritabanı ihtiyacı yeniden değerlendirilir (K12); dış sızma testi. | — | — | Sızma testi yayın öncesi (Hub ROADMAP) |
 
+### 6.1 PR 2 sonrası sunucu sözleşmesi (PR 3–5 buna göre)
+
+- **Etkin şirket:** iç kullanıcı uçları `X-Tenant-Id` başlığını ister (yoksa 400 `TENANT_REQUIRED`). Yetki başlıktan
+  değil `tenants/{t}/members/{uid}` belgesinden: üye değil/şirket yok → 403 `NOT_A_MEMBER` (varlık sızmaz), rol
+  yetmiyor → 403 `FORBIDDEN`, askı → 403 `TENANT_SUSPENDED`, salt okunur bantta yazma → 402 `TENANT_READ_ONLY`,
+  kapalı → 402 `TENANT_CLOSED` (`functions/middleware/auth.js` → `requireTenant`).
+- **Roller:** eski `super_admin` → `admin`. Aday yazan uçlar (CV, toplu içe aktarma, bakım, e-posta) admin/recruiter;
+  OAuth bağlama department_user'a da açık; `support` hiçbir yazma ucunu açamaz.
+- **Platform yöneticisi:** `PLATFORM_ADMIN_EMAILS` (her istekte okunur, e-posta doğrulanmış olmalı) yalnız
+  `/api/admin/api-keys`, `/api/admin/integrations`, `/api/platform/usage`; şirket verisi için üyelik şart.
+- **Aday tarafı (geçici, PR 5'e kadar):** `/api/positions/:id`, `/api/applications`, `/api/session/:id`,
+  `/api/init-interview-session`, `/api/update-candidate-status`, `/api/candidate-respond` şirketi sorgu/gövdedeki
+  `tenantId`'den alır; kayıt kimliği yetki anahtarı olarak kalır, şirket kimliği aramayı o şirketin ağacına daraltır.
+  Yeni mülakat belgesini yalnız şirketin admin/recruiter'ı açar. PR 5'te `publicLinks` çözücüsü bunun yerini alır.
+- **Kaldırılanlar (K3):** `POST /api/auth/invitation-lookup`, `POST /api/send-invite`. `DELETE /api/admin/auth-user/:uid`
+  (ve `DELETE /api/admin/members/:uid`) artık üyeliği kaldırır (`status: removed`, son yönetici kilidi), Firebase
+  hesabına dokunmaz.
+- **`companyIntel` (K6):** `POST /api/company-intel/resolve {name, force?}` (önce şirketin elle kaydı, sonra ortak
+  önbellek `platform/companyIntel/entries/{id}`, yoksa sunucuda kaynaklı arama; aday bağlamı/`hint` sorguya ve
+  önbelleğe girmez), `PUT|DELETE /api/company-intel/manual` (şirkete özel `tenants/{t}/companyIntelManual`).
+  Yanıt ham kaynaklı yanıt (`answer`); ayrıştırma istemcide (PR 3).
+- **AI ölçümü:** platform toplamı `platformUsage/{day}`; şirket başına ölçüm PR 7. Storage: CV yüklemesi
+  `tenants/{t}/cvs/`, toplu kaynak öneki `tenants/{t}/bulk-imports/{uid}/`.
+
 Toplam kaba efor: **~3–4 hafta** (PR 0–8; davet/kayıt akışlarının kalkması PR 3'ü küçültüyor, e-posta (7b) ve destek
 üyeliği ekleniyor — toplam değişmedi), Hub tarafı ek ~1–1,5 hafta (köprü + admin konsolunda destek erişimi). Kritik yol:
 0 → 1 → 2 → (3, 4, 5, 6, 7, 7b paralel olabilir) → 8.

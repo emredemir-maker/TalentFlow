@@ -1,6 +1,6 @@
 // Background worker for bulk-import jobs.
 //
-// Jobs live in Firestore under BULK_JOBS_COLL with a sub-collection of
+// Jobs live in Firestore under tenants/{t}/bulkImportJobs with a sub-collection of
 // per-row 'items'. The worker loop:
 //   1. Polls for status='queued' jobs.
 //   2. Atomically claims one with a transaction (status -> 'processing').
@@ -28,14 +28,18 @@ import { generateText } from './gemini.js';
 import { childLogger } from './logger.js';
 import { positionRequirements } from './positionRequirements.js';
 import { expandJobSources } from './bulkExpand.js';
+import { storagePaths, tenantIdFromPath, tenantPaths } from './tenantPaths.js';
+import { decideTenantAccess, WRITER_ROLES } from '../middleware/auth.js';
 const log = childLogger('bulk-worker');
 
 const require = createRequire(import.meta.url);
 const mammoth = require('mammoth');
 
-export const BULK_JOBS_COLL = 'artifacts/talent-flow/public/data/bulkImportJobs';
-export const CANDIDATES_COLL = 'artifacts/talent-flow/public/data/candidates';
-export const POSITIONS_COLL = 'artifacts/talent-flow/public/data/positions';
+// İşler şirketin ağacında: tenants/{t}/bulkImportJobs/{id}(/items). İşçi tek bir
+// süreçte TÜM şirketlerin kuyruğunu collection group sorgusuyla yoklar; işin
+// şirketi belge YOLUNDAN çıkarılır (alandan değil) ve işin bütün okuma/yazması
+// o şirketin yollarıyla yapılır — bir şirketin işi başka şirkete aday yazamaz.
+export const BULK_JOBS_GROUP = 'bulkImportJobs';
 
 const normTitle = (s) => (s || '').trim().toLowerCase();
 
@@ -346,17 +350,20 @@ const normContact = (s) => (s || '').trim().toLowerCase().replace(/[\s\-().+]/g,
  * since older docs may store mixed case), then phone (raw + normalized).
  * Returns { id, foundBy } of the existing candidate, or null.
  */
-export async function findDuplicateCandidate(parsed, item = {}) {
+export async function findDuplicateCandidate(paths, parsed, item = {}) {
+    // Yalnız işin şirketinin havuzu: başka şirketin adayı mükerrer sayılmaz
+    // (ve böylece varlığı ifşa edilmez).
+    const candidates = paths.candidates();
     const emailRaw = (parsed?.email || item.email || '').trim();
     const emails = [...new Set([emailRaw.toLowerCase(), emailRaw].filter(Boolean))];
     for (const value of emails) {
-        const snap = await db.collection(CANDIDATES_COLL).where('email', '==', value).limit(1).get();
+        const snap = await db.collection(candidates).where('email', '==', value).limit(1).get();
         if (!snap.empty) return { id: snap.docs[0].id, foundBy: 'email' };
     }
     const phoneRaw = (parsed?.phone || '').trim();
     const phones = [...new Set([normContact(phoneRaw), phoneRaw].filter(Boolean))];
     for (const value of phones) {
-        const snap = await db.collection(CANDIDATES_COLL).where('phone', '==', value).limit(1).get();
+        const snap = await db.collection(candidates).where('phone', '==', value).limit(1).get();
         if (!snap.empty) return { id: snap.docs[0].id, foundBy: 'phone' };
     }
     return null;
@@ -385,16 +392,50 @@ async function extractCvTextFromUrl(cvUrl) {
     return extractCvText(buf, ext);
 }
 
+/**
+ * Collection group sonucundan yalnız şirket ağacındaki işleri bırakır.
+ * Eski ortak kökte aynı adlı koleksiyon dururken
+ * (PR 8'de silinir) oradaki işler de gruba düşer; onlar ASLA işlenmez.
+ */
+export function tenantJobDocs(docs) {
+    return docs.filter((d) => tenantIdFromPath(d.ref.path) !== null);
+}
+
+const QUEUE_PAGE = 10;
+const QUEUE_MAX_PAGES = 100;
+
+/**
+ * Kuyruktaki ŞİRKET işlerini bulur.
+ *
+ * Collection group sorgusunda `limit` süzgeçten ÖNCE uygulanıyor: eski ortak
+ * kökte bekleyen ≥10 iş varken tek sayfalık sorgu yalnız onları getirir,
+ * süzgeç hepsini atar ve şirket işleri hiç alınmazdı (eski kökteki işler
+ * değişmediği için sonsuza kadar). Firestore collection group sorgusunu yol
+ * önekine daraltamadığı için sayfa sayfa ilerleniyor: sonuçlar belge yoluna
+ * göre sıralı geliyor, dışarıda kalan sayfanın son belgesinden devam edilir.
+ * Sayfa sayısı sınırlı (en çok QUEUE_PAGE × QUEUE_MAX_PAGES belge).
+ */
+export async function findQueuedTenantJobs() {
+    // Tek alanlı collection group sorgusu (firestore.indexes.json →
+    // fieldOverrides: bulkImportJobs.status, COLLECTION_GROUP).
+    const base = db.collectionGroup(BULK_JOBS_GROUP).where('status', '==', 'queued');
+    let query = base.limit(QUEUE_PAGE);
+    for (let page = 0; page < QUEUE_MAX_PAGES; page += 1) {
+        const snap = await query.get();
+        const docs = tenantJobDocs(snap.docs);
+        if (docs.length > 0 || snap.size < QUEUE_PAGE) return docs;
+        query = base.startAfter(snap.docs[snap.docs.length - 1]).limit(QUEUE_PAGE);
+    }
+    log.warn('[bulk-import] kuyruk taraması sayfa sınırına ulaştı');
+    return [];
+}
+
 // Atomically claim a single queued job via Firestore transaction.
-async function claimNextQueuedJob() {
-    // Simple single-field query to avoid needing composite index
-    const snap = await db.collection(BULK_JOBS_COLL)
-        .where('status', '==', 'queued')
-        .limit(5)
-        .get();
-    if (snap.empty) return null;
+export async function claimNextQueuedJob() {
+    const docs = await findQueuedTenantJobs();
+    if (docs.length === 0) return null;
     // Pick earliest by createdAt if available, else first result
-    const sorted = snap.docs.sort((a, b) => {
+    const sorted = docs.sort((a, b) => {
         const ta = a.data().createdAt?.toMillis?.() || 0;
         const tb = b.data().createdAt?.toMillis?.() || 0;
         return ta - tb;
@@ -413,7 +454,7 @@ async function claimNextQueuedJob() {
         });
         claimed = true;
     });
-    return claimed ? jobDoc.id : null;
+    return claimed ? jobDoc.ref.path : null;
 }
 
 // Recover stale 'processing' jobs left from a previous crash/restart.
@@ -430,11 +471,11 @@ export async function recoverStaleJobs() {
         // 'unpacking' de kurtarılabilir olmalı: açma fazı uzun sürer ve o
         // sırada ölen bir instance işi orada asılı bırakırdı — yalnızca
         // 'processing' aranırken böyle bir iş kimsenin taramasına düşmüyordu.
-        const snap = await db.collection(BULK_JOBS_COLL)
+        const snap = await db.collectionGroup(BULK_JOBS_GROUP)
             .where('status', 'in', ['processing', 'unpacking'])
             .get();
         let recovered = 0;
-        for (const doc of snap.docs) {
+        for (const doc of tenantJobDocs(snap.docs)) {
             const d = doc.data();
             const heartbeat = d.lastUpdatedAt?.toMillis?.() || d.startedAt?.toMillis?.() || d.createdAt?.toMillis?.() || 0;
             if (Date.now() - heartbeat < STALE_JOB_MS) continue; // hâlâ canlı bir worker'da
@@ -456,16 +497,16 @@ export async function runBulkWorkerLoop() {
     try {
         let idlePolls = 0;
         while (true) {
-            let jobId = null;
+            let jobPath = null;
             try {
-                jobId = await claimNextQueuedJob();
+                jobPath = await claimNextQueuedJob();
             } catch (pollErr) {
                 // Firestore poll failed — retry after backoff
                 log.warn(`[bulk-import] Poll error: ${pollErr.message}`);
                 await new Promise(r => setTimeout(r, 10000));
                 continue;
             }
-            if (!jobId) {
+            if (!jobPath) {
                 // Öksüz iş taraması: deploy/ölçekleme sırasında instance'ı
                 // ölen bir job 'processing'de takılı kalır; kurtarma yalnızca
                 // cold start'ta çalıştığından, trafik canlı kaldığı sürece
@@ -475,13 +516,13 @@ export async function runBulkWorkerLoop() {
                 await new Promise(r => setTimeout(r, 5000));
                 continue;
             }
-            log.info(`[bulk-import] Worker claimed job ${jobId}`);
+            log.info(`[bulk-import] Worker claimed job ${jobPath}`);
             try {
-                await executeJob(jobId);
+                await executeJob(jobPath);
             } catch (err) {
-                log.error(`[bulk-import] Job ${jobId} fatal error: ${err.message}`);
+                log.error(`[bulk-import] Job ${jobPath} fatal error: ${err.message}`);
                 try {
-                    await db.doc(`${BULK_JOBS_COLL}/${jobId}`).update({
+                    await db.doc(jobPath).update({
                         status: 'error',
                         errorMessage: err.message,
                         completedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -508,7 +549,15 @@ export async function runBulkWorkerLoop() {
  * Toplam sayı ancak arşivler açıldıkça bilinir; ilerleme büyüyen bir toplamla
  * bildirilir. Ekran "0/0" ya da uydurulmuş bir hedef göstermez.
  */
-async function unpackSources(jobRef, itemsRef, sources) {
+async function unpackSources(jobRef, itemsRef, sources, tenantId) {
+    // Kaynaklar iş açılırken parseSources ile bu şirketin/kişinin önekine göre
+    // doğrulandı; işçi yine de indirmeden önce şirket önekini denetler (iş
+    // belgesini yalnız sunucu yazsa da tek bir hatalı yazım başka şirketin
+    // dosyasını okutmasın).
+    const prefix = storagePaths.tenantPrefix(tenantId);
+    if (sources.some((src) => !String(src?.storagePath || '').startsWith(prefix))) {
+        throw new Error('Kaynak dosya bu şirkete ait değil.');
+    }
     let bucket;
     try {
         bucket = getStorageBucket();
@@ -547,13 +596,44 @@ async function unpackSources(jobRef, itemsRef, sources) {
     return result;
 }
 
+/**
+ * İş hâlâ yazabilir mi? İşi açan kişi (createdBy) bu şirketin etkin
+ * admin/recruiter'ı olmalı ve şirket yazmaya açık olmalı (K5) — iş açılırken
+ * requireTenant'tan geçmiş olması yetmez: şirket salt okunur banda girerse,
+ * askıya alınırsa ya da kişi çıkarılırsa işçi aday yazmayı ve AI harcamayı
+ * bırakmalı. Kurallar bu koleksiyona istemci yazımını zaten kapatıyor; tek
+ * denetim burası.
+ */
+export async function jobMayWrite(tenantId, createdBy) {
+    if (!createdBy || typeof createdBy !== 'string') return false;
+    const paths = tenantPaths(tenantId);
+    const [t, m] = await db.getAll(db.doc(paths.root), db.doc(paths.member(createdBy)));
+    return decideTenantAccess({
+        tenant: t.exists ? t.data() : null,
+        member: m.exists ? m.data() : null,
+        roles: WRITER_ROLES,
+        write: true,
+    }).ok;
+}
+
+const WRITE_RECHECK_MS = 60 * 1000;
+
 // Execute a single job (already claimed, status = processing)
-async function executeJob(jobId) {
-    const jobRef = db.doc(`${BULK_JOBS_COLL}/${jobId}`);
-    const itemsRef = db.collection(`${BULK_JOBS_COLL}/${jobId}/items`);
+export async function executeJob(jobPath) {
+    const tenantId = tenantIdFromPath(jobPath);
+    if (!tenantId) throw new Error('İş şirket ağacında değil.');
+    const paths = tenantPaths(tenantId);
+    const jobId = jobPath.split('/').pop();
+    const jobRef = db.doc(paths.bulkJob(jobId));
+    const itemsRef = db.collection(paths.bulkItems(jobId));
     try {
         // status already set to 'processing' by claimNextQueuedJob
         const jobData = (await jobRef.get()).data() || {};
+        if (!(await jobMayWrite(tenantId, jobData.createdBy))) {
+            // Hata olarak kapanır (runBulkWorkerLoop status: 'error' yazar);
+            // kuyruğa geri dönmez.
+            throw new Error('TENANT_READ_ONLY: şirket yazmaya kapalı ya da işi açan kişinin yetkisi yok.');
+        }
         const positionId = jobData.positionId || '';
         const positionTitle = jobData.positionTitle || '';
 
@@ -561,7 +641,7 @@ async function executeJob(jobId) {
         // hiçbir kayıt işlenmez, bu yüzden yarıda kalan bir açmayı baştan
         // yapmak güvenlidir — üzerine yazılan kayıtların hiçbiri işlenmemiştir.
         if (!jobData.expanded && Array.isArray(jobData.sources) && jobData.sources.length > 0) {
-            await unpackSources(jobRef, itemsRef, jobData.sources);
+            await unpackSources(jobRef, itemsRef, jobData.sources, tenantId);
         }
 
         const itemsSnap = await itemsRef.orderBy('index').get();
@@ -576,7 +656,7 @@ async function executeJob(jobId) {
         // anahtar-kelime yedeğine düşer.
         let openPositions = [];
         try {
-            const posSnap = await db.collection(POSITIONS_COLL).where('status', '==', 'open').get();
+            const posSnap = await db.collection(paths.positions()).where('status', '==', 'open').get();
             openPositions = posSnap.docs
                 .map((d) => ({
                     id: d.id,
@@ -663,7 +743,7 @@ async function executeJob(jobId) {
                     // kayıt açma — item 'duplicate' işaretlenir, mevcut aday korunur.
                     let duplicate = null;
                     try {
-                        duplicate = await findDuplicateCandidate(parsed, item);
+                        duplicate = await findDuplicateCandidate(paths, parsed, item);
                     } catch (dupErr) {
                         // Lookup failure must not block candidate creation
                         log.warn(`[bulk-import] duplicate lookup failed for ${item.originalName}: ${dupErr.message}`);
@@ -686,7 +766,7 @@ async function executeJob(jobId) {
                     // pozisyon seçilmediyse bile aday gerçek bir pozisyona bağlanır.
                     const matchedPos = openPositions.find((p) => p.title === matchedTitle);
                     const noOpenMatch = matchedTitle === null && openPositionTitles.length > 0;
-                    await db.collection(CANDIDATES_COLL).add({
+                    await db.collection(paths.candidates()).add({
                         name: parsed?.name || item.name || item.originalName?.replace(/\.[^.]+$/, '') || '',
                         email: parsed?.email || item.email || '',
                         phone: parsed?.phone || '',
@@ -758,17 +838,32 @@ async function executeJob(jobId) {
         // ortak soğuma penceresiyle sağlanır.
         const CONCURRENCY = Math.max(1, parseInt(process.env.BULK_CONCURRENCY || '4', 10));
         let nextIdx = 0;
+        // Uzun işte yetki dakikada bir yeniden denetlenir (bkz. jobMayWrite).
+        let lastWriteCheck = Date.now();
+        let writeAllowed = true;
+        const stillAllowed = async () => {
+            if (Date.now() - lastWriteCheck >= WRITE_RECHECK_MS) {
+                lastWriteCheck = Date.now();
+                writeAllowed = await jobMayWrite(tenantId, jobData.createdBy);
+            }
+            return writeAllowed;
+        };
         await Promise.all(
             Array.from({ length: Math.min(CONCURRENCY, itemsSnap.docs.length) }, async (_, w) => {
                 // Kademeli başlangıç — işçiler Gemini'ye aynı anda vurmasın
                 await new Promise((r) => setTimeout(r, w * 500));
                 while (nextIdx < itemsSnap.docs.length) {
+                    if (!(await stillAllowed())) break;
                     const itemDoc = itemsSnap.docs[nextIdx];
                     nextIdx += 1;
                     await processItem(itemDoc);
                 }
             })
         );
+
+        if (!writeAllowed) {
+            throw new Error('TENANT_READ_ONLY: şirket yazmaya kapalı ya da işi açan kişinin yetkisi yok.');
+        }
 
         const doneSnap = await itemsRef.where('status', '==', 'done').get();
         const avgScore = doneSnap.size > 0

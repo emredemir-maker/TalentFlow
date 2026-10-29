@@ -18,6 +18,7 @@
 
 import { db, admin } from '../config/firebaseAdmin.js';
 import { childLogger } from './logger.js';
+import { PLATFORM_PATHS } from './tenantPaths.js';
 
 const log = childLogger('usage');
 
@@ -98,7 +99,9 @@ export async function recordUsage({ label, modelId = '', usage, cached = false, 
         const inc = admin?.firestore?.FieldValue?.increment;
         if (typeof inc !== 'function') return;
 
-        await db.doc(`artifacts/talent-flow/public/data/usage/${dayKey(now)}`).set(
+        // Platform toplamı (tüm şirketler). Şirket başına ölçüm PR 7'de
+        // (tenants/{t}/usage/{day}); global güvenlik tavanı bu belgeyi okur.
+        await db.doc(PLATFORM_PATHS.usageDay(dayKey(now))).set(
             {
                 day: dayKey(now),
                 totals: {

@@ -17,13 +17,11 @@ import { readFile, writeFile } from 'fs/promises';
 import path from 'path';
 import { createRequire } from 'module';
 
-import { requireAuth } from '../middleware/auth.js';
+import { requireTenant, WRITER_ROLES } from '../middleware/auth.js';
+import { isValidDocId } from '../services/tenantPaths.js';
 import { wrapMulter } from '../middleware/multipart.js';
 import { db, admin } from '../config/firebaseAdmin.js';
-import {
-    BULK_JOBS_COLL,
-    extractCvText,
-} from '../services/bulkWorker.js';
+import { extractCvText } from '../services/bulkWorker.js';
 import { parseSources } from '../services/bulkSources.js';
 import { chunk } from '../services/bulkExpand.js';
 import { childLogger } from '../services/logger.js';
@@ -59,7 +57,8 @@ export function createBulkRouter(uploadBaseDir) {
         },
     });
 
-    router.post('/api/bulk-import', requireAuth(), wrapMulter(bulkUpload.array('cvs', 20)), async (req, res) => {
+    // Toplu içe aktarma aday YAZAR → kurallardaki candidates yazımıyla aynı roller.
+    router.post('/api/bulk-import', requireTenant(WRITER_ROLES), wrapMulter(bulkUpload.array('cvs', 20)), async (req, res) => {
         try {
             const positionId = req.body?.positionId || '';
             const positionTitle = req.body?.positionTitle || '';
@@ -73,7 +72,7 @@ export function createBulkRouter(uploadBaseDir) {
                 const raw = typeof req.body.sources === 'string'
                     ? JSON.parse(req.body.sources)
                     : req.body.sources;
-                const parsed = parseSources(raw, req.user.uid);
+                const parsed = parseSources(raw, req.tenant.id, req.user.uid);
                 if (parsed.error) return res.status(400).json({ error: parsed.error });
                 sources = parsed.sources;
             } else if (req.files && req.files.length > 0) {
@@ -165,8 +164,10 @@ export function createBulkRouter(uploadBaseDir) {
                     }
                 }
             }
-            const jobRef = db.collection(BULK_JOBS_COLL).doc();
+            const jobRef = db.collection(req.paths.bulkJobs()).doc();
             await jobRef.set({
+                // Bilgi amaçlı; işçi şirketi belge YOLUNDAN çıkarır.
+                tenantId: req.tenant.id,
                 status: 'queued',
                 // Storage yolunda gerçek sayı ancak arşivler açılınca bilinir.
                 // Tahmini bir toplam yazmak, ölçülmemiş bir sayıyı ölçülmüş
@@ -197,9 +198,11 @@ export function createBulkRouter(uploadBaseDir) {
         }
     });
 
-    router.get('/api/bulk-import/:jobId', requireAuth(), async (req, res) => {
+    router.get('/api/bulk-import/:jobId', requireTenant(), async (req, res) => {
         try {
-            const jobRef = db.doc(`${BULK_JOBS_COLL}/${req.params.jobId}`);
+            if (!isValidDocId(req.params.jobId)) return res.status(404).json({ error: 'Job bulunamadı.' });
+            // Yalnız bu şirketin işi: başka şirketin iş kimliği burada 404.
+            const jobRef = db.doc(req.paths.bulkJob(req.params.jobId));
             let snap = await jobRef.get();
             if (!snap.exists) return res.status(404).json({ error: 'Job bulunamadı.' });
             let data = snap.data();

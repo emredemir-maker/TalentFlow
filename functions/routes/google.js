@@ -18,7 +18,7 @@
 // yenilenmeli), TOKEN_EXPIRED (Google 401), AUTH_SCOPE (Google 403).
 import { Router } from 'express';
 
-import { requireAuth } from '../middleware/auth.js';
+import { requireTenant, SELF_WRITER_ROLES } from '../middleware/auth.js';
 import { IntegrationError } from '../services/integrationTokens.js';
 import { tokenStore } from '../services/integrationTokenStore.js';
 import { childLogger } from '../services/logger.js';
@@ -131,8 +131,9 @@ function sendError(res, err, fallback) {
 }
 
 /** Kullanıcının jetonuyla Google API çağrısı; hata durumunda status taşıyan Error fırlatır. */
-async function googleFetch(uid, url, init = {}) {
-    const token = await tokenStore.getAccessToken(uid, 'google');
+async function googleFetch(req, url, init = {}) {
+    // Jeton bu şirketteki bağlantıdan: başka şirketteki bağlantı kullanılamaz.
+    const token = await tokenStore.getAccessToken(req.tenant.id, req.user.uid, 'google');
     const res = await fetch(url, {
         ...init,
         headers: { ...(init.headers || {}), 'Authorization': `Bearer ${token}` },
@@ -146,7 +147,7 @@ async function googleFetch(uid, url, init = {}) {
     return data;
 }
 
-router.post('/api/google/send-email', requireAuth(), async (req, res) => {
+router.post('/api/google/send-email', requireTenant(SELF_WRITER_ROLES), async (req, res) => {
     const { to, subject = '', body, html, replyTo, ics } = req.body || {};
     const recipients = parseRecipients(to);
     if (!recipients) return res.status(400).json({ success: false, error: 'Geçersiz alıcı adresi.' });
@@ -160,7 +161,7 @@ router.post('/api/google/send-email', requireAuth(), async (req, res) => {
 
     try {
         const raw = buildRawEmail({ to: recipients.join(', '), subject, body, html, replyTo: replyTo?.trim(), ics });
-        const data = await googleFetch(req.user.uid, 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+        const data = await googleFetch(req, 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ raw }),
@@ -171,12 +172,12 @@ router.post('/api/google/send-email', requireAuth(), async (req, res) => {
     }
 });
 
-router.get('/api/google/thread/:threadId', requireAuth(), async (req, res) => {
+router.get('/api/google/thread/:threadId', requireTenant(SELF_WRITER_ROLES), async (req, res) => {
     const { threadId } = req.params;
     if (!/^[A-Za-z0-9_-]{1,128}$/.test(threadId)) return res.status(400).json({ success: false, error: 'Geçersiz konuşma kimliği.' });
     try {
         const data = await googleFetch(
-            req.user.uid,
+            req,
             `https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date`
         );
         const messages = (data.messages || []).map((msg) => {
@@ -195,17 +196,16 @@ router.get('/api/google/thread/:threadId', requireAuth(), async (req, res) => {
     }
 });
 
-router.get('/api/google/check-messages', requireAuth(), async (req, res) => {
+router.get('/api/google/check-messages', requireTenant(SELF_WRITER_ROLES), async (req, res) => {
     const { q } = req.query;
     if (!q || typeof q !== 'string') return res.status(400).json({ success: false, error: 'Query is required.' });
 
     try {
-        const uid = req.user.uid;
-        const searchData = await googleFetch(uid, `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(q)}&maxResults=1`);
+        const searchData = await googleFetch(req, `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(q)}&maxResults=1`);
         if (!searchData.messages?.length) return res.json({ success: true, found: false });
 
         const msgId = searchData.messages[0].id;
-        const msgData = await googleFetch(uid, `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(msgId)}`);
+        const msgData = await googleFetch(req, `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(msgId)}`);
 
         const decode = (data) => Buffer.from(data, 'base64').toString('utf-8');
         let body = '';
@@ -234,21 +234,21 @@ router.get('/api/google/check-messages', requireAuth(), async (req, res) => {
 
 const isDateString = (v) => typeof v === 'string' && !Number.isNaN(Date.parse(v));
 
-router.get('/api/google/calendar-events', requireAuth(), async (req, res) => {
+router.get('/api/google/calendar-events', requireTenant(SELF_WRITER_ROLES), async (req, res) => {
     const { timeMin, timeMax } = req.query;
     if (!isDateString(timeMin) || !isDateString(timeMax)) {
         return res.status(400).json({ success: false, error: 'timeMin ve timeMax geçerli tarih olmalı.' });
     }
     try {
         const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}&singleEvents=true&orderBy=startTime`;
-        const data = await googleFetch(req.user.uid, url);
+        const data = await googleFetch(req, url);
         res.json({ success: true, events: data.items || [] });
     } catch (err) {
         sendError(res, err, 'Takvim verileri alınamadı.');
     }
 });
 
-router.post('/api/google/calendar-events', requireAuth(), async (req, res) => {
+router.post('/api/google/calendar-events', requireTenant(SELF_WRITER_ROLES), async (req, res) => {
     const { summary, description, startDateTime, endDateTime, guestEmail, guestEmails, timeZone } = req.body || {};
     if (!summary || !isDateString(startDateTime) || !isDateString(endDateTime)) {
         return res.status(400).json({ success: false, error: 'Eksik parametre.' });
@@ -284,7 +284,7 @@ router.post('/api/google/calendar-events', requireAuth(), async (req, res) => {
 
     try {
         const data = await googleFetch(
-            req.user.uid,
+            req,
             'https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1&sendUpdates=none',
             { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(event) }
         );

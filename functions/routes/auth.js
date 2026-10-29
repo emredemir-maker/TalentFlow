@@ -8,11 +8,12 @@
 //   POST /api/auth/<provider>/exchange  — swap the auth code for tokens, fetch
 //                                         the user's email, and persist the
 //                                         tokens ŞİFRELİ olarak
-//                                         integrationSecrets/{uid}'e; profilde
-//                                         yalnızca connected/email kalır
+//                                         tenants/{t}/integrationSecrets/{uid}'e;
+//                                         üyelik belgesinde yalnızca
+//                                         connected/email kalır
 //                                         (services/integrationTokens.js).
-//                                         uid DOĞRULANMIŞ Firebase tokenından
-//                                         gelir (req.authUser.uid); anonim
+//                                         uid ve şirket requireTenant'tan
+//                                         gelir (req.user, req.tenant); anonim
 //                                         oturumlar reddedilir.
 //
 // Yenileme artık burada değil: istemci refresh token'ı hiç görmüyor; sunucu
@@ -23,9 +24,7 @@
 // from Firestore at startup and updated via /api/admin/integrations.
 import { Router } from 'express';
 
-import { verifyFirebaseToken, rejectAnonymous } from '../middleware/auth.js';
-import { inviteLimiter } from '../middleware/rateLimit.js';
-import { db } from '../config/firebaseAdmin.js';
+import { requireTenant, SELF_WRITER_ROLES } from '../middleware/auth.js';
 import { integrationConfigs } from '../config/integrations.js';
 import { tokenStore } from '../services/integrationTokenStore.js';
 import { GOOGLE_SCOPES, MS_SCOPES, expiresAtFrom } from '../services/oauthProviders.js';
@@ -62,7 +61,7 @@ router.get('/api/auth/microsoft/url', async (req, res) => {
     }
 });
 
-router.post('/api/auth/microsoft/exchange', verifyFirebaseToken, rejectAnonymous, async (req, res) => {
+router.post('/api/auth/microsoft/exchange', requireTenant(SELF_WRITER_ROLES), async (req, res) => {
     try {
         const cfg = integrationConfigs.microsoft365;
         if (!cfg?.clientId || !cfg?.tenantId || !cfg?.clientSecret) {
@@ -73,7 +72,7 @@ router.post('/api/auth/microsoft/exchange', verifyFirebaseToken, rejectAnonymous
 
         // Tokenlar YALNIZCA çağıranın kendi profiline yazılır — userId asla
         // istemci verisinden (state blob / body) alınmaz (IDOR düzeltmesi).
-        const userId = req.authUser.uid;
+        const userId = req.user.uid;
 
         const redirect = redirectUri || cfg.redirectUri || `${req.protocol}://${req.get('host')}/auth/microsoft/callback`;
 
@@ -109,7 +108,7 @@ router.post('/api/auth/microsoft/exchange', verifyFirebaseToken, rejectAnonymous
             email = profile.mail || profile.userPrincipalName || '';
         } catch { /* non-fatal */ }
 
-        await tokenStore.connect(userId, 'microsoft', {
+        await tokenStore.connect(req.tenant.id, userId, 'microsoft', {
             email,
             accessToken: access_token,
             refreshToken: refresh_token,
@@ -153,7 +152,7 @@ router.get('/api/auth/google/url', async (req, res) => {
     }
 });
 
-router.post('/api/auth/google/exchange', verifyFirebaseToken, rejectAnonymous, async (req, res) => {
+router.post('/api/auth/google/exchange', requireTenant(SELF_WRITER_ROLES), async (req, res) => {
     try {
         const cfg = integrationConfigs.google;
         if (!cfg?.clientId || !cfg?.clientSecret) {
@@ -163,7 +162,7 @@ router.post('/api/auth/google/exchange', verifyFirebaseToken, rejectAnonymous, a
         if (!code) return res.status(400).json({ error: 'OAuth kodu eksik.' });
 
         // IDOR düzeltmesi: userId doğrulanmış tokendan gelir, state yok sayılır.
-        const userId = req.authUser.uid;
+        const userId = req.user.uid;
 
         const redirect = redirectUri || cfg.redirectUri || `${req.protocol}://${req.get('host')}/auth/google/callback`;
 
@@ -194,7 +193,7 @@ router.post('/api/auth/google/exchange', verifyFirebaseToken, rejectAnonymous, a
             email = profile.email || '';
         } catch { /* non-fatal */ }
 
-        await tokenStore.connect(userId, 'google', {
+        await tokenStore.connect(req.tenant.id, userId, 'google', {
             email,
             accessToken: access_token,
             refreshToken: refresh_token,
@@ -218,13 +217,13 @@ router.post('/api/auth/google/exchange', verifyFirebaseToken, rejectAnonymous, a
 // getAccessToken REAUTH_REQUIRED döner ve SPA popup'ı yeniden açar.
 const FIREBASE_TOKEN_TTL_MS = 55 * 60 * 1000;
 
-router.post('/api/auth/google/firebase-token', verifyFirebaseToken, rejectAnonymous, async (req, res) => {
+router.post('/api/auth/google/firebase-token', requireTenant(SELF_WRITER_ROLES), async (req, res) => {
     const { accessToken, email } = req.body || {};
     if (typeof accessToken !== 'string' || accessToken.length < 10 || accessToken.length > 4096) {
         return res.status(400).json({ error: 'Geçersiz erişim jetonu.' });
     }
     try {
-        await tokenStore.connect(req.authUser.uid, 'google', {
+        await tokenStore.connect(req.tenant.id, req.user.uid, 'google', {
             email: typeof email === 'string' ? email : '',
             accessToken,
             tokenExpiresAt: Date.now() + FIREBASE_TOKEN_TTL_MS,
@@ -240,11 +239,11 @@ router.post('/api/auth/google/firebase-token', verifyFirebaseToken, rejectAnonym
 // ─── Bağlantıyı kes ───────────────────────────────────────────────────────────
 // Profildeki `integrations` alanı firestore.rules'ta istemci yazımına kapalı
 // (jeton alanları bir daha oraya yazılamasın diye) — kesme de sunucudan.
-router.post('/api/auth/:provider/disconnect', verifyFirebaseToken, rejectAnonymous, async (req, res) => {
+router.post('/api/auth/:provider/disconnect', requireTenant(SELF_WRITER_ROLES), async (req, res) => {
     const { provider } = req.params;
     if (provider !== 'google' && provider !== 'microsoft') return res.status(400).json({ error: 'Bilinmeyen sağlayıcı.' });
     try {
-        await tokenStore.disconnect(req.authUser.uid, provider);
+        await tokenStore.disconnect(req.tenant.id, req.user.uid, provider);
         res.json({ success: true });
     } catch (err) {
         log.error({ err: err.message }, `[${provider}/disconnect]`);
@@ -252,61 +251,7 @@ router.post('/api/auth/:provider/disconnect', verifyFirebaseToken, rejectAnonymo
     }
 });
 
-// ─── Davetiye sorgusu ─────────────────────────────────────────────────────────
-//
-// ── NEDEN SUNUCUDA ──────────────────────────────────────────────────────────
-// Kayıt akışı, hesap HENÜZ YOKKEN "bu e-postaya bekleyen bir davet var mı"
-// sorusunu sormak zorunda: kullanıcı dokümanını yazan Firestore kuralı,
-// istenen rolün karşılığında bir davet kimliği (`inviteId`) görmek istiyor.
-//
-// Bu yüzden davetiye koleksiyonunda `allow read: if true` duruyordu. Ama
-// Firestore'da `read` hem `get` hem `list` demek: kural, kimliksiz bir
-// istemcinin koleksiyonun TAMAMINI dökmesine — yani davet edilmiş bütün
-// e-posta adreslerini ve rollerini tek istekte okumasına — izin veriyordu.
-//
-// Sorgu buraya taşındı. Admin SDK kuralların dışında çalıştığı için istemcinin
-// koleksiyona hiç erişmesi gerekmiyor; kural artık super_admin'e kapalı.
-// Geriye kalan tek bilgi sızıntısı "şu e-posta davetli mi" cevabı — bu, akışın
-// çalışması için zorunlu ve `inviteLimiter` ile saatte 10 denemeye bağlı.
-
-const INVITATIONS_PATH = 'artifacts/talent-flow/public/data/invitations';
-
-/**
- * Davet dokümanını istemcinin ihtiyaç duyduğu asgari alanlara indirger.
- *
- * SADECE ÜÇ ALAN dönüyor: davet dokümanının kendisini olduğu gibi vermek,
- * kimliksiz bir uçtan davet edenin kimliği ve zaman damgaları gibi alanları da
- * sızdırırdı.
- *
- * Departman listesi eski tekil `department` alanını da tolere ediyor — aynı
- * geri düşme zinciri Firestore kuralında da var (`inviteDepartments`); ikisi
- * ayrışırsa kural, istemcinin yazdığı profili reddeder.
- */
-export function invitationPayload(doc) {
-    const d = (typeof doc?.data === 'function' ? doc.data() : null) || {};
-    const departments = Array.isArray(d.departments)
-        ? d.departments
-        : (d.department ? [d.department] : []);
-    return { inviteId: doc.id, role: d.role || 'recruiter', departments };
-}
-
-router.post('/api/auth/invitation-lookup', inviteLimiter, async (req, res) => {
-    const email = String(req.body?.email || '').trim().toLowerCase();
-    if (!email || !email.includes('@')) {
-        return res.status(400).json({ error: 'Geçerli bir e-posta adresi gerekli.' });
-    }
-    try {
-        const snap = await db.collection(INVITATIONS_PATH)
-            .where('email', '==', email)
-            .where('status', '==', 'pending')
-            .limit(1)
-            .get();
-        if (snap.empty) return res.json({ found: false });
-        return res.json({ found: true, ...invitationPayload(snap.docs[0]) });
-    } catch (err) {
-        log.error({ err: err.message }, '[invitation-lookup]');
-        return res.status(500).json({ error: 'Davetiye kontrolü yapılamadı.' });
-    }
-});
+// Davetiye sorgusu (`/api/auth/invitation-lookup`) KALDIRILDI (K3): Talent'a
+// giriş yalnız Hub'dan; üyelik Hub'dan gelir, Talent'ın kendi daveti yok.
 
 export default router;
