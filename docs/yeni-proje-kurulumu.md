@@ -218,6 +218,37 @@ Demo aynı fonksiyon kaynağını kullanıyor: fonksiyon artık `talentflowApi` 
 dört çalışma rolünü ver (yukarıdaki tablo). Demo değişkenleri: `DEMO_FIREBASE_PROJECT_ID`,
 `DEMO_FIREBASE_MESSAGING_SENDER_ID`, `DEMO_FIREBASE_APP_ID`. Kimlikte "demo" geçmeli.
 
+### 9. Firestore PITR ve indeks dosyası (elle, Emre — çok şirketli geçiş PR 0)
+
+Bu iki adım ajan oturumundan yapılamıyor (projeye erişim yok); gerçek müşteri verisi gelmeden önce bir kez yapılır.
+
+**PITR (zamanda geri dönüş, 7 gün).** Silinen ya da bozulan veriyi son 7 gün içindeki herhangi bir dakikaya geri
+almayı sağlar. Ücret: saklanan eski sürümler kadar ek depolama.
+
+```bash
+gcloud firestore databases update --database='(default)' --enable-pitr --project=agentinn-nyqpx
+# doğrulama: POINT_IN_TIME_RECOVERY_ENABLED ve 604800s görünmeli
+gcloud firestore databases describe --database='(default)' --project=agentinn-nyqpx \
+  --format='value(pointInTimeRecoveryEnablement,versionRetentionPeriod)'
+```
+
+Konsoldan: Firebase/Cloud konsolu → Firestore → `(default)` → **Disaster recovery** → **Edit** → "Point-in-time
+recovery" aç → Kaydet.
+
+**İndeks dosyası.** Repoda `firestore.indexes.json` var; kodun sorgularından türetildi ve bileşik indeks gerektiren
+sorgu bulunmadığı için boş (yalnız eşitlik süzgeçleri ve tek alanlı `orderBy`; Firestore bunları otomatik indekslerle
+karşılıyor). Konsolda elle açılmış indeks olup olmadığını karşılaştır:
+
+```bash
+firebase firestore:indexes --project agentinn-nyqpx > /tmp/indexes-konsol.json
+diff <(jq -S . /tmp/indexes-konsol.json) <(jq -S . firestore.indexes.json)
+```
+
+Fark varsa konsoldaki indeksleri dosyaya ekleyen bir PR aç. **Dosya şimdilik `firebase.json`'a bağlı değil**: dağıtım
+`--only …,firestore` ve `--force` ile çalışıyor; dosya bağlanırsa CLI dosyada olmayan konsol indekslerini **siler**.
+Karşılaştırma bitip dosya konsolla aynı olunca `firebase.json` → `firestore.indexes: "firestore.indexes.json"`
+eklenir (çok şirketli geçişte işçinin collection group indeksi bu dosyaya girecek).
+
 ## Sonra
 
 - `deploy-n8n-local`'de yarım kalan kurulum (servis hesabı, web uygulaması) zararsız; temizleme kararı Emre'nin.

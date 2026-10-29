@@ -6,13 +6,19 @@
 #   - build: Vite production build
 #   - e2e:   Playwright smoke tests against `vite preview` (no Firebase
 #            secrets required — public-route smokes only)
+#   - rules-test: Firestore + Storage güvenlik kuralı testleri (emülatör)
 name: CI
 
+# claude/talent-mt: çok şirketli geçişin entegrasyon dalı
+# (docs/coklu-sirket-plani.md §4.1). PR 1–7 bu dala birleşiyor; dal main'e tek
+# birleştirmeyle geçene kadar kural testleri ve E2E'nin orada da koşması
+# gerekiyor. Dağıtım workflow'u yalnızca main'i dinliyor — bu dala push canlıya
+# hiçbir şey göndermez.
 on:
   pull_request:
-    branches: [main]
+    branches: [main, claude/talent-mt]
   push:
-    branches: [main]
+    branches: [main, claude/talent-mt]
 
 # Cancel superseded runs when a branch is pushed to repeatedly.
 #
@@ -172,6 +178,33 @@ jobs:
         # the build if the main app chunk grows past the budget defined
         # in scripts/check-bundle-size.mjs.
         run: npm run check:bundle-size
+
+  # ── Güvenlik kuralı testleri ──────────────────────────────────────────────
+  # firestore.rules ve storage.rules'u emülatöre yükleyip
+  # @firebase/rules-unit-testing ile sınar (tests/rules/). Kural dosyası
+  # dağıtımda proje geneline gidiyor; bir koşulun yanlışlıkla gevşemesi ancak
+  # burada yakalanır. Emülatör kurulumu e2e-emulator işiyle aynı (Java 21 +
+  # firebase-tools); ayrı yapılandırma (firebase.rules-test.json) üretim
+  # firebase.json'una dokunmadan Storage emülatörünü de açar.
+  rules-test:
+    name: Güvenlik kuralı testleri (emülatör)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm ci --no-audit --no-fund
+      - name: Install firebase-tools
+        run: npm install -g firebase-tools@latest
+      - name: Kural testleri
+        run: npm run test:rules
 
   e2e:
     name: E2E (Playwright smoke)

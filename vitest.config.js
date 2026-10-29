@@ -31,6 +31,9 @@ export default defineConfig({
             // Playwright E2E specs live under tests/e2e/ — they're driven
             // by `npm run test:e2e` (a separate runner), not vitest.
             'tests/e2e/**',
+            // Güvenlik kuralı testleri emülatör ister — `npm run test:rules`
+            // (vitest.rules.config.js) ile ayrı koşar.
+            'tests/rules/**',
         ],
         coverage: {
             provider: 'v8',
