@@ -60,12 +60,28 @@ export function unauthCtx(env) {
     return env.unauthenticatedContext();
 }
 
+// Matristeki bir kimliğin (tests/rules/matrix.js → IDENTITIES) bağlamı.
+export function ctxFor(env, key, identity) {
+    switch (identity.kind) {
+        case 'anon':
+            return anonCtx(env, key);
+        case 'unauth':
+            return unauthCtx(env);
+        default:
+            return strictCtx(env, key, identity.claims || {});
+    }
+}
+
 // Kuralları devre dışı bırakıp tohum verisi yazar.
 export async function seed(env, docs) {
     await env.withSecurityRulesDisabled(async (ctx) => {
         const db = ctx.firestore();
-        for (const [path, data] of Object.entries(docs)) {
-            await db.doc(path).set(data);
+        const entries = Object.entries(docs);
+        // Toplu yazım: matris yüzlerce belge tohumluyor (sınır 500/parti).
+        for (let i = 0; i < entries.length; i += 400) {
+            const batch = db.batch();
+            for (const [path, data] of entries.slice(i, i + 400)) batch.set(db.doc(path), data);
+            await batch.commit();
         }
     });
 }
