@@ -35,8 +35,10 @@ import fs from 'fs';
 import path from 'path';
 
 import { generalLimiter } from '../middleware/rateLimit.js';
-import { requireTenant, WRITER_ROLES } from '../middleware/auth.js';
-import { isValidDocId, isValidTenantId, tenantPaths } from '../services/tenantPaths.js';
+import { randomUUID } from 'crypto';
+
+import { requireTenant, loadPublicTenant, WRITER_ROLES } from '../middleware/auth.js';
+import { isValidDocId } from '../services/tenantPaths.js';
 import { db, admin } from '../config/firebaseAdmin.js';
 import { childLogger } from '../services/logger.js';
 const log = childLogger('email');
@@ -194,7 +196,10 @@ router.post('/api/send-interview-invite', generalLimiter, requireTenant(WRITER_R
 
 // /api/gemini-stt moved to routes/ai.js
 router.post('/api/send-info-request', generalLimiter, requireTenant(WRITER_ROLES), async (req, res) => {
-    const { to, candidateName, recruiterName, recruiterEmail, position, requestMessage, requestedItems, sessionId, candidateId, branding, requestId: clientRequestId, respondUrl: clientRespondUrl } = req.body;
+    // requestId ve respondUrl istemciden ALINMAZ: gelen kutusu tüm şirketlerde
+    // ortak ve yanıt konudaki kimlikle eşleşiyor; istemci kimliği seçebilseydi
+    // başka şirketin talebinin kimliğini kopyalayıp yanıtını kendine çekebilirdi.
+    const { to, candidateName, recruiterName, recruiterEmail, position, requestMessage, requestedItems, sessionId, candidateId, branding } = req.body;
     if (!to || !candidateName) return res.status(400).json({ error: 'Email ve aday adı gereklidir.' });
     const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
     if (!emailRe.test(to)) return res.status(400).json({ error: 'Geçersiz email adresi.' });
@@ -209,12 +214,10 @@ router.post('/api/send-info-request', generalLimiter, requireTenant(WRITER_ROLES
     const b = branding || { companyName: 'Talent-Inn', primaryColor: '#1E3A8A' };
     const fromName = (b.companyName || 'Talent-Inn').slice(0, 100);
     try {
-        if (clientRequestId && (!isValidDocId(clientRequestId) || !String(clientRequestId).startsWith('ir-'))) {
-            return res.status(400).json({ error: 'Geçersiz talep kimliği.' });
-        }
-        const requestId = clientRequestId || `ir-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        const requestId = `ir-${randomUUID()}`;
         const APP_URL = resolveAppUrl();
-        const respondUrl = clientRespondUrl || `${APP_URL}/respond/${requestId}?type=info`;
+        // Şirket kimliği bağlantıda (geçici — PR 5'te publicLinks).
+        const respondUrl = `${APP_URL}/respond/${requestId}?type=info&tenantId=${encodeURIComponent(req.tenant.id)}`;
         try {
             // Rol ve şirket requireTenant'ta denetlendi; kayıt şirketin yolunda.
             await db.doc(req.paths.infoRequest(requestId)).set(
@@ -278,9 +281,12 @@ router.post('/api/send-info-request', generalLimiter, requireTenant(WRITER_ROLES
 router.post('/api/candidate-respond', generalLimiter, async (req, res) => {
     const { id, type, action, responseData, tenantId } = req.body;
     if (!id || !type) return res.status(400).json({ error: 'id ve type gereklidir.' });
-    if (!isValidTenantId(tenantId) || !isValidDocId(id)) return res.status(404).json({ error: 'Talep bulunamadı.' });
-    const paths = tenantPaths(tenantId);
+    if (!isValidDocId(id)) return res.status(404).json({ error: 'Talep bulunamadı.' });
     try {
+        // Kapalı/salt okunur/askıdaki şirkete aday yazımı yok (K5).
+        const tenant = await loadPublicTenant(String(tenantId || ''), { write: true });
+        if (!tenant) return res.status(404).json({ error: 'Talep bulunamadı.' });
+        const paths = tenant.paths;
         const now = admin.firestore.FieldValue.serverTimestamp();
         if (type === 'info') {
             const ref = db.doc(paths.infoRequest(id));
@@ -490,6 +496,25 @@ function fetchImapInfoReplies() {
     });
 }
 
+/**
+ * Gelen yanıt bu talebe uygulanacak mı; uygulanacaksa yazılacak alanlar.
+ * Yalnız talebin gönderildiği adresten gelen yanıt: konudaki kimliği bilen
+ * başkası (ortak gelen kutusuna yazan herkes) yanıt enjekte edemesin.
+ * @returns {object|null}
+ */
+export function replyPatch(existing, reply, now = new Date()) {
+    const from = String(reply?.from || '').trim().toLowerCase();
+    if (!from || String(existing?.candidateEmail || '').trim().toLowerCase() !== from) return null;
+    const status = existing.status;
+    if (status !== 'pending' && existing.replyBody) return null;
+    const patch = { replySubject: reply.subject, replyBody: reply.replyBody || '' };
+    if (status === 'pending') {
+        patch.status = 'responded';
+        patch.respondedAt = now;
+    }
+    return patch;
+}
+
 router.post('/api/check-info-replies', generalLimiter, requireTenant(WRITER_ROLES), async (req, res) => {
     try {
         const replies = await fetchImapInfoReplies();
@@ -503,12 +528,8 @@ router.post('/api/check-info-replies', generalLimiter, requireTenant(WRITER_ROLE
                 const ref = db.doc(req.paths.infoRequest(reply.requestId));
                 const snap = await ref.get();
                 if (!snap.exists) continue;
-                const existing = snap.data() || {};
-                const status = existing.status;
-                const existingReplyBody = existing.replyBody || '';
-                if (status !== 'pending' && existingReplyBody) continue;
-                const patch = { replySubject: reply.subject, replyBody: reply.replyBody || '' };
-                if (status === 'pending') { patch.status = 'responded'; patch.respondedAt = new Date(); }
+                const patch = replyPatch(snap.data() || {}, reply);
+                if (!patch) continue;
                 await ref.update(patch);
                 updated++;
                 log.info(`✅ Yanıt işaretlendi: ${reply.requestId}`);

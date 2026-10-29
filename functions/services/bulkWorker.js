@@ -29,6 +29,7 @@ import { childLogger } from './logger.js';
 import { positionRequirements } from './positionRequirements.js';
 import { expandJobSources } from './bulkExpand.js';
 import { storagePaths, tenantIdFromPath, tenantPaths } from './tenantPaths.js';
+import { decideTenantAccess, WRITER_ROLES } from '../middleware/auth.js';
 const log = childLogger('bulk-worker');
 
 const require = createRequire(import.meta.url);
@@ -572,8 +573,30 @@ async function unpackSources(jobRef, itemsRef, sources, tenantId) {
     return result;
 }
 
+/**
+ * İş hâlâ yazabilir mi? İşi açan kişi (createdBy) bu şirketin etkin
+ * admin/recruiter'ı olmalı ve şirket yazmaya açık olmalı (K5) — iş açılırken
+ * requireTenant'tan geçmiş olması yetmez: şirket salt okunur banda girerse,
+ * askıya alınırsa ya da kişi çıkarılırsa işçi aday yazmayı ve AI harcamayı
+ * bırakmalı. Kurallar bu koleksiyona istemci yazımını zaten kapatıyor; tek
+ * denetim burası.
+ */
+export async function jobMayWrite(tenantId, createdBy) {
+    if (!createdBy || typeof createdBy !== 'string') return false;
+    const paths = tenantPaths(tenantId);
+    const [t, m] = await db.getAll(db.doc(paths.root), db.doc(paths.member(createdBy)));
+    return decideTenantAccess({
+        tenant: t.exists ? t.data() : null,
+        member: m.exists ? m.data() : null,
+        roles: WRITER_ROLES,
+        write: true,
+    }).ok;
+}
+
+const WRITE_RECHECK_MS = 60 * 1000;
+
 // Execute a single job (already claimed, status = processing)
-async function executeJob(jobPath) {
+export async function executeJob(jobPath) {
     const tenantId = tenantIdFromPath(jobPath);
     if (!tenantId) throw new Error('İş şirket ağacında değil.');
     const paths = tenantPaths(tenantId);
@@ -583,6 +606,11 @@ async function executeJob(jobPath) {
     try {
         // status already set to 'processing' by claimNextQueuedJob
         const jobData = (await jobRef.get()).data() || {};
+        if (!(await jobMayWrite(tenantId, jobData.createdBy))) {
+            // Hata olarak kapanır (runBulkWorkerLoop status: 'error' yazar);
+            // kuyruğa geri dönmez.
+            throw new Error('TENANT_READ_ONLY: şirket yazmaya kapalı ya da işi açan kişinin yetkisi yok.');
+        }
         const positionId = jobData.positionId || '';
         const positionTitle = jobData.positionTitle || '';
 
@@ -787,17 +815,32 @@ async function executeJob(jobPath) {
         // ortak soğuma penceresiyle sağlanır.
         const CONCURRENCY = Math.max(1, parseInt(process.env.BULK_CONCURRENCY || '4', 10));
         let nextIdx = 0;
+        // Uzun işte yetki dakikada bir yeniden denetlenir (bkz. jobMayWrite).
+        let lastWriteCheck = Date.now();
+        let writeAllowed = true;
+        const stillAllowed = async () => {
+            if (Date.now() - lastWriteCheck >= WRITE_RECHECK_MS) {
+                lastWriteCheck = Date.now();
+                writeAllowed = await jobMayWrite(tenantId, jobData.createdBy);
+            }
+            return writeAllowed;
+        };
         await Promise.all(
             Array.from({ length: Math.min(CONCURRENCY, itemsSnap.docs.length) }, async (_, w) => {
                 // Kademeli başlangıç — işçiler Gemini'ye aynı anda vurmasın
                 await new Promise((r) => setTimeout(r, w * 500));
                 while (nextIdx < itemsSnap.docs.length) {
+                    if (!(await stillAllowed())) break;
                     const itemDoc = itemsSnap.docs[nextIdx];
                     nextIdx += 1;
                     await processItem(itemDoc);
                 }
             })
         );
+
+        if (!writeAllowed) {
+            throw new Error('TENANT_READ_ONLY: şirket yazmaya kapalı ya da işi açan kişinin yetkisi yok.');
+        }
 
         const doneSnap = await itemsRef.where('status', '==', 'done').get();
         const avgScore = doneSnap.size > 0

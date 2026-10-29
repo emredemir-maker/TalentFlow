@@ -30,10 +30,16 @@ const router = Router();
 
 const MAX_MANUAL_BYTES = 20 * 1024;
 
+// Normalleştirilmiş adın üst sınırları: şirket adı kısa; uzun "ad"lar istem
+// enjeksiyonu taşımaya elverişli ve gerçek bir şirketi temsil etmiyor.
+const MAX_KEY_CHARS = 80;
+const MAX_KEY_WORDS = 8;
+
 /** Addan önbellek kimliği; ad uygun değilse null. */
-function idFromName(name) {
+export function idFromName(name) {
     if (typeof name !== 'string' || !name.trim() || name.length > 300) return null;
     const key = companyKey(name);
+    if (!key || key.length > MAX_KEY_CHARS || key.split(' ').length > MAX_KEY_WORDS) return null;
     const id = docIdFor(key);
     return id ? { key, id } : null;
 }
@@ -52,16 +58,22 @@ router.post('/api/company-intel/resolve', aiLimiter, requireTenant(WRITER_ROLES)
         // 2) Ortak önbellek.
         const cacheRef = db.doc(PLATFORM_PATHS.companyIntel(ref.id));
         const cached = await cacheRef.get();
-        if (cached.exists && !force && isFresh(cached.data())) {
+        // `force` taze ve kaynaklı ortak kaydı EZMEZ: bir şirketin tek isteği
+        // tüm şirketlerin gördüğü kaydı değiştiremesin. Yeniden arama yalnız
+        // bayat ya da kaynaksız (withheld) kayıtta.
+        const forceAllowed = force && (!cached.exists || cached.data()?.withheld === true);
+        if (cached.exists && !forceAllowed && isFresh(cached.data())) {
             const c = cached.data();
             return res.json({ key: ref.key, source: 'cache', answer: c.answer, resolvedAt: c.resolvedAt });
         }
 
-        // 3) Canlı, kaynaklı arama — sorgu sunucuda, yalnız şirket adıyla.
-        const answer = await generateGrounded(buildCompanyQuery(req.body.name, sanitizeForPrompt), {
+        // 3) Canlı, kaynaklı arama — sorgu sunucuda ve ANAHTARDAN kurulur: aynı
+        // anahtarın istemi her zaman aynı, ham addaki (anahtara girmeyen, ör.
+        // başka alfabeden) ek metin modele ulaşıp ortak kaydı zehirleyemez.
+        const answer = await generateGrounded(buildCompanyQuery(ref.key, sanitizeForPrompt), {
             maxOutputTokens: 4096,
         });
-        const record = { key: ref.key, ...cacheRecordFrom(req.body.name, answer) };
+        const record = { key: ref.key, ...cacheRecordFrom(ref.key, answer) };
         // Kim sorguladı yazılmaz (yan kanal yok).
         await cacheRef.set(record);
         res.json({ key: ref.key, source: 'live', answer: record.answer, resolvedAt: record.resolvedAt });
