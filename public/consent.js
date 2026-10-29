@@ -1,5 +1,6 @@
-// Clyro sitelerinde ziyaret istatistiği onayı (clyrolabs.com, Hub, CX). Aynı dosya: apps/site/consent.js,
-// apps/web/public/consent.js ve CX-Inn'de artifacts/cx-platform/public/consent.js; birini değiştirirken öbürlerini de.
+// Clyro sitelerinde ziyaret istatistiği onayı (clyrolabs.com, Hub, CX, Talent). Aynı dosya: apps/site/consent.js,
+// apps/web/public/consent.js, CX-Inn'de artifacts/cx-platform/public/consent.js ve TalentFlow'da public/consent.js;
+// birini değiştirirken öbürlerini de.
 // Onay yoksa clyro.js hiç yüklenmez: ne betik isteği ne olay gider, tarayıcıya yalnız "hayır" tercihi yazılır.
 // Tercih bu alan adının localStorage'ında ("clyro-consent": granted | denied); alt alan adları ayrı sorar.
 // data-clyro-consent özniteliği olan her bağlantı ya da window.clyroConsent.open() şeridi yeniden açar.
@@ -17,25 +18,34 @@
   function get() { try { return localStorage.getItem(KEY); } catch (e) { return null; } }
   function set(v) { try { localStorage.setItem(KEY, v); } catch (e) { /* gizli pencere: yalnız bu sayfa için geçerli */ } }
 
+  function tag() { return document.querySelector('script[data-key="' + SITE_KEY + '"]'); }
+
+  // Son tercihi betiğe iletir. Betik henüz yükleniyorsa açılışta okuduğu data-consent değişir, yüklenince de bir
+  // kez daha uygulanır: "Kabul et"in hemen ardından gelen geri alma kaybolmasın.
+  function apply() {
+    var granted = get() === 'granted';
+    var s = tag();
+    if (s) s.setAttribute('data-consent', granted ? 'granted' : 'denied');
+    if (window.clyro && window.clyro.consent) window.clyro.consent(granted);
+  }
+
   function load() {
-    if (document.querySelector('script[data-key="' + SITE_KEY + '"]')) {
-      if (window.clyro && window.clyro.consent) window.clyro.consent(true);
-      return;
-    }
+    if (tag()) return apply();
     var s = document.createElement('script');
     s.src = SRC;
     s.defer = true;
     s.setAttribute('data-key', SITE_KEY);
     s.setAttribute('data-consent', 'granted');
+    s.addEventListener('load', apply);
     document.head.appendChild(s);
   }
 
   function choose(granted) {
     set(granted ? 'granted' : 'denied');
     close();
-    if (granted) load();
     // Geri alınınca betik tarayıcıda tuttuklarını (anonim kimlik, oturum) siler ve bir daha göndermez.
-    else if (window.clyro && window.clyro.consent) window.clyro.consent(false);
+    if (granted) load();
+    else apply();
   }
 
   function close() { if (bar) { bar.remove(); bar = null; } }
@@ -86,14 +96,26 @@
 
   window.clyroConsent = { open: open };
 
+  var started = false;
   function start() {
     // Başka bir sayfanın içine gömülüyken (ör. CX'in Zoho Desk kartı) ne sorulur ne takip edilir.
-    if (window.top !== window.self) return;
+    if (started || window.top !== window.self) return;
     for (var i = 0; i < skip.length; i++) if (location.pathname.indexOf(skip[i]) === 0) return;
+    started = true;
     var v = get();
     if (v === 'granted') load();
     else if (v !== 'denied') open();
   }
+  // Tek sayfa uygulamalarında atlanan bir yoldan (ör. /hub-giris) sayfa yenilenmeden çıkılır; karar o zaman verilir.
+  ['pushState', 'replaceState'].forEach(function (m) {
+    var orig = history[m];
+    history[m] = function () {
+      var r = orig.apply(this, arguments);
+      setTimeout(start, 0);
+      return r;
+    };
+  });
+  window.addEventListener('popstate', start);
   if (document.body) start();
   else document.addEventListener('DOMContentLoaded', start);
 })();
