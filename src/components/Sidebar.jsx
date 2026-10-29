@@ -177,6 +177,14 @@ export default function Sidebar({
                         <LogOut className="w-4 h-4" />
                         <span className="text-[13px] font-medium">Çıkış yap</span>
                     </button>
+                    {/* public/consent.js bu özniteliği dinler ve ziyaret istatistiği şeridini yeniden açar. */}
+                    <button
+                        type="button"
+                        data-clyro-consent=""
+                        className={`w-full h-8 items-center px-3 text-[12px] text-n500 hover:text-n900 ${collapsed ? 'flex lg:hidden' : 'flex'}`}
+                    >
+                        Gizlilik tercihleri
+                    </button>
                 </div>
 
                 {/* Desktop Collapse Toggle (mobile uses overlay click + X button) */}

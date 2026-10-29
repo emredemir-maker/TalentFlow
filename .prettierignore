@@ -8,6 +8,8 @@ node_modules
 
 # Generated / vendored
 public/pdf.worker.mjs
+# Clyro siteleriyle ortak dosya (Hub-Inn apps/site/consent.js); birebir aynı kalmalı
+public/consent.js
 attached_assets
 chrome-session
 functions/lib
